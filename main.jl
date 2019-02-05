@@ -505,10 +505,22 @@ function main(maxsteps::Int, newtoniter::Int, save2jld::Bool)
     @show maxsteps
     @show newtoniter
 
-    @time sol = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+    # read NEODyS delay observations (range)
+    del = readdlm("Apophis_NEODyS_DEL.dat")
+    #read NEODyS Doppler obs. (range-rate)
+    dop = readdlm("Apophis_NEODyS_DOP.dat")
+    # read NEODyS delay & Doppler
+    deldop = readdlm("Apophis_NEODyS.dat")
+
+    deldop_dates_j = Dates.datetime2julian.(  Dates.DateTime.( deldop[:,3].*"T".*deldop[:,4] )  )
+
+    tv_neodys_obs = union(t0, deldop_dates_j[8:end])
+
+    @time sol = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, tv_neodys_obs, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+    @show length(sol)
 
     if save2jld
-        vars = ["tv1", "xv1", "tvS1", "xvS1", "gvS1"] #names of variables
+        vars = ["xv1", "tvS1", "xvS1", "gvS1"] #names of variables
         #loop over variables
         println("Saving solution to .jld files")
         # recovered_sol = similar(sol)
@@ -520,7 +532,6 @@ function main(maxsteps::Int, newtoniter::Int, save2jld::Bool)
             save(filename, vars[i], sol[i])
 
             #read solution from files and assign recovered variable to recovered_sol_i
-            ex2 = Symbol(vars[i])
             recovered_sol_i = load(filename, vars[i])
 
             #check that solution was recovered succesfully
@@ -528,6 +539,29 @@ function main(maxsteps::Int, newtoniter::Int, save2jld::Bool)
         end
         println("Saved solution")
     end
+
+    # @time sol = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+
+    # if save2jld
+    #     vars = ["tv1", "xv1", "tvS1", "xvS1", "gvS1"] #names of variables
+    #     #loop over variables
+    #     println("Saving solution to .jld files")
+    #     # recovered_sol = similar(sol)
+    #     for i in eachindex(vars)
+    #         filename = string("Apophis_jt_", vars[i], ".jld")
+
+    #         #write solution to .jld files
+    #         println("Saving variable: ", vars[i])
+    #         save(filename, vars[i], sol[i])
+
+    #         #read solution from files and assign recovered variable to recovered_sol_i
+    #         recovered_sol_i = load(filename, vars[i])
+
+    #         #check that solution was recovered succesfully
+    #         @show recovered_sol_i == sol[i]
+    #     end
+    #     println("Saved solution")
+    # end
     nothing
 end
 
