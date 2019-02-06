@@ -62,9 +62,9 @@ uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
 [[DiffEqBase]]
 deps = ["Compat", "IteratorInterfaceExtensions", "LinearAlgebra", "RecipesBase", "RecursiveArrayTools", "Requires", "Roots", "SparseArrays", "StaticArrays", "Statistics", "SuiteSparse", "TableTraits", "Test", "TreeViews"]
-git-tree-sha1 = "c60ea94050751f09e3f86dc6182a4cccac9806b8"
+git-tree-sha1 = "f52b84dd3224bca7829f5d5d04560409d3f91b40"
 uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
-version = "4.32.0"
+version = "5.0.1"
 
 [[Distributed]]
 deps = ["LinearAlgebra", "Random", "Serialization", "Sockets"]
@@ -72,9 +72,9 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[Espresso]]
 deps = ["LinearAlgebra", "Statistics", "Test"]
-git-tree-sha1 = "89604e2ca1e664b6fca48c6658d713964e5512cb"
+git-tree-sha1 = "cde61b7c72023d15e2aaae8d4eb3e2c94f5bdb7b"
 uuid = "6912e4f1-e036-58b0-9138-08d1e6358ea9"
-version = "0.5.1"
+version = "0.6.0"
 
 [[FileIO]]
 deps = ["Pkg", "Random", "Test"]
@@ -273,9 +273,9 @@ version = "0.4.0"
 
 [[TaylorSeries]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Markdown", "SparseArrays", "Test"]
-git-tree-sha1 = "6a11171969e0da52179a4e5759e261ac0f45cc68"
+git-tree-sha1 = "7330c5a4e09e4b1b345b508184ec507d3b758a37"
 uuid = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
-version = "0.8.1"
+version = "0.9.0"
 
 [[Test]]
 deps = ["Distributed", "InteractiveUtils", "Logging", "Random"]
