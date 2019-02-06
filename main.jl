@@ -6,17 +6,17 @@ const newtoniter = 5
 const maxsteps = 10000
 
 #integrator warmup
-main(2, newtoniter, false)
-# main(2, newtoniter, true)
+main(2, newtoniter, output=false)
+# main(2, newtoniter)
 println("*** Finished warmup")
 
 #root-finding methods warmup (integrate until first root-finding event):
-main(100, newtoniter, true)
+main(100, newtoniter)
 println("*** Finished root-finding warmup")
 
-#main(300, newtoniter, true)
+#main(300, newtoniter)
 #println("*** Finished root-finding test: several roots")
 
 #Full jet transport integration until ~2038: about 8,000 steps
-# main(8000, newtoniter, true)
+# main(8000, newtoniter)
 # println("*** Finished full jet transport integration")

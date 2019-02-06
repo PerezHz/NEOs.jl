@@ -466,7 +466,7 @@ end
 g(t,x,dx) = (x[3N-2]-x[3ea-2])^2+(x[3N-1]-x[3ea-1])^2+(x[3N]-x[3ea])^2
 g2(t,x,dx) = (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x[6N-1]-x[3(N+ea)-1])+(x[3N]-x[3ea])*(x[6N]-x[3(N+ea)])
 
-function main(maxsteps::Int, newtoniter::Int, save2jld::Bool)
+function main(maxsteps::Int, newtoniter::Int; output::Bool=true)
     # check that methods have been defined
     @show methods(RNp1BP_pN_A_J234E_J2S_ng!)
     @show methods(TaylorIntegration.jetcoeffs!)
@@ -521,7 +521,7 @@ function main(maxsteps::Int, newtoniter::Int, save2jld::Bool)
     @time sol = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, tv_neodys_obs, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
     @show length(sol)
 
-    if save2jld
+    if output
         vars = ["xv1", "tvS1", "xvS1", "gvS1"] #names of variables
         #loop over variables
         println("Saving solution to .jld files")
@@ -544,7 +544,7 @@ function main(maxsteps::Int, newtoniter::Int, save2jld::Bool)
 
     # @time sol = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
 
-    # if save2jld
+    # if output
     #     vars = ["tv1", "xv1", "tvS1", "xvS1", "gvS1"] #names of variables
     #     #loop over variables
     #     println("Saving solution to .jld files")
