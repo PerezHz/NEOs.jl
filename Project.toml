@@ -1,3 +1,8 @@
+name = "Apophis"
+uuid = "b41c07a2-2abb-11e9-070a-c3c1b239e7df"
+authors = ["Jorge Pérez <jperez@icf.unam.mx>"]
+version = "0.1.0"
+
 [deps]
 JLD = "4138dd39-2aa7-5051-a626-17a0bb65d9c8"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
