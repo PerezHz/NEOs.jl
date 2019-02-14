@@ -1,1 +1,3 @@
 *.jld
+*.out
+notebooks/.ipynb_checkpoints
