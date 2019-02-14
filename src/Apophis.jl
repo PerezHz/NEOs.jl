@@ -1,6 +1,6 @@
 module Apophis
 
-export main
+export main, au
 
 include("jpl-de-430-431-earth-orientation-model.jl")
 
@@ -25,6 +25,9 @@ const Λ2 = [4.5685187392703475e-12, 0.0, 0.0, 1.9679542578489185e-12, 2.7428745
 
 const N = length(μ)
 # const j2_body_index=[su, ea]
+
+const au = 1.495978707E8 # astronomical unit value in km
+const yr = 365.25 # days in a Julian year
 
 @taylorize function RNp1BP_pN_A_J234E_J2S_ng!(t, q, dq)
     local S = eltype(q[1])
@@ -471,7 +474,6 @@ function main(maxsteps::Int, newtoniter::Int; output::Bool=true)
     @show methods(RNp1BP_pN_A_J234E_J2S_ng!)
     @show methods(TaylorIntegration.jetcoeffs!)
     #some constants
-    yr=365.25
     t0 = Dates.datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
 
     #initial condition as Vector{Float64}
