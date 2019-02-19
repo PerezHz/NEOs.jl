@@ -1,6 +1,6 @@
 module Apophis
 
-export main, au
+export main, au, t0, yr
 
 include("jpl-de-430-431-earth-orientation-model.jl")
 
@@ -18,16 +18,87 @@ const abstol = 1.0E-30
 const ea = 4 #Earth's index
 
 # vector of G*m values
-const μ = [0.0002959122082855911, 4.912248045036476e-11, 7.24345233264412e-10, 8.887692445125634e-10, 1.093189450742374e-11, 9.54954869555077e-11, 2.82534584083387e-7, 8.45970607324503e-8, 1.29202482578296e-8, 1.52435734788511e-8, 1.4004765625463623e-13, 0.0]
+const μ = [0.0002959122082855911, 4.912248045036476e-11, 7.24345233264412e-10,
+8.887692445125634e-10, 1.093189450742374e-11, 9.54954869555077e-11,
+2.82534584083387e-7, 8.45970607324503e-8, 1.29202482578296e-8,
+1.52435734788511e-8, 1.4004765625463623e-13, 0.0]
 
 # vector of J2*R^2 values
-const Λ2 = [4.5685187392703475e-12, 0.0, 0.0, 1.9679542578489185e-12, 2.7428745500623694e-14, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+const Λ2 = [4.5685187392703475e-12, 0.0, 0.0, 1.9679542578489185e-12,
+2.7428745500623694e-14, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 const N = length(μ)
-# const j2_body_index=[su, ea]
 
 const au = 1.495978707E8 # astronomical unit value in km
 const yr = 365.25 # days in a Julian year
+
+const t0 = Dates.datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
+
+function __init__()
+    @show length(methods(RNp1BP_pN_A_J234E_J2S_ng!))
+    @show length(methods(TaylorIntegration.jetcoeffs!))
+    @show methods(RNp1BP_pN_A_J234E_J2S_ng!)
+    @show t0 == 2454733.5
+end
+
+function initialcond(N)
+    # output from JPL Horizons
+
+    q0 = Array{Float64}(undef, 6N+1) #initial condition array
+
+    #sun
+    i = 1
+    q0[3i-2:3i]         .= [-0.001540802671596496, 0.00438889278161424, 0.001858638798427623]
+    q0[3(N+i)-2:3(N+i)] .= [0.3046385524098975, -0.2239262872848795, -0.1518487166013703]
+    #mercury
+    i = 2
+    q0[3i-2:3i]         .= [-0.2370720145769874, -0.627040738077614, -0.267324380799051]
+    q0[3(N+i)-2:3(N+i)] .= [1.001401996348207, 0.02359641338688291, 0.01018195925304371]
+    #venus
+    i = 3
+    q0[3i-2:3i]         .= [1.000367432977523, 0.02564117583042711, 0.01116491651187949]
+    q0[3(N+i)-2:3(N+i)] .= [-1.270960531462236, -0.8678508302720224, -0.3639208032155261]
+    #earth
+    i = 4
+    q0[3i-2:3i]         .= [2.077128040651103, -4.307585374501212, -1.896991978186166]
+    q0[3(N+i)-2:3(N+i)] .= [-8.903241825277506, 2.458572188095974, 1.398754563334379]
+    #moon
+    i = 5
+    q0[3i-2:3i]         .= [19.82869761020429, -2.880418477382511, -1.542003907582929]
+    q0[3(N+i)-2:3(N+i)] .= [23.97437761296793, -16.52272563943745, -7.359720948896527]
+    #mars
+    i = 6
+    q0[3i-2:3i]         .= [-1.208270526225632, 1.963641380708032, 1.170481449363465]
+    q0[3(N+i)-2:3(N+i)] .= [-0.9633018148154301, 0.5100291398744978, 0.1652803001584807]
+    #jupiter
+    i = 7
+    q0[3i-2:3i]         .= [-6.109751994756004e-6, -1.931572052779964e-6, -7.092564632948912e-7]
+    q0[3(N+i)-2:3(N+i)] .= [0.013061958045048, 0.0203012991458782, 0.009489733386707604]
+    #saturn
+    i = 8
+    q0[3i-2:3i]         .= [0.01898821199448838, -0.005631644544425267, -0.003735536566147577]
+    q0[3(N+i)-2:3(N+i)] .= [-0.0006391556078946668, 0.01572260216573083, 0.006817017673265036]
+    #uranus
+    i = 9
+    q0[3i-2:3i]         .= [-0.001195603426398212, 0.01552432630673204, 0.006676849606937177]
+    q0[3(N+i)-2:3(N+i)] .= [0.008879230398263355, -0.009029298818909943, -0.004381331767031147]
+    #neptune
+    i = 10
+    q0[3i-2:3i]         .= [0.006810526029641702, 0.003190231984051103, 0.001201585413837261]
+    q0[3(N+i)-2:3(N+i)] .= [-0.001977534413001538, -0.004960690616673099, -0.001963830282375063]
+    #ceres
+    i = 11
+    q0[3i-2:3i]         .= [0.0006086573593461934, 0.003390327455820016, 0.001476271782483529]
+    q0[3(N+i)-2:3(N+i)] .= [0.001869835257921788, 0.002353940265223347, 0.000916928221659154]
+    #apophis
+    i = 12
+    q0[3i-2:3i]         .= [-0.009348216591255532, -0.005863175034617146, -0.0008596609867992848]
+    q0[3(N+i)-2:3(N+i)] .= [-0.007118874645519014, -0.01206123416050721, -0.00466951380149129]
+
+    q0[6N+1] = 0.0 # A2 Yarkovsky coefficient
+
+    return q0
+end
 
 @taylorize function RNp1BP_pN_A_J234E_J2S_ng!(t, q, dq)
     local S = eltype(q[1])
@@ -402,7 +473,7 @@ const yr = 365.25 # days in a Julian year
                 F_J2_y[i,j] = (s21[i,j]+s22[i,j])+s23[i,j]
                 F_J2_z[i,j] = (s31[i,j]+s32[i,j])+s33[i,j]
 
-                # # add result to total acceleration on upon j-th body figure due to i-th point mass
+                # # add result to total acceleration upon j-th body figure due to i-th point mass
                 # @show "acc",j,"+μ",i,"Λ2",j
                 timp_004[i,j] = accX[j] + (μ[i]*F_J2_x[i,j])
                 accX[j] = timp_004[i,j]
@@ -469,104 +540,62 @@ end
 g(t,x,dx) = (x[3N-2]-x[3ea-2])^2+(x[3N-1]-x[3ea-1])^2+(x[3N]-x[3ea])^2
 g2(t,x,dx) = (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x[6N-1]-x[3(N+ea)-1])+(x[3N]-x[3ea])*(x[6N]-x[3(N+ea)])
 
-function main(maxsteps::Int, newtoniter::Int; output::Bool=true)
-    # check that methods have been defined
-    @show methods(RNp1BP_pN_A_J234E_J2S_ng!)
-    @show methods(TaylorIntegration.jetcoeffs!)
-    #some constants
-    t0 = Dates.datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
+function main(maxsteps::Int, newtoniter::Int, tspan::T; output::Bool=true,
+        radarobs::Bool=true) where {T<:Real}
 
-    #initial condition as Vector{Float64}
-    q0=[-0.001540802671596496, 0.00438889278161424, 0.001858638798427623, 0.3046385524098975, -0.2239262872848795, -0.1518487166013703, -0.2370720145769874, -0.627040738077614, -0.267324380799051, 1.001401996348207, 0.02359641338688291, 0.01018195925304371, 1.000367432977523, 0.02564117583042711, 0.01116491651187949, -1.270960531462236, -0.8678508302720224, -0.3639208032155261, 2.077128040651103, -4.307585374501212, -1.896991978186166, -8.903241825277506, 2.458572188095974, 1.398754563334379, 19.82869761020429, -2.880418477382511, -1.542003907582929, 23.97437761296793, -16.52272563943745, -7.359720948896527, -1.208270526225632, 1.963641380708032, 1.170481449363465, -0.9633018148154301, 0.5100291398744978, 0.1652803001584807, -6.109751994756004e-6, -1.931572052779964e-6, -7.092564632948912e-7, 0.013061958045048, 0.0203012991458782, 0.009489733386707604, 0.01898821199448838, -0.005631644544425267, -0.003735536566147577, -0.0006391556078946668, 0.01572260216573083, 0.006817017673265036, -0.001195603426398212, 0.01552432630673204, 0.006676849606937177, 0.008879230398263355, -0.009029298818909943, -0.004381331767031147, 0.006810526029641702, 0.003190231984051103, 0.001201585413837261, -0.001977534413001538, -0.004960690616673099, -0.001963830282375063, 0.0006086573593461934, 0.003390327455820016, 0.001476271782483529, 0.001869835257921788, 0.002353940265223347, 0.000916928221659154, -0.009348216591255532, -0.005863175034617146, -0.0008596609867992848, -0.007118874645519014, -0.01206123416050721, -0.00466951380149129, 0.0]
+    # get initial conditions
+    q0 = initialcond(length(μ))
 
-    println("length(q0)=", length(q0))
-
-    @show N;
-
-    @show t0 == 2454733.5
-
-    #initial condition as Vector{Taylor1{Float64}} for jet transport
+    #construct jet transport initial condition as Vector{Taylor1{Float64}} from `q0`
     q0T1 = Taylor1.(q0,varorder)
     q0T1[1:end-1] = Taylor1.(q0[1:end-1],varorder)
     q0T1[end] = Taylor1([q0[end],1e-14],varorder) #note the 1e-14!!!
 
-    @show methods(RNp1BP_pN_A_J234E_J2S_ng!)
+    @show tmax = t0+tspan*yr #final time of integration
 
-    @show nyears = (  Dates.datetime2julian( DateTime(2032,9,24) )-t0  )/yr
+    # @show q0T1() == q0
+    # @show map(x->x[1], q0T1[1:end-1]) == zeros(72)
+    # @show q0T1[end][0] == 0.0
+    # @show q0T1[end][1] == 1.0e-14
 
-    @show tmax = t0+nyears*yr #30.7871321013yr #final time of integration
+    # do integration
+    if radarobs
+        # read NEODyS delay observations (range)
+        del = readdlm("Apophis_NEODyS_DEL.dat")
+        #read NEODyS Doppler obs. (range-rate)
+        dop = readdlm("Apophis_NEODyS_DOP.dat")
+        # read NEODyS delay & Doppler
+        deldop = readdlm("Apophis_NEODyS.dat")
+        deldop_dates_j = Dates.datetime2julian.(  Dates.DateTime.( deldop[:,3].*"T".*deldop[:,4] )  )
+        # construct time range variable with observation times
+        tv_neodys_obs = union(t0, deldop_dates_j[8:end])
 
-    @show (tmax-t0)/yr, Dates.julian2datetime(t0), Dates.julian2datetime(tmax)
-
-    @show q0T1() == q0
-
-    @show map(x->x[1], q0T1[1:end-1]) == zeros(72)
-
-    @show q0T1[end][0] == 0.0
-
-    @show q0T1[end][1] == 1.0e-14
-
-    @show maxsteps
-    @show newtoniter
-
-    # read NEODyS delay observations (range)
-    del = readdlm("Apophis_NEODyS_DEL.dat")
-    #read NEODyS Doppler obs. (range-rate)
-    dop = readdlm("Apophis_NEODyS_DOP.dat")
-    # read NEODyS delay & Doppler
-    deldop = readdlm("Apophis_NEODyS.dat")
-
-    deldop_dates_j = Dates.datetime2julian.(  Dates.DateTime.( deldop[:,3].*"T".*deldop[:,4] )  )
-
-    tv_neodys_obs = union(t0, deldop_dates_j[8:end])
-
-    @time sol = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, tv_neodys_obs, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
-    @show length(sol)
+        @time sol_objs = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, tv_neodys_obs, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+        tup_names = (:xv1, :tvS1, :xvS1, :gvS1)
+        sol = NamedTuple{tup_names}(sol_objs)
+    else
+        @time sol_objs = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+        tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
+        sol = NamedTuple{tup_names}(sol_objs)
+    end
 
     if output
-        vars = ["xv1", "tvS1", "xvS1", "gvS1"] #names of variables
-        #loop over variables
         println("Saving solution to .jld files")
-        # recovered_sol = similar(sol)
-        for i in eachindex(vars)
-            filename = string("Apophis_jt_", vars[i], ".jld")
-
+        #loop over variables
+        for ind in eachindex(sol)
+            varname = string(ind)
+            filename = string("Apophis_jt_", varname, ".jld")
             #write solution to .jld files
-            println("Saving variable: ", vars[i])
-            save(filename, vars[i], sol[i])
-
+            println("Saving variable: ", varname)
+            save(filename, varname, sol[ind])
             #read solution from files and assign recovered variable to recovered_sol_i
-            recovered_sol_i = load(filename, vars[i])
-
+            recovered_sol_i = load(filename, varname)
             #check that solution was recovered succesfully
-            @show recovered_sol_i == sol[i]
+            @show recovered_sol_i == sol[ind]
         end
         println("Saved solution")
     end
-
-    # @time sol = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
-
-    # if output
-    #     vars = ["tv1", "xv1", "tvS1", "xvS1", "gvS1"] #names of variables
-    #     #loop over variables
-    #     println("Saving solution to .jld files")
-    #     # recovered_sol = similar(sol)
-    #     for i in eachindex(vars)
-    #         filename = string("Apophis_jt_", vars[i], ".jld")
-
-    #         #write solution to .jld files
-    #         println("Saving variable: ", vars[i])
-    #         save(filename, vars[i], sol[i])
-
-    #         #read solution from files and assign recovered variable to recovered_sol_i
-    #         recovered_sol_i = load(filename, vars[i])
-
-    #         #check that solution was recovered succesfully
-    #         @show recovered_sol_i == sol[i]
-    #     end
-    #     println("Saved solution")
-    # end
-    nothing
+    return nothing
 end
 
 end
