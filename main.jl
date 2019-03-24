@@ -1,5 +1,6 @@
-include("src/Apophis.jl")
-using .Apophis
+import Pkg
+Pkg.activate("./")
+using Apophis
 
 #script parameters (TODO: use ArgParse.jl instead)
 const newtoniter = 5
