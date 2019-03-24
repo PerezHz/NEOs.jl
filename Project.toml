@@ -4,6 +4,10 @@ authors = ["Jorge Pérez <PerezHz@users.noreply.github.com>", "Luis Benet <lbene
 version = "0.1.0"
 
 [deps]
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 JLD = "4138dd39-2aa7-5051-a626-17a0bb65d9c8"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 TaylorIntegration = "92b13dbe-c966-51a2-8445-caca9f8a7d42"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
