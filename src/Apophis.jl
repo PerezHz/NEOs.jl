@@ -571,7 +571,7 @@ function main(maxsteps::Int, newtoniter::Int, tspan::T; output::Bool=true,
     # do integration
     if radarobs
         # read Apophis radar astrometry from JPL date
-        jpl_radar = readdlm("../Apophis_JPL_data.dat", '\t')
+        jpl_radar = readdlm("Apophis_JPL_data.dat", '\t')
         # JPL date/time format
         df_jpl = "y-m-d H:M:S"
         #construct vector of observation times (UTC) > t0
@@ -594,6 +594,15 @@ function main(maxsteps::Int, newtoniter::Int, tspan::T; output::Bool=true,
 
     if output
         println("Saving solution to .jld files")
+        #first, deal with `tv_jpl_integ`
+        filename = string("Apophis_jt_", "tv_jpl_integ", ".jld")
+        #write solution to .jld files
+        println("Saving variable: tv_jpl_integ")
+        save(filename, "tv_jpl_integ", tv_jpl_integ)
+        #read solution from files and assign recovered variable to recovered_sol_i
+        recovered_tv_jpl_integ = load(filename, "tv_jpl_integ")
+        #check that solution was recovered succesfully
+        @show recovered_tv_jpl_integ == tv_jpl_integ
         #loop over variables
         for ind in eachindex(sol)
             varname = string(ind)
