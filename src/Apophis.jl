@@ -1,14 +1,18 @@
 module Apophis
 
-export main, au, t0, yr
+__precompile__(false)
 
-include("jpl-de-430-431-earth-orientation-model.jl")
+export main, au, t0, yr, observer_position, apophisdofs, sundofs, ssdofs,
+    c_au_per_day, μ
 
 using Reexport
-@reexport using TaylorIntegration, LinearAlgebra
+@reexport using TaylorIntegration, LinearAlgebra # so that JLD may interpret previously saved Taylor1 objects saved in .jld files
 using DelimitedFiles
 using Dates, Test
 using JLD
+
+include("jpl-de-430-431-earth-orientation-model.jl")
+include("topocentric.jl")
 
 # integration parameters
 const varorder = 10
@@ -31,8 +35,13 @@ const N = length(μ)
 
 const au = 1.495978707E8 # astronomical unit value in km
 const yr = 365.25 # days in a Julian year
+const c_au_per_day = 86400(299792.548/au) # speed of light in au per day
 
 const t0 = Dates.datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
+
+const apophisdofs = union(34:36, 70:72)
+const sundofs = union(1:3, 37:39)
+const ssdofs = setdiff(1:72, apophisdofs)
 
 function __init__()
     @show length(methods(RNp1BP_pN_A_J234E_J2S_ng!))
