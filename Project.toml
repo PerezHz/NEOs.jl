@@ -4,6 +4,7 @@ authors = ["Jorge Pérez <PerezHz@users.noreply.github.com>", "Luis Benet <lbene
 version = "0.1.0"
 
 [deps]
+AstroTime = "c61b5328-d09d-5e37-a9a8-0eb41c39009c"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 JLD = "4138dd39-2aa7-5051-a626-17a0bb65d9c8"
