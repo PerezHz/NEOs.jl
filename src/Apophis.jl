@@ -10,6 +10,7 @@ using Reexport
 using DelimitedFiles
 using Dates, Test
 using JLD
+using AstroTime
 
 include("jpl-de-430-431-earth-orientation-model.jl")
 include("topocentric.jl")
@@ -569,17 +570,20 @@ function main(maxsteps::Int, newtoniter::Int, tspan::T; output::Bool=true,
 
     # do integration
     if radarobs
-        # read NEODyS delay observations (range)
-        del = readdlm("Apophis_NEODyS_DEL.dat")
-        #read NEODyS Doppler obs. (range-rate)
-        dop = readdlm("Apophis_NEODyS_DOP.dat")
-        # read NEODyS delay & Doppler
-        deldop = readdlm("Apophis_NEODyS.dat")
-        deldop_dates_j = Dates.datetime2julian.(  Dates.DateTime.( deldop[:,3].*"T".*deldop[:,4] )  )
-        # construct time range variable with observation times
-        tv_neodys_obs = union(t0, deldop_dates_j[8:end])
+        # read Apophis radar astrometry from JPL date
+        jpl_radar = readdlm("../Apophis_JPL_data.dat", '\t')
+        # JPL date/time format
+        df_jpl = "y-m-d H:M:S"
+        #construct vector of observation times (UTC) > t0
+        tv_jpl_utc = UTCEpoch.(DateTime.(jpl_radar[:,2], df_jpl)[8:end])
+        # convert to TDB
+        tv_jpl_tdb = TDBEpoch.(tv_jpl_utc)
+        # date/time to Julian date
+        tv_jpl_tdb_julian = julian.(tv_jpl_tdb)
+        # construct time range variable with t0 and observation times > t0, removing repeated values
+        tv_jpl_integ = union(t0, map(x->x.Δt, tv_jpl_tdb_julian))
 
-        @time sol_objs = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, tv_neodys_obs, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+        @time sol_objs = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, tv_jpl_integ, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
         tup_names = (:xv1, :tvS1, :xvS1, :gvS1)
         sol = NamedTuple{tup_names}(sol_objs)
     else
