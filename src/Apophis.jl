@@ -614,10 +614,10 @@ function main(maxsteps::Int, newtoniter::Int, tspan::T; output::Bool=true,
             end
         end
         #check that tv_jpl_integ was recovered succesfully
+        println("Checking that all variables were saved correctly...")
         recovered_tv_jpl_integ = load(filename, "tv_jpl_integ")
         @show recovered_tv_jpl_integ == tv_jpl_integ
         #loop over variables
-        println("Checking that all variables were saved correctly...")
         for ind in eachindex(sol)
             varname = string(ind)
             #read varname from files and assign recovered variable to recovered_sol_i
