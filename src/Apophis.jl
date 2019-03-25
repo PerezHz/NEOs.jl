@@ -582,6 +582,7 @@ function main(maxsteps::Int, newtoniter::Int, tspan::T; output::Bool=true,
         tv_jpl_tdb_julian = julian.(tv_jpl_tdb)
         # construct time range variable with t0 and observation times > t0, removing repeated values
         tv_jpl_integ = union(t0, map(x->x.Δt, tv_jpl_tdb_julian))
+        @show tv_jpl_integ
 
         @time sol_objs = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, tv_jpl_integ, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
         tup_names = (:xv1, :tvS1, :xvS1, :gvS1)
@@ -598,7 +599,12 @@ function main(maxsteps::Int, newtoniter::Int, tspan::T; output::Bool=true,
         filename = string("Apophis_jt_", "tv_jpl_integ", ".jld")
         #write solution to .jld files
         println("Saving variable: tv_jpl_integ")
-        save(filename, "tv_jpl_integ", tv_jpl_integ)
+        jldopen(filename, "w") do file
+            # addrequire(file, TaylorIntegration)
+            # addrequire(file, LinearAlgebra)
+            write(file, "tv_jpl_integ", tv_jpl_integ)
+        end
+        # save(filename, "tv_jpl_integ", tv_jpl_integ)
         #read solution from files and assign recovered variable to recovered_sol_i
         recovered_tv_jpl_integ = load(filename, "tv_jpl_integ")
         #check that solution was recovered succesfully
@@ -609,7 +615,12 @@ function main(maxsteps::Int, newtoniter::Int, tspan::T; output::Bool=true,
             filename = string("Apophis_jt_", varname, ".jld")
             #write solution to .jld files
             println("Saving variable: ", varname)
-            save(filename, varname, sol[ind])
+            jldopen(filename, "w") do file
+                # addrequire(file, TaylorIntegration)
+                # addrequire(file, LinearAlgebra)
+                write(file, varname, sol[ind])
+            end
+            # save(filename, varname, sol[ind])
             #read solution from files and assign recovered variable to recovered_sol_i
             recovered_sol_i = load(filename, varname)
             #check that solution was recovered succesfully
