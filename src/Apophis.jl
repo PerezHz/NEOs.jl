@@ -595,37 +595,34 @@ function main(maxsteps::Int, newtoniter::Int, tspan::T; output::Bool=true,
         sol = NamedTuple{tup_names}(sol_objs)
     end
 
+    #write solution to .jld files
     if output
         println("Saving solution to .jld files")
         #first, deal with `tv_jpl_integ`
-        filename = string("Apophis_jt_", "tv_jpl_integ", ".jld")
-        #write solution to .jld files
-        println("Saving variable: tv_jpl_integ")
+        # filename = string("Apophis_jt_", "tv_jpl_integ", ".jld")
+        filename = string("Apophis_jt.jld")
         jldopen(filename, "w") do file
-            # addrequire(file, TaylorIntegration)
-            # addrequire(file, LinearAlgebra)
+            println("Saving variable: tv_jpl_integ")
             write(file, "tv_jpl_integ", tv_jpl_integ)
+            #loop over variables
+            for ind in eachindex(sol)
+                varname = string(ind)
+                # filename = string("Apophis_jt_", varname, ".jld")
+                println("Saving variable: ", varname)
+                write(file, varname, sol[ind])
+                # save(filename, varname, sol[ind])
+            end
         end
-        # save(filename, "tv_jpl_integ", tv_jpl_integ)
-        #read solution from files and assign recovered variable to recovered_sol_i
+        #check that tv_jpl_integ was recovered succesfully
         recovered_tv_jpl_integ = load(filename, "tv_jpl_integ")
-        #check that solution was recovered succesfully
         @show recovered_tv_jpl_integ == tv_jpl_integ
         #loop over variables
+        println("Checking that all variables were saved correctly...")
         for ind in eachindex(sol)
             varname = string(ind)
-            filename = string("Apophis_jt_", varname, ".jld")
-            #write solution to .jld files
-            println("Saving variable: ", varname)
-            jldopen(filename, "w") do file
-                # addrequire(file, TaylorIntegration)
-                # addrequire(file, LinearAlgebra)
-                write(file, varname, sol[ind])
-            end
-            # save(filename, varname, sol[ind])
-            #read solution from files and assign recovered variable to recovered_sol_i
+            #read varname from files and assign recovered variable to recovered_sol_i
             recovered_sol_i = load(filename, varname)
-            #check that solution was recovered succesfully
+            #check that varname was recovered succesfully
             @show recovered_sol_i == sol[ind]
         end
         println("Saved solution")
