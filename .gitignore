@@ -1,4 +1,5 @@
 *.jld
 *.out
+*.err
 notebooks/.ipynb_checkpoints
 jpleph/
