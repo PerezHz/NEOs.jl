@@ -134,34 +134,31 @@ function pole_lat(t)
     return atan(  pole_frame_t[3]/sqrt(pole_frame_t[1]^2+pole_frame_t[2]^2)  )
 end
 
+# rotation from inertial frame to frame with pole at right ascension α and declination δ
 function pole_rotation(α::T, δ::T) where {T <: Number}
-
-    # m11 = cos(α/2)^2-cos(2δ)*(sin(α/2)^2)
-    # m22 = cos(α/2)^2+cos(2δ)*(sin(α/2)^2)
-    # m33 = cos(α)
-    #
-    # m12 = -2cos(δ)*sin(δ)*(sin(α/2)^2)
-    # m13 = cos(δ)*sin(α)
-    # m23 = sin(α)*sin(δ)
-    #
-    # m21 = m12
-    # m31 = -m13
-    # m32 = -m23
-
+    # diagonal terms
     m11 = (cos(α)^2)*cos(δ)+sin(α)^2
     m22 = (cos(α)^2)+cos(δ)*(sin(α)^2)
     m33 = cos(δ)
 
+    # off-diagonal terms
     m12 = -2cos(α)*sin(α)*(sin(δ/2)^2)
-    m13 = cos(α)*sin(δ)
-    m23 = sin(α)*sin(δ)
-
     m21 = m12
-    m31 = -m13
-    m32 = -m23
+
+    m31 = cos(α)*sin(δ)
+    m32 = sin(α)*sin(δ)
+
+    m13 = -m31
+    m23 = -m32
 
     return [m11 m12 m13; m21 m22 m23; m31 m32 m33]
+end
 
+# rotation matrix from inertial frame to Earth pole at time t since J2000.0
+function earth_pole_rotation(t)
+    α_ep = pole_long(t) # Earth pole at time t since J2000.0
+    δ_ep = pole_lat(t) # Earth pole at time t since J2000.0
+    return pole_rotation(α_ep, π/2-δ_ep)
 end
 
 # The following was taken from "Report of the IAU/IAG Working Group", Seidelmann et. al, 2006
