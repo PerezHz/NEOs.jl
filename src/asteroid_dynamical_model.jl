@@ -117,14 +117,11 @@
     accZ = Array{Taylor1{S}}(undef, N)
 
     # rotations to and from Earth and Sun poles
-    local dsj2k = t-J2000 # J2000.0 = 2.451545e6
-    local αe = pole_long(dsj2k)
-    local δe = (1.5707963267948966-pole_lat(dsj2k))
     local αs = deg2rad(268.13+0t)
     local δs = deg2rad(63.87+0t)
     local M_ = Array{Taylor1{S}}(undef, 3, 3, N)
     local W_ = Array{Taylor1{S}}(undef, 3, 3, N)
-    local M_[:,:,ea] = pole_rotation( αe, δe )
+    local M_[:,:,ea] = earth_pole_rotation(t-J2000) # J2000.0 = 2.451545e6
     local W_[:,:,ea] = inv(M_[:, :, ea])
     local M_[:,:,su] = pole_rotation( αs, δs )
     local W_[:,:,su] = inv(M_[:, :, su])
