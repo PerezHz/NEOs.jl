@@ -4,7 +4,7 @@ __precompile__(false)
 
 export main, au, t0, yr, observer_position, apophisdofs, sundofs, earthdofs,
     ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler,
-    delay_doppler_jpleph
+    delay_doppler_jpleph, mas2rad
 
 using Reexport
 @reexport using TaylorIntegration, LinearAlgebra # so that JLD may interpret previously saved Taylor1 objects saved in .jld files

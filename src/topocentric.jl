@@ -40,7 +40,7 @@ function observer_position(station_code, t_utc::T) where {T<:Number}
 end
 
 # conversion of micro-arcseconds to radians
-mas2rad(x) = (5/18)*deg2rad(x) # 5/18 = 1000/3600
+mas2rad(x) = deg2rad(x/3.6e6) # mas/1000 -> arcsec; arcsec/3600 -> deg; deg2rad(deg) -> rad
 
 # Celestial-to-terrestrial rotation matrix (including polar motion)
 # Reproduction of Section 5.3 of SOFA Tools for Earth Attitude
@@ -55,104 +55,53 @@ function sofa_c2t_rotation(t_utc::Taylor1{T}) where {T<:Real}
     t0_utc_jul = julian(t0_utc)
 
     # Polar motion (arcsec->radians)
-    xp_arcsec, yp_arcsec = polarmotion(t0_utc_jul.Δt)
+    xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t0_utc_jul.Δt)
     xp = deg2rad(xp_arcsec/3600)
     yp = deg2rad(yp_arcsec/3600)
 
-    # # UT1-UTC (s)
-    # dut1 = getΔUT1(t0_utc_jul.Δt)
+    # UT1-UTC (s)
+    dut1 = EarthOrientation.getΔUT1(t0_utc_jul.Δt) # seconds
 
     # CIP offsets wrt IAU 2000A (mas->radians)
-    dx00_mas, dy00_mas = precession_nutation00(t0_utc_jul.Δt)
-    dx00 = mas2rad(dx00_mas) # 0.1725 * DMAS2R;
-    dy00 = mas2rad(dy00_mas) # -0.2650 * DMAS2R;
+    dx00_mas, dy00_mas = EarthOrientation.precession_nutation00(t0_utc_jul.Δt)
+    dx00 = mas2rad(dx00_mas)
+    dy00 = mas2rad(dy00_mas)
 
-    # TT (MJD)
-    # t0_tt = TTEpoch(t0_utc)
-    djmjd0, tt = julian_twopart(TT, t0_utc)
+    # TT
+    t0_tt = TTEpoch(t0_utc)
+    t0_tt_jd1, t0_tt_jd2 = julian_twopart(t0_tt)
 
     # UT1
     t0_ut1 = UT1Epoch(t0_utc)
+    t0_ut1_jd1, t0_ut1_jd2 = julian_twopart(t0_ut1)
 
     # CIP and CIO, IAU 2000A
-    x, y, s = iauXys00a( djmjd0.Δt, tt.Δt )
+    x, y, s = iauXys00a( t0_tt_jd1.Δt, t0_tt_jd2.Δt )
 
     # Add CIP corrections
-    #x += dx00
-    #y += dy00
+    x += dx00
+    y += dy00
 
     # GCRS to CIRS matrix
     rc2i = iauC2ixys( x, y, s)
 
     # Earth rotation angle
-    t0_ut1_jd1, t0_ut1_jd2 = julian_twopart(t0_ut1)
     era = iauEra00( t0_ut1_jd1.Δt, t0_ut1_jd2.Δt ) #rad
-    eraT1 = era + ω*Taylor1(t_utc.order)
+    eraT1 = era + ω*Taylor1(t_utc.order) #rad/day
 
     # Form celestial-terrestrial matrix (no polar motion yet)
     rc2ti = iauCr(rc2i)
-    Rz_eraT1 = [cos(eraT1) sin(eraT1) zero(eraT1); -sin(eraT1) cos(eraT1) zero(eraT1); zero(eraT1) zero(eraT1) one(eraT1)]
+    Rz_eraT1 = [cos(eraT1) sin(eraT1) zero(eraT1);
+        -sin(eraT1) cos(eraT1) zero(eraT1);
+        zero(eraT1) zero(eraT1) one(eraT1)
+    ]
     rc2tiT1 = Rz_eraT1*rc2ti
 
     # Polar motion matrix (TIRS->ITRS, IERS 2003)
-    sp = iauSp00( djmjd0.Δt, tt.Δt )
+    sp = iauSp00( t0_tt_jd1.Δt, t0_tt_jd2.Δt )
     rpom = iauPom00( xp, yp, sp)
 
     # Form celestial-terrestrial matrix (including polar motion)
     rc2itT1 = rpom*rc2tiT1
     return rc2itT1
-end
-
-function sofa_c2t_rotation(t_utc::T) where {T<:Real}
-    # UTC
-    t0_utc = UTCEpoch(t_utc, origin=:julian)
-    t0_utc_jul = julian(t0_utc)
-
-    # Polar motion (arcsec->radians)
-    xp_arcsec, yp_arcsec = polarmotion(t0_utc_jul.Δt)
-    xp = deg2rad(xp_arcsec/3600)
-    yp = deg2rad(yp_arcsec/3600)
-
-    # # UT1-UTC (s)
-    # dut1 = getΔUT1(t0_utc_jul.Δt)
-
-    # CIP offsets wrt IAU 2000A (mas->radians)
-    dx00_mas, dy00_mas = precession_nutation00(t0_utc_jul.Δt)
-    dx00 = mas2rad(dx00_mas) # 0.1725 * DMAS2R;
-    dy00 = mas2rad(dy00_mas) # -0.2650 * DMAS2R;
-
-    # TT (MJD)
-    # t0_tt = TTEpoch(t0_utc)
-    djmjd0, tt = julian_twopart(TT, t0_utc)
-
-    # UT1
-    t0_ut1 = UT1Epoch(t0_utc)
-
-    # CIP and CIO, IAU 2000A
-    #x, y, s_rad = iauXys00a( djmjd0.Δt, tt.Δt )
-    #s = rad2deg(s_rad)*3600 #arcsec
-    x, y, s = iauXys00a( djmjd0.Δt, tt.Δt )
-
-    # Add CIP corrections
-    #x += dx00
-    #y += dy00
-
-    # GCRS to CIRS matrix
-    rc2i = iauC2ixys( x, y, s)
-
-    # Earth rotation angle
-    t0_ut1_jd1, t0_ut1_jd2 = julian_twopart(t0_ut1)
-    era = iauEra00( t0_ut1_jd1.Δt, t0_ut1_jd2.Δt ) #rad
-
-    # Form celestial-terrestrial matrix (no polar motion yet)
-    rc2ti = iauCr(rc2i)
-    rc2ti = iauRz( era, rc2ti )
-
-    # Polar motion matrix (TIRS->ITRS, IERS 2003)
-    sp = iauSp00( djmjd0.Δt, tt.Δt )
-    rpom = iauPom00( xp, yp, sp)
-
-    # Form celestial-terrestrial matrix (including polar motion)
-    rc2it = iauRxr( rpom, rc2ti )
-    return rc2it
 end

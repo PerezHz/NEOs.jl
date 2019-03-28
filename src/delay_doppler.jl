@@ -174,7 +174,7 @@ function delay_doppler(x, station_code, t, f_T, niter::Int=10)
     return (1e6*86400)*(total_time_delay+Δτ_rel), f_D # total signal delay (μs) and Doppler shift (Hz)
 end
 
-const eph = Ephem(["jpleph/a99942.bsp", "jpleph/de430.bsp"])
+const eph = Ephem(["jpleph/a99942.bsp", "jpleph/de430_1850-2150.bsp", "jpleph/TTmTDB.de430.19feb2015.bsp"])
 prefetch(eph)
 
 apophis_pv(t) = compute(eph, t, 0.0, 2099942, 12, unitKM+unitDay,1)/au
