@@ -3,14 +3,15 @@ module Apophis
 __precompile__(false)
 
 export main, au, t0, yr, observer_position, apophisdofs, sundofs, earthdofs,
-    ssdofs, c_au_per_day, μ
+    ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler,
+    delay_doppler_jpleph
 
 using Reexport
 @reexport using TaylorIntegration, LinearAlgebra # so that JLD may interpret previously saved Taylor1 objects saved in .jld files
 using DelimitedFiles
 using Dates, Test
 using JLD
-using AstroTime, EarthOrientation, SOFA
+using AstroTime, EarthOrientation, SOFA, CALCEPH
 
 # integration parameters
 const varorder = 10
@@ -39,7 +40,7 @@ const t0 = Dates.datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of in
 
 const apophisdofs = union(34:36, 70:72)
 const sundofs = union(1:3, 37:39)
-const earthdofs = union(10:12, 46:48)
+const earthdofs = union(3ea-2:3ea, 3(N+ea)-2:3(N+ea))
 const ssdofs = setdiff(1:72, apophisdofs)
 
 const J2000 = 2.451545e6
@@ -58,10 +59,15 @@ include("jpl-de-430-431-earth-orientation-model.jl")
 include("topocentric.jl")
 include("asteroid_dynamical_model.jl")
 include("initial_conditions.jl")
+include("delay_doppler.jl")
 
-#root-finding functions
+#root-finding functions (simplified versions of range_ae, radvel_ae)
 g(t,x,dx) = (x[3N-2]-x[3ea-2])^2+(x[3N-1]-x[3ea-1])^2+(x[3N]-x[3ea])^2
 g2(t,x,dx) = (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x[6N-1]-x[3(N+ea)-1])+(x[3N]-x[3ea])*(x[6N]-x[3(N+ea)])
+
+# Apophis instantaneous geocentric range, radial velocity
+range_ae(x) = sqrt( (x[3N-2]-x[3ea-2])^2+(x[3N-1]-x[3ea-1])^2+(x[3N]-x[3ea])^2 )
+radvel_ae(x) = ( (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x[6N-1]-x[3(N+ea)-1])+(x[3N]-x[3ea])*(x[6N]-x[3(N+ea)]) )/range_ae(x)
 
 function main(maxsteps::Int, newtoniter::Int, tspan::T; output::Bool=true,
         radarobs::Bool=true) where {T<:Real}

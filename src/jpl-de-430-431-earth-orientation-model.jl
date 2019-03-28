@@ -1,5 +1,6 @@
 # JPL-DE-430/431 model for the orientation of the Earth
 
+# From JPL DE430 documentation (Folkner et al., 2014):
 # Only the long-term change of the Earth's orientation is modeled in the ephemeris
 # integration. The Earth orientation model used for the DE 430 and 431 integration
 # is based on the International Astronomical Union (IAU) 1976 precession model\* with
