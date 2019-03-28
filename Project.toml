@@ -5,10 +5,13 @@ version = "0.1.0"
 
 [deps]
 AstroTime = "c61b5328-d09d-5e37-a9a8-0eb41c39009c"
+CALCEPH = "1537fe66-4725-5aba-80f4-3a74792cecc1"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+EarthOrientation = "732a3c5d-d6c0-58bc-adb1-1b51709a25e2"
 JLD = "4138dd39-2aa7-5051-a626-17a0bb65d9c8"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+SOFA = "ad3d3fd0-b5f2-51ee-b274-8cdbe62317e2"
 TaylorIntegration = "92b13dbe-c966-51a2-8445-caca9f8a7d42"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

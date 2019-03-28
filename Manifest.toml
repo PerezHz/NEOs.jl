@@ -39,6 +39,12 @@ git-tree-sha1 = "5d55b9486590fdda5905c275bb21ce1f0754020f"
 uuid = "e1450e63-4bb3-523b-b2a4-4ffa8c0fd77d"
 version = "1.0.0"
 
+[[CALCEPH]]
+deps = ["BinDeps", "BinaryProvider", "Libdl", "Test"]
+git-tree-sha1 = "6815a00ed043849b01fbc9dc9d34e7026cdb4795"
+uuid = "1537fe66-4725-5aba-80f4-3a74792cecc1"
+version = "1.0.1"
+
 [[CMake]]
 deps = ["BinDeps", "Libdl", "Test"]
 git-tree-sha1 = "6e39bef3cbb8321e8a464b18a5c20d7cef813938"
@@ -292,6 +298,12 @@ version = "0.7.4"
 
 [[SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+
+[[SOFA]]
+deps = ["BinDeps", "Libdl", "Test"]
+git-tree-sha1 = "4995dd70022b15a643bbfa96f4c7b110a3ab9f3f"
+uuid = "ad3d3fd0-b5f2-51ee-b274-8cdbe62317e2"
+version = "0.1.1"
 
 [[Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
