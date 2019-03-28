@@ -2,15 +2,15 @@ module Apophis
 
 __precompile__(false)
 
-export main, au, t0, yr, observer_position, apophisdofs, sundofs, ssdofs,
-    c_au_per_day, μ
+export main, au, t0, yr, observer_position, apophisdofs, sundofs, earthdofs,
+    ssdofs, c_au_per_day, μ
 
 using Reexport
 @reexport using TaylorIntegration, LinearAlgebra # so that JLD may interpret previously saved Taylor1 objects saved in .jld files
 using DelimitedFiles
 using Dates, Test
 using JLD
-using AstroTime
+using AstroTime, EarthOrientation, SOFA
 
 # integration parameters
 const varorder = 10
@@ -39,9 +39,13 @@ const t0 = Dates.datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of in
 
 const apophisdofs = union(34:36, 70:72)
 const sundofs = union(1:3, 37:39)
+const earthdofs = union(10:12, 46:48)
 const ssdofs = setdiff(1:72, apophisdofs)
 
 const J2000 = 2.451545e6
+
+# standard value of nominal mean angular velocity of Earth (rad/day), ESAA 2014 Sec 7.4.3.3 p. 296
+const ω = 86400*7.292115e-5
 
 function __init__()
     @show length(methods(RNp1BP_pN_A_J234E_J2S_ng!))
