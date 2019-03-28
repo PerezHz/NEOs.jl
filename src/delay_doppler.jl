@@ -169,7 +169,7 @@ function delay_doppler(x, station_code, t, f_T, niter::Int=10)
     Δτ_rel_U = (1+1)*μ[1]*log( (e_U+p_U+q_U)/(e_U+p_U-q_U) )/(c_au_per_day^3)
     # total
     Δτ_rel = Δτ_rel_D + Δτ_rel_U # seconds
-    @show Δτ_rel
+    # @show Δτ_rel
 
     return (1e6*86400)*(total_time_delay+Δτ_rel), f_D # total signal delay (μs) and Doppler shift (Hz)
 end
@@ -336,7 +336,7 @@ function delay_doppler_jpleph(station_code, t_r, f_T, niter::Int=10)
     Δτ_rel_U = (1+1)*μ[1]*log( (e_U+p_U+q_U)/(e_U+p_U-q_U) )/(c_au_per_day^3)
     # total
     Δτ_rel = 86400(Δτ_rel_D + Δτ_rel_U) # seconds
-    @show Δτ_rel
+    # @show Δτ_rel
 
     return 1e6(total_time_delay+Δτ_rel), f_D # total signal delay (μs) and Doppler shift (Hz)
 end
