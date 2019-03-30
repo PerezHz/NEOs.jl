@@ -3,7 +3,6 @@ function observer_position(station_code, t_utc::T) where {T<:Real}
     # r_cos_phi: distance from spin axis (km), taken from Yeomans et al. (1992)
     # r_sin_phi: height above equatorial plane (km), taken from Yeomans et al. (1992)
     # East long data is consistent with MPC database (2019-Mar-7)
-    # Goldstone site numbers 13, 14 seem to be interchanged in Yeomans et al. (1992) paper
     # TODO: add more radar stations
     if station_code == 251 # Arecibo
         east_long = 293.24692 #deg
@@ -107,9 +106,77 @@ function t2c_rotation_iau_00_06(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
 end
 
 # TODO: add IAU 1976/1980 Earth orientation/rotation model
-# function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<:Real}
-    # IAU 1976/1980 model ...
-# end
+# Celestial-to-terrestrial rotation matrix (including polar motion)
+# Reproduction of Section 5.2 of SOFA Tools for Earth Attitude
+# "IAU 1976/1980/1982/1994, equinox based"
+# found at SOFA website, Mar 27, 2019
+# Some modifications were applied, using TaylorSeries.jl, in order to compute
+# the geocentric velocity of the observer, following the guidelines from
+# ESAA 2014, Sec 7.4.3.3 (page 295)
+function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<:Real}
+    # UTC
+    t0_utc = UTCEpoch(t_utc, origin=:julian)
+    # TT
+    t0_tt = TTEpoch(t0_utc)
+    djmjd0 = julian(J2000_EPOCH).Δt # J2000.0 (TT) epoch (days)
+    tt = j2000(t0_tt).Δt
+    # IAU 1976 precession matrix, J2000.0 to date
+    rp = iauPmat76(djmjd0, tt)
+    # IAU 1980 nutation
+    dp80, de80  = iauNut80(djmjd0, tt)
+    #Nutation corrections wrt IAU 1976/1980 (mas->radians)
+    ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(t_utc)
+    # Add adjustments: frame bias, precession-rates, geophysical
+    ddp80 = mas2rad(ddp80_mas)
+    dde80 = mas2rad(dde80_mas)
+    dpsi = dp80 + ddp80
+    deps = de80 + dde80
+    # Mean obliquity
+    epsa = iauObl80(djmjd0, tt)
+    # Build the rotation matrix
+    rn = iauNumat(epsa, dpsi, deps)
+    # Combine the matrices:  PN = N x P
+    rnpb = rn*rp
+    # Equation of the equinoxes, including nutation correction
+    ee = iauEqeq94(djmjd0, tt) + ddp80*cos(epsa)
+
+    # UT1
+    # dut1 = EarthOrientation.getΔUT1(t0_utc_jul.Δt) # UT1-UTC (seconds)
+    t0_ut1 = UT1Epoch(t0_utc)
+    djmjd0_plus_date, tut = julian_twopart(t0_ut1)
+    # Greenwich apparent sidereal time (IAU 1982/1994)
+    gst = iauAnp( iauGmst82( djmjd0_plus_date.Δt, tut.Δt ) + ee ) #rad
+    # this trick allows us to compute the whole Celestial->Terrestrial matrix and its first derivative
+    # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
+    gstT1 = gst + ω*Taylor1(1) #rad/day
+    # Rz(-GST)
+    Rz_minus_gst_T1 = [cos(gstT1) sin(-gstT1) zero(gstT1);
+        sin(gstT1) cos(gstT1) zero(gstT1);
+        zero(gstT1) zero(gstT1) one(gstT1)
+    ]
+    Rz_minus_GST = Rz_minus_gst_T1()
+    # dRz(-GST)/dt
+    dRz_minus_gst_T1 = differentiate.(Rz_minus_gst_T1)
+    dRz_minus_GST = dRz_minus_gst_T1()
+
+    # Form celestial-terrestrial matrix (no polar motion yet)
+    rc2ti = deepcopy(rnpb)
+    rc2ti = iauRz(gst, rc2ti)
+
+    # Polar motion matrix (TIRS->ITRS, IERS 1996)
+    rpom = Array{Float64}(I, 3, 3)
+    # Polar motion (arcsec->radians)
+    xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t_utc)
+    xp = deg2rad(xp_arcsec/3600)
+    yp = deg2rad(yp_arcsec/3600)
+    rpom = iauRx(-yp, rpom)
+    rpom = iauRy(-xp, rpom)
+    # Form celestial-terrestrial matrix (including polar motion)
+    rc2it = rpom*rc2ti
+
+    # TODO: Add ESAA 2014-like transformations for pos, vel vectors
+    return 0
+end
 
 # TODO: check Earth rotation rate; Ostro (1993) and Yeomans (1992) say that variable rotation rate is taken into account
 # References: Sovers and Fanselow (1987); Wahr (1988)
