@@ -4,7 +4,7 @@ __precompile__(false)
 
 export main, au, t0, yr, observer_position, apophisdofs, sundofs, earthdofs,
     ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler,
-    delay_doppler_jpleph, mas2rad
+    delay_doppler_jpleph, mas2rad, c2t_rotation_iau_00_06
 
 using Reexport
 @reexport using TaylorIntegration, LinearAlgebra # so that JLD may interpret previously saved Taylor1 objects saved in .jld files
@@ -47,6 +47,12 @@ const J2000 = 2.451545e6
 
 # standard value of nominal mean angular velocity of Earth (rad/day), ESAA 2014 Sec 7.4.3.3 p. 296
 const ω = 86400*7.292115e-5
+
+const R_sun = 696000.0/au # Solar radius in au, value taken from DE430 docs
+
+const A_sun = 1.06e8 # Solar corona parameter A [cm^-3] (ESAA 2014, Table 8.5 p. 329)
+const a_sun = 4.89e5 # Solar corona parameter a [cm^-3] (ESAA 2014, Table 8.5 p. 329)
+const b_sun = 3.91e5 # Solar corona parameter b [cm^-3] (ESAA 2014, Table 8.5 p. 329)
 
 function __init__()
     @show length(methods(RNp1BP_pN_A_J234E_J2S_ng!))

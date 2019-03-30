@@ -1,4 +1,4 @@
-function observer_position(station_code, t_utc::T) where {T<:Number}
+function observer_position(station_code, t_utc::T) where {T<:Real}
     # east_long: East longitude (deg)
     # r_cos_phi: distance from spin axis (km), taken from Yeomans et al. (1992)
     # r_sin_phi: height above equatorial plane (km), taken from Yeomans et al. (1992)
@@ -26,17 +26,14 @@ function observer_position(station_code, t_utc::T) where {T<:Number}
     end
     # cartesian components of Earth-fixed position of observer
     east_long_rad = deg2rad(east_long)
-    x_gc = r_cos_phi*cos(east_long_rad)
-    y_gc = r_cos_phi*sin(east_long_rad)
-    z_gc = r_sin_phi*one(east_long_rad)
+    x_gc = r_cos_phi*cos(east_long_rad) #km
+    y_gc = r_cos_phi*sin(east_long_rad) #km
+    z_gc = r_sin_phi*one(east_long_rad) #km
+
+    pos_geo = [x_gc, y_gc, z_gc]/au #au
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
-    W = inv(sofa_c2t_rotation(t_utc))
-
-    vec_pos_pod = [x_gc, y_gc, z_gc]
-    vec_pos_frame = W*vec_pos_pod
-
-    return vec_pos_frame
+    return c2t_rotation_iau_00_06(t_utc, pos_geo)
 end
 
 # conversion of micro-arcseconds to radians
@@ -47,61 +44,64 @@ mas2rad(x) = deg2rad(x/3.6e6) # mas/1000 -> arcsec; arcsec/3600 -> deg; deg2rad(
 # "IAU 2000A, CIO based, using classical angles"
 # found at SOFA website, Mar 27, 2019
 # Some modifications were applied, using TaylorSeries.jl, in order to compute
-# the derivative of the observer position, following the guidelines from
+# the geocentric velocity of the observer, following the guidelines from
 # ESAA 2014, Sec 7.4.3.3 (page 295)
-function sofa_c2t_rotation(t_utc::Taylor1{T}) where {T<:Real}
+function c2t_rotation_iau_00_06(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<:Real}
     # UTC
-    t0_utc = UTCEpoch(constant_term(t_utc), origin=:julian)
+    t0_utc = UTCEpoch(t_utc, origin=:julian)
     t0_utc_jul = julian(t0_utc)
 
-    # Polar motion (arcsec->radians)
-    xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t0_utc_jul.Δt)
-    xp = deg2rad(xp_arcsec/3600)
-    yp = deg2rad(yp_arcsec/3600)
-
-    # UT1-UTC (s)
-    dut1 = EarthOrientation.getΔUT1(t0_utc_jul.Δt) # seconds
-
-    # CIP offsets wrt IAU 2000A (mas->radians)
-    dx00_mas, dy00_mas = EarthOrientation.precession_nutation00(t0_utc_jul.Δt)
-    dx00 = mas2rad(dx00_mas)
-    dy00 = mas2rad(dy00_mas)
+    # UT1
+    # dut1 = EarthOrientation.getΔUT1(t0_utc_jul.Δt) # UT1-UTC (seconds)
+    t0_ut1 = UT1Epoch(t0_utc)
+    t0_ut1_jd1, t0_ut1_jd2 = julian_twopart(t0_ut1)
+    # Earth rotation angle ERA = ERA0 + ω*(ERA - ERA0)
+    era = iauEra00( t0_ut1_jd1.Δt, t0_ut1_jd2.Δt ) #rad
+    # this trick allows us to compute the whole Celestial->Terrestrial matrix and its first derivative
+    # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
+    eraT1 = era + ω*Taylor1(1) #rad/day
+    # Rz(-ERA)
+    Rz_minus_era_T1 = [cos(eraT1) sin(-eraT1) zero(eraT1);
+        sin(eraT1) cos(eraT1) zero(eraT1);
+        zero(eraT1) zero(eraT1) one(eraT1)
+    ]
+    Rz_minus_ERA = Rz_minus_era_T1()
+    # dRz(-ERA)/dt
+    dRz_minus_era_T1 = differentiate.(Rz_minus_era_T1)
+    dRz_minus_ERA = dRz_minus_era_T1()
 
     # TT
     t0_tt = TTEpoch(t0_utc)
     t0_tt_jd1, t0_tt_jd2 = julian_twopart(t0_tt)
-
-    # UT1
-    t0_ut1 = UT1Epoch(t0_utc)
-    t0_ut1_jd1, t0_ut1_jd2 = julian_twopart(t0_ut1)
+    # Polar motion (arcsec->radians)
+    xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t0_utc_jul.Δt)
+    xp = deg2rad(xp_arcsec/3600)
+    yp = deg2rad(yp_arcsec/3600)
+    # Polar motion matrix (TIRS->ITRS, IERS 2003)
+    sp = iauSp00( t0_tt_jd1.Δt, t0_tt_jd2.Δt )
+    W = iauPom00( xp, yp, sp)
+    W_inv = inv(W)
 
     # CIP and CIO, IAU 2000A
     x, y, s = iauXys00a( t0_tt_jd1.Δt, t0_tt_jd2.Δt )
-
+    # CIP offsets wrt IAU 2000A (mas->radians)
+    dx00_mas, dy00_mas = EarthOrientation.precession_nutation00(t0_utc_jul.Δt)
+    dx00 = mas2rad(dx00_mas)
+    dy00 = mas2rad(dy00_mas)
     # Add CIP corrections
     x += dx00
     y += dy00
-
     # GCRS to CIRS matrix
-    rc2i = iauC2ixys( x, y, s)
+    C = iauC2ixys( x, y, s)
+    C_inv = inv(C) # CIRS -> GCRS
 
-    # Earth rotation angle
-    era = iauEra00( t0_ut1_jd1.Δt, t0_ut1_jd2.Δt ) #rad
-    eraT1 = era + ω*Taylor1(t_utc.order) #rad/day
+    # g(t), \dot g(t) ESAA vectors
+     g_vec_ESAA =  Rz_minus_ERA*(W_inv*pos_geo)
+    dg_vec_ESAA = dRz_minus_ERA*(W_inv*pos_geo)
 
-    # Form celestial-terrestrial matrix (no polar motion yet)
-    rc2ti = iauCr(rc2i)
-    Rz_eraT1 = [cos(eraT1) sin(eraT1) zero(eraT1);
-        -sin(eraT1) cos(eraT1) zero(eraT1);
-        zero(eraT1) zero(eraT1) one(eraT1)
-    ]
-    rc2tiT1 = Rz_eraT1*rc2ti
+    # G(t), \dot G(t) ESAA vectors
+     G_vec_ESAA = C_inv* g_vec_ESAA
+    dG_vec_ESAA = C_inv*dg_vec_ESAA
 
-    # Polar motion matrix (TIRS->ITRS, IERS 2003)
-    sp = iauSp00( t0_tt_jd1.Δt, t0_tt_jd2.Δt )
-    rpom = iauPom00( xp, yp, sp)
-
-    # Form celestial-terrestrial matrix (including polar motion)
-    rc2itT1 = rpom*rc2tiT1
-    return rc2itT1
+     return G_vec_ESAA, dG_vec_ESAA
 end

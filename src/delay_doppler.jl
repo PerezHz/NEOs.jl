@@ -2,25 +2,21 @@
 # station_code: observing station identifier (MPC nomenclature)
 # t: time of echo reception (TDB)
 # f_T: transmitter frequency (Hz)
-function delay_doppler(x, station_code, t, f_T, niter::Int=10)
+function delay_doppler(x, station_code, t_r_utc_julian, f_T, niter::Int=10)
+    # UTC -> TT
+    t_r_tt = TTEpoch( UTCEpoch(t_r_utc_julian, origin=:julian) )
+    # TT -> TDB
+    t_r_tt_jul = julian(t_r_tt).Δt
+    t = t_r_tt_jul - tt_m_tdb(t_r_tt_jul)[1]/86400 # TDB ≈ TT - f(TT), where f(t) = (TT-TDB)(t)
+
     # Compute Taylor expansion at receiving time (TDB)
     t_r = Taylor1([t, one(t)], Apophis.order)
     x_r = Taylor1.(x, Apophis.order)
     dx_r = similar(x_r)
     @time TaylorIntegration.jetcoeffs!(Val(Apophis.RNp1BP_pN_A_J234E_J2S_ng!), t_r, x_r, dx_r)
 
-    # convert Julian date of receiving time from TDB to UTC
-    t_r_utc_julian = julian(AstroTime.UTC, TDBEpoch(t, origin=:julian)).Δt
-    t_r_utc_julian_T = t_r_utc_julian + Taylor1(Apophis.order)
-    # Taylor expansion of station geocentric position (au), wrt receiving time t_r (TDB)
-    R_station = observer_position(station_code, t_r_utc_julian_T)/au
-    # Taylor expansion of station geocentric velocity (au/day), wrt receiving time t_r (TDB)
-    V_station = differentiate.(R_station)
-
-    # Earth-fixed geocentric position of receiving antenna (au)
-    R_r = R_station()
-    # Earth-fixed geocentric velocity of receiving antenna (au/day)
-    V_r = V_station()
+    # Earth-fixed geocentric position/velocity of receiving antenna (au, au/day)
+    R_r, V_r = observer_position(station_code, t_r_utc_julian)
 
     # Earth's barycentric position and velocity at the receive time
     #rv_e_t_r = earth_pv(t_r)
@@ -72,10 +68,8 @@ function delay_doppler(x, station_code, t, f_T, niter::Int=10)
     t_t = t_b - τ_U
     # convert transmit time to UTC time
     t_t_utc_julian = julian(AstroTime.UTC, TDBEpoch(constant_term(t_t), origin=:julian)).Δt
-    # Earth-fixed geocentric position of transmitting antenna (au)
-    R_t = R_station(t_t_utc_julian-t_r_utc_julian)
-    # Earth-fixed geocentric velocity of transmitting antenna (au/day)
-    V_t = V_station(t_t_utc_julian-t_r_utc_julian)
+    # Earth-fixed geocentric position/velocity of receiving antenna (au, au/day)
+    R_t, V_t = observer_position(station_code, t_t_utc_julian)
     # Earth's barycentric position and velocity at the transmit time
     #rv_e_t_t = earth_pv(t_t)
     r_e_t_t = x_r[(3ea-2):3ea](t_t-t) #rv_e_t_t[1:3]
@@ -94,10 +88,8 @@ function delay_doppler(x, station_code, t, f_T, niter::Int=10)
         t_t = t_b - τ_U
         # convert transmit time to UTC time
         t_t_utc_julian = julian(AstroTime.UTC, TDBEpoch(constant_term(t_t), origin=:julian)).Δt
-        # Earth-fixed geocentric position of transmitting antenna (au)
-        R_t = R_station(t_t_utc_julian-t_r_utc_julian)
-        # Earth-fixed geocentric velocity of transmitting antenna (au/day)
-        V_t = V_station(t_t_utc_julian-t_r_utc_julian)
+        # Earth-fixed geocentric position/velocity of receiving antenna (au, au/day)
+        R_t, V_t = observer_position(station_code, t_t_utc_julian)
         # Earth's barycentric position and velocity at the transmit time
         #rv_e_t_t = earth_pv(t_t)
         r_e_t_t = x_r[(3ea-2):3ea](t_t-t) #rv_e_t_t[1:3]
@@ -177,29 +169,26 @@ end
 const eph = Ephem(["jpleph/a99942.bsp", "jpleph/de430_1850-2150.bsp", "jpleph/TTmTDB.de430.19feb2015.bsp"])
 prefetch(eph)
 
-apophis_pv(t) = compute(eph, t, 0.0, 2099942, 12, unitKM+unitDay,1)/au
-sun_pv(t)     = compute(eph, t, 0.0, 11     , 12, unitKM+unitDay,1)/au
-earth_pv(t)   = compute(eph, t, 0.0, 3      , 12, unitKM+unitDay,1)/au
-moon_pv(t)    = compute(eph, t, 0.0, 10     , 12, unitKM+unitDay,1)/au
+apophis_pv(t) = compute(eph, t, 0.0, 2099942   , 12        , unitKM+unitDay, 1)/au # units: au, au/day
+sun_pv(t)     = compute(eph, t, 0.0, 11        , 12        , unitKM+unitDay, 1)/au # units: au, au/day
+earth_pv(t)   = compute(eph, t, 0.0, 3         , 12        , unitKM+unitDay, 1)/au # units: au, au/day
+moon_pv(t)    = compute(eph, t, 0.0, 10        , 12        , unitKM+unitDay, 1)/au # units: au, au/day
+tt_m_tdb(t)   = compute(eph, t, 0.0, 1000000001, 1000000000, unitSec       , 1) # units: seconds
 
 # Alternate version of delay_doppler, using JPL ephemerides
 # eph: Solar System + Apophis ephemerides pos/vel (au, au/day)
 # station_code: observing station identifier (MPC nomenclature)
-# t: time of echo reception (TDB)
+# t_r_utc_julian: time of echo reception (UTC)
 # f_T: transmitter frequency (Hz)
-function delay_doppler_jpleph(station_code, t_r, f_T, niter::Int=10)
-    # convert Julian date of receiving time from TDB to UTC
-    t_r_utc_julian = julian(AstroTime.UTC, TDBEpoch(t_r, origin=:julian)).Δt
-    t_r_utc_julian_T = Taylor1([t_r_utc_julian, one(t_r_utc_julian)], Apophis.order)
-    # Taylor expansion of station geocentric position (au), wrt receiving time t_r (TDB)
-    R_station = observer_position(station_code, t_r_utc_julian_T)/au
-    # Taylor expansion of station geocentric velocity (au/day), wrt receiving time t_r (TDB)
-    V_station = differentiate.(R_station)
+function delay_doppler_jpleph(station_code, t_r_utc_julian, f_T, niter::Int=10)
+    # UTC -> TT
+    t_r_tt = TTEpoch( UTCEpoch(t_r_utc_julian, origin=:julian) )
+    # TT -> TDB
+    t_r_tt_jul = julian(t_r_tt).Δt
+    t_r = t_r_tt_jul - tt_m_tdb(t_r_tt_jul)[1]/86400 # TDB ≈ TT - f(TT), where f(t) = (TT-TDB)(t)
 
-    # Earth-fixed geocentric position of receiving antenna (au)
-    R_r = R_station()
-    # Earth-fixed geocentric velocity of receiving antenna (au/day)
-    V_r = V_station()
+    # Earth-fixed geocentric position/velocity of receiving antenna (au, au/day)
+    R_r, V_r = observer_position(station_code, t_r_utc_julian)
 
     # Earth's barycentric position and velocity at the receive time
     rv_e_t_r = earth_pv(t_r)
@@ -241,6 +230,11 @@ function delay_doppler_jpleph(station_code, t_r, f_T, niter::Int=10)
         r_a_t_b = rv_a_t_b[1:3]
         v_a_t_b = rv_a_t_b[4:6]
     end
+    # get latest estimates of ρ_vec_r and ρ_r
+    # Eq. (3) Yeomans et al. (1992)
+    ρ_vec_r = r_a_t_b - r_r_t_r
+    # Eq. (4) Yeomans et al. (1992)
+    ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
     # @show τ_D
 
     # up-leg iteration
@@ -250,12 +244,11 @@ function delay_doppler_jpleph(station_code, t_r, f_T, niter::Int=10)
     # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
     t_t = t_b - τ_U
     # convert transmit time to UTC time
-    t_t_utc_julian = julian(AstroTime.UTC, TDBEpoch(t_t, origin=:julian)).Δt
-    # Earth-fixed geocentric position of transmitting antenna (au)
-    R_t = R_station(t_t_utc_julian-t_r_utc_julian)
-    # Earth-fixed geocentric velocity of transmitting antenna (au/day)
-    V_t = V_station(t_t_utc_julian-t_r_utc_julian)
-    # Earth's barycentric position and velocity at the transmit time
+    # TDB -> TT
+    t_t_tt = t_t + tt_m_tdb(t_t)[1]/86400 # TDB -> TT
+    t_t_utc_julian = julian(AstroTime.UTC, TTEpoch(t_t_tt, origin=:julian)).Δt
+    # Earth-fixed geocentric position/velocity of receiving antenna (au, au/day)
+    R_t, V_t = observer_position(station_code, t_t_utc_julian)
     rv_e_t_t = earth_pv(t_t)
     r_e_t_t = rv_e_t_t[1:3]
     v_e_t_t = rv_e_t_t[4:6]
@@ -272,11 +265,11 @@ function delay_doppler_jpleph(station_code, t_r, f_T, niter::Int=10)
         # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
         t_t = t_b - τ_U
         # convert transmit time to UTC time
-        t_t_utc_julian = julian(AstroTime.UTC, TDBEpoch(t_t, origin=:julian)).Δt
-        # Earth-fixed geocentric position of transmitting antenna (au)
-        R_t = R_station(t_t_utc_julian-t_r_utc_julian)
-        # Earth-fixed geocentric velocity of transmitting antenna (au/day)
-        V_t = V_station(t_t_utc_julian-t_r_utc_julian)
+        # TDB -> TT
+        t_t_tt = t_t + tt_m_tdb(t_t)[1]/86400 # TDB -> TT
+        t_t_utc_julian = julian(AstroTime.UTC, TTEpoch(t_t_tt, origin=:julian)).Δt
+        # Earth-fixed geocentric position/velocity of receiving antenna (au, au/day)
+        R_t, V_t = observer_position(station_code, t_t_utc_julian)
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t = earth_pv(t_t)
         r_e_t_t = rv_e_t_t[1:3]
@@ -292,8 +285,11 @@ function delay_doppler_jpleph(station_code, t_r, f_T, niter::Int=10)
 
     # Eq. (9) Yeomans et al. (1992)
     #τ = τ_D + τ_U
-    t_r_UTC = UTCEpoch(TDBEpoch(t_r, origin=:julian))
-    t_t_UTC = UTCEpoch(TDBEpoch(t_t, origin=:julian))
+    # TDB -> TT
+    t_r_tt = t_r + tt_m_tdb(t_r)[1]/86400 # TDB -> TT (t_r)
+    t_r_UTC = UTCEpoch(TTEpoch(t_r_tt, origin=:julian))
+    t_t_tt = t_t + tt_m_tdb(t_t)[1]/86400 # TDB -> TT (t_t)
+    t_t_UTC = UTCEpoch(TTEpoch(t_t_tt, origin=:julian))
     total_time_delay = ( t_r_UTC - t_t_UTC ).Δt
     #@show TDB_minus_UTC_t - TDB_minus_UTC_r
     @show total_time_delay
@@ -324,16 +320,17 @@ function delay_doppler_jpleph(station_code, t_r, f_T, niter::Int=10)
 
     # compute Shapiro delay
     # down-leg
+    # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, Δτ_rel_[D|U]
     e_D = norm(r_e_t_r-r_s_t_r) # heliocentric distance of Earth at t_r
     r_s_t_b = sun_pv(t_b)[1:3]
     p_D = norm(r_a_t_b-r_s_t_b) # heliocentric distance of asteroid at t_b
     q_D = norm(r_a_t_b-r_e_t_r) #signal path (down-leg)
-    Δτ_rel_D = (1+1)*μ[1]*log( (e_D+p_D+q_D)/(e_D+p_D-q_D) )/(c_au_per_day^3)
+    Δτ_rel_D = 2μ[1]*log( (e_D+p_D+q_D)/(e_D+p_D-q_D) )/(c_au_per_day^3) # days
     # up-leg
     e_U = norm(r_e_t_t-r_s_t_t) # heliocentric distance of Earth at t_t
     p_U = p_D # heliocentric distance of asteroid at t_b
     q_U = norm(r_a_t_b-r_e_t_t) #signal path (up-leg)
-    Δτ_rel_U = (1+1)*μ[1]*log( (e_U+p_U+q_U)/(e_U+p_U-q_U) )/(c_au_per_day^3)
+    Δτ_rel_U = 2μ[1]*log( (e_U+p_U+q_U)/(e_U+p_U-q_U) )/(c_au_per_day^3) # days
     # total
     Δτ_rel = 86400(Δτ_rel_D + Δτ_rel_U) # seconds
     # @show Δτ_rel
