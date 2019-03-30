@@ -33,7 +33,7 @@ function observer_position(station_code, t_utc::T) where {T<:Real}
     pos_geo = [x_gc, y_gc, z_gc]/au #au
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
-    return c2t_rotation_iau_00_06(t_utc, pos_geo)
+    return t2c_rotation_iau_00_06(t_utc, pos_geo)
 end
 
 # conversion of micro-arcseconds to radians
@@ -46,7 +46,7 @@ mas2rad(x) = deg2rad(x/3.6e6) # mas/1000 -> arcsec; arcsec/3600 -> deg; deg2rad(
 # Some modifications were applied, using TaylorSeries.jl, in order to compute
 # the geocentric velocity of the observer, following the guidelines from
 # ESAA 2014, Sec 7.4.3.3 (page 295)
-function c2t_rotation_iau_00_06(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<:Real}
+function t2c_rotation_iau_00_06(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<:Real}
     # UTC
     t0_utc = UTCEpoch(t_utc, origin=:julian)
     t0_utc_jul = julian(t0_utc)
