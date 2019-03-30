@@ -105,3 +105,8 @@ function t2c_rotation_iau_00_06(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
 
      return G_vec_ESAA, dG_vec_ESAA
 end
+
+# TODO: add IAU 1976/1980 Earth orientation/rotation model
+# function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<:Real}
+    # IAU 1976/1980 model ...
+# end
