@@ -110,3 +110,6 @@ end
 # function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<:Real}
     # IAU 1976/1980 model ...
 # end
+
+# TODO: check Earth rotation rate; Ostro (1993) and Yeomans (1992) say that variable rotation rate is taken into account
+# References: Sovers and Fanselow (1987); Wahr (1988)
