@@ -32,7 +32,8 @@ function observer_position(station_code, t_utc::T) where {T<:Real}
     pos_geo = [x_gc, y_gc, z_gc]/au #au
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
-    return t2c_rotation_iau_00_06(t_utc, pos_geo)
+    # return t2c_rotation_iau_00_06(t_utc, pos_geo)
+    return t2c_rotation_iau_76_80(t_utc, pos_geo)
 end
 
 # conversion of micro-arcseconds to radians
@@ -137,9 +138,9 @@ function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
     rn = iauNumat(epsa, dpsi, deps)
     # Combine the matrices:  PN = N x P
     rnpb = rn*rp
+
     # Equation of the equinoxes, including nutation correction
     ee = iauEqeq94(djmjd0, tt) + ddp80*cos(epsa)
-
     # UT1
     # dut1 = EarthOrientation.getΔUT1(t0_utc_jul.Δt) # UT1-UTC (seconds)
     t0_ut1 = UT1Epoch(t0_utc)
@@ -159,9 +160,9 @@ function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
     dRz_minus_gst_T1 = differentiate.(Rz_minus_gst_T1)
     dRz_minus_GST = dRz_minus_gst_T1()
 
-    # Form celestial-terrestrial matrix (no polar motion yet)
-    rc2ti = deepcopy(rnpb)
-    rc2ti = iauRz(gst, rc2ti)
+    # # Form celestial-terrestrial matrix (no polar motion yet)
+    # rc2ti = deepcopy(rnpb)
+    # rc2ti = iauRz(gst, rc2ti)
 
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
     rpom = Array{Float64}(I, 3, 3)
@@ -171,11 +172,22 @@ function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
     yp = deg2rad(yp_arcsec/3600)
     rpom = iauRx(-yp, rpom)
     rpom = iauRy(-xp, rpom)
-    # Form celestial-terrestrial matrix (including polar motion)
-    rc2it = rpom*rc2ti
 
-    # TODO: Add ESAA 2014-like transformations for pos, vel vectors
-    return 0
+    # # Form celestial-terrestrial matrix (including polar motion)
+    # rc2it = rpom*rc2ti
+
+    W_inv = inv(rpom)
+    C_inv = inv(rnpb)
+
+    # g(t), \dot g(t) ESAA vectors
+    g_vec_ESAA =  Rz_minus_GST*(W_inv*pos_geo)
+    dg_vec_ESAA = dRz_minus_GST*(W_inv*pos_geo)
+
+    # G(t), \dot G(t) ESAA vectors
+     G_vec_ESAA = C_inv* g_vec_ESAA
+    dG_vec_ESAA = C_inv*dg_vec_ESAA
+
+    return G_vec_ESAA, dG_vec_ESAA
 end
 
 # TODO: check Earth rotation rate; Ostro (1993) and Yeomans (1992) say that variable rotation rate is taken into account
