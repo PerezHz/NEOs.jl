@@ -47,6 +47,9 @@ const J2000 = 2.451545e6
 
 # standard value of nominal mean angular velocity of Earth (rad/day), ESAA 2014 Sec 7.4.3.3 p. 296
 const ω = 86400*7.292115e-5
+# The relationship of the angular velocity of the earth Omega with LOD is (https://www.iers.org/IERS/EN/Science/EarthRotation/UT1LOD.html)
+# where `omega` is in units of rad/day, and `lod` is in units of milliseconds
+omega(lod) = (86400e-12)*(72921151.467064 - 0.843994809lod)
 
 const R_sun = 696000.0/au # Solar radius in au, value taken from DE430 docs
 

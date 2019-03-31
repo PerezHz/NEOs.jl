@@ -27,13 +27,13 @@ function observer_position(station_code, t_utc::T) where {T<:Real}
     east_long_rad = deg2rad(east_long)
     x_gc = r_cos_phi*cos(east_long_rad) #km
     y_gc = r_cos_phi*sin(east_long_rad) #km
-    z_gc = r_sin_phi*one(east_long_rad) #km
+    z_gc = r_sin_phi #km
 
     pos_geo = [x_gc, y_gc, z_gc]/au #au
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
-    # return t2c_rotation_iau_00_06(t_utc, pos_geo)
-    return t2c_rotation_iau_76_80(t_utc, pos_geo)
+    # return t2c_rotation_iau_76_80(t_utc, pos_geo)
+    return t2c_rotation_iau_00_06(t_utc, pos_geo)
 end
 
 # conversion of micro-arcseconds to radians
@@ -55,11 +55,12 @@ function t2c_rotation_iau_00_06(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
     # dut1 = EarthOrientation.getΔUT1(t0_utc_jul.Δt) # UT1-UTC (seconds)
     t0_ut1 = UT1Epoch(t0_utc)
     t0_ut1_jd1, t0_ut1_jd2 = julian_twopart(t0_ut1)
-    # Earth rotation angle ERA = ERA0 + ω*(ERA - ERA0)
+    # Earth rotation angle
     era = iauEra00( t0_ut1_jd1.Δt, t0_ut1_jd2.Δt ) #rad
     # this trick allows us to compute the whole Celestial->Terrestrial matrix and its first derivative
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
-    eraT1 = era + ω*Taylor1(1) #rad/day
+    # eraT1 = era + ω*Taylor1(1) #rad/day
+    eraT1 = era + omega(getlod(t_utc))*Taylor1(1) #rad/day
     # Rz(-ERA)
     Rz_minus_era_T1 = [cos(eraT1) sin(-eraT1) zero(eraT1);
         sin(eraT1) cos(eraT1) zero(eraT1);
@@ -149,7 +150,8 @@ function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
     gst = iauAnp( iauGmst82( djmjd0_plus_date.Δt, tut.Δt ) + ee ) #rad
     # this trick allows us to compute the whole Celestial->Terrestrial matrix and its first derivative
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
-    gstT1 = gst + ω*Taylor1(1) #rad/day
+    # gstT1 = gst + ω*Taylor1(1) #rad/day
+    gstT1 = gst + omega(EarthOrientation.getlod(t_utc))*Taylor1(1) #rad/day
     # Rz(-GST)
     Rz_minus_gst_T1 = [cos(gstT1) sin(-gstT1) zero(gstT1);
         sin(gstT1) cos(gstT1) zero(gstT1);
@@ -189,6 +191,3 @@ function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
 
     return G_vec_ESAA, dG_vec_ESAA
 end
-
-# TODO: check Earth rotation rate; Ostro (1993) and Yeomans (1992) say that variable rotation rate is taken into account
-# References: Sovers and Fanselow (1987); Wahr (1988)
