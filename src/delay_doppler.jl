@@ -169,6 +169,13 @@ end
 const eph = Ephem(["jpleph/a99942.bsp", "jpleph/de430_1850-2150.bsp", "jpleph/TTmTDB.de430.19feb2015.bsp"])
 prefetch(eph)
 
+# CALCEPH index conventions:
+#12: Solar System Barycenter
+#11: Sun (heliocenter)
+#2099942: Apophis
+#3: Earth (geocenter)
+#10: Moon
+#1000000001 from body 1000000000: TT-TDB
 apophis_pv(t) = compute(eph, t, 0.0, 2099942   , 12        , unitKM+unitDay, 1)/au # units: au, au/day
 sun_pv(t)     = compute(eph, t, 0.0, 11        , 12        , unitKM+unitDay, 1)/au # units: au, au/day
 earth_pv(t)   = compute(eph, t, 0.0, 3         , 12        , unitKM+unitDay, 1)/au # units: au, au/day
