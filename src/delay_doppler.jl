@@ -263,7 +263,7 @@ tropo_delay(z) = (7e-9/86400)/( cos(z) + 0.0014/(0.045+cot(z)) ) # days
 
 function tropo_delay(r_antenna::Vector{S}, ρ_vec_ae::Vector{S}) where {S<:Number}
     zd = zenith_distance(r_antenna, ρ_vec_ae)
-    @show rad2deg(zd)
+    # @show rad2deg(zd)
     return tropo_delay(zd)
 end
 
