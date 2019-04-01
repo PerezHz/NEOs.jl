@@ -318,7 +318,7 @@ function delay_doppler_jpleph(station_code, t_r_utc_julian, f_T, niter::Int=10)
         e_D = norm(r_e_t_r-r_s_t_r) # heliocentric distance of Earth at t_r
         r_s_t_b = sun_pv(t_r - τ_D)[1:3] # barycentric position of Sun at estimated bounce time
         p_D = norm(r_a_t_b-r_s_t_b) # heliocentric distance of asteroid at t_b
-        q_D = norm(r_a_t_b-r_e_t_r) #signal path (down-leg)
+        q_D = norm(ρ_vec_r) #signal path (down-leg)
         Δτ_rel_D = shapiro_delay(e_D, p_D, q_D) # days
         Δτ_corona_D = corona_delay(r_a_t_b, r_e_t_r, t_r, τ_D, f_T)
         Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)
@@ -370,7 +370,7 @@ function delay_doppler_jpleph(station_code, t_r_utc_julian, f_T, niter::Int=10)
         e_U = norm(r_e_t_t-r_s_t_t) # heliocentric distance of Earth at t_t
         r_s_t_b = sun_pv(t_b)[1:3] # barycentric position of Sun at bounce time
         p_U = norm(r_a_t_b-r_s_t_b) # heliocentric distance of asteroid at t_b
-        q_U = norm(r_a_t_b-r_e_t_t) #signal path (up-leg)
+        q_U = norm(ρ_vec_t) #signal path (up-leg)
         Δτ_rel_U = Δτ_rel_D = shapiro_delay(e_U, p_U, q_U) # days
         Δτ_corona_U = corona_delay(r_e_t_t, r_a_t_b, t_t, τ_U, f_T) # days
         Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # days
