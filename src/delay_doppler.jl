@@ -249,9 +249,23 @@ function corona_delay(p1::Vector{S}, p2::Vector{S}, t_1_tdb::T, current_delay::T
     return 1e-6Δτ_corona_D/86400 # Xseconds -> days ***NOT SURE ABOUT UNITS; seem to be μseconds***
 end
 
+# *VERY* elementary computation of zenith distance
+# r_antenna: position of antenna at receive/transmit time in celestial frame wrt geocenter
+# ρ_vec_ae: slant-range vector from antenna to asteroid
+function zenith_distance(r_antenna::Vector{S}, ρ_vec_ae::Vector{S}) where {S<:Number}
+    cos_antenna_slant = dot(r_antenna, ρ_vec_ae)/(norm(r_antenna)*norm(ρ_vec_ae))
+    return acos(cos_antenna_slant)
+end
+
 # Time delay from the Earth's troposphere for radio frequencies
 # oscillates between 0.007μs and 0.225μs for z between 0 and π/2 rad
-tropo_delay(z) = (7e-9)/( cos(z) + 0.0014/(0.045+cot(z)) ) # seconds
+tropo_delay(z) = (7e-9/86400)/( cos(z) + 0.0014/(0.045+cot(z)) ) # days
+
+function tropo_delay(r_antenna::Vector{S}, ρ_vec_ae::Vector{S}) where {S<:Number}
+    zd = zenith_distance(r_antenna, ρ_vec_ae)
+    @show rad2deg(zd)
+    return tropo_delay(zd)
+end
 
 # Alternate version of delay_doppler, using JPL ephemerides
 # eph: Solar System + Apophis ephemerides pos/vel (au, au/day)
@@ -262,7 +276,7 @@ function delay_doppler_jpleph(station_code, t_r_utc_julian, f_T, niter::Int=10)
     # UTC -> TDB
     t_r = julian(TDB, UTCEpoch(t_r_utc_julian, origin=:julian)).Δt
 
-    # Earth-fixed geocentric position/velocity of receiving antenna (au, au/day)
+    # Geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
     R_r, V_r = observer_position(station_code, t_r_utc_julian)
 
     # Earth's barycentric position and velocity at the receive time
@@ -307,10 +321,12 @@ function delay_doppler_jpleph(station_code, t_r_utc_julian, f_T, niter::Int=10)
         q_D = norm(r_a_t_b-r_e_t_r) #signal path (down-leg)
         Δτ_rel_D = shapiro_delay(e_D, p_D, q_D) # days
         Δτ_corona_D = corona_delay(r_a_t_b, r_e_t_r, t_r, τ_D, f_T)
-        τ_D = τ_D + Δτ_rel_D + Δτ_corona_D
+        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)
+        τ_D = τ_D + Δτ_rel_D + Δτ_corona_D + Δτ_tropo_D
         # @show τ_D
         @show Δτ_rel_D
         @show Δτ_corona_D
+        @show Δτ_tropo_D
         # bounce time, new estimate Eq. (2) Yeomans et al. (1992)
         t_b = t_r - τ_D
         # asteroid barycentric position (in a.u.) at bounce time (TDB)
@@ -332,7 +348,7 @@ function delay_doppler_jpleph(station_code, t_r_utc_julian, f_T, niter::Int=10)
     # convert transmit time to UTC time
     # TDB -> UTC
     t_t_utc_julian = julian(AstroTime.UTC, TDBEpoch(t_t, origin=:julian)).Δt
-    # Earth-fixed geocentric position/velocity of receiving antenna (au, au/day)
+    # Geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
     R_t, V_t = observer_position(station_code, t_t_utc_julian)
     rv_e_t_t = earth_pv(t_t)
     r_e_t_t = rv_e_t_t[1:3]
@@ -356,11 +372,13 @@ function delay_doppler_jpleph(station_code, t_r_utc_julian, f_T, niter::Int=10)
         p_U = norm(r_a_t_b-r_s_t_b) # heliocentric distance of asteroid at t_b
         q_U = norm(r_a_t_b-r_e_t_t) #signal path (up-leg)
         Δτ_rel_U = Δτ_rel_D = shapiro_delay(e_U, p_U, q_U) # days
-        Δτ_corona_U = corona_delay(r_e_t_t, r_a_t_b, t_t, τ_U, f_T)
-        τ_U = τ_U + Δτ_rel_U + Δτ_corona_U
+        Δτ_corona_U = corona_delay(r_e_t_t, r_a_t_b, t_t, τ_U, f_T) # days
+        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # days
+        τ_U = τ_U + Δτ_rel_U + Δτ_corona_U + Δτ_tropo_U
         # @show τ_U
         # @show Δτ_rel_U
         # @show Δτ_corona_U
+        # @show Δτ_tropo_U
         # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
         t_t = t_b - τ_U
         # convert transmit time to UTC time

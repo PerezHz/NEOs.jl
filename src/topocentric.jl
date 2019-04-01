@@ -31,9 +31,11 @@ function observer_position(station_code, t_utc::T) where {T<:Real}
 
     pos_geo = [x_gc, y_gc, z_gc]/au #au
 
+    # G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(t_utc, pos_geo)
+    G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(t_utc, pos_geo)
+
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
-    # return t2c_rotation_iau_76_80(t_utc, pos_geo)
-    return t2c_rotation_iau_00_06(t_utc, pos_geo)
+    return G_vec_ESAA, dG_vec_ESAA
 end
 
 # conversion of micro-arcseconds to radians
@@ -104,7 +106,7 @@ function t2c_rotation_iau_00_06(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
      G_vec_ESAA = C_inv* g_vec_ESAA
     dG_vec_ESAA = C_inv*dg_vec_ESAA
 
-     return G_vec_ESAA, dG_vec_ESAA
+     return G_vec_ESAA, dG_vec_ESAA, era
 end
 
 # TODO: add IAU 1976/1980 Earth orientation/rotation model
@@ -147,24 +149,24 @@ function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
     t0_ut1 = UT1Epoch(t0_utc)
     djmjd0_plus_date, tut = julian_twopart(t0_ut1)
     # Greenwich apparent sidereal time (IAU 1982/1994)
-    gst = iauAnp( iauGmst82( djmjd0_plus_date.Δt, tut.Δt ) + ee ) #rad
+    gast = iauAnp( iauGmst82( djmjd0_plus_date.Δt, tut.Δt ) + ee ) #rad
     # this trick allows us to compute the whole Celestial->Terrestrial matrix and its first derivative
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
-    # gstT1 = gst + ω*Taylor1(1) #rad/day
-    gstT1 = gst + omega(EarthOrientation.getlod(t_utc))*Taylor1(1) #rad/day
-    # Rz(-GST)
-    Rz_minus_gst_T1 = [cos(gstT1) sin(-gstT1) zero(gstT1);
-        sin(gstT1) cos(gstT1) zero(gstT1);
-        zero(gstT1) zero(gstT1) one(gstT1)
+    # gastT1 = gast + ω*Taylor1(1) #rad/day
+    gastT1 = gast + omega(EarthOrientation.getlod(t_utc))*Taylor1(1) #rad/day
+    # Rz(-GAST)
+    Rz_minus_gast_T1 = [cos(gastT1) sin(-gastT1) zero(gastT1);
+        sin(gastT1) cos(gastT1) zero(gastT1);
+        zero(gastT1) zero(gastT1) one(gastT1)
     ]
-    Rz_minus_GST = Rz_minus_gst_T1()
-    # dRz(-GST)/dt
-    dRz_minus_gst_T1 = differentiate.(Rz_minus_gst_T1)
-    dRz_minus_GST = dRz_minus_gst_T1()
+    Rz_minus_GAST = Rz_minus_gast_T1()
+    # dRz(-GAST)/dt
+    dRz_minus_gast_T1 = differentiate.(Rz_minus_gast_T1)
+    dRz_minus_GAST = dRz_minus_gast_T1()
 
     # # Form celestial-terrestrial matrix (no polar motion yet)
     # rc2ti = deepcopy(rnpb)
-    # rc2ti = iauRz(gst, rc2ti)
+    # rc2ti = iauRz(gast, rc2ti)
 
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
     rpom = Array{Float64}(I, 3, 3)
@@ -182,12 +184,12 @@ function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
     C_inv = inv(rnpb)
 
     # g(t), \dot g(t) ESAA vectors
-    g_vec_ESAA =  Rz_minus_GST*(W_inv*pos_geo)
-    dg_vec_ESAA = dRz_minus_GST*(W_inv*pos_geo)
+    g_vec_ESAA =  Rz_minus_GAST*(W_inv*pos_geo)
+    dg_vec_ESAA = dRz_minus_GAST*(W_inv*pos_geo)
 
     # G(t), \dot G(t) ESAA vectors
      G_vec_ESAA = C_inv* g_vec_ESAA
     dG_vec_ESAA = C_inv*dg_vec_ESAA
 
-    return G_vec_ESAA, dG_vec_ESAA
+    return G_vec_ESAA, dG_vec_ESAA, gast
 end

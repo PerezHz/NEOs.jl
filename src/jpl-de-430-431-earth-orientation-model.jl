@@ -91,15 +91,15 @@ end
 function Ry(alpha)
     res = Array{typeof(alpha)}(undef, 3, 3)
 
+    res[1, 1] = cos(alpha)
+    res[1, 2] = res[2, 3]
+    res[1, 3] = sin(alpha)
+    res[2, 1] = zero(alpha)
     res[2, 2] = one(alpha)
     res[2, 3] = zero(alpha)
-    res[2, 1] = zero(alpha)
-    res[3, 2] = res[2, 3]
-    res[1, 2] = res[2, 3]
-    res[3, 3] = cos(alpha)
     res[3, 1] = -sin(alpha)
-    res[1, 3] = sin(alpha)
-    res[1, 1] = cos(alpha)
+    res[3, 2] = res[2, 3]
+    res[3, 3] = cos(alpha)
 
     return res
 end
