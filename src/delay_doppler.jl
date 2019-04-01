@@ -209,7 +209,12 @@ function Ne(p1::Vector{S}, p2::Vector{S}, t0_tdb_jul::T, dt_tdb::U) where {T<:Re
     s_p2_p1 = map(x->s*x, (p2-p1))
     r_vec = p1+s_p2_p1 - sun_pv(t0_tdb_jul+constant_term(dt_tdb))[1:3] # heliocentric position (au) of point on ray path at time t_tdb_jul (Julian days)
     r = sqrt( r_vec[1]^2 + r_vec[2]^2 + r_vec[3]^2 ) # heliocentric distance (au) of point on ray path at time t_tdb_jul (Julian days)
-    β = atan( r_vec[3]/sqrt(r_vec[1]^2 + r_vec[2]^2) ) # solar latitude of point on ray path (rad)
+    # compute ecliptic solar latitude of point on ray path
+    # NOTE: actually, (Anderson, 1978) says it should be heliographic
+    # (i.e., wrt solar equator), but diff is ~7 deg and things don't seem to change a lot
+    # compute heliographic latitude (ecliptic plane is not equal to heliographic but almost by ~7deg)
+    r_vec_ecliptic = Rx(deg2rad(23.43929))*r_vec
+    β = asin( r_vec_ecliptic[3]/r ) # ecliptic solar latitude of point on ray path (rad)
     r_sr = r/R_sun
     return (A_sun/r_sr^6) + ( (a_sun*b_sun)/sqrt((a_sun*sin(β))^2 + (b_sun*cos(β))^2) )/(r_sr^2)
 end

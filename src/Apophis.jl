@@ -12,7 +12,7 @@ using DelimitedFiles
 using Dates, Test
 using JLD
 using AstroTime, EarthOrientation, SOFA, CALCEPH
-using Statistics: mean
+# using Statistics: mean
 
 # integration parameters
 const varorder = 10
