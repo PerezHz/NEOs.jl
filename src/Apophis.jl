@@ -4,7 +4,7 @@ __precompile__(false)
 
 export main, au, t0, yr, observer_position, apophisdofs, sundofs, earthdofs,
     ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler,
-    delay_doppler_jpleph, mas2rad, t2c_rotation_iau_00_06, tropo_delay, Ne,
+    delay_doppler_jpleph, mas2rad, t2c_rotation_iau_00_06,
     process_radar_data_jpl, RadarDataJPL
 
 using Reexport
