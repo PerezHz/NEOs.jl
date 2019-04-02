@@ -242,7 +242,6 @@ function Ne_path_integral(p1::Vector{S}, p2::Vector{S}, t0_tdb_jul::T, current_d
     end
     # do path integral; distance vector sv is in au; integral vector iv is in (electrons/cm^3)*au
     sv, iv = taylorinteg(int_kernel, 0.0, 0.0, c_au_per_day*current_delay/R_sun, 28, 1e-20)
-    @show size(sv), size(iv)
     return iv[end] # (electrons/cm^3)*solar-radii
 end
 
@@ -337,7 +336,7 @@ function delay_doppler_jpleph(station_code, t_r_utc_julian, f_T, niter::Int=10)
         Δτ_rel_D = shapiro_delay(e_D, p_D, q_D) # days
         Δτ_corona_D = corona_delay(r_a_t_b, r_e_t_r, t_b, τ_D, f_T)
         Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)
-        τ_D = τ_D + Δτ_rel_D + Δτ_corona_D + Δτ_tropo_D
+        τ_D = τ_D + Δτ_rel_D # + Δτ_corona_D + Δτ_tropo_D
         # @show τ_D
         @show Δτ_rel_D
         @show Δτ_corona_D
@@ -386,10 +385,10 @@ function delay_doppler_jpleph(station_code, t_r_utc_julian, f_T, niter::Int=10)
         r_s_t_b = sun_pv(t_b)[1:3] # barycentric position of Sun at bounce time
         p_U = norm(r_a_t_b-r_s_t_b) # heliocentric distance of asteroid at t_b
         q_U = norm(ρ_vec_t) #signal path (up-leg)
-        Δτ_rel_U = Δτ_rel_D = shapiro_delay(e_U, p_U, q_U) # days
+        Δτ_rel_U = shapiro_delay(e_U, p_U, q_U) # days
         Δτ_corona_U = corona_delay(r_e_t_t, r_a_t_b, t_t, τ_U, f_T) # days
         Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # days
-        τ_U = τ_U + Δτ_rel_U + Δτ_corona_U + Δτ_tropo_U
+        τ_U = τ_U + Δτ_rel_U # + Δτ_corona_U + Δτ_tropo_U
         # @show τ_U
         # @show Δτ_rel_U
         # @show Δτ_corona_U

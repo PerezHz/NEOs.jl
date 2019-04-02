@@ -4,7 +4,8 @@ __precompile__(false)
 
 export main, au, t0, yr, observer_position, apophisdofs, sundofs, earthdofs,
     ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler,
-    delay_doppler_jpleph, mas2rad, t2c_rotation_iau_00_06, tropo_delay, Ne
+    delay_doppler_jpleph, mas2rad, t2c_rotation_iau_00_06, tropo_delay, Ne,
+    process_radar_data_jpl, RadarDataJPL
 
 using Reexport
 @reexport using TaylorIntegration, LinearAlgebra # so that JLD may interpret previously saved Taylor1 objects saved in .jld files
@@ -70,6 +71,7 @@ function __init__()
     @show t0 == 2454733.5
 end
 
+include("process_jpl_data.jl")
 include("jpl-de-430-431-earth-orientation-model.jl")
 include("topocentric.jl")
 include("asteroid_dynamical_model.jl")
