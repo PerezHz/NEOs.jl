@@ -5,7 +5,7 @@ __precompile__(false)
 export main, au, t0, yr, observer_position, apophisdofs, sundofs, earthdofs,
     ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler,
     delay_doppler_jpleph, mas2rad, t2c_rotation_iau_00_06,
-    process_radar_data_jpl, RadarDataJPL
+    process_radar_data_jpl, RadarDataJPL, ismonostatic
 
 using Reexport
 @reexport using TaylorIntegration, LinearAlgebra # so that JLD may interpret previously saved Taylor1 objects saved in .jld files
@@ -37,7 +37,7 @@ const N = length(μ)
 const au = 1.495978707E8 # astronomical unit value in km
 const yr = 365.25 # days in a Julian year
 const c_au_per_day = 86400(299792.548/au) # speed of light in au per day
-const c_cm_per_sec = 100000c_au_per_day*au/86400 # speed of light in cm per sec
+const c_cm_per_sec = 100*299792548.0 # speed of light in cm per sec
 
 const t0 = Dates.datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
 
@@ -71,7 +71,7 @@ function __init__()
     @show t0 == 2454733.5
 end
 
-include("process_jpl_data.jl")
+include("process_radar_data_jpl.jl")
 include("jpl-de-430-431-earth-orientation-model.jl")
 include("topocentric.jl")
 include("asteroid_dynamical_model.jl")

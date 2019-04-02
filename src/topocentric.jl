@@ -1,4 +1,4 @@
-function observer_position(station_code, t_utc::T) where {T<:Real}
+function observer_position(station_code::Int, t_utc::DateTime)
     # east_long: East longitude (deg)
     # r_cos_phi: distance from spin axis (km), taken from Yeomans et al. (1992)
     # r_sin_phi: height above equatorial plane (km), taken from Yeomans et al. (1992)
@@ -31,8 +31,8 @@ function observer_position(station_code, t_utc::T) where {T<:Real}
 
     pos_geo = [x_gc, y_gc, z_gc]/au #au
 
-    # G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(t_utc, pos_geo)
-    G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(t_utc, pos_geo)
+    G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(t_utc, pos_geo)
+    # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(t_utc, pos_geo)
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
     return G_vec_ESAA, dG_vec_ESAA
@@ -48,14 +48,13 @@ mas2rad(x) = deg2rad(x/3.6e6) # mas/1000 -> arcsec; arcsec/3600 -> deg; deg2rad(
 # Some modifications were applied, using TaylorSeries.jl, in order to compute
 # the geocentric velocity of the observer, following the guidelines from
 # ESAA 2014, Sec 7.4.3.3 (page 295)
-function t2c_rotation_iau_00_06(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<:Real}
+function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector)
     # UTC
-    t0_utc = UTCEpoch(t_utc, origin=:julian)
-    t0_utc_jul = julian(t0_utc)
+    t0_utc_jul = datetime2julian(t_utc)
 
     # UT1
     # dut1 = EarthOrientation.getΔUT1(t0_utc_jul.Δt) # UT1-UTC (seconds)
-    t0_ut1 = UT1Epoch(t0_utc)
+    t0_ut1 = UT1Epoch(t_utc)
     t0_ut1_jd1, t0_ut1_jd2 = julian_twopart(t0_ut1)
     # Earth rotation angle
     era = iauEra00( t0_ut1_jd1.Δt, t0_ut1_jd2.Δt ) #rad
@@ -74,10 +73,10 @@ function t2c_rotation_iau_00_06(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
     dRz_minus_ERA = dRz_minus_era_T1()
 
     # TT
-    t0_tt = TTEpoch(t0_utc)
+    t0_tt = TTEpoch(t_utc)
     t0_tt_jd1, t0_tt_jd2 = julian_twopart(t0_tt)
     # Polar motion (arcsec->radians)
-    xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t0_utc_jul.Δt)
+    xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t0_utc_jul)
     xp = deg2rad(xp_arcsec/3600)
     yp = deg2rad(yp_arcsec/3600)
     # Polar motion matrix (TIRS->ITRS, IERS 2003)
@@ -88,7 +87,7 @@ function t2c_rotation_iau_00_06(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
     # CIP and CIO, IAU 2000A
     x, y, s = iauXys00a( t0_tt_jd1.Δt, t0_tt_jd2.Δt )
     # CIP offsets wrt IAU 2000A (mas->radians)
-    dx00_mas, dy00_mas = EarthOrientation.precession_nutation00(t0_utc_jul.Δt)
+    dx00_mas, dy00_mas = EarthOrientation.precession_nutation00(t0_utc_jul)
     dx00 = mas2rad(dx00_mas)
     dy00 = mas2rad(dy00_mas)
     # Add CIP corrections
@@ -117,9 +116,9 @@ end
 # Some modifications were applied, using TaylorSeries.jl, in order to compute
 # the geocentric velocity of the observer, following the guidelines from
 # ESAA 2014, Sec 7.4.3.3 (page 295)
-function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<:Real}
+function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector)
     # UTC
-    t0_utc = UTCEpoch(t_utc, origin=:julian)
+    t0_utc = UTCEpoch(t_utc)
     # TT
     t0_tt = TTEpoch(t0_utc)
     djmjd0 = julian(J2000_EPOCH).Δt # J2000.0 (TT) epoch (days)
@@ -140,7 +139,7 @@ function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
     # Build the rotation matrix
     rn = iauNumat(epsa, dpsi, deps)
     # Combine the matrices:  PN = N x P
-    rnpb = rn*rp
+    C = rn*rp
 
     # Equation of the equinoxes, including nutation correction
     ee = iauEqeq94(djmjd0, tt) + ddp80*cos(epsa)
@@ -165,23 +164,23 @@ function t2c_rotation_iau_76_80(t_utc::T, pos_geo::Vector{S}) where {T<:Real, S<
     dRz_minus_GAST = dRz_minus_gast_T1()
 
     # # Form celestial-terrestrial matrix (no polar motion yet)
-    # rc2ti = deepcopy(rnpb)
+    # rc2ti = deepcopy(C)
     # rc2ti = iauRz(gast, rc2ti)
 
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
-    rpom = Array{Float64}(I, 3, 3)
+    W = Array{Float64}(I, 3, 3)
     # Polar motion (arcsec->radians)
     xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t_utc)
     xp = deg2rad(xp_arcsec/3600)
     yp = deg2rad(yp_arcsec/3600)
-    rpom = iauRx(-yp, rpom)
-    rpom = iauRy(-xp, rpom)
+    W = iauRx(-yp, W)
+    W = iauRy(-xp, W)
 
     # # Form celestial-terrestrial matrix (including polar motion)
-    # rc2it = rpom*rc2ti
+    # rc2it = W*rc2ti
 
-    W_inv = inv(rpom)
-    C_inv = inv(rnpb)
+    W_inv = inv(W)
+    C_inv = inv(C)
 
     # g(t), \dot g(t) ESAA vectors
     g_vec_ESAA =  Rz_minus_GAST*(W_inv*pos_geo)

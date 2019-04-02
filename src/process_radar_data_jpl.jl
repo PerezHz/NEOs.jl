@@ -48,6 +48,9 @@ function RadarDataJPL(object::String,
         doppler, doppler_sigma, doppler_units, freq, rcvr, xmit, bouncepoint)
 end
 
+#monostatic mode: check that each receiver and transmitter are the same
+ismonostatic(rdata::RadarDataJPL) = rdata.rcvr == rdata.xmit
+
 function process_radar_data_jpl(radar_data_jpl_file_path::String)
     radar_data_jpl = readdlm(radar_data_jpl_file_path, '\t')
     dataformat_jpl = "y-m-d H:M:S"
