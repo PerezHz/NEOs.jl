@@ -1,38 +1,38 @@
 function observer_position(station_code::Int, t_utc::DateTime)
-    # east_long: East longitude (deg)
-    # r_cos_phi: distance from spin axis (km), taken from Yeomans et al. (1992)
-    # r_sin_phi: height above equatorial plane (km), taken from Yeomans et al. (1992)
+    # λ_deg: East longitude (deg)
+    # u: distance from spin axis (km), taken from Yeomans et al. (1992) u = r*cos(ϕ)
+    # v: height above equatorial plane (km), taken from Yeomans et al. (1992) v = r*sin(ϕ)
     # East long data is consistent with MPC database (2019-Mar-7)
     # TODO: add more radar stations
     if station_code == 251 # Arecibo
-        east_long = 293.24692 #deg
-        r_cos_phi = 6056.525 #km
-        r_sin_phi = 1994.665 #km
+        λ_deg = 293.24692 #deg
+        u = 6056.525 #km
+        v = 1994.665 #km
     elseif station_code == 252 # Goldstone DSS 13 (Venus site), Fort Irwin
-        east_long = 243.20512 #deg
-        r_cos_phi = 5215.484 #km
-        r_sin_phi = 3660.957 #km
+        λ_deg = 243.20512 #deg
+        u = 5215.484 #km
+        v = 3660.957 #km
     elseif station_code == 253 # Goldstone DSS 14 (Mars site), Fort Irwin
-        east_long = 243.11047 #deg
-        r_cos_phi = 5203.997 #km
-        r_sin_phi = 3677.052 #km
+        λ_deg = 243.11047 #deg
+        u = 5203.997 #km
+        v = 3677.052 #km
     elseif station_code == 254 # Haystack, Westford, MA
-        east_long = 288.51128 #deg
-        r_cos_phi = 4700.514 #km
-        r_sin_phi = 4296.900 #km
+        λ_deg = 288.51128 #deg
+        u = 4700.514 #km
+        v = 4296.900 #km
     else
         @error "Unknown station."
     end
     # cartesian components of Earth-fixed position of observer
-    east_long_rad = deg2rad(east_long)
-    x_gc = r_cos_phi*cos(east_long_rad) #km
-    y_gc = r_cos_phi*sin(east_long_rad) #km
-    z_gc = r_sin_phi #km
+    λ_rad = deg2rad(λ_deg) # rad
+    x_gc = u*cos(λ_rad) #km
+    y_gc = u*sin(λ_rad) #km
+    z_gc = v #km
 
     pos_geo = [x_gc, y_gc, z_gc]/au #au
 
-    G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(t_utc, pos_geo)
-    # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(t_utc, pos_geo)
+    # G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(t_utc, pos_geo)
+    G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(t_utc, pos_geo)
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
     return G_vec_ESAA, dG_vec_ESAA
@@ -50,11 +50,12 @@ mas2rad(x) = deg2rad(x/3.6e6) # mas/1000 -> arcsec; arcsec/3600 -> deg; deg2rad(
 # ESAA 2014, Sec 7.4.3.3 (page 295)
 function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector)
     # UTC
+    t0_utc = UTCEpoch(t_utc)
     t0_utc_jul = datetime2julian(t_utc)
 
     # UT1
-    # dut1 = EarthOrientation.getΔUT1(t0_utc_jul.Δt) # UT1-UTC (seconds)
-    t0_ut1 = UT1Epoch(t_utc)
+    # dut1 = EarthOrientation.getΔUT1(t_utc) # UT1-UTC (seconds)
+    t0_ut1 = UT1Epoch(t0_utc)
     t0_ut1_jd1, t0_ut1_jd2 = julian_twopart(t0_ut1)
     # Earth rotation angle
     era = iauEra00( t0_ut1_jd1.Δt, t0_ut1_jd2.Δt ) #rad
@@ -73,10 +74,10 @@ function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector)
     dRz_minus_ERA = dRz_minus_era_T1()
 
     # TT
-    t0_tt = TTEpoch(t_utc)
+    t0_tt = TTEpoch(t0_utc)
     t0_tt_jd1, t0_tt_jd2 = julian_twopart(t0_tt)
     # Polar motion (arcsec->radians)
-    xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t0_utc_jul)
+    xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t_utc)
     xp = deg2rad(xp_arcsec/3600)
     yp = deg2rad(yp_arcsec/3600)
     # Polar motion matrix (TIRS->ITRS, IERS 2003)
@@ -87,7 +88,7 @@ function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector)
     # CIP and CIO, IAU 2000A
     x, y, s = iauXys00a( t0_tt_jd1.Δt, t0_tt_jd2.Δt )
     # CIP offsets wrt IAU 2000A (mas->radians)
-    dx00_mas, dy00_mas = EarthOrientation.precession_nutation00(t0_utc_jul)
+    dx00_mas, dy00_mas = EarthOrientation.precession_nutation00(t_utc)
     dx00 = mas2rad(dx00_mas)
     dy00 = mas2rad(dy00_mas)
     # Add CIP corrections

@@ -56,13 +56,13 @@ omega(lod) = (86400e-12)*(72921151.467064 - 0.843994809lod)
 
 const R_sun = 696000.0/au # Solar radius in au, value taken from DE430 docs
 
-# const A_sun = 1.06e8 # Solar corona parameter A [cm^-3] (ESAA 2014, Table 8.5 p. 329)
-# const a_sun = 4.89e5 # Solar corona parameter a [cm^-3] (ESAA 2014, Table 8.5 p. 329)
-# const b_sun = 3.91e5 # Solar corona parameter b [cm^-3] (ESAA 2014, Table 8.5 p. 329)
+const A_sun = 1.06e8 # Solar corona parameter A [cm^-3] (ESAA 2014, Table 8.5 p. 329)
+const a_sun = 4.89e5 # Solar corona parameter a [cm^-3] (ESAA 2014, Table 8.5 p. 329)
+const b_sun = 3.91e5 # Solar corona parameter b [cm^-3] (ESAA 2014, Table 8.5 p. 329)
 
-const A_sun = 1.67e8 # Solar corona parameter A [cm^-3] (Anderson 1978)
-const a_sun = 0.750e6 # Solar corona parameter a [cm^-3] (Anderson 1978)
-const b_sun = 0.1836e6 # Solar corona parameter b [cm^-3] (Anderson 1978)
+# const A_sun = 1.67e8 # Solar corona parameter A [cm^-3] (Anderson 1978)
+# const a_sun = 0.750e6 # Solar corona parameter a [cm^-3] (Anderson 1978)
+# const b_sun = 0.1836e6 # Solar corona parameter b [cm^-3] (Anderson 1978)
 
 function __init__()
     @show length(methods(RNp1BP_pN_A_J234E_J2S_ng!))
