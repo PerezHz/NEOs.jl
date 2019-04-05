@@ -292,11 +292,11 @@ function corona_delay(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{T}, v_s_t0::V
     Δτ_corona = 40.3int_path/(c_cm_per_sec*f_T^2) # seconds
     # numerical factor k dependent on transmitter frequency (S-band, X-band) (Muhleman & Anderson, 1981 ApJ 247-1093)
     if station_code == 251 # Arecibo
-        k = 0.00435
+        k = 0.0000005
     elseif station_code == 252 # Goldstone DSS 13 (Venus site), Fort Irwin
         k = 0.0
     elseif station_code == 253 # Goldstone DSS 14 (Mars site), Fort Irwin
-        k = 0.054
+        k = 0.0005
     elseif station_code == 254 # Haystack, Westford, MA
         k = 0.0
     end

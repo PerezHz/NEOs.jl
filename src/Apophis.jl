@@ -36,9 +36,9 @@ const N = length(μ)
 
 const au = 1.495978707E8 # astronomical unit value in km
 const yr = 365.25 # days in a Julian year
-const daysec = 86400 # number of seconds in a day
-const c_au_per_day = daysec*(299792.548/au) # speed of light in au per day
-const c_cm_per_sec = 100*299792548.0 # speed of light in cm per sec
+const daysec = 86_400 # number of seconds in a day
+const c_au_per_day = daysec*(299_792.458/au) # speed of light in au per day
+const c_cm_per_sec = 100_000*299_792.458 # speed of light in cm per sec
 
 const t0 = Dates.datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
 
