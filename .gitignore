@@ -3,3 +3,4 @@
 *.err
 notebooks/.ipynb_checkpoints
 jpleph/
+notebooks/figs

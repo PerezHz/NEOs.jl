@@ -36,7 +36,8 @@ const N = length(μ)
 
 const au = 1.495978707E8 # astronomical unit value in km
 const yr = 365.25 # days in a Julian year
-const c_au_per_day = 86400(299792.548/au) # speed of light in au per day
+const daysec = 86400 # number of seconds in a day
+const c_au_per_day = daysec*(299792.548/au) # speed of light in au per day
 const c_cm_per_sec = 100*299792548.0 # speed of light in cm per sec
 
 const t0 = Dates.datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
@@ -49,10 +50,10 @@ const ssdofs = setdiff(1:72, apophisdofs)
 const J2000 = 2.451545e6
 
 # standard value of nominal mean angular velocity of Earth (rad/day), ESAA 2014 Sec 7.4.3.3 p. 296
-const ω = 86400*7.292115e-5
+const ω = daysec*7.292115e-5
 # The relationship of the angular velocity of the earth Omega with LOD is (https://www.iers.org/IERS/EN/Science/EarthRotation/UT1LOD.html)
 # where `omega` is in units of rad/day, and `lod` is in units of milliseconds
-omega(lod) = (86400e-12)*(72921151.467064 - 0.843994809lod)
+omega(lod) = (1e-12daysec)*(72921151.467064 - 0.843994809lod)
 
 const R_sun = 696000.0/au # Solar radius in au, value taken from DE430 docs
 
