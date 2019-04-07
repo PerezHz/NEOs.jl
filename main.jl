@@ -15,7 +15,7 @@ const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integrat
 @show t0 == 2454733.5
 
 #integrator warmup
-main(objname, objdata, 1, newtoniter, t0, nyears, output=true, radarobs=radarobs, jt=jt)
+main(objname, objdata, 1, newtoniter, t0, nyears, output=false, radarobs=radarobs, jt=jt)
 println("*** Finished warmup")
 
 #root-finding methods warmup (integrate until first root-finding event):
