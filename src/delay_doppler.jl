@@ -285,6 +285,9 @@ function corona_k(f_T::T) where {T<:Real}
         return 5e-7
     elseif isxband(f_T)
         return 5e-4
+    else
+        @warn "Frequency is neither X or S band. Returning k=1.0."
+        return 1.0
     end
 end
 
