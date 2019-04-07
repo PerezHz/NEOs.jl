@@ -197,7 +197,10 @@ function delay_doppler(x, station_code::Int, t_r_utc::DateTime, f_T, niter::Int=
     return 1e6τ, 1e6ν # total signal delay (μs) and Doppler shift (Hz)
 end
 
-const eph = Ephem(["jpleph/a99942.bsp", "jpleph/de430_1850-2150.bsp", "jpleph/TTmTDB.de430.19feb2015.bsp"])
+# construct path of JPL ephemerides
+const jplephpath = joinpath(dirname(pathof(Apophis)), "../jpleph")
+# read JPL ephemerides (Apophis, Solar System, TT-TDB)
+const eph = Ephem(joinpath.(jplephpath, ["a99942.bsp", "de430_1850-2150.bsp", "TTmTDB.de430.19feb2015.bsp"]))
 prefetch(eph)
 
 # CALCEPH index conventions:

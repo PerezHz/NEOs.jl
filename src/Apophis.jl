@@ -2,15 +2,17 @@ module Apophis
 
 __precompile__(false)
 
-export main, au, t0, yr, observer_position, apophisdofs, sundofs, earthdofs,
+export main, au, yr, observer_position, apophisdofs, sundofs, earthdofs,
     ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler,
     delay_doppler_jpleph, mas2rad, t2c_rotation_iau_00_06,
     process_radar_data_jpl, RadarDataJPL, ismonostatic
 
 using Reexport
 @reexport using TaylorIntegration, LinearAlgebra # so that JLD may interpret previously saved Taylor1 objects saved in .jld files
+@reexport using Printf
+using Dates: DateTime, julian2datetime, datetime2julian
 using DelimitedFiles
-using Dates, Test
+using Test
 using JLD
 using AstroTime, EarthOrientation, SOFA, CALCEPH
 # using Statistics: mean
@@ -40,8 +42,6 @@ const daysec = 86_400 # number of seconds in a day
 const c_au_per_day = daysec*(299_792.458/au) # speed of light in au per day
 const c_cm_per_sec = 100_000*299_792.458 # speed of light in cm per sec
 
-const t0 = Dates.datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
-
 const apophisdofs = union(34:36, 70:72)
 const sundofs = union(1:3, 37:39)
 const earthdofs = union(3ea-2:3ea, 3(N+ea)-2:3(N+ea))
@@ -69,7 +69,6 @@ function __init__()
     @show length(methods(RNp1BP_pN_A_J234E_J2S_ng!))
     @show length(methods(TaylorIntegration.jetcoeffs!))
     @show methods(RNp1BP_pN_A_J234E_J2S_ng!)
-    @show t0 == 2454733.5
 end
 
 include("process_radar_data_jpl.jl")
@@ -83,75 +82,74 @@ include("delay_doppler.jl")
 g(t,x,dx) = (x[3N-2]-x[3ea-2])^2+(x[3N-1]-x[3ea-1])^2+(x[3N]-x[3ea])^2
 g2(t,x,dx) = (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x[6N-1]-x[3(N+ea)-1])+(x[3N]-x[3ea])*(x[6N]-x[3(N+ea)])
 
-# Apophis instantaneous geocentric range, radial velocity
+# instantaneous geocentric range, radial velocity
 range_ae(x) = sqrt( (x[3N-2]-x[3ea-2])^2+(x[3N-1]-x[3ea-1])^2+(x[3N]-x[3ea])^2 )
 radvel_ae(x) = ( (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x[6N-1]-x[3(N+ea)-1])+(x[3N]-x[3ea])*(x[6N]-x[3(N+ea)]) )/range_ae(x)
 
-function main(maxsteps::Int, newtoniter::Int, tspan::T; output::Bool=true,
-        radarobs::Bool=true) where {T<:Real}
+function main(objname::String, datafile::String, maxsteps::Int, newtoniter::Int,
+    t0::T, tspan::T; output::Bool=true, radarobs::Bool=true, jt::Bool=true) where {T<:Real}
 
     # get initial conditions
     q0 = initialcond(length(μ))
 
-    #construct jet transport initial condition as Vector{Taylor1{Float64}} from `q0`
-    q0T1 = Taylor1.(q0,varorder)
-    q0T1[1:end-1] = Taylor1.(q0[1:end-1],varorder)
-    q0T1[end] = Taylor1([q0[end],1e-14],varorder) #note the 1e-14!!!
+    if jt
+        #construct jet transport initial condition as Vector{Taylor1{Float64}} from `q0`
+        q0T1 = Taylor1.(q0,varorder)
+        q0T1[1:end-1] = Taylor1.(q0[1:end-1],varorder)
+        q0T1[end] = Taylor1([q0[end],1e-14],varorder) #note the 1e-14!!!
+        __q0 = q0T1
+    else
+        __q0 = q0
+    end
 
     @show tmax = t0+tspan*yr #final time of integration
 
-    # @show q0T1() == q0
-    # @show map(x->x[1], q0T1[1:end-1]) == zeros(72)
-    # @show q0T1[end][0] == 0.0
-    # @show q0T1[end][1] == 1.0e-14
-
     # do integration
     if radarobs
-        # read Apophis radar astrometry from JPL date
-        jpl_radar = readdlm("Apophis_JPL_data.dat", '\t')
-        # JPL date/time format
-        df_jpl = "y-m-d H:M:S"
+        # read object radar astrometry from JPL date
+        radar_data_jpl = process_radar_data_jpl(datafile)
         #construct vector of observation times (UTC) > t0
-        tv_jpl_utc = UTCEpoch.(DateTime.(jpl_radar[:,2], df_jpl)[8:end])
+        tv_jpl_utc = UTCEpoch.([x.utcepoch for x in radar_data_jpl])
         # convert to TDB
         tv_jpl_tdb = TDBEpoch.(tv_jpl_utc)
         # date/time to Julian date
-        tv_jpl_tdb_julian = julian.(tv_jpl_tdb)
+        tv_jpl_tdb_julian =  map(x->x.Δt, julian.(tv_jpl_tdb))
         # construct time range variable with t0 and observation times > t0, removing repeated values
-        tv_jpl_integ = union(t0, map(x->x.Δt, tv_jpl_tdb_julian))
-
-        @time sol_objs = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, tv_jpl_integ, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+        tv = union(t0, tv_jpl_tdb_julian[tv_jpl_tdb_julian .> t0])
+        @show all(diff(tv) .> 0)
+        @time sol_objs = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, __q0, tv, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
         tup_names = (:xv1, :tvS1, :xvS1, :gvS1)
         sol = NamedTuple{tup_names}(sol_objs)
     else
-        @time sol_objs = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, q0T1, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+        @time sol_objs = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, __q0, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
         tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
         sol = NamedTuple{tup_names}(sol_objs)
     end
 
     #write solution to .jld files
     if output
-        println("Saving solution to .jld files")
+        filename = string(objname, "_jt.jld")
+        println("Saving solution to file: $filename")
         #first, deal with `tv_jpl_integ`
-        # filename = string("Apophis_jt_", "tv_jpl_integ", ".jld")
-        filename = string("Apophis_jt.jld")
         jldopen(filename, "w") do file
-            println("Saving variable: tv_jpl_integ")
-            write(file, "tv_jpl_integ", tv_jpl_integ)
+            if radarobs
+                println("Saving variable: tv1")
+                write(file, "tv1", tv)
+            end
             #loop over variables
             for ind in eachindex(sol)
                 varname = string(ind)
-                # filename = string("Apophis_jt_", varname, ".jld")
                 println("Saving variable: ", varname)
                 write(file, varname, sol[ind])
-                # save(filename, varname, sol[ind])
             end
         end
         #check that tv_jpl_integ was recovered succesfully
         println("Checking that all variables were saved correctly...")
-        recovered_tv_jpl_integ = load(filename, "tv_jpl_integ")
-        @show recovered_tv_jpl_integ == tv_jpl_integ
-        #loop over variables
+        if radarobs
+            recovered_tv_jpl_integ = load(filename, "tv1")
+            @show recovered_tv_jpl_integ == tv
+        end
+        #loop over rest of variables
         for ind in eachindex(sol)
             varname = string(ind)
             #read varname from files and assign recovered variable to recovered_sol_i
