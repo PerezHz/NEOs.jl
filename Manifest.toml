@@ -176,10 +176,10 @@ uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "0.20.0"
 
 [[JuliaInterpreter]]
-deps = ["CodeTracking", "Dates", "Distributed", "InteractiveUtils", "Random", "SHA", "Test", "UUIDs"]
-git-tree-sha1 = "126d66c97171e676c3446f643ea159966d3ab10b"
+deps = ["CodeTracking", "Dates", "Distributed", "InteractiveUtils", "Mmap", "Random", "SHA", "Test", "UUIDs"]
+git-tree-sha1 = "9234d36f3837f0071e209ed338a01e48b1423940"
 uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
-version = "0.3.2"
+version = "0.4.1"
 
 [[LeapSeconds]]
 deps = ["Dates", "Test"]
@@ -325,9 +325,9 @@ version = "0.5.2"
 
 [[Revise]]
 deps = ["CodeTracking", "Distributed", "FileWatching", "InteractiveUtils", "JuliaInterpreter", "LibGit2", "LoweredCodeUtils", "OrderedCollections", "Pkg", "REPL", "Random", "Test", "UUIDs", "Unicode"]
-git-tree-sha1 = "58cc98a8c1ef3a90e0208fd4e530af2e75d168e2"
+git-tree-sha1 = "cdf9eba89e1ea2c312db1aa426adebb27431a4bd"
 uuid = "295af30f-e4ad-537b-8983-00126c2a3abe"
-version = "2.0.2"
+version = "2.1.0"
 
 [[Roots]]
 deps = ["Printf", "Statistics", "Test"]
@@ -380,9 +380,9 @@ version = "0.4.1"
 
 [[TaylorIntegration]]
 deps = ["DiffEqBase", "Espresso", "LinearAlgebra", "Markdown", "Reexport", "TaylorSeries", "Test"]
-git-tree-sha1 = "f323a41e5cc23d5500816f6f3b5b9c1e9d64bf88"
+git-tree-sha1 = "b72bab37a869b6fd850cb06dca7480cddf081f47"
 uuid = "92b13dbe-c966-51a2-8445-caca9f8a7d42"
-version = "0.4.0"
+version = "0.4.1"
 
 [[TaylorSeries]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Markdown", "Requires", "SparseArrays", "Test"]
