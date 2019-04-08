@@ -11,6 +11,7 @@ const maxsteps = 10000
 const nyears = 24.0 # since t0 is 2008-9-24, this ends the integration on 2032-9-24; NOTE: this value is overriden when evaluating solution at JPL radar observation times
 const radarobs = false#true
 const jt = false#true
+const dynamics = RNp1BP_pN_A_J234E_J2S_ng!
 const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
 @show t0 == 2454733.5
 
@@ -22,7 +23,7 @@ println("*** Finished warmup")
 # main(objname, objdata, 100, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
 # println("*** Finished root-finding warmup")
 
-main(objname, objdata, 300, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
+main(objname, objdata, dynamics, 300, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
 println("*** Finished root-finding test: several roots")
 
 #Full jet transport integration until ~2038: about 8,000 steps

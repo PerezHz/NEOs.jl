@@ -5,7 +5,9 @@ __precompile__(false)
 export main, au, yr, observer_position, apophisdofs, sundofs, earthdofs,
     ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler,
     delay_doppler_jpleph, mas2rad, t2c_rotation_iau_00_06,
-    process_radar_data_jpl, RadarDataJPL, ismonostatic
+    process_radar_data_jpl, RadarDataJPL, ismonostatic,
+    RNp1BP_pN_A_J234E_J2S_ng!, RNp1BP_pN_A_J234E_J2S_ng_d225!,
+    RNp1BP_pN_A_J234E_J2S_ng_d225_srp!
 
 using Reexport
 @reexport using TaylorIntegration, LinearAlgebra # so that JLD may interpret previously saved Taylor1 objects saved in .jld files
@@ -61,6 +63,9 @@ const A_sun = 1.06e8 # Solar corona parameter A [cm^-3] (ESAA 2014, Table 8.5 p.
 const a_sun = 4.89e5 # Solar corona parameter a [cm^-3] (ESAA 2014, Table 8.5 p. 329)
 const b_sun = 3.91e5 # Solar corona parameter b [cm^-3] (ESAA 2014, Table 8.5 p. 329)
 
+const S0_sun = 63.15E6 # Sun radiated power intensity at photosphere surface, Watt/meter^2
+const m2_s3_to_au2_day3 = 1e-6daysec^3/au^2 # conversion factor from m^2/sec^3 to au^2/day^3
+
 # const A_sun = 1.67e8 # Solar corona parameter A [cm^-3] (Anderson 1978)
 # const a_sun = 0.750e6 # Solar corona parameter a [cm^-3] (Anderson 1978)
 # const b_sun = 0.1836e6 # Solar corona parameter b [cm^-3] (Anderson 1978)
@@ -74,7 +79,7 @@ end
 include("process_radar_data_jpl.jl")
 include("jpl-de-430-431-earth-orientation-model.jl")
 include("topocentric.jl")
-include("asteroid_dynamical_model.jl")
+include("asteroid_dynamical_models.jl")
 include("initial_conditions.jl")
 include("delay_doppler.jl")
 
@@ -86,8 +91,9 @@ g2(t,x,dx) = (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x[6N-
 range_ae(x) = sqrt( (x[3N-2]-x[3ea-2])^2+(x[3N-1]-x[3ea-1])^2+(x[3N]-x[3ea])^2 )
 radvel_ae(x) = ( (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x[6N-1]-x[3(N+ea)-1])+(x[3N]-x[3ea])*(x[6N]-x[3(N+ea)]) )/range_ae(x)
 
-function main(objname::String, datafile::String, maxsteps::Int, newtoniter::Int,
-    t0::T, tspan::T; output::Bool=true, radarobs::Bool=true, jt::Bool=true) where {T<:Real}
+function main(objname::String, datafile::String, dynamics::Function, maxsteps::Int,
+    newtoniter::Int, t0::T, tspan::T; output::Bool=true, radarobs::Bool=true,
+    jt::Bool=true) where {T<:Real}
 
     # get initial conditions
     q0 = initialcond(length(μ))
@@ -117,11 +123,11 @@ function main(objname::String, datafile::String, maxsteps::Int, newtoniter::Int,
         # construct time range variable with t0 and observation times > t0, removing repeated values
         tv = union(t0, tv_jpl_tdb_julian[tv_jpl_tdb_julian .> t0])
         @show all(diff(tv) .> 0)
-        @time sol_objs = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, __q0, tv, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+        @time sol_objs = taylorinteg(dynamics, g2, __q0, tv, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
         tup_names = (:xv1, :tvS1, :xvS1, :gvS1)
         sol = NamedTuple{tup_names}(sol_objs)
     else
-        @time sol_objs = taylorinteg(RNp1BP_pN_A_J234E_J2S_ng!, g2, __q0, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+        @time sol_objs = taylorinteg(dynamics, g2, __q0, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
         tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
         sol = NamedTuple{tup_names}(sol_objs)
     end
