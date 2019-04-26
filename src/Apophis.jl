@@ -16,7 +16,7 @@ using Dates: DateTime, julian2datetime, datetime2julian
 using DelimitedFiles
 using Test
 using JLD
-using AstroTime, EarthOrientation, SOFA, CALCEPH
+using AstroTime, EarthOrientation, SOFA, SPICE
 # using Statistics: mean
 
 # integration parameters
@@ -42,6 +42,7 @@ const au = 1.495978707E8 # astronomical unit value in km
 const yr = 365.25 # days in a Julian year
 const daysec = 86_400 # number of seconds in a day
 const c_au_per_day = daysec*(299_792.458/au) # speed of light in au per day
+const c_au_per_sec = 299_792.458/au # speed of light in au per sec
 const c_cm_per_sec = 100_000*299_792.458 # speed of light in cm per sec
 
 const apophisdofs = union(34:36, 70:72)
@@ -74,6 +75,8 @@ function __init__()
     @show length(methods(RNp1BP_pN_A_J234E_J2S_ng!))
     @show length(methods(TaylorIntegration.jetcoeffs!))
     @show methods(RNp1BP_pN_A_J234E_J2S_ng!)
+    # load JPL ephemerides
+    loadjpleph()
 end
 
 include("process_radar_data_jpl.jl")

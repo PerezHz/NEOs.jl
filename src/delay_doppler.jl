@@ -150,7 +150,8 @@ function delay_doppler(x, station_code::Int, t_r_utc::DateTime, f_T, niter::Int=
     j != 0 && @warn "iauDat: j = $j. See SOFA.jl docs for more detail."
     tt_utc_t = 32.184 + tai_utc_t # seconds
     ##TT-TDB (transmit time)
-    tt_tdb_t = tt_m_tdb(constant_term(t_t))[1] # seconds
+    tdb_arg = (constant_term(t_t)-J2000)*daysec
+    tt_tdb_t = tt_m_tdb(tdb_arg)[1] # seconds
     tdb_utc_t = tt_utc_t - tt_tdb_t #seconds
     @show tdb_utc_t
 
@@ -162,7 +163,9 @@ function delay_doppler(x, station_code::Int, t_r_utc::DateTime, f_T, niter::Int=
     tt_utc_r = 32.184 + tai_utc_r
     tt_tdb_r = 0.0
     for i in 1:niter+1
-        tt_tdb_r = tt_m_tdb(utc_jd1_r.Δt + utc_jd2_r.Δt + tt_utc_r/daysec + tt_tdb_r)[1] # seconds
+        tdb_arg = utc_jd1_r.Δt + utc_jd2_r.Δt + tt_utc_r/daysec + tt_tdb_r
+        tdb_arg = (tdb_arg-J2000)*daysec
+        tt_tdb_r = tt_m_tdb(tdb_arg)[1] # seconds
         @show tt_tdb_r
     end
     tdb_utc_r = tt_utc_r - tt_tdb_r #seconds
@@ -199,24 +202,43 @@ end
 
 # construct path of JPL ephemerides
 const jplephpath = joinpath(dirname(pathof(Apophis)), "../jpleph")
+
 # read JPL ephemerides (Apophis, Solar System, TT-TDB)
-const eph = Ephem(joinpath.(jplephpath, ["a99942.bsp", "de430_1850-2150.bsp", "TTmTDB.de430.19feb2015.bsp"]))
-prefetch(eph)
+function loadjpleph()
+    furnsh.( joinpath.(jplephpath, ["a99942.bsp", "de430_1850-2150.bsp", "TTmTDB.de430.19feb2015.bsp"]) )
+end
 
-# CALCEPH index conventions:
-#12: Solar System Barycenter
-#11: Sun (heliocenter)
+# this is an auxiliary function which converts a [x,y,z,vx,vy,vz] "state" vector from km,km/sec units to au,au/day
+function kmsec2auday(pv)
+    pv /= au # (km, km/sec) -> (au, au/sec)
+    pv[4:6] *= daysec # (au, au/sec) -> (au, au/day)
+    return pv
+end
+
+# get [x,y,z,vx,vy,vz] geometric "state" vector at TDB instant `et` from
+# SPK-formatted ephemeris file wrt J2000 frame
+function getpv(target::Int, observer::Int, et)
+    return spkgeo(target, et, "J2000", observer)[1] # units: km,km/sec
+end
+
+# NAIF IDs:
+#0: Solar System Barycenter
+#10: Sun (heliocenter)
 #2099942: Apophis
-#3: Earth (geocenter)
-#10: Moon
+#399: Earth (geocenter)
+#301: Moon
 #1000000001 from body 1000000000: TT-TDB
-apophis_pv(jd1, jd2) = compute(eph, jd1, jd2, 2099942   , 12        , unitKM+unitDay, 1)/au # units: au, au/day
-sun_pv(jd1, jd2)     = compute(eph, jd1, jd2, 11        , 12        , unitKM+unitDay, 1)/au # units: au, au/day
-earth_pv(jd1, jd2)   = compute(eph, jd1, jd2, 3         , 12        , unitKM+unitDay, 1)/au # units: au, au/day
-moon_pv(jd1, jd2)    = compute(eph, jd1, jd2, 10        , 12        , unitKM+unitDay, 1)/au # units: au, au/day
-tt_m_tdb(jd1, jd2)   = compute(eph, jd1, jd2, 1000000001, 1000000000, unitSec       , 1) # units: seconds
-
-tt_m_tdb(t) = tt_m_tdb(t, 0.0) # units: seconds
+# Here, we follow the convention from the CSPICE, library, that the ephemeris
+# time is referred to the J2000 frame epoch:
+# https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/spk.html#Terminology
+# argument `et` represents "ephemeris seconds" (TDB seconds) since J2000.0 TDB epoch
+# position and velocity are assumed to be returned in km, km/sec, resp., by spkgeo
+# https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/spkgeo_c.html (see: Detailed ouput section)
+apophis_pv(et) = kmsec2auday( getpv(2099942, 0, et) ) # units: au, au/day
+sun_pv(et) = kmsec2auday( getpv(10, 0, et) ) # units: au, au/day
+earth_pv(et) = kmsec2auday( getpv(399, 0, et) ) # units: au, au/day
+moon_pv(et) = kmsec2auday( getpv(399, 0, et) ) # units: au, au/day
+tt_m_tdb(et) = getpv(1000000001, 1000000000, et) # units: seconds
 
 # Standard formula for relativistic (Shapiro) delay
 function shapiro_delay(e, p, q)
@@ -332,35 +354,40 @@ function tropo_delay(r_antenna::Vector{T}, ρ_vec_ae::Vector{S}) where {T<:Numbe
 end
 
 # Alternate version of delay_doppler, using JPL ephemerides
-# eph: Solar System + Apophis ephemerides pos/vel (au, au/day)
 # station_code: observing station identifier (MPC nomenclature)
 # t_r_utc_julian: time of echo reception (UTC)
 # f_T: transmitter frequency (MHz)
 function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::Int=10)
     # UTC -> TDB (receiving time)
-    __t_r_jd1, __t_r_jd2 = julian_twopart(TDB, UTCEpoch(t_r_utc))
-    t_r_jd1, t_r_jd2 = __t_r_jd1.Δt, __t_r_jd2.Δt
+    # __t_r_jd1, __t_r_jd2 = julian_twopart(TDB, UTCEpoch(t_r_utc))
+    # t_r_jd1, t_r_jd2 = __t_r_jd1.Δt, __t_r_jd2.Δt
+    t_r_jd_j2000 = seconds( AstroTime.j2000(TDB, UTCEpoch(t_r_utc)) ).Δt
     # @show t_r_jd1+t_r_jd2
+    # @show t_r_jd_j2000
+    # @show t_r_utc
+    # @show TDBEpoch(UTCEpoch(t_r_utc))
 
     # Geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
     R_r, V_r = observer_position(station_code, t_r_utc)
 
     # Earth's barycentric position and velocity at the receive time
-    rv_e_t_r = earth_pv(t_r_jd1, t_r_jd2)
+    rv_e_t_r = earth_pv(t_r_jd_j2000)
     r_e_t_r = rv_e_t_r[1:3]
     v_e_t_r = rv_e_t_r[4:6]
+    # @show r_e_t_r
+    # @show v_e_t_r
 
     # Barycentric position and velocity of the receiver at the receive time
     r_r_t_r = r_e_t_r + R_r
     v_r_t_r = v_e_t_r + V_r
 
     # asteroid barycentric position (in au) at receiving time (TDB)
-    rv_a_t_r = apophis_pv(t_r_jd1, t_r_jd2)
+    rv_a_t_r = apophis_pv(t_r_jd_j2000)
     r_a_t_r = rv_a_t_r[1:3]
     v_a_t_r = rv_a_t_r[4:6]
 
     # Sun barycentric position (in au) at receiving time (TDB)
-    vr_s_t_r = sun_pv(t_r_jd1, t_r_jd2)
+    vr_s_t_r = sun_pv(t_r_jd_j2000)
     r_s_t_r = vr_s_t_r[1:3]
     v_s_t_r = vr_s_t_r[4:6]
 
@@ -368,25 +395,25 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
     # τ_D first approximation: Eq. (1) Yeomans et al. (1992)
     ρ_vec_r = r_a_t_r - r_r_t_r
     ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
-    τ_D = ρ_r/c_au_per_day # (days) -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
+    τ_D = ρ_r/c_au_per_sec # (seconds) -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
     # bounce time, 1st estimate, Eq. (2) Yeomans et al. (1992)
-    t_b_jd1, t_b_jd2 = t_r_jd1, t_r_jd2-τ_D
+    t_b_jd_j2000 = t_r_jd_j2000-τ_D
     # asteroid barycentric position (in au) at bounce time (TDB)
-    rv_a_t_b = apophis_pv(t_b_jd1, t_b_jd2)
+    rv_a_t_b = apophis_pv(t_b_jd_j2000)
     r_a_t_b = rv_a_t_b[1:3]
     v_a_t_b = rv_a_t_b[4:6]
-    Δτ_rel_D = zero(τ_D)
+    # Δτ_rel_D = zero(τ_D)
     for i in 1:niter
         # Eq. (3) Yeomans et al. (1992)
         ρ_vec_r = r_a_t_b - r_r_t_r
         # Eq. (4) Yeomans et al. (1992)
         ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
-        τ_D = ρ_r/c_au_per_day # (days) -R_b/c (COM correction) + Δτ_D (relativistic, tropo, iono...)
+        τ_D = ρ_r/c_au_per_sec # (seconds) -R_b/c (COM correction) + Δτ_D (relativistic, tropo, iono...)
         # compute down-leg Shapiro delay
         # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, Δτ_rel_[D|U]
         r_rs_t_r = r_r_t_r-r_s_t_r
         e_D = norm(r_rs_t_r) # norm(r_e_t_r-r_s_t_r) # heliocentric distance of station at t_r
-        rv_s_t_b = sun_pv(t_b_jd1, t_b_jd2) # barycentric position and velocity of Sun at estimated bounce time
+        rv_s_t_b = sun_pv(t_b_jd_j2000) # barycentric position and velocity of Sun at estimated bounce time
         r_s_t_b = rv_s_t_b[1:3]
         v_s_t_b = rv_s_t_b[4:6]
         r_as_t_b = r_a_t_b-r_s_t_b
@@ -395,16 +422,16 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
         Δτ_rel_D = shapiro_delay(e_D, p_D, q_D) # days
         Δτ_corona_D = corona_delay(r_a_t_b, r_e_t_r, r_s_t_b, v_s_t_b, f_T, station_code)
         Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)
-        Δτ_D = Δτ_corona_D + (Δτ_rel_D + Δτ_tropo_D)
-        τ_D = τ_D + Δτ_D
+        Δτ_D = Δτ_corona_D + (Δτ_rel_D + Δτ_tropo_D) # days TODO: convert formulas to seconds
+        τ_D = τ_D + Δτ_D*daysec
         # @show τ_D
-        # @show Δτ_rel_D*(1e6*daysec)
-        # @show Δτ_corona_D*(1e6*daysec)
-        # @show Δτ_tropo_D*(1e6*daysec)
+        # @show Δτ_rel_D*(1e6)
+        # @show Δτ_corona_D*(1e6)
+        # @show Δτ_tropo_D*(1e6)
         # bounce time, new estimate Eq. (2) Yeomans et al. (1992)
-        t_b_jd2 = t_r_jd2-τ_D
+        t_b_jd_j2000 = t_r_jd_j2000-τ_D
         # asteroid barycentric position (in au) at bounce time (TDB)
-        rv_a_t_b = apophis_pv(t_b_jd1, t_b_jd2)
+        rv_a_t_b = apophis_pv(t_b_jd_j2000)
         r_a_t_b = rv_a_t_b[1:3]
         v_a_t_b = rv_a_t_b[4:6]
     end
@@ -419,13 +446,13 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
     τ_U = τ_D
     # @show τ_U
     # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
-    t_t_jd1, t_t_jd2 = t_r_jd1, t_r_jd2-(τ_U+τ_D)
+    t_t_jd_j2000 = t_r_jd_j2000-(τ_U+τ_D)
     # convert transmit time to UTC time
     # TDB -> UTC
-    t_t_utc = DateTime(UTCEpoch(TDBEpoch(t_t_jd1, t_t_jd2, origin=:julian)))
+    t_t_utc = DateTime(UTCEpoch(TDBEpoch(t_t_jd_j2000/daysec, origin=:j2000)))
     # Geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
     R_t, V_t = observer_position(station_code, t_t_utc)
-    rv_e_t_t = earth_pv(t_r_jd1, t_r_jd2-(τ_U+τ_D))
+    rv_e_t_t = earth_pv(t_t_jd_j2000)
     r_e_t_t = rv_e_t_t[1:3]
     v_e_t_t = rv_e_t_t[4:6]
     # Barycentric position and velocity of the transmitter at the transmit time
@@ -435,38 +462,38 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
     ρ_vec_t = r_a_t_b - r_t_t_t
     ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
     # Sun barycentric position (in au) at transmit time (TDB)
-    r_s_t_t = sun_pv(t_r_jd1, t_r_jd2-(τ_U+τ_D))[1:3]
+    r_s_t_t = sun_pv(t_t_jd_j2000)[1:3]
     Δτ_rel_U = zero(τ_U)
     for i in 1:niter
         # Eq. (8) Yeomans et al. (1992)
-        τ_U = ρ_t/c_au_per_day # (days) -R_b/c (COM correction) + Δτ_U (relativistic, tropo, iono...)
+        τ_U = ρ_t/c_au_per_sec # (seconds) -R_b/c (COM correction) + Δτ_U (relativistic, tropo, iono...)
         # Sun barycentric position and velocity (in au, au/day) at transmit time (TDB)
-        rv_s_t_t = sun_pv(t_r_jd1, t_r_jd2-(τ_U-τ_D))
+        rv_s_t_t = sun_pv(t_r_jd_j2000-(τ_U+τ_D))
         r_s_t_t = rv_s_t_t[1:3]
         v_s_t_t = rv_s_t_t[4:6]
         # compute up-leg Shapiro delay
         e_U = norm(r_t_t_t-r_s_t_t) # heliocentric distance of station at t_t
-        r_s_t_b = sun_pv(t_b_jd1, t_b_jd2)[1:3] # barycentric position of Sun at bounce time
+        r_s_t_b = sun_pv(t_b_jd_j2000)[1:3] # barycentric position of Sun at bounce time
         p_U = norm(r_a_t_b-r_s_t_b) # heliocentric distance of asteroid at t_b
         q_U = norm(ρ_vec_t) #signal path (up-leg)
         Δτ_rel_U = shapiro_delay(e_U, p_U, q_U) # days
         Δτ_corona_U = corona_delay(r_e_t_t, r_a_t_b, r_s_t_t, v_s_t_t, f_T, station_code) # days
         Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # days
         Δτ_U = Δτ_corona_U + (Δτ_rel_U + Δτ_tropo_U)
-        τ_U = τ_U + Δτ_U
+        τ_U = τ_U + Δτ_U*daysec
         # @show τ_U
         # @show Δτ_rel_U*(1e6*daysec)
         # @show Δτ_corona_U*(1e6*daysec)
         # @show Δτ_tropo_U*(1e6*daysec)
         # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
-        t_t_jd1, t_t_jd2 = t_r_jd1, t_r_jd2-(τ_U+τ_D)
+        t_t_jd_j2000 = t_r_jd_j2000-(τ_U+τ_D)
         # convert transmit time to UTC time
         # TDB -> UTC
-        t_t_utc = DateTime(UTCEpoch(TDBEpoch(t_t_jd1, t_t_jd2, origin=:julian)))
+        t_t_utc = DateTime(UTCEpoch(TDBEpoch(t_t_jd_j2000/daysec, origin=:j2000)))
         # Geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
         R_t, V_t = observer_position(station_code, t_t_utc)
         # Earth's barycentric position and velocity at the transmit time
-        rv_e_t_t = earth_pv(t_r_jd1, t_r_jd2-(τ_U+τ_D))
+        rv_e_t_t = earth_pv(t_t_jd_j2000)
         r_e_t_t = rv_e_t_t[1:3]
         v_e_t_t = rv_e_t_t[4:6]
         # Barycentric position and velocity of the transmitter at the transmit time
@@ -479,7 +506,7 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
 
     # compute TDB-UTC at transmit time
     # TDB -> UTC
-    t_t_utc = UTCEpoch(TDBEpoch(t_t_jd1, t_t_jd2, origin=:julian))
+    t_t_utc = UTCEpoch(TDBEpoch(t_t_jd_j2000/daysec, origin=:j2000))
     # ut1_utc_t = EarthOrientation.getΔUT1( julian(t_t_utc).Δt ) # seconds
     utc_jd1_t, utc_jd2_t = julian_twopart(t_t_utc) # days, days
     # @show utc_jd2_t.Δt
@@ -487,7 +514,7 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
     j != 0 && @warn "iauDat: j = $j. See SOFA.jl docs for more detail."
     tt_utc_t = 32.184 + tai_utc_t # seconds
     ##TT-TDB (transmit time)
-    tt_tdb_t = tt_m_tdb(t_t_jd1, t_t_jd2)[1] # seconds
+    tt_tdb_t = tt_m_tdb(t_t_jd_j2000)[1] # seconds
     tdb_utc_t = tt_utc_t - tt_tdb_t #seconds
     # @show tdb_utc_t
 
@@ -498,9 +525,11 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
     j, tai_utc_r = iauDat(year(t_r_utc), month(t_r_utc), day(t_r_utc), utc_jd2_r.Δt)
     j != 0 && @warn "iauDat: j = $j. See SOFA.jl docs for more detail."
     tt_utc_r = 32.184 + tai_utc_r
+    # compute `tt_tdb_r` recursively
     tt_tdb_r = 0.0
     for i in 1:niter+1 #TODO: check that convergence always holds
-        tt_tdb_r = tt_m_tdb(utc_jd1_r.Δt, utc_jd2_r.Δt + tt_utc_r/daysec + tt_tdb_r)[1] # seconds
+        utc_j2000_r = seconds( AstroTime.j2000(UTCEpoch(t_r_utc)) ).Δt # days since J2000 (UTC)
+        tt_tdb_r = tt_m_tdb(utc_j2000_r + (tt_utc_r + tt_tdb_r))[1] # seconds
         # @show tt_tdb_r
     end
     tdb_utc_r = tt_utc_r - tt_tdb_r #seconds
@@ -510,8 +539,9 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
     # Eq. (9) Yeomans et al. (1992)
     #τ = τ_D + τ_U + (TDB-UTC)_t - (TDB-UTC)_r
     # @show daysec*(τ_U + τ_D) + (tdb_utc_t - tdb_utc_r)
-    τ = (τ_U + τ_D) + (tdb_utc_t - tdb_utc_r)/daysec
-    τ *= daysec
+    # τ = (τ_U + τ_D) + (tdb_utc_t - tdb_utc_r)/daysec
+    # τ *= daysec
+    τ = (τ_U + τ_D) + (tdb_utc_t - tdb_utc_r)
     # @show tdb_utc_t - tdb_utc_r
     # @show τ
 
