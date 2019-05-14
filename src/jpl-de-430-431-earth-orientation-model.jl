@@ -136,30 +136,41 @@ function pole_lat(t)
 end
 
 # rotation from inertial frame to frame with pole at right ascension α and declination δ
+# function pole_rotation(α::T, δ::T) where {T <: Number}
+#     # diagonal terms
+#     m11 = (cos(α)^2)*cos(δ)+sin(α)^2
+#     m22 = (cos(α)^2)+cos(δ)*(sin(α)^2)
+#     m33 = cos(δ)
+#     # off-diagonal terms
+#     m12 = -2cos(α)*sin(α)*(sin(δ/2)^2)
+#     m21 = m12
+#     m31 = cos(α)*sin(δ)
+#     m32 = sin(α)*sin(δ)
+#     m13 = -m31
+#     m23 = -m32
+#     return [m11 m12 m13; m21 m22 m23; m31 m32 m33]
+# end
 function pole_rotation(α::T, δ::T) where {T <: Number}
+    m = Matrix{T}(undef, 3, 3)
     # diagonal terms
-    m11 = (cos(α)^2)*cos(δ)+sin(α)^2
-    m22 = (cos(α)^2)+cos(δ)*(sin(α)^2)
-    m33 = cos(δ)
-
+    m[1,1] = sin(α)^2 + sin(δ)*(cos(α)^2)
+    m[2,2] = cos(α)^2 + sin(δ)*(sin(α)^2)
+    m[3,3] = sin(δ)
     # off-diagonal terms
-    m12 = -2cos(α)*sin(α)*(sin(δ/2)^2)
-    m21 = m12
-
-    m31 = cos(α)*sin(δ)
-    m32 = sin(α)*sin(δ)
-
-    m13 = -m31
-    m23 = -m32
-
-    return [m11 m12 m13; m21 m22 m23; m31 m32 m33]
+    m[1,2] = cos(α)*sin(α)*(-1+sin(δ))
+    m[3,1] = -cos(δ)*cos(α)
+    m[3,2] = -cos(δ)*sin(α)
+    m[2,1] = m[1,2]
+    m[1,3] = -m[3,1]
+    m[2,3] = -m[3,2]
+    return m
 end
 
 # rotation matrix from inertial frame to Earth pole at time t since J2000.0
 function earth_pole_rotation(t)
     α_ep = pole_long(t) # Earth pole at time t since J2000.0
     δ_ep = pole_lat(t) # Earth pole at time t since J2000.0
-    return pole_rotation(α_ep, π/2-δ_ep)
+    return pole_rotation(α_ep, δ_ep)
 end
 
 # The following was taken from "Report of the IAU/IAG Working Group", Seidelmann et. al, 2006

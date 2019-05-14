@@ -64,6 +64,9 @@ const A_sun = 1.06e8 # Solar corona parameter A [cm^-3] (ESAA 2014, Table 8.5 p.
 const a_sun = 4.89e5 # Solar corona parameter a [cm^-3] (ESAA 2014, Table 8.5 p. 329)
 const b_sun = 3.91e5 # Solar corona parameter b [cm^-3] (ESAA 2014, Table 8.5 p. 329)
 
+const α_p_sun = 268.13 # Sun's rotation pole right ascension (degrees)
+const δ_p_sun = 63.87 # Sun's rotation pole declination (degrees)
+
 const S0_sun = 63.15E6 # Sun radiated power intensity at photosphere surface, Watt/meter^2
 const m2_s3_to_au2_day3 = 1e-6daysec^3/au^2 # conversion factor from m^2/sec^3 to au^2/day^3
 
