@@ -55,8 +55,8 @@ end
 
 # where
 
-phi_x = t -> deg2rad( phi_x0 + 100*(t/36525)*Dt_phi_x )
-phi_y = t -> deg2rad( phi_y0 + 100*(t/36525)*Dt_phi_y )
+phi_x = t -> deg2rad( (phi_x0 + 100*(t/36525)*Dt_phi_x)/3600 )
+phi_y = t -> deg2rad( (phi_y0 + 100*(t/36525)*Dt_phi_y)/3600 )
 
 phi_x0 = 5.6754203322893470E-03 #x-axis rotation at J2000.0 (arcseconds)
 phi_y0 = -1.7022656914989530E-02 #y-axis rotation at J2000.0 (arcseconds)
@@ -76,13 +76,13 @@ function Rx(alpha)
     res = Array{typeof(alpha)}(undef, 3, 3)
 
     res[1, 1] = one(alpha)
+    res[2, 1] = zero(alpha)
+    res[3, 1] = zero(alpha)
     res[1, 2] = zero(alpha)
-    res[1, 3] = zero(alpha)
-    res[2, 1] = res[1, 2]
-    res[3, 1] = res[1, 2]
     res[2, 2] = cos(alpha)
-    res[2, 3] = sin(alpha)
     res[3, 2] = -sin(alpha)
+    res[1, 3] = zero(alpha)
+    res[2, 3] = sin(alpha)
     res[3, 3] = cos(alpha)
 
     return res
@@ -92,13 +92,13 @@ function Ry(alpha)
     res = Array{typeof(alpha)}(undef, 3, 3)
 
     res[1, 1] = cos(alpha)
-    res[1, 2] = zero(alpha)
-    res[1, 3] = sin(alpha)
     res[2, 1] = zero(alpha)
+    res[3, 1] = sin(alpha)
+    res[1, 2] = zero(alpha)
     res[2, 2] = one(alpha)
-    res[2, 3] = zero(alpha)
-    res[3, 1] = -sin(alpha)
     res[3, 2] = zero(alpha)
+    res[1, 3] = -sin(alpha)
+    res[2, 3] = zero(alpha)
     res[3, 3] = cos(alpha)
 
     return res
@@ -107,15 +107,15 @@ end
 function Rz(alpha)
     res = Array{typeof(alpha)}(undef, 3, 3)
 
-    res[3, 3] = one(alpha)
-    res[3, 1] = zero(alpha)
-    res[3, 2] = zero(alpha)
-    res[1, 3] = res[3, 1]
-    res[2, 3] = res[3, 1]
     res[1, 1] = cos(alpha)
-    res[1, 2] = sin(alpha)
     res[2, 1] = -sin(alpha)
+    res[3, 1] = zero(alpha)
+    res[1, 2] = sin(alpha)
     res[2, 2] = cos(alpha)
+    res[3, 2] = zero(alpha)
+    res[1, 3] = zero(alpha)
+    res[2, 3] = zero(alpha)
+    res[3, 3] = one(alpha)
 
     return res
 end
@@ -136,20 +136,6 @@ function pole_lat(t)
 end
 
 # rotation from inertial frame to frame with pole at right ascension α and declination δ
-# function pole_rotation(α::T, δ::T) where {T <: Number}
-#     # diagonal terms
-#     m11 = (cos(α)^2)*cos(δ)+sin(α)^2
-#     m22 = (cos(α)^2)+cos(δ)*(sin(α)^2)
-#     m33 = cos(δ)
-#     # off-diagonal terms
-#     m12 = -2cos(α)*sin(α)*(sin(δ/2)^2)
-#     m21 = m12
-#     m31 = cos(α)*sin(δ)
-#     m32 = sin(α)*sin(δ)
-#     m13 = -m31
-#     m23 = -m32
-#     return [m11 m12 m13; m21 m22 m23; m31 m32 m33]
-# end
 function pole_rotation(α::T, δ::T) where {T <: Number}
     m = Matrix{T}(undef, 3, 3)
     # diagonal terms
@@ -166,7 +152,7 @@ function pole_rotation(α::T, δ::T) where {T <: Number}
     return m
 end
 
-# rotation matrix from inertial frame to Earth pole at time t since J2000.0
+# rotation matrix from inertial frame to Earth pole at time t (days) since J2000.0
 function earth_pole_rotation(t)
     α_ep = pole_long(t) # Earth pole at time t since J2000.0
     δ_ep = pole_lat(t) # Earth pole at time t since J2000.0
