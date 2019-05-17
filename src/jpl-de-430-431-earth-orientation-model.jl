@@ -138,17 +138,15 @@ end
 # rotation from inertial frame to frame with pole at right ascension α and declination δ
 function pole_rotation(α::T, δ::T) where {T <: Number}
     m = Matrix{T}(undef, 3, 3)
-    # diagonal terms
     m[1,1] = sin(α)^2 + sin(δ)*(cos(α)^2)
-    m[2,2] = cos(α)^2 + sin(δ)*(sin(α)^2)
-    m[3,3] = sin(δ)
-    # off-diagonal terms
-    m[1,2] = cos(α)*sin(α)*(-1+sin(δ))
+    m[2,1] = cos(α)*sin(α)*(-1+sin(δ))
     m[3,1] = -cos(δ)*cos(α)
+    m[1,2] = m[2,1]
+    m[2,2] = cos(α)^2 + sin(δ)*(sin(α)^2)
     m[3,2] = -cos(δ)*sin(α)
-    m[2,1] = m[1,2]
     m[1,3] = -m[3,1]
     m[2,3] = -m[3,2]
+    m[3,3] = sin(δ)
     return m
 end
 
