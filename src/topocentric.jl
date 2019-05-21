@@ -41,7 +41,7 @@ end
 # conversion of micro-arcseconds to radians
 mas2rad(x) = deg2rad(x/3.6e6) # mas/1000 -> arcsec; arcsec/3600 -> deg; deg2rad(deg) -> rad
 
-# Celestial-to-terrestrial rotation matrix (including polar motion)
+# Terrestrial-to-celestial rotation matrix (including polar motion)
 # Reproduction of Section 5.3 of SOFA Tools for Earth Attitude
 # "IAU 2000A, CIO based, using classical angles"
 # found at SOFA website, Mar 27, 2019
@@ -110,7 +110,7 @@ function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector)
 end
 
 # TODO: add IAU 1976/1980 Earth orientation/rotation model
-# Celestial-to-terrestrial rotation matrix (including polar motion)
+# Terrestrial-to-celestial rotation matrix (including polar motion)
 # Reproduction of Section 5.2 of SOFA Tools for Earth Attitude
 # "IAU 1976/1980/1982/1994, equinox based"
 # found at SOFA website, Mar 27, 2019
@@ -123,7 +123,7 @@ function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector)
     # TT
     t0_tt = TTEpoch(t0_utc)
     djmjd0 = julian(J2000_EPOCH).Δt # J2000.0 (TT) epoch (days)
-    tt = j2000(t0_tt).Δt
+    tt = AstroTime.j2000(t0_tt).Δt
     # IAU 1976 precession matrix, J2000.0 to date
     rp = iauPmat76(djmjd0, tt)
     # IAU 1980 nutation
