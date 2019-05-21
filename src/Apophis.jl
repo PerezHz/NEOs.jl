@@ -24,7 +24,9 @@ const varorder = 10
 const order = 30
 const abstol = 1.0E-30
 
+const su = 1 #Sun's index
 const ea = 4 #Earth's index
+const mo = 5 #Moon's index
 
 # vector of G*m values
 const μ = [0.0002959122082855911, 4.912248045036476e-11, 7.24345233264412e-10,
@@ -36,7 +38,17 @@ const μ = [0.0002959122082855911, 4.912248045036476e-11, 7.24345233264412e-10,
 const Λ2 = [4.5685187392703475e-12, 0.0, 0.0, 1.9679542578489185e-12,
 2.7428745500623694e-14, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
+# vector of J3*R^3 values
+const Λ3 = [0.0, 0.0, 0.0, -1.962633335678878e-19, 1.3265639193531515e-20, 0.0,
+0.0, 0.0, 0.0, 0.0]
+
 const N = length(μ)
+
+# Matrix of J2 interactions included in DE430 ephemeris, according to Folkner et al., 2014
+const UJ_interaction = fill(false, N, N)
+UJ_interaction[2:end, su] .= true
+UJ_interaction[union(1:3,5:7,N), ea] .= true
+UJ_interaction[union(1:4,6:7), mo] .= true
 
 const au = 1.495978707E8 # astronomical unit value in km
 const yr = 365.25 # days in a Julian year
