@@ -7,7 +7,7 @@ export main, au, yr, observer_position, apophisdofs, sundofs, earthdofs,
     delay_doppler_jpleph, mas2rad, t2c_rotation_iau_00_06,
     process_radar_data_jpl, RadarDataJPL, ismonostatic,
     RNp1BP_pN_A_J234E_J2S_ng!, RNp1BP_pN_A_J234E_J2S_ng_d225!,
-    RNp1BP_pN_A_J234E_J2S_ng_d225_srp!
+    RNp1BP_pN_A_J234E_J2S_ng_d225_srp!, semimajoraxis, eccentricity, inclination
 
 using Reexport
 @reexport using TaylorIntegration, LinearAlgebra # so that JLD may interpret previously saved Taylor1 objects saved in .jld files
@@ -29,20 +29,46 @@ const ea = 4 #Earth's index
 const mo = 5 #Moon's index
 
 # vector of G*m values
-const μ = [0.0002959122082855911, 4.912248045036476e-11, 7.24345233264412e-10,
-8.887692445125634e-10, 1.093189450742374e-11, 9.54954869555077e-11,
-2.82534584083387e-7, 8.45970607324503e-8, 1.29202482578296e-8,
-1.52435734788511e-8, 1.4004765625463623e-13, 0.0]
 
-# vector of J2*R^2 values
-const Λ2 = [4.5685187392703475e-12, 0.0, 0.0, 1.9679542578489185e-12,
-2.7428745500623694e-14, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+const μ = [0.0002959122082855911, 4.91248045036476e-11, 7.24345233264412e-10, # Sun, Mercury, Venus
+8.887692445125634e-10, 1.093189450742374e-11, 9.54954869555077e-11, # Earth, Moon, Mars
+2.82534584083387e-7, 8.45970607324503e-8, 1.29202482578296e-8, # Jupiter, Saturn, Uranus
+1.52435734788511e-8, # Neptune
 
-# vector of J3*R^3 values
-const Λ3 = [0.0, 0.0, 0.0, -1.962633335678878e-19, 1.3265639193531515e-20, 0.0,
-0.0, 0.0, 0.0, 0.0]
+2.17844105197418e-12, # Pluto
+
+1.4004765561723440E-13, # 1 Ceres
+3.8547501878088100E-14, # 4 Vesta
+3.1044481989387130E-14, # 2 Pallas
+1.2358007872941250E-14, # 10 Hygiea
+6.3432804736486020E-15, # 31 Euphrosyne
+5.2561686784936620E-15, # 704 Interamnia
+5.1981269794574980E-15, # 511 Davida
+4.6783074183509050E-15, # 15 Eunomia
+3.6175383171479370E-15, # 3 Juno
+3.4115868261938120E-15, # 16 Psyche
+3.1806592826525410E-15, # 65 Cybele
+2.5771141273110470E-15, # 88 Thisbe
+2.5310917260150680E-15, # 48 Doris
+2.4767881012558670E-15, # 52 Europa
+2.2955593906374620E-15, # 451 Patientia
+2.1992951735740730E-15, # 87 Sylvia
+
+0.0 # Apophis
+]
 
 const N = length(μ)
+
+# vector of J2*R^2 values
+const Λ2 = zeros(N)
+Λ2[su] = 4.5685187392703475e-12
+Λ2[ea] = 1.9679542578489185e-12
+Λ2[mo] = 2.7428745500623694e-14
+
+# vector of J3*R^3 values
+const Λ3 = zeros(N)
+Λ3[ea] = -1.962633335678878e-19
+Λ3[mo] = 1.3265639193531515e-20
 
 # Matrix of J2 interactions included in DE430 ephemeris, according to Folkner et al., 2014
 const UJ_interaction = fill(false, N, N)
@@ -100,6 +126,7 @@ include("topocentric.jl")
 include("asteroid_dynamical_models.jl")
 include("initial_conditions.jl")
 include("delay_doppler.jl")
+include("osculating.jl")
 
 #root-finding functions (simplified versions of range_ae, radvel_ae)
 g(t,x,dx) = (x[3N-2]-x[3ea-2])^2+(x[3N-1]-x[3ea-1])^2+(x[3N]-x[3ea])^2
