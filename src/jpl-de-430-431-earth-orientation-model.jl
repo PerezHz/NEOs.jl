@@ -92,9 +92,8 @@ end
 
 # The rotation matrices are defined by
 
-function Rx(alpha)
-    res = Array{typeof(alpha)}(undef, 3, 3)
-
+function Rx(alpha::T) where {T<:Number}
+    res = Array{T}(undef, 3, 3)
     res[1, 1] = one(alpha)
     res[2, 1] = zero(alpha)
     res[3, 1] = zero(alpha)
@@ -104,15 +103,13 @@ function Rx(alpha)
     res[1, 3] = zero(alpha)
     res[2, 3] = sin(alpha)
     res[3, 3] = cos(alpha)
-
     return res
 end
 
 # Lieske et al. (1977, 1979) introduces the convention that this matrix has
 # opposite signs outside the sine terms (wrt Rx, Rz)
-function Ry(alpha)
-    res = Array{typeof(alpha)}(undef, 3, 3)
-
+function Ry(alpha::T) where {T<:Number}
+    res = Array{T}(undef, 3, 3)
     res[1, 1] = cos(alpha)
     res[2, 1] = zero(alpha)
     res[3, 1] = sin(alpha)
@@ -122,13 +119,11 @@ function Ry(alpha)
     res[1, 3] = -sin(alpha)
     res[2, 3] = zero(alpha)
     res[3, 3] = cos(alpha)
-
     return res
 end
 
-function Rz(alpha)
-    res = Array{typeof(alpha)}(undef, 3, 3)
-
+function Rz(alpha::T) where {T<:Number}
+    res = Array{T}(undef, 3, 3)
     res[1, 1] = cos(alpha)
     res[2, 1] = -sin(alpha)
     res[3, 1] = zero(alpha)
@@ -138,7 +133,6 @@ function Rz(alpha)
     res[1, 3] = zero(alpha)
     res[2, 3] = zero(alpha)
     res[3, 3] = one(alpha)
-
     return res
 end
 
