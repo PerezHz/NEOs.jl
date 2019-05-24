@@ -31,8 +31,8 @@ function observer_position(station_code::Int, t_utc::DateTime)
 
     pos_geo = [x_gc, y_gc, z_gc]/au #au
 
-    # G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(t_utc, pos_geo)
-    G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(t_utc, pos_geo)
+    G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(t_utc, pos_geo)
+    # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(t_utc, pos_geo)
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
     return G_vec_ESAA, dG_vec_ESAA
@@ -109,8 +109,8 @@ function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector)
      return G_vec_ESAA, dG_vec_ESAA, era
 end
 
-# TODO: add IAU 1976/1980 Earth orientation/rotation model
 # Terrestrial-to-celestial rotation matrix (including polar motion)
+# Using 1976/1980 Earth orientation/rotation model
 # Reproduction of Section 5.2 of SOFA Tools for Earth Attitude
 # "IAU 1976/1980/1982/1994, equinox based"
 # found at SOFA website, Mar 27, 2019
@@ -126,7 +126,7 @@ function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector)
     tt = AstroTime.j2000(t0_tt).Δt
     # IAU 1976 precession matrix, J2000.0 to date
     rp = iauPmat76(djmjd0, tt)
-    # IAU 1980 nutation
+    # IAU 1980 nutation angles Δψ (nutation in longitude), Δϵ (nutation in obliquity)
     dp80, de80  = iauNut80(djmjd0, tt)
     #Nutation corrections wrt IAU 1976/1980 (mas->radians)
     ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(t_utc)
@@ -155,10 +155,10 @@ function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector)
     # gastT1 = gast + ω*Taylor1(1) #rad/day
     gastT1 = gast + omega(EarthOrientation.getlod(t_utc))*Taylor1(1) #rad/day
     # Rz(-GAST)
-    Rz_minus_gast_T1 = [cos(gastT1) sin(-gastT1) zero(gastT1);
+    Rz_minus_gast_T1 = [cos(gastT1) -sin(gastT1) zero(gastT1);
         sin(gastT1) cos(gastT1) zero(gastT1);
-        zero(gastT1) zero(gastT1) one(gastT1)
-    ]
+        zero(gastT1) zero(gastT1) one(gastT1)]
+    # Rz_minus_gast_T1 = Rz(-gastT1)
     Rz_minus_GAST = Rz_minus_gast_T1()
     # dRz(-GAST)/dt
     dRz_minus_gast_T1 = differentiate.(Rz_minus_gast_T1)
@@ -180,8 +180,8 @@ function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector)
     # # Form celestial-terrestrial matrix (including polar motion)
     # rc2it = W*rc2ti
 
-    W_inv = inv(W)
-    C_inv = inv(C)
+    W_inv = transpose(W)
+    C_inv = transpose(C)
 
     # g(t), \dot g(t) ESAA vectors
     g_vec_ESAA =  Rz_minus_GAST*(W_inv*pos_geo)
