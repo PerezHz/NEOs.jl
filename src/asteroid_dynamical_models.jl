@@ -277,8 +277,13 @@
         for j in 1:N
             if j==i
             else
-                temp_004 = newtonianNb_Potential[j] + newtonian1b_Potential[i]
+                xj = ss16asteph_t[3j-2]
+                yj = ss16asteph_t[3j-1]
+                zj = ss16asteph_t[3j  ]
+                temp_004 = newtonianNb_Potential[j] + (μ[j]/sqrt((((xi-xj)^2) + ((yi-yj)^2)) + ((zi-zj)^2)))
                 newtonianNb_Potential[j] = temp_004
+                temp_004 = newtonianNb_Potential[i] + newtonian1b_Potential[i]
+                newtonianNb_Potential[i] = temp_004
             end
         end
 
