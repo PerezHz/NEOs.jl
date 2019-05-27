@@ -45,6 +45,7 @@ function delay_doppler(x, station_code::Int, t_r_utc::DateTime, f_T, niter::Int=
     r_a_t_b = x_r[apophisdofs[1:3]](-τ_D) #rv_a_t_b[1:3]
     v_a_t_b = x_r[apophisdofs[4:6]](-τ_D) # rv_a_t_b[4:6]
     Δν_corona_D = 0.0
+    Δτ_D = zero(τ_D)
     for i in 1:niter
         # Eq. (3) Yeomans et al. (1992)
         ρ_vec_r = r_a_t_b - r_r_t_r
@@ -62,8 +63,7 @@ function delay_doppler(x, station_code::Int, t_r_utc::DateTime, f_T, niter::Int=
         # Δτ_corona_D = corona_delay(r_a_t_b, r_e_t_r, r_s_t_b, v_s_t_b, f_T, station_code)
         Δτ_corona_D, Δν_corona_D = corona_delay(r_a_t_b, r_e_t_r, r_s_t_b, v_s_t_b, f_T, station_code) # days, Hz
         Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)
-        Δτ_D = Δτ_corona_D + (Δτ_rel_D + Δτ_tropo_D)
-        τ_D = τ_D + Δτ_D/daysec
+        Δτ_D = Δτ_rel_D/daysec #Δτ_corona_D + Δτ_tropo_D
         @show τ_D
         @show Δτ_rel_D*(1e6*daysec)
         @show Δτ_corona_D*(1e6*daysec)
@@ -75,6 +75,7 @@ function delay_doppler(x, station_code::Int, t_r_utc::DateTime, f_T, niter::Int=
         r_a_t_b = x_r[apophisdofs[1:3]](-τ_D) # rv_a_t_b[1:3]
         v_a_t_b = x_r[apophisdofs[4:6]](-τ_D) # rv_a_t_b[4:6]
     end
+    τ_D = τ_D + Δτ_D
     @show Δν_corona_D
     # get latest estimates of ρ_vec_r and ρ_r
     # Eq. (3) Yeomans et al. (1992)
@@ -104,7 +105,8 @@ function delay_doppler(x, station_code::Int, t_r_utc::DateTime, f_T, niter::Int=
     ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
     # Sun barycentric position (in au) at transmit time (TDB)
     r_s_t_t = x_r[sundofs[1:3]](-τ_U-τ_D) # sun_pv(t_r, -τ_U-τ_D)[1:3]
-    Δν_corona_U = 0.0
+    Δν_corona_U = zero(τ_U)
+    Δτ_U = zero(τ_U)
     for i in 1:niter
         # Eq. (8) Yeomans et al. (1992)
         τ_U = ρ_t/c_au_per_day # (days) -R_b/c (COM correction) + Δτ_U (relativistic, tropo, iono...)
@@ -120,8 +122,7 @@ function delay_doppler(x, station_code::Int, t_r_utc::DateTime, f_T, niter::Int=
         # Δτ_corona_U = corona_delay(r_e_t_t, r_a_t_b, r_s_t_t, v_s_t_t, f_T, station_code) # days
         Δτ_corona_U, Δν_corona_U = corona_delay(r_e_t_t, r_a_t_b, r_s_t_t, v_s_t_t, f_T, station_code) # days, Hz
         Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # days
-        Δτ_U = Δτ_corona_U + (Δτ_rel_U + Δτ_tropo_U)
-        τ_U = τ_U + Δτ_U/daysec
+        Δτ_U = Δτ_rel_U/daysec # Δτ_corona_U + Δτ_tropo_U
         @show τ_U
         @show Δτ_rel_U*(1e6*daysec)
         @show Δτ_corona_U*(1e6*daysec)
@@ -144,6 +145,7 @@ function delay_doppler(x, station_code::Int, t_r_utc::DateTime, f_T, niter::Int=
         ρ_vec_t = r_a_t_b - r_t_t_t
         ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
     end
+    τ_U = τ_U + Δτ_U
     @show τ_U
     @show Δν_corona_U
     @show Δν_corona_D+Δν_corona_U
@@ -254,7 +256,7 @@ function shapiro_delay(e, p, q)
 end
 
 function shapiro_doppler(e, de, p, dp, q, dq, f_T)
-    # shap_dop = 2μ[1]*( (de+dp+dq)/(e+p+q) - (de+dp-dq)/(e+p-q) )/(c_au_per_day^3) # (adim.)
+    # shap_del_diff = 2μ[1]*( (de+dp+dq)/(e+p+q) - (de+dp-dq)/(e+p-q) )/(c_au_per_day^3) # (adim.)
     shap_del_diff = 4μ[1]*(  ( dq*(e+p) - q*(de+dp) )/( (e+p)^2 - q^2 )  )/(c_au_per_day^3) # differential of Shapiro delay (adim.)
     shap_dop = -f_T*shap_del_diff # ν = -f_T*dτ/dt (units of f_T) <-- Shapiro, Ash, Tausner (1966), footnote 10
     @show shap_dop
@@ -431,12 +433,13 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
     rv_a_t_b = apophis_pv(t_b_jd_j2000)
     r_a_t_b = rv_a_t_b[1:3]
     v_a_t_b = rv_a_t_b[4:6]
+    Δτ_D = zero(τ_D)
     Δτ_rel_D = zero(τ_D)
     Δτ_corona_D = zero(τ_D)
     Δτ_tropo_D = zero(τ_D)
-    Δν_rel_D = 0.0
-    Δν_corona_D = 0.0
-    # Δν_tropo_D = 0.0
+    Δν_rel_D = zero(τ_D)
+    Δν_corona_D = zero(τ_D)
+    # Δν_tropo_D = zero(τ_D)
     for i in 1:niter
         # Eq. (3) Yeomans et al. (1992)
         ρ_vec_r = r_a_t_b - r_r_t_r
@@ -461,11 +464,11 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
         p_DT = sqrt(r_as_t_bT[1]^2 + r_as_t_bT[2]^2 + r_as_t_bT[3]^2)
         p_D = p_DT[0] #norm(r_as_t_b) # norm(r_a_t_b-r_s_t_b) # heliocentric distance of asteroid at t_b
         dp_D = p_DT[1]
-        rv_e_t_b = earth_pv(t_b_jd_j2000) # barycentric position/velocity of Earth at bounce time
-        r_e_t_b = rv_e_t_b[1:3]
-        v_e_t_b = rv_e_t_b[4:6]
-        r_ae_t_b = r_a_t_b-r_e_t_b
-        v_ae_t_b = v_a_t_b-v_e_t_b
+        # rv_e_t_b = earth_pv(t_b_jd_j2000) # barycentric position/velocity of Earth at bounce time
+        # r_e_t_b = rv_e_t_b[1:3]
+        # v_e_t_b = rv_e_t_b[4:6]
+        r_ae_t_b = ρ_vec_r#r_as_t_b - r_rs_t_r#r_a_t_b-r_r_t_r
+        v_ae_t_b = ρ_vec_dot_r#v_as_t_b - v_rs_t_r#v_a_t_b-v_r_t_r
         r_ae_t_bT = r_ae_t_b + map(x->x*Taylor1(1), v_ae_t_b)
         q_DT = sqrt(r_ae_t_bT[1]^2 + r_ae_t_bT[2]^2 + r_ae_t_bT[3]^2)
         q_D = q_DT[0] # norm(ρ_vec_r) #signal path (down-leg)
@@ -483,8 +486,7 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
         # Δν_tropo_D = f_T*daysec*tropo_delay(R_rT, ρ_vec_rT)[1]
         # @show Δν_tropo_D
         Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)
-        Δτ_D = Δτ_corona_D + (Δτ_rel_D + Δτ_tropo_D) # seconds TODO: convert formulas to seconds
-        τ_D = τ_D + Δτ_D
+        Δτ_D = Δτ_rel_D #Δτ_corona_D Δτ_tropo_D # seconds TODO: convert formulas to seconds
         # @show τ_D
         # @show Δτ_rel_D
         # @show Δτ_corona_D
@@ -496,6 +498,7 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
         r_a_t_b = rv_a_t_b[1:3]
         v_a_t_b = rv_a_t_b[4:6]
     end
+    τ_D = τ_D + Δτ_D
     # @show Δν_corona_D
     # get latest estimates of ρ_vec_r and ρ_r
     # Eq. (3) Yeomans et al. (1992)
@@ -526,6 +529,7 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
     ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
     # Sun barycentric position (in au) at transmit time (TDB)
     r_s_t_t = sun_pv(t_t_jd_j2000)[1:3]
+    Δτ_U = zero(τ_U)
     Δτ_rel_U = zero(τ_U)
     Δτ_corona_U = zero(τ_U)
     Δτ_tropo_U = zero(τ_U)
@@ -558,8 +562,8 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
         rv_e_t_b = earth_pv(t_b_jd_j2000) # barycentric position/velocity of Earth at bounce time
         r_e_t_b = rv_e_t_b[1:3]
         v_e_t_b = rv_e_t_b[4:6]
-        r_ae_t_b = r_a_t_b-r_e_t_b
-        v_ae_t_b = v_a_t_b-v_e_t_b
+        r_ae_t_b = r_a_t_b-r_t_t_t
+        v_ae_t_b = v_a_t_b-v_t_t_t
         r_ae_t_bT = r_ae_t_b + map(x->x*Taylor1(1), v_ae_t_b)
         q_UT = sqrt(r_ae_t_bT[1]^2 + r_ae_t_bT[2]^2 + r_ae_t_bT[3]^2)
         q_U = q_UT[0] #norm(ρ_vec_t) #signal path (up-leg)
@@ -577,8 +581,7 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
         # Δν_tropo_U = f_T*daysec*tropo_delay(R_tT, ρ_vec_tT)[1]
         # @show Δν_tropo_U
         Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # seconds
-        Δτ_U = Δτ_corona_U + (Δτ_rel_U + Δτ_tropo_U)
-        τ_U = τ_U + Δτ_U
+        Δτ_U = Δτ_rel_U #+ Δτ_corona_U + Δτ_tropo_U
         # @show τ_U
         # @show Δτ_rel_U
         # @show Δτ_corona_U
@@ -602,6 +605,7 @@ function delay_doppler_jpleph(station_code::Int, t_r_utc::DateTime, f_T, niter::
         ρ_vec_dot_t = v_a_t_b - v_t_t_t
         ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
     end
+    τ_U = τ_U + Δτ_U
     @show 1e6*(Δν_rel_D + Δν_rel_U)
     # @show 1e6*(Δτ_corona_D + Δτ_corona_U)
     # @show Δτ_rel_D, Δτ_rel_U, Δτ_rel_D + Δτ_rel_U
