@@ -3,21 +3,25 @@
 # as well as the asteroid of interest as a test particle with null mass. Dynamical
 # effects considered are:
 # - post-Newtonian point-mass accelerations between all bodies,
-# - figure-effects (oblateness) of the Earth (J2, J3 and J4)
+# - figure-effects (oblateness) of the Earth (J2 and J3)
 # - J2 effect of the Sun
-# - Kinematic model for the precession and nutation of the Earth's pole (DE430/431 model)
-# - also, a model for non-gravitational accelerations acting upon the asteroid
-# is included (Yarkovsky effect) a_nongrav = A2*t_vec*(au/r)^d, where t_vec is the
+# - J2 and J3 effect of the Moon
+# - Kinematic model for the precession and nutation of the Earth's orientation (IAU 1976/1980 Earth orientation model)
+# - Kinematic model for the Moons's orientation (Seidelmann et al., 2006)
+# - Non-gravitational accelerations acting upon the asteroid
+# are included (Yarkovsky effect) a_nongrav = A2*t_vec*(au/r)^d, where t_vec is the
 # unit heliocentric transverse vector, au is 1 astronomical unit, r is the
 # asteroid's heliocentric range, A2 is a coefficient (with units of au/day^2),
 # and d = 2.0
-@taylorize function RNp1BP_pN_A_J234E_J2S_ng!(t, q, dq)
+@taylorize function RNp1BP_pN_A_J23E_J23E_J2S_ng_eph!(t, q, dq)
+    local ss16asteph_t = ss16asteph(t)
+    local acceph_t = acc_eph(t)
     local S = eltype(q[1])
-    local N = Int((length(q)-1)/6) # number of bodies, including NEA
+    local N = length(μ) # number of bodies, including NEA
     local _1_to_N = Base.OneTo(N) # iterator over all bodies
 
     local succ_approx_iter = 1 # number of iterations of post-Newtonian subroutine
-    local j2_body_index = [su, ea, mo] # indices of bodies with J2 flattening (note: Earth and Moon also have J3)
+    local j2_body_index = [su, ea]#, mo] # indices of bodies with J2 flattening (note: Earth and Moon also have J3)
 
     # parameters related to speed of light, c
     local c_p2 = 29979.063823897606 # c^2 = 29979.063823897606 au^2/d^2
@@ -25,125 +29,121 @@
 
     local zero_q_1 = zero(q[1])
 
-    X = Array{Taylor1{S}}(undef, N, N)
-    Y = Array{Taylor1{S}}(undef, N, N)
-    Z = Array{Taylor1{S}}(undef, N, N)
+    X = Array{Taylor1{S}}(undef, N)
+    Y = Array{Taylor1{S}}(undef, N)
+    Z = Array{Taylor1{S}}(undef, N)
 
-    r_p2 = Array{Taylor1{S}}(undef, N, N)
-    r_p3d2 = Array{Taylor1{S}}(undef, N, N)
-    r_p7d2 = Array{Taylor1{S}}(undef, N, N)
+    r_p2 = Array{Taylor1{S}}(undef, N)
+    r_p1d2 = Array{Taylor1{S}}(undef, N)
+    r_p3d2 = Array{Taylor1{S}}(undef, N)
+    r_p7d2 = Array{Taylor1{S}}(undef, N)
 
     #Newtonian accelerations
-    newtonX = Array{Taylor1{S}}(undef, N)
-    newtonY = Array{Taylor1{S}}(undef, N)
-    newtonZ = Array{Taylor1{S}}(undef, N)
+    newtonX = zero_q_1
+    newtonY = zero_q_1
+    newtonZ = zero_q_1
 
-    newtonianCoeff = Array{Taylor1{S}}(undef, N, N)
+    newtonianCoeff = Array{Taylor1{S}}(undef, N)
 
-    #post-Newtonian stuff
-    U = Array{Taylor1{S}}(undef, N, N)
-    V = Array{Taylor1{S}}(undef, N, N)
-    W = Array{Taylor1{S}}(undef, N, N)
+    # #post-Newtonian stuff
+    U = Array{Taylor1{S}}(undef, N)
+    V = Array{Taylor1{S}}(undef, N)
+    W = Array{Taylor1{S}}(undef, N)
 
-    _4U_m_3X = Array{Taylor1{S}}(undef, N, N)
-    _4V_m_3Y = Array{Taylor1{S}}(undef, N, N)
-    _4W_m_3Z = Array{Taylor1{S}}(undef, N, N)
+    _4U_m_3X = Array{Taylor1{S}}(undef, N)
+    _4V_m_3Y = Array{Taylor1{S}}(undef, N)
+    _4W_m_3Z = Array{Taylor1{S}}(undef, N)
 
-    UU = Array{Taylor1{S}}(undef, N, N)
-    VV = Array{Taylor1{S}}(undef, N, N)
-    WW = Array{Taylor1{S}}(undef, N, N)
+    UU = Array{Taylor1{S}}(undef, N)
+    VV = Array{Taylor1{S}}(undef, N)
+    WW = Array{Taylor1{S}}(undef, N)
 
-    r_p1d2 = Array{Taylor1{S}}(undef, N, N)
-
-    postNewtonX = Array{Taylor1{S}}(undef, N)
-    postNewtonY = Array{Taylor1{S}}(undef, N)
-    postNewtonZ = Array{Taylor1{S}}(undef, N)
+    postNewtonX = zero_q_1
+    postNewtonY = zero_q_1
+    postNewtonZ = zero_q_1
 
     newtonianNb_Potential = Array{Taylor1{S}}(undef, N)
-    newtonian1b_Potential = Array{Taylor1{S}}(undef, N, N)
-    newtonianCoeff = Array{Taylor1{S}}(undef, N, N)
+    newtonian1b_Potential = Array{Taylor1{S}}(undef, N)
+    newtonianCoeff = Array{Taylor1{S}}(undef, N)
 
-    pntempX = Array{Taylor1{S}}(undef, N)
-    pntempY = Array{Taylor1{S}}(undef, N)
-    pntempZ = Array{Taylor1{S}}(undef, N)
+    pntempX = zero_q_1
+    pntempY = zero_q_1
+    pntempZ = zero_q_1
 
-    pn1 = Array{Taylor1{S}}(undef, N, N)
+    pn1 = Array{Taylor1{S}}(undef, N)
     v2 = Array{Taylor1{S}}(undef, N)
-    vi_dot_vj = Array{Taylor1{S}}(undef, N, N)
-    pn2 = Array{Taylor1{S}}(undef, N, N)
-    pn3 = Array{Taylor1{S}}(undef, N, N)
+    vi_dot_vj = Array{Taylor1{S}}(undef, N)
+    pn2 = Array{Taylor1{S}}(undef, N)
+    pn3 = Array{Taylor1{S}}(undef, N)
 
     # J2 acceleration auxiliaries
-    t31 = Array{Taylor1{S}}(undef, N, N)
-    t32 = Array{Taylor1{S}}(undef, N, N)
-    t33 = Array{Taylor1{S}}(undef, N, N)
-    r_sin_ϕ = Array{Taylor1{S}}(undef, N, N)
-    F_J2_x = Array{Taylor1{S}}(undef, N, N)
-    F_J2_y = Array{Taylor1{S}}(undef, N, N)
-    F_J2_z = Array{Taylor1{S}}(undef, N, N)
-    F_J2_x1 = Array{Taylor1{S}}(undef, N, N)
-    F_J2_y1 = Array{Taylor1{S}}(undef, N, N)
-    F_J2_z1 = Array{Taylor1{S}}(undef, N, N)
-    F_J2_x2 = Array{Taylor1{S}}(undef, N, N)
-    F_J2_y2 = Array{Taylor1{S}}(undef, N, N)
-    F_J2_z2 = Array{Taylor1{S}}(undef, N, N)
-    temp_accX_j = Array{Taylor1{S}}(undef, N, N)
-    temp_accY_j = Array{Taylor1{S}}(undef, N, N)
-    temp_accZ_j = Array{Taylor1{S}}(undef, N, N)
-    temp_accX_i = Array{Taylor1{S}}(undef, N, N)
-    temp_accY_i = Array{Taylor1{S}}(undef, N, N)
-    temp_accZ_i = Array{Taylor1{S}}(undef, N, N)
-    sin_ϕ = Array{Taylor1{S}}(undef, N, N)
-    sin2_ϕ = Array{Taylor1{S}}(undef, N, N)
-    sin3_ϕ = Array{Taylor1{S}}(undef, N, N)
-    sin4_ϕ = Array{Taylor1{S}}(undef, N, N)
-    ϕ = Array{Taylor1{S}}(undef, N, N)
-    cos_ϕ = Array{Taylor1{S}}(undef, N, N)
-    P_2_sin_ϕ = Array{Taylor1{S}}(undef, N, N)
-    ∂P_2_sin_ϕ = Array{Taylor1{S}}(undef, N, N)
-    P_3_sin_ϕ = Array{Taylor1{S}}(undef, N, N)
-    ∂P_3_sin_ϕ = Array{Taylor1{S}}(undef, N, N)
-    m_c_ϕ_∂P_2 = Array{Taylor1{S}}(undef, N, N)
-    m_c_ϕ_∂P_3 = Array{Taylor1{S}}(undef, N, N)
-    Λ2j_div_r4 = Array{Taylor1{S}}(undef, N, N)
-    Λ3j_div_r5 = Array{Taylor1{S}}(undef, N, N)
-    F_J_ξ = Array{Taylor1{S}}(undef, N, N)
-    F_J_η = Array{Taylor1{S}}(undef, N, N)
-    F_J_ζ = Array{Taylor1{S}}(undef, N, N)
-    F_J2_ξ = Array{Taylor1{S}}(undef, N, N)
-    F_J2_η = Array{Taylor1{S}}(undef, N, N)
-    F_J2_ζ = Array{Taylor1{S}}(undef, N, N)
-    F_J3_ξ = Array{Taylor1{S}}(undef, N, N)
-    F_J3_η = Array{Taylor1{S}}(undef, N, N)
-    F_J3_ζ = Array{Taylor1{S}}(undef, N, N)
-    ξx = Array{Taylor1{S}}(undef, N, N)
-    ξy = Array{Taylor1{S}}(undef, N, N)
-    ξz = Array{Taylor1{S}}(undef, N, N)
-    ηx = Array{Taylor1{S}}(undef, N, N)
-    ηy = Array{Taylor1{S}}(undef, N, N)
-    ηz = Array{Taylor1{S}}(undef, N, N)
-    ηx1 = Array{Taylor1{S}}(undef, N, N)
-    ηy1 = Array{Taylor1{S}}(undef, N, N)
-    ηz1 = Array{Taylor1{S}}(undef, N, N)
-    ηx2 = Array{Taylor1{S}}(undef, N, N)
-    ηy2 = Array{Taylor1{S}}(undef, N, N)
-    ηz2 = Array{Taylor1{S}}(undef, N, N)
-    ζx = Array{Taylor1{S}}(undef, N, N)
-    ζy = Array{Taylor1{S}}(undef, N, N)
-    ζz = Array{Taylor1{S}}(undef, N, N)
-    ζx1 = Array{Taylor1{S}}(undef, N, N)
-    ζy1 = Array{Taylor1{S}}(undef, N, N)
-    ζz1 = Array{Taylor1{S}}(undef, N, N)
-    ζx2 = Array{Taylor1{S}}(undef, N, N)
-    ζy2 = Array{Taylor1{S}}(undef, N, N)
-    ζz2 = Array{Taylor1{S}}(undef, N, N)
+    t31 = Array{Taylor1{S}}(undef, N)
+    t32 = Array{Taylor1{S}}(undef, N)
+    t33 = Array{Taylor1{S}}(undef, N)
+    r_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    F_J2_x = Array{Taylor1{S}}(undef, N)
+    F_J2_y = Array{Taylor1{S}}(undef, N)
+    F_J2_z = Array{Taylor1{S}}(undef, N)
+    F_J2_x1 = Array{Taylor1{S}}(undef, N)
+    F_J2_y1 = Array{Taylor1{S}}(undef, N)
+    F_J2_z1 = Array{Taylor1{S}}(undef, N)
+    F_J2_x2 = Array{Taylor1{S}}(undef, N)
+    F_J2_y2 = Array{Taylor1{S}}(undef, N)
+    F_J2_z2 = Array{Taylor1{S}}(undef, N)
+    temp_accX_i = Array{Taylor1{S}}(undef, N)
+    temp_accY_i = Array{Taylor1{S}}(undef, N)
+    temp_accZ_i = Array{Taylor1{S}}(undef, N)
+    sin_ϕ = Array{Taylor1{S}}(undef, N)
+    sin2_ϕ = Array{Taylor1{S}}(undef, N)
+    sin3_ϕ = Array{Taylor1{S}}(undef, N)
+    sin4_ϕ = Array{Taylor1{S}}(undef, N)
+    ϕ = Array{Taylor1{S}}(undef, N)
+    cos_ϕ = Array{Taylor1{S}}(undef, N)
+    P_2_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    ∂P_2_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    P_3_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    ∂P_3_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    m_c_ϕ_∂P_2 = Array{Taylor1{S}}(undef, N)
+    m_c_ϕ_∂P_3 = Array{Taylor1{S}}(undef, N)
+    Λ2j_div_r4 = Array{Taylor1{S}}(undef, N)
+    Λ3j_div_r5 = Array{Taylor1{S}}(undef, N)
+    F_J_ξ = Array{Taylor1{S}}(undef, N)
+    F_J_η = Array{Taylor1{S}}(undef, N)
+    F_J_ζ = Array{Taylor1{S}}(undef, N)
+    F_J2_ξ = Array{Taylor1{S}}(undef, N)
+    F_J2_η = Array{Taylor1{S}}(undef, N)
+    F_J2_ζ = Array{Taylor1{S}}(undef, N)
+    F_J3_ξ = Array{Taylor1{S}}(undef, N)
+    F_J3_η = Array{Taylor1{S}}(undef, N)
+    F_J3_ζ = Array{Taylor1{S}}(undef, N)
+    ξx = Array{Taylor1{S}}(undef, N)
+    ξy = Array{Taylor1{S}}(undef, N)
+    ξz = Array{Taylor1{S}}(undef, N)
+    ηx = Array{Taylor1{S}}(undef, N)
+    ηy = Array{Taylor1{S}}(undef, N)
+    ηz = Array{Taylor1{S}}(undef, N)
+    ηx1 = Array{Taylor1{S}}(undef, N)
+    ηy1 = Array{Taylor1{S}}(undef, N)
+    ηz1 = Array{Taylor1{S}}(undef, N)
+    ηx2 = Array{Taylor1{S}}(undef, N)
+    ηy2 = Array{Taylor1{S}}(undef, N)
+    ηz2 = Array{Taylor1{S}}(undef, N)
+    ζx = Array{Taylor1{S}}(undef, N)
+    ζy = Array{Taylor1{S}}(undef, N)
+    ζz = Array{Taylor1{S}}(undef, N)
+    ζx1 = Array{Taylor1{S}}(undef, N)
+    ζy1 = Array{Taylor1{S}}(undef, N)
+    ζz1 = Array{Taylor1{S}}(undef, N)
+    ζx2 = Array{Taylor1{S}}(undef, N)
+    ζy2 = Array{Taylor1{S}}(undef, N)
+    ζz2 = Array{Taylor1{S}}(undef, N)
 
-    # extended-body accelerations
-    accX = Array{Taylor1{S}}(undef, N)
-    accY = Array{Taylor1{S}}(undef, N)
-    accZ = Array{Taylor1{S}}(undef, N)
+    # # extended-body accelerations
+    accX = zero_q_1
+    accY = zero_q_1
+    accZ = zero_q_1
 
-    # rotations to and from Earth, Sun and Moon pole-oriented frames
+    # # rotations to and from Earth, Sun and Moon pole-oriented frames
     local dsj2k = t-2.451545e6 # J2000.0 = 2.451545e6
     local αs = deg2rad(268.13*one(t))
     local δs = deg2rad(63.87*one(t))
@@ -154,320 +154,300 @@
     local M_[:,:,su] = pole_rotation( αs, δs )
     local M_[:,:,mo] = pole_rotation( αm, δm )
 
-    for j in _1_to_N
-        newtonX[j] = zero_q_1
-        newtonY[j] = zero_q_1
-        newtonZ[j] = zero_q_1
+    dq[1] = q[4]
+    dq[2] = q[5]
+    dq[3] = q[6]
 
+    for j in 1:N
         newtonianNb_Potential[j] = zero_q_1
-
-        accX[j] = zero_q_1
-        accY[j] = zero_q_1
-        accZ[j] = zero_q_1
-
-        dq[3j-2] = q[3(N+j)-2]
-        dq[3j-1] = q[3(N+j)-1]
-        dq[3j  ] = q[3(N+j)  ]
     end
 
     for j in j2_body_index
-        for i in _1_to_N
-            if i == j
-            else
-                t31[i,j] = zero_q_1
-                t32[i,j] = zero_q_1
-                t33[i,j] = zero_q_1
-                F_J2_x[i,j] = zero_q_1
-                F_J2_y[i,j] = zero_q_1
-                F_J2_z[i,j] = zero_q_1
-                F_J2_x1[i,j] = zero_q_1
-                F_J2_y1[i,j] = zero_q_1
-                F_J2_z1[i,j] = zero_q_1
-                F_J2_x2[i,j] = zero_q_1
-                F_J2_y2[i,j] = zero_q_1
-                F_J2_z2[i,j] = zero_q_1
-                temp_accX_j[i,j] = zero_q_1
-                temp_accY_j[i,j] = zero_q_1
-                temp_accZ_j[i,j] = zero_q_1
-                temp_accX_i[i,j] = zero_q_1
-                temp_accY_i[i,j] = zero_q_1
-                temp_accZ_i[i,j] = zero_q_1
-                sin_ϕ[i,j] = zero_q_1
-                sin2_ϕ[i,j] = zero_q_1
-                sin3_ϕ[i,j] = zero_q_1
-                sin4_ϕ[i,j] = zero_q_1
-                ϕ[i,j] = zero_q_1
-                cos_ϕ[i,j] = zero_q_1
-                P_2_sin_ϕ[i,j] = zero_q_1
-                ∂P_2_sin_ϕ[i,j] = zero_q_1
-                P_3_sin_ϕ[i,j] = zero_q_1
-                ∂P_3_sin_ϕ[i,j] = zero_q_1
-                m_c_ϕ_∂P_2[i,j] = zero_q_1
-                m_c_ϕ_∂P_3[i,j] = zero_q_1
-                Λ2j_div_r4[i,j] = zero_q_1
-                Λ3j_div_r5[i,j] = zero_q_1
-                F_J_ξ[i,j] = zero_q_1
-                F_J_η[i,j] = zero_q_1
-                F_J_ζ[i,j] = zero_q_1
-                F_J2_ξ[i,j] = zero_q_1
-                F_J2_η[i,j] = zero_q_1
-                F_J2_ζ[i,j] = zero_q_1
-                F_J3_ξ[i,j] = zero_q_1
-                F_J3_η[i,j] = zero_q_1
-                F_J3_ζ[i,j] = zero_q_1
-                ξx[i,j] = zero_q_1
-                ξy[i,j] = zero_q_1
-                ξz[i,j] = zero_q_1
-                ηx[i,j] = zero_q_1
-                ηy[i,j] = zero_q_1
-                ηz[i,j] = zero_q_1
-                ηx1[i,j] = zero_q_1
-                ηy1[i,j] = zero_q_1
-                ηz1[i,j] = zero_q_1
-                ηx2[i,j] = zero_q_1
-                ηy2[i,j] = zero_q_1
-                ηz2[i,j] = zero_q_1
-                ζx[i,j] = zero_q_1
-                ζy[i,j] = zero_q_1
-                ζz[i,j] = zero_q_1
-                ζx1[i,j] = zero_q_1
-                ζy1[i,j] = zero_q_1
-                ζz1[i,j] = zero_q_1
-                ζx2[i,j] = zero_q_1
-                ζy2[i,j] = zero_q_1
-                ζz2[i,j] = zero_q_1
-            end #if i == j
-        end #for i in _1_to_N
+        t31[j] = zero_q_1
+        t32[j] = zero_q_1
+        t33[j] = zero_q_1
+        F_J2_x[j] = zero_q_1
+        F_J2_y[j] = zero_q_1
+        F_J2_z[j] = zero_q_1
+        F_J2_x1[j] = zero_q_1
+        F_J2_y1[j] = zero_q_1
+        F_J2_z1[j] = zero_q_1
+        F_J2_x2[j] = zero_q_1
+        F_J2_y2[j] = zero_q_1
+        F_J2_z2[j] = zero_q_1
+        temp_accX_i[j] = zero_q_1
+        temp_accY_i[j] = zero_q_1
+        temp_accZ_i[j] = zero_q_1
+        sin_ϕ[j] = zero_q_1
+        sin2_ϕ[j] = zero_q_1
+        sin3_ϕ[j] = zero_q_1
+        sin4_ϕ[j] = zero_q_1
+        ϕ[j] = zero_q_1
+        cos_ϕ[j] = zero_q_1
+        P_2_sin_ϕ[j] = zero_q_1
+        ∂P_2_sin_ϕ[j] = zero_q_1
+        P_3_sin_ϕ[j] = zero_q_1
+        ∂P_3_sin_ϕ[j] = zero_q_1
+        m_c_ϕ_∂P_2[j] = zero_q_1
+        m_c_ϕ_∂P_3[j] = zero_q_1
+        Λ2j_div_r4[j] = zero_q_1
+        Λ3j_div_r5[j] = zero_q_1
+        F_J_ξ[j] = zero_q_1
+        F_J_η[j] = zero_q_1
+        F_J_ζ[j] = zero_q_1
+        F_J2_ξ[j] = zero_q_1
+        F_J2_η[j] = zero_q_1
+        F_J2_ζ[j] = zero_q_1
+        F_J3_ξ[j] = zero_q_1
+        F_J3_η[j] = zero_q_1
+        F_J3_ζ[j] = zero_q_1
+        ξx[j] = zero_q_1
+        ξy[j] = zero_q_1
+        ξz[j] = zero_q_1
+        ηx[j] = zero_q_1
+        ηy[j] = zero_q_1
+        ηz[j] = zero_q_1
+        ηx1[j] = zero_q_1
+        ηy1[j] = zero_q_1
+        ηz1[j] = zero_q_1
+        ηx2[j] = zero_q_1
+        ηy2[j] = zero_q_1
+        ηz2[j] = zero_q_1
+        ζx[j] = zero_q_1
+        ζy[j] = zero_q_1
+        ζz[j] = zero_q_1
+        ζx1[j] = zero_q_1
+        ζy1[j] = zero_q_1
+        ζz1[j] = zero_q_1
+        ζx2[j] = zero_q_1
+        ζy2[j] = zero_q_1
+        ζz2[j] = zero_q_1
     end #for j in j2_body_index
 
     #compute point-mass Newtonian accelerations, all bodies
-    for j in _1_to_N
-        for i in _1_to_N
-            # i == j && continue
-            if i == j
+    for i in 1:N-1
+        xi = ss16asteph_t[3i-2]
+        yi = ss16asteph_t[3i-1]
+        zi = ss16asteph_t[3i  ]
+        ui = ss16asteph_t[3(N-1+i)-2]
+        vi = ss16asteph_t[3(N-1+i)-1]
+        wi = ss16asteph_t[3(N-1+i)  ]
+
+        X[i] = xi-q[1]
+        Y[i] = yi-q[2]
+        Z[i] = zi-q[3]
+
+        U[i] = ui-dq[1]
+        V[i] = vi-dq[2]
+        W[i] = wi-dq[3]
+
+        _4U_m_3X[i] = (4ui)-(3dq[1])
+        _4V_m_3Y[i] = (4vi)-(3dq[2])
+        _4W_m_3Z[i] = (4wi)-(3dq[3])
+
+        pn2x = X[i]*_4U_m_3X[i]
+        pn2y = Y[i]*_4V_m_3Y[i]
+        pn2z = Z[i]*_4W_m_3Z[i]
+
+        UU[i] = ui*dq[1]
+        VV[i] = vi*dq[2]
+        WW[i] = wi*dq[3]
+
+        vi_dot_vj[i] = ( UU[i]+VV[i] ) + WW[i]
+
+        r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)
+
+        r_p1d2[i] = sqrt(r_p2[i])
+        r_p3d2[i] = r_p2[i]^1.5
+        r_p7d2[i] = r_p2[i]^3.5
+
+        newtonianCoeff[i] =  μ[i]/r_p3d2[i]
+
+        pn2[i] = newtonianCoeff[i]*(( pn2x+pn2y ) + pn2z)
+
+        temp_001 = newtonX + (X[i]*newtonianCoeff[i])
+        newtonX = temp_001
+        temp_002 = newtonY + (Y[i]*newtonianCoeff[i])
+        newtonY = temp_002
+        temp_003 = newtonZ + (Z[i]*newtonianCoeff[i])
+        newtonZ = temp_003
+
+        newtonian1b_Potential[i] = μ[i]/r_p1d2[i]
+
+        for j in 1:N
+            if j==i
             else
-                X[i,j] = q[3i-2]-q[3j-2]
-                Y[i,j] = q[3i-1]-q[3j-1]
-                Z[i,j] = q[3i]-q[3j]
-
-                U[i,j] = dq[3i-2]-dq[3j-2]
-                V[i,j] = dq[3i-1]-dq[3j-1]
-                W[i,j] = dq[3i  ]-dq[3j  ]
-
-                _4U_m_3X[i,j] = (4dq[3j-2])-(3dq[3i-2])
-                _4V_m_3Y[i,j] = (4dq[3j-1])-(3dq[3i-1])
-                _4W_m_3Z[i,j] = (4dq[3j  ])-(3dq[3i  ])
-
-                pn2x = X[i,j]*_4U_m_3X[i,j]
-                pn2y = Y[i,j]*_4V_m_3Y[i,j]
-                pn2z = Z[i,j]*_4W_m_3Z[i,j]
-
-                UU[i,j] = dq[3i-2]*dq[3j-2]
-                VV[i,j] = dq[3i-1]*dq[3j-1]
-                WW[i,j] = dq[3i  ]*dq[3j  ]
-
-                vi_dot_vj[i,j] = ( UU[i,j]+VV[i,j] ) + WW[i,j]
-
-                r_p2[i,j] = ( (X[i,j]^2)+(Y[i,j]^2) ) + (Z[i,j]^2)
-
-                r_p1d2[i,j] = sqrt(r_p2[i,j])
-                r_p3d2[i,j] = r_p2[i,j]^1.5
-                r_p7d2[i,j] = r_p2[i,j]^3.5
-
-                newtonianCoeff[i,j] =  μ[i]/r_p3d2[i,j]
-
-                pn2[i,j] = newtonianCoeff[i,j]*(( pn2x+pn2y ) + pn2z)
-
-                temp_001 = newtonX[j] + (X[i,j]*newtonianCoeff[i,j])
-                newtonX[j] = temp_001
-                temp_002 = newtonY[j] + (Y[i,j]*newtonianCoeff[i,j])
-                newtonY[j] = temp_002
-                temp_003 = newtonZ[j] + (Z[i,j]*newtonianCoeff[i,j])
-                newtonZ[j] = temp_003
-
-                newtonian1b_Potential[i,j] = μ[i]/r_p1d2[i, j]
-
-                temp_004 = newtonianNb_Potential[j] + newtonian1b_Potential[i, j]
+                temp_004 = newtonianNb_Potential[j] + newtonian1b_Potential[i]
                 newtonianNb_Potential[j] = temp_004
+            end
+        end
 
-                #J2 accelerations, if j-th body is flattened
-                if UJ_interaction[i,j]
-                    # # rotate from inertial frame to extended-body frame
-                    t31[i,j] = X[i,j]*M_[1,3,j]
-                    t32[i,j] = Y[i,j]*M_[2,3,j]
-                    t33[i,j] = Z[i,j]*M_[3,3,j]
-                    r_sin_ϕ[i,j] = (t31[i,j]+t32[i,j])+t33[i,j]
+        #J2 accelerations, if i-th body is flattened
+        if UJ_interaction[N,i]
+            # rotate from inertial frame to extended-body frame
+            t31[i] = X[i]*M_[1,3,i]
+            t32[i] = Y[i]*M_[2,3,i]
+            t33[i] = Z[i]*M_[3,3,i]
+            r_sin_ϕ[i] = (t31[i]+t32[i])+t33[i]
 
-                    # compute cartesian coordinates of acceleration due to body figure in body frame
-                    sin_ϕ[i,j] = r_sin_ϕ[i,j]/r_p1d2[i,j] # z/r = latitude of point mass wrt body frame
-                    ϕ[i,j] = asin(sin_ϕ[i,j])
-                    cos_ϕ[i,j] = cos(ϕ[i,j])
-                    sin2_ϕ[i,j] = sin_ϕ[i,j]^2
-                    sin3_ϕ[i,j] = sin_ϕ[i,j]^3
-                    P_2_sin_ϕ[i,j] = 1.5sin2_ϕ[i,j] - 0.5
-                    ∂P_2_sin_ϕ[i,j] = 3sin_ϕ[i,j]
-                    P_3_sin_ϕ[i,j] = (-1.5sin_ϕ[i,j]) + (2.5sin3_ϕ[i,j])
-                    ∂P_3_sin_ϕ[i,j] = -1.5 + 7.5sin2_ϕ[i,j]
-                    Λ2j_div_r4[i,j] = (-Λ2[j])/(r_p2[i,j]^2)
-                    Λ3j_div_r5[i,j] = (-Λ3[j])/(r_p1d2[i,j]^5)
-                    m_c_ϕ_∂P_2[i,j] = (-cos_ϕ[i,j])*∂P_2_sin_ϕ[i,j]
-                    m_c_ϕ_∂P_3[i,j] = (-cos_ϕ[i,j])*∂P_3_sin_ϕ[i,j]
-                    F_J2_ξ[i,j] = ( Λ2j_div_r4[i,j]*(3P_2_sin_ϕ[i,j]) )
-                    #F_J2_η[i,j] = zero_q_1
-                    F_J2_ζ[i,j] = Λ2j_div_r4[i,j]*m_c_ϕ_∂P_2[i,j]
-                    F_J3_ξ[i,j] = ( Λ3j_div_r5[i,j]*(4P_3_sin_ϕ[i,j]) )
-                    #F_J3_η[i,j] = zero_q_1
-                    F_J3_ζ[i,j] = Λ3j_div_r5[i,j]*m_c_ϕ_∂P_3[i,j]
-                    F_J_ξ[i,j] = F_J2_ξ[i,j] + F_J3_ξ[i,j]
-                    #F_J_η[i,j] = zero_q_1
-                    F_J_ζ[i,j] = F_J2_ζ[i,j] + F_J3_ζ[i,j]
-                    #Compute unit vectors ξ,η,ζ
-                    ξx[i,j] = X[i,j]/r_p1d2[i,j]
-                    ξy[i,j] = Y[i,j]/r_p1d2[i,j]
-                    ξz[i,j] = Z[i,j]/r_p1d2[i,j]
-                    #Compute η = p x ξ
-                    ηx1[i,j] = M_[2,3,j]*ξz[i,j]
-                    ηy1[i,j] = M_[3,3,j]*ξx[i,j]
-                    ηz1[i,j] = M_[1,3,j]*ξy[i,j]
-                    ηx2[i,j] = M_[3,3,j]*ξy[i,j]
-                    ηy2[i,j] = M_[1,3,j]*ξz[i,j]
-                    ηz2[i,j] = M_[2,3,j]*ξx[i,j]
-                    ηx[i,j] = ηx1[i,j] - ηx2[i,j]
-                    ηy[i,j] = ηy1[i,j] - ηy2[i,j]
-                    ηz[i,j] = ηz1[i,j] - ηz2[i,j]
-                    #Compute ζ = ξ x η
-                    ζx1[i,j] = ξy[i,j]*ηz[i,j]
-                    ζy1[i,j] = ξz[i,j]*ηx[i,j]
-                    ζz1[i,j] = ξx[i,j]*ηy[i,j]
-                    ζx2[i,j] = ξz[i,j]*ηy[i,j]
-                    ζy2[i,j] = ξx[i,j]*ηz[i,j]
-                    ζz2[i,j] = ξy[i,j]*ηx[i,j]
-                    ζx[i,j] = ζx1[i,j] - ζx2[i,j]
-                    ζy[i,j] = ζy1[i,j] - ζy2[i,j]
-                    ζz[i,j] = ζz1[i,j] - ζz2[i,j]
-                    # compute cartesian coordinates of acceleration due to body figure in inertial frame
-                    F_J2_x1[i,j] = F_J_ξ[i,j]*ξx[i,j]
-                    F_J2_y1[i,j] = F_J_ξ[i,j]*ξy[i,j]
-                    F_J2_z1[i,j] = F_J_ξ[i,j]*ξz[i,j]
-                    F_J2_x2[i,j] = F_J_ζ[i,j]*ζx[i,j]
-                    F_J2_y2[i,j] = F_J_ζ[i,j]*ζy[i,j]
-                    F_J2_z2[i,j] = F_J_ζ[i,j]*ζz[i,j]
-                    F_J2_x[i,j] = F_J2_x1[i,j] + F_J2_x2[i,j]
-                    F_J2_y[i,j] = F_J2_y1[i,j] + F_J2_y2[i,j]
-                    F_J2_z[i,j] = F_J2_z1[i,j] + F_J2_z2[i,j]
+            # compute cartesian coordinates of acceleration due to body figure in body frame
+            sin_ϕ[i] = r_sin_ϕ[i]/r_p1d2[i] # z/r = latitude of point mass wrt body frame
+            ϕ[i] = asin(sin_ϕ[i])
+            cos_ϕ[i] = cos(ϕ[i])
+            sin2_ϕ[i] = sin_ϕ[i]^2
+            sin3_ϕ[i] = sin_ϕ[i]^3
+            P_2_sin_ϕ[i] = 1.5sin2_ϕ[i] - 0.5
+            ∂P_2_sin_ϕ[i] = 3sin_ϕ[i]
+            P_3_sin_ϕ[i] = (-1.5sin_ϕ[i]) + (2.5sin3_ϕ[i])
+            ∂P_3_sin_ϕ[i] = -1.5 + 7.5sin2_ϕ[i]
+            Λ2j_div_r4[i] = (-Λ2[i])/(r_p2[i]^2)
+            Λ3j_div_r5[i] = (-Λ3[i])/(r_p1d2[i]^5)
+            m_c_ϕ_∂P_2[i] = (-cos_ϕ[i])*∂P_2_sin_ϕ[i]
+            m_c_ϕ_∂P_3[i] = (-cos_ϕ[i])*∂P_3_sin_ϕ[i]
+            F_J2_ξ[i] = ( Λ2j_div_r4[i]*(3P_2_sin_ϕ[i]) )
+            #F_J2_η[i] = zero_q_1
+            F_J2_ζ[i] = Λ2j_div_r4[i]*m_c_ϕ_∂P_2[i]
+            F_J3_ξ[i] = ( Λ3j_div_r5[i]*(4P_3_sin_ϕ[i]) )
+            #F_J3_η[i] = zero_q_1
+            F_J3_ζ[i] = Λ3j_div_r5[i]*m_c_ϕ_∂P_3[i]
+            F_J_ξ[i] = F_J2_ξ[i] + F_J3_ξ[i]
+            #F_J_η[i] = zero_q_1
+            F_J_ζ[i] = F_J2_ζ[i] + F_J3_ζ[i]
+            #Compute unit vectors ξ,η,ζ
+            ξx[i] = X[i]/r_p1d2[i]
+            ξy[i] = Y[i]/r_p1d2[i]
+            ξz[i] = Z[i]/r_p1d2[i]
+            #Compute η = p x ξ
+            ηx1[i] = M_[2,3,i]*ξz[i]
+            ηy1[i] = M_[3,3,i]*ξx[i]
+            ηz1[i] = M_[1,3,i]*ξy[i]
+            ηx2[i] = M_[3,3,i]*ξy[i]
+            ηy2[i] = M_[1,3,i]*ξz[i]
+            ηz2[i] = M_[2,3,i]*ξx[i]
+            ηx[i] = ηx1[i] - ηx2[i]
+            ηy[i] = ηy1[i] - ηy2[i]
+            ηz[i] = ηz1[i] - ηz2[i]
+            #Compute ζ = ξ x η
+            ζx1[i] = ξy[i]*ηz[i]
+            ζy1[i] = ξz[i]*ηx[i]
+            ζz1[i] = ξx[i]*ηy[i]
+            ζx2[i] = ξz[i]*ηy[i]
+            ζy2[i] = ξx[i]*ηz[i]
+            ζz2[i] = ξy[i]*ηx[i]
+            ζx[i] = ζx1[i] - ζx2[i]
+            ζy[i] = ζy1[i] - ζy2[i]
+            ζz[i] = ζz1[i] - ζz2[i]
+            # compute cartesian coordinates of acceleration due to body figure in inertial frame
+            F_J2_x1[i] = F_J_ξ[i]*ξx[i]
+            F_J2_y1[i] = F_J_ξ[i]*ξy[i]
+            F_J2_z1[i] = F_J_ξ[i]*ξz[i]
+            F_J2_x2[i] = F_J_ζ[i]*ζx[i]
+            F_J2_y2[i] = F_J_ζ[i]*ζy[i]
+            F_J2_z2[i] = F_J_ζ[i]*ζz[i]
+            F_J2_x[i] = F_J2_x1[i] + F_J2_x2[i]
+            F_J2_y[i] = F_J2_y1[i] + F_J2_y2[i]
+            F_J2_z[i] = F_J2_z1[i] + F_J2_z2[i]
 
-                    # # add result to total acceleration on upon j-th body figure due to i-th point mass
-                    # @show "acc",j,"+μ",i,"Λ2",j
-                    temp_accX_j[i,j] = accX[j] + (μ[i]*F_J2_x[i,j])
-                    accX[j] = temp_accX_j[i,j]
-                    temp_accY_j[i,j] = accY[j] + (μ[i]*F_J2_y[i,j])
-                    accY[j] = temp_accY_j[i,j]
-                    temp_accZ_j[i,j] = accZ[j] + (μ[i]*F_J2_z[i,j])
-                    accZ[j] = temp_accZ_j[i,j]
+            # # add result to total acceleration on upon j-th body figure due to i-th point mass
+            # @show "acc",j,"+μ",i,"Λ2",j
+            # temp_accX_j[i] = accX + (μ[i]*F_J2_x[i])
+            # accX = temp_accX_j[i]
+            # temp_accY_j[i] = accY + (μ[i]*F_J2_y[i])
+            # accY = temp_accY_j[i]
+            # temp_accZ_j[i] = accZ + (μ[i]*F_J2_z[i])
+            # accZ = temp_accZ_j[i]
 
-                    # # reaction force on i-th body
-                    # @show "acc",i,"-μ",j,"Λ2",j
-                    temp_accX_i[i,j] = accX[i] - (μ[j]*F_J2_x[i,j])
-                    accX[i] = temp_accX_i[i,j]
-                    temp_accY_i[i,j] = accY[i] - (μ[j]*F_J2_y[i,j])
-                    accY[i] = temp_accY_i[i,j]
-                    temp_accZ_i[i,j] = accZ[i] - (μ[j]*F_J2_z[i,j])
-                    accZ[i] = temp_accZ_i[i,j]
-                end
-            end #if i != j
-        end #for, i
-        v2[j] = ( (dq[3j-2]^2)+(dq[3j-1]^2) ) + (dq[3j]^2)
-    end #for, j
+            # # reaction force on asteroid point mass
+            # @show "acc",i,"-μ",j,"Λ2",j
+            temp_accX_i[i] = accX - (μ[i]*F_J2_x[i])
+            accX = temp_accX_i[i]
+            temp_accY_i[i] = accY - (μ[i]*F_J2_y[i])
+            accY = temp_accY_i[i]
+            temp_accZ_i[i] = accZ - (μ[i]*F_J2_z[i])
+            accZ = temp_accZ_i[i]
+        end
+    v2[i] = ( (ui^2)+(vi^2) ) + (wi^2)
+    end #for, i
+    v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
 
-    for j in _1_to_N
-        postNewtonX[j] = newtonX[j]
-        postNewtonY[j] = newtonY[j]
-        postNewtonZ[j] = newtonZ[j]
-    end
+    postNewtonX = newtonX
+    postNewtonY = newtonY
+    postNewtonZ = newtonZ
 
     for k in Base.OneTo(succ_approx_iter)
-        for j in _1_to_N
-            pntempX[j] = zero_q_1
-            pntempY[j] = zero_q_1
-            pntempZ[j] = zero_q_1
-        end
-        for j in _1_to_N
-            for i in _1_to_N
-                # i == j && continue
-                if i == j
-                else
-                    #post-Newtonian corrections to gravitational acceleration
-                    #Moyer, 1971, page 7 eq. 35
-                    temp_005a = newtonianNb_Potential[i]+(4newtonianNb_Potential[j])
-                    temp_005b = (2v2[i])-(4vi_dot_vj[i,j])
-                    temp_005c = v2[j]+temp_005b
-                    temp_005 = temp_005c-temp_005a
-                    temp_006a = X[i,j]*dq[3i-2]
-                    temp_006b = Y[i,j]*dq[3i-1]
-                    temp_006c = Z[i,j]*dq[3i]
-                    temp_006d = ( temp_006a+temp_006b ) + temp_006c
-                    # the expression below inside the (...)^2 should have a minus sign in front of the numerator,
-                    # but upon squaring it is eliminated, so at the end of the day, it is irrelevant ;)
-                    temp_006e = (temp_006d^2)/r_p2[i,j]
-                    temp_006 = temp_005-(1.5temp_006e)
-                    temp_007a = X[i,j]*postNewtonX[i]
-                    temp_007b = Y[i,j]*postNewtonY[i]
-                    temp_007c = Z[i,j]*postNewtonZ[i]
-                    temp_007d = ( temp_007a+temp_007b ) + temp_007c
-                    temp_007 = temp_006 + (0.5temp_007d)
-                    temp_008 = c_p2+temp_007
-                    pn1[i,j] = newtonianCoeff[i,j]*temp_008
+        pntempX = zero_q_1
+        pntempY = zero_q_1
+        pntempZ = zero_q_1
+        for i in 1:N-1
+            #post-Newtonian corrections to gravitational acceleration
+            #Moyer, 1971, page 7 eq. 35
+            # post-Newtonian velocity of i-th body
+            ui_ = ss16asteph_t[3(N-1+i)-2]
+            vi_ = ss16asteph_t[3(N-1+i)-1]
+            wi_ = ss16asteph_t[3(N-1+i)  ]
+            # acceleration of i-th body
+            pNxi = acceph_t[3i-2]
+            pNyi = acceph_t[3i-1]
+            pNzi = acceph_t[3i  ]
+            temp_005a = newtonianNb_Potential[i] + (4newtonianNb_Potential[N])
+            temp_005b = (2v2[i]) - (4vi_dot_vj[i])
+            temp_005c = v2[N]+temp_005b
+            temp_005 = temp_005c-temp_005a
+            temp_006a = X[i]*ui_
+            temp_006b = Y[i]*vi_
+            temp_006c = Z[i]*wi_
+            temp_006d = ( temp_006a+temp_006b ) + temp_006c
+            # the expression below inside the (...)^2 should have a minus sign in front of the numerator,
+            # but upon squaring it is eliminated, so at the end of the day, it is irrelevant ;)
+            temp_006e = (temp_006d^2)/r_p2[i]
+            temp_006 = temp_005-(1.5temp_006e)
+            temp_007a = X[i]*pNxi
+            temp_007b = Y[i]*pNyi
+            temp_007c = Z[i]*pNzi
+            temp_007d = ( temp_007a+temp_007b ) + temp_007c
+            temp_007 = temp_006 + (0.5temp_007d)
+            temp_008 = c_p2+temp_007
+            pn1[i] = newtonianCoeff[i]*temp_008
 
-                    temp_009 = X[i,j]*pn1[i,j]
-                    temp_010 = Y[i,j]*pn1[i,j]
-                    temp_011 = Z[i,j]*pn1[i,j]
+            temp_009 = X[i]*pn1[i]
+            temp_010 = Y[i]*pn1[i]
+            temp_011 = Z[i]*pn1[i]
 
-                    pn3[i,j] = 3.5*newtonian1b_Potential[i,j]
+            pn3[i] = 3.5*newtonian1b_Potential[i]
 
-                    temp_013a = pn2[i,j]*U[i,j]
-                    temp_013b = pn3[i,j]*postNewtonX[i]
-                    temp_013 = pntempX[j] + (temp_009 + (temp_013a+temp_013b))
-                    pntempX[j] = temp_013
+            temp_013a = pn2[i]*U[i]
+            temp_013b = pn3[i]*pNxi
+            temp_013 = pntempX + (temp_009 + (temp_013a+temp_013b))
+            pntempX = temp_013
 
-                    temp_014a = pn2[i,j]*V[i,j]
-                    temp_014b = pn3[i,j]*postNewtonY[i]
-                    temp_014 = pntempY[j] + (temp_010 + (temp_014a+temp_014b))
-                    pntempY[j] = temp_014
+            temp_014a = pn2[i]*V[i]
+            temp_014b = pn3[i]*pNyi
+            temp_014 = pntempY + (temp_010 + (temp_014a+temp_014b))
+            pntempY = temp_014
 
-                    temp_015a = pn2[i,j]*W[i,j]
-                    temp_015b = pn3[i,j]*postNewtonZ[i]
-                    temp_015 = pntempZ[j] + (temp_011 + (temp_015a+temp_015b))
-                    pntempZ[j] = temp_015
-                end
-            end #for i
+            temp_015a = pn2[i]*W[i]
+            temp_015b = pn3[i]*pNzi
+            temp_015 = pntempZ + (temp_011 + (temp_015a+temp_015b))
+            pntempZ = temp_015
         end #for j
-        for j in _1_to_N
-            postNewtonX[j] = pntempX[j]*c_m2
-            postNewtonY[j] = pntempY[j]*c_m2
-            postNewtonZ[j] = pntempZ[j]*c_m2
-        end
+        postNewtonX = pntempX*c_m2
+        postNewtonY = pntempY*c_m2
+        postNewtonZ = pntempZ*c_m2
     end #for k in Base.OneTo(succ_approx_iter) # (post-Newtonian iterations)
 
-    #fill the equations of motion for everyone except test particle (Newtonian, post-Newtonian and extended body accelerations)
-    for i in Base.OneTo(N-1)
-        dq[3(N+i)-2] = postNewtonX[i]+accX[i]
-        dq[3(N+i)-1] = postNewtonY[i]+accY[i]
-        dq[3(N+i)  ] = postNewtonZ[i]+accZ[i]
-    end
-
     #computation of non-gravitational accelerations:
-    hx = (Y[N,1]*(dq[3N  ]-dq[3]))-(Z[N,1]*(dq[3N-1]-dq[2]))
-    hy = (Z[N,1]*(dq[3N-2]-dq[1]))-(X[N,1]*(dq[3N  ]-dq[3]))
-    hz = (X[N,1]*(dq[3N-1]-dq[2]))-(Y[N,1]*(dq[3N-2]-dq[1]))
-    r_hs = sqrt(r_p2[N,1])
-    runitx = X[N,1]/r_hs
-    runity = Y[N,2]/r_hs
-    runitz = Z[N,3]/r_hs
+    hx = (Z[1]*V[1])-(Y[1]*W[1])
+    hy = (X[1]*W[1])-(Z[1]*U[1])
+    hz = (Y[1]*U[1])-(X[1]*V[1])
+    r_hs = sqrt(r_p2[1])
+    runitx = X[1]/r_hs
+    runity = Y[2]/r_hs
+    runitz = Z[3]/r_hs
 
     #cartesian components of transversal unit vector:
-    tunitx0 = (hy*runitz)-(hz*runity)
-    tunity0 = (hz*runitx)-(hx*runitz)
-    tunitz0 = (hx*runity)-(hy*runitx)
+    tunitx0 = (hy*runitz) - (hz*runity)
+    tunity0 = (hz*runitx) - (hx*runitz)
+    tunitz0 = (hx*runity) - (hy*runitx)
     hmag = sqrt( ((tunitx0^2)+(tunity0^2))+(tunitz0^2) )
     tunitx = tunitx0/hmag
     tunity = tunity0/hmag
@@ -475,17 +455,17 @@
 
     # evaluate non-grav acceleration of NEA (Yarkovsky):
     g_r = r_hs^(-2.0)
-    A2_t_g_r = q[6N+1]*g_r
+    A2_t_g_r = q[7]*g_r
 
     NGAx = A2_t_g_r*tunitx
     NGAy = A2_t_g_r*tunity
     NGAz = A2_t_g_r*tunitz
 
-    dq[6N-2] = (postNewtonX[N]+accX[N])+NGAx
-    dq[6N-1] = (postNewtonY[N]+accY[N])+NGAy
-    dq[6N  ] = (postNewtonZ[N]+accZ[N])+NGAz
+    dq[4] = ( postNewtonX + accX ) + NGAx
+    dq[5] = ( postNewtonY + accY ) + NGAy
+    dq[6] = ( postNewtonZ + accZ ) + NGAz
 
-    dq[6N+1] = zero_q_1
+    dq[7] = zero_q_1
 
     nothing
 end

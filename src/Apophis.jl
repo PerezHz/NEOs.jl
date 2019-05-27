@@ -6,7 +6,7 @@ export main, au, yr, observer_position, apophisdofs, sundofs, earthdofs,
     ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler,
     delay_doppler_jpleph, mas2rad, t2c_rotation_iau_00_06,
     process_radar_data_jpl, RadarDataJPL, ismonostatic,
-    RNp1BP_pN_A_J234E_J2S_ng!, RNp1BP_pN_A_J234E_J2S_ng_d225!,
+    RNp1BP_pN_A_J23E_J23E_J2S_ng_eph!, RNp1BP_pN_A_J234E_J2S_ng_d225!,
     RNp1BP_pN_A_J234E_J2S_ng_d225_srp!, semimajoraxis, eccentricity, inclination
 
 using Reexport
@@ -83,10 +83,10 @@ const c_au_per_day = daysec*(299_792.458/au) # speed of light in au per day
 const c_au_per_sec = 299_792.458/au # speed of light in au per sec
 const c_cm_per_sec = 100_000*299_792.458 # speed of light in cm per sec
 
-const apophisdofs = union(34:36, 70:72)
-const sundofs = union(1:3, 37:39)
+const apophisdofs = union(3N-2:3N, 6N-2:6N) #union(34:36, 70:72)
+const sundofs = union(1:3, 3(N+su)-2:3(N+su))
 const earthdofs = union(3ea-2:3ea, 3(N+ea)-2:3(N+ea))
-const ssdofs = setdiff(1:72, apophisdofs)
+const ssdofs = setdiff(1:6N, apophisdofs)
 
 const J2000 = 2.451545e6
 
@@ -113,9 +113,9 @@ const m2_s3_to_au2_day3 = 1e-6daysec^3/au^2 # conversion factor from m^2/sec^3 t
 # const b_sun = 0.1836e6 # Solar corona parameter b [cm^-3] (Anderson 1978)
 
 function __init__()
-    @show length(methods(RNp1BP_pN_A_J234E_J2S_ng!))
+    @show length(methods(RNp1BP_pN_A_J23E_J23E_J2S_ng_eph!))
     @show length(methods(TaylorIntegration.jetcoeffs!))
-    @show methods(RNp1BP_pN_A_J234E_J2S_ng!)
+    @show methods(RNp1BP_pN_A_J23E_J23E_J2S_ng_eph!)
     # load JPL ephemerides
     loadjpleph()
 end
@@ -140,17 +140,33 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
     newtoniter::Int, t0::T, tspan::T; output::Bool=true, radarobs::Bool=true,
     jt::Bool=true) where {T<:Real}
 
-    # get initial conditions
-    q0 = initialcond(length(μ))
+    __ss16asteph = load("/Users/Jorge/projects/Apophis/jpleph/ss16ast.jld", "ss16ast_eph")
+    t_eph = __ss16asteph.t
+    x_eph = __ss16asteph.x
+    global ss16asteph = TaylorInterpolant(t_eph, x_eph)
+    # differentiate velocities of major Solar Sytem bodies + 16 pertubers to obtain their accelerations
+    # then, wrap those interpolants in a TaylorInterpolant
+    # accelerations of "everybody else" are needed when evaluating post-Newtonian acceleration of Apophis
+    global acc_eph = TaylorInterpolant(t_eph, differentiate.(__ss16asteph.x[:,3(N-1)+1:6(N-1)]))
+
+    #numerator of Halley radial velocity wrt Jupiter
+    function rvelea(t,x,dx)
+        ss16asteph_t = ss16asteph(t)
+        xe = ss16asteph_t[union(3ea-2:3ea,3(N-1+ea)-2:3(N-1+ea))]
+        return (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
+    end
+
+    # get asteroid initial conditions
+    __q0 = initialcond()
 
     if jt
-        #construct jet transport initial condition as Vector{Taylor1{Float64}} from `q0`
-        q0T1 = Taylor1.(q0,varorder)
-        q0T1[1:end-1] = Taylor1.(q0[1:end-1],varorder)
-        q0T1[end] = Taylor1([q0[end],1e-14],varorder) #note the 1e-14!!!
-        __q0 = q0T1
+        #construct jet transport initial condition as Vector{Taylor1{Float64}} from `__q0`
+        q0T1 = Taylor1.(__q0,varorder)
+        q0T1[1:end-1] = Taylor1.(__q0[1:end-1],varorder)
+        q0T1[end] = Taylor1([__q0[end],1e-14],varorder) #note the 1e-14!!!
+        q0 = q0T1
     else
-        __q0 = q0
+        q0 = __q0
     end
 
     @show tmax = t0+tspan*yr #final time of integration
@@ -168,11 +184,11 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
         # construct time range variable with t0 and observation times > t0, removing repeated values
         tv = union(t0, tv_jpl_tdb_julian[tv_jpl_tdb_julian .> t0])
         @show all(diff(tv) .> 0)
-        @time sol_objs = taylorinteg(dynamics, g2, __q0, tv, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+        @time sol_objs = taylorinteg(dynamics, rvelea, q0, tv, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
         tup_names = (:xv1, :tvS1, :xvS1, :gvS1)
         sol = NamedTuple{tup_names}(sol_objs)
     else
-        @time sol_objs = taylorinteg(dynamics, g2, __q0, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+        @time sol_objs = taylorinteg(dynamics, rvelea, q0, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
         tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
         sol = NamedTuple{tup_names}(sol_objs)
     end
