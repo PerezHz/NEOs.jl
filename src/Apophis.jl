@@ -140,7 +140,7 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
     newtoniter::Int, t0::T, tspan::T; output::Bool=true, radarobs::Bool=true,
     jt::Bool=true) where {T<:Real}
 
-    __ss16asteph = load("/Users/Jorge/projects/Apophis/jpleph/ss16ast.jld", "ss16ast_eph")
+    __ss16asteph = load(joinpath(jplephpath, "ss16ast343_eph.jld"), "ss16ast_eph")
     t_eph = __ss16asteph.t
     x_eph = __ss16asteph.x
     global ss16asteph = TaylorInterpolant(t_eph, x_eph)
