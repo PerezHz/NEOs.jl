@@ -241,9 +241,9 @@
         V[i] = vi-dq[2]
         W[i] = wi-dq[3]
 
-        _4U_m_3X[i] = (4ui)-(3dq[1])
-        _4V_m_3Y[i] = (4vi)-(3dq[2])
-        _4W_m_3Z[i] = (4wi)-(3dq[3])
+        _4U_m_3X[i] = (4dq[1])-(3ui)
+        _4V_m_3Y[i] = (4dq[2])-(3vi)
+        _4W_m_3Z[i] = (4dq[3])-(3wi)
 
         pn2x = X[i]*_4U_m_3X[i]
         pn2y = Y[i]*_4V_m_3Y[i]
