@@ -289,8 +289,10 @@
         newtonZ = temp_003
 
         newtonian1b_Potential[i] = μ[i]/r_p1d2[i]
+        temp_004 = newtonianNb_Potential[N] + newtonian1b_Potential[i]
+        newtonianNb_Potential[N] = temp_004
 
-        for j in 1:N
+        for j in 1:N-1
             if j==i
             else
                 xij[i,j] = xi-ss16asteph_t[3j-2]
@@ -298,8 +300,8 @@
                 zij[i,j] = zi-ss16asteph_t[3j  ]
                 r2ij[i,j] = ((xij[i,j]^2) + (yij[i,j]^2)) + (zij[i,j]^2)
                 rij[i,j] = sqrt( r2ij[i,j] )
-                temp_004 = newtonianNb_Potential[j] + ( μ[i]/rij[i,j] )
-                newtonianNb_Potential[j] = temp_004
+                temp_004 = newtonianNb_Potential[i] + ( μ[j]/rij[i,j] )
+                newtonianNb_Potential[i] = temp_004
                 # temp_004_ = newtonianNb_Potential[i] + newtonian1b_Potential[i]
                 # newtonianNb_Potential[i] = temp_004_
             end
