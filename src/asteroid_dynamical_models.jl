@@ -13,7 +13,7 @@
 # unit heliocentric transverse vector, au is 1 astronomical unit, r is the
 # asteroid's heliocentric range, A2 is a coefficient (with units of au/day^2),
 # and d = 2.0
-@taylorize function RNp1BP_pN_A_J23E_J23E_J2S_ng_eph!(t, q, dq)
+@taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph!(t, q, dq)
     local ss16asteph_t = ss16asteph(t)
     local acceph_t = acc_eph(t)
     local S = eltype(q[1])
@@ -42,6 +42,12 @@
     newtonX = zero_q_1
     newtonY = zero_q_1
     newtonZ = zero_q_1
+
+    xij = Array{Taylor1{S}}(undef, N, N)
+    yij = Array{Taylor1{S}}(undef, N, N)
+    zij = Array{Taylor1{S}}(undef, N, N)
+    rij = Array{Taylor1{S}}(undef, N, N)
+    r2ij = Array{Taylor1{S}}(undef, N, N)
 
     newtonianCoeff = Array{Taylor1{S}}(undef, N)
 
@@ -158,8 +164,18 @@
     dq[2] = q[5]
     dq[3] = q[6]
 
-    for j in 1:N
-        newtonianNb_Potential[j] = zero_q_1
+    for i in 1:N
+        newtonianNb_Potential[i] = zero_q_1
+        for j in 1:N
+            if j==i
+            else
+                xij[i,j] = zero_q_1
+                yij[i,j] = zero_q_1
+                zij[i,j] = zero_q_1
+                r2ij[i,j] = zero_q_1
+                rij[i,j] = zero_q_1
+            end
+        end
     end
 
     for j in j2_body_index
@@ -277,16 +293,15 @@
         for j in 1:N
             if j==i
             else
-                xij = xi-ss16asteph_t[3j-2]
-                yij = yi-ss16asteph_t[3j-1]
-                zij = zi-ss16asteph_t[3j  ]
-                x2ij = xij^2
-                y2ij = yij^2
-                z2ij = zij^2
-                temp_004 = newtonianNb_Potential[j] + ( μ[j]/sqrt( (x2ij + y2ij) + (z2ij) ) )
-                newtonianNb_Potential[j] = temp_004
-                temp_004 = newtonianNb_Potential[i] + newtonian1b_Potential[i]
+                xij[i,j] = xi-ss16asteph_t[3j-2]
+                yij[i,j] = yi-ss16asteph_t[3j-1]
+                zij[i,j] = zi-ss16asteph_t[3j  ]
+                r2ij[i,j] = ((xij[i,j]^2) + (yij[i,j]^2)) + (zij[i,j]^2)
+                rij[i,j] = sqrt( r2ij[i,j] )
+                temp_004 = newtonianNb_Potential[i] + ( μ[j]/rij[i,j] )
                 newtonianNb_Potential[i] = temp_004
+                # temp_004_ = newtonianNb_Potential[i] + newtonian1b_Potential[i]
+                # newtonianNb_Potential[i] = temp_004_
             end
         end
 
@@ -378,9 +393,9 @@
     end #for, i
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
 
-    postNewtonX = newtonX
-    postNewtonY = newtonY
-    postNewtonZ = newtonZ
+    # postNewtonX = newtonX
+    # postNewtonY = newtonY
+    # postNewtonZ = newtonZ
 
     for k in Base.OneTo(succ_approx_iter)
         pntempX = zero_q_1
@@ -397,10 +412,11 @@
             pNxi = acceph_t[3i-2]
             pNyi = acceph_t[3i-1]
             pNzi = acceph_t[3i  ]
+
             temp_005a = newtonianNb_Potential[i] + (4newtonianNb_Potential[N])
-            temp_005b = (2v2[i]) - (4vi_dot_vj[i])
-            temp_005c = v2[N]+temp_005b
-            temp_005 = temp_005c-temp_005a
+            temp_005b = v2[N] + ( (2v2[i]) - (4vi_dot_vj[i]) )
+            temp_005 = temp_005b - temp_005a
+
             temp_006a = X[i]*ui_
             temp_006b = Y[i]*vi_
             temp_006c = Z[i]*wi_
@@ -408,14 +424,17 @@
             # the expression below inside the (...)^2 should have a minus sign in front of the numerator,
             # but upon squaring it is eliminated, so at the end of the day, it is irrelevant ;)
             temp_006e = (temp_006d^2)/r_p2[i]
-            temp_006 = temp_005-(1.5temp_006e)
+            temp_006 = 1.5temp_006e
+
             temp_007a = X[i]*pNxi
             temp_007b = Y[i]*pNyi
             temp_007c = Z[i]*pNzi
             temp_007d = ( temp_007a+temp_007b ) + temp_007c
-            temp_007 = temp_006 + (0.5temp_007d)
-            temp_008 = c_p2+temp_007
-            pn1[i] = newtonianCoeff[i]*temp_008
+            temp_007 = 0.5temp_007d
+
+            temp_008 = c_p2 + (temp_005 + temp_007)
+
+            pn1[i] = newtonianCoeff[i]*(temp_006 + temp_008)
 
             temp_009 = X[i]*pn1[i]
             temp_010 = Y[i]*pn1[i]
@@ -469,9 +488,12 @@
     NGAy = A2_t_g_r*tunity
     NGAz = A2_t_g_r*tunitz
 
-    dq[4] = ( postNewtonX + accX ) + NGAx
-    dq[5] = ( postNewtonY + accY ) + NGAy
-    dq[6] = ( postNewtonZ + accZ ) + NGAz
+    # dq[4] = ( postNewtonX + accX ) + NGAx
+    # dq[5] = ( postNewtonY + accY ) + NGAy
+    # dq[6] = ( postNewtonZ + accZ ) + NGAz
+    dq[4] = ( newtonX + accX ) + NGAx
+    dq[5] = ( newtonY + accY ) + NGAy
+    dq[6] = ( newtonZ + accZ ) + NGAz
 
     dq[7] = zero_q_1
 

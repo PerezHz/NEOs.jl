@@ -6,7 +6,7 @@ export main, au, yr, observer_position, apophisdofs, sundofs, earthdofs,
     ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler,
     delay_doppler_jpleph, mas2rad, t2c_rotation_iau_00_06,
     process_radar_data_jpl, RadarDataJPL, ismonostatic,
-    RNp1BP_pN_A_J23E_J23E_J2S_ng_eph!, RNp1BP_pN_A_J234E_J2S_ng_d225!,
+    RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J234E_J2S_ng_d225!,
     RNp1BP_pN_A_J234E_J2S_ng_d225_srp!, semimajoraxis, eccentricity, inclination
 
 using Reexport
@@ -113,9 +113,9 @@ const m2_s3_to_au2_day3 = 1e-6daysec^3/au^2 # conversion factor from m^2/sec^3 t
 # const b_sun = 0.1836e6 # Solar corona parameter b [cm^-3] (Anderson 1978)
 
 function __init__()
-    @show length(methods(RNp1BP_pN_A_J23E_J23E_J2S_ng_eph!))
+    @show length(methods(RNp1BP_pN_A_J23E_J2S_ng_eph!))
     @show length(methods(TaylorIntegration.jetcoeffs!))
-    @show methods(RNp1BP_pN_A_J23E_J23E_J2S_ng_eph!)
+    @show methods(RNp1BP_pN_A_J23E_J2S_ng_eph!)
     # load JPL ephemerides
     loadjpleph()
 end
@@ -227,6 +227,28 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
         println("Saved solution")
     end
     return nothing
+end
+
+function testjetcoeffs()
+    global ss16asteph = load(joinpath(jplephpath, "ss16ast343_eph.jld"), "ss16ast_eph")
+    global acc_eph = TaylorInterpolant(ss16asteph.t, differentiate.(ss16asteph.x[:,3(N-1)+1:6(N-1)]))
+    q0 = initialcond()
+    t0 = datetime2julian(DateTime(2008,9,24))
+    tT = t0 + Taylor1(order)
+    q0T = Taylor1.(q0, order)
+    dq0T = similar(q0T)
+    xaux = similar(q0T)
+    q0T2 = Taylor1.(q0, order)
+    dq0T2 = similar(q0T)
+    @show methods(TaylorIntegration.jetcoeffs!)
+    @time TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0T, dq0T, xaux)
+    @time TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT, q0T2, dq0T2)
+
+    @show q0T
+    @show q0T2
+    @show norm(q0T-q0T2, Inf)
+    @show norm(dq0T-dq0T2, Inf)
+
 end
 
 end
