@@ -298,8 +298,8 @@
                 zij[i,j] = zi-ss16asteph_t[3j  ]
                 r2ij[i,j] = ((xij[i,j]^2) + (yij[i,j]^2)) + (zij[i,j]^2)
                 rij[i,j] = sqrt( r2ij[i,j] )
-                temp_004 = newtonianNb_Potential[i] + ( μ[j]/rij[i,j] )
-                newtonianNb_Potential[i] = temp_004
+                temp_004 = newtonianNb_Potential[j] + ( μ[i]/rij[i,j] )
+                newtonianNb_Potential[j] = temp_004
                 # temp_004_ = newtonianNb_Potential[i] + newtonian1b_Potential[i]
                 # newtonianNb_Potential[i] = temp_004_
             end
