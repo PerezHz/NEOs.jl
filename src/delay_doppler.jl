@@ -246,7 +246,7 @@ end
 apophis_pv(et) = kmsec2auday( getpv(2099942, 0, et) ) # units: au, au/day
 sun_pv(et) = kmsec2auday( getpv(10, 0, et) ) # units: au, au/day
 earth_pv(et) = kmsec2auday( getpv(399, 0, et) ) # units: au, au/day
-moon_pv(et) = kmsec2auday( getpv(399, 0, et) ) # units: au, au/day
+moon_pv(et) = kmsec2auday( getpv(301, 0, et) ) # units: au, au/day
 tt_m_tdb(et) = getpv(1000000001, 1000000000, et) # units: seconds
 
 # Standard formula for relativistic (Shapiro) delay
