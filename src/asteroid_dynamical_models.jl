@@ -302,17 +302,15 @@
                 rij[i,j] = sqrt( r2ij[i,j] )
                 temp_004 = newtonianNb_Potential[i] + ( μ[j]/rij[i,j] )
                 newtonianNb_Potential[i] = temp_004
-                # temp_004_ = newtonianNb_Potential[i] + newtonian1b_Potential[i]
-                # newtonianNb_Potential[i] = temp_004_
             end
         end
 
         #J2 accelerations, if i-th body is flattened
         if UJ_interaction[N,i]
             # rotate from inertial frame to extended-body frame
-            t31[i] = X[i]*M_[1,3,i]
-            t32[i] = Y[i]*M_[2,3,i]
-            t33[i] = Z[i]*M_[3,3,i]
+            t31[i] = -X[i]*M_[1,3,i]
+            t32[i] = -Y[i]*M_[2,3,i]
+            t33[i] = -Z[i]*M_[3,3,i]
             r_sin_ϕ[i] = (t31[i]+t32[i])+t33[i]
 
             # compute cartesian coordinates of acceleration due to body figure in body frame
@@ -339,9 +337,9 @@
             #F_J_η[i] = zero_q_1
             F_J_ζ[i] = F_J2_ζ[i] + F_J3_ζ[i]
             #Compute unit vectors ξ,η,ζ
-            ξx[i] = X[i]/r_p1d2[i]
-            ξy[i] = Y[i]/r_p1d2[i]
-            ξz[i] = Z[i]/r_p1d2[i]
+            ξx[i] = -X[i]/r_p1d2[i]
+            ξy[i] = -Y[i]/r_p1d2[i]
+            ξz[i] = -Z[i]/r_p1d2[i]
             #Compute η = p x ξ
             ηx1[i] = M_[2,3,i]*ξz[i]
             ηy1[i] = M_[3,3,i]*ξx[i]
@@ -391,7 +389,7 @@
             temp_accZ_i[i] = accZ - (μ[i]*F_J2_z[i])
             accZ = temp_accZ_i[i]
         end
-    v2[i] = ( (ui^2)+(vi^2) ) + (wi^2)
+        v2[i] = ( (ui^2)+(vi^2) ) + (wi^2)
     end #for, i
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
 
@@ -458,7 +456,7 @@
             temp_015b = pn3[i]*pNzi
             temp_015 = pntempZ + (temp_011 + (temp_015a+temp_015b))
             pntempZ = temp_015
-        end #for j
+        end #for i
         postNewtonX = pntempX*c_m2
         postNewtonY = pntempY*c_m2
         postNewtonZ = pntempZ*c_m2
