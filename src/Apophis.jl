@@ -138,16 +138,13 @@ radvel_ae(x) = ( (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x
 
 function main(objname::String, datafile::String, dynamics::Function, maxsteps::Int,
     newtoniter::Int, t0::T, tspan::T; output::Bool=true, radarobs::Bool=true,
-    jt::Bool=true) where {T<:Real}
+    jt::Bool=true, dense::Bool=false) where {T<:Real}
 
-    __ss16asteph = load(joinpath(jplephpath, "ss16ast343_eph.jld"), "ss16ast_eph")
-    t_eph = __ss16asteph.t
-    x_eph = __ss16asteph.x
-    global ss16asteph = TaylorInterpolant(t_eph, x_eph)
+    global ss16asteph = load(joinpath(jplephpath, "ss16ast343_eph.jld"), "ss16ast_eph")
     # differentiate velocities of major Solar Sytem bodies + 16 pertubers to obtain their accelerations
     # then, wrap those interpolants in a TaylorInterpolant
     # accelerations of "everybody else" are needed when evaluating post-Newtonian acceleration of Apophis
-    global acc_eph = TaylorInterpolant(t_eph, differentiate.(__ss16asteph.x[:,3(N-1)+1:6(N-1)]))
+    global acc_eph = TaylorInterpolant(ss16asteph.t, differentiate.(ss16asteph.x[:,3(N-1)+1:6(N-1)]))
 
     #numerator of Halley radial velocity wrt Jupiter
     function rvelea(t,x,dx)
@@ -172,25 +169,30 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
     @show tmax = t0+tspan*yr #final time of integration
 
     # do integration
-    if radarobs
-        # read object radar astrometry from JPL date
-        radar_data_jpl = process_radar_data_jpl(datafile)
-        #construct vector of observation times (UTC) > t0
-        tv_jpl_utc = UTCEpoch.([x.utcepoch for x in radar_data_jpl])
-        # convert to TDB
-        tv_jpl_tdb = TDBEpoch.(tv_jpl_utc)
-        # date/time to Julian date
-        tv_jpl_tdb_julian =  map(x->x.Δt, julian.(tv_jpl_tdb))
-        # construct time range variable with t0 and observation times > t0, removing repeated values
-        tv = union(t0, tv_jpl_tdb_julian[tv_jpl_tdb_julian .> t0])
-        @show all(diff(tv) .> 0)
-        @time sol_objs = taylorinteg(dynamics, rvelea, q0, tv, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
-        tup_names = (:xv1, :tvS1, :xvS1, :gvS1)
-        sol = NamedTuple{tup_names}(sol_objs)
+    if !dense
+        if radarobs
+            # read object radar astrometry from JPL date
+            radar_data_jpl = process_radar_data_jpl(datafile)
+            #construct vector of observation times (UTC) > t0
+            tv_jpl_utc = UTCEpoch.([x.utcepoch for x in radar_data_jpl])
+            # convert to TDB
+            tv_jpl_tdb = TDBEpoch.(tv_jpl_utc)
+            # date/time to Julian date
+            tv_jpl_tdb_julian =  map(x->x.Δt, julian.(tv_jpl_tdb))
+            # construct time range variable with t0 and observation times > t0, removing repeated values
+            tv = union(t0, tv_jpl_tdb_julian[tv_jpl_tdb_julian .> t0])
+            @show all(diff(tv) .> 0)
+            @time sol_objs = taylorinteg(dynamics, rvelea, q0, tv, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+            tup_names = (:xv1, :tvS1, :xvS1, :gvS1)
+            sol = NamedTuple{tup_names}(sol_objs)
+        else
+            @time sol_objs = taylorinteg(dynamics, rvelea, q0, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+            tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
+            sol = NamedTuple{tup_names}(sol_objs)
+        end
     else
-        @time sol_objs = taylorinteg(dynamics, rvelea, q0, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
-        tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
-        sol = NamedTuple{tup_names}(sol_objs)
+        @time interp = taylorinteg(dynamics, q0, t0, tmax, order, abstol; maxsteps=maxsteps, dense=dense);
+        sol = (interp=interp,)
     end
 
     #write solution to .jld files
