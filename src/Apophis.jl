@@ -169,7 +169,10 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
     @show tmax = t0+tspan*yr #final time of integration
 
     # do integration
-    if !dense
+    if dense
+        @time interp = taylorinteg(dynamics, q0, t0, tmax, order, abstol; maxsteps=maxsteps, dense=dense);
+        sol = (interp=interp,)
+    else
         if radarobs
             # read object radar astrometry from JPL date
             radar_data_jpl = process_radar_data_jpl(datafile)
@@ -190,9 +193,6 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
             tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
             sol = NamedTuple{tup_names}(sol_objs)
         end
-    else
-        @time interp = taylorinteg(dynamics, q0, t0, tmax, order, abstol; maxsteps=maxsteps, dense=dense);
-        sol = (interp=interp,)
     end
 
     #write solution to .jld files
