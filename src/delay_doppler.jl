@@ -473,18 +473,12 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, f_T::Real,
     doppler_c2_t2 = ϕ1 - ϕ3 # order c^-2, 2nd term
     doppler_c2_t3 = (  dot(v_t_t_t, v_t_t_t) - dot(v_r_t_r, v_r_t_r)  )/2  # order c^-2, 3rd term
     doppler_c2 = -f_T*(doppler_c2_t1 + doppler_c2_t2 + doppler_c2_t3)/(c_au_per_day^2)
-    # Add corrections of order c^-3 to Doppler shift (Moyer, 1971, p. 56, Eq. 343)
-    # not sure if corrections are too small for Apophis (i.e., not necessary to reduce data); might be needed for other objects
-    # on the other hand, "Shapiro doppler" (i.e., `Δν_rel_D+Δν_rel_U`) might be important
+    # Corrections of order c^-3 to Doppler shift (Moyer, 1971, p. 56, Eq. 343)
     doppler_c3_t1 = ρ_dot_t*p_t^2 - ρ_dot_r*p_r^2 - ρ_dot_t*ρ_dot_r*(p_r-p_t)
     doppler_c3_t2 = -(ρ_dot_t+ρ_dot_r)*(doppler_c2_t2+doppler_c2_t3)
+    # Note that c^3 corrections to Doppler include a "Shapiro-like" term, which has already been multiplied by the transmitter frequency
     doppler_c3 = -f_T*(doppler_c3_t1+doppler_c3_t2)/(c_au_per_day^3) + (Δν_rel_D+Δν_rel_U)
-    # @show 1e6doppler_c3
     ν = (doppler_c + doppler_c2) + doppler_c3
-    # @show ν
-    # @show doppler_c
-    # @show doppler_c2
-    # @show doppler_c3
 
     return 1e6τ, 1e6ν # total signal delay (μs) and Doppler shift (Hz)
 end
