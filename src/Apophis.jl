@@ -3,11 +3,11 @@ module Apophis
 __precompile__(false)
 
 export main, au, yr, observer_position, apophisdofs, sundofs, earthdofs,
-    ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler,
-    delay_doppler_jpleph, mas2rad, t2c_rotation_iau_00_06,
-    process_radar_data_jpl, RadarDataJPL, ismonostatic,
+    ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler, ismonostatic,
+    mas2rad, t2c_rotation_iau_00_06, process_radar_data_jpl, RadarDataJPL,
     RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J234E_J2S_ng_d225!,
-    RNp1BP_pN_A_J234E_J2S_ng_d225_srp!, semimajoraxis, eccentricity, inclination
+    RNp1BP_pN_A_J234E_J2S_ng_d225_srp!, semimajoraxis, eccentricity, inclination,
+    julian2etsecs, etsecs2julian
 
 using Reexport
 @reexport using TaylorIntegration, LinearAlgebra # so that JLD may interpret previously saved Taylor1 objects saved in .jld files
