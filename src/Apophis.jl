@@ -146,7 +146,7 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
     # accelerations of "everybody else" are needed when evaluating post-Newtonian acceleration of Apophis
     global acc_eph = TaylorInterpolant(ss16asteph.t, differentiate.(ss16asteph.x[:,3(N-1)+1:6(N-1)]))
 
-    #numerator of Halley radial velocity wrt Jupiter
+    #numerator of Apophis radial velocity wrt Earth
     function rvelea(t,x,dx)
         ss16asteph_t = ss16asteph(t)
         xe = ss16asteph_t[union(3ea-2:3ea,3(N-1+ea)-2:3(N-1+ea))]
