@@ -80,9 +80,12 @@ end
 function Ne(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}, ds::U, ΔS::Real) where {S<:Number, U<:Number}
     # s: linear parametrization of ray path, such that
     # s=0 -> point on ray path is at p1; s=1 -> point on ray path is at p2
+    # @show p1, p2, r_s_t0
     s = ds/ΔS
-    s_p2_p1 = map(x->s*x, (p2-p1))
-    r_vec = p1+s_p2_p1 - r_s_t0 # heliocentric position (au) of point on ray path at time t_tdb_jul (Julian days)
+    # @show s
+    s_p2_p1 = map(x->s*x, Taylor1.(p2-p1, s.order))
+    r_vec = Taylor1.(p1, s.order) + s_p2_p1 - Taylor1.(r_s_t0, s.order) # heliocentric position (au) of point on ray path at time t_tdb_jul (Julian days)
+    # @show r_vec
     r = sqrt( r_vec[1]^2 + r_vec[2]^2 + r_vec[3]^2 ) # heliocentric distance (au) of point on ray path at time t_tdb_jul (Julian days)
     # compute heliocentric position vector of point on ray path wrt Sun's rotation pole and equator (i.e., heliographic)
     α_p_sun_rad = deg2rad(α_p_sun)
@@ -96,6 +99,7 @@ function Ne(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}, ds::U, ΔS::Real) w
     Ne_t1 = (A_sun/r_sr^6)
     Ne_t2 = ( (a_sun*b_sun)/sqrt((a_sun*sin(β))^2 + (b_sun*cos(β))^2) )/(r_sr^2)
     Ne_val = Ne_t1 + Ne_t2
+    # @show Ne_val
     return Ne_val
 end
 
@@ -114,10 +118,11 @@ function Ne_path_integral(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}) where
     end
     # do path integral
     i0 = zero(p1[1])
-    # @show i0
     tT = Taylor1(24)
     x0T = Taylor1(i0, 24)
+    # @show i0, tT, x0T
     TaylorIntegration.jetcoeffs!(int_kernel, tT, x0T)
+    # @show x0T, x0T(ΔS)
     return x0T(ΔS)
 end
 
@@ -129,8 +134,8 @@ function corona_k(F_tx::T) where {T<:Real}
     elseif isxband(F_tx)
         return 400
     else
-        @warn "Frequency is neither X or S band. Returning k=1.0."
-        return 1.0
+        @warn "Frequency is neither X or S band. Returning k=1"
+        return 1
     end
 end
 
@@ -146,7 +151,8 @@ end
 # and the expression (40.3/(c*f^2))*∫Ne*ds, with c in centimeters/second, is in seconds
 function corona_delay(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}, F_tx::U, station_code::Int) where {S<:Number, U<:Real}
     # for the time being, we're removing the terms associated with higher-order terms in the variationals (ie, Yarkovsky)
-    int_path = Ne_path_integral(map(x->constant_term.(x), (p1, p2, r_s_t0))...) # (electrons/cm^2)
+    # int_path = Ne_path_integral(map(x->constant_term.(x), (p1, p2, r_s_t0))...) # (electrons/cm^2)
+    int_path = Ne_path_integral(p1, p2, r_s_t0) # (electrons/cm^2)
     Δτ_corona = corona_k(F_tx)*40.3e-6int_path/(c_cm_per_sec*(F_tx)^2) # seconds
     return Δτ_corona # seconds
 end
@@ -219,7 +225,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     Δτ_corona_D = zero(τ_D)
     Δτ_tropo_D = zero(τ_D)
     # Δν_corona_D = zero(τ_D)
-    # Δν_tropo_D = zero(τ_D)
+    Δν_tropo_D = zero(τ_D)
 
     for i in 1:niter
         # Eq. (3) Yeomans et al. (1992)
@@ -260,6 +266,11 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         # Δν_rel_D = shapiro_doppler(e_D, de_D, p_D, dp_D, q_D, dq_D, F_tx) # MHz
         Δν_rel_D = -F_tx*Δτ_rel_D_T[1]/daysec # MHz
         # @show Δν_rel_D
+        # r_a_t_bT = constant_term.(r_a_t_b) + map(x->x*Taylor1(1), constant_term.(v_a_t_b))
+        # r_r_t_rT = constant_term.(r_r_t_r) + map(x->x*Taylor1(1), constant_term.(v_r_t_r))
+        # r_s_t_rT = constant_term.(r_s_t_r) + map(x->x*Taylor1(1), constant_term.(v_s_t_r))
+        # Δτ_corona_DT = corona_delay(r_a_t_bT, r_r_t_rT, r_s_t_rT, F_tx, station_code) # seconds
+        # Δτ_corona_D = Δτ_corona_DT[0] # seconds
         Δτ_corona_D = corona_delay(constant_term.(r_a_t_b), r_r_t_r, r_s_t_r, F_tx, station_code) # seconds
         # @show Δτ_corona_D
         # @show Δν_corona_D
@@ -268,7 +279,14 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         # # @show R_rT, ρ_vec_rT
         # # Δν_tropo_D = F_tx*daysec*tropo_delay(R_rT, ρ_vec_rT)[1]
         # # @show Δν_tropo_D
-        Δτ_tropo_D = tropo_delay(constant_term.(R_r), constant_term.(ρ_vec_r))
+        # Δτ_tropo_D = tropo_delay(constant_term.(R_r), constant_term.(ρ_vec_r)) # -F_tx*Δτ_corona_DT[1]/daysec
+        R_rT = constant_term.(R_r) + map(x->x*Taylor1(1), constant_term.(V_r))
+        ρ_vec_rT = constant_term.(ρ_vec_r) + map(x->x*Taylor1(1), constant_term.(ρ_vec_dot_r))
+        Δτ_tropo_DT = tropo_delay(R_rT, ρ_vec_rT)
+        Δτ_tropo_D = Δτ_tropo_DT[0] # seconds
+        Δν_tropo_D = -F_tx*Δτ_tropo_DT[1]/daysec # MHz
+        # @show Δτ_tropo_D
+        # @show Δτ_tropo_DT
         Δτ_D = Δτ_rel_D + Δτ_corona_D + Δτ_tropo_D # seconds TODO: convert formulas to seconds
         # # @show τ_D
         # # @show Δτ_rel_D
@@ -317,7 +335,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     Δτ_corona_U = zero(τ_U)
     Δτ_tropo_U = zero(τ_U)
     # Δν_corona_U = zero(τ_U)
-    # # Δν_tropo_U = zero(τ_U)
+    Δν_tropo_U = zero(τ_U)
 
     for i in 1:niter
         # Eq. (8) Yeomans et al. (1992)
@@ -343,9 +361,9 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         p_UT = sqrt(r_as_t_bT[1]^2 + r_as_t_bT[2]^2 + r_as_t_bT[3]^2)
         p_U = p_UT[0] # heliocentric distance of asteroid at t_b
         dp_U = p_UT[1]
-        rv_e_t_b = xve(et_b_secs) # barycentric position/velocity of Earth at bounce time
-        r_e_t_b = rv_e_t_b[1:3]
-        v_e_t_b = rv_e_t_b[4:6]
+        # rv_e_t_b = xve(et_b_secs) # barycentric position/velocity of Earth at bounce time
+        # r_e_t_b = rv_e_t_b[1:3]
+        # v_e_t_b = rv_e_t_b[4:6]
         r_ae_t_b = constant_term.(r_a_t_b-r_t_t_t)
         v_ae_t_b = constant_term.(v_a_t_b-v_t_t_t)
         r_ae_t_bT = r_ae_t_b + map(x->x*Taylor1(1), v_ae_t_b)
@@ -360,7 +378,13 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         # Δν_rel_U = shapiro_doppler(e_U, de_U, p_U, dp_U, q_U, dq_U, F_tx)
         Δν_rel_U = -F_tx*Δτ_rel_U_T[1]/daysec # MHz
         # @show Δν_rel_U
+        # r_t_t_tT = constant_term.(r_t_t_t) + map(x->x*Taylor1(1), constant_term.(v_t_t_t))
+        # r_a_t_bT = constant_term.(r_a_t_b) + map(x->x*Taylor1(1), constant_term.(v_a_t_b))
+        # r_s_t_bT = constant_term.(r_s_t_b) + map(x->x*Taylor1(1), constant_term.(v_s_t_b))
+        # Δτ_corona_UT = corona_delay(r_t_t_tT, r_a_t_bT, r_s_t_bT, F_tx, station_code) # seconds
         Δτ_corona_U = corona_delay(constant_term.(r_t_t_t), constant_term.(r_a_t_b), constant_term.(r_s_t_b), F_tx, station_code) # seconds
+        # Δτ_corona_U = Δτ_corona_UT[0] # seconds
+        #@show Δτ_corona_UT
         # @show Δτ_corona_U
         # @show Δν_corona_U
         # # R_tT = R_t + map(x->x*Taylor1(1), V_t)
@@ -368,7 +392,14 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         # # @show R_tT, ρ_vec_tT
         # # Δν_tropo_U = F_tx*daysec*tropo_delay(R_tT, ρ_vec_tT)[1]
         # # @show Δν_tropo_U
-        Δτ_tropo_U = tropo_delay(constant_term.(R_t), constant_term.(ρ_vec_t)) # seconds
+        # Δτ_tropo_U = tropo_delay(constant_term.(R_t), constant_term.(ρ_vec_t)) # seconds # -F_tx*Δτ_corona_UT[1]/daysec
+        R_tT = constant_term.(R_t) + map(x->x*Taylor1(1), constant_term.(V_t))
+        ρ_vec_tT = constant_term.(ρ_vec_t) + map(x->x*Taylor1(1), constant_term.(ρ_vec_dot_t))
+        Δτ_tropo_UT = tropo_delay(R_tT, ρ_vec_tT)
+        Δτ_tropo_U = Δτ_tropo_UT[0] #seconds
+        Δν_tropo_U = -F_tx*Δτ_tropo_UT[1]/daysec # MHz
+        # @show Δτ_tropo_U
+        # @show Δτ_tropo_UT
         Δτ_U = Δτ_rel_U + Δτ_corona_U + Δτ_tropo_U
         # # @show τ_U
         # # @show Δτ_rel_U
@@ -457,7 +488,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     doppler_c3_t2 = -(ρ_dot_t+ρ_dot_r)*(doppler_c2_t2+doppler_c2_t3)
     # Note that c^3 corrections to Doppler include a "Shapiro-like" term, which has already been multiplied by the transmitter frequency
     doppler_c3 = -F_tx*(doppler_c3_t1+doppler_c3_t2)/(c_au_per_day^3) + (Δν_rel_D+Δν_rel_U)
-    ν = (doppler_c + doppler_c2) + doppler_c3
+    ν = (doppler_c + doppler_c2) + doppler_c3  + (Δν_tropo_D+Δν_tropo_U)
 
-    return 1e6τ, 1e6ν, (Δτ_corona_D+Δτ_corona_U), (Δτ_tropo_D+Δτ_tropo_U) # total signal delay (μs) and Doppler shift (Hz)
+    return 1e6τ, 1e6ν, (Δτ_corona_D+Δτ_corona_U) # total signal delay (μs) and Doppler shift (Hz)
 end
