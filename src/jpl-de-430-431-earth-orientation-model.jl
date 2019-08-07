@@ -15,8 +15,8 @@
 # where `t` is the TDB time in Julian days from J2000.0. The nutations in longitude
 # $\Delta \psi$ and obliquity $\Delta \epsilon$ are given by
 
-Delta_psi(t) = deg2rad( (-17.206262/3600)*sin(Ω(t)) )
-Delta_epsilon(t) = deg2rad( (9.205348/3600)*cos(Ω(t)) )
+Delta_psi(t) = deg2rad( (-17.1996/3600)*sin(Ω(t)) )
+Delta_epsilon(t) = deg2rad( (9.2025/3600)*cos(Ω(t)) )
 
 # The true pole of date unit vector $\vec p_\mathrm{d}$ is computed by rotating the
 # Earth-fixed pole vector by the effect of the 18.6-year nutation term to give

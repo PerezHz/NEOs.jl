@@ -70,6 +70,9 @@ const Λ3 = zeros(N)
 Λ3[ea] = -1.962633335678878e-19
 Λ3[mo] = 1.3265639193531515e-20
 
+#TODO: Add Earth's Λ4 (and Λ5?) Correct report values according to Folkner
+#TODO: Add Moon's tesseral coefficients
+
 # Matrix of J2 interactions included in DE430 ephemeris, according to Folkner et al., 2014
 const UJ_interaction = fill(false, N, N)
 UJ_interaction[2:end, su] .= true
@@ -102,7 +105,7 @@ const A_sun = 1.06e8 # Solar corona parameter A [cm^-3] (ESAA 2014, Table 8.5 p.
 const a_sun = 4.89e5 # Solar corona parameter a [cm^-3] (ESAA 2014, Table 8.5 p. 329)
 const b_sun = 3.91e5 # Solar corona parameter b [cm^-3] (ESAA 2014, Table 8.5 p. 329)
 
-const α_p_sun = 268.13 # Sun's rotation pole right ascension (degrees)
+const α_p_sun = 286.13 # Sun's rotation pole right ascension (degrees)
 const δ_p_sun = 63.87 # Sun's rotation pole declination (degrees)
 
 const S0_sun = 63.15E6 # Sun radiated power intensity at photosphere surface, Watt/meter^2
