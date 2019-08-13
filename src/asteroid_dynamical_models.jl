@@ -151,8 +151,8 @@
 
     # # rotations to and from Earth, Sun and Moon pole-oriented frames
     local dsj2k = t-2.451545e6 # J2000.0 = 2.451545e6
-    local αs = deg2rad(268.13*one(t))
-    local δs = deg2rad(63.87*one(t))
+    local αs = deg2rad(α_p_sun*one(t))
+    local δs = deg2rad(δ_p_sun*one(t))
     local αm = moon_pole_ra(dsj2k)
     local δm = moon_pole_dec(dsj2k)
     local M_ = Array{Taylor1{S}}(undef, 3, 3, N)
