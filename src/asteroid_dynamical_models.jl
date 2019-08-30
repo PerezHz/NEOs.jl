@@ -13,7 +13,7 @@
 # unit heliocentric transverse vector, au is 1 astronomical unit, r is the
 # asteroid's heliocentric range, A2 is a coefficient (with units of au/day^2),
 # and d = 2.0
-@taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph!(t, q, dq)
+@taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph!(dq, q, params, t)
     local ss16asteph_t = ss16asteph(t)
     local acceph_t = acc_eph(t)
     local S = eltype(q[1])

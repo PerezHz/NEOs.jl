@@ -139,6 +139,13 @@ g2(t,x,dx) = (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x[6N-
 range_ae(x) = sqrt( (x[3N-2]-x[3ea-2])^2+(x[3N-1]-x[3ea-1])^2+(x[3N]-x[3ea])^2 )
 radvel_ae(x) = ( (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x[6N-1]-x[3(N+ea)-1])+(x[3N]-x[3ea])*(x[6N]-x[3(N+ea)]) )/range_ae(x)
 
+#numerator of Apophis radial velocity wrt Earth
+function rvelea(dx, x, params, t)
+    ss16asteph_t = ss16asteph(t)
+    xe = ss16asteph_t[union(3ea-2:3ea,3(N-1+ea)-2:3(N-1+ea))]
+    return (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
+end
+
 function main(objname::String, datafile::String, dynamics::Function, maxsteps::Int,
     newtoniter::Int, t0::T, tspan::T; output::Bool=true, radarobs::Bool=true,
     jt::Bool=true, dense::Bool=false) where {T<:Real}
@@ -148,13 +155,6 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
     # then, wrap those interpolants in a TaylorInterpolant
     # accelerations of "everybody else" are needed when evaluating post-Newtonian acceleration of Apophis
     global acc_eph = TaylorInterpolant(ss16asteph.t, differentiate.(ss16asteph.x[:,3(N-1)+1:6(N-1)]))
-
-    #numerator of Apophis radial velocity wrt Earth
-    function rvelea(t,x,dx)
-        ss16asteph_t = ss16asteph(t)
-        xe = ss16asteph_t[union(3ea-2:3ea,3(N-1+ea)-2:3(N-1+ea))]
-        return (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
-    end
 
     # get asteroid initial conditions
     __q0 = initialcond()
