@@ -5,8 +5,7 @@ __precompile__(false)
 export main, au, yr, observer_position, apophisdofs, sundofs, earthdofs,
     ssdofs, c_au_per_day, μ, range_ae, radvel_ae, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_00_06, process_radar_data_jpl, RadarDataJPL,
-    RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J234E_J2S_ng_d225!,
-    RNp1BP_pN_A_J234E_J2S_ng_d225_srp!, semimajoraxis, eccentricity, inclination,
+    RNp1BP_pN_A_J23E_J2S_ng_eph!, semimajoraxis, eccentricity, inclination,
     julian2etsecs, etsecs2julian
 
 using Reexport
@@ -131,7 +130,7 @@ include("initial_conditions.jl")
 include("delay_doppler.jl")
 include("osculating.jl")
 
-#root-finding functions (simplified versions of range_ae, radvel_ae)
+#OLD root-finding functions: NOT LONGER USED; WILL BE REMOVED SOON!
 g(t,x,dx) = (x[3N-2]-x[3ea-2])^2+(x[3N-1]-x[3ea-1])^2+(x[3N]-x[3ea])^2
 g2(t,x,dx) = (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x[6N-1]-x[3(N+ea)-1])+(x[3N]-x[3ea])*(x[6N]-x[3(N+ea)])
 
@@ -141,7 +140,7 @@ radvel_ae(x) = ( (x[3N-2]-x[3ea-2])*(x[6N-2]-x[3(N+ea)-2])+(x[3N-1]-x[3ea-1])*(x
 
 #numerator of Apophis radial velocity wrt Earth
 function rvelea(dx, x, params, t)
-    ss16asteph_t = ss16asteph(t)
+    ss16asteph_t = params[1](t) #ss16asteph(t)
     xe = ss16asteph_t[union(3ea-2:3ea,3(N-1+ea)-2:3(N-1+ea))]
     return (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
 end
@@ -150,11 +149,33 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
     newtoniter::Int, t0::T, tspan::T; output::Bool=true, radarobs::Bool=true,
     jt::Bool=true, dense::Bool=false) where {T<:Real}
 
-    global ss16asteph = load(joinpath(jplephpath, "ss16ast343_eph.jld"), "ss16ast_eph")
-    # differentiate velocities of major Solar Sytem bodies + 16 pertubers to obtain their accelerations
-    # then, wrap those interpolants in a TaylorInterpolant
-    # accelerations of "everybody else" are needed when evaluating post-Newtonian acceleration of Apophis
-    global acc_eph = TaylorInterpolant(ss16asteph.t, differentiate.(ss16asteph.x[:,3(N-1)+1:6(N-1)]))
+    # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
+    ss16asteph = load(joinpath(jplephpath, "ss16ast343_eph.jld"), "ss16ast_eph")
+    #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
+    # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
+    Nm1 = N-1
+    acc_eph = TaylorInterpolant(ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, 3Nm1))
+    fill!(acc_eph.x, zero(ss16asteph.x[1]))
+    _1_to_Nm1 = Base.OneTo(Nm1) # iterator over all bodies except Apophis
+    for j in _1_to_Nm1
+        for i in _1_to_Nm1
+            # i == j && continue
+            if i == j
+            else
+                X_ij = ss16asteph.x[:,3i-2] .- ss16asteph.x[:,3j-2]
+                Y_ij = ss16asteph.x[:,3i-1] .- ss16asteph.x[:,3j-1]
+                Z_ij = ss16asteph.x[:,3i  ] .- ss16asteph.x[:,3j  ]
+                r_p2_ij = ( (X_ij.^2) .+ (Y_ij.^2) ) .+ (Z_ij.^2)
+                r_p3d2_ij = r_p2_ij.^1.5
+                newtonianCoeff_ij =  μ[i]./r_p3d2_ij
+                acc_eph.x[:,3j-2] .+= (X_ij.*newtonianCoeff_ij)
+                acc_eph.x[:,3j-1] .+= (Y_ij.*newtonianCoeff_ij)
+                acc_eph.x[:,3j  ] .+= (Z_ij.*newtonianCoeff_ij)
+            end #if i != j
+        end #for, i
+    end #for, j
+
+    params = (ss16asteph, acc_eph)
 
     # get asteroid initial conditions
     __q0 = initialcond()
@@ -173,7 +194,7 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
 
     # do integration
     if dense
-        @time interp = taylorinteg(dynamics, q0, t0, tmax, order, abstol; maxsteps=maxsteps, dense=dense);
+        @time interp = taylorinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense);
         sol = (interp=interp,)
     else
         if radarobs
@@ -188,11 +209,11 @@ function main(objname::String, datafile::String, dynamics::Function, maxsteps::I
             # construct time range variable with t0 and observation times > t0, removing repeated values
             tv = union(t0, tv_jpl_tdb_julian[tv_jpl_tdb_julian .> t0])
             @show all(diff(tv) .> 0)
-            @time sol_objs = taylorinteg(dynamics, rvelea, q0, tv, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+            @time sol_objs = taylorinteg(dynamics, rvelea, q0, tv, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter);
             tup_names = (:xv1, :tvS1, :xvS1, :gvS1)
             sol = NamedTuple{tup_names}(sol_objs)
         else
-            @time sol_objs = taylorinteg(dynamics, rvelea, q0, t0, tmax, order, abstol; maxsteps=maxsteps, newtoniter=newtoniter);
+            @time sol_objs = taylorinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter);
             tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
             sol = NamedTuple{tup_names}(sol_objs)
         end
