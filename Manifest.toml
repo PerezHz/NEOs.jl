@@ -113,9 +113,9 @@ uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
 [[DiffEqBase]]
 deps = ["ArrayInterface", "Compat", "Distributed", "DocStringExtensions", "FunctionWrappers", "IterativeSolvers", "IteratorInterfaceExtensions", "LinearAlgebra", "MuladdMacro", "Parameters", "RecipesBase", "RecursiveArrayTools", "RecursiveFactorization", "Requires", "Roots", "SparseArrays", "StaticArrays", "Statistics", "SuiteSparse", "TableTraits", "TreeViews"]
-git-tree-sha1 = "fa870131f32ae7b2fc2b6eee71cd0924200fa6db"
+git-tree-sha1 = "6005d11da7617b65b77c5c310dc9494dab03b559"
 uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
-version = "5.20.0"
+version = "6.0.0"
 
 [[DiffEqDiffTools]]
 deps = ["ArrayInterface", "LinearAlgebra", "Requires", "SparseArrays", "StaticArrays"]
@@ -203,9 +203,9 @@ version = "0.12.3"
 
 [[HTTP]]
 deps = ["Base64", "Dates", "IniFile", "MbedTLS", "Sockets"]
-git-tree-sha1 = "c4a527dba1d26add0e85946e1a53f42a1b343acc"
+git-tree-sha1 = "f1e1b417a34cf73a70cbed919915bf8f8bad1806"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "0.8.5"
+version = "0.8.6"
 
 [[IniFile]]
 deps = ["Test"]
@@ -300,10 +300,9 @@ uuid = "739be429-bea8-5141-9913-cc70e7f3736d"
 version = "0.6.8"
 
 [[Missings]]
-deps = ["SparseArrays", "Test"]
-git-tree-sha1 = "f0719736664b4358aa9ec173077d4285775f8007"
+git-tree-sha1 = "29858ce6c8ae629cf2d733bffa329619a1c843d0"
 uuid = "e1d29d7a-bbdc-5cf2-9ac0-f12de2c33e28"
-version = "0.4.1"
+version = "0.4.2"
 
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
@@ -439,10 +438,10 @@ version = "0.8.3"
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 
 [[SOFA]]
-deps = ["BinDeps", "Libdl", "Test"]
-git-tree-sha1 = "4995dd70022b15a643bbfa96f4c7b110a3ab9f3f"
+deps = ["BinDeps", "Libdl", "StaticArrays", "Test"]
+git-tree-sha1 = "6c8773c9e5a7a9ce0c0663161da2d5172ed7c17a"
 uuid = "ad3d3fd0-b5f2-51ee-b274-8cdbe62317e2"
-version = "0.1.1"
+version = "1.0.0"
 
 [[SPICE]]
 deps = ["BinaryProvider", "Libdl", "LinearAlgebra"]

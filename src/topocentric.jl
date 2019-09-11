@@ -103,10 +103,10 @@ function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector)
     dg_vec_ESAA = dRz_minus_ERA*(W_inv*pos_geo)
 
     # G(t), \dot G(t) ESAA vectors
-     G_vec_ESAA = C_inv* g_vec_ESAA
-    dG_vec_ESAA = C_inv*dg_vec_ESAA
+     G_vec_ESAA = convert(Vector{Float64}, C_inv* g_vec_ESAA)
+    dG_vec_ESAA = convert(Vector{Float64}, C_inv*dg_vec_ESAA)
 
-     return G_vec_ESAA, dG_vec_ESAA, era
+    return G_vec_ESAA, dG_vec_ESAA, era
 end
 
 # Terrestrial-to-celestial rotation matrix (including polar motion)
@@ -186,10 +186,9 @@ function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector)
     # g(t), \dot g(t) ESAA vectors
     g_vec_ESAA =  Rz_minus_GAST*(W_inv*pos_geo)
     dg_vec_ESAA = dRz_minus_GAST*(W_inv*pos_geo)
-
     # G(t), \dot G(t) ESAA vectors
-     G_vec_ESAA = C_inv* g_vec_ESAA
-    dG_vec_ESAA = C_inv*dg_vec_ESAA
-
+     G_vec_ESAA = convert(Vector{Float64}, C_inv* g_vec_ESAA)
+    dG_vec_ESAA = convert(Vector{Float64}, C_inv*dg_vec_ESAA)
+    # return g(t), \dot g(t), GAST
     return G_vec_ESAA, dG_vec_ESAA, gast
 end
