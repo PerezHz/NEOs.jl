@@ -33,7 +33,9 @@ const N = length(μ)
 const UJ_interaction = fill(false, N)
 UJ_interaction[su] = true
 UJ_interaction[ea] = true
-UJ_interaction[mo] = true
+# UJ_interaction[mo] = true
+
+j2_body_index = [i for i = 1:length(UJ_interaction)][UJ_interaction]
 
 const apophisdofs = union(3N-2:3N, 6N-2:6N)
 const ssdofs = setdiff(1:6N, apophisdofs)

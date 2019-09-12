@@ -21,7 +21,7 @@
     local _1_to_N = Base.OneTo(N) # iterator over all bodies
 
     local succ_approx_iter = 1 # number of iterations of post-Newtonian subroutine
-    local j2_body_index = [su, ea]#, mo] # indices of bodies with J2 flattening (note: Earth and Moon also have J3)
+    # local j2_body_index = [su, ea]#, mo] # indices of bodies with J2 flattening (note: Earth and Moon also have J3)
 
     # parameters related to speed of light, c
     local c_p2 = 29979.063823897606 # c^2 = 29979.063823897606 au^2/d^2
