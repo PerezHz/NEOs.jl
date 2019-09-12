@@ -10,21 +10,23 @@ function propagate(objname::String, datafile::String, dynamics::Function, maxste
     jt::Bool=true, dense::Bool=false) where {T<:Real}
 
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    ss16asteph = load(joinpath(jplephpath, "ss16ast343_eph.jld"), "ss16ast_eph")
+    ss16ast_eph_t = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_t")
+    ss16ast_eph_x = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_x")
+    ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
     #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
     # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
     Nm1 = N-1
-    acc_eph = TaylorInterpolant(ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, 3Nm1))
-    fill!(acc_eph.x, zero(ss16asteph.x[1]))
+    acc_eph = TaylorInterpolant(ss16ast_eph_t, Matrix{eltype(ss16ast_eph_x)}(undef, length(ss16ast_eph_t)-1, 3Nm1))
+    fill!(acc_eph.x, zero(ss16ast_eph_x[1]))
     _1_to_Nm1 = Base.OneTo(Nm1) # iterator over all bodies except Apophis
     for j in _1_to_Nm1
         for i in _1_to_Nm1
             # i == j && continue
             if i == j
             else
-                X_ij = ss16asteph.x[:,3i-2] .- ss16asteph.x[:,3j-2]
-                Y_ij = ss16asteph.x[:,3i-1] .- ss16asteph.x[:,3j-1]
-                Z_ij = ss16asteph.x[:,3i  ] .- ss16asteph.x[:,3j  ]
+                X_ij = ss16ast_eph_x[:,3i-2] .- ss16ast_eph_x[:,3j-2]
+                Y_ij = ss16ast_eph_x[:,3i-1] .- ss16ast_eph_x[:,3j-1]
+                Z_ij = ss16ast_eph_x[:,3i  ] .- ss16ast_eph_x[:,3j  ]
                 r_p2_ij = ( (X_ij.^2) .+ (Y_ij.^2) ) .+ (Z_ij.^2)
                 r_p3d2_ij = r_p2_ij.^1.5
                 newtonianCoeff_ij =  μ[i]./r_p3d2_ij
@@ -85,10 +87,6 @@ function propagate(objname::String, datafile::String, dynamics::Function, maxste
         println("Saving solution to file: $filename")
         #first, deal with `tv_jpl_integ`
         jldopen(filename, "w") do file
-            if dense
-                addrequire(file, TaylorSeries)
-                addrequire(file, TaylorIntegration)
-            end
             if radarobs
                 println("Saving variable: tv1")
                 write(file, "tv1", tv)

@@ -8,9 +8,10 @@ export propagate, au, yr, observer_position, apophisdofs,
     RNp1BP_pN_A_J23E_J2S_ng_eph!, semimajoraxis, eccentricity, inclination,
     julian2etsecs, etsecs2julian
 
+using TaylorIntegration
 using Printf, DelimitedFiles, Test, LinearAlgebra
 using Dates: DateTime, julian2datetime, datetime2julian
-using TaylorIntegration, PlanetaryEphemeris
+using PlanetaryEphemeris
 using JLD
 using AstroTime, EarthOrientation, SOFA, SPICE
 
