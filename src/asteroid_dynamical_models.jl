@@ -306,7 +306,7 @@
         end
 
         #J2 accelerations, if i-th body is flattened
-        if UJ_interaction[N,i]
+        if UJ_interaction[i]
             # rotate from inertial frame to extended-body frame
             t31[i] = -X[i]*M_[1,3,i]
             t32[i] = -Y[i]*M_[2,3,i]

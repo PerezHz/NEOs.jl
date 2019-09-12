@@ -16,19 +16,19 @@ const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integrat
 @show t0 == 2454733.5
 
 #integrator warmup
-main(objname, objdata, dynamics, 1, newtoniter, t0, nyears, output=false, radarobs=radarobs, jt=jt, dense=dense)
+propagate(objname, objdata, dynamics, 1, newtoniter, t0, nyears, output=false, radarobs=radarobs, jt=jt, dense=dense)
 println("*** Finished warmup")
 
-main(objname, objdata, dynamics, 2, newtoniter, t0, nyears, radarobs=radarobs, jt=jt, dense=dense)
+propagate(objname, objdata, dynamics, 2, newtoniter, t0, nyears, radarobs=radarobs, jt=jt, dense=dense)
 println("*** Finished 2nd warmup")
 
 #root-finding methods warmup (integrate until first root-finding event):
-# main(objname, objdata, dynamics, 50, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
+# propagate(objname, objdata, dynamics, 50, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
 # println("*** Finished root-finding warmup")
 
-#main(objname, objdata, dynamics, 100, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
+#propagate(objname, objdata, dynamics, 100, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
 #println("*** Finished root-finding test: several roots")
 
 #Full jet transport integration until ~2038: about 8,000 steps
-# main(objname, objdata, dynamics, 8000, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
+# propagate(objname, objdata, dynamics, 8000, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
 # println("*** Finished full jet transport integration")
