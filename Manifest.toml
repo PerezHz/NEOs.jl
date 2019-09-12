@@ -113,9 +113,9 @@ uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
 [[DiffEqBase]]
 deps = ["ArrayInterface", "Compat", "Distributed", "DocStringExtensions", "FunctionWrappers", "IterativeSolvers", "IteratorInterfaceExtensions", "LinearAlgebra", "MuladdMacro", "Parameters", "Printf", "RecipesBase", "RecursiveArrayTools", "RecursiveFactorization", "Requires", "Roots", "SparseArrays", "StaticArrays", "Statistics", "SuiteSparse", "TableTraits", "TreeViews"]
-git-tree-sha1 = "7fcfa41fd228e1da2dfea0627f7562e675e291ae"
+git-tree-sha1 = "9c45fb4ca2a57b8ea9dacde7d09b6cccf922e780"
 uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
-version = "6.1.0"
+version = "6.2.0"
 
 [[DiffEqDiffTools]]
 deps = ["ArrayInterface", "LinearAlgebra", "Requires", "SparseArrays", "StaticArrays"]
@@ -236,9 +236,11 @@ version = "1.0.0"
 
 [[JLD]]
 deps = ["Compat", "FileIO", "HDF5", "LegacyStrings", "Profile", "Random"]
-git-tree-sha1 = "95fd5d7f129918a75d0535aaaf5b8e235e6e0b0b"
+git-tree-sha1 = "cef77baaa4d03b5fc78ba39ba710a4c5940cc778"
+repo-rev = "master"
+repo-url = "https://github.com/JuliaIO/JLD.jl.git"
 uuid = "4138dd39-2aa7-5051-a626-17a0bb65d9c8"
-version = "0.9.1"
+version = "0.9.1+"
 
 [[JuliaInterpreter]]
 deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
@@ -294,10 +296,10 @@ deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MbedTLS]]
-deps = ["BinaryProvider", "Dates", "Distributed", "Libdl", "Random", "Sockets", "Test"]
-git-tree-sha1 = "2d94286a9c2f52c63a16146bb86fd6cdfbf677c6"
+deps = ["BinaryProvider", "Dates", "Libdl", "Random", "Sockets"]
+git-tree-sha1 = "85f5947b53c8cfd53ccfa3f4abae31faa22c2181"
 uuid = "739be429-bea8-5141-9913-cc70e7f3736d"
-version = "0.6.8"
+version = "0.7.0"
 
 [[Missings]]
 git-tree-sha1 = "29858ce6c8ae629cf2d733bffa329619a1c843d0"
@@ -512,7 +514,7 @@ uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 version = "0.8.0"
 
 [[SuiteSparse]]
-deps = ["Libdl", "LinearAlgebra", "SparseArrays"]
+deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
 uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[TableTraits]]
