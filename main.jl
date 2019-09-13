@@ -23,12 +23,12 @@ propagate(objname, objdata, dynamics, 2, newtoniter, t0, nyears, radarobs=radaro
 println("*** Finished 2nd warmup")
 
 #root-finding methods warmup (integrate until first root-finding event):
-# propagate(objname, objdata, dynamics, 50, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
+# propagate(objname, objdata, dynamics, 50, newtoniter, t0, nyears, radarobs=radarobs, jt=jt, dense=dense)
 # println("*** Finished root-finding warmup")
 
-#propagate(objname, objdata, dynamics, 100, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
+#propagate(objname, objdata, dynamics, 100, newtoniter, t0, nyears, radarobs=radarobs, jt=jt, dense=dense)
 #println("*** Finished root-finding test: several roots")
 
 #Full jet transport integration until ~2038: about 8,000 steps
-# propagate(objname, objdata, dynamics, 8000, newtoniter, t0, nyears, radarobs=radarobs, jt=jt)
+# propagate(objname, objdata, dynamics, 8000, newtoniter, t0, nyears, radarobs=radarobs, jt=jt, dense=dense)
 # println("*** Finished full jet transport integration")
