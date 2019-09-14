@@ -113,9 +113,9 @@ uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
 [[DiffEqBase]]
 deps = ["ArrayInterface", "Compat", "Distributed", "DocStringExtensions", "FunctionWrappers", "IterativeSolvers", "IteratorInterfaceExtensions", "LinearAlgebra", "MuladdMacro", "Parameters", "Printf", "RecipesBase", "RecursiveArrayTools", "RecursiveFactorization", "Requires", "Roots", "SparseArrays", "StaticArrays", "Statistics", "SuiteSparse", "TableTraits", "TreeViews"]
-git-tree-sha1 = "9c45fb4ca2a57b8ea9dacde7d09b6cccf922e780"
+git-tree-sha1 = "18c81eb8f0c9b40c001ce3f369c9bcc2d865d888"
 uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
-version = "6.2.0"
+version = "6.2.1"
 
 [[DiffEqDiffTools]]
 deps = ["ArrayInterface", "LinearAlgebra", "Requires", "SparseArrays", "StaticArrays"]
@@ -244,9 +244,9 @@ version = "0.9.1+"
 
 [[JuliaInterpreter]]
 deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
-git-tree-sha1 = "599cc7c6683e54cd0b3786ee37800db037e22df4"
+git-tree-sha1 = "5020abc08c5c9f7d47ec7e861309bc79ed74aec7"
 uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
-version = "0.5.2"
+version = "0.7.2"
 
 [[LeapSeconds]]
 deps = ["Dates", "Test"]
@@ -358,14 +358,14 @@ uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 version = "0.12.0"
 
 [[Pkg]]
-deps = ["Dates", "LibGit2", "Markdown", "Printf", "REPL", "Random", "SHA", "UUIDs"]
+deps = ["Dates", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "UUIDs"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PlanetaryEphemeris]]
 deps = ["Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "TaylorIntegration", "Test"]
 git-tree-sha1 = "31312e52d8176c10d2c5c1ee30b7341be61ec717"
 repo-rev = "master"
-repo-url = "https://github.com/PerezHz/PlanetaryEphemeris.jl.git"
+repo-url = "ssh://git@github.com/PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
 version = "0.1.0"
 
@@ -428,9 +428,9 @@ version = "0.5.2"
 
 [[Revise]]
 deps = ["CodeTracking", "Distributed", "FileWatching", "JuliaInterpreter", "LibGit2", "LoweredCodeUtils", "OrderedCollections", "Pkg", "REPL", "UUIDs", "Unicode"]
-git-tree-sha1 = "0148fc4b3392778e09eb75c4971ce75424acd1d1"
+git-tree-sha1 = "3ea49472d265bc250bb14100ba54090fcf11e9e6"
 uuid = "295af30f-e4ad-537b-8983-00126c2a3abe"
-version = "2.1.5"
+version = "2.1.10"
 
 [[Rmath]]
 deps = ["BinaryProvider", "Libdl", "Random", "Statistics", "Test"]
@@ -527,7 +527,7 @@ version = "1.0.0"
 deps = ["AutoHashEquals", "DiffEqBase", "Espresso", "LinearAlgebra", "Markdown", "Reexport", "Requires", "TaylorSeries"]
 git-tree-sha1 = "de89a18ad4512afe121afacb75373791e94b1843"
 repo-rev = "jp/interpolation"
-repo-url = "https://github.com/PerezHz/TaylorIntegration.jl.git"
+repo-url = "ssh://git@github.com/PerezHz/TaylorIntegration.jl.git"
 uuid = "92b13dbe-c966-51a2-8445-caca9f8a7d42"
 version = "0.6.0"
 

@@ -59,7 +59,7 @@ function __init__()
     @show length(methods(TaylorIntegration.jetcoeffs!))
     @show methods(RNp1BP_pN_A_J23E_J2S_ng_eph!)
     # load JPL ephemerides
-    loadjpleph()
+    # loadjpleph()
 end
 
 include("process_radar_data_jpl.jl")
