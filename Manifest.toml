@@ -113,9 +113,9 @@ uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
 [[DiffEqBase]]
 deps = ["ArrayInterface", "Compat", "Distributed", "DocStringExtensions", "FunctionWrappers", "IterativeSolvers", "IteratorInterfaceExtensions", "LinearAlgebra", "MuladdMacro", "Parameters", "Printf", "RecipesBase", "RecursiveArrayTools", "RecursiveFactorization", "Requires", "Roots", "SparseArrays", "StaticArrays", "Statistics", "SuiteSparse", "TableTraits", "TreeViews"]
-git-tree-sha1 = "18c81eb8f0c9b40c001ce3f369c9bcc2d865d888"
+git-tree-sha1 = "d6bc4c018b992bbb745070ab7ca24dc75f636bce"
 uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
-version = "6.2.1"
+version = "6.2.2"
 
 [[DiffEqDiffTools]]
 deps = ["ArrayInterface", "LinearAlgebra", "Requires", "SparseArrays", "StaticArrays"]
@@ -527,7 +527,7 @@ version = "1.0.0"
 deps = ["AutoHashEquals", "DiffEqBase", "Espresso", "LinearAlgebra", "Markdown", "Reexport", "Requires", "TaylorSeries"]
 git-tree-sha1 = "de89a18ad4512afe121afacb75373791e94b1843"
 repo-rev = "jp/interpolation"
-repo-url = "ssh://git@github.com/PerezHz/TaylorIntegration.jl.git"
+repo-url = "https://github.com/PerezHz/TaylorIntegration.jl.git"
 uuid = "92b13dbe-c966-51a2-8445-caca9f8a7d42"
 version = "0.6.0"
 
