@@ -118,8 +118,34 @@ function propagate(objname::String, datafile::String, dynamics::Function, maxste
 end
 
 function testjetcoeffs()
-    global ss16asteph = load(joinpath(jplephpath, "ss16ast343_eph.jld"), "ss16ast_eph")
-    global acc_eph = TaylorInterpolant(ss16asteph.t, differentiate.(ss16asteph.x[:,3(N-1)+1:6(N-1)]))
+    # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
+    ss16ast_eph_t = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_t")
+    ss16ast_eph_x = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_x")
+    ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
+    #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
+    # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
+    Nm1 = N-1
+    acc_eph = TaylorInterpolant(ss16ast_eph_t, Matrix{eltype(ss16ast_eph_x)}(undef, length(ss16ast_eph_t)-1, 3Nm1))
+    fill!(acc_eph.x, zero(ss16ast_eph_x[1]))
+    _1_to_Nm1 = Base.OneTo(Nm1) # iterator over all bodies except Apophis
+    for j in _1_to_Nm1
+        for i in _1_to_Nm1
+            # i == j && continue
+            if i == j
+            else
+                X_ij = ss16ast_eph_x[:,3i-2] .- ss16ast_eph_x[:,3j-2]
+                Y_ij = ss16ast_eph_x[:,3i-1] .- ss16ast_eph_x[:,3j-1]
+                Z_ij = ss16ast_eph_x[:,3i  ] .- ss16ast_eph_x[:,3j  ]
+                r_p2_ij = ( (X_ij.^2) .+ (Y_ij.^2) ) .+ (Z_ij.^2)
+                r_p3d2_ij = r_p2_ij.^1.5
+                newtonianCoeff_ij =  μ[i]./r_p3d2_ij
+                acc_eph.x[:,3j-2] .+= (X_ij.*newtonianCoeff_ij)
+                acc_eph.x[:,3j-1] .+= (Y_ij.*newtonianCoeff_ij)
+                acc_eph.x[:,3j  ] .+= (Z_ij.*newtonianCoeff_ij)
+            end #if i != j
+        end #for, i
+    end #for, j
+    params = (ss16asteph, acc_eph)
     q0 = initialcond()
     t0 = datetime2julian(DateTime(2008,9,24))
     tT = t0 + Taylor1(order)
@@ -129,8 +155,8 @@ function testjetcoeffs()
     q0T2 = Taylor1.(q0, order)
     dq0T2 = similar(q0T)
     @show methods(TaylorIntegration.jetcoeffs!)
-    @time TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0T, dq0T, xaux)
-    @time TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT, q0T2, dq0T2)
+    @time TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0T, dq0T, xaux, params)
+    @time TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT, q0T2, dq0T2, params)
 
     @show q0T
     @show q0T2
