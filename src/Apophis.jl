@@ -5,8 +5,9 @@ __precompile__(false)
 export propagate, au, yr, observer_position, apophisdofs,
     ssdofs, c_au_per_day, μ, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_00_06, process_radar_data_jpl, RadarDataJPL,
-    RNp1BP_pN_A_J23E_J2S_ng_eph!, semimajoraxis, eccentricity, inclination,
-    julian2etsecs, etsecs2julian
+    semimajoraxis, eccentricity, inclination,
+    julian2etsecs, etsecs2julian,
+    RNp1BP_pN_A_J23E_J2S_ng_eph!
 
 using TaylorIntegration
 using Printf, DelimitedFiles, Test, LinearAlgebra
@@ -36,7 +37,7 @@ UJ_interaction[su] = true
 UJ_interaction[ea] = true
 # UJ_interaction[mo] = true
 
-j2_body_index = [i for i = 1:length(UJ_interaction)][UJ_interaction]
+const j2_body_index = findall(x->x, UJ_interaction)
 
 const apophisdofs = union(3N-2:3N, 6N-2:6N)
 const ssdofs = setdiff(1:6N, apophisdofs)

@@ -14,8 +14,9 @@
 # asteroid's heliocentric range, A2 is a coefficient (with units of au/day^2),
 # and d = 2.0
 @taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph!(dq, q, params, t)
-    local ss16asteph_t = params[1](t) #ss16asteph(t)
-    local acceph_t = params[2](t) #acc_eph(t)
+    local ss16asteph_t = params[1](t)*one(q[1]) #ss16asteph(t)
+    local acceph_t = params[2](t)*one(q[1]) #acc_eph(t)
+    local newtonianNb_Potential_t = params[3](t)*one(q[1]) #newtonianNb_Potential(t), massive bodies
     local S = eltype(q[1])
     local N = length(μ) # number of bodies, including NEA
     local _1_to_N = Base.OneTo(N) # iterator over all bodies
@@ -38,18 +39,20 @@
     r_p3d2 = Array{Taylor1{S}}(undef, N)
     r_p7d2 = Array{Taylor1{S}}(undef, N)
 
-    #Newtonian accelerations
-    newtonX = zero_q_1
-    newtonY = zero_q_1
-    newtonZ = zero_q_1
-
-    xij = Array{Taylor1{S}}(undef, N, N)
-    yij = Array{Taylor1{S}}(undef, N, N)
-    zij = Array{Taylor1{S}}(undef, N, N)
-    rij = Array{Taylor1{S}}(undef, N, N)
-    r2ij = Array{Taylor1{S}}(undef, N, N)
-
     newtonianCoeff = Array{Taylor1{S}}(undef, N)
+
+    xi = Array{Taylor1{S}}(undef, N-1)
+    yi = Array{Taylor1{S}}(undef, N-1)
+    zi = Array{Taylor1{S}}(undef, N-1)
+    ui = Array{Taylor1{S}}(undef, N-1)
+    vi = Array{Taylor1{S}}(undef, N-1)
+    wi = Array{Taylor1{S}}(undef, N-1)
+    _3ui = Array{Taylor1{S}}(undef, N-1)
+    _3vi = Array{Taylor1{S}}(undef, N-1)
+    _3wi = Array{Taylor1{S}}(undef, N-1)
+    pNxi = Array{Taylor1{S}}(undef, N-1)
+    pNyi = Array{Taylor1{S}}(undef, N-1)
+    pNzi = Array{Taylor1{S}}(undef, N-1)
 
     # #post-Newtonian stuff
     U = Array{Taylor1{S}}(undef, N)
@@ -72,9 +75,9 @@
     newtonian1b_Potential = Array{Taylor1{S}}(undef, N)
     newtonianCoeff = Array{Taylor1{S}}(undef, N)
 
-    pntempX = zero_q_1
-    pntempY = zero_q_1
-    pntempZ = zero_q_1
+    pntempX = Array{Taylor1{S}}(undef, N-1)
+    pntempY = Array{Taylor1{S}}(undef, N-1)
+    pntempZ = Array{Taylor1{S}}(undef, N-1)
 
     pn1 = Array{Taylor1{S}}(undef, N)
     v2 = Array{Taylor1{S}}(undef, N)
@@ -158,25 +161,13 @@
     local M_ = Array{Taylor1{S}}(undef, 3, 3, N)
     local M_[:,:,ea] = t2c_jpl_de430(dsj2k)
     local M_[:,:,su] = pole_rotation( αs, δs )
-    local M_[:,:,mo] = pole_rotation( αm, δm )
+    # local M_[:,:,mo] = pole_rotation( αm, δm )
 
     dq[1] = q[4]
     dq[2] = q[5]
     dq[3] = q[6]
 
-    for i in 1:N
-        newtonianNb_Potential[i] = zero_q_1
-        for j in 1:N
-            if j==i
-            else
-                xij[i,j] = zero_q_1
-                yij[i,j] = zero_q_1
-                zij[i,j] = zero_q_1
-                r2ij[i,j] = zero_q_1
-                rij[i,j] = zero_q_1
-            end
-        end
-    end
+    newtonianNb_Potential[N] = zero_q_1
 
     for j in j2_body_index
         t31[j] = zero_q_1
@@ -242,32 +233,35 @@
 
     #compute point-mass Newtonian accelerations, all bodies
     for i in 1:N-1
-        xi = ss16asteph_t[3i-2]
-        yi = ss16asteph_t[3i-1]
-        zi = ss16asteph_t[3i  ]
-        ui = ss16asteph_t[3(N-1+i)-2]
-        vi = ss16asteph_t[3(N-1+i)-1]
-        wi = ss16asteph_t[3(N-1+i)  ]
+        xi[i] = ss16asteph_t[3i-2]
+        yi[i] = ss16asteph_t[3i-1]
+        zi[i] = ss16asteph_t[3i  ]
+        ui[i] = ss16asteph_t[3(N-1+i)-2]
+        vi[i] = ss16asteph_t[3(N-1+i)-1]
+        wi[i] = ss16asteph_t[3(N-1+i)  ]
+        _3ui[i] = 3ui[i]
+        _3vi[i] = 3vi[i]
+        _3wi[i] = 3wi[i]
 
-        X[i] = xi-q[1]
-        Y[i] = yi-q[2]
-        Z[i] = zi-q[3]
+        X[i] = xi[i]-q[1]
+        Y[i] = yi[i]-q[2]
+        Z[i] = zi[i]-q[3]
 
-        U[i] = ui-dq[1]
-        V[i] = vi-dq[2]
-        W[i] = wi-dq[3]
+        U[i] = ui[i]-dq[1]
+        V[i] = vi[i]-dq[2]
+        W[i] = wi[i]-dq[3]
 
-        _4U_m_3X[i] = (4dq[1])-(3ui)
-        _4V_m_3Y[i] = (4dq[2])-(3vi)
-        _4W_m_3Z[i] = (4dq[3])-(3wi)
+        _4U_m_3X[i] = (4dq[1]) - _3ui[i]
+        _4V_m_3Y[i] = (4dq[2]) - _3vi[i]
+        _4W_m_3Z[i] = (4dq[3]) - _3wi[i]
 
         pn2x = X[i]*_4U_m_3X[i]
         pn2y = Y[i]*_4V_m_3Y[i]
         pn2z = Z[i]*_4W_m_3Z[i]
 
-        UU[i] = ui*dq[1]
-        VV[i] = vi*dq[2]
-        WW[i] = wi*dq[3]
+        UU[i] = ui[i]*dq[1]
+        VV[i] = vi[i]*dq[2]
+        WW[i] = wi[i]*dq[3]
 
         vi_dot_vj[i] = ( UU[i]+VV[i] ) + WW[i]
 
@@ -281,29 +275,8 @@
 
         pn2[i] = newtonianCoeff[i]*(( pn2x+pn2y ) + pn2z)
 
-        temp_001 = newtonX + (X[i]*newtonianCoeff[i])
-        newtonX = temp_001
-        temp_002 = newtonY + (Y[i]*newtonianCoeff[i])
-        newtonY = temp_002
-        temp_003 = newtonZ + (Z[i]*newtonianCoeff[i])
-        newtonZ = temp_003
-
         newtonian1b_Potential[i] = μ[i]/r_p1d2[i]
-        temp_004 = newtonianNb_Potential[N] + newtonian1b_Potential[i]
-        newtonianNb_Potential[N] = temp_004
-
-        for j in 1:N-1
-            if j==i
-            else
-                xij[i,j] = xi-ss16asteph_t[3j-2]
-                yij[i,j] = yi-ss16asteph_t[3j-1]
-                zij[i,j] = zi-ss16asteph_t[3j  ]
-                r2ij[i,j] = ((xij[i,j]^2) + (yij[i,j]^2)) + (zij[i,j]^2)
-                rij[i,j] = sqrt( r2ij[i,j] )
-                temp_004 = newtonianNb_Potential[i] + ( μ[j]/rij[i,j] )
-                newtonianNb_Potential[i] = temp_004
-            end
-        end
+        #newtonianNb_Potential[i] = newtonianNb_Potential_t[i]
 
         #J2 accelerations, if i-th body is flattened
         if UJ_interaction[i]
@@ -382,53 +355,47 @@
 
             # # reaction force on asteroid point mass
             # @show "acc",i,"-μ",j,"Λ2",j
-            temp_accX_i[i] = accX - (μ[i]*F_J2_x[i])
-            accX = temp_accX_i[i]
-            temp_accY_i[i] = accY - (μ[i]*F_J2_y[i])
-            accY = temp_accY_i[i]
-            temp_accZ_i[i] = accZ - (μ[i]*F_J2_z[i])
-            accZ = temp_accZ_i[i]
+            temp_accX_i[i] = -(μ[i]*F_J2_x[i])
+            temp_accY_i[i] = -(μ[i]*F_J2_y[i])
+            temp_accZ_i[i] = -(μ[i]*F_J2_z[i])
         end
-        v2[i] = ( (ui^2)+(vi^2) ) + (wi^2)
+        v2[i] = ( (ui[i]^2)+(vi[i]^2) ) + (wi[i]^2)
     end #for, i
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
-
-    # postNewtonX = newtonX
-    # postNewtonY = newtonY
-    # postNewtonZ = newtonZ
+    for i in 1:N-1
+        newtonianNb_Potential[N] = newtonianNb_Potential[N] + newtonian1b_Potential[i]
+    end
+    for i in j2_body_index
+        accX = accX + temp_accX_i[i]
+        accY = accY + temp_accY_i[i]
+        accZ = accZ + temp_accZ_i[i]
+    end
 
     for k in Base.OneTo(succ_approx_iter)
-        pntempX = zero_q_1
-        pntempY = zero_q_1
-        pntempZ = zero_q_1
         for i in 1:N-1
             #post-Newtonian corrections to gravitational acceleration
             #Moyer, 1971, page 7 eq. 35
-            # post-Newtonian velocity of i-th body
-            ui_ = ss16asteph_t[3(N-1+i)-2]
-            vi_ = ss16asteph_t[3(N-1+i)-1]
-            wi_ = ss16asteph_t[3(N-1+i)  ]
             # acceleration of i-th body
-            pNxi = acceph_t[3i-2]
-            pNyi = acceph_t[3i-1]
-            pNzi = acceph_t[3i  ]
+            pNxi[i] = acceph_t[3i-2]
+            pNyi[i] = acceph_t[3i-1]
+            pNzi[i] = acceph_t[3i  ]
 
-            temp_005a = newtonianNb_Potential[i] + (4newtonianNb_Potential[N])
-            temp_005b = v2[N] + ( (2v2[i]) - (4vi_dot_vj[i]) )
+            temp_005a = newtonianNb_Potential_t[i] + (4newtonianNb_Potential[N])
+            temp_005b = ( (2v2[i]) - (4vi_dot_vj[i]) ) + v2[N]
             temp_005 = temp_005b - temp_005a
 
-            temp_006a = X[i]*ui_
-            temp_006b = Y[i]*vi_
-            temp_006c = Z[i]*wi_
+            temp_006a = X[i]*ui[i]
+            temp_006b = Y[i]*vi[i]
+            temp_006c = Z[i]*wi[i]
             temp_006d = ( temp_006a+temp_006b ) + temp_006c
             # the expression below inside the (...)^2 should have a minus sign in front of the numerator,
             # but upon squaring it is eliminated, so at the end of the day, it is irrelevant ;)
             temp_006e = (temp_006d^2)/r_p2[i]
             temp_006 = 1.5temp_006e
 
-            temp_007a = X[i]*pNxi
-            temp_007b = Y[i]*pNyi
-            temp_007c = Z[i]*pNzi
+            temp_007a = X[i]*pNxi[i]
+            temp_007b = Y[i]*pNyi[i]
+            temp_007c = Z[i]*pNzi[i]
             temp_007d = ( temp_007a+temp_007b ) + temp_007c
             temp_007 = 0.5temp_007d
 
@@ -443,23 +410,25 @@
             pn3[i] = 3.5*newtonian1b_Potential[i]
 
             temp_013a = pn2[i]*U[i]
-            temp_013b = pn3[i]*pNxi
-            temp_013 = pntempX + (temp_009 + (temp_013a+temp_013b))
-            pntempX = temp_013
+            temp_013b = pn3[i]*pNxi[i]
+            pntempX[i] = (temp_009 + (temp_013a+temp_013b))
 
             temp_014a = pn2[i]*V[i]
-            temp_014b = pn3[i]*pNyi
-            temp_014 = pntempY + (temp_010 + (temp_014a+temp_014b))
-            pntempY = temp_014
+            temp_014b = pn3[i]*pNyi[i]
+            pntempY[i] = (temp_010 + (temp_014a+temp_014b))
 
             temp_015a = pn2[i]*W[i]
-            temp_015b = pn3[i]*pNzi
-            temp_015 = pntempZ + (temp_011 + (temp_015a+temp_015b))
-            pntempZ = temp_015
+            temp_015b = pn3[i]*pNzi[i]
+            pntempZ[i] = (temp_011 + (temp_015a+temp_015b))
         end #for i
-        postNewtonX = pntempX*c_m2
-        postNewtonY = pntempY*c_m2
-        postNewtonZ = pntempZ*c_m2
+        for i in 1:N-1
+            postNewtonX = postNewtonX + pntempX[i]
+            postNewtonY = postNewtonY + pntempY[i]
+            postNewtonZ = postNewtonZ + pntempZ[i]
+        end
+        postNewtonX = postNewtonX*c_m2
+        postNewtonY = postNewtonY*c_m2
+        postNewtonZ = postNewtonZ*c_m2
     end #for k in Base.OneTo(succ_approx_iter) # (post-Newtonian iterations)
 
     #computation of non-gravitational accelerations:
