@@ -2,17 +2,18 @@ module Apophis
 
 __precompile__(false)
 
-export propagate, au, yr, observer_position, apophisdofs,
-    ssdofs, c_au_per_day, μ, delay_doppler, ismonostatic,
+export propagate, observer_position, apophisdofs,
+    ssdofs, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_00_06, process_radar_data_jpl, RadarDataJPL,
-    semimajoraxis, eccentricity, inclination,
     julian2etsecs, etsecs2julian,
     RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
 
 using TaylorIntegration
 using Printf, DelimitedFiles, Test, LinearAlgebra
 using Dates: DateTime, julian2datetime, datetime2julian
-using PlanetaryEphemeris
+import PlanetaryEphemeris
+using PlanetaryEphemeris: daysec, su, ea, Λ2, Λ3, α_p_sun, δ_p_sun, moon_pole_ra,
+    moon_pole_dec, t2c_jpl_de430, pole_rotation
 using JLD
 using AstroTime, EarthOrientation, SOFA, SPICE
 
@@ -22,8 +23,8 @@ const order = 30
 const abstol = 1.0E-30
 
 # vector of G*m values
-# Bodies included: Sun, Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus,
-# Neptune, Pluto,
+# Bodies included: Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn,
+# Uranus, Neptune, Pluto,
 # 1 Ceres, 4 Vesta, 2 Pallas, 10 Hygiea, 31 Euphrosyne, 704 Interamnia,
 # 511 Davida, 15 Eunomia, 3 Juno, 16 Psyche, 65 Cybele, 88 Thisbe, 48 Doris,
 # 52 Europa, 451 Patientia, 87 Sylvia
@@ -60,7 +61,6 @@ include("topocentric.jl")
 include("asteroid_dynamical_models.jl")
 include("initial_conditions.jl")
 include("delay_doppler.jl")
-include("osculating.jl")
 include("propagation.jl")
 
 function __init__()
