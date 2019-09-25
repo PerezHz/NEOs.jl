@@ -363,8 +363,8 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PlanetaryEphemeris]]
 deps = ["Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "TaylorIntegration", "TaylorSeries", "Test"]
-git-tree-sha1 = "e3fc0705613bd71924ea6fbd046744ce2276ec16"
-repo-rev = "master"
+git-tree-sha1 = "964c8fcda200d582c1996a6df004dbeec14c06a8"
+repo-rev = "jp/test_threads"
 repo-url = "ssh://git@github.com/PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
 version = "0.1.0"
@@ -448,10 +448,10 @@ version = "0.8.3"
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 
 [[SOFA]]
-deps = ["BinDeps", "Libdl", "StaticArrays", "Test"]
-git-tree-sha1 = "6c8773c9e5a7a9ce0c0663161da2d5172ed7c17a"
+deps = ["BinDeps", "Libdl", "StaticArrays"]
+git-tree-sha1 = "bbefeb7f962143f599c43c4155595e84e974e5ae"
 uuid = "ad3d3fd0-b5f2-51ee-b274-8cdbe62317e2"
-version = "1.0.0"
+version = "1.0.1"
 
 [[SPICE]]
 deps = ["BinaryProvider", "Libdl", "LinearAlgebra"]
@@ -525,7 +525,7 @@ version = "1.0.0"
 
 [[TaylorIntegration]]
 deps = ["AutoHashEquals", "DiffEqBase", "Espresso", "LinearAlgebra", "Markdown", "Reexport", "Requires", "TaylorSeries"]
-git-tree-sha1 = "d3a39f78be1d391d26324e1519aa91c5f4ff1925"
+git-tree-sha1 = "8a4fee5001ff1ea1d880d09985e2ebb8d32813c9"
 repo-rev = "jp/interpolation_threads"
 repo-url = "https://github.com/PerezHz/TaylorIntegration.jl.git"
 uuid = "92b13dbe-c966-51a2-8445-caca9f8a7d42"
@@ -533,9 +533,7 @@ version = "0.6.0"
 
 [[TaylorSeries]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Markdown", "Requires", "SparseArrays"]
-git-tree-sha1 = "409d5c7bee1c86bcd9b336c9e43a0f71e0201ed0"
-repo-rev = "master"
-repo-url = "https://github.com/JuliaDiff/TaylorSeries.jl.git"
+git-tree-sha1 = "09426cb060ae6e615b4140d94e165f32d0b5ffca"
 uuid = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
 version = "0.10.0"
 
