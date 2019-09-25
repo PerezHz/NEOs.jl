@@ -55,14 +55,6 @@ const b_sun = 3.91e5 # Solar corona parameter b [cm^-3] (ESAA 2014, Table 8.5 p.
 const S0_sun = 63.15E6 # Sun radiated power intensity at photosphere surface, Watt/meter^2
 # const m2_s3_to_au2_day3 = 1e-6daysec^3/au^2 # conversion factor from m^2/sec^3 to au^2/day^3
 
-function __init__()
-    @show length(methods(RNp1BP_pN_A_J23E_J2S_ng_eph!))
-    @show length(methods(TaylorIntegration.jetcoeffs!))
-    @show methods(RNp1BP_pN_A_J23E_J2S_ng_eph!)
-    # load JPL ephemerides
-    # loadjpleph()
-end
-
 include("process_radar_data_jpl.jl")
 include("topocentric.jl")
 include("asteroid_dynamical_models.jl")
@@ -70,5 +62,14 @@ include("initial_conditions.jl")
 include("delay_doppler.jl")
 include("osculating.jl")
 include("propagation.jl")
+
+function __init__()
+    @show length(methods(RNp1BP_pN_A_J23E_J2S_ng_eph!))
+    @show length(methods(TaylorIntegration.jetcoeffs!))
+    @show methods(RNp1BP_pN_A_J23E_J2S_ng_eph!)
+    @show methods(TaylorIntegration.jetcoeffs!)
+    # load JPL ephemerides
+    # loadjpleph()
+end
 
 end

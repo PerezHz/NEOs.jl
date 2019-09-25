@@ -163,12 +163,16 @@ function testjetcoeffs()
     tT1 = t0 + Taylor1(order)
     q0T1 = Taylor1.(q0, order)
     dq0T1 = similar(q0T)
+
     @show methods(TaylorIntegration.jetcoeffs!)
+
+    TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0T, dq0T, xaux, params)
     @time TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0T, dq0T, xaux, params)
+    TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT1, q0T1, dq0T1, params)
     @time TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT1, q0T1, dq0T1, params)
 
-    @show q0T
-    @show q0T1
+    # @show q0T
+    # @show q0T1
     @show norm(q0T-q0T1, Inf)
     @show norm(dq0T-dq0T1, Inf)
     @show q0T==q0T1
@@ -185,11 +189,13 @@ function testjetcoeffs()
     # q0TT2 = Taylor1.(__q0, order)
     # dq0TT2 = similar(q0TT2)
 
+    TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0TT, dq0TT, xauxTT, params)
     @time TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0TT, dq0TT, xauxTT, params)
+    TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT1, q0TT1, dq0TT1, params)
     @time TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT1, q0TT1, dq0TT1, params)
 
-    @show q0TT
-    @show q0TT1
+    # @show q0TT
+    # @show q0TT1
     @show norm(q0TT-q0TT1, Inf)
     @show norm(dq0TT-dq0TT1, Inf)
     @show q0TT==q0TT1
