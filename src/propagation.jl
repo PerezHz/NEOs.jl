@@ -6,8 +6,8 @@ function rvelea(dx, x, params, t)
 end
 
 function propagate(objname::String, datafile::String, dynamics::Function, maxsteps::Int,
-    newtoniter::Int, t0::T, tspan::T; output::Bool=true, radarobs::Bool=true,
-    jt::Bool=true, dense::Bool=false) where {T<:Real}
+        newtoniter::Int, t0::T, tspan::T; output::Bool=true, jt::Bool=true,
+        dense::Bool=false) where {T<:Real}
 
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
     ss16ast_eph_t = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_t")
@@ -61,26 +61,9 @@ function propagate(objname::String, datafile::String, dynamics::Function, maxste
         @time interp = taylorinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense);
         sol = (t=interp.t[:], x=interp.x[:,:])
     else
-        if radarobs
-            # read object radar astrometry from JPL date
-            radar_data_jpl = process_radar_data_jpl(datafile)
-            #construct vector of observation times (UTC) > t0
-            tv_jpl_utc = UTCEpoch.([x.utcepoch for x in radar_data_jpl])
-            # convert to TDB
-            tv_jpl_tdb = TDBEpoch.(tv_jpl_utc)
-            # date/time to Julian date
-            tv_jpl_tdb_julian =  map(x->x.Δt, julian.(tv_jpl_tdb))
-            # construct time range variable with t0 and observation times > t0, removing repeated values
-            tv = union(t0, tv_jpl_tdb_julian[tv_jpl_tdb_julian .> t0])
-            @show all(diff(tv) .> 0)
-            @time sol_objs = taylorinteg(dynamics, rvelea, q0, tv, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter);
-            tup_names = (:xv1, :tvS1, :xvS1, :gvS1)
-            sol = NamedTuple{tup_names}(sol_objs)
-        else
-            @time sol_objs = taylorinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter);
-            tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
-            sol = NamedTuple{tup_names}(sol_objs)
-        end
+        @time sol_objs = taylorinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter);
+        tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
+        sol = NamedTuple{tup_names}(sol_objs)
     end
 
     #write solution to .jld files
@@ -89,11 +72,7 @@ function propagate(objname::String, datafile::String, dynamics::Function, maxste
         println("Saving solution to file: $filename")
         #first, deal with `tv_jpl_integ`
         jldopen(filename, "w") do file
-            if radarobs
-                println("Saving variable: tv1")
-                write(file, "tv1", tv)
-            end
-            #loop over variables
+            #loop over solution variables
             for ind in eachindex(sol)
                 varname = string(ind)
                 println("Saving variable: ", varname)
@@ -102,11 +81,7 @@ function propagate(objname::String, datafile::String, dynamics::Function, maxste
         end
         #check that tv_jpl_integ was recovered succesfully
         println("Checking that all variables were saved correctly...")
-        if radarobs
-            recovered_tv_jpl_integ = load(filename, "tv1")
-            @show recovered_tv_jpl_integ == tv
-        end
-        #loop over rest of variables
+        #loop over solution variables
         for ind in eachindex(sol)
             varname = string(ind)
             #read varname from files and assign recovered variable to recovered_sol_i
