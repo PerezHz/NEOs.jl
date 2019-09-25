@@ -10,8 +10,8 @@ function propagate(objname::String, datafile::String, dynamics::Function, maxste
     jt::Bool=true, dense::Bool=false) where {T<:Real}
 
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    ss16ast_eph_t = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx_100STEPS.jld"), "ss16ast_eph_t")
-    ss16ast_eph_x = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx_100STEPS.jld"), "ss16ast_eph_x")
+    ss16ast_eph_t = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_t")
+    ss16ast_eph_x = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_x")
     ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
     #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
     # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
@@ -121,8 +121,8 @@ end
 
 function testjetcoeffs()
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    ss16ast_eph_t = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx_100STEPS.jld"), "ss16ast_eph_t")
-    ss16ast_eph_x = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx_100STEPS.jld"), "ss16ast_eph_x")
+    ss16ast_eph_t = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_t")
+    ss16ast_eph_x = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_x")
     ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
     #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
     # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
@@ -160,7 +160,6 @@ function testjetcoeffs()
     q0T = Taylor1.(q0, order)
     dq0T = similar(q0T)
     xaux = similar(q0T)
-    tT1 = t0 + Taylor1(order)
     q0T1 = Taylor1.(q0, order)
     dq0T1 = similar(q0T)
 
@@ -168,8 +167,8 @@ function testjetcoeffs()
 
     TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0T, dq0T, xaux, params)
     @time TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0T, dq0T, xaux, params)
-    TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT1, q0T1, dq0T1, params)
-    @time TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT1, q0T1, dq0T1, params)
+    TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT, q0T1, dq0T1, params)
+    @time TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT, q0T1, dq0T1, params)
 
     # @show q0T
     # @show q0T1
@@ -186,17 +185,23 @@ function testjetcoeffs()
     xauxTT = similar(q0TT)
     q0TT1 = Taylor1.(__q0, order)
     dq0TT1 = similar(q0TT1)
-    # q0TT2 = Taylor1.(__q0, order)
-    # dq0TT2 = similar(q0TT2)
+    q0TT2 = Taylor1.(__q0, order)
+    dq0TT2 = similar(q0TT2)
 
     TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0TT, dq0TT, xauxTT, params)
     @time TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0TT, dq0TT, xauxTT, params)
-    TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT1, q0TT1, dq0TT1, params)
-    @time TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT1, q0TT1, dq0TT1, params)
+    TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT, q0TT1, dq0TT1, params)
+    @time TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT, q0TT1, dq0TT1, params)
+    TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph_threads!), tT, q0TT2, dq0TT2, params)
+    @time TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph_threads!), tT, q0TT2, dq0TT2, params)
 
     # @show q0TT
     # @show q0TT1
     @show norm(q0TT-q0TT1, Inf)
     @show norm(dq0TT-dq0TT1, Inf)
     @show q0TT==q0TT1
+    @show Threads.nthreads()
+    @show norm(q0TT2-q0TT1, Inf)
+    @show norm(dq0TT2-dq0TT1, Inf)
+    @show q0TT2==q0TT1
 end

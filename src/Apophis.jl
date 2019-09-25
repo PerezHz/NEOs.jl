@@ -7,7 +7,7 @@ export propagate, au, yr, observer_position, apophisdofs,
     mas2rad, t2c_rotation_iau_00_06, process_radar_data_jpl, RadarDataJPL,
     semimajoraxis, eccentricity, inclination,
     julian2etsecs, etsecs2julian,
-    RNp1BP_pN_A_J23E_J2S_ng_eph!
+    RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
 
 using TaylorIntegration
 using Printf, DelimitedFiles, Test, LinearAlgebra
@@ -64,9 +64,9 @@ include("osculating.jl")
 include("propagation.jl")
 
 function __init__()
-    @show length(methods(RNp1BP_pN_A_J23E_J2S_ng_eph!))
     @show length(methods(TaylorIntegration.jetcoeffs!))
     @show methods(RNp1BP_pN_A_J23E_J2S_ng_eph!)
+    @show methods(RNp1BP_pN_A_J23E_J2S_ng_eph_threads!)
     @show methods(TaylorIntegration.jetcoeffs!)
     # load JPL ephemerides
     # loadjpleph()

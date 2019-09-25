@@ -2,6 +2,8 @@
 using Apophis
 using Dates
 
+@show Threads.nthreads()
+
 #script parameters (TODO: use ArgParse.jl instead)
 const objname = "Apophis"
 const objdata = "../Apophis_JPL_data.dat"
@@ -11,7 +13,8 @@ const nyears = 24.0 # since t0 is 2008-9-24, this ends the integration on 2032-9
 const radarobs = false#true
 const jt = true
 const dense = true#false
-const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph!
+# const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph!
+const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
 const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
 @show t0 == 2454733.5
 
