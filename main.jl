@@ -1,3 +1,6 @@
+#Multi-threaded:
+#JULIA_NUM_THREADS=8 julia --project=@. main.jl
+#Single-threaded:
 #julia --project=@. main.jl
 using Apophis
 using Dates
