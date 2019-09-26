@@ -113,9 +113,9 @@ uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
 [[DiffEqBase]]
 deps = ["ArrayInterface", "Compat", "DiffEqDiffTools", "Distributed", "DocStringExtensions", "FunctionWrappers", "IterativeSolvers", "IteratorInterfaceExtensions", "LinearAlgebra", "MuladdMacro", "Parameters", "Printf", "RecipesBase", "RecursiveArrayTools", "RecursiveFactorization", "Requires", "Roots", "SparseArrays", "StaticArrays", "Statistics", "SuiteSparse", "TableTraits", "TreeViews"]
-git-tree-sha1 = "6eaeec7b043ee1ad4caf04d1b2ad1af2328e9d73"
+git-tree-sha1 = "5629889ad8aae3420cdd59c336ee776404b62c19"
 uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
-version = "6.3.2"
+version = "6.3.3"
 
 [[DiffEqDiffTools]]
 deps = ["ArrayInterface", "LinearAlgebra", "Requires", "SparseArrays", "StaticArrays"]
@@ -363,7 +363,7 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PlanetaryEphemeris]]
 deps = ["Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "TaylorIntegration", "TaylorSeries", "Test"]
-git-tree-sha1 = "964c8fcda200d582c1996a6df004dbeec14c06a8"
+git-tree-sha1 = "a00f45dba3ed247a9f4d664ef9c21af10e1e5034"
 repo-rev = "jp/test_threads"
 repo-url = "ssh://git@github.com/PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
