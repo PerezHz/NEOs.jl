@@ -5,7 +5,7 @@ function rvelea(dx, x, params, t)
     return (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
 end
 
-function propagate(objname::String, datafile::String, dynamics::Function, maxsteps::Int,
+function propagate(objname::String, dynamics::Function, maxsteps::Int,
         newtoniter::Int, t0::T, tspan::T; output::Bool=true, jt::Bool=true,
         dense::Bool=false) where {T<:Real}
 
@@ -79,7 +79,6 @@ function propagate(objname::String, datafile::String, dynamics::Function, maxste
                 write(file, varname, sol[ind])
             end
         end
-        #check that tv_jpl_integ was recovered succesfully
         println("Checking that all variables were saved correctly...")
         #loop over solution variables
         for ind in eachindex(sol)
