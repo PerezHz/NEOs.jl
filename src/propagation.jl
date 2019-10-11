@@ -10,8 +10,9 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int,
         dense::Bool=false) where {T<:Real}
 
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    ss16ast_eph_t = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_t")
-    ss16ast_eph_x = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_x")
+    eph_file_name = "ss16ast343_eph_5yr_tx.jld"
+    ss16ast_eph_t = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_t")
+    ss16ast_eph_x = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_x")
     ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
     #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
     # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
@@ -95,11 +96,13 @@ end
 
 function testjetcoeffs()
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    ss16ast_eph_t = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_t")
-    ss16ast_eph_x = load(joinpath(jplephpath, "ss16ast343_eph_24yr_tx.jld"), "ss16ast_eph_x")
+    eph_file_name = "ss16ast343_eph_5yr_tx.jld"
+    ss16ast_eph_t = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_t")
+    ss16ast_eph_x = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_x")
     ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
     #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
     # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
+    @show N
     Nm1 = N-1
     acc_eph = TaylorInterpolant(ss16ast_eph_t, Matrix{eltype(ss16ast_eph_x)}(undef, length(ss16ast_eph_t)-1, 3Nm1))
     newtonianNb_Potential = TaylorInterpolant(ss16ast_eph_t, Matrix{eltype(ss16ast_eph_x)}(undef, length(ss16ast_eph_t)-1, Nm1))
