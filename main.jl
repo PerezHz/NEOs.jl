@@ -11,7 +11,7 @@ using Dates
 const objname = "Apophis"
 const newtoniter = 10
 const maxsteps = 10000
-const nyears = 24.0 # since t0 is 2008-9-24, this ends the integration on 2032-9-24; NOTE: this value is overriden when evaluating solution at JPL radar observation times
+const nyears = 24.0
 const jt = true
 const dense = true#false
 # const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph!
