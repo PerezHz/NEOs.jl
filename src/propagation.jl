@@ -10,7 +10,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int,
         dense::Bool=false) where {T<:Real}
 
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    eph_file_name = "ss16ast343_eph_5yr_tx.jld"
+    eph_file_name = "ss16ast343_eph_24yr_tx.jld"
     ss16ast_eph_t = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_t")
     ss16ast_eph_x = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_x")
     ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
@@ -103,7 +103,7 @@ end
 
 function testjetcoeffs()
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    eph_file_name = "ss16ast343_eph_5yr_tx.jld"
+    eph_file_name = "ss16ast343_eph_24yr_tx.jld"
     ss16ast_eph_t = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_t")
     ss16ast_eph_x = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_x")
     ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
