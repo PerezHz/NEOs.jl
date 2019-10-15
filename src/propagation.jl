@@ -66,11 +66,11 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int,
         tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
         # sol = NamedTuple{tup_names}(sol_objs)
         sol = (
-            tv1 = sol_objs.tv1[:],
-            xv1 = sol_objs.xv1[:,:],
-            tvS1 = sol_objs.tvS1[:],
-            xvS1 = sol_objs.xvS1[:,:],
-            gvS1 = sol_objs.gvS1[:]
+            tv1 = sol_objs[1][:],
+            xv1 = sol_objs[2][:,:],
+            tvS1 = sol_objs[3][:],
+            xvS1 = sol_objs[4][:,:],
+            gvS1 = sol_objs[5][:]
         )
     end
 
