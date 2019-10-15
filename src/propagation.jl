@@ -64,7 +64,14 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int,
     else
         @time sol_objs = taylorinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter);
         tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
-        sol = NamedTuple{tup_names}(sol_objs)
+        # sol = NamedTuple{tup_names}(sol_objs)
+        sol = (
+            tv1 = sol_objs.tv1[:],
+            xv1 = sol_objs.xv1[:,:],
+            tvS1 = sol_objs.tvS1[:],
+            xvS1 = sol_objs.xvS1[:,:],
+            gvS1 = sol_objs.gvS1[:]
+        )
     end
 
     #write solution to .jld files
