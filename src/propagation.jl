@@ -59,10 +59,10 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int,
 
     # do integration
     if dense
-        @time interp = taylorinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense);
+        @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense);
         sol = (t=interp.t[:], x=interp.x[:,:])
     else
-        @time sol_objs = taylorinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter);
+        @time sol_objs = apophisinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter);
         tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
         # sol = NamedTuple{tup_names}(sol_objs)
         sol = (

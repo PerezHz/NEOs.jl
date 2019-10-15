@@ -59,9 +59,10 @@ const S0_sun = 63.15E6 # Sun radiated power intensity at photosphere surface, Wa
 
 include("process_radar_data_jpl.jl")
 include("topocentric.jl")
+include("delay_doppler.jl")
 include("asteroid_dynamical_models.jl")
 include("initial_conditions.jl")
-include("delay_doppler.jl")
+include("integration_methods.jl")
 include("propagation.jl")
 
 function __init__()
