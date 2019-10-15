@@ -23,7 +23,7 @@ const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integrat
 propagate(objname, dynamics, 1, newtoniter, t0, nyears, output=false, jt=jt, dense=dense)
 println("*** Finished warmup")
 
-propagate(objname, dynamics, 10, newtoniter, t0, nyears, jt=jt, dense=dense)
+propagate(objname, dynamics, 2, newtoniter, t0, nyears, jt=jt, dense=dense)
 println("*** Finished 2nd warmup")
 
 #root-finding methods warmup (integrate until first root-finding event):
