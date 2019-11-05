@@ -5,14 +5,18 @@ function rvelea(dx, x, params, t)
     return (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
 end
 
-function propagate(objname::String, dynamics::Function, maxsteps::Int,
-        newtoniter::Int, t0::T, tspan::T; output::Bool=true, jt::Bool=true,
-        dense::Bool=false) where {T<:Real}
+function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
+        tspan::T, ephfile::String; output::Bool=true, jt::Bool=true,
+        newtoniter::Int=10, dense::Bool=false) where {T<:Real}
 
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    eph_file_name = "ss16ast343_eph_24yr_tx.jld"
-    ss16ast_eph_t = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_t")
-    ss16ast_eph_x = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_x")
+    # ephfile = "ss16ast343_eph_24yr_tx.jld"
+    # ss16ast_eph_t = load(joinpath(jplephpath, ephfile), "ss16ast_eph_t")
+    # ss16ast_eph_x = load(joinpath(jplephpath, ephfile), "ss16ast_eph_x")
+    # ss16ast_eph_t = load(ephfile, "t")
+    # ss16ast_eph_x = load(ephfile, "x")
+    ss16ast_eph_t = load(ephfile, "ss16ast_eph_t")
+    ss16ast_eph_x = load(ephfile, "ss16ast_eph_x")
     ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
     #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
     # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
@@ -46,11 +50,16 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int,
     __q0 = initialcond()
 
     if jt
-        #construct jet transport initial condition as Vector{Taylor1{Float64}} from `__q0`
-        q0T1 = Taylor1.(__q0,varorder)
-        q0T1[1:end-1] = Taylor1.(__q0[1:end-1],varorder)
-        q0T1[end] = Taylor1([__q0[end],1e-14],varorder) #note the 1e-14!!!
-        q0 = q0T1
+        # #construct jet transport initial condition as Vector{Taylor1{Float64}} from `__q0`
+        # q0T1 = Taylor1.(__q0,varorder)
+        # q0T1[1:end-1] = Taylor1.(__q0[1:end-1],varorder)
+        # q0T1[end] = Taylor1([__q0[end],1e-14],varorder) #note the 1e-14!!!
+        # q0 = q0T1
+
+        # #construct jet transport initial condition as Vector{TaylorN{Float64}} from `__q0`
+        ξv = set_variables("ξ", order=varorder, numvars=1)
+        zeroxi = zero(ξv[1])
+        q0 = __q0 + [zeroxi, zeroxi, zeroxi, zeroxi, zeroxi, zeroxi, 1e-14ξv[1]]
     else
         q0 = __q0
     end
@@ -103,9 +112,9 @@ end
 
 function testjetcoeffs()
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    eph_file_name = "ss16ast343_eph_24yr_tx.jld"
-    ss16ast_eph_t = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_t")
-    ss16ast_eph_x = load(joinpath(jplephpath, eph_file_name), "ss16ast_eph_x")
+    ephfile = "ss16ast343_eph_24yr_tx.jld"
+    ss16ast_eph_t = load(joinpath(jplephpath, ephfile), "ss16ast_eph_t")
+    ss16ast_eph_x = load(joinpath(jplephpath, ephfile), "ss16ast_eph_x")
     ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
     #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
     # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration

@@ -53,6 +53,7 @@ function apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T,
             parse_eqs = false
         end
     end
+    @show parse_eqs
 
     # Integration
     nsteps = 1
@@ -125,6 +126,7 @@ function apophisinteg(f!, g, q0::Array{U,1}, t0::T, tmax::T, order::Int,
             parse_eqs = false
         end
     end
+    @show parse_eqs
 
     #Some auxiliary arrays for root-finding/event detection/Poincaré surface of section evaluation
     g_val = zero(g(x, x, params, t))

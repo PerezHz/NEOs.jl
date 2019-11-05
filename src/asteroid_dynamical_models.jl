@@ -1,3 +1,24 @@
+#auxiliary function to evaluate pl.eph. case: no jet transport
+# function evaleph(eph::TaylorInterpolant, t::Taylor1, ::Taylor1{T}) where {T<:Real}
+#     return eph(t)
+# end
+
+# #auxiliary function to evaluate pl.eph. case: Taylor1 jet transport
+# function evaleph(eph::TaylorInterpolant, t::Taylor1, q1::Taylor1{Taylor1{T}}) where {T<:Real}
+#     #return Taylor1.(  map( x->Taylor1.(x,varorder), getfield.(eph(t), :coeffs) )  )
+#     return map( x->Taylor1(x.coeffs*one(q1)), eph(t))
+# end
+
+# #auxiliary function to evaluate pl.eph. case: TaylorN jet transport
+# function evaleph(eph::TaylorInterpolant, t::Taylor1, q1::Taylor1{TaylorN{T}}) where {T<:Real}
+#     # return eph(t)*one(q1) --> leads to infinite promotion!!!
+# end
+
+#auxiliary function to evaluate pl.eph.
+function evaleph(eph::TaylorInterpolant, t::Taylor1, q1::Taylor1)
+    return map( x->Taylor1(x.coeffs*one(q1)), eph(t))
+end
+
 # Nearth-Earth asteroid dynamical model (d=2.0)
 # Bodies considered in the model are: the Sun, the eight planets, the Moon and Ceres,
 # as well as the asteroid of interest as a test particle with null mass. Dynamical
@@ -14,9 +35,9 @@
 # asteroid's heliocentric range, A2 is a coefficient (with units of au/day^2),
 # and d = 2.0
 function RNp1BP_pN_A_J23E_J2S_ng_eph!(dq, q, params, t)
-    local ss16asteph_t = params[1](t)*one(q[1]) #ss16asteph(t)
-    local acceph_t = params[2](t)*one(q[1]) #acc_eph(t)
-    local newtonianNb_Potential_t = params[3](t)*one(q[1]) #newtonianNb_Potential(t), massive bodies
+    local ss16asteph_t = evaleph(params[1], t, q[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
+    local acceph_t = evaleph(params[2], t, q[1]) # params[2](t)*one(q[1]) #acc_eph(t)
+    local newtonianNb_Potential_t = evaleph(params[3], t, q[1]) # params[3](t)*one(q[1]) #newtonianNb_Potential(t), massive bodies
     local S = eltype(q[1])
     local N = length(μ) # number of bodies, including NEA
     local _1_to_N = Base.OneTo(N) # iterator over all bodies
