@@ -51,15 +51,15 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
 
     if jt
         # #construct jet transport initial condition as Vector{Taylor1{Float64}} from `__q0`
-        # q0T1 = Taylor1.(__q0,varorder)
-        # q0T1[1:end-1] = Taylor1.(__q0[1:end-1],varorder)
-        # q0T1[end] = Taylor1([__q0[end],1e-14],varorder) #note the 1e-14!!!
-        # q0 = q0T1
+        q0T1 = Taylor1.(__q0,varorder)
+        q0T1[1:end-1] = Taylor1.(__q0[1:end-1],varorder)
+        q0T1[end] = Taylor1([__q0[end],1e-14],varorder) #note the 1e-14!!!
+        q0 = q0T1
 
         # #construct jet transport initial condition as Vector{TaylorN{Float64}} from `__q0`
-        ξv = set_variables("ξ", order=varorder, numvars=1)
-        zeroxi = zero(ξv[1])
-        q0 = __q0 + [zeroxi, zeroxi, zeroxi, zeroxi, zeroxi, zeroxi, 1e-14ξv[1]]
+        # ξv = set_variables("ξ", order=varorder, numvars=1)
+        # zeroxi = zero(ξv[1])
+        # q0 = __q0 + [zeroxi, zeroxi, zeroxi, zeroxi, zeroxi, zeroxi, 1e-14ξv[1]]
     else
         q0 = __q0
     end
