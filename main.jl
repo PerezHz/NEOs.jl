@@ -20,7 +20,7 @@ const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integrat
 @show t0 == 2454733.5
 
 # path to local Solar System ephemeris file
-my_eph_file = joinpath(dirname(pathof(Apophis)), "../jpleph", "ss16ast343_eph_5yr_tx.jld")
+my_eph_file = joinpath(dirname(pathof(Apophis)), "../jpleph", "ss16ast343_eph_24yr_tx.jld")
 
 #integrator warmup
 propagate(objname, dynamics, 1, t0, nyears, my_eph_file, output=false, jt=jt, dense=dense)
