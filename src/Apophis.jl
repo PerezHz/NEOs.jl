@@ -19,7 +19,6 @@ using JLD
 using AstroTime, EarthOrientation, SOFA, SPICE
 
 # integration parameters
-const varorder = 10
 const order = 30
 const abstol = 1.0E-30
 

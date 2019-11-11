@@ -9,7 +9,7 @@ using Dates
 
 #script parameters (TODO: use ArgParse.jl instead)
 const objname = "Apophis"
-const newtoniter = 10
+const varorder = 10
 const maxsteps = 10000
 const nyears = 24.0
 const jt = true
@@ -23,19 +23,19 @@ const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integrat
 my_eph_file = joinpath(dirname(pathof(Apophis)), "../jpleph", "ss16ast343_eph_24yr_tx.jld")
 
 #integrator warmup
-propagate(objname, dynamics, 1, t0, nyears, my_eph_file, output=false, jt=jt, dense=dense)
+propagate(objname, dynamics, 1, t0, nyears, my_eph_file, output=false, jt=jt, dense=dense, varorder=varorder)
 println("*** Finished warmup")
 
-propagate(objname, dynamics, 2, t0, nyears, my_eph_file, jt=jt, dense=dense)
+propagate(objname, dynamics, 2, t0, nyears, my_eph_file, jt=jt, dense=dense, varorder=varorder)
 println("*** Finished 2nd warmup")
 
 #root-finding methods warmup (integrate until first root-finding event):
-# propagate(objname, dynamics, 50, t0, nyears, my_eph_file, jt=jt, dense=dense)
+# propagate(objname, dynamics, 50, t0, nyears, my_eph_file, jt=jt, dense=dense, varorder=varorder)
 # println("*** Finished root-finding warmup")
 
-#propagate(objname, dynamics, 100, t0, nyears, my_eph_file, jt=jt, dense=dense)
+#propagate(objname, dynamics, 100, t0, nyears, my_eph_file, jt=jt, dense=dense, varorder=varorder)
 #println("*** Finished root-finding test: several roots")
 
 #Full jet transport integration until ~2038: about 8,000 steps
-# propagate(objname, dynamics, 8000, t0, nyears, my_eph_file, jt=jt, dense=dense)
+# propagate(objname, dynamics, 8000, t0, nyears, my_eph_file, jt=jt, dense=dense, varorder=varorder)
 # println("*** Finished full jet transport integration")

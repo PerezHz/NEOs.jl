@@ -7,7 +7,7 @@ end
 
 function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         tspan::T, ephfile::String; output::Bool=true, jt::Bool=true,
-        newtoniter::Int=10, dense::Bool=false) where {T<:Real}
+        newtoniter::Int=10, dense::Bool=false, varorder::Int=10) where {T<:Real}
 
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
     # ephfile = "ss16ast343_eph_24yr_tx.jld"
@@ -170,9 +170,9 @@ function testjetcoeffs()
     @show q0T==q0T1
 
     # test **WITH** jet transport
-    __q0 = Taylor1.(q0,varorder)
-    __q0[1:end-1] = Taylor1.(q0[1:end-1],varorder)
-    __q0[end] = Taylor1([q0[end],1e-14],varorder) #note the 1e-14!!!
+    __q0 = Taylor1.(q0,10)
+    __q0[1:end-1] = Taylor1.(q0[1:end-1],10)
+    __q0[end] = Taylor1([q0[end],1e-14],10) #note the 1e-14!!!
     q0TT = Taylor1.(__q0, order)
     dq0TT = similar(q0TT)
     xauxTT = similar(q0TT)
