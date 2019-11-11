@@ -141,9 +141,9 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[Distributions]]
 deps = ["LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns"]
-git-tree-sha1 = "444fc445f7805a1abe2868ccfa933c5b2bb29a08"
+git-tree-sha1 = "838a37797ac24c1b4c3353d46ec87ea6598f2308"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
-version = "0.21.6"
+version = "0.21.7"
 
 [[DocStringExtensions]]
 deps = ["LibGit2", "Markdown", "Pkg", "Test"]
@@ -365,7 +365,7 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 [[PlanetaryEphemeris]]
 deps = ["Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "TaylorIntegration", "TaylorSeries", "Test"]
 git-tree-sha1 = "a50aa30f3673df9ea4969a0bfb9ac7d8adeedc33"
-repo-rev = "jp/test_threads"
+repo-rev = "master"
 repo-url = "ssh://git@github.com/PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
 version = "0.1.0"
