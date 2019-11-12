@@ -1,4 +1,7 @@
-function initialcond()
+function initialcond(dq::Vector=zeros(7))
+
+    @assert length(dq) == 7 "Perturbation `dq` to initial condition must have `length(dq) == 7`"
+
     # output from JPL Horizons
 
     q0 = Array{Float64}(undef, 7) #initial condition array
@@ -9,5 +12,5 @@ function initialcond()
 
     q0[7] = 0.0 # A2 Yarkovsky coefficient
 
-    return q0
+    return q0 .+ dq
 end

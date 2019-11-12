@@ -6,8 +6,8 @@ function rvelea(dx, x, params, t)
 end
 
 function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
-        tspan::T, ephfile::String; output::Bool=true, jt::Bool=true,
-        newtoniter::Int=10, dense::Bool=false, varorder::Int=10) where {T<:Real}
+        tspan::T, ephfile::String; output::Bool=true, newtoniter::Int=10,
+        dense::Bool=false, dq::Vector=zeros(7)) where {T<:Real}
 
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
     # ephfile = "ss16ast343_eph_24yr_tx.jld"
@@ -47,22 +47,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
     end #for, j
     params = (ss16asteph, acc_eph, newtonianNb_Potential)
     # get asteroid initial conditions
-    __q0 = initialcond()
-
-    if jt
-        # #construct jet transport initial condition as Vector{Taylor1{Float64}} from `__q0`
-        q0T1 = Taylor1.(__q0,varorder)
-        q0T1[1:end-1] = Taylor1.(__q0[1:end-1],varorder)
-        q0T1[end] = Taylor1([__q0[end],1e-14],varorder) #note the 1e-14!!!
-        q0 = q0T1
-
-        # #construct jet transport initial condition as Vector{TaylorN{Float64}} from `__q0`
-        # ξv = set_variables("ξ", order=varorder, numvars=1)
-        # zeroxi = zero(ξv[1])
-        # q0 = __q0 + [zeroxi, zeroxi, zeroxi, zeroxi, zeroxi, zeroxi, 1e-14ξv[1]]
-    else
-        q0 = __q0
-    end
+    q0 = initialcond(dq)
 
     @show tmax = t0+tspan*yr #final time of integration
 
