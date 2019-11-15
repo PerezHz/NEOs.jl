@@ -1,4 +1,4 @@
-function observer_position(station_code::Int, t_utc::DateTime)
+function observer_position(station_code::Int, t_utc::DateTime, pm::Bool=true)
     # λ_deg: East longitude (deg)
     # u: distance from spin axis (km), taken from Yeomans et al. (1992) u = r*cos(ϕ)
     # v: height above equatorial plane (km), taken from Yeomans et al. (1992) v = r*sin(ϕ)
@@ -31,8 +31,8 @@ function observer_position(station_code::Int, t_utc::DateTime)
 
     pos_geo = [x_gc, y_gc, z_gc]/au #au
 
-    G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(t_utc, pos_geo)
-    # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(t_utc, pos_geo)
+    G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(t_utc, pos_geo, pm)
+    # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(t_utc, pos_geo, pm)
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
     return G_vec_ESAA, dG_vec_ESAA
@@ -48,7 +48,7 @@ mas2rad(x) = deg2rad(x/3.6e6) # mas/1000 -> arcsec; arcsec/3600 -> deg; deg2rad(
 # Some modifications were applied, using TaylorSeries.jl, in order to compute
 # the geocentric velocity of the observer, following the guidelines from
 # ESAA 2014, Sec 7.4.3.3 (page 295)
-function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector)
+function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector, pm::Bool=true)
     # UTC
     t0_utc = UTCEpoch(t_utc)
     t0_utc_jul = datetime2julian(t_utc)
@@ -77,12 +77,15 @@ function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector)
     t0_tt = TTEpoch(t0_utc)
     t0_tt_jd1, t0_tt_jd2 = julian_twopart(t0_tt)
     # Polar motion (arcsec->radians)
-    xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t_utc)
-    xp = deg2rad(xp_arcsec/3600)
-    yp = deg2rad(yp_arcsec/3600)
-    # Polar motion matrix (TIRS->ITRS, IERS 2003)
-    sp = iauSp00( t0_tt_jd1.Δt, t0_tt_jd2.Δt )
-    W = iauPom00( xp, yp, sp)
+    W = Array{Float64}(I, 3, 3)
+    if pm
+        xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t_utc)
+        xp = deg2rad(xp_arcsec/3600)
+        yp = deg2rad(yp_arcsec/3600)
+        # Polar motion matrix (TIRS->ITRS, IERS 2003)
+        sp = iauSp00( t0_tt_jd1.Δt, t0_tt_jd2.Δt )
+        W = iauPom00( xp, yp, sp)
+    end
     W_inv = inv(W)
 
     # CIP and CIO, IAU 2000A
@@ -117,7 +120,7 @@ end
 # Some modifications were applied, using TaylorSeries.jl, in order to compute
 # the geocentric velocity of the observer, following the guidelines from
 # ESAA 2014, Sec 7.4.3.3 (page 295)
-function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector)
+function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector, pm::Bool=true)
     # UTC
     t0_utc = UTCEpoch(t_utc)
     # TT
@@ -171,11 +174,13 @@ function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector)
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
     W = Array{Float64}(I, 3, 3)
     # Polar motion (arcsec->radians)
-    xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t_utc)
-    xp = deg2rad(xp_arcsec/3600)
-    yp = deg2rad(yp_arcsec/3600)
-    W = iauRx(-yp, W)
-    W = iauRy(-xp, W)
+    if pm
+        xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t_utc)
+        xp = deg2rad(xp_arcsec/3600)
+        yp = deg2rad(yp_arcsec/3600)
+        W = iauRx(-yp, W)
+        W = iauRy(-xp, W)
+    end
 
     # # Form celestial-terrestrial matrix (including polar motion)
     # rc2it = W*rc2ti

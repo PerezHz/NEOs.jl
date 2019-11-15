@@ -163,12 +163,12 @@ end
 # xvs: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in au and velocity in au/day
 # xva: Apophis ephemeris wich takes et seconds since J2000 as input and returns Apophis barycentric position in au and velocity in au/day
 function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
-        niter::Int=10; xve::Function=earth_pv, xvs::Function=sun_pv,
+        niter::Int=10, pm::Bool=true; xve::Function=earth_pv, xvs::Function=sun_pv,
         xva::Function=apophis_pv)
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = seconds( AstroTime.j2000(TDB, UTCEpoch(t_r_utc)) ).Δt
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, V_r = observer_position(station_code, t_r_utc)
+    R_r, V_r = observer_position(station_code, t_r_utc, pm)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]
@@ -268,7 +268,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     # convert transmit time from TDB to UTC time
     t_t_utc = DateTime(UTCEpoch(TDBEpoch(constant_term(et_t_secs)/daysec, origin=:j2000)))
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = observer_position(station_code, t_t_utc)
+    R_t, V_t = observer_position(station_code, t_t_utc, pm)
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
     v_e_t_t = rv_e_t_t[4:6]
@@ -332,7 +332,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         # convert transmit time from TDB to UTC time
         t_t_utc = DateTime(UTCEpoch(TDBEpoch(constant_term(et_t_secs)/daysec, origin=:j2000)))
         # Geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-        R_t, V_t = observer_position(station_code, t_t_utc)
+        R_t, V_t = observer_position(station_code, t_t_utc, pm)
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]
