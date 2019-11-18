@@ -34,7 +34,7 @@ const N = length(μ)
 
 # Matrix of J2 interactions included in DE430 ephemeris, according to Folkner et al., 2014
 const UJ_interaction = fill(false, N)
-UJ_interaction[su] = true
+# UJ_interaction[su] = true
 UJ_interaction[ea] = true
 # UJ_interaction[mo] = true
 
