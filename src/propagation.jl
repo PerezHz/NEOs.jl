@@ -57,8 +57,6 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         sol = (t=interp.t[:], x=interp.x[:,:])
     else
         @time sol_objs = apophisinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter);
-        tup_names = (:tv1, :xv1, :tvS1, :xvS1, :gvS1)
-        # sol = NamedTuple{tup_names}(sol_objs)
         sol = (
             tv1 = sol_objs[1][:],
             xv1 = sol_objs[2][:,:],

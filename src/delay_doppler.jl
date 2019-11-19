@@ -408,3 +408,97 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
 
     return 1e6τ, 1e6ν # total signal delay (μs) and Doppler shift (Hz)
 end
+
+function delay_doppler(astradardata::Vector{RadarDataJPL{T}},
+        niter::Int=10, pm::Bool=true; xve::Function=earth_pv,
+        xvs::Function=sun_pv, xva::Function=apophis_pv) where {T<:Number}
+
+    et1 = seconds( AstroTime.j2000(TDB, UTCEpoch(astradardata[1].utcepoch)) ).Δt
+    a1_et1 = xva(et1)[1]
+    S = typeof(a1_et1)
+
+    vdelay = Array{S}(undef, length(astradardata))
+    vdoppler = Array{S}(undef, length(astradardata))
+
+    for i in eachindex(astradardata)
+        vdelay[i], vdoppler[i] = delay_doppler(
+            astradardata[i].rcvr,
+            astradardata[i].utcepoch,
+            astradardata[i].freq,
+            niter,
+            xve = xve,
+            xvs = xvs,
+            xva = xva
+        )
+    end
+
+    delay_index = findall(x->x.delay_units=="us", astradardata)
+    doppler_index = findall(x->x.doppler_units=="Hz", astradardata)
+
+    return vdelay[delay_index], vdoppler[doppler_index]
+end
+
+function delay_doppler(sseph_file::String, asteph_file::String, asteroid_data_file::String)
+    # sseph_file = "ss16ast343_eph_24yr_tx.jld"
+    # asteph_file = "Apophis_vT1_o10_24yr_noJ2S_jt.jld"
+    # apophis_radar_data_2005_2013 = process_radar_data_jpl("../Apophis_JPL_data.dat")
+
+    #Load time (t) and state (x) arrays, to construct a TaylorInterpolant object
+    ss16ast_eph_t = load(joinpath(Apophis.jplephpath, sseph_file), "ss16ast_eph_t")
+    ss16ast_eph_x = load(joinpath(Apophis.jplephpath, sseph_file), "ss16ast_eph_x")
+    ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
+
+    # Load TT-TDB DE430 ephemeris
+    furnsh( joinpath(jplephpath, "TTmTDB.de430.19feb2015.bsp") )
+
+    #recover asteroid integration from .jld file
+    t = load(asteph_file, "t")
+    x = load(asteph_file, "x")
+
+    #construct Taylor interpolant
+    apophis = TaylorInterpolant(t, x)
+    @show apophis.t[1]
+    t0 = apophis.t[1]
+
+    @show julian2datetime(apophis.t[end])
+
+    function apophis_et(et)
+        return apophis( etsecs2julian(et) )[1:6]
+    end
+    function earth_et(et)
+        return ss16asteph( etsecs2julian(et) )[union(3*4-2:3*4,3*(27+4)-2:3*(27+4))]
+    end
+    function sun_et(et)
+        return ss16asteph( etsecs2julian(et) )[union(3*1-2:3*1,3*(27+1)-2:3*(27+1))]
+    end
+
+    #compute time-delay and Doppler-shift "ephemeris" (i.e., predicted values according to ephemeris)
+    asteroid_data = process_radar_data_jpl(asteroid_data_file)
+    vdel, vdop = delay_doppler(asteroid_data; xve=earth_et, xvs=sun_et, xva=apophis_et)
+
+    sol = (vdel=vdel, vdop=vdop)
+
+    #write solution to .jld files
+    outfilename = "deldop.jld"
+    println("Saving observation predictions to file: $outfilename")
+    #first, deal with `tv_jpl_integ`
+    jldopen(outfilename, "w") do file
+        #loop over solution variables
+        for ind in eachindex(sol)
+            varname = string(ind)
+            println("Saving variable: ", varname)
+            write(file, varname, sol[ind])
+        end
+    end
+    println("Checking that all variables were saved correctly...")
+    #loop over solution variables
+    for ind in eachindex(sol)
+        varname = string(ind)
+        #read varname from files and assign recovered variable to recovered_sol_i
+        recovered_sol_i = load(outfilename, varname)
+        #check that varname was recovered succesfully
+        @show recovered_sol_i == sol[ind]
+    end
+    println("Saved solution")
+    return nothing
+end
