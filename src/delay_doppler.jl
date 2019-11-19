@@ -457,10 +457,6 @@ function delay_doppler(sseph_file::String, asteph_file::String, asteroid_data_fi
 
     #construct Taylor interpolant
     apophis = TaylorInterpolant(t, x)
-    @show apophis.t[1]
-    t0 = apophis.t[1]
-
-    @show julian2datetime(apophis.t[end])
 
     function apophis_et(et)
         return apophis( etsecs2julian(et) )[1:6]
