@@ -31,6 +31,8 @@ struct RadarDataJPL{T}
     end
 end
 
+# Outer constructors
+RadarDataJPL(r::RadarDataJPL{T}) where {T<:Number} = r
 function RadarDataJPL(object::String,
     utcepoch::DateTime,
     delay::T,
