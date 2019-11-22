@@ -14,6 +14,8 @@ const objname = "Apophis"
 const maxsteps = 10000
 const nyears = 5.0
 const dense = true#false
+const apophisjlpath = dirname(pathof(Apophis))
+const radarobsfile = joinpath(apophisjlpath, "../Apophis_JPL_data_2012_2013.dat")
 # const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph!
 const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
 const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
@@ -21,7 +23,7 @@ const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integrat
 
 # path to local Solar System ephemeris file
 # my_eph_file = joinpath(dirname(pathof(Apophis)), "../jpleph", "ss16ast343_eph_24yr_tx.jld")
-my_eph_file = joinpath(dirname(pathof(Apophis)), "../jpleph", "ss16ast343_eph_5yr_tx.jld")
+ast_eph_file = joinpath(dirname(pathof(Apophis)), "../jpleph", "ss16ast343_eph_5yr_tx.jld")
 
 # dq: perturbation to nominal initial condition (Taylor1 jet transport)
 dq = Taylor1.(zeros(7), varorder)
@@ -35,7 +37,7 @@ dq[end][1] = 1e-14
 # dq[end][1][end] = 1e-14
 
 #integrator warmup
-propagate(objname, dynamics, 1, t0, nyears, my_eph_file, output=false, dense=dense, dq=dq)
+propagate(objname, dynamics, 1, t0, nyears, ast_eph_file, output=false, dense=dense, dq=dq)
 println("*** Finished warmup")
 
 #propagate(objname, dynamics, 2, t0, nyears, my_eph_file, dense=dense, dq=dq)
@@ -49,5 +51,5 @@ println("*** Finished warmup")
 #println("*** Finished root-finding test: several roots")
 
 #Full jet transport integration until ~2038: about 8,000 steps
-propagate(objname, dynamics, maxsteps, t0, nyears, my_eph_file, dense=dense, dq=dq)
+propagate(objname, dynamics, maxsteps, t0, nyears, ast_eph_file, dense=dense, dq=dq, radarobsfile=radarobsfile)
 println("*** Finished full jet transport integration")
