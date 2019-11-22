@@ -7,7 +7,7 @@ end
 
 function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         tspan::T, ephfile::String; output::Bool=true, newtoniter::Int=10,
-        dense::Bool=false, dq::Vector=zeros(7)) where {T<:Real}
+        dense::Bool=false, dq::Vector=zeros(7), radarobsfile::String="") where {T<:Real}
 
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
     # ephfile = "ss16ast343_eph_24yr_tx.jld"
@@ -53,10 +53,30 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
 
     # do integration
     if dense
-        @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense);
-        sol = (t=interp.t[:], x=interp.x[:,:])
+        if radarobsfile != ""
+            asteroid_data = process_radar_data_jpl(radarobsfile)
+            # TODO: check that first and last observation times are within interpolation interval
+            @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense)
+            # Load TT-TDB DE430 ephemeris
+            furnsh( joinpath(jplephpath, "TTmTDB.de430.19feb2015.bsp") )
+            function apophis_et(et)
+                return interp( etsecs2julian(et) )[1:6]
+            end
+            function earth_et(et)
+                return ss16asteph( etsecs2julian(et) )[union(3*4-2:3*4,3*(27+4)-2:3*(27+4))]
+            end
+            function sun_et(et)
+                return ss16asteph( etsecs2julian(et) )[union(3*1-2:3*1,3*(27+1)-2:3*(27+1))]
+            end
+            #compute time-delay and Doppler-shift "ephemeris" (i.e., predicted values according to ephemeris)
+            vdel, vdop = delay_doppler(asteroid_data; xve=earth_et, xvs=sun_et, xva=apophis_et)
+            sol = (t=interp.t[:], x=interp.x[:,:], vdel=vdel, vdop=vdop)
+        else
+            @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense)
+            sol = (t=interp.t[:], x=interp.x[:,:])
+        end
     else
-        @time sol_objs = apophisinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter);
+        @time sol_objs = apophisinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter)
         sol = (
             tv1 = sol_objs[1][:],
             xv1 = sol_objs[2][:,:],
