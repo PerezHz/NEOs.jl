@@ -53,7 +53,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
 
     # do integration
     if dense
-        if radarobsfile != ""
+        if output && radarobsfile != ""
             asteroid_data = process_radar_data_jpl(radarobsfile)
             # TODO: check that first and last observation times are within interpolation interval
             @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense)
