@@ -1,6 +1,6 @@
 ###julia --machine-file <host-file> distributed.jl
 ###julia -p <number-of-processors> distributed.jl
-using Distributed
+#using Distributed
 @everywhere begin
     import Pkg
     Pkg.activate("../")
@@ -49,18 +49,9 @@ for i in 1:nworkers()
 end
 
 #warmup (compilation) short run on all processes
-parallel_run(objname, dynamics, 1, t0, tmax, ast_eph_file, aux, output=false)
+parallel_run(objname, dynamics, 1, t0, tmax, ast_eph_file, aux, output=true)
+println("*** Finished warmup")
 
-# # #Full jet transport integration until ~2038: about 8,000 steps
-# # f2 = dx -> begin
-# #     # dq: perturbation to nominal initial condition (Taylor1 jet transport)
-# #     dq = Taylor1.(zeros(7), varorder)
-# #     for i in 1:6
-# #         dq[i][0] = dx[i]
-# #     end
-# #     dq[end][1] = 1e-14
-# #     @show dq
-# #     propagate_distributed(objname, dynamics, maxsteps, t0, tmax, ast_eph_file, aux, dq=dq, radarobsfile=radarobsfile)
-# #     println("*** Finished full jet transport integration")
-# # end
-# # pmap(f2, dxv[1:nworkers()])
+#Full jet transport integration until ~2038: about 8,000 steps
+#parallel_run(objname, dynamics, maxsteps, t0, tmax, ast_eph_file, aux, radarobsfile=radarobsfile)
+#println("*** Finished full jet transport integration")
