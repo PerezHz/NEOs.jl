@@ -201,7 +201,6 @@ function propagate_distributed(objname::String, dynamics::Function, maxsteps::In
     if output
         save2jldandcheck(objname, sol)
     end
-    println("*** Finished warmup")
     return nothing
 end
 
@@ -229,7 +228,8 @@ function parallel_run(objname::String, dynamics::Function, maxsteps::Int,
     end
     @show dqv
 
-    f1 = x -> propagate_distributed(objname, dynamics, 1, t0, tmax, ephfile, aux, output=false, dq=x)
+    f1 = x -> propagate_distributed(objname, dynamics, maxsteps, t0, tmax,
+        ephfile, aux, output=output, radarobsfile=radarobsfile, dq=x)
     pmap(f1, dqv[1:nworkers()])
 end
 
