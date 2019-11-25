@@ -351,30 +351,35 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
 
     # compute TDB-UTC at transmit time
     # transmit time: TDB -> UTC
-    t_t_utc = UTCEpoch(TDBEpoch(constant_term(et_t_secs)/daysec, origin=:j2000))
-    # ut1_utc_t = EarthOrientation.getΔUT1( julian(t_t_utc).Δt ) # seconds
-    utc_jd1_t, utc_jd2_t = julian_twopart(t_t_utc) # days, days
-    j, tai_utc_t = iauDat(year(t_t_utc), month(t_t_utc), day(t_t_utc), utc_jd2_t.Δt)
-    j != 0 && @warn "iauDat: j = $j. See SOFA.jl docs for more detail."
-    tt_utc_t = 32.184 + tai_utc_t # seconds
-    ##TT-TDB (transmit time)
-    tt_tdb_t = tt_m_tdb(constant_term(et_t_secs))[1] # seconds
-    tdb_utc_t = tt_utc_t - tt_tdb_t #seconds
+    t_t_tdb = TDBEpoch(constant_term(et_t_secs)/daysec, origin=:j2000)
+    t_t_utc = UTCEpoch(t_t_tdb)
+    tdb_utc_t = seconds(AstroTime.j2000(t_t_tdb)).Δt - seconds(AstroTime.j2000(t_t_utc)).Δt
+    # t_t_utc = UTCEpoch(TDBEpoch(constant_term(et_t_secs)/daysec, origin=:j2000))
+    # # ut1_utc_t = EarthOrientation.getΔUT1( julian(t_t_utc).Δt ) # seconds
+    # utc_jd1_t, utc_jd2_t = julian_twopart(t_t_utc) # days, days
+    # j, tai_utc_t = iauDat(year(t_t_utc), month(t_t_utc), day(t_t_utc), utc_jd2_t.Δt)
+    # j != 0 && @warn "iauDat: j = $j. See SOFA.jl docs for more detail."
+    # tt_utc_t = 32.184 + tai_utc_t # seconds
+    # ##TT-TDB (transmit time)
+    # tt_tdb_t = tt_m_tdb(constant_term(et_t_secs))[1] # seconds
+    # tdb_utc_t = tt_utc_t - tt_tdb_t #seconds
 
     # compute TDB-UTC at receive time
+    t_r_tdb = TDBEpoch(t_r_utc, origin=:j2000)
+    tdb_utc_r = seconds(AstroTime.j2000(t_r_tdb)).Δt - seconds(AstroTime.j2000(t_r_utc)).Δt
     # UTC two-part "quasi" Julian date (see http://www.iausofa.org/sofa_ts_c.pdf)
-    utc_jd1_r, utc_jd2_r = julian_twopart(UTCEpoch(t_r_utc)) # days, days
-    # ΔAT = TAI - UTC
-    j, tai_utc_r = iauDat(year(t_r_utc), month(t_r_utc), day(t_r_utc), utc_jd2_r.Δt)
-    j != 0 && @warn "iauDat: j = $j. See SOFA.jl docs for more detail."
-    tt_utc_r = 32.184 + tai_utc_r
-    # compute `tt_tdb_r` recursively
-    tt_tdb_r = 0.0
-    for i in 1:niter+1 #TODO: check that convergence always holds
-        utc_j2000_r = seconds( AstroTime.j2000(UTCEpoch(t_r_utc)) ).Δt # days since J2000 (UTC)
-        tt_tdb_r = tt_m_tdb(utc_j2000_r + (tt_utc_r + tt_tdb_r))[1] # seconds
-    end
-    tdb_utc_r = tt_utc_r - tt_tdb_r #seconds
+    # utc_jd1_r, utc_jd2_r = julian_twopart(UTCEpoch(t_r_utc)) # days, days
+    # # ΔAT = TAI - UTC
+    # j, tai_utc_r = iauDat(year(t_r_utc), month(t_r_utc), day(t_r_utc), utc_jd2_r.Δt)
+    # j != 0 && @warn "iauDat: j = $j. See SOFA.jl docs for more detail."
+    # tt_utc_r = 32.184 + tai_utc_r
+    # # compute `tt_tdb_r` recursively
+    # tt_tdb_r = 0.0
+    # for i in 1:niter+1 #TODO: check that convergence always holds
+    #     utc_j2000_r = seconds( AstroTime.j2000(UTCEpoch(t_r_utc)) ).Δt # days since J2000 (UTC)
+    #     tt_tdb_r = tt_m_tdb(utc_j2000_r + (tt_utc_r + tt_tdb_r))[1] # seconds
+    # end
+    # tdb_utc_r = tt_utc_r - tt_tdb_r #seconds
 
     # compute total time delay (UTC seconds)
     # Eq. (9) Yeomans et al. (1992)

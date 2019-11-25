@@ -10,11 +10,6 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         dense::Bool=false, dq::Vector=zeros(7), radarobsfile::String="") where {T<:Real}
 
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    # ephfile = "ss16ast343_eph_24yr_tx.jld"
-    # ss16ast_eph_t = load(joinpath(jplephpath, ephfile), "ss16ast_eph_t")
-    # ss16ast_eph_x = load(joinpath(jplephpath, ephfile), "ss16ast_eph_x")
-    # ss16ast_eph_t = load(ephfile, "t")
-    # ss16ast_eph_x = load(ephfile, "x")
     ss16ast_eph_t = load(ephfile, "ss16ast_eph_t")
     ss16ast_eph_x = load(ephfile, "ss16ast_eph_x")
     ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
@@ -57,7 +52,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
             asteroid_data = process_radar_data_jpl(radarobsfile)
             # TODO: check that first and last observation times are within interpolation interval
             @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense)
-            # Load TT-TDB DE430 ephemeris
+            # Load TT-TDB from DE430 ephemeris TODO: use AstroTime.jl instead
             furnsh( joinpath(jplephpath, "TTmTDB.de430.19feb2015.bsp") )
             function apophis_et(et)
                 return interp( etsecs2julian(et) )[1:6]
@@ -111,6 +106,131 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         println("Saved solution")
     end
     return nothing
+end
+
+function loadeph(ephfile)
+    # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
+    ss16ast_eph_t = load(ephfile, "ss16ast_eph_t")
+    ss16ast_eph_x = load(ephfile, "ss16ast_eph_x")
+    ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
+    #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
+    # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
+    Nm1 = N-1
+    acc_eph = TaylorInterpolant(ss16ast_eph_t, Matrix{eltype(ss16ast_eph_x)}(undef, length(ss16ast_eph_t)-1, 3Nm1))
+    newtonianNb_Potential = TaylorInterpolant(ss16ast_eph_t, Matrix{eltype(ss16ast_eph_x)}(undef, length(ss16ast_eph_t)-1, Nm1))
+    fill!(acc_eph.x, zero(ss16ast_eph_x[1]))
+    fill!(newtonianNb_Potential.x, zero(ss16ast_eph_x[1]))
+    _1_to_Nm1 = Base.OneTo(Nm1) # iterator over all bodies except Apophis
+    for j in _1_to_Nm1
+        for i in _1_to_Nm1
+            # i == j && continue
+            if i == j
+            else
+                X_ij = ss16ast_eph_x[:,3i-2] .- ss16ast_eph_x[:,3j-2]
+                Y_ij = ss16ast_eph_x[:,3i-1] .- ss16ast_eph_x[:,3j-1]
+                Z_ij = ss16ast_eph_x[:,3i  ] .- ss16ast_eph_x[:,3j  ]
+                r_p2_ij = ( (X_ij.^2) .+ (Y_ij.^2) ) .+ (Z_ij.^2)
+                r_p3d2_ij = r_p2_ij.^1.5
+                r_ij = sqrt.(r_p2_ij)
+                newtonianCoeff_ij =  μ[i]./r_p3d2_ij
+                acc_eph.x[:,3j-2] .+= (X_ij.*newtonianCoeff_ij)
+                acc_eph.x[:,3j-1] .+= (Y_ij.*newtonianCoeff_ij)
+                acc_eph.x[:,3j  ] .+= (Z_ij.*newtonianCoeff_ij)
+                newtonianNb_Potential.x[:,j] .+= (μ[i]./r_ij)
+            end #if i != j
+        end #for, i
+    end #for, j
+    return ss16asteph, acc_eph, newtonianNb_Potential
+end
+
+function save2jldandcheck(objname, sol)
+    filename = string(objname, "_jt.", myid(), ".jld")
+    println("Saving solution to file: $filename")
+    #first, deal with `tv_jpl_integ`
+    jldopen(filename, "w") do file
+        #loop over solution variables
+        for ind in eachindex(sol)
+            varname = string(ind)
+            println("Saving variable: ", varname)
+            write(file, varname, sol[ind])
+        end
+    end
+    println("Checking that all variables were saved correctly...")
+    #loop over solution variables
+    for ind in eachindex(sol)
+        varname = string(ind)
+        #read varname from files and assign recovered variable to recovered_sol_i
+        recovered_sol_i = load(filename, varname)
+        #check that varname was recovered succesfully
+        @show recovered_sol_i == sol[ind]
+    end
+    println("Saved solution")
+    return nothing
+end
+
+# distributed computing (Monte-Carlo) version of `propagate`
+function propagate_distributed(objname::String, dynamics::Function, maxsteps::Int,
+        t0::T, tmax::T, ephfile::String, aux; output::Bool=true, newtoniter::Int=10,
+        dq::Vector=zeros(7), radarobsfile::String="") where {T<:Real}
+
+    ss16asteph, acc_eph, newtonianNb_Potential, earth_et, sun_et = aux
+    params = aux[1:3]
+
+    # get asteroid initial conditions
+    q0 = initialcond(dq)
+
+    @show myid()
+
+    # do integration
+    if output && radarobsfile != ""
+        asteroid_data = process_radar_data_jpl(radarobsfile)
+        # TODO: check that first and last observation times are within interpolation interval
+        @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=true)
+        function apophis_et(et)
+            return interp( etsecs2julian(et) )[1:6]
+        end
+        #compute time-delay and Doppler-shift "ephemeris" (i.e., predicted values according to ephemeris)
+        vdel, vdop = delay_doppler(asteroid_data; xve=earth_et, xvs=sun_et, xva=apophis_et)
+        sol = (t=interp.t[:], x=interp.x[:,:], vdel=vdel, vdop=vdop)
+    else
+        @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=true)
+        sol = (t=interp.t[:], x=interp.x[:,:])
+    end
+
+    #write solution to .jld files
+    if output
+        save2jldandcheck(objname, sol)
+    end
+    println("*** Finished warmup")
+    return nothing
+end
+
+function parallel_run(objname::String, dynamics::Function, maxsteps::Int,
+        t0::T, tmax::T, ephfile::String, aux; output::Bool=true, newtoniter::Int=10,
+        radarobsfile::String="") where {T<:Real}
+
+    varorder = 5 # varorder is the order corresponding to the jet transport perturbation
+    dxv = [1e-8randn(6) for w in workers()]
+
+    dqv = Vector{typeof(Taylor1.(dxv[1], varorder))}(undef, length(dxv))
+    for j in eachindex(dqv)
+        # dqv[j]: perturbation to nominal initial condition (Taylor1 jet transport)
+        dqv[j] = Taylor1.(zeros(7), varorder)
+        for i in 1:6
+            dqv[j][i][0] = dxv[j][i]
+        end
+        dqv[j][end][1] = 1e-14
+        # dq: perturbation to nominal initial condition (TaylorN jet transport)
+        # dq = set_variables("ξ", order=varorder, numvars=7)
+        # for i in 1:6
+        #     dq[i][1][i] = 1e-8
+        # end
+        # dq[end][1][end] = 1e-14
+    end
+    @show dqv
+
+    f1 = x -> propagate_distributed(objname, dynamics, 1, t0, tmax, ephfile, aux, output=false, dq=x)
+    pmap(f1, dqv[1:nworkers()])
 end
 
 function testjetcoeffs()

@@ -6,8 +6,10 @@ export propagate, observer_position, apophisdofs,
     ssdofs, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_00_06, process_radar_data_jpl, RadarDataJPL,
     julian2etsecs, etsecs2julian,
-    RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
+    RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!,
+    propagate_distributed, parallel_run
 
+using Distributed
 using TaylorIntegration
 using Printf, DelimitedFiles, Test, LinearAlgebra
 using Dates: DateTime, julian2datetime, datetime2julian
