@@ -191,7 +191,8 @@ function taylor_roots(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
     return xnewton
 end
 
-function least_squares_A2(asteroid_data, vdel::Vector{Taylor1}, vdop::Vector{Taylor1})
+function least_squares_A2(asteroid_data::Vector{RadarDataJPL{T}},
+        vdel::Vector{Taylor1{U}}, vdop::Vector{Taylor1{U}}) where {T<:Number, U<:Number}
     delay_index = findall(x->x.delay_units=="us", asteroid_data)
     doppler_index = findall(x->x.doppler_units=="Hz", asteroid_data)
     tdelay_jpl_obs = [x.delay for x in asteroid_data][delay_index]
