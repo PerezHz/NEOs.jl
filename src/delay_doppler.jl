@@ -365,8 +365,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     # tdb_utc_t = tt_utc_t - tt_tdb_t #seconds
 
     # compute TDB-UTC at receive time
-    t_r_tdb = TDBEpoch(t_r_utc, origin=:j2000)
-    tdb_utc_r = seconds(AstroTime.j2000(t_r_tdb)).Δt - seconds(AstroTime.j2000(t_r_utc)).Δt
+    tdb_utc_r = et_r_secs - seconds( AstroTime.j2000(UTCEpoch(DateTime(2008,9,24))) ).Δt
     # UTC two-part "quasi" Julian date (see http://www.iausofa.org/sofa_ts_c.pdf)
     # utc_jd1_r, utc_jd2_r = julian_twopart(UTCEpoch(t_r_utc)) # days, days
     # # ΔAT = TAI - UTC

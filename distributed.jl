@@ -1,6 +1,5 @@
 ###julia --machine-file <host-file> distributed.jl
 ###julia -p <number-of-processors> distributed.jl
-#using Distributed
 @everywhere begin
     import Pkg
     Pkg.activate("../")
@@ -10,7 +9,6 @@ end
     using Apophis
     using Dates
     using TaylorSeries
-    using SPICE: furnsh
 
     #script parameters (TODO: use ArgParse.jl instead)
     const objname = "Apophis"
@@ -38,20 +36,16 @@ end
 ast_eph_file = joinpath(dirname(pathof(Apophis)), "../jpleph", "ss16ast343_eph_5yr_tx.jld")
 
 ss16asteph, acc_eph, newtonianNb_Potential = Apophis.loadeph(ast_eph_file)
-# Load TT-TDB from DE430 ephemeris TODO: use AstroTime.jl instead
-# furnsh( joinpath(Apophis.jplephpath, "TTmTDB.de430.19feb2015.bsp") )
 
-# aux = (1,2,3)
 aux = (ss16asteph, acc_eph, newtonianNb_Potential, earth_et, sun_et)
 for i in 1:nworkers()
-    # @spawnat i+1 aux = (1,2,3)
     @spawnat i+1 aux = (ss16asteph, acc_eph, newtonianNb_Potential, earth_et, sun_et)
 end
 
 #warmup (compilation) short run on all processes
-parallel_run(objname, dynamics, 1, t0, tmax, ast_eph_file, aux, output=true)
+parallel_run(objname, dynamics, 1, t0, tmax, ast_eph_file, aux, output=false)
 println("*** Finished warmup")
 
 #Full jet transport integration until ~2038: about 8,000 steps
-#parallel_run(objname, dynamics, maxsteps, t0, tmax, ast_eph_file, aux, radarobsfile=radarobsfile)
-#println("*** Finished full jet transport integration")
+# parallel_run(objname, dynamics, maxsteps, t0, tmax, ast_eph_file, aux, radarobsfile=radarobsfile)
+# println("*** Finished full jet transport integration")

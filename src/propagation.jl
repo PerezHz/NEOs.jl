@@ -170,7 +170,7 @@ end
 
 # distributed computing (Monte-Carlo) version of `propagate`
 function propagate_distributed(objname::String, dynamics::Function, maxsteps::Int,
-        t0::T, tmax::T, ephfile::String, aux; output::Bool=true, newtoniter::Int=10,
+        t0::T, tmax::T, aux; output::Bool=true, newtoniter::Int=10,
         dq::Vector=zeros(7), radarobsfile::String="") where {T<:Real}
 
     ss16asteph, acc_eph, newtonianNb_Potential, earth_et, sun_et = aux
@@ -205,7 +205,7 @@ function propagate_distributed(objname::String, dynamics::Function, maxsteps::In
 end
 
 function parallel_run(objname::String, dynamics::Function, maxsteps::Int,
-        t0::T, tmax::T, ephfile::String, aux; output::Bool=true, newtoniter::Int=10,
+        t0::T, tmax::T, aux; output::Bool=true, newtoniter::Int=10,
         radarobsfile::String="") where {T<:Real}
 
     varorder = 5 # varorder is the order corresponding to the jet transport perturbation
@@ -229,7 +229,7 @@ function parallel_run(objname::String, dynamics::Function, maxsteps::Int,
     @show dqv
 
     f1 = x -> propagate_distributed(objname, dynamics, maxsteps, t0, tmax,
-        ephfile, aux, output=output, radarobsfile=radarobsfile, dq=x)
+        aux, output=output, radarobsfile=radarobsfile, dq=x)
     pmap(f1, dqv[1:nworkers()])
 end
 
