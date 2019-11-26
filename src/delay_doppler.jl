@@ -354,6 +354,18 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     t_t_tdb = TDBEpoch(constant_term(et_t_secs)/daysec, origin=:j2000)
     t_t_utc = UTCEpoch(t_t_tdb)
     tdb_utc_t = seconds(AstroTime.j2000(t_t_tdb)).Δt - seconds(AstroTime.j2000(t_t_utc)).Δt
+    # t_t_tdb_jd1, t_t_tdb_jd2 = julian_twopart(t_t_tdb) # days, days
+    # t_t_utc_jd1, t_t_utc_jd2 = julian_twopart(t_t_utc) # days, days
+    # tdb_utc_t = seconds(t_t_tdb_jd2).Δt - seconds(t_t_utc_jd2).Δt
+    # compute TDB-UTC at receive time
+    tdb_utc_r = et_r_secs - seconds( AstroTime.j2000(UTCEpoch(t_r_utc)) ).Δt
+    # t_r_tdb = TDBEpoch(UTCEpoch(t_r_utc))
+    # t_r_tdb_jd1, t_r_tdb_jd2 = julian_twopart(TDBEpoch(UTCEpoch(t_r_utc))) # days, days
+    # t_r_utc_jd1, t_r_utc_jd2 = julian_twopart(UTCEpoch(t_r_utc)) # days, days
+    # tdb_utc_r = seconds(t_r_tdb_jd2).Δt - seconds(t_r_utc_jd2).Δt
+
+    # # compute TDB-UTC at transmit time
+    # # transmit time: TDB -> UTC
     # t_t_utc = UTCEpoch(TDBEpoch(constant_term(et_t_secs)/daysec, origin=:j2000))
     # # ut1_utc_t = EarthOrientation.getΔUT1( julian(t_t_utc).Δt ) # seconds
     # utc_jd1_t, utc_jd2_t = julian_twopart(t_t_utc) # days, days
@@ -363,10 +375,8 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     # ##TT-TDB (transmit time)
     # tt_tdb_t = tt_m_tdb(constant_term(et_t_secs))[1] # seconds
     # tdb_utc_t = tt_utc_t - tt_tdb_t #seconds
-
-    # compute TDB-UTC at receive time
-    tdb_utc_r = et_r_secs - seconds( AstroTime.j2000(UTCEpoch(DateTime(2008,9,24))) ).Δt
-    # UTC two-part "quasi" Julian date (see http://www.iausofa.org/sofa_ts_c.pdf)
+    # # compute TDB-UTC at receive time
+    # # UTC two-part "quasi" Julian date (see http://www.iausofa.org/sofa_ts_c.pdf)
     # utc_jd1_r, utc_jd2_r = julian_twopart(UTCEpoch(t_r_utc)) # days, days
     # # ΔAT = TAI - UTC
     # j, tai_utc_r = iauDat(year(t_r_utc), month(t_r_utc), day(t_r_utc), utc_jd2_r.Δt)
