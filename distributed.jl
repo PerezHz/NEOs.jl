@@ -1,5 +1,7 @@
 ###julia --machine-file <host-file> distributed.jl
 ###julia -p <number-of-processors> distributed.jl
+
+# using Distributed # not necessary when doing `julia -p ...` or `julia --machine-file...`
 @everywhere begin
     import Pkg
     Pkg.activate("../")
@@ -32,10 +34,10 @@ end
 end
 
 # path to local Solar System ephemeris file
-# ast_eph_file = joinpath(dirname(pathof(Apophis)), "../jpleph", "ss16ast343_eph_24yr_tx.jld")
-ast_eph_file = joinpath(dirname(pathof(Apophis)), "../jpleph", "ss16ast343_eph_5yr_tx.jld")
+# ss_eph_file = joinpath(dirname(pathof(Apophis)), "../jpleph", "ss16ast343_eph_24yr_tx.jld")
+ss_eph_file = joinpath(dirname(pathof(Apophis)), "../jpleph", "ss16ast343_eph_5yr_tx.jld")
 
-ss16asteph, acc_eph, newtonianNb_Potential = Apophis.loadeph(ast_eph_file)
+ss16asteph, acc_eph, newtonianNb_Potential = Apophis.loadeph(ss_eph_file)
 
 aux = (ss16asteph, acc_eph, newtonianNb_Potential, earth_et, sun_et)
 for i in 1:nworkers()
@@ -43,9 +45,9 @@ for i in 1:nworkers()
 end
 
 #warmup (compilation) short run on all processes
-parallel_run(objname, dynamics, 1, t0, tmax, ast_eph_file, aux, output=false)
+parallel_run(objname, dynamics, 1, t0, tmax, aux, output=false)
 println("*** Finished warmup")
 
 #Full jet transport integration until ~2038: about 8,000 steps
-# parallel_run(objname, dynamics, maxsteps, t0, tmax, ast_eph_file, aux, radarobsfile=radarobsfile)
+# parallel_run(objname, dynamics, maxsteps, t0, tmax, aux, radarobsfile=radarobsfile)
 # println("*** Finished full jet transport integration")
