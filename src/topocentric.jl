@@ -6,8 +6,8 @@ function observer_position(station_code::Int, t_utc::DateTime, pm::Bool=true)
     # TODO: add more radar stations
     if station_code == 251 # Arecibo
         λ_deg = 293.24692 #deg
-        u = 6056.525 #km
-        v = 1994.665 #km
+        u = 6056.525 #km #6056.497 #km
+        v = 1994.665 #km #1994.649 #km
     elseif station_code == 252 # Goldstone DSS 13 (Venus site), Fort Irwin
         λ_deg = 243.20512 #deg
         u = 5215.484 #km
@@ -38,7 +38,7 @@ function observer_position(station_code::Int, t_utc::DateTime, pm::Bool=true)
     return G_vec_ESAA, dG_vec_ESAA
 end
 
-# conversion of micro-arcseconds to radians
+# conversion of milli-arcseconds to radians
 mas2rad(x) = deg2rad(x/3.6e6) # mas/1000 -> arcsec; arcsec/3600 -> deg; deg2rad(deg) -> rad
 
 # Terrestrial-to-celestial rotation matrix (including polar motion)
@@ -61,8 +61,8 @@ function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector, pm::Bool=true)
     era = iauEra00( t0_ut1_jd1.Δt, t0_ut1_jd2.Δt ) #rad
     # this trick allows us to compute the whole Celestial->Terrestrial matrix and its first derivative
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
-    # eraT1 = era + ω*Taylor1(1) #rad/day
-    eraT1 = era + omega(getlod(t_utc))*Taylor1(1) #rad/day
+    eraT1 = era + ω*Taylor1(1) #rad/day
+    # eraT1 = era + omega(getlod(t_utc))*Taylor1(1) #rad/day
     # Rz(-ERA)
     Rz_minus_era_T1 = [cos(eraT1) sin(-eraT1) zero(eraT1);
         sin(eraT1) cos(eraT1) zero(eraT1);
@@ -128,24 +128,30 @@ function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector, pm::Bool=true)
     djmjd0 = julian(J2000_EPOCH).Δt # J2000.0 (TT) epoch (days)
     tt = AstroTime.j2000(t0_tt).Δt
     # IAU 1976 precession matrix, J2000.0 to date
+    # https://github.com/sisl/SOFA.jl/blob/be9ddfd412c5ab77b291b17decfd369041ef365b/src/pmat76.jl#L14
     rp = iauPmat76(djmjd0, tt)
     # IAU 1980 nutation angles Δψ (nutation in longitude), Δϵ (nutation in obliquity)
+    # Output of `SOFA.iauNut80` is in radians:
+    # https://github.com/sisl/SOFA.jl/blob/dc911b990dba79435399e1af0206e4acfc94c630/src/nut80.jl#L14
     dp80, de80  = iauNut80(djmjd0, tt)
-    #Nutation corrections wrt IAU 1976/1980 (mas->radians)
+    #Nutation corrections wrt IAU 1976/1980
+    # Output of `EarthOrientation.precession_nutation80` is in mas:
+    # https://github.com/JuliaAstro/EarthOrientation.jl/blob/529f12425a6331b133f989443aeb3fbbafd8f324/src/EarthOrientation.jl#L413
     ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(t_utc)
-    # Add adjustments: frame bias, precession-rates, geophysical
+    # Convert mas -> radians
     ddp80 = mas2rad(ddp80_mas)
     dde80 = mas2rad(dde80_mas)
-    dpsi = dp80 + ddp80
-    deps = de80 + dde80
-    # Mean obliquity
-    epsa = iauObl80(djmjd0, tt)
-    # Build the rotation matrix
+    # Add adjustments: frame bias, precession-rates, geophysical
+    dpsi = dp80 + ddp80 #rad
+    deps = de80 + dde80 #rad
+    # Mean obliquity (output in radians)
+    epsa = iauObl80(djmjd0, tt) # rad
+    # Form the matrix of nutation
     rn = iauNumat(epsa, dpsi, deps)
-    # Combine the matrices:  PN = N x P
+    # Combine the matrices:  PN = N x P (with frame-bias B included)
     C = rn*rp
 
-    # Equation of the equinoxes, including nutation correction
+    # Equation of the equinoxes `ee = GAST - GMST`, including nutation correction
     ee = iauEqeq94(djmjd0, tt) + ddp80*cos(epsa)
     # UT1
     # dut1 = EarthOrientation.getΔUT1(t0_utc_jul.Δt) # UT1-UTC (seconds)
@@ -155,8 +161,8 @@ function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector, pm::Bool=true)
     gast = iauAnp( iauGmst82( djmjd0_plus_date.Δt, tut.Δt ) + ee ) #rad
     # this trick allows us to compute the whole Celestial->Terrestrial matrix and its first derivative
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
-    # gastT1 = gast + ω*Taylor1(1) #rad/day
-    gastT1 = gast + omega(EarthOrientation.getlod(t_utc))*Taylor1(1) #rad/day
+    gastT1 = gast + ω*Taylor1(1) #rad/day
+    # gastT1 = gast + omega(EarthOrientation.getlod(t_utc))*Taylor1(1) #rad/day
     # Rz(-GAST)
     Rz_minus_gast_T1 = [cos(gastT1) -sin(gastT1) zero(gastT1);
         sin(gastT1) cos(gastT1) zero(gastT1);
@@ -166,6 +172,12 @@ function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector, pm::Bool=true)
     # dRz(-GAST)/dt
     dRz_minus_gast_T1 = differentiate.(Rz_minus_gast_T1)
     dRz_minus_GAST = dRz_minus_gast_T1()
+    # Rz_minus_GAST = [cos(gast) -sin(gast) 0.0;
+    #     sin(gast) cos(gast) 0.0;
+    #     0.0 0.0 1.0]
+    # dRz_minus_GAST = ω*[-sin(gast) -cos(gast) 0.0;
+    #     cos(gast) -sin(gast) 0.0;
+    #     0.0 0.0 0.0]
 
     # # Form celestial-terrestrial matrix (no polar motion yet)
     # rc2ti = deepcopy(C)

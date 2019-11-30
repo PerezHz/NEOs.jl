@@ -198,7 +198,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
 
     Δτ_D = zero(τ_D)
     Δτ_rel_D = zero(τ_D)
-    Δν_rel_D = zero(τ_D)
+    # Δν_rel_D = zero(τ_D)
     Δτ_corona_D = zero(τ_D)
     Δτ_tropo_D = zero(τ_D)
     # Δν_corona_D = zero(τ_D)
@@ -238,7 +238,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         # Shapiro correction to time-delay
         Δτ_rel_D = Δτ_rel_D_T[0] # seconds
         # "Shapiro-like" correction to Doppler ν(Shapiro) = -F_tx*dτ(Shapiro)/dt
-        Δν_rel_D = -F_tx*Δτ_rel_D_T[1]/daysec # MHz
+        # Δν_rel_D = -F_tx*Δτ_rel_D_T[1]/daysec # MHz
         Δτ_corona_D = corona_delay(constant_term.(r_a_t_b), r_r_t_r, r_s_t_r, F_tx, station_code) # seconds
         R_rT = constant_term.(R_r) + map(x->x*Taylor1(1), constant_term.(V_r))
         ρ_vec_rT = constant_term.(ρ_vec_r) + map(x->x*Taylor1(1), constant_term.(ρ_vec_dot_r))
@@ -282,7 +282,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
 
     Δτ_U = zero(τ_U)
     Δτ_rel_U = zero(τ_U)
-    Δν_rel_U = zero(τ_U)
+    # Δν_rel_U = zero(τ_U)
     Δτ_corona_U = zero(τ_U)
     Δτ_tropo_U = zero(τ_U)
     # Δν_corona_U = zero(τ_U)
@@ -319,7 +319,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         dq_U = q_UT[1]
         Δτ_rel_U_T = shapiro_delay(e_UT, p_UT, q_UT)
         Δτ_rel_U = Δτ_rel_U_T[0] # seconds
-        Δν_rel_U = -F_tx*Δτ_rel_U_T[1]/daysec # MHz
+        # Δν_rel_U = -F_tx*Δτ_rel_U_T[1]/daysec # MHz
         Δτ_corona_U = corona_delay(constant_term.(r_t_t_t), constant_term.(r_a_t_b), constant_term.(r_s_t_b), F_tx, station_code) # seconds
         R_tT = constant_term.(R_t) + map(x->x*Taylor1(1), constant_term.(V_t))
         ρ_vec_tT = constant_term.(ρ_vec_t) + map(x->x*Taylor1(1), constant_term.(ρ_vec_dot_t))
@@ -413,12 +413,13 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     doppler_c2_t2 = ϕ1 - ϕ3 # order c^-2, 2nd term
     doppler_c2_t3 = (  dot(v_t_t_t, v_t_t_t) - dot(v_r_t_r, v_r_t_r)  )/2  # order c^-2, 3rd term
     doppler_c2 = -F_tx*(doppler_c2_t1 + doppler_c2_t2 + doppler_c2_t3)/(c_au_per_day^2)
-    # Corrections of order c^-3 to Doppler shift (Moyer, 1971, p. 56, Eq. 343)
-    doppler_c3_t1 = ρ_dot_t*p_t^2 - ρ_dot_r*p_r^2 - ρ_dot_t*ρ_dot_r*(p_r-p_t)
-    doppler_c3_t2 = -(ρ_dot_t+ρ_dot_r)*(doppler_c2_t2+doppler_c2_t3)
-    # Note that c^3 corrections to Doppler include a "Shapiro-like" term, which has already been multiplied by the transmitter frequency
-    doppler_c3 = -F_tx*(doppler_c3_t1+doppler_c3_t2)/(c_au_per_day^3) + (Δν_rel_D+Δν_rel_U)
-    ν = (doppler_c + doppler_c2) + doppler_c3
+    ν = (doppler_c + doppler_c2)
+    # # Corrections of order c^-3 to Doppler shift (Moyer, 1971, p. 56, Eq. 343)
+    # doppler_c3_t1 = ρ_dot_t*p_t^2 - ρ_dot_r*p_r^2 - ρ_dot_t*ρ_dot_r*(p_r-p_t)
+    # doppler_c3_t2 = -(ρ_dot_t+ρ_dot_r)*(doppler_c2_t2+doppler_c2_t3)
+    # # Note that c^3 corrections to Doppler include a "Shapiro-like" term, which has already been multiplied by the transmitter frequency
+    # doppler_c3 = -F_tx*(doppler_c3_t1+doppler_c3_t2)/(c_au_per_day^3) + (Δν_rel_D+Δν_rel_U)
+    # ν = (doppler_c + doppler_c2) + doppler_c3
 
     return 1e6τ, 1e6ν # total signal delay (μs) and Doppler shift (Hz)
 end
