@@ -40,14 +40,14 @@ dq[end][1] = 1e-14
 propagate(objname, dynamics, 1, t0, nyears, ast_eph_file, output=false, dense=dense, dq=dq)
 println("*** Finished warmup")
 
-#propagate(objname, dynamics, 2, t0, nyears, my_eph_file, dense=dense, dq=dq)
+#propagate(objname, dynamics, 2, t0, nyears, ast_eph_file, dense=dense, dq=dq)
 #println("*** Finished 2nd warmup")
 
 #root-finding methods warmup (integrate until first root-finding event):
-# propagate(objname, dynamics, 50, t0, nyears, my_eph_file, dense=dense, dq=dq)
+# propagate(objname, dynamics, 50, t0, nyears, ast_eph_file, dense=dense, dq=dq)
 # println("*** Finished root-finding warmup")
 
-#propagate(objname, dynamics, 100, t0, nyears, my_eph_file, dense=dense, dq=dq)
+#propagate(objname, dynamics, 100, t0, nyears, ast_eph_file, dense=dense, dq=dq)
 #println("*** Finished root-finding test: several roots")
 
 #Full jet transport integration until ~2038: about 8,000 steps
