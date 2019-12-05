@@ -233,8 +233,11 @@ end
 
 function testjetcoeffs(ephfile)
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    # ephfile = "ss16ast343_eph_24yr_tx.jld"
     ss16asteph, acc_eph, newtonianNb_Potential = loadeph(ephfile)
+    testjetcoeffs(ss16asteph, acc_eph, newtonianNb_Potential)
+end
+
+function testjetcoeffs(ss16asteph, acc_eph, newtonianNb_Potential)
     params = (ss16asteph, acc_eph, newtonianNb_Potential)
 
     # test **WITHOUT** jet transport
@@ -247,6 +250,32 @@ function testjetcoeffs(ephfile)
     q0T1 = Taylor1.(q0, order)
     dq0T1 = similar(q0T)
 
+    # Determine if specialized jetcoeffs! method runs without trouble (parsed but no threads)
+    parse_eqs = true
+    if parse_eqs
+        try
+            TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph!), tT, q0T1, dq0T1, params)
+        catch
+            parse_eqs = false
+        end
+    end
+    @show parse_eqs # should evaluate to true, if evaluation of parsed jetcoeffs! method worked
+    q0T1 = Taylor1.(q0, order)
+    dq0T1 = similar(q0T)
+    # Determine if specialized jetcoeffs! method runs without trouble (parsed+threads)
+    parse_eqs = true
+    if parse_eqs
+        try
+            TaylorIntegration.jetcoeffs!(Val(RNp1BP_pN_A_J23E_J2S_ng_eph_threads!), tT, q0T1, dq0T1, params)
+        catch
+            parse_eqs = false
+        end
+    end
+    @show parse_eqs # should evaluate to true, if evaluation of parsed jetcoeffs! method worked
+
+    # q0T1 = Taylor1.(q0, order)
+    # dq0T1 = similar(q0T)
+
     @show methods(TaylorIntegration.jetcoeffs!)
 
     TaylorIntegration.jetcoeffs!(RNp1BP_pN_A_J23E_J2S_ng_eph!, tT, q0T, dq0T, xaux, params)
@@ -256,14 +285,16 @@ function testjetcoeffs(ephfile)
 
     # @show q0T
     # @show q0T1
+    # Test equality of non-parsed vs parsed jetcoeffs! methods
     @show norm(q0T-q0T1, Inf)
     @show norm(dq0T-dq0T1, Inf)
     @show q0T==q0T1
 
     # test **WITH** jet transport
-    __q0 = Taylor1.(q0,10)
-    __q0[1:end-1] = Taylor1.(q0[1:end-1],10)
-    __q0[end] = Taylor1([q0[end],1e-14],10) #note the 1e-14!!!
+    # dq: perturbation to nominal initial condition (Taylor1 jet transport)
+    dq = Taylor1.(zeros(7), 10)
+    dq[end][1] = 1e-14 #note the 1e-14!!!
+    __q0 = initialcond(dq)
     q0TT = Taylor1.(__q0, order)
     dq0TT = similar(q0TT)
     xauxTT = similar(q0TT)
