@@ -70,7 +70,7 @@ end
 
     r_p1d2 = Array{Taylor1{S}}(undef, N)
 
-    newtonianNb_Potential = zero_q_1
+    newtonianNb_Potential = Array{Taylor1{S}}(undef, N)
     newtonian1b_Potential = Array{Taylor1{S}}(undef, N)
     newtonianCoeff = Array{Taylor1{S}}(undef, N)
     newton_acc_X = Array{Taylor1{S}}(undef, N)
@@ -81,7 +81,7 @@ end
     vi_dot_vj = Array{Taylor1{S}}(undef, N)
     pn2 = Array{Taylor1{S}}(undef, N)
     pn3 = Array{Taylor1{S}}(undef, N)
-    _4ϕj = zero_q_1
+    _4ϕj = Array{Taylor1{S}}(undef, N)
     ϕi_plus_4ϕj = Array{Taylor1{S}}(undef, N)
     sj2_plus_2si2_minus_4vivj = Array{Taylor1{S}}(undef, N)
     ϕs_and_vs = Array{Taylor1{S}}(undef, N)
@@ -191,6 +191,11 @@ end
     dq[1] = q[4]
     dq[2] = q[5]
     dq[3] = q[6]
+
+    newtonianNb_Potential[N] = zero_q_1
+    # accX[N] = zero_q_1
+    # accY[N] = zero_q_1
+    # accZ[N] = zero_q_1
 
     #compute point-mass Newtonian accelerations, all bodies
     for i in _1_to_Nm1
@@ -307,8 +312,8 @@ end
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
 
     for i in _1_to_Nm1
-        temp_004 = newtonianNb_Potential + newtonian1b_Potential[i]
-        newtonianNb_Potential = temp_004
+        temp_004 = newtonian1b_Potential[i] + newtonianNb_Potential[N]
+        newtonianNb_Potential[N] = temp_004
         if UJ_interaction[i]
             # # # add result to total acceleration on upon j-th body figure due to i-th point mass
             # # @show "acc",j,"+μ",i,"Λ2",j
@@ -333,9 +338,9 @@ end
     #post-Newtonian corrections to gravitational acceleration
     #Moyer, 1971, page 7 eq. 35
     # post-Newtonian iterative procedure setup and initialization
-    _4ϕj = 4newtonianNb_Potential
+    _4ϕj[N] = 4newtonianNb_Potential[N]
     for i in _1_to_Nm1
-        ϕi_plus_4ϕj[i] = newtonianNb_Potential_t[i] + _4ϕj
+        ϕi_plus_4ϕj[i] = newtonianNb_Potential_t[i] + _4ϕj[N]
         sj2_plus_2si2_minus_4vivj[i] = (v2[N] + (2v2[i])) - (4vi_dot_vj[i])
         ϕs_and_vs[i] = sj2_plus_2si2_minus_4vivj[i] - ϕi_plus_4ϕj[i]
         Xij_t_Ui = X[i]*ss16asteph_t[3(N-1+i)-2]
@@ -476,7 +481,7 @@ end
 
     r_p1d2 = Array{Taylor1{S}}(undef, N)
 
-    newtonianNb_Potential = zero_q_1
+    newtonianNb_Potential = Array{Taylor1{S}}(undef, N)
     newtonian1b_Potential = Array{Taylor1{S}}(undef, N)
     newtonianCoeff = Array{Taylor1{S}}(undef, N)
     newton_acc_X = Array{Taylor1{S}}(undef, N)
@@ -487,7 +492,7 @@ end
     vi_dot_vj = Array{Taylor1{S}}(undef, N)
     pn2 = Array{Taylor1{S}}(undef, N)
     pn3 = Array{Taylor1{S}}(undef, N)
-    _4ϕj = zero_q_1
+    _4ϕj = Array{Taylor1{S}}(undef, N)
     ϕi_plus_4ϕj = Array{Taylor1{S}}(undef, N)
     sj2_plus_2si2_minus_4vivj = Array{Taylor1{S}}(undef, N)
     ϕs_and_vs = Array{Taylor1{S}}(undef, N)
@@ -597,6 +602,11 @@ end
     dq[1] = q[4]
     dq[2] = q[5]
     dq[3] = q[6]
+
+    newtonianNb_Potential[N] = zero_q_1
+    # accX[N] = zero_q_1
+    # accY[N] = zero_q_1
+    # accZ[N] = zero_q_1
 
     #compute point-mass Newtonian accelerations, all bodies
     Threads.@threads for i in _1_to_Nm1
@@ -713,8 +723,8 @@ end
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
 
     for i in _1_to_Nm1
-        temp_004 = newtonianNb_Potential + newtonian1b_Potential[i]
-        newtonianNb_Potential = temp_004
+        temp_004 = newtonian1b_Potential[i] + newtonianNb_Potential[N]
+        newtonianNb_Potential[N] = temp_004
         if UJ_interaction[i]
             # # # add result to total acceleration on upon j-th body figure due to i-th point mass
             # # @show "acc",j,"+μ",i,"Λ2",j
@@ -739,9 +749,9 @@ end
     #post-Newtonian corrections to gravitational acceleration
     #Moyer, 1971, page 7 eq. 35
     # post-Newtonian iterative procedure setup and initialization
-    _4ϕj = 4newtonianNb_Potential
+    _4ϕj[N] = 4newtonianNb_Potential[N]
     Threads.@threads for i in _1_to_Nm1
-        ϕi_plus_4ϕj[i] = newtonianNb_Potential_t[i] + _4ϕj
+        ϕi_plus_4ϕj[i] = newtonianNb_Potential_t[i] + _4ϕj[N]
         sj2_plus_2si2_minus_4vivj[i] = (v2[N] + (2v2[i])) - (4vi_dot_vj[i])
         ϕs_and_vs[i] = sj2_plus_2si2_minus_4vivj[i] - ϕi_plus_4ϕj[i]
         Xij_t_Ui = X[i]*ss16asteph_t[3(N-1+i)-2]
