@@ -268,9 +268,9 @@ end
             F_J3_ξ[i] = ( Λ3j_div_r5[i]*(4P_3_sin_ϕ[i]) )
             #F_J3_η[i] = zero_q_1
             F_J3_ζ[i] = Λ3j_div_r5[i]*m_c_ϕ_∂P_3[i]
-            F_J_ξ[i] = F_J2_ξ[i] + F_J3_ξ[i]
+            F_J_ξ[i] = F_J2_ξ[i] #+ F_J3_ξ[i]
             #F_J_η[i] = zero_q_1
-            F_J_ζ[i] = F_J2_ζ[i] + F_J3_ζ[i]
+            F_J_ζ[i] = F_J2_ζ[i] #+ F_J3_ζ[i]
             #Compute unit vectors ξ,η,ζ
             ξx[i] = -X[i]/r_p1d2[i]
             ξy[i] = -Y[i]/r_p1d2[i]
@@ -655,9 +655,9 @@ end
             F_J3_ξ[i] = ( Λ3j_div_r5[i]*(4P_3_sin_ϕ[i]) )
             #F_J3_η[i] = zero_q_1
             F_J3_ζ[i] = Λ3j_div_r5[i]*m_c_ϕ_∂P_3[i]
-            F_J_ξ[i] = F_J2_ξ[i] + F_J3_ξ[i]
+            F_J_ξ[i] = F_J2_ξ[i] #+ F_J3_ξ[i]
             #F_J_η[i] = zero_q_1
-            F_J_ζ[i] = F_J2_ζ[i] + F_J3_ζ[i]
+            F_J_ζ[i] = F_J2_ζ[i] #+ F_J3_ζ[i]
             #Compute unit vectors ξ,η,ζ
             ξx[i] = -X[i]/r_p1d2[i]
             ξy[i] = -Y[i]/r_p1d2[i]
