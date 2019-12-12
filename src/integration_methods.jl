@@ -1,20 +1,16 @@
-function apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}}, dx::Vector{Taylor1{U}},
-        xaux::Vector{Taylor1{U}}, t0::T, t1::T, order::Int, abstol::T, params,
-        parse_eqs::Bool=true) where {T<:Real, U<:Number}
-
-    @assert t1 > t0
+function apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
+    dx::Vector{Taylor1{U}}, xaux::Vector{Taylor1{U}}, abstol::T, params,
+    parse_eqs::Bool=true) where {T<:Real, U<:Number}
 
     # Compute the Taylor coefficients
     TaylorIntegration.__jetcoeffs!(Val(parse_eqs), f!, t, x, dx, xaux, params)
 
     # Compute the step-size of the integration using `abstol`
     δt = TaylorIntegration.stepsize(x, abstol)
-    # Handle case: when Apophis time-step is larger than ephemeris time-step
-    ind = findlast(x->x≤t0, params[1].t)
-    Δt = params[1].t[ind+1] - t0
+    # Force Apophis time-step to be no larger than ephemeris time-step
+    ind = TaylorIntegration.getinterpindex(params[1], t[0])
+    Δt = abs(params[1].t[ind+1] - t[0])
     δt = min(δt, Δt)
-
-    δt = min(δt, t1-t0)
 
     return δt
 end
@@ -43,6 +39,7 @@ function apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T,
     x0 = deepcopy(q0)
     @inbounds tv[1] = t0
     @inbounds xv[:,1] .= q0
+    sign_tstep = copysign(1, tmax-t0)
 
     # Determine if specialized jetcoeffs! method exists
     parse_eqs = parse_eqs && (length(methods(TaylorIntegration.jetcoeffs!)) > 2)
@@ -57,8 +54,10 @@ function apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T,
 
     # Integration
     nsteps = 1
-    while t0 < tmax
-        δt = apophisstep!(f!, t, x, dx, xaux, t0, tmax, order, abstol, params, parse_eqs)
+    while sign_tstep*t0 < sign_tstep*tmax
+        δt = apophisstep!(f!, t, x, dx, xaux, abstol, params, parse_eqs) # δt is positive!
+        # Below, δt has the proper sign according to the direction of the integration
+        δt = sign_tstep * min(δt, sign_tstep*(tmax-t0))
         evaluate!(x, δt, x0) # new initial condition
         if dense
             xv_interp[:,nsteps] .= deepcopy(x)
@@ -87,6 +86,7 @@ function apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T,
     end
 end
 
+#TODO: allow backwards integration
 # root-finding integration method
 function apophisinteg(f!, g, q0::Array{U,1}, t0::T, tmax::T, order::Int,
         abstol::T, params = nothing; maxsteps::Int=500, parse_eqs::Bool=true,
