@@ -50,6 +50,18 @@ function RadarDataJPL(object::String,
         doppler, doppler_sigma, doppler_units, freq, rcvr, xmit, bouncepoint)
 end
 
+utcepoch(rdata::RadarDataJPL) = rdata.utcepoch
+delay(rdata::RadarDataJPL) = rdata.delay
+delay_sigma(rdata::RadarDataJPL) = rdata.delay_sigma
+delay_units(rdata::RadarDataJPL) = rdata.delay_units
+doppler(rdata::RadarDataJPL) = rdata.doppler
+doppler_sigma(rdata::RadarDataJPL) = rdata.doppler_sigma
+doppler_units(rdata::RadarDataJPL) = rdata.doppler_units
+freq(rdata::RadarDataJPL) = rdata.freq
+rcvr(rdata::RadarDataJPL) = rdata.rcvr
+xmit(rdata::RadarDataJPL) = rdata.xmit
+bouncepoint(rdata::RadarDataJPL) = rdata.bouncepoint
+
 #monostatic mode: check that each receiver and transmitter are the same
 ismonostatic(rdata::RadarDataJPL) = rdata.rcvr == rdata.xmit
 

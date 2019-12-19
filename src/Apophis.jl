@@ -7,7 +7,9 @@ export propagate, observer_position, apophisdofs,
     mas2rad, t2c_rotation_iau_00_06, process_radar_data_jpl, RadarDataJPL,
     julian2etsecs, etsecs2julian,
     RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!,
-    propagate_distributed, parallel_run
+    propagate_distributed, parallel_run,
+    utcepoch, delay, delay_sigma, delay_units, doppler, doppler_sigma,
+    doppler_units, freq, rcvr, xmit, bouncepoint
 
 using Distributed
 using TaylorIntegration
@@ -19,6 +21,7 @@ using PlanetaryEphemeris: daysec, su, ea, Λ2, Λ3, α_p_sun, δ_p_sun, moon_pol
     c_cm_per_sec, c_au_per_sec, yr
 using JLD
 using AstroTime, EarthOrientation, SOFA, SPICE
+using Dates
 
 # integration parameters
 const order = 30
@@ -47,7 +50,7 @@ const apophisdofs = union(3N-2:3N, 6N-2:6N)
 const ssdofs = setdiff(1:6N, apophisdofs)
 
 # standard value of nominal mean angular velocity of Earth (rad/day), ESAA 2014 Sec 7.4.3.3 p. 296
-const ω = daysec*7.292115e-5 #7.2921151467e-5
+const ω = daysec*7.2921151467e-5 #7.292115e-5
 # The relationship of the angular velocity of the earth Omega with LOD is (https://www.iers.org/IERS/EN/Science/EarthRotation/UT1LOD.html)
 # where `omega` is in units of rad/day, and `lod` is in units of milliseconds
 omega(lod) = (1e-12daysec)*(72921151.467064 - 0.843994809lod)
