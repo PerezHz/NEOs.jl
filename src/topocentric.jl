@@ -1,13 +1,22 @@
-function observer_position(station_code::Int, t_utc::DateTime, pm::Bool=true)
+# et: ephemeris time (TDB seconds since J2000.0 epoch)
+function observer_position(station_code::Int, et::Float64, pm::Bool=true)
     # λ_deg: East longitude (deg)
     # u: distance from spin axis (km), taken from Yeomans et al. (1992) u = r*cos(ϕ)
     # v: height above equatorial plane (km), taken from Yeomans et al. (1992) v = r*sin(ϕ)
     # East long data is consistent with MPC database (2019-Mar-7)
     # TODO: add more radar stations
     if station_code == 251 # Arecibo
-        λ_deg = 293.24692 #deg
-        u = 6056.525 #km #6056.497 #km
-        v = 1994.665 #km #1994.649 #km
+        # 293°14'50.3''E, 18°20'39.1''N, 450.56 m (HORIZONS-web)
+        # λ_deg = 293+14/60+50.3/3600 #deg
+        # ϕ_gd = 18+20/60+39.1/3600 #deg
+        # h = 450.56 # meters above MSL
+        # ϕ_gc, r = GeodetictoGeocentric(deg2rad(ϕ_gd), h)
+        # u = r*cos(ϕ_gc)/1000 #6056.525 #km #6056.497 #km
+        # v = r*sin(ϕ_gc)/1000 #1994.665 #km #1994.649 #km
+        # (HORIZONS-telnet)
+        λ_deg = 293.2473 #deg
+        u = +404849(1e-10au) #km; DXY (1e-10au)
+        v = +133339(1e-10au) #km; DZ (1e-10au)
     elseif station_code == 252 # Goldstone DSS 13 (Venus site), Fort Irwin
         λ_deg = 243.20512 #deg
         u = 5215.484 #km
@@ -31,8 +40,8 @@ function observer_position(station_code::Int, t_utc::DateTime, pm::Bool=true)
 
     pos_geo = [x_gc, y_gc, z_gc]/au #au
 
-    G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(t_utc, pos_geo, pm)
-    # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(t_utc, pos_geo, pm)
+    G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(et, pos_geo, pm)
+    # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(et, pos_geo, pm)
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
     return G_vec_ESAA, dG_vec_ESAA
@@ -48,8 +57,10 @@ mas2rad(x) = deg2rad(x/3.6e6) # mas/1000 -> arcsec; arcsec/3600 -> deg; deg2rad(
 # Some modifications were applied, using TaylorSeries.jl, in order to compute
 # the geocentric velocity of the observer, following the guidelines from
 # ESAA 2014, Sec 7.4.3.3 (page 295)
-function t2c_rotation_iau_00_06(t_utc::DateTime, pos_geo::Vector, pm::Bool=true)
+# et: ephemeris time (TDB seconds since J2000.0 epoch)
+function t2c_rotation_iau_00_06(et::Float64, pos_geo::Vector, pm::Bool=true)
     # UTC
+    t_utc = DateTime(et2utc(constant_term(et), "ISOC", 3))
     t0_utc = UTCEpoch(t_utc)
     t0_utc_jul = datetime2julian(t_utc)
 
@@ -117,16 +128,15 @@ end
 # Reproduction of Section 5.2 of SOFA Tools for Earth Attitude
 # "IAU 1976/1980/1982/1994, equinox based"
 # found at SOFA website, Mar 27, 2019
-# Some modifications were applied, using TaylorSeries.jl, in order to compute
-# the geocentric velocity of the observer, following the guidelines from
-# ESAA 2014, Sec 7.4.3.3 (page 295)
-function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector, pm::Bool=true)
-    # UTC
-    t0_utc = UTCEpoch(t_utc)
+# et: ephemeris time (TDB seconds since J2000.0 epoch)
+function t2c_rotation_iau_76_80(et::Float64, pos_geo::Vector, pm::Bool=true)
+    t_utc = DateTime(et2utc(constant_term(et), "ISOC", 3))
     # TT
-    t0_tt = TTEpoch(t0_utc)
+    # t0_tt = TTEpoch(t0_utc)
+    t0_tt = unitim(et, "ET", "TDT" )
     djmjd0 = julian(J2000_EPOCH).Δt # J2000.0 (TT) epoch (days)
-    tt = AstroTime.j2000(t0_tt).Δt
+    # tt = AstroTime.j2000(t0_tt).Δt
+    tt = t0_tt/daysec
     # IAU 1976 precession matrix, J2000.0 to date
     # https://github.com/sisl/SOFA.jl/blob/be9ddfd412c5ab77b291b17decfd369041ef365b/src/pmat76.jl#L14
     rp = iauPmat76(djmjd0, tt)
@@ -154,34 +164,24 @@ function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector, pm::Bool=true)
     # Equation of the equinoxes `ee = GAST - GMST`, including nutation correction
     ee = iauEqeq94(djmjd0, tt) + ddp80*cos(epsa)
     # UT1
-    # dut1 = EarthOrientation.getΔUT1(t0_utc_jul.Δt) # UT1-UTC (seconds)
-    t0_ut1 = UT1Epoch(t0_utc)
-    djmjd0_plus_date, tut = julian_twopart(t0_ut1)
+    dut1 = EarthOrientation.getΔUT1(t_utc) # UT1-UTC (seconds)
+    # jd1_utc, jd2_utc = julian_twopart(t0_utc)
+    jd1_utc, jd2_utc = julian_twopart(UTCEpoch(t_utc))
     # Greenwich apparent sidereal time (IAU 1982/1994)
-    gast = iauAnp( iauGmst82( djmjd0_plus_date.Δt, tut.Δt ) + ee ) #rad
-    # this trick allows us to compute the whole Celestial->Terrestrial matrix and its first derivative
+    gmst82 = iauGmst82( jd1_utc.Δt, jd2_utc.Δt+dut1/daysec ) #rad
+    gast = iauAnp( gmst82 + ee ) #rad
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
-    gastT1 = gast + ω*Taylor1(1) #rad/day
-    # gastT1 = gast + omega(EarthOrientation.getlod(t_utc))*Taylor1(1) #rad/day
-    # Rz(-GAST)
-    Rz_minus_gast_T1 = [cos(gastT1) -sin(gastT1) zero(gastT1);
-        sin(gastT1) cos(gastT1) zero(gastT1);
-        zero(gastT1) zero(gastT1) one(gastT1)]
-    # Rz_minus_gast_T1 = Rz(-gastT1)
-    Rz_minus_GAST = Rz_minus_gast_T1()
-    # dRz(-GAST)/dt
-    dRz_minus_gast_T1 = differentiate.(Rz_minus_gast_T1)
-    dRz_minus_GAST = dRz_minus_gast_T1()
-    # Rz_minus_GAST = [cos(gast) -sin(gast) 0.0;
-    #     sin(gast) cos(gast) 0.0;
-    #     0.0 0.0 1.0]
-    # dRz_minus_GAST = ω*[-sin(gast) -cos(gast) 0.0;
-    #     cos(gast) -sin(gast) 0.0;
-    #     0.0 0.0 0.0]
-
-    # # Form celestial-terrestrial matrix (no polar motion yet)
-    # rc2ti = deepcopy(C)
-    # rc2ti = iauRz(gast, rc2ti)
+    Rz_minus_GAST = [
+            cos(gast) -sin(gast) 0.0;
+            sin(gast) cos(gast) 0.0;
+            0.0 0.0 1.0
+        ]
+    β_dot = omega(EarthOrientation.getlod(t_utc))
+    dRz_minus_GAST = β_dot*[
+            -sin(gast) -cos(gast) 0.0;
+            cos(gast) -sin(gast) 0.0;
+            0.0 0.0 0.0
+        ]
 
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
     W = Array{Float64}(I, 3, 3)
@@ -193,9 +193,6 @@ function t2c_rotation_iau_76_80(t_utc::DateTime, pos_geo::Vector, pm::Bool=true)
         W = iauRx(-yp, W)
         W = iauRy(-xp, W)
     end
-
-    # # Form celestial-terrestrial matrix (including polar motion)
-    # rc2it = W*rc2ti
 
     W_inv = transpose(W)
     C_inv = transpose(C)
