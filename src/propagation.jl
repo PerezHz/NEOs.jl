@@ -41,10 +41,13 @@ function loadeph(ephfile)
 end
 
 function save2jldandcheck(objname, sol)
-    filename = string(objname, "_jt.", myid()-1, ".jld")
-    println("Saving solution to file: $filename")
-    #first, deal with `tv_jpl_integ`
-    jldopen(filename, "w") do file
+    outfilename = string(objname, "_jt.", myid()-1, ".jld")
+    return __save2jldandcheck(outfilename, sol)
+end
+
+function __save2jldandcheck(outfilename, sol)
+    println("Saving solution to file: $outfilename")
+    jldopen(outfilename, "w") do file
         #loop over solution variables
         for ind in eachindex(sol)
             varname = string(ind)
@@ -57,12 +60,12 @@ function save2jldandcheck(objname, sol)
     for ind in eachindex(sol)
         varname = string(ind)
         #read varname from files and assign recovered variable to recovered_sol_i
-        recovered_sol_i = load(filename, varname)
+        recovered_sol_i = load(outfilename, varname)
         #check that varname was recovered succesfully
         @show recovered_sol_i == sol[ind]
     end
     println("Saved solution")
-    return nothing
+    return outfilename
 end
 
 function taylor_minimum(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
@@ -122,31 +125,13 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
 
     @show tmax = t0+tspan*yr #final time of integration
 
-    # do integration
+    # propagate orbit
     if dense
-        if output && radarobsfile != ""
-            asteroid_data = process_radar_data_jpl(radarobsfile)
-            # TODO: check that first and last observation times are within interpolation interval
-            @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense)
-            function apophis_et(et)
-                return interp( etsecs2julian(et) )[1:6]
-            end
-            function earth_et(et)
-                return ss16asteph( etsecs2julian(et) )[union(3*4-2:3*4,3*(27+4)-2:3*(27+4))]
-            end
-            function sun_et(et)
-                return ss16asteph( etsecs2julian(et) )[union(3*1-2:3*1,3*(27+1)-2:3*(27+1))]
-            end
-            #compute time-delay and Doppler-shift "ephemeris" (i.e., predicted values according to ephemeris)
-            vdel, vdop = delay_doppler(asteroid_data; xve=earth_et, xvs=sun_et, xva=apophis_et)
-            # `least_squares_A2` only works with Taylor1{Taylor1} (i.e., 1 variable) jet transport
-            # A2, Γ_A2 = least_squares_A2(asteroid_data, vdel, vdop)
-            # sol = (t=interp.t[:], x=interp.x[:,:], vdel=vdel, vdop=vdop, A2=A2, Γ_A2=Γ_A2)
-            sol = (t=interp.t[:], x=interp.x[:,:], vdel=vdel, vdop=vdop)
-        else
-            @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense)
-            sol = (t=interp.t[:], x=interp.x[:,:])
-        end
+        @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense)
+        sol = (
+            t=interp.t[:],
+            x=interp.x[:,:]
+        )
     else
         @time sol_objs = apophisinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter)
         sol = (
@@ -158,9 +143,36 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         )
     end
 
-    #write solution to .jld files
+    #write solution and predicted values of observations (if requested) to .jld files
     if output
-        save2jldandcheck(objname, sol)
+        outfilename = save2jldandcheck(objname, sol)
+        if dense
+            # if requested by user, calculate computed (i.e., predicted) values of observations
+            compute_radar_obs(outfilename, radarobsfile, interp, ss16asteph)
+        end
+    end
+
+    return nothing
+end
+
+function compute_radar_obs(outfilename, radarobsfile, apophis_interp, ss16asteph)
+    if radarobsfile != ""
+        asteroid_data = process_radar_data_jpl(radarobsfile)
+        # TODO: check that first and last observation times are within interpolation interval
+        function apophis_et(et)
+            return apophis_interp( etsecs2julian(et) )[1:6]
+        end
+        function earth_et(et)
+            return ss16asteph( etsecs2julian(et) )[union(3*4-2:3*4,3*(N-1+4)-2:3*(N-1+4))]
+        end
+        function sun_et(et)
+            return ss16asteph( etsecs2julian(et) )[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))]
+        end
+        #compute time-delay and Doppler-shift "ephemeris" (i.e., predicted values according to ephemeris)
+        vdel, vdop = delay_doppler(asteroid_data; xve=earth_et, xvs=sun_et, xva=apophis_et)
+        sol = (vdel=vdel, vdop=vdop)
+        #save data to file
+        __save2jldandcheck(outfilename, sol)
     end
     return nothing
 end
