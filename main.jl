@@ -4,15 +4,16 @@
 #julia --project=@. main.jl
 using Apophis
 using Dates
-using TaylorSeries
-
+using TaylorIntegration
+using JLD
+using SPICE: furnsh
 @show Threads.nthreads()
 
 #script parameters (TODO: use ArgParse.jl instead)
 const varorder = 5 # varorder is the order corresponding to the jet transport perturbation
 const objname = "Apophis"
 const maxsteps = 10000
-const nyears = -5.0
+const nyears = -5.0 #5.0 #24.0
 const dense = true #false
 const apophisjlpath = dirname(pathof(Apophis))
 # const radarobsfile = joinpath(apophisjlpath, "../Apophis_JPL_data_2012_2013.dat")
@@ -26,6 +27,7 @@ const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integrat
 # ast_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_24yr_tx.jld")
 # ast_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_5yr_tx.jld")
 ast_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_minus5yr_tx_BACKWARDS.jld")
+
 
 # dq: perturbation to nominal initial condition (Taylor1 jet transport)
 dq = Taylor1.(zeros(7), varorder)
@@ -60,3 +62,13 @@ println("*** Finished warmup")
 #Full jet transport integration until ~2038: about 8,000 steps
 propagate(objname, dynamics, maxsteps, t0, nyears, ast_eph_file, dense=dense, dq=dq, radarobsfile=radarobsfile)
 println("*** Finished full jet transport integration")
+
+# calculate computed values of time-delays and Doppler shifts
+ss16asteph, acc_eph, newtonianNb_Potential = Apophis.loadeph(ast_eph_file)
+astfname = "Apophis_jt.0.jld"
+t = load(astfname, "t")
+x = load(astfname, "x")
+tx = TaylorInterpolant(t, x)
+furnsh( joinpath(apophisjlpath, "../jpleph", "naif0012.tls") ) # load leapseconds kernel
+furnsh( joinpath(apophisjlpath, "../jpleph", "de431t.bsp") ) # at least one SPK file must be loaded to read .tls file
+Apophis.compute_radar_obs("deldop.jld", radarobsfile, tx, ss16asteph)
