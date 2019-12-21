@@ -50,7 +50,7 @@ const apophisdofs = union(3N-2:3N, 6N-2:6N)
 const ssdofs = setdiff(1:6N, apophisdofs)
 
 # standard value of nominal mean angular velocity of Earth (rad/day), ESAA 2014 Sec 7.4.3.3 p. 296
-const ω = daysec*7.2921151467e-5 #7.292115e-5
+const ω = daysec*7.292115e-5 #7.2921151467e-5
 # The relationship of the angular velocity of the earth Omega with LOD is (https://www.iers.org/IERS/EN/Science/EarthRotation/UT1LOD.html)
 # where `omega` is in units of rad/day, and `lod` is in units of milliseconds
 omega(lod) = (1e-12daysec)*(72921151.467064 - 0.843994809lod)

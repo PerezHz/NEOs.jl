@@ -4,7 +4,9 @@ const jplephpath = joinpath(dirname(pathof(Apophis)), "../jpleph")
 # read JPL ephemerides (Apophis, Solar System, TT-TDB)
 function loadjpleph()
     # unload("a99942_s199.bsp")
-    furnsh.( joinpath.(jplephpath, ["a99942_s197.bsp", "de431t.bsp", "naif0012.tls"]) )
+    # unload("a99942_s197.bsp")
+    # furnsh.( joinpath.(jplephpath, ["a99942_s199.bsp", "de431t.bsp", "naif0012.tls"]) )
+    furnsh.( joinpath.(jplephpath, ["a99942_s197.bsp", "a99942_s199.bsp", "de431t.bsp", "naif0012.tls"]) )
 end
 
 # this is an auxiliary function which converts a [x,y,z,vx,vy,vz] "state" vector from km,km/sec units to au,au/day
@@ -33,11 +35,12 @@ end
 # argument `et` represents "ephemeris seconds" (TDB seconds) since J2000.0 TDB epoch
 # position and velocity are assumed to be returned in km, km/sec, resp., by spkgeo
 # https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/spkgeo_c.html (see: Detailed ouput section)
-apophis_pv(et) = kmsec2auday( getpv(2099942, 0, et) ) # units: au, au/day
+apophis_pv_197(et) = kmsec2auday( getpv(9904406, 0, et) ) # units: au, au/day
+apophis_pv_199(et) = kmsec2auday( getpv(2099942, 0, et) ) # units: au, au/day
 sun_pv(et) = kmsec2auday( getpv(10, 0, et) ) # units: au, au/day
 earth_pv(et) = kmsec2auday( getpv(399, 0, et) ) # units: au, au/day
 moon_pv(et) = kmsec2auday( getpv(301, 0, et) ) # units: au, au/day
-tt_m_tdb(et) = getpv(1000000001, 1000000000, et) # units: seconds
+tt_tdb(et) = getpv(1000000001, 1000000000, et)[1] # units: seconds
 
 # Convert julian days to ephemeris seconds since J2000
 function julian2etsecs(jd)
@@ -156,6 +159,19 @@ function tropo_delay(r_antenna::Vector{T}, ρ_vec_ae::Vector{S}) where {T<:Numbe
     return tropo_delay(zd) # seconds
 end
 
+# auxiliary function to compute (TDB-UTC); useful to convert TDB to UTC via UTC + (TDB-UTC) and viceversa
+function tdb_utc(et::Real)
+    tt_tdb_et = tt_tdb(et)
+    tt_tai = 32.184
+    utc_secs = et - deltet(et, "ET") # used only to determine ΔAT; no high-precision needed
+    jd_utc = J2000 + utc_secs/daysec
+    dt_utc = julian2datetime(jd_utc)
+    fd_utc = (jd_utc+0.5) - floor(jd_utc+0.5)
+    # @show jd_utc_r, dt_utc_r, fd_utc_r
+    j, tai_utc = iauDat(year(dt_utc), month(dt_utc), day(dt_utc), fd_utc)
+    return - tt_tdb_et + (tt_tai + tai_utc) # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
+end
+
 # Alternate version of delay_doppler, using JPL ephemerides
 # station_code: observing station identifier (MPC nomenclature)
 # t_r_utc_julian: time of echo reception (UTC)
@@ -164,12 +180,12 @@ end
 # xvs: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in au and velocity in au/day
 # xva: Apophis ephemeris wich takes et seconds since J2000 as input and returns Apophis barycentric position in au and velocity in au/day
 function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
-        niter::Int=10, pm::Bool=true; xve::Function=earth_pv, xvs::Function=sun_pv,
-        xva::Function=apophis_pv)
+        niter::Int=10; pm::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv,
+        xva::Function=apophis_pv_197)
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = str2et(string(t_r_utc))
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, V_r = observer_position(station_code, et_r_secs, pm)
+    R_r, V_r = observer_position(station_code, et_r_secs, pm=pm)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]
@@ -199,6 +215,8 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
 
     Δτ_D = zero(τ_D)
     Δτ_rel_D = zero(τ_D)
+    # Δτ_corona_D = zero(τ_D)
+    Δτ_tropo_D = zero(τ_D)
 
     for i in 1:niter
         # Eq. (3) Yeomans et al. (1992)
@@ -229,7 +247,10 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         q_D = sqrt(q_D_vec[1]^2 + q_D_vec[2]^2 + q_D_vec[3]^2) #signal path distance (down-leg)
         # Shapiro correction to time-delay
         Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)
-        Δτ_D = Δτ_rel_D # seconds
+        # troposphere correction to time-delay
+        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r) # seconds
+        # Δτ_corona_D = corona_delay(constant_term.(r_a_t_b), r_r_t_r, r_s_t_r, F_tx, station_code) # seconds
+        Δτ_D = Δτ_rel_D + Δτ_tropo_D #+ Δτ_corona_D # seconds
     end
     τ_D = τ_D + Δτ_D
     # get latest estimates of ρ_vec_r and ρ_r
@@ -244,7 +265,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
     et_t_secs = et_r_secs - (τ_U+τ_D)
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = observer_position(station_code, constant_term(et_t_secs), pm)
+    R_t, V_t = observer_position(station_code, constant_term(et_t_secs), pm=pm)
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
     v_e_t_t = rv_e_t_t[4:6]
@@ -258,6 +279,8 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
 
     Δτ_U = zero(τ_U)
     Δτ_rel_U = zero(τ_U)
+    # Δτ_corona_U = zero(τ_U)
+    Δτ_tropo_U = zero(τ_U)
 
     for i in 1:niter
         # Eq. (8) Yeomans et al. (1992)
@@ -265,7 +288,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         # transmit time, new estimate
         et_t_secs = et_r_secs-(τ_U+τ_D)
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-        R_t, V_t = observer_position(station_code, constant_term(et_t_secs), pm)
+        R_t, V_t = observer_position(station_code, constant_term(et_t_secs), pm=pm)
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]
@@ -295,16 +318,18 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         dq_U_vec = constant_term.(v_a_t_b - v_e_t_t)
         q_U = sqrt(q_U_vec[1]^2 + q_U_vec[2]^2 + q_U_vec[3]^2) # signal path (up-leg)
         Δτ_rel_U = shapiro_delay(e_U, p_U, q_U) # seconds
-        Δτ_U = Δτ_rel_U
+        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # seconds
+        # Δτ_corona_U = corona_delay(constant_term.(r_t_t_t), constant_term.(r_a_t_b), constant_term.(r_s_t_b), F_tx, station_code) # seconds
+        Δτ_U = Δτ_rel_U + Δτ_tropo_U #+ Δτ_corona_U # seconds
     end
     # Sun barycentric position (in au) at transmit time (TDB)
     r_s_t_t = xvs(et_t_secs)[1:3]
     τ_U = τ_U + Δτ_U
 
     # compute TDB-UTC at transmit time
-    tdb_utc_t = deltet(constant_term(et_t_secs), "ET")
+    tdb_utc_t = tdb_utc(constant_term(et_t_secs)) #deltet(constant_term(et_t_secs), "ET")
     # compute TDB-UTC at receive time
-    tdb_utc_r = deltet(et_r_secs, "ET")
+    tdb_utc_r = tdb_utc(et_r_secs) #deltet(et_r_secs, "ET")
 
     # compute total time delay (UTC seconds)
     # Eq. (9) Yeomans et al. (1992)
@@ -318,7 +343,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     ρ_dot_t = dot(ρ_vec_t, ρ_vec_dot_t)/ρ_t
     ρ_dot_r = dot(ρ_vec_r, ρ_vec_dot_r)/ρ_r
     # Eq. (12) Yeomans et al. (1992)
-    doppler_c = -F_tx*(ρ_dot_t+ρ_dot_r)/c_au_per_day
+    doppler_c = (ρ_dot_t+ρ_dot_r)/c_au_per_day
     p_t = dot(ρ_vec_t, v_t_t_t)/ρ_t
     p_r = dot(ρ_vec_r, v_r_t_r)/ρ_r
     doppler_c2_t1 = ρ_dot_t*p_t - ρ_dot_r*p_r - ρ_dot_t*ρ_dot_r # order c^-2, 1st term
@@ -328,25 +353,25 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     r_rs = sqrt(r_rs_vec[1]^2+r_rs_vec[2]^2+r_rs_vec[3]^2)
     doppler_c2_t2 = μ[1]*( (1/r_ts) - (1/r_rs) ) # order c^-2, 2nd term
     doppler_c2_t3 = (  dot(v_t_t_t, v_t_t_t) - dot(v_r_t_r, v_r_t_r)  )/2  # order c^-2, 3rd term
-    doppler_c2 = -F_tx*(doppler_c2_t1 + doppler_c2_t2 + doppler_c2_t3)/(c_au_per_day^2)
-    ν = (doppler_c + doppler_c2)
+    doppler_c2 = (doppler_c2_t1 + doppler_c2_t2 + doppler_c2_t3)/(c_au_per_day^2)
+    ν = -F_tx*(doppler_c + doppler_c2)
 
     return 1e6τ, 1e6ν # total signal delay (μs) and Doppler shift (Hz)
 end
 
 function delay_doppler(astradarfile::String,
-        niter::Int=10, pm::Bool=true; xve::Function=earth_pv,
-        xvs::Function=sun_pv, xva::Function=apophis_pv) where {T<:Number}
+        niter::Int=10; pm::Bool=true, xve::Function=earth_pv,
+        xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T<:Number}
 
     astradardata = process_radar_data_jpl(astradarfile)
 
-    vdel, vdop = delay_doppler(astradardata, niter, pm; xve=xve, xvs=xvs, xva=xva)
+    vdel, vdop = delay_doppler(astradardata, niter, pm=pm; xve=xve, xvs=xvs, xva=xva)
     return vdel, vdop
 end
 
 function delay_doppler(astradardata::Vector{RadarDataJPL{T}},
-        niter::Int=10, pm::Bool=true; xve::Function=earth_pv,
-        xvs::Function=sun_pv, xva::Function=apophis_pv) where {T<:Number}
+        niter::Int=10; pm::Bool=true, xve::Function=earth_pv,
+        xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T<:Number}
 
     et1 = str2et(string(astradardata[1].utcepoch))
     a1_et1 = xva(et1)[1]
@@ -361,6 +386,7 @@ function delay_doppler(astradardata::Vector{RadarDataJPL{T}},
             astradardata[i].utcepoch,
             astradardata[i].freq,
             niter,
+            pm = pm,
             xve = xve,
             xvs = xvs,
             xva = xva
