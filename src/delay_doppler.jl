@@ -3,9 +3,6 @@ const jplephpath = joinpath(dirname(pathof(Apophis)), "../jpleph")
 
 # read JPL ephemerides (Apophis, Solar System, TT-TDB)
 function loadjpleph()
-    # unload("a99942_s199.bsp")
-    # unload("a99942_s197.bsp")
-    # furnsh.( joinpath.(jplephpath, ["a99942_s199.bsp", "de431t.bsp", "naif0012.tls"]) )
     furnsh.( joinpath.(jplephpath, ["a99942_s197.bsp", "a99942_s199.bsp", "de431t.bsp", "naif0012.tls"]) )
 end
 
@@ -66,10 +63,6 @@ function shapiro_doppler(e, de, p, dp, q, dq, F_tx)
 end
 
 # Density of ionized electrons in interplanetary medium (ESAA 2014, p. 323, Sec. 8.7.5, Eq. 8.22)
-# ESAA 2014 text probably has an error: Maybe it should say that transmitter frequency is in MHz instead of Hz
-# But it doesn't specify output units of correction to time delay either
-# Currently there is no errata reported about this (Apr 3, 2019)
-# Errata URL: (https://aa.usno.navy.mil/publications/docs/exp_supp_errata.pdf)
 # ESAA 2014 in turn refers to Muhleman and Anderson (1981)
 # Ostro (1993) gives a reference to Anderson (1978), where this model is fitted to Mariner 9 ranging data
 # Reading https://gssc.esa.int/navipedia/index.php/Ionospheric_Delay
@@ -78,7 +71,7 @@ end
 # Ne: ionized electrons density: electrons/cm^3
 # p1: signal departure point (transmitter/bounce) (au)
 # p2: signal arrival point (bounce/receiver) (au)
-# r_s_t0, v_s_t0: Barycentric position (au) and velocity (au/day) of Sun at initial time of propagation of signal path (bounce time for downlink; transmit time for uplink)
+# r_s_t0: Barycentric position (au) of Sun at initial time of propagation of signal path (bounce time for down-leg; transmit time for up-leg)
 # ds: current distance travelled by ray from emission point (au)
 # ΔS: total distance between p1 and p2 (au)
 function Ne(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}, ds::U, ΔS::Real) where {S<:Number, U<:Number}
@@ -105,9 +98,8 @@ end
 # TODO: @taylorize!
 # p1: signal departure point (transmitter/bounce) (au)
 # p2: signal arrival point (bounce/receiver) (au)
-# t_tdb_jd1, t_tdb_jd2: Two-part Julian date (TDB) of signal path (bounce time for downlink; transmit time for uplink)
-# current_delay: total time-delay for current signal path (TDB days)
-# output has units of electrons/cm^2
+# r_s_t0: Barycentric position (au) of Sun at initial time of propagation of signal path (bounce time for down-leg; transmit time for up-leg)
+# output is in units of electrons/cm^2
 function Ne_path_integral(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}) where {S<:Number}
     ΔS = (100_000au)*norm(p2-p1) # total distance between p1 and p2, in centimeters
     # kernel of path integral; distance parameter `s` and total distance `ΔS` is in cm
@@ -129,6 +121,7 @@ end
 # t_tdb_jd1, t_tdb_jd2: Two-part Julian date (TDB) of signal path (bounce time for downlink; transmit time for uplink)
 # F_tx: transmitter frequency (MHz)
 # From https://gssc.esa.int/navipedia/index.php/Ionospheric_Delay it seems that
+# ESAA 2014 text probably should say that in the formula for Δτ_corona,
 # the expression 40.3*Ne/f^2 is adimensional, where Ne [electrons/centimeters^3] and f is in Hz
 # therefore, the integral (40.3/f^2)*∫Ne*ds is in centimeters, where ds is in centimeters
 # and the expression (40.3/(c*f^2))*∫Ne*ds, with c in centimeters/second, is in seconds
@@ -172,13 +165,16 @@ function tdb_utc(et::Real)
     return - tt_tdb_et + (tt_tai + tai_utc) # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
 end
 
-# Alternate version of delay_doppler, using JPL ephemerides
+# Compute round-trip time and Doppler shift radar astrometry for an asteroid at
+# UTC instant `t_r_utc` from tracking station with code `station_code` from Earth,
+# Sun and asteroid ephemerides
 # station_code: observing station identifier (MPC nomenclature)
 # t_r_utc_julian: time of echo reception (UTC)
 # F_tx: transmitter frequency (MHz)
+# niter: number of light-time solution iterations
 # xve: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in au and velocity in au/day
 # xvs: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in au and velocity in au/day
-# xva: Apophis ephemeris wich takes et seconds since J2000 as input and returns Apophis barycentric position in au and velocity in au/day
+# xva: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in au and velocity in au/day
 function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         niter::Int=10; pm::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv,
         xva::Function=apophis_pv_197)
@@ -400,10 +396,6 @@ function delay_doppler(astradardata::Vector{RadarDataJPL{T}},
 end
 
 function delay_doppler(sseph_file::String, asteph_file::String, asteroid_data_file::String)
-    # sseph_file = "ss16ast343_eph_24yr_tx.jld"
-    # asteph_file = "Apophis_vT1_o10_24yr_noJ2S_jt.jld"
-    # apophis_radar_data_2005_2013 = process_radar_data_jpl("../Apophis_JPL_data.dat")
-
     #Load time (t) and state (x) arrays, to construct a TaylorInterpolant object
     ss16ast_eph_t = load(joinpath(Apophis.jplephpath, sseph_file), "ss16ast_eph_t")
     ss16ast_eph_x = load(joinpath(Apophis.jplephpath, sseph_file), "ss16ast_eph_x")
