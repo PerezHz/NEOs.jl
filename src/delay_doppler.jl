@@ -185,7 +185,7 @@ end
 # xve: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in au and velocity in au/day
 # xvs: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in au and velocity in au/day
 # xva: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in au and velocity in au/day
-function delay_doppler(station_code::Int, et_r_secs::Float64, F_tx::Real,
+function delay_doppler(station_code::Int, et_r_secs::Real, F_tx::Real,
         niter::Int=10; pm::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv,
         xva::Function=apophis_pv_197)
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
@@ -385,7 +385,7 @@ function delay_doppler2(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     τe, νe = delay_doppler(station_code, et_r_secs+tc, F_tx, niter; pm=pm, xve=xve, xvs=xvs, xva=xva)
     τn, νn = delay_doppler(station_code, et_r_secs, F_tx, niter; pm=pm, xve=xve, xvs=xvs, xva=xva)
     τs, νs = delay_doppler(station_code, et_r_secs-tc, F_tx, niter; pm=pm, xve=xve, xvs=xvs, xva=xva)
-    return τn, -F_tx*((τe-τs)/(2tc))
+    return τn, -(F_tx/(2tc))*(τe-τs)
 end
 
 function delay_doppler(astradarfile::String,
@@ -394,7 +394,7 @@ function delay_doppler(astradarfile::String,
 
     astradardata = process_radar_data_jpl(astradarfile)
 
-    vdel, vdop = delay_doppler(astradardata, niter, pm=pm; xve=xve, xvs=xvs, xva=xva)
+    vdel, vdop = delay_doppler(astradardata, niter, pm=pm, tc=tc, xve=xve, xvs=xvs, xva=xva)
     return vdel, vdop
 end
 
