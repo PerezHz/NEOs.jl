@@ -365,7 +365,7 @@ end
         pNY_t_pn3[i] = acceph_t[3i-1]*pn3[i]
         pNZ_t_pn3[i] = acceph_t[3i  ]*pn3[i]
     end #for i
-    for i in 1:10
+    for i in _1_to_Nm1
         termpnx = ( X_t_pn1[i] + (U_t_pn2[i]+pNX_t_pn3[i]) )
         sumpnx = pntempX + termpnx
         pntempX = sumpnx
@@ -373,17 +373,6 @@ end
         sumpny = pntempY + termpny
         pntempY = sumpny
         termpnz = ( Z_t_pn1[i] + (W_t_pn2[i]+pNZ_t_pn3[i]) )
-        sumpnz = pntempZ + termpnz
-        pntempZ = sumpnz
-    end
-    for i in 12:N-1
-        termpnx = newton_acc_X[i]*c_p2
-        sumpnx = pntempX + termpnx
-        pntempX = sumpnx
-        termpny = newton_acc_Y[i]*c_p2
-        sumpny = pntempY + termpny
-        pntempY = sumpny
-        termpnz = newton_acc_Z[i]*c_p2
         sumpnz = pntempZ + termpnz
         pntempZ = sumpnz
     end
@@ -763,7 +752,7 @@ end
         pNY_t_pn3[i] = acceph_t[3i-1]*pn3[i]
         pNZ_t_pn3[i] = acceph_t[3i  ]*pn3[i]
     end #for i
-    for i in 1:10
+    for i in _1_to_Nm1
         termpnx = ( X_t_pn1[i] + (U_t_pn2[i]+pNX_t_pn3[i]) )
         sumpnx = pntempX + termpnx
         pntempX = sumpnx
@@ -771,17 +760,6 @@ end
         sumpny = pntempY + termpny
         pntempY = sumpny
         termpnz = ( Z_t_pn1[i] + (W_t_pn2[i]+pNZ_t_pn3[i]) )
-        sumpnz = pntempZ + termpnz
-        pntempZ = sumpnz
-    end
-    for i in 12:N-1
-        termpnx = newton_acc_X[i]*c_p2
-        sumpnx = pntempX + termpnx
-        pntempX = sumpnx
-        termpny = newton_acc_Y[i]*c_p2
-        sumpny = pntempY + termpny
-        pntempY = sumpny
-        termpnz = newton_acc_Z[i]*c_p2
         sumpnz = pntempZ + termpnz
         pntempZ = sumpnz
     end
