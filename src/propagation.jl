@@ -155,7 +155,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
     return nothing
 end
 
-function compute_radar_obs(outfilename, radarobsfile, apophis_interp, ss16asteph)
+function compute_radar_obs(outfilename::String, radarobsfile::String, apophis_interp, ss16asteph; tc::Real=3.0)
     if radarobsfile != ""
         asteroid_data = process_radar_data_jpl(radarobsfile)
         # TODO: check that first and last observation times are within interpolation interval
@@ -169,7 +169,7 @@ function compute_radar_obs(outfilename, radarobsfile, apophis_interp, ss16asteph
             return ss16asteph( etsecs2julian(et) )[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))]
         end
         #compute time-delay and Doppler-shift "ephemeris" (i.e., predicted values according to ephemeris)
-        vdel, vdop = delay_doppler(asteroid_data; xve=earth_et, xvs=sun_et, xva=apophis_et)
+        vdel, vdop = delay_doppler(asteroid_data, tc=tc, xve=earth_et, xvs=sun_et, xva=apophis_et)
         sol = (vdel=vdel, vdop=vdop)
         #save data to file
         __save2jldandcheck(outfilename, sol)
