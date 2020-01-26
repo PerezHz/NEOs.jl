@@ -74,6 +74,12 @@ git-tree-sha1 = "f641eb0a4f00c343bbc32346e1217b86f3ce9dad"
 uuid = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
 version = "0.5.1"
 
+[[ChainRulesCore]]
+deps = ["MuladdMacro"]
+git-tree-sha1 = "eb54d7349210f37c142e58d67668951efc1e5cdc"
+uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+version = "0.6.1"
+
 [[CodeTracking]]
 deps = ["InteractiveUtils", "UUIDs"]
 git-tree-sha1 = "0becdab7e6fbbcb7b88d8de5b72e5bb2f28239f3"
@@ -99,9 +105,9 @@ version = "1.1.0"
 
 [[DataStructures]]
 deps = ["InteractiveUtils", "OrderedCollections"]
-git-tree-sha1 = "f784254f428fb8fd7ac15982e5862a38a44523d3"
+git-tree-sha1 = "b7720de347734f4716d1815b00ce5664ed6bbfd4"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-version = "0.17.7"
+version = "0.17.9"
 
 [[Dates]]
 deps = ["Printf"]
@@ -112,10 +118,10 @@ deps = ["Mmap"]
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
 [[DiffEqBase]]
-deps = ["ArrayInterface", "Compat", "DataStructures", "DiffEqDiffTools", "Distributed", "DocStringExtensions", "FunctionWrappers", "IterativeSolvers", "IteratorInterfaceExtensions", "LinearAlgebra", "MuladdMacro", "Parameters", "Printf", "RecipesBase", "RecursiveArrayTools", "RecursiveFactorization", "Requires", "Roots", "SparseArrays", "StaticArrays", "Statistics", "SuiteSparse", "TableTraits", "TreeViews", "ZygoteRules"]
-git-tree-sha1 = "c2a3d3b1f44240feee1e5052d77afc7ac4d5b953"
+deps = ["ArrayInterface", "ChainRulesCore", "Compat", "DataStructures", "Distributed", "DocStringExtensions", "FunctionWrappers", "IterativeSolvers", "IteratorInterfaceExtensions", "LinearAlgebra", "MuladdMacro", "Parameters", "Printf", "RecipesBase", "RecursiveArrayTools", "RecursiveFactorization", "Requires", "Roots", "SparseArrays", "StaticArrays", "Statistics", "SuiteSparse", "TableTraits", "TreeViews", "ZygoteRules"]
+git-tree-sha1 = "3ef848bc1b8b09ce3cc14b53ddd0b4abec0407ae"
 uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
-version = "6.10.0"
+version = "6.13.1"
 
 [[DiffEqDiffTools]]
 deps = ["ArrayInterface", "LinearAlgebra", "Requires", "SparseArrays", "StaticArrays"]
@@ -189,11 +195,17 @@ git-tree-sha1 = "de38b0253ade98340fabaf220f368f6144541938"
 uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
 version = "0.7.4"
 
+[[FiniteDiff]]
+deps = ["ArrayInterface", "LinearAlgebra", "Requires", "SparseArrays", "StaticArrays"]
+git-tree-sha1 = "9780052a73314dba08bc427edb9e7a5e8895d447"
+uuid = "6a86dc24-6348-571c-b903-95158fe2bd41"
+version = "2.0.1"
+
 [[ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "NaNMath", "Random", "SpecialFunctions", "StaticArrays"]
-git-tree-sha1 = "840700059391d36e2498d89c2e82c08f261f2a2a"
+git-tree-sha1 = "88b082d492be6b63f967b6c96b352e25ced1a34c"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
-version = "0.10.8"
+version = "0.10.9"
 
 [[FunctionWrappers]]
 deps = ["Compat"]
@@ -250,9 +262,9 @@ version = "0.9.1+"
 
 [[JuliaInterpreter]]
 deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
-git-tree-sha1 = "060067ba4ed17e730c12051e4bb32856f7a5ae3a"
+git-tree-sha1 = "a4f675340a109713f74c47a2b499df06f800c8d0"
 uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
-version = "0.7.7"
+version = "0.7.8"
 
 [[LeapSeconds]]
 deps = ["Dates", "Test"]
@@ -323,16 +335,15 @@ version = "0.4.3"
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
 [[MuladdMacro]]
-deps = ["MacroTools", "Test"]
-git-tree-sha1 = "41e6e7c4b448afeaddaac7f496b414854f83b848"
+git-tree-sha1 = "c6190f9a7fc5d9d5915ab29f2134421b12d24a68"
 uuid = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
-version = "0.2.1"
+version = "0.2.2"
 
 [[NLSolversBase]]
-deps = ["Calculus", "DiffEqDiffTools", "DiffResults", "Distributed", "ForwardDiff"]
-git-tree-sha1 = "f1b8ed89fa332f410cfc7c937682eb4d0b361521"
+deps = ["DiffResults", "Distributed", "FiniteDiff", "ForwardDiff"]
+git-tree-sha1 = "b13b1f97ce88a37dd55ce7ae7e75b81002bf2b9d"
 uuid = "d41bc354-129a-5804-8e4c-c37616107c6c"
-version = "7.5.0"
+version = "7.6.0"
 
 [[NaNMath]]
 git-tree-sha1 = "928b8ca9b2791081dc71a51c55347c27c618760f"
@@ -341,9 +352,9 @@ version = "0.3.3"
 
 [[OpenBLAS_jll]]
 deps = ["Libdl", "Pkg"]
-git-tree-sha1 = "27f7e3187464eef76b4b7784b79fe10cb302c75c"
+git-tree-sha1 = "3a6e5767e8ae022871c19162cc3ecd80748bd3dc"
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.7+3"
+version = "0.3.7+4"
 
 [[Optim]]
 deps = ["Calculus", "DiffEqDiffTools", "FillArrays", "ForwardDiff", "LineSearches", "LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "PositiveFactorizations", "Printf", "Random", "SparseArrays", "StatsBase"]
@@ -358,10 +369,9 @@ uuid = "87e2bd06-a317-5318-96d9-3ecbac512eee"
 version = "2.0.0"
 
 [[OptionalData]]
-deps = ["Test"]
-git-tree-sha1 = "4359fca64d21e25a6489d23dc16629dc83d47bde"
+git-tree-sha1 = "9cb155139e565416af876b88fb5d57391410a3c0"
 uuid = "fbd9d27c-2d1c-5c1c-99f2-7497d746985d"
-version = "0.2.1"
+version = "0.3.0"
 
 [[OrderedCollections]]
 deps = ["Random", "Serialization", "Test"]
@@ -371,9 +381,9 @@ version = "1.1.0"
 
 [[PDMats]]
 deps = ["Arpack", "LinearAlgebra", "SparseArrays", "SuiteSparse", "Test"]
-git-tree-sha1 = "035f8d60ba2a22cb1d2580b1e0e5ce0cb05e4563"
+git-tree-sha1 = "5f303510529486bb02ac4d70da8295da38302194"
 uuid = "90014a1f-27ba-587c-ab20-58faa44d9150"
-version = "0.9.10"
+version = "0.9.11"
 
 [[Parameters]]
 deps = ["OrderedCollections"]
@@ -386,8 +396,8 @@ deps = ["Dates", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "R
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PlanetaryEphemeris]]
-deps = ["Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "TaylorIntegration", "TaylorSeries", "Test"]
-git-tree-sha1 = "3832fee152a419e4b6cad691f9612885d8dba5fe"
+deps = ["Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "Revise", "TaylorIntegration", "TaylorSeries", "Test"]
+git-tree-sha1 = "e3ba284f4ec0f1fa04d494d5c7681fa5bb712387"
 repo-rev = "master"
 repo-url = "ssh://git@github.com/PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
@@ -427,10 +437,10 @@ uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 version = "0.7.0"
 
 [[RecursiveArrayTools]]
-deps = ["ArrayInterface", "RecipesBase", "Requires", "StaticArrays", "Statistics"]
-git-tree-sha1 = "35a01ee8529e84d1ca4c7131fee30e7f61047fc8"
+deps = ["ArrayInterface", "RecipesBase", "Requires", "StaticArrays", "Statistics", "ZygoteRules"]
+git-tree-sha1 = "275cb9be63cbb8a1e9d5737dac45ecff5840ad48"
 uuid = "731186ca-8d62-57ce-b412-fbd966d074cd"
-version = "1.2.1"
+version = "2.0.4"
 
 [[RecursiveFactorization]]
 deps = ["LinearAlgebra"]
