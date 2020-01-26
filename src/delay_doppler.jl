@@ -369,7 +369,7 @@ function delay_doppler(station_code::Int, et_r_secs::Real, F_tx::Real,
 end
 
 function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
-        niter::Int=10; pm::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv,
+        niter::Int=10; pm::Bool=true, tc::Real=3.0, xve::Function=earth_pv, xvs::Function=sun_pv,
         xva::Function=apophis_pv_197)
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = str2et(string(t_r_utc))
@@ -382,11 +382,11 @@ function delay_doppler2(station_code::Int, t_r_utc::DateTime, F_tx::Real,
 
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = str2et(string(t_r_utc))
-    # time count (microseconds)
+    # time count (seconds)
     τe, νe = delay_doppler(station_code, et_r_secs+tc, F_tx, niter; pm=pm, xve=xve, xvs=xvs, xva=xva)
     τn, νn = delay_doppler(station_code, et_r_secs, F_tx, niter; pm=pm, xve=xve, xvs=xvs, xva=xva)
     τs, νs = delay_doppler(station_code, et_r_secs-tc, F_tx, niter; pm=pm, xve=xve, xvs=xvs, xva=xva)
-    return τn, -(F_tx/(2tc))*(τe-τs)
+    return τn, -(F_tx/(2tc))*(τe-τs) #(νe+νs)/2
 end
 
 function delay_doppler3(station_code::Int, t_r_utc::DateTime, F_tx::Real,
@@ -461,7 +461,7 @@ function delay_doppler3(station_code::Int, et_r_secs::Real, F_tx::Real,
         r_a_t_b = map((x,y)->Taylor1([x*one_a, y*one_a]), r_a_t_b_, v_a_t_b_) #r_a_t_b_
         # compute down-leg Shapiro delay
         # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, Δτ_rel_[D|U]
-        e_D_vec  = r_e_t_r - r_s_t_r
+        e_D_vec  = r_r_t_r - r_s_t_r
         e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2) # heliocentric distance of Earth at t_r
         rv_s_t_b_ = xvs(et_b_secs) # barycentric position and velocity of Sun at estimated bounce time
         r_s_t_b_ = rv_s_t_b_[1:3]
@@ -469,7 +469,7 @@ function delay_doppler3(station_code::Int, et_r_secs::Real, F_tx::Real,
         r_s_t_b = map((x,y)->Taylor1([x*one_a, y*one_a]), r_s_t_b_, v_s_t_b_) #r_s_t_b_
         p_D_vec  = r_a_t_b - r_s_t_b
         p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2) # heliocentric distance of asteroid at t_b
-        q_D_vec  = r_a_t_b - r_e_t_r
+        q_D_vec  = r_a_t_b - r_r_t_r
         q_D = sqrt(q_D_vec[1]^2 + q_D_vec[2]^2 + q_D_vec[3]^2) #signal path distance (down-leg)
         # Shapiro correction to time-delay
         Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)
@@ -516,7 +516,7 @@ function delay_doppler3(station_code::Int, et_r_secs::Real, F_tx::Real,
         # transmit time, new estimate
         et_t_secs = et_r_secs-(τ_U+τ_D)
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-        R_t_, V_t_ = observer_position(station_code, constant_term(et_t_secs), pm=pm)
+        R_t_, V_t_ = observer_position(station_code, constant_term(constant_term(et_t_secs)), pm=pm)
         R_t = map((x,y)->Taylor1([x*one_a, y*one_a]), R_t_, V_t_/daysec) #R_t_
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t_ = xve(et_t_secs)
@@ -536,7 +536,7 @@ function delay_doppler3(station_code::Int, et_r_secs::Real, F_tx::Real,
         r_s_t_t_ = rv_s_t_t_[1:3]
         v_s_t_t_ = rv_s_t_t_[4:6]/daysec
         r_s_t_t = map((x,y)->Taylor1([x*one_a, y*one_a]), r_s_t_t_, v_s_t_t_) #r_s_t_t_
-        e_U_vec = r_e_t_t - r_s_t_t
+        e_U_vec = r_t_t_t - r_s_t_t
         e_U = sqrt(e_U_vec[1]^2 + e_U_vec[2]^2 + e_U_vec[3]^2) # heliocentric distance of Earth at t_t
         rv_s_t_b_ = xvs(et_b_secs) # barycentric position/velocity of Sun at bounce time
         r_s_t_b_ = rv_s_t_b_[1:3]
@@ -544,7 +544,7 @@ function delay_doppler3(station_code::Int, et_r_secs::Real, F_tx::Real,
         r_s_t_b = map((x,y)->Taylor1([x*one_a, y*one_a]), r_s_t_b_, v_s_t_b_) # r_s_t_b_
         p_U_vec = r_a_t_b - r_s_t_b
         p_U = sqrt(p_U_vec[1]^2 + p_U_vec[2]^2 + p_U_vec[3]^2) # heliocentric distance of asteroid at t_b
-        q_U_vec = r_a_t_b - r_e_t_t
+        q_U_vec = r_a_t_b - r_t_t_t
         q_U = sqrt(q_U_vec[1]^2 + q_U_vec[2]^2 + q_U_vec[3]^2) # signal path (up-leg)
         Δτ_rel_U = shapiro_delay(e_U, p_U, q_U) # seconds
         Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # seconds
