@@ -117,6 +117,50 @@ function t2c_rotation_iau_00_06(et::Float64, pos_geo::Vector; pm::Bool=true)
     return G_vec_ESAA, dG_vec_ESAA, era
 end
 
+# IAU 1976/1980 nutation-precession matrix
+# tt: days since J2000.0
+function nupr7680mat(tt)
+        # IAU 1976 precession matrix, J2000.0 to date
+    # https://github.com/sisl/SOFA.jl/blob/be9ddfd412c5ab77b291b17decfd369041ef365b/src/pmat76.jl#L14
+    rp = iauPmat76(J2000, tt)
+    # IAU 1980 nutation angles Δψ (nutation in longitude), Δϵ (nutation in obliquity)
+    # Output of `SOFA.iauNut80` is in radians:
+    # https://github.com/sisl/SOFA.jl/blob/dc911b990dba79435399e1af0206e4acfc94c630/src/nut80.jl#L14
+    dp80, de80  = iauNut80(J2000, tt)
+    #Nutation corrections wrt IAU 1976/1980
+    # Output of `EarthOrientation.precession_nutation80` is in mas:
+    # https://github.com/JuliaAstro/EarthOrientation.jl/blob/529f12425a6331b133f989443aeb3fbbafd8f324/src/EarthOrientation.jl#L413
+    ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(J2000+tt)
+    # Convert mas -> radians
+    ddp80 = mas2rad(ddp80_mas)
+    dde80 = mas2rad(dde80_mas)
+    # Add adjustments: frame bias, precession-rates, geophysical
+    dpsi = dp80 + ddp80 #rad
+    deps = de80 + dde80 #rad
+    # Mean obliquity (output in radians)
+    epsa = iauObl80(J2000, tt) # rad
+    # Form the matrix of nutation
+    rn = iauNumat(epsa, dpsi, deps)
+    # Combine the matrices:  PN = N x P (with frame-bias B included)
+    return rn*rp
+end
+
+# Polar motion matrix (TIRS->ITRS, IERS 1996)
+# tt: days since J2000.0
+function polarmotionmat(tt; pm::Bool=true)
+    W = Array{Float64}(I, 3, 3)
+    # Polar motion (arcsec->radians)
+    if pm
+        # xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t_utc)
+        xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(J2000+tt)
+        xp = deg2rad(xp_arcsec/3600)
+        yp = deg2rad(yp_arcsec/3600)
+        W = iauRx(-yp, W)
+        W = iauRy(-xp, W)
+    end
+    return W
+end
+
 # Terrestrial-to-celestial rotation matrix (including polar motion)
 # Using 1976/1980 Earth orientation/rotation model
 # Reproduction of Section 5.2 of SOFA Tools for Earth Attitude
@@ -130,13 +174,9 @@ function t2c_rotation_iau_76_80(et::Float64, pos_geo::Vector; pm::Bool=true)
     # TT
     t0_tt = et - tt_tdb(et)
     tt = t0_tt/daysec
-    # IAU 1976 precession matrix, J2000.0 to date
-    # https://github.com/sisl/SOFA.jl/blob/be9ddfd412c5ab77b291b17decfd369041ef365b/src/pmat76.jl#L14
-    rp = iauPmat76(J2000, tt)
-    # IAU 1980 nutation angles Δψ (nutation in longitude), Δϵ (nutation in obliquity)
-    # Output of `SOFA.iauNut80` is in radians:
-    # https://github.com/sisl/SOFA.jl/blob/dc911b990dba79435399e1af0206e4acfc94c630/src/nut80.jl#L14
-    dp80, de80  = iauNut80(J2000, tt)
+    # IAU 76/80 nutation-precession matrix
+    C = nupr7680mat(tt)
+
     #Nutation corrections wrt IAU 1976/1980
     # Output of `EarthOrientation.precession_nutation80` is in mas:
     # https://github.com/JuliaAstro/EarthOrientation.jl/blob/529f12425a6331b133f989443aeb3fbbafd8f324/src/EarthOrientation.jl#L413
@@ -144,16 +184,8 @@ function t2c_rotation_iau_76_80(et::Float64, pos_geo::Vector; pm::Bool=true)
     # Convert mas -> radians
     ddp80 = mas2rad(ddp80_mas)
     dde80 = mas2rad(dde80_mas)
-    # Add adjustments: frame bias, precession-rates, geophysical
-    dpsi = dp80 + ddp80 #rad
-    deps = de80 + dde80 #rad
     # Mean obliquity (output in radians)
     epsa = iauObl80(J2000, tt) # rad
-    # Form the matrix of nutation
-    rn = iauNumat(epsa, dpsi, deps)
-    # Combine the matrices:  PN = N x P (with frame-bias B included)
-    C = rn*rp
-
     # Equation of the equinoxes `ee = GAST - GMST`, including nutation correction
     ee = iauEqeq94(J2000, tt) + ddp80*cos(epsa)
     # ΔUT1 = UT1-UTC (seconds)
@@ -182,15 +214,7 @@ function t2c_rotation_iau_76_80(et::Float64, pos_geo::Vector; pm::Bool=true)
         ]
 
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
-    W = Array{Float64}(I, 3, 3)
-    # Polar motion (arcsec->radians)
-    if pm
-        xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t_utc)
-        xp = deg2rad(xp_arcsec/3600)
-        yp = deg2rad(yp_arcsec/3600)
-        W = iauRx(-yp, W)
-        W = iauRy(-xp, W)
-    end
+    W = polarmotionmat(tt; pm=pm)
 
     W_inv = transpose(W)
     C_inv = transpose(C)
