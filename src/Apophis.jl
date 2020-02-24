@@ -16,8 +16,8 @@ using TaylorIntegration
 using Printf, DelimitedFiles, Test, LinearAlgebra
 using Dates: DateTime, julian2datetime, datetime2julian
 import PlanetaryEphemeris
-using PlanetaryEphemeris: daysec, su, ea, Λ2, Λ3, α_p_sun, δ_p_sun, moon_pole_ra,
-    moon_pole_dec, t2c_jpl_de430, pole_rotation, au, J2000, c_au_per_day, R_sun,
+using PlanetaryEphemeris: daysec, su, ea, Λ2, Λ3, α_p_sun, δ_p_sun,
+    t2c_jpl_de430, pole_rotation, au, J2000, c_au_per_day, R_sun,
     c_cm_per_sec, c_au_per_sec, yr
 using JLD
 using AstroTime, EarthOrientation, SOFA, SPICE

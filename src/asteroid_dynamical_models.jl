@@ -179,12 +179,8 @@ end
     local dsj2k = t-2.451545e6 # J2000.0 = 2.451545e6
     local αs = deg2rad(α_p_sun*one(t))
     local δs = deg2rad(δ_p_sun*one(t))
-    local αm = moon_pole_ra(dsj2k)
-    local δm = moon_pole_dec(dsj2k)
     local M_ = Array{Taylor1{S}}(undef, 3, 3, N)
     local M_[:,:,ea] = t2c_jpl_de430(dsj2k)
-    # local M_[:,:,su] = pole_rotation( αs, δs )
-    # local M_[:,:,mo] = pole_rotation( αm, δm )
 
     dq[1] = q[4]
     dq[2] = q[5]
@@ -566,12 +562,8 @@ end
     local dsj2k = t-2.451545e6 # J2000.0 = 2.451545e6
     local αs = deg2rad(α_p_sun*one(t))
     local δs = deg2rad(δ_p_sun*one(t))
-    local αm = moon_pole_ra(dsj2k)
-    local δm = moon_pole_dec(dsj2k)
     local M_ = Array{Taylor1{S}}(undef, 3, 3, N)
     local M_[:,:,ea] = t2c_jpl_de430(dsj2k)
-    # local M_[:,:,su] = pole_rotation( αs, δs )
-    # local M_[:,:,mo] = pole_rotation( αm, δm )
 
     dq[1] = q[4]
     dq[2] = q[5]
