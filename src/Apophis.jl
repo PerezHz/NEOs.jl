@@ -16,7 +16,7 @@ using TaylorIntegration
 using Printf, DelimitedFiles, Test, LinearAlgebra
 using Dates: DateTime, julian2datetime, datetime2julian
 import PlanetaryEphemeris
-using PlanetaryEphemeris: daysec, su, ea, Λ2, Λ3, α_p_sun, δ_p_sun,
+using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun,
     t2c_jpl_de430, pole_rotation, au, J2000, c_au_per_day, R_sun,
     c_cm_per_sec, c_au_per_sec, yr
 using JLD
@@ -61,6 +61,13 @@ const b_sun = 3.91e5 # Solar corona parameter b [cm^-3] (ESAA 2014, Table 8.5 p.
 
 const S0_sun = 63.15E6 # Sun radiated power intensity at photosphere surface, Watt/meter^2
 # const m2_s3_to_au2_day3 = 1e-6daysec^3/au^2 # conversion factor from m^2/sec^3 to au^2/day^3
+
+# vector of J2*R^2 values
+const Λ2 = zeros(N)
+Λ2[ea] = 1.9679542578489185e-12
+# vector of J3*R^3 values
+const Λ3 = zeros(N)
+Λ3[ea] = -1.962633335678878e-19
 
 include("process_radar_data_jpl.jl")
 include("topocentric.jl")
