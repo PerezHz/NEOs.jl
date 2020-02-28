@@ -377,25 +377,21 @@ end
     postNewtonZ = pntempZ*c_m2
 
     # compute non-gravitational acceleration
-    hx = (Z[1]*V[1])-(Y[1]*W[1])
-    hy = (X[1]*W[1])-(Z[1]*U[1])
-    hz = (Y[1]*U[1])-(X[1]*V[1])
-    r_hs = sqrt(r_p2[1])
-    runitx = X[1]/r_hs
-    runity = Y[2]/r_hs
-    runitz = Z[3]/r_hs
+    hx = (Y[1]*W[1])-(Z[1]*V[1])
+    hy = (Z[1]*U[1])-(X[1]*W[1])
+    hz = (X[1]*V[1])-(Y[1]*U[1])
 
     #cartesian components of transversal unit vector:
-    tunitx0 = (hy*runitz) - (hz*runity)
-    tunity0 = (hz*runitx) - (hx*runitz)
-    tunitz0 = (hx*runity) - (hy*runitx)
+    tunitx0 = (hy*Z[1]) - (hz*Y[1])
+    tunity0 = (hz*X[1]) - (hx*Z[1])
+    tunitz0 = (hx*Y[1]) - (hy*X[1])
     hmag = sqrt( ((tunitx0^2)+(tunity0^2))+(tunitz0^2) )
     tunitx = tunitx0/hmag
     tunity = tunity0/hmag
     tunitz = tunitz0/hmag
 
     # evaluate non-grav acceleration of NEA (Yarkovsky):
-    g_r = r_hs^2
+    g_r = r_p2[1]^2
     A2_t_g_r = q[7]/g_r
 
     NGAx = A2_t_g_r*tunitx
@@ -760,25 +756,21 @@ end
     postNewtonZ = pntempZ*c_m2
 
     # compute non-gravitational acceleration
-    hx = (Z[1]*V[1])-(Y[1]*W[1])
-    hy = (X[1]*W[1])-(Z[1]*U[1])
-    hz = (Y[1]*U[1])-(X[1]*V[1])
-    r_hs = sqrt(r_p2[1])
-    runitx = X[1]/r_hs
-    runity = Y[2]/r_hs
-    runitz = Z[3]/r_hs
+    hx = (Y[1]*W[1])-(Z[1]*V[1])
+    hy = (Z[1]*U[1])-(X[1]*W[1])
+    hz = (X[1]*V[1])-(Y[1]*U[1])
 
     #cartesian components of transversal unit vector:
-    tunitx0 = (hy*runitz) - (hz*runity)
-    tunity0 = (hz*runitx) - (hx*runitz)
-    tunitz0 = (hx*runity) - (hy*runitx)
+    tunitx0 = (hy*Z[1]) - (hz*Y[1])
+    tunity0 = (hz*X[1]) - (hx*Z[1])
+    tunitz0 = (hx*Y[1]) - (hy*X[1])
     hmag = sqrt( ((tunitx0^2)+(tunity0^2))+(tunitz0^2) )
     tunitx = tunitx0/hmag
     tunity = tunity0/hmag
     tunitz = tunitz0/hmag
 
     # evaluate non-grav acceleration of NEA (Yarkovsky):
-    g_r = r_hs^2
+    g_r = r_p2[1]^2
     A2_t_g_r = q[7]/g_r
 
     NGAx = A2_t_g_r*tunitx
