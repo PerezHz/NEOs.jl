@@ -770,7 +770,7 @@ end
     tunitz = tunitz0/hmag
 
     # evaluate non-grav acceleration of NEA (Yarkovsky):
-    g_r = r_p2[1]^2
+    g_r = r_p2[1]
     A2_t_g_r = q[7]/g_r
 
     NGAx = A2_t_g_r*tunitx
