@@ -761,7 +761,7 @@ end
     hz = (X[1]*V[1])-(Y[1]*U[1])
 
     #cartesian components of transversal unit vector:
-    tunitx0 = (hz*Y[1]) - (hy*Z[1])
+    tunitx0 = (hz*Y[1]) - (hy*Z[1]) # Note: Y[1] = y_Sun - y_Apophis, etc.
     tunity0 = (hx*Z[1]) - (hz*X[1])
     tunitz0 = (hy*X[1]) - (hx*Y[1])
     hmag = sqrt( ((tunitx0^2)+(tunity0^2))+(tunitz0^2) )
