@@ -23,19 +23,28 @@ function loadeph(ephfile)
             # i == j && continue
             if i == j
             else
+                # X_ij = ss16ast_eph_x[:,3i-2] .- ss16ast_eph_x[:,3j-2]
+                # Y_ij = ss16ast_eph_x[:,3i-1] .- ss16ast_eph_x[:,3j-1]
+                # Z_ij = ss16ast_eph_x[:,3i  ] .- ss16ast_eph_x[:,3j  ]
+                # r_p2_ij = ( (X_ij.^2) .+ (Y_ij.^2) ) .+ (Z_ij.^2)
+                # r_p3d2_ij = r_p2_ij.^1.5
+                # r_ij = sqrt.(r_p2_ij)
+                # newtonianCoeff_ij =  μ[i]./r_p3d2_ij
+                # acc_eph.x[:,3j-2] .+= (X_ij.*newtonianCoeff_ij)
+                # acc_eph.x[:,3j-1] .+= (Y_ij.*newtonianCoeff_ij)
+                # acc_eph.x[:,3j  ] .+= (Z_ij.*newtonianCoeff_ij)
+                # newtonianNb_Potential.x[:,j] .+= (μ[i]./r_ij)
                 X_ij = ss16ast_eph_x[:,3i-2] .- ss16ast_eph_x[:,3j-2]
                 Y_ij = ss16ast_eph_x[:,3i-1] .- ss16ast_eph_x[:,3j-1]
                 Z_ij = ss16ast_eph_x[:,3i  ] .- ss16ast_eph_x[:,3j  ]
                 r_p2_ij = ( (X_ij.^2) .+ (Y_ij.^2) ) .+ (Z_ij.^2)
-                r_p3d2_ij = r_p2_ij.^1.5
                 r_ij = sqrt.(r_p2_ij)
-                newtonianCoeff_ij =  μ[i]./r_p3d2_ij
-                acc_eph.x[:,3j-2] .+= (X_ij.*newtonianCoeff_ij)
-                acc_eph.x[:,3j-1] .+= (Y_ij.*newtonianCoeff_ij)
-                acc_eph.x[:,3j  ] .+= (Z_ij.*newtonianCoeff_ij)
                 newtonianNb_Potential.x[:,j] .+= (μ[i]./r_ij)
             end #if i != j
         end #for, i
+        acc_eph.x[:,3j-2] .= differentiate.(ss16ast_eph_x[:,3(N-1+j)-2])
+        acc_eph.x[:,3j-1] .= differentiate.(ss16ast_eph_x[:,3(N-1+j)-1])
+        acc_eph.x[:,3j  ] .= differentiate.(ss16ast_eph_x[:,3(N-1+j)  ])
     end #for, j
     return ss16asteph, acc_eph, newtonianNb_Potential
 end
