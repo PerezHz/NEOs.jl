@@ -34,7 +34,7 @@ end
     local newtonianNb_Potential_t = evaleph(params[3], t, q[1]) # params[3](t)*one(q[1]) #newtonianNb_Potential(t), massive bodies
     local S = eltype(q[1])
     local N = length(μ) # number of bodies, including NEA
-    local _1_to_Nm1 = Base.OneTo(N-1) # iterator over all bodies
+    local _1_to_Nm1 = 1:(N-1) # iterator over all bodies
 
     # parameters related to speed of light, c
     local c_p2 = 29979.063823897606 # c^2 = 29979.063823897606 au^2/d^2
@@ -251,7 +251,7 @@ end
     local newtonianNb_Potential_t = evaleph(params[3], t, q[1]) # params[3](t)*one(q[1]) #newtonianNb_Potential(t), massive bodies
     local S = eltype(q[1])
     local N = length(μ) # number of bodies, including NEA
-    local _1_to_Nm1 = Base.OneTo(N-1) # iterator over all bodies
+    local _1_to_Nm1 = 1:(N-1) # iterator over all bodies
 
     # parameters related to speed of light, c
     local c_p2 = 29979.063823897606 # c^2 = 29979.063823897606 au^2/d^2
