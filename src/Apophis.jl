@@ -52,7 +52,7 @@ const ssdofs = setdiff(1:6N, apophisdofs)
 const ω = daysec*7.292115e-5 #7.2921151467e-5
 # The relationship of the angular velocity of the earth Omega with LOD is (https://www.iers.org/IERS/EN/Science/EarthRotation/UT1LOD.html)
 # where `omega` is in units of rad/day, and `lod` is in units of milliseconds
-omega(lod) = (1e-12daysec)*(72921151.467064 - 0.843994809lod)
+omega(lod) = (1e-12)*(72921151.467064 - 0.843994809lod)
 
 const A_sun = 1.06e8 # Solar corona parameter A [cm^-3] (ESAA 2014, Table 8.5 p. 329)
 const a_sun = 4.89e5 # Solar corona parameter a [cm^-3] (ESAA 2014, Table 8.5 p. 329)
@@ -61,12 +61,7 @@ const b_sun = 3.91e5 # Solar corona parameter b [cm^-3] (ESAA 2014, Table 8.5 p.
 const S0_sun = 63.15E6 # Sun radiated power intensity at photosphere surface, Watt/meter^2
 # const m2_s3_to_au2_day3 = 1e-6daysec^3/au^2 # conversion factor from m^2/sec^3 to au^2/day^3
 
-# vector of J2*R^2 values
-const Λ2 = zeros(N)
-Λ2[ea] = 1.9679542578489185e-12
-# vector of J3*R^3 values
-const Λ3 = zeros(N)
-Λ3[ea] = -1.962633335678878e-19
+const clightkms = 2.99792458E5 # speed of light, km/sec
 
 include("process_radar_data_jpl.jl")
 include("topocentric.jl")

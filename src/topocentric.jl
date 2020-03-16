@@ -32,10 +32,10 @@ function observer_position(station_code::Int, et::Float64; pm::Bool=true)
     y_gc = u*sin(λ_rad) #km
     z_gc = v #km
 
-    pos_geo = [x_gc, y_gc, z_gc]/au #au
+    pos_geo = [x_gc, y_gc, z_gc] #km
 
     G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(et, pos_geo, pm=pm)
-    # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(et, pos_geo, pm)
+    # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(et, pos_geo, pm=pm)
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
     return G_vec_ESAA, dG_vec_ESAA
