@@ -172,7 +172,7 @@ function t2c_rotation_iau_76_80(et::Float64, pos_geo::Vector; pm::Bool=true)
     utc_secs = et - tdb_utc(et)
     t_utc = J2000 + utc_secs/daysec
     # TT
-    t0_tt = et - tt_tdb(et)
+    t0_tt = et + tt_tdb(et)
     tt = t0_tt/daysec
     # IAU 76/80 nutation-precession matrix
     C = nupr7680mat(tt)
@@ -214,7 +214,7 @@ function t2c_rotation_iau_76_80(et::Float64, pos_geo::Vector; pm::Bool=true)
         ]
 
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
-    W = polarmotionmat(tt; pm=pm)
+    W = polarmotionmat(tt, pm=pm)
 
     W_inv = transpose(W)
     C_inv = transpose(C)

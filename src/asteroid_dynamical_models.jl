@@ -29,6 +29,7 @@ end
 # asteroid's heliocentric range, A2 is a coefficient (with units of au/day^2),
 # and d = 2.0
 @taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph!(dq, q, params, t)
+    local jd0 = params[4]
     local ss16asteph_t = evaleph(params[1], t, q[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
     local acceph_t = evaleph(params[2], t, q[1]) # params[2](t)*one(q[1]) #acc_eph(t)
     local newtonianNb_Potential_t = evaleph(params[3], t, q[1]) # params[3](t)*one(q[1]) #newtonianNb_Potential(t), massive bodies
@@ -105,6 +106,83 @@ end
     pNY_t_Y = Array{Taylor1{S}}(undef, N)
     pNZ_t_Z = Array{Taylor1{S}}(undef, N)
 
+    # J2 acceleration auxiliaries
+    t31 = Array{Taylor1{S}}(undef, N)
+    t32 = Array{Taylor1{S}}(undef, N)
+    t33 = Array{Taylor1{S}}(undef, N)
+    r_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    F_J2_x = Array{Taylor1{S}}(undef, N)
+    F_J2_y = Array{Taylor1{S}}(undef, N)
+    F_J2_z = Array{Taylor1{S}}(undef, N)
+    F_J2_x1 = Array{Taylor1{S}}(undef, N)
+    F_J2_y1 = Array{Taylor1{S}}(undef, N)
+    F_J2_z1 = Array{Taylor1{S}}(undef, N)
+    F_J2_x2 = Array{Taylor1{S}}(undef, N)
+    F_J2_y2 = Array{Taylor1{S}}(undef, N)
+    F_J2_z2 = Array{Taylor1{S}}(undef, N)
+    # temp_accX_j = Array{Taylor1{S}}(undef, N)
+    # temp_accY_j = Array{Taylor1{S}}(undef, N)
+    # temp_accZ_j = Array{Taylor1{S}}(undef, N)
+    temp_accX_i = Array{Taylor1{S}}(undef, N)
+    temp_accY_i = Array{Taylor1{S}}(undef, N)
+    temp_accZ_i = Array{Taylor1{S}}(undef, N)
+    sin_ϕ = Array{Taylor1{S}}(undef, N)
+    sin2_ϕ = Array{Taylor1{S}}(undef, N)
+    sin3_ϕ = Array{Taylor1{S}}(undef, N)
+    sin4_ϕ = Array{Taylor1{S}}(undef, N)
+    ϕ = Array{Taylor1{S}}(undef, N)
+    cos_ϕ = Array{Taylor1{S}}(undef, N)
+    P_2_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    ∂P_2_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    P_3_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    ∂P_3_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    m_c_ϕ_∂P_2 = Array{Taylor1{S}}(undef, N)
+    m_c_ϕ_∂P_3 = Array{Taylor1{S}}(undef, N)
+    Λ2j_div_r4 = Array{Taylor1{S}}(undef, N)
+    Λ3j_div_r5 = Array{Taylor1{S}}(undef, N)
+    F_J_ξ = Array{Taylor1{S}}(undef, N)
+    F_J_η = Array{Taylor1{S}}(undef, N)
+    F_J_ζ = Array{Taylor1{S}}(undef, N)
+    F_J2_ξ = Array{Taylor1{S}}(undef, N)
+    F_J2_η = Array{Taylor1{S}}(undef, N)
+    F_J2_ζ = Array{Taylor1{S}}(undef, N)
+    F_J3_ξ = Array{Taylor1{S}}(undef, N)
+    F_J3_η = Array{Taylor1{S}}(undef, N)
+    F_J3_ζ = Array{Taylor1{S}}(undef, N)
+    ξx = Array{Taylor1{S}}(undef, N)
+    ξy = Array{Taylor1{S}}(undef, N)
+    ξz = Array{Taylor1{S}}(undef, N)
+    ηx = Array{Taylor1{S}}(undef, N)
+    ηy = Array{Taylor1{S}}(undef, N)
+    ηz = Array{Taylor1{S}}(undef, N)
+    ηx1 = Array{Taylor1{S}}(undef, N)
+    ηy1 = Array{Taylor1{S}}(undef, N)
+    ηz1 = Array{Taylor1{S}}(undef, N)
+    ηx2 = Array{Taylor1{S}}(undef, N)
+    ηy2 = Array{Taylor1{S}}(undef, N)
+    ηz2 = Array{Taylor1{S}}(undef, N)
+    ζx = Array{Taylor1{S}}(undef, N)
+    ζy = Array{Taylor1{S}}(undef, N)
+    ζz = Array{Taylor1{S}}(undef, N)
+    ζx1 = Array{Taylor1{S}}(undef, N)
+    ζy1 = Array{Taylor1{S}}(undef, N)
+    ζz1 = Array{Taylor1{S}}(undef, N)
+    ζx2 = Array{Taylor1{S}}(undef, N)
+    ζy2 = Array{Taylor1{S}}(undef, N)
+    ζz2 = Array{Taylor1{S}}(undef, N)
+
+    # extended-body accelerations
+    accX = zero_q_1
+    accY = zero_q_1
+    accZ = zero_q_1
+
+    # rotations to and from Earth, Sun and Moon pole-oriented frames
+    local dsj2k = t+(jd0-2.451545e6) # days since J2000.0 = 2.451545e6
+    local αs = deg2rad(α_p_sun*one(t))
+    local δs = deg2rad(δ_p_sun*one(t))
+    local M_ = Array{Taylor1{S}}(undef, 3, 3, N)
+    local M_[:,:,ea] = t2c_jpl_de430(dsj2k)
+
     dq[1] = q[4]
     dq[2] = q[5]
     dq[3] = q[6]
@@ -159,6 +237,72 @@ end
         V_t_pn2[i] = pn2[i]*V[i]
         W_t_pn2[i] = pn2[i]*W[i]
 
+        #J2 accelerations, if i-th body is flattened
+        if UJ_interaction[i]
+            # # rotate from inertial frame to extended-body frame
+            t31[i] = -X[i]*M_[1,3,i]
+            t32[i] = -Y[i]*M_[2,3,i]
+            t33[i] = -Z[i]*M_[3,3,i]
+            r_sin_ϕ[i] = (t31[i]+t32[i])+t33[i]
+
+            # compute cartesian coordinates of acceleration due to body figure in body frame
+            sin_ϕ[i] = r_sin_ϕ[i]/r_p1d2[i] # z/r = latitude of point mass wrt body frame
+            ϕ[i] = asin(sin_ϕ[i])
+            cos_ϕ[i] = cos(ϕ[i])
+            sin2_ϕ[i] = sin_ϕ[i]^2
+            sin3_ϕ[i] = sin_ϕ[i]^3
+            P_2_sin_ϕ[i] = 1.5sin2_ϕ[i] - 0.5
+            ∂P_2_sin_ϕ[i] = 3sin_ϕ[i]
+            P_3_sin_ϕ[i] = (-1.5sin_ϕ[i]) + (2.5sin3_ϕ[i])
+            ∂P_3_sin_ϕ[i] = -1.5 + 7.5sin2_ϕ[i]
+            Λ2j_div_r4[i] = (-Λ2[i])/(r_p2[i]^2)
+            Λ3j_div_r5[i] = (-Λ3[i])/(r_p1d2[i]^5)
+            m_c_ϕ_∂P_2[i] = (-cos_ϕ[i])*∂P_2_sin_ϕ[i]
+            m_c_ϕ_∂P_3[i] = (-cos_ϕ[i])*∂P_3_sin_ϕ[i]
+            F_J2_ξ[i] = ( Λ2j_div_r4[i]*(3P_2_sin_ϕ[i]) )
+            #F_J2_η[i] = zero_q_1
+            F_J2_ζ[i] = Λ2j_div_r4[i]*m_c_ϕ_∂P_2[i]
+            F_J3_ξ[i] = ( Λ3j_div_r5[i]*(4P_3_sin_ϕ[i]) )
+            #F_J3_η[i] = zero_q_1
+            F_J3_ζ[i] = Λ3j_div_r5[i]*m_c_ϕ_∂P_3[i]
+            F_J_ξ[i] = F_J2_ξ[i] #+ F_J3_ξ[i]
+            #F_J_η[i] = zero_q_1
+            F_J_ζ[i] = F_J2_ζ[i] #+ F_J3_ζ[i]
+            #Compute unit vectors ξ,η,ζ
+            ξx[i] = -X[i]/r_p1d2[i]
+            ξy[i] = -Y[i]/r_p1d2[i]
+            ξz[i] = -Z[i]/r_p1d2[i]
+            #Compute η = p x ξ
+            ηx1[i] = M_[2,3,i]*ξz[i]
+            ηy1[i] = M_[3,3,i]*ξx[i]
+            ηz1[i] = M_[1,3,i]*ξy[i]
+            ηx2[i] = M_[3,3,i]*ξy[i]
+            ηy2[i] = M_[1,3,i]*ξz[i]
+            ηz2[i] = M_[2,3,i]*ξx[i]
+            ηx[i] = ηx1[i] - ηx2[i]
+            ηy[i] = ηy1[i] - ηy2[i]
+            ηz[i] = ηz1[i] - ηz2[i]
+            #Compute ζ = ξ x η
+            ζx1[i] = ξy[i]*ηz[i]
+            ζy1[i] = ξz[i]*ηx[i]
+            ζz1[i] = ξx[i]*ηy[i]
+            ζx2[i] = ξz[i]*ηy[i]
+            ζy2[i] = ξx[i]*ηz[i]
+            ζz2[i] = ξy[i]*ηx[i]
+            ζx[i] = ζx1[i] - ζx2[i]
+            ζy[i] = ζy1[i] - ζy2[i]
+            ζz[i] = ζz1[i] - ζz2[i]
+            # compute cartesian coordinates of acceleration due to body figure in inertial frame
+            F_J2_x1[i] = F_J_ξ[i]*ξx[i]
+            F_J2_y1[i] = F_J_ξ[i]*ξy[i]
+            F_J2_z1[i] = F_J_ξ[i]*ξz[i]
+            F_J2_x2[i] = F_J_ζ[i]*ζx[i]
+            F_J2_y2[i] = F_J_ζ[i]*ζy[i]
+            F_J2_z2[i] = F_J_ζ[i]*ζz[i]
+            F_J2_x[i] = F_J2_x1[i] + F_J2_x2[i]
+            F_J2_y[i] = F_J2_y1[i] + F_J2_y2[i]
+            F_J2_z[i] = F_J2_z1[i] + F_J2_z2[i]
+        end # if UJ_interaction[i]
         v2[i] = ( (ui[i]^2)+(vi[i]^2) ) + (wi[i]^2)
     end #for, i
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
@@ -166,13 +310,32 @@ end
     for i in _1_to_Nm1
         temp_004 = newtonian1b_Potential[i] + newtonianNb_Potential[N]
         newtonianNb_Potential[N] = temp_004
+        if UJ_interaction[i]
+            # # # add result to total acceleration on upon j-th body figure due to i-th point mass
+            # # @show "acc",j,"+μ",i,"Λ2",j
+            # temp_accX_j[i,j] = accX[j] + (μ[i]*F_J2_x[i,j])
+            # accX[j] = temp_accX_j[i,j]
+            # temp_accY_j[i,j] = accY[j] + (μ[i]*F_J2_y[i,j])
+            # accY[j] = temp_accY_j[i,j]
+            # temp_accZ_j[i,j] = accZ[j] + (μ[i]*F_J2_z[i,j])
+            # accZ[j] = temp_accZ_j[i,j]
+
+            # # reaction force on i-th body
+            # @show "acc",i,"-μ",j,"Λ2",j
+            temp_accX_i[i] = accX - (μ[i]*F_J2_x[i])
+            accX = temp_accX_i[i]
+            temp_accY_i[i] = accY - (μ[i]*F_J2_y[i])
+            accY = temp_accY_i[i]
+            temp_accZ_i[i] = accZ - (μ[i]*F_J2_z[i])
+            accZ = temp_accZ_i[i]
+        end
     end
 
-    #post-Newtonian corrections to gravitational acceleration
+    #post-Newtonian accelerations due to Sun, Moon and planets (Mercury through Neptune)
     #Moyer, 1971, page 7 eq. 35
     # post-Newtonian iterative procedure setup and initialization
     _4ϕj[N] = 4newtonianNb_Potential[N]
-    for i in _1_to_Nm1
+    for i in 1:10
         ϕi_plus_4ϕj[i] = newtonianNb_Potential_t[i] + _4ϕj[N]
         sj2_plus_2si2_minus_4vivj[i] = ( (2v2[i]) - (4vi_dot_vj[i]) ) + v2[N]
         ϕs_and_vs[i] = sj2_plus_2si2_minus_4vivj[i] - ϕi_plus_4ϕj[i]
@@ -199,7 +362,7 @@ end
         pNY_t_pn3[i] = acceph_t[3i-1]*pn3[i]
         pNZ_t_pn3[i] = acceph_t[3i  ]*pn3[i]
     end #for i
-    for i in _1_to_Nm1
+    for i in 1:10
         termpnx = ( X_t_pn1[i] + (U_t_pn2[i]+pNX_t_pn3[i]) )
         sumpnx = pntempX + termpnx
         pntempX = sumpnx
@@ -207,6 +370,23 @@ end
         sumpny = pntempY + termpny
         pntempY = sumpny
         termpnz = ( Z_t_pn1[i] + (W_t_pn2[i]+pNZ_t_pn3[i]) )
+        sumpnz = pntempZ + termpnz
+        pntempZ = sumpnz
+    end
+    # compute Newtonian accelerations due to Pluto and 16 asteroid perturbers
+    for i in 11:27
+        X_t_pn1[i] = c_p2*newton_acc_X[i]
+        Y_t_pn1[i] = c_p2*newton_acc_Y[i]
+        Z_t_pn1[i] = c_p2*newton_acc_Z[i]
+    end #for i
+    for i in 11:27
+        termpnx = X_t_pn1[i]
+        sumpnx = pntempX + termpnx
+        pntempX = sumpnx
+        termpny = Y_t_pn1[i]
+        sumpny = pntempY + termpny
+        pntempY = sumpny
+        termpnz = Z_t_pn1[i]
         sumpnz = pntempZ + termpnz
         pntempZ = sumpnz
     end
@@ -236,9 +416,9 @@ end
     NGAy = A2_t_g_r*tunity
     NGAz = A2_t_g_r*tunitz
 
-    dq[4] = postNewtonX + NGAx
-    dq[5] = postNewtonY + NGAy
-    dq[6] = postNewtonZ + NGAz
+    dq[4] = ( postNewtonX + accX ) + NGAx
+    dq[5] = ( postNewtonY + accY ) + NGAy
+    dq[6] = ( postNewtonZ + accZ ) + NGAz
 
     dq[7] = zero_q_1
 
@@ -246,6 +426,7 @@ end
 end
 
 @taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
+    local jd0 = params[4]
     local ss16asteph_t = evaleph(params[1], t, q[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
     local acceph_t = evaleph(params[2], t, q[1]) # params[2](t)*one(q[1]) #acc_eph(t)
     local newtonianNb_Potential_t = evaleph(params[3], t, q[1]) # params[3](t)*one(q[1]) #newtonianNb_Potential(t), massive bodies
@@ -322,6 +503,83 @@ end
     pNY_t_Y = Array{Taylor1{S}}(undef, N)
     pNZ_t_Z = Array{Taylor1{S}}(undef, N)
 
+    # J2 acceleration auxiliaries
+    t31 = Array{Taylor1{S}}(undef, N)
+    t32 = Array{Taylor1{S}}(undef, N)
+    t33 = Array{Taylor1{S}}(undef, N)
+    r_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    F_J2_x = Array{Taylor1{S}}(undef, N)
+    F_J2_y = Array{Taylor1{S}}(undef, N)
+    F_J2_z = Array{Taylor1{S}}(undef, N)
+    F_J2_x1 = Array{Taylor1{S}}(undef, N)
+    F_J2_y1 = Array{Taylor1{S}}(undef, N)
+    F_J2_z1 = Array{Taylor1{S}}(undef, N)
+    F_J2_x2 = Array{Taylor1{S}}(undef, N)
+    F_J2_y2 = Array{Taylor1{S}}(undef, N)
+    F_J2_z2 = Array{Taylor1{S}}(undef, N)
+    # temp_accX_j = Array{Taylor1{S}}(undef, N)
+    # temp_accY_j = Array{Taylor1{S}}(undef, N)
+    # temp_accZ_j = Array{Taylor1{S}}(undef, N)
+    temp_accX_i = Array{Taylor1{S}}(undef, N)
+    temp_accY_i = Array{Taylor1{S}}(undef, N)
+    temp_accZ_i = Array{Taylor1{S}}(undef, N)
+    sin_ϕ = Array{Taylor1{S}}(undef, N)
+    sin2_ϕ = Array{Taylor1{S}}(undef, N)
+    sin3_ϕ = Array{Taylor1{S}}(undef, N)
+    sin4_ϕ = Array{Taylor1{S}}(undef, N)
+    ϕ = Array{Taylor1{S}}(undef, N)
+    cos_ϕ = Array{Taylor1{S}}(undef, N)
+    P_2_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    ∂P_2_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    P_3_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    ∂P_3_sin_ϕ = Array{Taylor1{S}}(undef, N)
+    m_c_ϕ_∂P_2 = Array{Taylor1{S}}(undef, N)
+    m_c_ϕ_∂P_3 = Array{Taylor1{S}}(undef, N)
+    Λ2j_div_r4 = Array{Taylor1{S}}(undef, N)
+    Λ3j_div_r5 = Array{Taylor1{S}}(undef, N)
+    F_J_ξ = Array{Taylor1{S}}(undef, N)
+    F_J_η = Array{Taylor1{S}}(undef, N)
+    F_J_ζ = Array{Taylor1{S}}(undef, N)
+    F_J2_ξ = Array{Taylor1{S}}(undef, N)
+    F_J2_η = Array{Taylor1{S}}(undef, N)
+    F_J2_ζ = Array{Taylor1{S}}(undef, N)
+    F_J3_ξ = Array{Taylor1{S}}(undef, N)
+    F_J3_η = Array{Taylor1{S}}(undef, N)
+    F_J3_ζ = Array{Taylor1{S}}(undef, N)
+    ξx = Array{Taylor1{S}}(undef, N)
+    ξy = Array{Taylor1{S}}(undef, N)
+    ξz = Array{Taylor1{S}}(undef, N)
+    ηx = Array{Taylor1{S}}(undef, N)
+    ηy = Array{Taylor1{S}}(undef, N)
+    ηz = Array{Taylor1{S}}(undef, N)
+    ηx1 = Array{Taylor1{S}}(undef, N)
+    ηy1 = Array{Taylor1{S}}(undef, N)
+    ηz1 = Array{Taylor1{S}}(undef, N)
+    ηx2 = Array{Taylor1{S}}(undef, N)
+    ηy2 = Array{Taylor1{S}}(undef, N)
+    ηz2 = Array{Taylor1{S}}(undef, N)
+    ζx = Array{Taylor1{S}}(undef, N)
+    ζy = Array{Taylor1{S}}(undef, N)
+    ζz = Array{Taylor1{S}}(undef, N)
+    ζx1 = Array{Taylor1{S}}(undef, N)
+    ζy1 = Array{Taylor1{S}}(undef, N)
+    ζz1 = Array{Taylor1{S}}(undef, N)
+    ζx2 = Array{Taylor1{S}}(undef, N)
+    ζy2 = Array{Taylor1{S}}(undef, N)
+    ζz2 = Array{Taylor1{S}}(undef, N)
+
+    # extended-body accelerations
+    accX = zero_q_1
+    accY = zero_q_1
+    accZ = zero_q_1
+
+    # rotations to and from Earth, Sun and Moon pole-oriented frames
+    local dsj2k = t+(jd0-2.451545e6) # days since J2000.0 = 2.451545e6
+    local αs = deg2rad(α_p_sun*one(t))
+    local δs = deg2rad(δ_p_sun*one(t))
+    local M_ = Array{Taylor1{S}}(undef, 3, 3, N)
+    local M_[:,:,ea] = t2c_jpl_de430(dsj2k)
+
     dq[1] = q[4]
     dq[2] = q[5]
     dq[3] = q[6]
@@ -376,6 +634,72 @@ end
         V_t_pn2[i] = pn2[i]*V[i]
         W_t_pn2[i] = pn2[i]*W[i]
 
+        #J2 accelerations, if i-th body is flattened
+        if UJ_interaction[i]
+            # # rotate from inertial frame to extended-body frame
+            t31[i] = -X[i]*M_[1,3,i]
+            t32[i] = -Y[i]*M_[2,3,i]
+            t33[i] = -Z[i]*M_[3,3,i]
+            r_sin_ϕ[i] = (t31[i]+t32[i])+t33[i]
+
+            # compute cartesian coordinates of acceleration due to body figure in body frame
+            sin_ϕ[i] = r_sin_ϕ[i]/r_p1d2[i] # z/r = latitude of point mass wrt body frame
+            ϕ[i] = asin(sin_ϕ[i])
+            cos_ϕ[i] = cos(ϕ[i])
+            sin2_ϕ[i] = sin_ϕ[i]^2
+            sin3_ϕ[i] = sin_ϕ[i]^3
+            P_2_sin_ϕ[i] = 1.5sin2_ϕ[i] - 0.5
+            ∂P_2_sin_ϕ[i] = 3sin_ϕ[i]
+            P_3_sin_ϕ[i] = (-1.5sin_ϕ[i]) + (2.5sin3_ϕ[i])
+            ∂P_3_sin_ϕ[i] = -1.5 + 7.5sin2_ϕ[i]
+            Λ2j_div_r4[i] = (-Λ2[i])/(r_p2[i]^2)
+            Λ3j_div_r5[i] = (-Λ3[i])/(r_p1d2[i]^5)
+            m_c_ϕ_∂P_2[i] = (-cos_ϕ[i])*∂P_2_sin_ϕ[i]
+            m_c_ϕ_∂P_3[i] = (-cos_ϕ[i])*∂P_3_sin_ϕ[i]
+            F_J2_ξ[i] = ( Λ2j_div_r4[i]*(3P_2_sin_ϕ[i]) )
+            #F_J2_η[i] = zero_q_1
+            F_J2_ζ[i] = Λ2j_div_r4[i]*m_c_ϕ_∂P_2[i]
+            F_J3_ξ[i] = ( Λ3j_div_r5[i]*(4P_3_sin_ϕ[i]) )
+            #F_J3_η[i] = zero_q_1
+            F_J3_ζ[i] = Λ3j_div_r5[i]*m_c_ϕ_∂P_3[i]
+            F_J_ξ[i] = F_J2_ξ[i] #+ F_J3_ξ[i]
+            #F_J_η[i] = zero_q_1
+            F_J_ζ[i] = F_J2_ζ[i] #+ F_J3_ζ[i]
+            #Compute unit vectors ξ,η,ζ
+            ξx[i] = -X[i]/r_p1d2[i]
+            ξy[i] = -Y[i]/r_p1d2[i]
+            ξz[i] = -Z[i]/r_p1d2[i]
+            #Compute η = p x ξ
+            ηx1[i] = M_[2,3,i]*ξz[i]
+            ηy1[i] = M_[3,3,i]*ξx[i]
+            ηz1[i] = M_[1,3,i]*ξy[i]
+            ηx2[i] = M_[3,3,i]*ξy[i]
+            ηy2[i] = M_[1,3,i]*ξz[i]
+            ηz2[i] = M_[2,3,i]*ξx[i]
+            ηx[i] = ηx1[i] - ηx2[i]
+            ηy[i] = ηy1[i] - ηy2[i]
+            ηz[i] = ηz1[i] - ηz2[i]
+            #Compute ζ = ξ x η
+            ζx1[i] = ξy[i]*ηz[i]
+            ζy1[i] = ξz[i]*ηx[i]
+            ζz1[i] = ξx[i]*ηy[i]
+            ζx2[i] = ξz[i]*ηy[i]
+            ζy2[i] = ξx[i]*ηz[i]
+            ζz2[i] = ξy[i]*ηx[i]
+            ζx[i] = ζx1[i] - ζx2[i]
+            ζy[i] = ζy1[i] - ζy2[i]
+            ζz[i] = ζz1[i] - ζz2[i]
+            # compute cartesian coordinates of acceleration due to body figure in inertial frame
+            F_J2_x1[i] = F_J_ξ[i]*ξx[i]
+            F_J2_y1[i] = F_J_ξ[i]*ξy[i]
+            F_J2_z1[i] = F_J_ξ[i]*ξz[i]
+            F_J2_x2[i] = F_J_ζ[i]*ζx[i]
+            F_J2_y2[i] = F_J_ζ[i]*ζy[i]
+            F_J2_z2[i] = F_J_ζ[i]*ζz[i]
+            F_J2_x[i] = F_J2_x1[i] + F_J2_x2[i]
+            F_J2_y[i] = F_J2_y1[i] + F_J2_y2[i]
+            F_J2_z[i] = F_J2_z1[i] + F_J2_z2[i]
+        end # if UJ_interaction[i]
         v2[i] = ( (ui[i]^2)+(vi[i]^2) ) + (wi[i]^2)
     end #for, i
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
@@ -383,13 +707,32 @@ end
     for i in _1_to_Nm1
         temp_004 = newtonian1b_Potential[i] + newtonianNb_Potential[N]
         newtonianNb_Potential[N] = temp_004
+        if UJ_interaction[i]
+            # # # add result to total acceleration on upon j-th body figure due to i-th point mass
+            # # @show "acc",j,"+μ",i,"Λ2",j
+            # temp_accX_j[i,j] = accX[j] + (μ[i]*F_J2_x[i,j])
+            # accX[j] = temp_accX_j[i,j]
+            # temp_accY_j[i,j] = accY[j] + (μ[i]*F_J2_y[i,j])
+            # accY[j] = temp_accY_j[i,j]
+            # temp_accZ_j[i,j] = accZ[j] + (μ[i]*F_J2_z[i,j])
+            # accZ[j] = temp_accZ_j[i,j]
+
+            # # reaction force on i-th body
+            # @show "acc",i,"-μ",j,"Λ2",j
+            temp_accX_i[i] = accX - (μ[i]*F_J2_x[i])
+            accX = temp_accX_i[i]
+            temp_accY_i[i] = accY - (μ[i]*F_J2_y[i])
+            accY = temp_accY_i[i]
+            temp_accZ_i[i] = accZ - (μ[i]*F_J2_z[i])
+            accZ = temp_accZ_i[i]
+        end
     end
 
-    #post-Newtonian corrections to gravitational acceleration
+    #post-Newtonian accelerations due to Sun, Moon and planets (Mercury through Neptune)
     #Moyer, 1971, page 7 eq. 35
     # post-Newtonian iterative procedure setup and initialization
     _4ϕj[N] = 4newtonianNb_Potential[N]
-    Threads.@threads for i in _1_to_Nm1
+    Threads.@threads for i in 1:10
         ϕi_plus_4ϕj[i] = newtonianNb_Potential_t[i] + _4ϕj[N]
         sj2_plus_2si2_minus_4vivj[i] = ( (2v2[i]) - (4vi_dot_vj[i]) ) + v2[N]
         ϕs_and_vs[i] = sj2_plus_2si2_minus_4vivj[i] - ϕi_plus_4ϕj[i]
@@ -416,7 +759,7 @@ end
         pNY_t_pn3[i] = acceph_t[3i-1]*pn3[i]
         pNZ_t_pn3[i] = acceph_t[3i  ]*pn3[i]
     end #for i
-    for i in _1_to_Nm1
+    for i in 1:10
         termpnx = ( X_t_pn1[i] + (U_t_pn2[i]+pNX_t_pn3[i]) )
         sumpnx = pntempX + termpnx
         pntempX = sumpnx
@@ -424,6 +767,23 @@ end
         sumpny = pntempY + termpny
         pntempY = sumpny
         termpnz = ( Z_t_pn1[i] + (W_t_pn2[i]+pNZ_t_pn3[i]) )
+        sumpnz = pntempZ + termpnz
+        pntempZ = sumpnz
+    end
+    # compute Newtonian accelerations due to Pluto and 16 asteroid perturbers
+    Threads.@threads for i in 11:27
+        X_t_pn1[i] = c_p2*newton_acc_X[i]
+        Y_t_pn1[i] = c_p2*newton_acc_Y[i]
+        Z_t_pn1[i] = c_p2*newton_acc_Z[i]
+    end #for i
+    for i in 11:27
+        termpnx = X_t_pn1[i]
+        sumpnx = pntempX + termpnx
+        pntempX = sumpnx
+        termpny = Y_t_pn1[i]
+        sumpny = pntempY + termpny
+        pntempY = sumpny
+        termpnz = Z_t_pn1[i]
         sumpnz = pntempZ + termpnz
         pntempZ = sumpnz
     end
@@ -453,9 +813,9 @@ end
     NGAy = A2_t_g_r*tunity
     NGAz = A2_t_g_r*tunitz
 
-    dq[4] = postNewtonX + NGAx
-    dq[5] = postNewtonY + NGAy
-    dq[6] = postNewtonZ + NGAz
+    dq[4] = ( postNewtonX + accX ) + NGAx
+    dq[5] = ( postNewtonY + accY ) + NGAy
+    dq[6] = ( postNewtonZ + accZ ) + NGAz
 
     dq[7] = zero_q_1
 

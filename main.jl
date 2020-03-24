@@ -10,7 +10,7 @@ using SPICE: furnsh
 @show Threads.nthreads()
 
 #script parameters (TODO: use ArgParse.jl instead)
-const varorder = 5 # varorder is the order corresponding to the jet transport perturbation
+const varorder = 10 # varorder is the order corresponding to the jet transport perturbation
 const nv = 7 #number of TaylorN variables
 const objname = "Apophis"
 const maxsteps = 10000
@@ -21,12 +21,13 @@ const radarobsfile = joinpath(apophisjlpath, "../Apophis_JPL_data_2012_2013.dat"
 # const radarobsfile = joinpath(apophisjlpath, "../Apophis_JPL_data_2005_2006.dat")
 # const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph!
 const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
-const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
-@show t0 == 2454733.5
+const jd0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #Julian date of integration initial time
+@show jd0 == 2454733.5
+const t0 = 0.0 # integration initial time
 
 # path to local Solar System ephemeris file
 # ss_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_24yr_tx.jld")
-ss_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_5yr_tx.jld")
+ss_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_5yr_tx_DE430.jld")
 # ss_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_minus5yr_tx_BACKWARDS.jld")
 
 # dq: perturbation to nominal initial condition (Taylor1 jet transport)

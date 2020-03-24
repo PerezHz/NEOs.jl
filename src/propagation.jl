@@ -117,7 +117,8 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         dense::Bool=false, dq::Vector=zeros(7), radarobsfile::String="") where {T<:Real}
 
     ss16asteph, acc_eph, newtonianNb_Potential = loadeph(ephfile)
-    params = (ss16asteph, acc_eph, newtonianNb_Potential)
+    jd0 = datetime2julian(DateTime(2008, 9, 24))
+    params = (ss16asteph, acc_eph, newtonianNb_Potential, jd0)
     # get asteroid initial conditions
     q0 = initialcond(dq)
 
