@@ -158,14 +158,15 @@ function compute_radar_obs(outfilename::String, radarobsfile::String, apophis_in
     if radarobsfile != ""
         asteroid_data = process_radar_data_jpl(radarobsfile)
         # TODO: check that first and last observation times are within interpolation interval
+        jd0 = datetime2julian(DateTime(2008,9,24))
         function apophis_et(et)
-            return apophis_interp( etsecs2julian(et) )[1:6]
+            return auday2kmsec(apophis_interp( (et/86400) - (jd0-J2000) )[1:6])
         end
         function earth_et(et)
-            return ss16asteph( etsecs2julian(et) )[union(3*4-2:3*4,3*(N-1+4)-2:3*(N-1+4))]
+            return auday2kmsec(ss16asteph( (et/86400) - (jd0-J2000) )[union(3*4-2:3*4,3*(N-1+4)-2:3*(N-1+4))])
         end
         function sun_et(et)
-            return ss16asteph( etsecs2julian(et) )[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))]
+            return auday2kmsec(ss16asteph( (et/86400) - (jd0-J2000) )[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
         end
         #compute time-delay and Doppler-shift "ephemeris" (i.e., predicted values according to ephemeris)
         vdel, vdop = delay_doppler(asteroid_data, tc=tc, xve=earth_et, xvs=sun_et, xva=apophis_et)
