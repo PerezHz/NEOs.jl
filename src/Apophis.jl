@@ -35,7 +35,8 @@ const abstol = 1.0E-30
 # 52 Europa, 451 Patientia, 87 Sylvia
 # and Apophis as a massless test particle
 μ_ast = PlanetaryEphemeris.μ[12:27]
-const μ = vcat(PlanetaryEphemeris.μ[1:11], μ_ast, 0.0)
+# index 11 corresponds to Pluto, its mass is set to zero
+const μ = vcat(PlanetaryEphemeris.μ[1:10], 0.0, μ_ast, 0.0)
 const N = length(μ)
 
 # Matrix of J2 interactions included in DE430 ephemeris, according to Folkner et al., 2014

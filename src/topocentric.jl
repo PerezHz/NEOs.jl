@@ -1,5 +1,5 @@
 # et: ephemeris time (TDB seconds since J2000.0 epoch)
-function observer_position(station_code::Int, et::Float64; pm::Bool=true)
+function observer_position(station_code::Int, et::T; pm::Bool=true) where {T<:Number}
     # λ_deg: East longitude (deg)
     # u: distance from spin axis (km), taken from Yeomans et al. (1992) u = r*cos(ϕ)
     # v: height above equatorial plane (km), taken from Yeomans et al. (1992) v = r*sin(ϕ)
@@ -12,13 +12,13 @@ function observer_position(station_code::Int, et::Float64; pm::Bool=true)
         u = 6056.525 #km
         v = 1994.665 #km
     elseif station_code == 252 # Goldstone DSS 13 (Venus site), Fort Irwin
-        λ_deg = 243.20512 #deg
-        u = 5215.484 #km
-        v = 3660.957 #km
+        λ_deg = 243.2055410 #deg
+        u = 5215.524541 #km
+        v = 3660.912728 #km
     elseif station_code == 253 # Goldstone DSS 14 (Mars site), Fort Irwin
-        λ_deg = 243.11047 #deg
-        u = 5203.997 #km
-        v = 3677.052 #km
+        λ_deg = 243.1104618 #deg
+        u = 5203.996911 #km
+        v = 3677.052277 #km
     elseif station_code == 254 # Haystack, Westford, MA
         λ_deg = 288.51128 #deg
         u = 4700.514 #km
@@ -167,38 +167,39 @@ end
 # "IAU 1976/1980/1982/1994, equinox based"
 # found at SOFA website, Mar 27, 2019
 # et: ephemeris time (TDB seconds since J2000.0 epoch)
-function t2c_rotation_iau_76_80(et::Float64, pos_geo::Vector; pm::Bool=true)
+function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true) where {T<:Number}
     # UTC (JD)
     utc_secs = et - tdb_utc(et)
     t_utc = J2000 + utc_secs/daysec
     # TT
-    t0_tt = et + tt_tdb(et)
+    jd0 = datetime2julian(DateTime(2008,9,24))
+    t0_tt = et + ttmtdb((et/86400) - (jd0-J2000))
     tt = t0_tt/daysec
     # IAU 76/80 nutation-precession matrix
-    C = nupr7680mat(tt)
+    C = nupr7680mat(constant_term(tt))
 
     #Nutation corrections wrt IAU 1976/1980
     # Output of `EarthOrientation.precession_nutation80` is in mas:
     # https://github.com/JuliaAstro/EarthOrientation.jl/blob/529f12425a6331b133f989443aeb3fbbafd8f324/src/EarthOrientation.jl#L413
-    ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(t_utc)
+    ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(constant_term(t_utc))
     # Convert mas -> radians
     ddp80 = mas2rad(ddp80_mas)
     dde80 = mas2rad(dde80_mas)
     # Mean obliquity (output in radians)
-    epsa = iauObl80(J2000, tt) # rad
+    epsa = iauObl80(J2000, constant_term(tt)) # rad
     # Equation of the equinoxes `ee = GAST - GMST`, including nutation correction
-    ee = iauEqeq94(J2000, tt) + ddp80*cos(epsa)
+    ee = iauEqeq94(J2000, constant_term(tt)) + ddp80*cos(epsa)
     # ΔUT1 = UT1-UTC (seconds)
-    dut1 = EarthOrientation.getΔUT1(t_utc)
+    dut1 = EarthOrientation.getΔUT1(constant_term(t_utc))
     # UT1
-    date = floor(t_utc) + 0.5
+    date = floor(constant_term(t_utc)) + 0.5
     time_secs = utc_secs - date*daysec
     tut = (time_secs + dut1)/daysec
 
     # Greenwich apparent sidereal time (IAU 1982/1994)
     # jd1_ut1, jd2_ut1 = J2000, (utc_secs+dut1)/daysec
     # gmst82 = iauGmst82( jd1_ut1, jd2_ut1 ) #rad
-    gmst82 = iauGmst82( J2000+date, tut ) #rad
+    gmst82 = iauGmst82( J2000+date, constant_term(tut) ) #rad
     gast = iauAnp( gmst82 + ee ) #rad
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
     Rz_minus_GAST = [
@@ -214,7 +215,7 @@ function t2c_rotation_iau_76_80(et::Float64, pos_geo::Vector; pm::Bool=true)
         ]
 
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
-    W = polarmotionmat(tt, pm=pm)
+    W = polarmotionmat(constant_term(tt), pm=pm)
 
     W_inv = transpose(W)
     C_inv = transpose(C)

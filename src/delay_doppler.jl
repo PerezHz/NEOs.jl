@@ -1,9 +1,14 @@
 # construct path of JPL ephemerides
 const jplephpath = joinpath(dirname(pathof(Apophis)), "../jpleph")
 
+fname = joinpath(jplephpath, "ttmtdb_DE430_2003_2013.jld")
+ttmtdb_t = load(fname, "ttmtdb_t")
+ttmtdb_x = load(fname, "ttmtdb_x")
+ttmtdb = TaylorInterpolant(ttmtdb_t, ttmtdb_x)
+
 # read JPL ephemerides (Apophis, Solar System, TT-TDB)
 function loadjpleph()
-    furnsh.( joinpath.(jplephpath, ["a99942_s197.bsp", "a99942_s199.bsp", "de430t.bsp", "naif0012.tls"]) )
+    furnsh.( joinpath.(jplephpath, ["a99942_s197.bsp", "a99942_s199.bsp", "de430t.bsp", "naif0012.tls", "TTmTDB.de430.19feb2015.bsp"]) )
 end
 
 # this is an auxiliary function which converts a [x,y,z,vx,vy,vz] "state" vector from km,km/sec units to au,au/day
@@ -171,17 +176,18 @@ end
 #         = (TDB-TT) + (TT-TAI) + (TAI-UTC)
 #         = (TDB-TT) + (32.184 s) + ΔAT
 # does not include correction due to position of measurement station v_E*(r_S.r_E)/c^2 (Folkner et al. 2014; Moyer, 2003)
-function tdb_utc(et::T) where {T<:Real}
-    tt_tdb_et = tt_tdb(et)
+function tdb_utc(et::T) where {T<:Number}
+    jd0 = datetime2julian(DateTime(2008,9,24))
+    tt_tdb_et = ttmtdb((et/86400) - (jd0-J2000))
     tt_tai = 32.184
-    utc_secs = et - deltet(et, "ET") # used only to determine ΔAT; no high-precision needed
+    utc_secs = constant_term(et) - deltet(constant_term(et), "ET") # used only to determine ΔAT; no high-precision needed
     jd_utc = J2000 + utc_secs/daysec
     dt_utc = julian2datetime(jd_utc)
     fd_utc = (jd_utc+0.5) - floor(jd_utc+0.5)
     # @show jd_utc_r, dt_utc_r, fd_utc_r
     j, tai_utc = iauDat(year(dt_utc), month(dt_utc), day(dt_utc), fd_utc)
     # @show tt_tdb_et
-    return (T(tt_tai) + T(tai_utc)) - T(tt_tdb_et) # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
+    return (tt_tai + tai_utc) - tt_tdb_et # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
 end
 
 # function dtutc2et(t_utc::DateTime)
@@ -255,7 +261,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real, F_tx::Real,
         # Shapiro correction to time-delay
         Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)
         # troposphere correction to time-delay
-        # Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r) # seconds
+        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r) # seconds
         # Δτ_corona_D = corona_delay(constant_term.(r_a_t_b), r_r_t_r, r_s_t_r, F_tx, station_code) # seconds
         Δτ_D = Δτ_rel_D # + Δτ_tropo_D #+ Δτ_corona_D # seconds
         p_dot_23 = dot(ρ_vec_r, v_a_t_b)/ρ_r
@@ -316,7 +322,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real, F_tx::Real,
         q_U_vec = r_a_t_b - r_e_t_t
         q_U = ρ_t # signal path distance (up-leg)
         Δτ_rel_U = shapiro_delay(e_U, p_U, q_U) # seconds
-        # Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # seconds
+        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # seconds
         # Δτ_corona_U = corona_delay(constant_term.(r_t_t_t), constant_term.(r_a_t_b), constant_term.(r_s_t_b), F_tx, station_code) # seconds
         Δτ_U = Δτ_rel_U # + Δτ_tropo_U #+ Δτ_corona_U # seconds
         p_dot_12 = -dot(ρ_vec_t, v_t_t_t)/ρ_t
@@ -329,7 +335,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real, F_tx::Real,
     # compute TDB-UTC at transmit time
     # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth are of order 0.01μs
     # Δtt_tdb_station_t = - dot(v_e_t_t, r_t_t_t-r_e_t_t)/clightkms^2
-    tdb_utc_t = tdb_utc(constant_term(et_t_secs)) # + Δtt_tdb_station_t
+    tdb_utc_t = tdb_utc(et_t_secs) # + Δtt_tdb_station_t
     # compute TDB-UTC at receive time
     # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth  are of order 0.01μs
     # Δtt_tdb_station_r = - dot(v_e_t_r, r_r_t_r-r_e_t_r)/clightkms^2
@@ -337,7 +343,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real, F_tx::Real,
 
     # compute total time delay (UTC seconds); relativistic delay is already included in τ_D, τ_U
     # Eq. (9) Yeomans et al. (1992)
-    τ = (τ_D + τ_U) + (tdb_utc_t - tdb_utc_r) # seconds
+    τ = (τ_D + τ_U) + (Δτ_tropo_D + Δτ_tropo_U) + (tdb_utc_t - tdb_utc_r) # seconds
 
     return 1e6τ # total signal delay (μs)
 end
