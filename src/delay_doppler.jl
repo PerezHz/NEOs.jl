@@ -2,9 +2,7 @@
 const jplephpath = joinpath(dirname(pathof(Apophis)), "../jpleph")
 
 fname = joinpath(jplephpath, "ttmtdb_DE430_2003_2013.jld")
-ttmtdb_t = load(fname, "ttmtdb_t")
-ttmtdb_x = load(fname, "ttmtdb_x")
-ttmtdb = TaylorInterpolant(ttmtdb_t, ttmtdb_x)
+ttmtdb = load(fname, "ttmtdb")
 
 # read JPL ephemerides (Apophis, Solar System, TT-TDB)
 function loadjpleph()
@@ -178,7 +176,7 @@ end
 # does not include correction due to position of measurement station v_E*(r_S.r_E)/c^2 (Folkner et al. 2014; Moyer, 2003)
 function tdb_utc(et::T) where {T<:Number}
     jd0 = datetime2julian(DateTime(2008,9,24))
-    tt_tdb_et = ttmtdb((et/86400) - (jd0-J2000))
+    tt_tdb_et = ttmtdb(et)
     tt_tai = 32.184
     utc_secs = constant_term(et) - deltet(constant_term(et), "ET") # used only to determine ΔAT; no high-precision needed
     jd_utc = J2000 + utc_secs/daysec

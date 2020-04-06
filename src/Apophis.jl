@@ -36,7 +36,8 @@ const abstol = 1.0E-30
 # and Apophis as a massless test particle
 μ_ast = PlanetaryEphemeris.μ[12:27]
 # index 11 corresponds to Pluto, its mass is set to zero
-const μ = vcat(PlanetaryEphemeris.μ[1:10], 0.0, μ_ast, 0.0)
+# const μ = vcat(PlanetaryEphemeris.μ[1:10], 0.0, μ_ast, 0.0)
+const μ = vcat(PlanetaryEphemeris.μ[1:11], μ_ast, 0.0)
 const N = length(μ)
 
 # Matrix of J2 interactions included in DE430 ephemeris, according to Folkner et al., 2014
@@ -70,6 +71,8 @@ const Λ2 = zeros(N)
 const Λ3 = zeros(N)
 Λ3[ea] = -1.962633335678878e-19
 const clightkms = 2.99792458E5 # speed of light, km/sec
+
+const jd0 = 2.4547335e6
 
 include("process_radar_data_jpl.jl")
 include("topocentric.jl")

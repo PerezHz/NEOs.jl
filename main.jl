@@ -14,7 +14,7 @@ const varorder = 10 # varorder is the order corresponding to the jet transport p
 const nv = 7 #number of TaylorN variables
 const objname = "Apophis"
 const maxsteps = 10000
-const nyears = 5.0 #-5.0 #24.0
+const nyears = 5.0 #24.0
 const dense = true #false
 const apophisjlpath = dirname(pathof(Apophis))
 const radarobsfile = joinpath(apophisjlpath, "../Apophis_JPL_data_2012_2013.dat")
@@ -26,15 +26,13 @@ const jd0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #Julian date of integrati
 const t0 = 0.0 # integration initial time
 
 # path to local Solar System ephemeris file
-# ss_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_24yr_tx.jld")
-ss_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_5yr_tx_DE430.jld")
-# ss_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_minus5yr_tx_BACKWARDS.jld")
+ss_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_p5y_et.jld")
 
-# dq: perturbation to nominal initial condition (Taylor1 jet transport)
+#### dq: perturbation to nominal initial condition (Taylor1 jet transport)
 dq = Taylor1.(zeros(7), varorder)
 dq[end][1] = 1e-14
 
-# # dq: perturbation to nominal initial condition (TaylorN jet transport)
+#### dq: perturbation to nominal initial condition (TaylorN jet transport)
 # dq = set_variables("ξ", order=varorder, numvars=nv)
 # for i in 1:6
 #     dq[i][1][i] = 1e-8
@@ -43,23 +41,16 @@ dq[end][1] = 1e-14
 #     dq[7][1][7] = 1e-14
 # end
 
-#integrator warmup
+####integrator warmup
 propagate(objname, dynamics, 1, t0, nyears, ss_eph_file, output=false, dense=dense, dq=dq)
 println("*** Finished warmup")
 
 propagate(objname, dynamics, 5, t0, nyears, ss_eph_file, dense=dense, dq=dq)
-println("*** Finished 2nd warmup")
+println("*** Finished 2nd warmup with output")
 
-#root-finding methods warmup (integrate until first root-finding event):
-# propagate(objname, dynamics, 50, t0, nyears, ss_eph_file, dense=dense, dq=dq)
-# println("*** Finished root-finding warmup")
-
-#propagate(objname, dynamics, 100, t0, nyears, ss_eph_file, dense=dense, dq=dq)
-#println("*** Finished root-finding test: several roots")
-
-#Full jet transport integration until ~2038: about 8,000 steps
-#propagate(objname, dynamics, maxsteps, t0, nyears, ss_eph_file, dense=dense, dq=dq)
-#println("*** Finished full jet transport integration")
+####Full jet transport integration until ~2038: about 8,000 steps
+##propagate(objname, dynamics, maxsteps, t0, nyears, ss_eph_file, dense=dense, dq=dq)
+##println("*** Finished full jet transport integration")
 
 # # calculate computed values of time-delays and Doppler shifts
 # ss16asteph, acc_eph, newtonianNb_Potential = Apophis.loadeph(ss_eph_file)
@@ -68,5 +59,5 @@ println("*** Finished 2nd warmup")
 # x = load(astfname, "x")
 # tx = TaylorInterpolant(t, x)
 # furnsh( joinpath(apophisjlpath, "../jpleph", "naif0012.tls") ) # load leapseconds kernel
-# furnsh( joinpath(apophisjlpath, "../jpleph", "de431t.bsp") ) # at least one SPK file must be loaded to read .tls file
+# furnsh( joinpath(apophisjlpath, "../jpleph", "de430_1850-2150.bsp") ) # at least one SPK file must be loaded to read .tls file
 # Apophis.compute_radar_obs("deldop.jld", radarobsfile, tx, ss16asteph)

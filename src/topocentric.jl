@@ -173,7 +173,7 @@ function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true) where {T<
     t_utc = J2000 + utc_secs/daysec
     # TT
     jd0 = datetime2julian(DateTime(2008,9,24))
-    t0_tt = et + ttmtdb((et/86400) - (jd0-J2000))
+    t0_tt = et + ttmtdb(et)
     tt = t0_tt/daysec
     # IAU 76/80 nutation-precession matrix
     C = nupr7680mat(constant_term(tt))

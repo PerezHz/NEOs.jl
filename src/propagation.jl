@@ -7,33 +7,36 @@ end
 
 function loadeph(ephfile)
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    ss16ast_eph_t = load(ephfile, "ss16ast_eph_t")
-    ss16ast_eph_x = load(ephfile, "ss16ast_eph_x")
-    ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
+    ss16asteph_ = load(ephfile, "ss16ast_eph")
+    ss16asteph_t0 = (ss16asteph_.t0 ./ daysec) - (jd0-J2000)
+    ss16asteph_t = (ss16asteph_.t ./ daysec)
+    ephord = ss16asteph_.x[1].order
+    ss16asteph_x = map(x->x(Taylor1(ephord)*daysec), ss16asteph_.x)
+    ss16asteph = TaylorInterpolant(ss16asteph_t0, ss16asteph_t, ss16asteph_x)
     #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
     # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
     Nm1 = N-1
-    acc_eph = TaylorInterpolant(ss16ast_eph_t, Matrix{eltype(ss16ast_eph_x)}(undef, length(ss16ast_eph_t)-1, 3Nm1))
-    newtonianNb_Potential = TaylorInterpolant(ss16ast_eph_t, Matrix{eltype(ss16ast_eph_x)}(undef, length(ss16ast_eph_t)-1, Nm1))
-    fill!(acc_eph.x, zero(ss16ast_eph_x[1]))
-    fill!(newtonianNb_Potential.x, zero(ss16ast_eph_x[1]))
+    acc_eph = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, 3Nm1))
+    newtonianNb_Potential = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, Nm1))
+    fill!(acc_eph.x, zero(ss16asteph.x[1]))
+    fill!(newtonianNb_Potential.x, zero(ss16asteph.x[1]))
     _1_to_Nm1 = Base.OneTo(Nm1) # iterator over all bodies except Apophis
     for j in _1_to_Nm1
         for i in _1_to_Nm1
             # i == j && continue
             if i == j
             else
-                X_ij = ss16ast_eph_x[:,3i-2] .- ss16ast_eph_x[:,3j-2]
-                Y_ij = ss16ast_eph_x[:,3i-1] .- ss16ast_eph_x[:,3j-1]
-                Z_ij = ss16ast_eph_x[:,3i  ] .- ss16ast_eph_x[:,3j  ]
+                X_ij = ss16asteph.x[:,3i-2] .- ss16asteph.x[:,3j-2]
+                Y_ij = ss16asteph.x[:,3i-1] .- ss16asteph.x[:,3j-1]
+                Z_ij = ss16asteph.x[:,3i  ] .- ss16asteph.x[:,3j  ]
                 r_p2_ij = ( (X_ij.^2) .+ (Y_ij.^2) ) .+ (Z_ij.^2)
                 r_ij = sqrt.(r_p2_ij)
                 newtonianNb_Potential.x[:,j] .+= (μ[i]./r_ij)
             end #if i != j
         end #for, i
-        acc_eph.x[:,3j-2] .= differentiate.(ss16ast_eph_x[:,3(N-1+j)-2])
-        acc_eph.x[:,3j-1] .= differentiate.(ss16ast_eph_x[:,3(N-1+j)-1])
-        acc_eph.x[:,3j  ] .= differentiate.(ss16ast_eph_x[:,3(N-1+j)  ])
+        acc_eph.x[:,3j-2] .= differentiate.(ss16asteph.x[:,3(Nm1+j)-2])
+        acc_eph.x[:,3j-1] .= differentiate.(ss16asteph.x[:,3(Nm1+j)-1])
+        acc_eph.x[:,3j  ] .= differentiate.(ss16asteph.x[:,3(Nm1+j)  ])
     end #for, j
     return ss16asteph, acc_eph, newtonianNb_Potential
 end
@@ -127,9 +130,11 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
     # propagate orbit
     if dense
         @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense)
-        sol = (
-            t=interp.t[:],
-            x=interp.x[:,:]
+        et0 = (jd0-J2000)*daysec
+        etv = interp.t[:]*daysec
+        interp_x_et = map(x->x(Taylor1(order)/daysec), interp.x[:,:])
+        apophis = TaylorInterpolant(et0, etv, interp_x_et)
+        sol = (apophis=apophis,
         )
     else
         @time sol_objs = apophisinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter)

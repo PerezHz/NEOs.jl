@@ -1,17 +1,14 @@
 function apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
-    dx::Vector{Taylor1{U}}, xaux::Vector{Taylor1{U}}, abstol::T, params,
-    parse_eqs::Bool=true) where {T<:Real, U<:Number}
-
+        dx::Vector{Taylor1{U}}, xaux::Vector{Taylor1{U}}, abstol::T, params,
+        parse_eqs::Bool=true) where {T<:Real, U<:Number}
     # Compute the Taylor coefficients
     TaylorIntegration.__jetcoeffs!(Val(parse_eqs), f!, t, x, dx, xaux, params)
-
     # Compute the step-size of the integration using `abstol`
     δt = TaylorIntegration.stepsize(x, abstol)
-    # Force Apophis time-step to be no larger than ephemeris time-step
-    ind = TaylorIntegration.getinterpindex(params[1], t[0])
+    # Force Apophis time-step to be no larger than planetary ephemeris time-step
+    ind, _ = TaylorIntegration.getinterpindex(params[1], t[0])
     Δt = abs(params[1].t[ind+1] - t[0])
     δt = min(δt, Δt)
-
     return δt
 end
 
@@ -80,7 +77,7 @@ function apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T,
     end
 
     if dense
-        return TaylorInterpolant(view(tv,1:nsteps), view(transpose(view(xv_interp,:,1:nsteps-1)),1:nsteps-1,:))
+        return TaylorInterpolant(tv[1], view(tv.-tv[1],1:nsteps), view(transpose(view(xv_interp,:,1:nsteps-1)),1:nsteps-1,:))
     else
         return view(tv,1:nsteps), view(transpose(view(xv,:,1:nsteps)),1:nsteps,:)
     end
@@ -177,7 +174,7 @@ function apophisinteg(f!, g, q0::Array{U,1}, t0::T, tmax::T, order::Int,
         end
     end
     if dense
-        return TaylorInterpolant(view(tv,1:nsteps), view(transpose(view(xv_interp,:,1:nsteps-1)),1:nsteps-1,:)), view(tvS,1:nevents-1), view(transpose(view(xvS,:,1:nevents-1)),1:nevents-1,:), view(gvS,1:nevents-1)
+        return TaylorInterpolant(tv[1], view(tv.-tv[1],1:nsteps), view(transpose(view(xv_interp,:,1:nsteps-1)),1:nsteps-1,:)), view(tvS,1:nevents-1), view(transpose(view(xvS,:,1:nevents-1)),1:nevents-1,:), view(gvS,1:nevents-1)
     else
         return view(tv,1:nsteps), view(transpose(view(xv,:,1:nsteps)),1:nsteps,:), view(tvS,1:nevents-1), view(transpose(view(xvS,:,1:nevents-1)),1:nevents-1,:), view(gvS,1:nevents-1)
     end
