@@ -150,7 +150,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         # apophis = TaylorInterpolant(et0, etv, interp_x_et)
         apophis_t0 = (jd0-J2000) # days since J2000 until initial integration time
         apophis_t = interp.t[:]
-        apophis_x = interp.x[:]
+        apophis_x = interp.x[:,:]
         apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
         sol = (apophis=apophis,
         )
