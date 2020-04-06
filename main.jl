@@ -52,12 +52,10 @@ println("*** Finished 2nd warmup with output")
 ##propagate(objname, dynamics, maxsteps, t0, nyears, ss_eph_file, dense=dense, dq=dq)
 ##println("*** Finished full jet transport integration")
 
-# # calculate computed values of time-delays and Doppler shifts
-# ss16asteph, acc_eph, newtonianNb_Potential = Apophis.loadeph(ss_eph_file)
+# #### calculate computed values of time-delays and Doppler shifts
+# ss16asteph = load(ss_eph_file, "ss16ast_eph")
 # astfname = "Apophis_jt.0.jld"
-# t = load(astfname, "t")
-# x = load(astfname, "x")
-# tx = TaylorInterpolant(t, x)
+# tx = load(astfname, "apophis")
 # furnsh( joinpath(apophisjlpath, "../jpleph", "naif0012.tls") ) # load leapseconds kernel
 # furnsh( joinpath(apophisjlpath, "../jpleph", "de430_1850-2150.bsp") ) # at least one SPK file must be loaded to read .tls file
 # Apophis.compute_radar_obs("deldop.jld", radarobsfile, tx, ss16asteph)

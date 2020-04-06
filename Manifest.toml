@@ -427,7 +427,7 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 deps = ["Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "Quadmath", "Revise", "TaylorIntegration", "TaylorSeries", "Test"]
 git-tree-sha1 = "e604e285c532ebc2de2c4aed8394313c03f62c5a"
 repo-rev = "jp/quadmath"
-repo-url = "https://github.com/PerezHz/PlanetaryEphemeris.jl.git"
+repo-url = "git@github.com:PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
 version = "0.1.0"
 
@@ -484,9 +484,9 @@ version = "0.8.0"
 
 [[RecursiveArrayTools]]
 deps = ["ArrayInterface", "RecipesBase", "Requires", "StaticArrays", "Statistics", "ZygoteRules"]
-git-tree-sha1 = "b5797350f4935882324b32cf966b3e19805de565"
+git-tree-sha1 = "01af091d2e62b907f6bb65ea2e7c12208131cf17"
 uuid = "731186ca-8d62-57ce-b412-fbd966d074cd"
-version = "2.1.2"
+version = "2.2.0"
 
 [[RecursiveFactorization]]
 deps = ["LinearAlgebra"]

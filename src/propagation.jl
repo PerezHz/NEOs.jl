@@ -115,6 +115,15 @@ function least_squares_A2(asteroid_data::Vector{RadarDataJPL{T}},
     return A2_lsqfit_deldop, Γ_deldop(A2_lsqfit_deldop)
 end
 
+function scaling(a::Taylor1{Taylor1{T}}, c::T) where {T<:Real}
+    x = c*Taylor1( Taylor1(a.order).coeffs*one(a[0]) )
+    suma = a[end]*one(x)
+    for k = a.order-1:-1:0
+        suma = suma*x + a[k]*one(x)
+    end
+    return suma
+end
+
 function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         tspan::T, ephfile::String; output::Bool=true, newtoniter::Int=10,
         dense::Bool=false, dq::Vector=zeros(7), radarobsfile::String="") where {T<:Real}
@@ -131,10 +140,18 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
     # propagate orbit
     if dense
         @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense)
-        et0 = (jd0-J2000)*daysec
-        etv = interp.t[:]*daysec
-        interp_x_et = map(x->x(Taylor1(order)/daysec), interp.x[:,:])
-        apophis = TaylorInterpolant(et0, etv, interp_x_et)
+        # et0 = (jd0-J2000)*daysec
+        # etv = interp.t[:]*daysec
+        # if eltype(interp.x) == Taylor1{Taylor1{Float64}}
+        #     interp_x_et = scaling.(interp.x[:,:], 1.0/86400)
+        # else
+        #     interp_x_et = map(x->x(Taylor1(order)/daysec), interp.x[:,:])
+        # end
+        # apophis = TaylorInterpolant(et0, etv, interp_x_et)
+        apophis_t0 = (jd0-J2000) # days since J2000 until initial integration time
+        apophis_t = interp.t[:]
+        apophis_x = interp.x[:]
+        apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
         sol = (apophis=apophis,
         )
     else
@@ -166,7 +183,7 @@ function compute_radar_obs(outfilename::String, radarobsfile::String, apophis_in
         # TODO: check that first and last observation times are within interpolation interval
         jd0 = datetime2julian(DateTime(2008,9,24))
         function apophis_et(et)
-            return auday2kmsec(apophis_interp(et)[1:6])
+            return auday2kmsec(apophis_interp(et/daysec)[1:6])
         end
         function earth_et(et)
             return auday2kmsec(ss16asteph(et)[union(3*4-2:3*4,3*(N-1+4)-2:3*(N-1+4))])
