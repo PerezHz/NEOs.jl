@@ -105,14 +105,16 @@ function apophisinteg(f!, g, q0::Array{U,1}, t0::T, tmax::T, order::Int,
     x = Array{Taylor1{U}}(undef, dof)
     dx = Array{Taylor1{U}}(undef, dof)
     xaux = Array{Taylor1{U}}(undef, dof)
-    dx .= Taylor1.(zeros(U, dof), order)
+    dx = Array{Taylor1{U}}(undef, dof)
 
     # Initial conditions
     @inbounds t[0] = t0
     x .= Taylor1.(q0, order)
+    dx .= zero.(x)
     x0 = deepcopy(q0)
     @inbounds tv[1] = t0
     @inbounds xv[:,1] .= q0
+    sign_tstep = copysign(1, tmax-t0)
 
     # Determine if specialized jetcoeffs! method exists
     parse_eqs = parse_eqs && (length(methods(TaylorIntegration.jetcoeffs!)) > 2)
@@ -125,19 +127,23 @@ function apophisinteg(f!, g, q0::Array{U,1}, t0::T, tmax::T, order::Int,
     end
     @show parse_eqs
 
-    #Some auxiliary arrays for root-finding/event detection/Poincaré surface of section evaluation
-    g_val = zero(g(x, x, params, t))
-    g_val_old = zero(g_val)
-    slope = zero(U)
-    dt_li = zero(U)
-    dt_nr = zero(U)
-    δt = zero(U)
-    δt_old = zero(U)
+    # Some auxiliary arrays for root-finding/event detection/Poincaré surface of section evaluation
+    g_tupl = g(dx, x, params, t)
+    g_tupl_old = g(dx, x, params, t)
+    # g_val = zero(gg_tupl[2])
+    # g_val_old = zero(g_val)
+    slope = zero(x[1])
+    dt_li = zero(x[1])
+    dt_nr = zero(x[1])
+    δt = zero(x[1])
+    δt_old = zero(x[1])
 
     x_dx = vcat(x, dx)
-    g_dg = vcat(g_val, g_val_old)
+    # g_dg = vcat(g_val, g_val_old)
+    g_dg = vcat(g_tupl[2], g_tupl_old[2])
     x_dx_val = Array{U}(undef, length(x_dx) )
-    g_dg_val = vcat(evaluate(g_val), evaluate(g_val_old))
+    # g_dg_val = vcat(evaluate(g_val), evaluate(g_val_old))
+    g_dg_val = vcat(evaluate(g_tupl[2]), evaluate(g_tupl_old[2]))
 
     tvS = Array{U}(undef, maxsteps+1)
     xvS = similar(xv)
@@ -146,18 +152,25 @@ function apophisinteg(f!, g, q0::Array{U,1}, t0::T, tmax::T, order::Int,
     # Integration
     nsteps = 1
     nevents = 1 #number of detected events
-    while t0 < tmax
+    while sign_tstep*t0 < sign_tstep*tmax
         δt_old = δt
-        δt = apophisstep!(f!, t, x, dx, xaux, t0, tmax, order, abstol, params, parse_eqs)
+        δt = apophisstep!(f!, t, x, dx, xaux, abstol, params, parse_eqs) # δt is positive!
+        # Below, δt has the proper sign according to the direction of the integration
+        δt = sign_tstep * min(δt, sign_tstep*(tmax-t0))
         evaluate!(x, δt, x0) # new initial condition
+        # g_val = g(dx, x, params, t)
+        # nevents = findroot!(t, x, dx, g_val_old, g_val, eventorder,
+        #     tvS, xvS, gvS, t0, δt_old, x_dx, x_dx_val, g_dg, g_dg_val,
+        #     nrabstol, newtoniter, nevents)
+        # g_val_old = deepcopy(g_val)
+        g_tupl = g(dx, x, params, t)
+        nevents = TaylorIntegration.findroot!(t, x, dx, g_tupl_old, g_tupl, eventorder,
+        tvS, xvS, gvS, t0, δt_old, x_dx, x_dx_val, g_dg, g_dg_val,
+        nrabstol, newtoniter, nevents)
         if dense
             xv_interp[:,nsteps] .= deepcopy(x)
         end
-        g_val = g(dx, x, params, t)
-        nevents = TaylorIntegration.findroot!(t, x, dx, g_val_old, g_val, eventorder,
-            tvS, xvS, gvS, t0, δt_old, x_dx, x_dx_val, g_dg, g_dg_val,
-            nrabstol, newtoniter, nevents)
-        g_val_old = deepcopy(g_val)
+        g_tupl_old = deepcopy(g_tupl)
         for i in eachindex(x0)
             @inbounds x[i][0] = x0[i]
         end
@@ -167,7 +180,7 @@ function apophisinteg(f!, g, q0::Array{U,1}, t0::T, tmax::T, order::Int,
         @inbounds tv[nsteps] = t0
         @inbounds xv[:,nsteps] .= x0
         if nsteps > maxsteps
-            @info("""
+            @warn("""
             Maximum number of integration steps reached; exiting.
             """)
             break

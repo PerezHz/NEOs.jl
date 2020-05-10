@@ -1,8 +1,8 @@
 #numerator of Apophis radial velocity wrt Earth
 function rvelea(dx, x, params, t)
-    ss16asteph_t = params[1](t) #ss16asteph(t)
+    ss16asteph_t = ss16asteph_t = evaleph(params[1], t, x[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
     xe = ss16asteph_t[union(3ea-2:3ea,3(N-1+ea)-2:3(N-1+ea))]
-    return (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
+    return true, (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
 end
 
 function loadeph(ephfile)

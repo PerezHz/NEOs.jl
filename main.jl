@@ -15,7 +15,7 @@ const nv = 7 #number of TaylorN variables
 const objname = "Apophis"
 const maxsteps = 10000
 const nyears = 5.0 #24.0
-const dense = true #false
+const dense = false #true
 const apophisjlpath = dirname(pathof(Apophis))
 const radarobsfile = joinpath(apophisjlpath, "../Apophis_JPL_data_2012_2013.dat")
 # const radarobsfile = joinpath(apophisjlpath, "../Apophis_JPL_data_2005_2006.dat")
@@ -27,6 +27,8 @@ const t0 = 0.0 # integration initial time
 
 # path to local Solar System ephemeris file
 ss_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_p5y_et.jld")
+#ss_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_p24y_et.jld")
+#ss_eph_file = joinpath(apophisjlpath, "../jpleph", "ss16ast343_eph_m4y_et.jld")
 
 #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
 dq = Taylor1.(zeros(7), varorder)
