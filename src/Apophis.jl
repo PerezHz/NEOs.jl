@@ -9,7 +9,7 @@ export propagate, observer_position, apophisdofs,
     RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!,
     propagate_distributed, parallel_run,
     utcepoch, delay, delay_sigma, delay_units, doppler, doppler_sigma,
-    doppler_units, freq, rcvr, xmit, bouncepoint
+    doppler_units, freq, rcvr, xmit, bouncepoint, valsecchi_circle
 
 using Distributed
 using TaylorIntegration
@@ -81,6 +81,7 @@ include("asteroid_dynamical_models.jl")
 include("initial_conditions.jl")
 include("integration_methods.jl")
 include("propagation.jl")
+include("impact_monitoring.jl")
 
 function __init__()
     @show length(methods(TaylorIntegration.jetcoeffs!))
