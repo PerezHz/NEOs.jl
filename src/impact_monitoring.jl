@@ -12,20 +12,15 @@ function valsecchi_circle(a, e, i, k, h, m_pl=3.003489614915764e-6)
     U_norm = sqrt( 3 - (1/a) - 2*sqrt(a*(1-(e^2)))*cos(i) )
     # should be equal to asteroid heliocentric elliptic a (Carusi et al, 1990)
     #@show 1/(1-U_^2-2U_y)
-    a_0_primed = (k/h)^(2/3)
-    cos_θ = U_y/U_norm
-    sin_θ = sin(acos(cos_θ)) #sqrt(1-cos_θ_^2) # TODO: CHECK SIGN
-    cos_θ_0_primed = (1-(U_norm^2)-(1/a_0_primed))/(2U_norm)
-    sin_θ_0_primed = sin(acos(cos_θ_0_primed))
+    a0p = (k/h)^(2/3)
+    cosθ = U_y/U_norm
+    sinθ = sin(acos(cosθ)) #sqrt(1-cos_θ_^2) # TODO: CHECK SIGN
+    cosθ0p = (1-(U_norm^2)-(1/a0p))/(2U_norm)
+    sinθ0p = sin(acos(cosθ0p))
     # c = m/U^2 (Valsecchi et al, 2003, Sec. 2.3, first sentence below Eq. 3)
     c = m_pl/(U_norm^2)
-    R_valsecchi = abs( c*sin(acos(cos_θ_0_primed))/(cos_θ_0_primed-cos_θ) )
-    D_valsecchi = c*sin_θ/(cos_θ_0_primed-cos_θ)
+    R0 = abs( c*sinθ0p/(cosθ0p-cosθ) )
+    D0 = c*sinθ/(cosθ0p-cosθ)
 
-    #@show c*(sin_θ+sin_θ_0_primed)/(cos_θ_0_primed-cos_θ)/(PlanetaryEphemeris.RE/au)
-    #@show c*(sin_θ-sin_θ_0_primed)/(cos_θ_0_primed-cos_θ)/(PlanetaryEphemeris.RE/au)
-    #@show c*sqrt((cos_θ_0_primed+cos_θ)/(cos_θ-cos_θ_0_primed))/(PlanetaryEphemeris.RE/au)
-    #@show -c*sqrt((cos_θ_0_primed+cos_θ)/(cos_θ-cos_θ_0_primed))/(PlanetaryEphemeris.RE/au)
-
-    return R_valsecchi, D_valsecchi
+    return R0, D0
 end
