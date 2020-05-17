@@ -126,7 +126,8 @@ end
 
 function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         tspan::T, ephfile::String; output::Bool=true, newtoniter::Int=10,
-        dense::Bool=false, dq::Vector=zeros(7), radarobsfile::String="") where {T<:Real}
+        dense::Bool=false, dq::Vector=zeros(7), radarobsfile::String="",
+        quadmath::Bool=false) where {T<:Real}
 
     ss16asteph, acc_eph, newtonianNb_Potential = loadeph(ephfile)
     jd0 = datetime2julian(DateTime(2008, 9, 24))
@@ -135,11 +136,26 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
     q0 = initialcond(dq)
     @show q0
 
-    @show tmax = t0+tspan*yr #final time of integration
+    if quadmath
+        _q0 = one(Float128)*q0
+        _t0 = Float128(t0)
+        _abstol = Float128(abstol)
+        _ss16asteph = TaylorInterpolant(Float128(ss16asteph.t0), Float128.(ss16asteph.t), map(x->Taylor1(Float128.(x.coeffs)), ss16asteph.x))
+        _acc_eph = TaylorInterpolant(Float128(acc_eph.t0), Float128.(acc_eph.t), map(x->Taylor1(Float128.(x.coeffs)), acc_eph.x))
+        _newtonianNb_Potential = TaylorInterpolant(Float128(newtonianNb_Potential.t0), Float128.(newtonianNb_Potential.t), map(x->Taylor1(Float128.(x.coeffs)), newtonianNb_Potential.x))
+        _params = (_ss16asteph, _acc_eph, _newtonianNb_Potential, Float128(jd0))
+    else
+        _q0 = q0
+        _t0 = t0
+        _abstol = abstol
+        _params = params
+    end
+
+    @show _tmax = _t0+tspan*yr #final time of integration
 
     # propagate orbit
     if dense
-        @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=dense)
+        @time interp = apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, dense=dense)
         # et0 = (jd0-J2000)*daysec
         # etv = interp.t[:]*daysec
         # if eltype(interp.x) == Taylor1{Taylor1{Float64}}
@@ -148,20 +164,29 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         #     interp_x_et = map(x->x(Taylor1(order)/daysec), interp.x[:,:])
         # end
         # apophis = TaylorInterpolant(et0, etv, interp_x_et)
-        apophis_t0 = (jd0-J2000) # days since J2000 until initial integration time
-        apophis_t = interp.t[:]
-        apophis_x = interp.x[:,:]
-        apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
-        sol = (apophis=apophis,
-        )
+        if quadmath
+            apophis_t0 = (jd0-J2000) # days since J2000 until initial integration time
+            apophis_t = Float64.(interp.t[:])
+            apophis_x = convert(Array{Taylor1{eltype(q0)}}, interp.x[:,:])
+            apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
+            sol = (apophis=apophis,
+            )
+        else
+            apophis_t0 = (jd0-J2000) # days since J2000 until initial integration time
+            apophis_t = interp.t[:]
+            apophis_x = interp.x[:,:]
+            apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
+            sol = (apophis=apophis,
+            )
+        end
     else
-        @time sol_objs = apophisinteg(dynamics, rvelea, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, newtoniter=newtoniter)
+        @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, newtoniter=newtoniter)
         sol = (
-            tv1 = sol_objs[1][:],
-            xv1 = sol_objs[2][:,:],
-            tvS1 = sol_objs[3][:],
-            xvS1 = sol_objs[4][:,:],
-            gvS1 = sol_objs[5][:]
+            tv1 = Float64.(sol_objs[1][:]),
+            xv1 = convert(Array{eltype(q0)}, sol_objs[2][:,:]),
+            tvS1 = convert(Array{eltype(q0)}, sol_objs[3][:]),
+            xvS1 = convert(Array{eltype(q0)}, sol_objs[4][:,:]),
+            gvS1 = convert(Array{eltype(q0)}, sol_objs[5][:])
         )
     end
 

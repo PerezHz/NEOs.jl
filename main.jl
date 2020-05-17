@@ -16,6 +16,7 @@ const objname = "Apophis"
 const maxsteps = 10000
 const nyears = 5.0 #24.0
 const dense = false #true
+const quadmath = true # use quadruple precision
 const apophisjlpath = dirname(pathof(Apophis))
 const radarobsfile = joinpath(apophisjlpath, "../Apophis_JPL_data_2012_2013.dat")
 # const radarobsfile = joinpath(apophisjlpath, "../Apophis_JPL_data_2005_2006.dat")
@@ -44,14 +45,14 @@ dq[end][1] = 1e-14
 # end
 
 ####integrator warmup
-propagate(objname, dynamics, 1, t0, nyears, ss_eph_file, output=false, dense=dense, dq=dq)
+propagate(objname, dynamics, 1, t0, nyears, ss_eph_file, output=false, dense=dense, dq=dq, quadmath=quadmath)
 println("*** Finished warmup")
 
-propagate(objname, dynamics, 5, t0, nyears, ss_eph_file, dense=dense, dq=dq)
+propagate(objname, dynamics, 5, t0, nyears, ss_eph_file, dense=dense, dq=dq, quadmath=quadmath)
 println("*** Finished 2nd warmup with output")
 
 ####Full jet transport integration until ~2038: about 8,000 steps
-##propagate(objname, dynamics, maxsteps, t0, nyears, ss_eph_file, dense=dense, dq=dq)
+##propagate(objname, dynamics, maxsteps, t0, nyears, ss_eph_file, dense=dense, dq=dq, quadmath=quadmath)
 ##println("*** Finished full jet transport integration")
 
 # #### calculate computed values of time-delays and Doppler shifts

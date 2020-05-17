@@ -22,6 +22,7 @@ using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun,
 using JLD
 using EarthOrientation, SOFA, SPICE
 using Dates
+using Quadmath
 
 # integration parameters
 const order = 30
