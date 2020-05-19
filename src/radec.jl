@@ -113,7 +113,7 @@ function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
 
     # Compute right ascension, declination angles
     dec_rad = asin(u2_vec[3]/u2_norm) # declination (rad)
-    ra_rad0 = atan(u2_vec[2], u2_vec[1])
+    ra_rad0 = atan(u2_vec[2]/u2_vec[1])
     ra_rad1 = atan(constant_term(u2_vec[2]), constant_term(u2_vec[1])) + (ra_rad0 - constant_term(ra_rad0)) # workaround for TaylorSeries.atan
     ra_rad = mod(ra_rad1, 2pi) # right ascension (rad)
 
