@@ -78,6 +78,7 @@ const jd0 = 2.4547335e6
 include("process_radar_data_jpl.jl")
 include("topocentric.jl")
 include("delay_doppler.jl")
+include("radec.jl")
 include("asteroid_dynamical_models.jl")
 include("initial_conditions.jl")
 include("integration_methods.jl")

@@ -1,5 +1,5 @@
 # et: ephemeris time (TDB seconds since J2000.0 epoch)
-function observer_position(station_code::Int, et::T; pm::Bool=true) where {T<:Number}
+function observer_position(station_code::Union{Int, String}, et::T; pm::Bool=true) where {T<:Number}
     # λ_deg: East longitude (deg)
     # u: distance from spin axis (km), taken from Yeomans et al. (1992) u = r*cos(ϕ)
     # v: height above equatorial plane (km), taken from Yeomans et al. (1992) v = r*sin(ϕ)
@@ -23,6 +23,18 @@ function observer_position(station_code::Int, et::T; pm::Bool=true) where {T<:Nu
         λ_deg = 288.51128 #deg
         u = 4700.514 #km
         v = 4296.900 #km
+    elseif station_code == "V00" # Kitt Peak-Bok
+        λ_deg = 248.39981 #deg
+        u = 0.849456*PlanetaryEphemeris.RE #km
+        v = +0.526492*PlanetaryEphemeris.RE #km
+    elseif station_code == "T09" # Mauna Kea-UH/Tholen NEO Follow-Up (Subaru)
+        λ_deg = 204.52398 #deg
+        u = 0.941706*PlanetaryEphemeris.RE #km
+        v = +0.337237*PlanetaryEphemeris.RE #km
+    elseif station_code == "T12" # Mauna Kea-UH/Tholen NEO Follow-Up (2.24-m)
+        λ_deg = 204.53057 #deg
+        u = 0.941729*PlanetaryEphemeris.RE #km
+        v = +0.337199*PlanetaryEphemeris.RE #km
     else
         @error "Unknown station."
     end
@@ -207,8 +219,8 @@ function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true) where {T<
             sin(gast) cos(gast) 0.0;
             0.0 0.0 1.0
         ]
-    β_dot = omega(EarthOrientation.getlod(t_utc))
-    dRz_minus_GAST = β_dot*[
+    β_dot = omega(EarthOrientation.getlod(t_utc))/daysec
+    dRz_minus_GAST = (β_dot)*[
             -sin(gast) -cos(gast) 0.0;
             cos(gast) -sin(gast) 0.0;
             0.0 0.0 0.0
