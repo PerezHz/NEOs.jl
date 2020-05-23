@@ -25,18 +25,30 @@ function observer_position(station_code::Union{Int, String}, et::T; pm::Bool=tru
         v = 4296.900 #km
     elseif station_code == "V00" # Kitt Peak-Bok
         λ_deg = 248.39981 #deg
-        u = 0.849456*PlanetaryEphemeris.RE #km
-        v = +0.526492*PlanetaryEphemeris.RE #km
+        u = 0.849456*RE #km
+        v = +0.526492*RE #km
     elseif station_code == "T09" # Mauna Kea-UH/Tholen NEO Follow-Up (Subaru)
         λ_deg = 204.52398 #deg
-        u = 0.941706*PlanetaryEphemeris.RE #km
-        v = +0.337237*PlanetaryEphemeris.RE #km
+        u = 0.941706*RE #km
+        v = +0.337237*RE #km
     elseif station_code == "T12" # Mauna Kea-UH/Tholen NEO Follow-Up (2.24-m)
         λ_deg = 204.53057 #deg
-        u = 0.941729*PlanetaryEphemeris.RE #km
-        v = +0.337199*PlanetaryEphemeris.RE #km
+        u = 0.941729*RE #km
+        v = +0.337199*RE #km
+    elseif station_code == "568" # Mauna Kea
+        λ_deg = 204.5278 #deg
+        u = 0.94171*RE #km
+        v = +0.33725*RE #km
+    elseif station_code == "H01" # Magdalena Ridge Observatory, Socorro
+        λ_deg = 252.81067 #deg
+        u = 0.830474*RE #km
+        v = +0.556096*RE #km
+    elseif station_code == "F51" # Pan-STARRS 1, Haleakala
+        λ_deg = 203.74409 #deg
+        u = 0.936241*RE #km
+        v = +0.351543*RE #km
     else
-        @error "Unknown station."
+        @error "Unknown station code: $station_code"
     end
     # cartesian components of Earth-fixed position of observer
     λ_rad = deg2rad(λ_deg) # rad
