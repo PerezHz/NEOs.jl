@@ -259,7 +259,7 @@ function compute_optical_obs_v15(outfilename::String, opticalobsfile::String, ap
             return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
         end
         #compute right ascension and declination "ephemeris" (i.e., predicted values according to ephemeris)
-        vra, vdec = radec_mpc_vokr15(opticalobsfile, xve=earth_et, xvs=sun_et, xva=apophis_et)
+        vra, vdec = radec_mpc_vokr15(xve=earth_et, xvs=sun_et, xva=apophis_et)
         sol = (vra=vra, vdec=vdec)
         #save data to file
         __save2jldandcheck(outfilename, sol)
