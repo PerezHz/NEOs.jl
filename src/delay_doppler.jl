@@ -1,7 +1,7 @@
 # construct path of JPL ephemerides
 const jplephpath = joinpath(dirname(pathof(Apophis)), "../jpleph")
 
-fname = joinpath(jplephpath, "ttmtdb_DE430_2003_2013.jld")
+fname = joinpath(jplephpath, "ttmtdb_DE430_2003_2030.jld")
 ttmtdb = load(fname, "ttmtdb")
 
 # read JPL ephemerides (Apophis, Solar System, TT-TDB)
