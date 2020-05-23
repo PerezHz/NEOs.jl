@@ -141,9 +141,36 @@ function radec(astopticalobsfile::String,
 
     for i in 1:n_optical_obs
         utc_i = DateTime(astopticalobsdata[i,1]) + Microsecond( round(1e6daysec*astopticalobsdata[i,2]) )
-        station_code_i = string(astopticalobsdata[i,11])
+        station_code_i = string(astopticalobsdata[i,17])
         vra[i], vdec[i] = radec(station_code_i, utc_i, niter, pm=pm, xve=xve, xvs=xvs, xva=xva)
     end
 
     return vra, vdec
+end
+
+function radec_mpc_vokr15(niter::Int=10; pm::Bool=true, xve::Function=earth_pv,
+        xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+
+    astopticalobsfile = joinpath(dirname(pathof(Apophis)), "../vokrouhlickyetal2015_mpc.dat")
+    vokr15 = readdlm(astopticalobsfile, ',', comments=true)
+
+    utc1 = DateTime(vokr15[1,4], vokr15[1,5], vokr15[1,6]) + Microsecond( round(1e6*86400*vokr15[1,7]) )
+    et1 = str2et(string(utc1))
+    a1_et1 = xva(et1)[1]
+    S = typeof(a1_et1)
+
+    n_optical_obs = size(vokr15)[1]
+
+    etv = Array{typeof(et1)}(undef, n_optical_obs)
+    vra = Array{S}(undef, n_optical_obs)
+    vdec = Array{S}(undef, n_optical_obs)
+
+    for i in 1:n_optical_obs
+        utc_i = DateTime(vokr15[i,4], vokr15[i,5], vokr15[i,6]) + Microsecond( round(1e6*86400*vokr15[i,7]) )
+        station_code_i = string(vokr15[i,20])
+        etv[i] = str2et(string(utc_i))
+        vra[i], vdec[i] = radec(station_code_i, utc_i, niter, pm=pm, xve=xve, xvs=xvs, xva=xva)
+    end
+
+    return etv, vra, vdec
 end
