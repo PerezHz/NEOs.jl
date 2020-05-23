@@ -238,7 +238,28 @@ function compute_optical_obs(outfilename::String, opticalobsfile::String, apophi
             return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
         end
         #compute right ascension and declination "ephemeris" (i.e., predicted values according to ephemeris)
-        vra, vdec = radec(opticalobsfile, xve=earth_et, xvs=sun_et, xva=apophis_et);
+        vra, vdec = radec(opticalobsfile, xve=earth_et, xvs=sun_et, xva=apophis_et)
+        sol = (vra=vra, vdec=vdec)
+        #save data to file
+        __save2jldandcheck(outfilename, sol)
+    end
+    return nothing
+end
+
+function compute_optical_obs_v15(outfilename::String, opticalobsfile::String, apophis_interp, ss16asteph)
+    if opticalobsfile != ""
+        # TODO: check that first and last observation times are within interpolation interval
+        function apophis_et(et)
+            return auday2kmsec(apophis_interp(et/daysec)[1:6])
+        end
+        function earth_et(et)
+            return auday2kmsec(ss16asteph(et)[union(3*4-2:3*4,3*(N-1+4)-2:3*(N-1+4))])
+        end
+        function sun_et(et)
+            return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
+        end
+        #compute right ascension and declination "ephemeris" (i.e., predicted values according to ephemeris)
+        vra, vdec = radec_mpc_vokr15(opticalobsfile, xve=earth_et, xvs=sun_et, xva=apophis_et)
         sol = (vra=vra, vdec=vdec)
         #save data to file
         __save2jldandcheck(outfilename, sol)
