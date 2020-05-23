@@ -161,16 +161,14 @@ function radec_mpc_vokr15(niter::Int=10; pm::Bool=true, xve::Function=earth_pv,
 
     n_optical_obs = size(vokr15)[1]
 
-    etv = Array{typeof(et1)}(undef, n_optical_obs)
     vra = Array{S}(undef, n_optical_obs)
     vdec = Array{S}(undef, n_optical_obs)
 
     for i in 1:n_optical_obs
         utc_i = DateTime(vokr15[i,4], vokr15[i,5], vokr15[i,6]) + Microsecond( round(1e6*86400*vokr15[i,7]) )
         station_code_i = string(vokr15[i,20])
-        etv[i] = str2et(string(utc_i))
         vra[i], vdec[i] = radec(station_code_i, utc_i, niter, pm=pm, xve=xve, xvs=xvs, xva=xva)
     end
 
-    return etv, vra, vdec
+    return vra, vdec
 end
