@@ -52,10 +52,10 @@ const j2_body_index = findall(x->x, UJ_interaction)
 const apophisdofs = union(3N-2:3N, 6N-2:6N)
 const ssdofs = setdiff(1:6N, apophisdofs)
 
-# standard value of nominal mean angular velocity of Earth (rad/day), ESAA 2014 Sec 7.4.3.3 p. 296
-const ω = daysec*7.292115e-5 #7.2921151467e-5
-# The relationship of the angular velocity of the earth Omega with LOD is (https://www.iers.org/IERS/EN/Science/EarthRotation/UT1LOD.html)
-# where `omega` is in units of rad/day, and `lod` is in units of milliseconds
+# standard value of nominal mean angular velocity of Earth (rad/sec), ESAA 2014 Sec 7.4.3.3 p. 296
+const ω = 7.2921151467e-5 # 7.292115e-5 rad/sec
+# The relationship of the angular velocity of the earth omega with LOD is (https://www.iers.org/IERS/EN/Science/EarthRotation/UT1LOD.html)
+# where `omega` is in units of rad/sec, and `lod` is in units of milliseconds
 omega(lod) = (1e-12)*(72921151.467064 - 0.843994809lod)
 
 const A_sun = 1.06e8 # Solar corona parameter A [cm^-3] (ESAA 2014, Table 8.5 p. 329)
