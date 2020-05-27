@@ -246,7 +246,7 @@ function compute_optical_obs(outfilename::String, opticalobsfile::String, apophi
     return nothing
 end
 
-function compute_optical_obs_v15(outfilename::String, opticalobsfile::String, apophis_interp, ss16asteph)
+function compute_optical_obs_v15(outfilename::String, opticalobsfile::String, apophis_interp, ss16asteph) #opticalobsfile arg not really used right now
     if opticalobsfile != ""
         # TODO: check that first and last observation times are within interpolation interval
         function apophis_et(et)
