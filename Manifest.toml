@@ -466,7 +466,7 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 [[PlanetaryEphemeris]]
 deps = ["Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "Quadmath", "Revise", "TaylorIntegration", "TaylorSeries", "Test"]
 git-tree-sha1 = "76e0dc33f31aac5888ce24ca5b358c00d019c53a"
-repo-rev = "jp/quadmath"
+repo-rev = "master"
 repo-url = "git@github.com:PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
 version = "0.1.0"
