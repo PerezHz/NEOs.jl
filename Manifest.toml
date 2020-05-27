@@ -465,7 +465,7 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PlanetaryEphemeris]]
 deps = ["Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "Quadmath", "Revise", "TaylorIntegration", "TaylorSeries", "Test"]
-git-tree-sha1 = "97ab8bc73dad17c81cfd63bbd98fd4b87add95d6"
+git-tree-sha1 = "76e0dc33f31aac5888ce24ca5b358c00d019c53a"
 repo-rev = "jp/quadmath"
 repo-url = "git@github.com:PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
@@ -670,17 +670,17 @@ version = "1.0.0"
 
 [[TaylorIntegration]]
 deps = ["AutoHashEquals", "DataStructures", "DiffEqBase", "Espresso", "InteractiveUtils", "LinearAlgebra", "Markdown", "Reexport", "Requires", "TaylorSeries"]
-git-tree-sha1 = "c92dc8eaa49d22c94889f35c9d4f80349fa0f306"
+git-tree-sha1 = "dc4812740ee1b2bc6df4f39c8738b922bdfe7961"
 repo-rev = "jp/interpolation"
 repo-url = "https://github.com/PerezHz/TaylorIntegration.jl.git"
 uuid = "92b13dbe-c966-51a2-8445-caca9f8a7d42"
-version = "0.8.2"
+version = "0.8.3"
 
 [[TaylorSeries]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Markdown", "Requires", "SparseArrays"]
-git-tree-sha1 = "46a9ffd6e70b783aef18784d74499856b07c729c"
+git-tree-sha1 = "3d332bc4202f85d010eebbeffc2aff266982cc97"
 uuid = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
-version = "0.10.3"
+version = "0.10.5"
 
 [[TerminalLoggers]]
 deps = ["LeftChildRightSiblingTrees", "Logging", "Markdown", "Printf", "ProgressLogging", "UUIDs"]
