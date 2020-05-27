@@ -202,17 +202,17 @@ end
 # station_code: observing station identifier (MPC nomenclature)
 # t_r_utc: UTC time of echo reception (DateTime)
 # t_offset: time offset, to compute Doppler shifts by range differences (seconds)
-# F_tx: transmitter frequency (MHz)
 # niter: number of light-time solution iterations
 # xve: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second
 # xvs: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second
 # xva: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second
-function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real, F_tx::Real,
-        niter::Int=10; pm::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv,
+function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
+        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true,
+        xve::Function=earth_pv, xvs::Function=sun_pv,
         xva::Function=apophis_pv_197)
     et_r_secs = str2et(string(t_r_utc)) + t_offset
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, V_r = observer_position(station_code, et_r_secs, pm=pm)
+    R_r, V_r = observer_position(station_code, et_r_secs, pm=pm, lod=lod, eocorr=eocorr)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]
@@ -277,7 +277,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real, F_tx::Real,
     # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
     et_t_secs = et_b_secs - τ_U
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = observer_position(station_code, constant_term(et_t_secs), pm=pm)
+    R_t, V_t = observer_position(station_code, constant_term(et_t_secs), pm=pm, lod=lod, eocorr=eocorr)
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
     v_e_t_t = rv_e_t_t[4:6]
@@ -296,7 +296,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real, F_tx::Real,
     for i in 1:niter
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
         # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial conditions variations via et_t_secs
-        R_t, V_t = observer_position(station_code, constant_term(et_t_secs), pm=pm)
+        R_t, V_t = observer_position(station_code, constant_term(et_t_secs), pm=pm, lod=lod, eocorr=eocorr)
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]
@@ -539,19 +539,20 @@ function delay_doppler(station_code::Int, et_r_secs::Real, F_tx::Real,
 end
 
 function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
-        niter::Int=10; pm::Bool=true, tc::Real=90.0, xve::Function=earth_pv, xvs::Function=sun_pv,
-        xva::Function=apophis_pv_197)
+        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true, tc::Real=90.0,
+        xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = str2et(string(t_r_utc))
-    return delay_doppler(station_code, et_r_secs, F_tx, niter, pm=pm, xve=xve, xvs=xvs, xva=xva)
+    return delay_doppler(station_code, et_r_secs, F_tx, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
 end
 
 function delay_doppler2(station_code::Int, t_r_utc::DateTime, F_tx::Real,
-        niter::Int=10; pm::Bool=true, tc::Real=90.0, xve::Function=earth_pv, xvs::Function=sun_pv,
+        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true, tc::Real=90.0,
+        xve::Function=earth_pv, xvs::Function=sun_pv,
         xva::Function=apophis_pv_197)
-    τe = delay(station_code, t_r_utc,  tc/2, F_tx, niter, pm=pm, xve=xve, xvs=xvs, xva=xva)
-    τn = delay(station_code, t_r_utc,   0.0, F_tx, niter, pm=pm, xve=xve, xvs=xvs, xva=xva)
-    τs = delay(station_code, t_r_utc, -tc/2, F_tx, niter, pm=pm, xve=xve, xvs=xvs, xva=xva)
+    τe = delay(station_code, t_r_utc,  tc/2, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+    τn = delay(station_code, t_r_utc,   0.0, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+    τs = delay(station_code, t_r_utc, -tc/2, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
     return τn, -F_tx*((τe-τs)/tc)
 end
 

@@ -8,11 +8,11 @@
 # xvs: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second
 # xva: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second
 function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
-        niter::Int=10; pm::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv,
-        xva::Function=apophis_pv_197)
+        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true,
+        xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
     et_r_secs = str2et(string(t_r_utc))
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, V_r = observer_position(station_code, et_r_secs, pm=pm)
+    R_r, V_r = observer_position(station_code, et_r_secs, pm=pm, lod=lod, eocorr=eocorr)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]
@@ -59,8 +59,8 @@ function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
         q_D = ρ_r #signal path distance (down-leg)
         # Shapiro correction to time-delay
         Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)
-        # troposphere correction to time-delay
-        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r) # seconds
+        # # troposphere correction to time-delay
+        # Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r) # seconds
         # Δτ_corona_D = corona_delay(constant_term.(r_a_t_b), r_r_t_r, r_s_t_r, F_tx, station_code) # seconds
         Δτ_D = Δτ_rel_D # + Δτ_tropo_D #+ Δτ_corona_D # seconds
         p_dot_23 = dot(ρ_vec_r, v_a_t_b)/ρ_r

@@ -1,5 +1,6 @@
 # et: ephemeris time (TDB seconds since J2000.0 epoch)
-function observer_position(station_code::Union{Int, String}, et::T; pm::Bool=true) where {T<:Number}
+function observer_position(station_code::Union{Int, String}, et::T;
+        pm::Bool=true, lod::Bool=true, eocorr::Bool=true) where {T<:Number}
     # λ_deg: East longitude (deg)
     # u: distance from spin axis (km), taken from Yeomans et al. (1992) u = r*cos(ϕ)
     # v: height above equatorial plane (km), taken from Yeomans et al. (1992) v = r*sin(ϕ)
@@ -58,7 +59,7 @@ function observer_position(station_code::Union{Int, String}, et::T; pm::Bool=tru
 
     pos_geo = [x_gc, y_gc, z_gc] #km
 
-    G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(et, pos_geo, pm=pm)
+    G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(et, pos_geo, pm=pm, lod=lod, eocorr=eocorr)
     # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(et, pos_geo, pm=pm)
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
@@ -142,8 +143,9 @@ function t2c_rotation_iau_00_06(et::Float64, pos_geo::Vector; pm::Bool=true)
 end
 
 # IAU 1976/1980 nutation-precession matrix
-# tt: days since J2000.0
-function nupr7680mat(tt)
+# tt: days since J2000.0 (TT)
+# eocorr: EarthOrientation.jl corrections
+function nupr7680mat(tt; eocorr::Bool=true)
         # IAU 1976 precession matrix, J2000.0 to date
     # https://github.com/sisl/SOFA.jl/blob/be9ddfd412c5ab77b291b17decfd369041ef365b/src/pmat76.jl#L14
     rp = iauPmat76(J2000, tt)
@@ -154,7 +156,11 @@ function nupr7680mat(tt)
     #Nutation corrections wrt IAU 1976/1980
     # Output of `EarthOrientation.precession_nutation80` is in mas:
     # https://github.com/JuliaAstro/EarthOrientation.jl/blob/529f12425a6331b133f989443aeb3fbbafd8f324/src/EarthOrientation.jl#L413
-    ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(J2000+tt)
+    if eocorr
+        ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(J2000+tt)
+    else
+        ddp80_mas, dde80_mas = 0.0, 0.0
+    end
     # Convert mas -> radians
     ddp80 = mas2rad(ddp80_mas)
     dde80 = mas2rad(dde80_mas)
@@ -175,7 +181,6 @@ function polarmotionmat(tt; pm::Bool=true)
     W = Array{Float64}(I, 3, 3)
     # Polar motion (arcsec->radians)
     if pm
-        # xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t_utc)
         xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(J2000+tt)
         xp = deg2rad(xp_arcsec/3600)
         yp = deg2rad(yp_arcsec/3600)
@@ -191,7 +196,8 @@ end
 # "IAU 1976/1980/1982/1994, equinox based"
 # found at SOFA website, Mar 27, 2019
 # et: ephemeris time (TDB seconds since J2000.0 epoch)
-function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true) where {T<:Number}
+function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true,
+        lod::Bool=true, eocorr::Bool=true) where {T<:Number}
     # UTC (JD)
     utc_secs = et - tdb_utc(et)
     t_utc = J2000 + utc_secs/daysec
@@ -200,21 +206,30 @@ function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true) where {T<
     t0_tt = et + ttmtdb(et)
     tt = t0_tt/daysec
     # IAU 76/80 nutation-precession matrix
-    C = nupr7680mat(constant_term(tt))
+    C = nupr7680mat(constant_term(tt), eocorr=eocorr)
 
     #Nutation corrections wrt IAU 1976/1980
     # Output of `EarthOrientation.precession_nutation80` is in mas:
     # https://github.com/JuliaAstro/EarthOrientation.jl/blob/529f12425a6331b133f989443aeb3fbbafd8f324/src/EarthOrientation.jl#L413
-    ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(constant_term(t_utc))
+    if eocorr
+        ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(constant_term(t_utc))
+    else
+        ddp80_mas, dde80_mas = 0.0, 0.0
+    end
     # Convert mas -> radians
     ddp80 = mas2rad(ddp80_mas)
     dde80 = mas2rad(dde80_mas)
+
     # Mean obliquity (output in radians)
     epsa = iauObl80(J2000, constant_term(tt)) # rad
     # Equation of the equinoxes `ee = GAST - GMST`, including nutation correction
     ee = iauEqeq94(J2000, constant_term(tt)) + ddp80*cos(epsa)
     # ΔUT1 = UT1-UTC (seconds)
-    dut1 = EarthOrientation.getΔUT1(constant_term(t_utc))
+    if eocorr
+        dut1 = EarthOrientation.getΔUT1(constant_term(t_utc))
+    else
+        dut1 = 0.0
+    end
     # UT1
     date = floor(constant_term(t_utc)) + 0.5
     time_secs = utc_secs - date*daysec
@@ -231,7 +246,11 @@ function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true) where {T<
             sin(gast) cos(gast) 0.0;
             0.0 0.0 1.0
         ]
-    β_dot = omega(EarthOrientation.getlod(t_utc))/daysec
+    if lod
+        β_dot = omega(EarthOrientation.getlod(t_utc))
+    else
+        β_dot = ω
+    end
     dRz_minus_GAST = (β_dot)*[
             -sin(gast) -cos(gast) 0.0;
             cos(gast) -sin(gast) 0.0;
