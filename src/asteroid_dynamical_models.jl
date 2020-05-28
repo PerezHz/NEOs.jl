@@ -178,6 +178,8 @@ end
 
     # rotations to and from Earth, Sun and Moon pole-oriented frames
     local dsj2k = t+(jd0-2.451545e6) # days since J2000.0 = 2.451545e6
+    local αs = deg2rad(α_p_sun*one(t))
+    local δs = deg2rad(δ_p_sun*one(t))
     local M_ = Array{Taylor1{S}}(undef, 3, 3, N)
     local M_[:,:,ea] = t2c_jpl_de430(dsj2k)
 
@@ -333,7 +335,7 @@ end
     #Moyer, 1971, page 7 eq. 35
     # post-Newtonian iterative procedure setup and initialization
     _4ϕj[N] = 4newtonianNb_Potential[N]
-    for i in _1_to_Nm1
+    for i in 1:10
         ϕi_plus_4ϕj[i] = newtonianNb_Potential_t[i] + _4ϕj[N]
         sj2_plus_2si2_minus_4vivj[i] = ( (2v2[i]) - (4vi_dot_vj[i]) ) + v2[N]
         ϕs_and_vs[i] = sj2_plus_2si2_minus_4vivj[i] - ϕi_plus_4ϕj[i]
@@ -360,7 +362,7 @@ end
         pNY_t_pn3[i] = acceph_t[3i-1]*pn3[i]
         pNZ_t_pn3[i] = acceph_t[3i  ]*pn3[i]
     end #for i
-    for i in _1_to_Nm1
+    for i in 1:10
         termpnx = ( X_t_pn1[i] + (U_t_pn2[i]+pNX_t_pn3[i]) )
         sumpnx = pntempX + termpnx
         pntempX = sumpnx
@@ -368,6 +370,23 @@ end
         sumpny = pntempY + termpny
         pntempY = sumpny
         termpnz = ( Z_t_pn1[i] + (W_t_pn2[i]+pNZ_t_pn3[i]) )
+        sumpnz = pntempZ + termpnz
+        pntempZ = sumpnz
+    end
+    # compute Newtonian accelerations due to Pluto and 16 asteroid perturbers
+    for i in 11:27
+        X_t_pn1[i] = c_p2*newton_acc_X[i]
+        Y_t_pn1[i] = c_p2*newton_acc_Y[i]
+        Z_t_pn1[i] = c_p2*newton_acc_Z[i]
+    end #for i
+    for i in 11:27
+        termpnx = X_t_pn1[i]
+        sumpnx = pntempX + termpnx
+        pntempX = sumpnx
+        termpny = Y_t_pn1[i]
+        sumpny = pntempY + termpny
+        pntempY = sumpny
+        termpnz = Z_t_pn1[i]
         sumpnz = pntempZ + termpnz
         pntempZ = sumpnz
     end
@@ -556,6 +575,8 @@ end
 
     # rotations to and from Earth, Sun and Moon pole-oriented frames
     local dsj2k = t+(jd0-2.451545e6) # days since J2000.0 = 2.451545e6
+    local αs = deg2rad(α_p_sun*one(t))
+    local δs = deg2rad(δ_p_sun*one(t))
     local M_ = Array{Taylor1{S}}(undef, 3, 3, N)
     local M_[:,:,ea] = t2c_jpl_de430(dsj2k)
 
@@ -711,7 +732,7 @@ end
     #Moyer, 1971, page 7 eq. 35
     # post-Newtonian iterative procedure setup and initialization
     _4ϕj[N] = 4newtonianNb_Potential[N]
-    Threads.@threads for i in _1_to_Nm1
+    Threads.@threads for i in 1:10
         ϕi_plus_4ϕj[i] = newtonianNb_Potential_t[i] + _4ϕj[N]
         sj2_plus_2si2_minus_4vivj[i] = ( (2v2[i]) - (4vi_dot_vj[i]) ) + v2[N]
         ϕs_and_vs[i] = sj2_plus_2si2_minus_4vivj[i] - ϕi_plus_4ϕj[i]
@@ -738,7 +759,7 @@ end
         pNY_t_pn3[i] = acceph_t[3i-1]*pn3[i]
         pNZ_t_pn3[i] = acceph_t[3i  ]*pn3[i]
     end #for i
-    for i in _1_to_Nm1
+    for i in 1:10
         termpnx = ( X_t_pn1[i] + (U_t_pn2[i]+pNX_t_pn3[i]) )
         sumpnx = pntempX + termpnx
         pntempX = sumpnx
@@ -746,6 +767,23 @@ end
         sumpny = pntempY + termpny
         pntempY = sumpny
         termpnz = ( Z_t_pn1[i] + (W_t_pn2[i]+pNZ_t_pn3[i]) )
+        sumpnz = pntempZ + termpnz
+        pntempZ = sumpnz
+    end
+    # compute Newtonian accelerations due to Pluto and 16 asteroid perturbers
+    Threads.@threads for i in 11:27
+        X_t_pn1[i] = c_p2*newton_acc_X[i]
+        Y_t_pn1[i] = c_p2*newton_acc_Y[i]
+        Z_t_pn1[i] = c_p2*newton_acc_Z[i]
+    end #for i
+    for i in 11:27
+        termpnx = X_t_pn1[i]
+        sumpnx = pntempX + termpnx
+        pntempX = sumpnx
+        termpny = Y_t_pn1[i]
+        sumpny = pntempY + termpny
+        pntempY = sumpny
+        termpnz = Z_t_pn1[i]
         sumpnz = pntempZ + termpnz
         pntempZ = sumpnz
     end
