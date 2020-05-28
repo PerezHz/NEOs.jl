@@ -178,8 +178,6 @@ end
 
     # rotations to and from Earth, Sun and Moon pole-oriented frames
     local dsj2k = t+(jd0-2.451545e6) # days since J2000.0 = 2.451545e6
-    local αs = deg2rad(α_p_sun*one(t))
-    local δs = deg2rad(δ_p_sun*one(t))
     local M_ = Array{Taylor1{S}}(undef, 3, 3, N)
     local M_[:,:,ea] = t2c_jpl_de430(dsj2k)
 
@@ -575,8 +573,6 @@ end
 
     # rotations to and from Earth, Sun and Moon pole-oriented frames
     local dsj2k = t+(jd0-2.451545e6) # days since J2000.0 = 2.451545e6
-    local αs = deg2rad(α_p_sun*one(t))
-    local δs = deg2rad(δ_p_sun*one(t))
     local M_ = Array{Taylor1{S}}(undef, 3, 3, N)
     local M_[:,:,ea] = t2c_jpl_de430(dsj2k)
 
