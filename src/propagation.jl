@@ -92,36 +92,9 @@ function taylor_roots(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
     return xnewton
 end
 
-function least_squares_A2(asteroid_data::Vector{RadarDataJPL{T}},
-        vdel::Vector{Taylor1{U}}, vdop::Vector{Taylor1{U}}) where {T<:Number, U<:Number}
-    delay_index = findall(x->x.delay_units=="us", asteroid_data)
-    doppler_index = findall(x->x.doppler_units=="Hz", asteroid_data)
-    tdelay_jpl_obs = [x.delay for x in asteroid_data][delay_index]
-    dshift_jpl_obs = [x.doppler for x in asteroid_data][doppler_index]
-    tdelay_jpl_obs_sigma = [x.delay_sigma for x in asteroid_data][delay_index]
-    dshift_jpl_obs_sigma = [x.doppler_sigma for x in asteroid_data][doppler_index]
-    res_del = tdelay_jpl_obs .- vdel # delay residuals a.a.f. of A2
-    res_dop = dshift_jpl_obs .- vdop # Doppler residuals a.a.f. of A2
-    W_del = 1 ./(tdelay_jpl_obs_sigma.^2) # delay weights
-    W_dop = 1 ./(dshift_jpl_obs_sigma.^2) # Doppler weights
-    res_deldop = vcat(res_del, res_dop) # delay + Doppler residuals as a function of A2
-    W_deldop = vcat(W_del, W_dop) # delay + Doppler weights
-    res_xWx_deldop = res_deldop .* W_deldop .* res_deldop
-    Q_A2_deldop = sum(res_xWx_deldop)/length(res_xWx_deldop)
-    A2_lsqfit_deldop = taylor_minimum(Q_A2_deldop, 0.0, niters=5)
-    B_deldop = differentiate.(res_deldop) # design matrix
-    C_deldop = ( transpose(B_deldop) )*( W_deldop.*B_deldop ) # normal matrix
-    Γ_deldop = inv(C_deldop) # covariance matrix
-    return A2_lsqfit_deldop, Γ_deldop(A2_lsqfit_deldop)
-end
-
 function scaling(a::Taylor1{Taylor1{T}}, c::T) where {T<:Real}
     x = c*Taylor1( Taylor1(a.order).coeffs*one(a[0]) )
-    suma = a[end]*one(x)
-    for k = a.order-1:-1:0
-        suma = suma*x + a[k]*one(x)
-    end
-    return suma
+    return a(x)
 end
 
 function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
@@ -290,8 +263,7 @@ function propagate_distributed(objname::String, dynamics::Function, maxsteps::In
         end
         #compute time-delay and Doppler-shift "ephemeris" (i.e., predicted values according to ephemeris)
         vdel, vdop = delay_doppler(asteroid_data; xve=earth_et, xvs=sun_et, xva=apophis_et)
-        A2, Γ_A2 = least_squares_A2(asteroid_data, vdel, vdop)
-        sol = (t=interp.t[:], x=interp.x[:,:], vdel=vdel, vdop=vdop, A2=A2, Γ_A2=Γ_A2)
+        sol = (t=interp.t[:], x=interp.x[:,:], vdel=vdel, vdop=vdop)
     else
         @time interp = apophisinteg(dynamics, q0, t0, tmax, order, abstol, params; maxsteps=maxsteps, dense=true)
         sol = (t=interp.t[:], x=interp.x[:,:])
