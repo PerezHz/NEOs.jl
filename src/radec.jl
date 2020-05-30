@@ -172,3 +172,30 @@ function radec_mpc_vokr15(niter::Int=10; pm::Bool=true, xve::Function=earth_pv,
 
     return vra, vdec
 end
+
+### FWF reader, due to @aplavin
+# # usage:
+# read_fwf(
+#   "file.tab",
+#   (
+#     colname1=(1, 20, String),
+#     colname2=(100, 120, Int),
+#     # ...
+#   ),
+#   skiprows=[1, 2, 3, 7]
+# )
+function read_fwf(io, colspecs; skiprows=[], missingstrings=[])
+    cols = Dict(
+        k => Vector{Union{typ, Missing}}(undef, 0)
+        for (k, (from, to, typ)) in pairs(colspecs)
+    )
+    for (irow, line) in eachline(io) |> enumerate
+        if irow ∈ skiprows continue end
+        for (k, (from, to, typ)) in pairs(colspecs)
+            s_val = from <= length(line) ? line[from:min(length(line), to)] : ""
+            f_val = s_val in missingstrings ? missing : convert_val(typ, s_val)
+            push!(cols[k], f_val)
+        end
+    end
+    DataFrame([k => identity.(cols[k]) for k in keys(colspecs)])
+end
