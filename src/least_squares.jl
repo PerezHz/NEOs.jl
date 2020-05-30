@@ -4,10 +4,10 @@ function nrms(res, w)
     return sqrt( sum(res .* w .* res)/length(res) )
 end
 
-#normalized root mean square error, squared
-function nrms2(res, w)
+# chi square
+function chi2(res, w)
     @assert length(res) == length(w)
-    return sum(w .* (res.^2))/length(res)
+    return sum(w .* (res.^2))
 end
 
 # B and C matrices from Milani and Gronchi (2010)

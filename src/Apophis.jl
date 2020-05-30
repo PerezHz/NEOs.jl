@@ -10,7 +10,7 @@ export propagate, observer_position, apophisdofs,
     propagate_distributed, parallel_run,
     utcepoch, delay, delay_sigma, delay_units, doppler, doppler_sigma,
     doppler_units, freq, rcvr, xmit, bouncepoint, valsecchi_circle,
-    nrms, nrms2, newtonls, newtonls_6v
+    nrms, chi2, newtonls, newtonls_6v
 
 using Distributed
 using TaylorIntegration
@@ -86,14 +86,5 @@ include("integration_methods.jl")
 include("propagation.jl")
 include("b_plane.jl")
 include("least_squares.jl")
-
-function __init__()
-    @show length(methods(TaylorIntegration.jetcoeffs!))
-    @show methods(RNp1BP_pN_A_J23E_J2S_ng_eph!)
-    @show methods(RNp1BP_pN_A_J23E_J2S_ng_eph_threads!)
-    @show methods(TaylorIntegration.jetcoeffs!)
-    # load JPL ephemerides
-    # loadjpleph()
-end
 
 end
