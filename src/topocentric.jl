@@ -69,6 +69,9 @@ end
 # conversion of milli-arcseconds to radians
 mas2rad(x) = deg2rad(x/3.6e6) # mas/1000 -> arcsec; arcsec/3600 -> deg; deg2rad(deg) -> rad
 
+# conversion of radians to arcseconds
+rad2arcsec(x) = 3600rad2deg(x) # rad2deg(rad) -> deg; 3600deg -> arcsec
+
 # Terrestrial-to-celestial rotation matrix (including polar motion)
 # Reproduction of Section 5.3 of SOFA Tools for Earth Attitude
 # "IAU 2000A, CIO based, using classical angles"

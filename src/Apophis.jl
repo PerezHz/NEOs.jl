@@ -10,7 +10,8 @@ export propagate, observer_position, apophisdofs,
     propagate_distributed, parallel_run,
     utcepoch, delay, delay_sigma, delay_units, doppler, doppler_sigma,
     doppler_units, freq, rcvr, xmit, bouncepoint, valsecchi_circle,
-    nrms, chi2, newtonls, newtonls_6v
+    nrms, chi2, newtonls, newtonls_6v,
+    readfwf, readmp
 
 using Distributed
 using TaylorIntegration
@@ -24,6 +25,8 @@ using JLD
 using EarthOrientation, SOFA, SPICE
 using Dates
 using Quadmath
+using DataFrames
+using Healpix
 
 # integration parameters
 const order = 30
