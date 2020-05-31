@@ -1,6 +1,6 @@
 module Apophis
 
-# __precompile__(false)
+__precompile__(false)
 
 export propagate, observer_position, apophisdofs,
     ssdofs, delay_doppler, ismonostatic,
@@ -25,7 +25,7 @@ using JLD
 using EarthOrientation, SOFA, SPICE
 using Dates
 using Quadmath
-using DataFrames: DataFrame
+using DataFrames: DataFrame, nrow
 using Healpix
 
 # integration parameters

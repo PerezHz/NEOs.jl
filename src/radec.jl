@@ -14,8 +14,7 @@
 # xva: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second
 function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
         niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true,
-        debias::Bool=false, catalog::String="", xve::Function=earth_pv, xvs::Function=sun_pv,
-        xva::Function=apophis_pv_197)
+        xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
     et_r_secs = str2et(string(t_r_utc))
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
     R_r, V_r = observer_position(station_code, et_r_secs, pm=pm, lod=lod, eocorr=eocorr)
@@ -118,52 +117,18 @@ function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
     u2_norm = sqrt(u2_vec[1]^2 + u2_vec[2]^2 + u2_vec[3]^2)
 
     # Compute right ascension, declination angles
-    dec_rad = asin(u2_vec[3]/u2_norm) # declination (rad)
-    ra_rad0 = atan(u2_vec[2]/u2_vec[1])
-    # ra_rad1 = atan(constant_term(u2_vec[2]), constant_term(u2_vec[1])) + (ra_rad0 - constant_term(ra_rad0)) # workaround for TaylorSeries.atan
-    ra_rad1 = atan(u2_vec[2], u2_vec[1])
-    ra_rad = mod(ra_rad1, 2pi) # right ascension (rad)
+    δ_rad = asin(u2_vec[3]/u2_norm) # declination (rad)
+    α_rad = atan(u2_vec[2], u2_vec[1]) # right ascension (rad)
 
-    # if `debias` is `true`, compute debiased ra/dec angles following Eggl et al. (2019)
-    Δα_rad = zero(ra_rad)
-    Δδ_rad = zero(dec_rad)
-    if debias
-        NSIDE= 64 #The healpix tesselation resolution of the bias maps
-        res = Resolution(NSIDE)
-        # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
-        # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
-        # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
-        pix_ind = ang2pixRing(res, π/2-constant_term(dec_rad), constant_term(ra_rad))-1
+    δ_as = rad2arcsec(δ_rad) # rad -> arcsec + debiasing
+    α_as = rad2arcsec(α_rad) # rad -> arcsec + debiasing
 
-        days_J2000_tdb = et_r_secs/daysec
-
-        # TODO: extract star catalog info from observational data
-        # Match extracted catalog character to list of debiased catalogs
-        # TODO: read dRA, pmRA, dDEC, pmDEC data from bias.dat and compute ra/dec corrections
-
-        dRA = 0.0
-        pmRA = 0.0
-        dDEC = 0.0
-        pmDEC = 0.0
-
-        # dRA, position correction in RA*cos(DEC) at epoch J2000.0 [arcsec];
-        # dDEC, position correction in DEC at epoch J2000.0 [arcsec];
-        # pmRA, proper motion correction in RA*cos(DEC) [mas/yr];
-        # pmDEC, proper motion correction in DEC [mas/yr].
-        Δα_as = ( dRA + days_J2000_tdb*pmRA/1000 ) / cos(constant_term(dec_rad)) # total debiasing correction in right ascension (arcsec)
-        Δδ_as = dDEC + days_J2000_tdb*pmDEC/1000 # total debiasing correction in declination (arcsec)
-    end
-
-    dec_as = rad2arcsec(dec_rad) + Δδ_as # rad -> arcsec + debiasing
-    ra_as = rad2arcsec(ra_rad) + Δα_as # rad -> arcsec + debiasing
-
-    return ra_as, dec_as # right ascension, declination (arcsec, arcsec)
+    return α_as, δ_as # right ascension, declination (arcsec, arcsec)
 end
 
 function radec(astopticalobsfile::String,
         niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true,
-        debias::Bool=false, catalog::String="", xve::Function=earth_pv,
-        xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+        xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
     # astopticalobsfile = "tholenetal2013_radec_data.dat"
     astopticalobsdata = readdlm(astopticalobsfile, ',', comments=true)
 
@@ -181,15 +146,15 @@ function radec(astopticalobsfile::String,
         utc_i = DateTime(astopticalobsdata[i,1]) + Microsecond( round(1e6daysec*astopticalobsdata[i,2]) )
         station_code_i = string(astopticalobsdata[i,17])
         vra[i], vdec[i] = radec(station_code_i, utc_i, niter, pm=pm, lod=lod,
-            eocorr=eocorr, debias=debias, catalog=catalog, xve=xve, xvs=xvs, xva=xva)
+            eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
     end
 
     return vra, vdec
 end
 
 function radec_mpc_vokr15(niter::Int=10; pm::Bool=true, lod::Bool=true,
-        eocorr::Bool=true, debias::Bool=false, catalog::String="",
-        xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+        eocorr::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv,
+        xva::Function=apophis_pv_197)
 
     astopticalobsfile = joinpath(dirname(pathof(Apophis)), "../vokrouhlickyetal2015_mpc.dat")
     vokr15 = readdlm(astopticalobsfile, ',', comments=true)
@@ -208,10 +173,77 @@ function radec_mpc_vokr15(niter::Int=10; pm::Bool=true, lod::Bool=true,
         utc_i = DateTime(vokr15[i,4], vokr15[i,5], vokr15[i,6]) + Microsecond( round(1e6*86400*vokr15[i,7]) )
         station_code_i = string(vokr15[i,20])
         vra[i], vdec[i] = radec(station_code_i, utc_i, niter, pm=pm, lod=lod,
-            eocorr=eocorr, debias=debias, catalog=catalog, xve=xve, xvs=xvs, xva=xva)
+            eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
     end
 
     return vra, vdec
+end
+
+function radec_mpc(astopticalobsfile, niter::Int=10; pm::Bool=true, lod::Bool=true,
+        eocorr::Bool=true, xve::Function=earth_pv,
+        xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+
+    obs_df = readmp(astopticalobsfile)
+
+    utc1 = DateTime(obs_df.yr[1], obs_df.month[1], obs_df.day[1]) + Microsecond( round(1e6*86400*obs_df.utc[1]) )
+    et1 = str2et(string(utc1))
+    a1_et1 = xva(et1)[1]
+    S = typeof(a1_et1)
+
+    n_optical_obs = nrow(obs_df)
+
+    vra = Array{S}(undef, n_optical_obs)
+    vdec = Array{S}(undef, n_optical_obs)
+
+    for i in 1:n_optical_obs
+        utc_i = DateTime(obs_df.yr[i], obs_df.month[i], obs_df.day[i]) + Microsecond( round(1e6*86400*obs_df.utc[i]) )
+        station_code_i = string(obs_df.obscode[i])
+        vra[i], vdec[i] = radec(station_code_i, utc_i, niter, pm=pm, lod=lod,
+            eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+    end
+
+    return vra, vdec # arcsec, arcsec
+end
+
+# Compute ra/dec debiasing corrections following Eggl et al. (2019)
+function radec_mpc_corr(astopticalobsfile::String)
+
+    obs_df = readmp(astopticalobsfile)
+    n_optical_obs = nrow(obs_df)
+
+    α_corr_v = Array{Float64}(undef, n_optical_obs)
+    δ_corr_v = Array{Float64}(undef, n_optical_obs)
+
+    bias_file = joinpath(dirname(pathof(Apophis)), "../debias/debias_2018/bias.dat")
+    bias_matrix = readdlm(bias_file, comment_char='!', comments=true)
+    NSIDE= 64 #The healpix tesselation resolution of the bias map from Eggl et al. (2019)
+    resol = Resolution(NSIDE) # initialize healpix Resolution variable
+
+    for i in 1:n_optical_obs
+        α_i_as = 15(3600obs_df.rah[i] + 60obs_df.ram[i] + obs_df.ras[i]) #arcsec
+        δ_i_as = 3600obs_df.decd[i] + 60obs_df.decm[i]+ obs_df.decs[i] #arcsec
+        α_i_rad = deg2rad(α_i_as/3600) #rad
+        δ_i_rad = deg2rad(δ_i_as/3600) #rad
+        # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
+        # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
+        # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
+        pix_ind = ang2pixRing(resol, π/2-constant_term(δ_i_rad), constant_term(α_i_rad))
+        cat_ind = mpc_catalog_nomenclature[obs_df.catalog[i]][1]
+        @show pix_ind, cat_ind
+        utc_i = DateTime(obs_df.yr[i], obs_df.month[i], obs_df.day[i]) + Microsecond( round(1e6*86400*obs_df.utc[i]) )
+        # read dRA, pmRA, dDEC, pmDEC data from bias.dat
+        # dRA, position correction in RA*cos(DEC) at epoch J2000.0 [arcsec];
+        # dDEC, position correction in DEC at epoch J2000.0 [arcsec];
+        # pmRA, proper motion correction in RA*cos(DEC) [mas/yr];
+        # pmDEC, proper motion correction in DEC [mas/yr].
+        dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
+        @show dRA, dDEC, pmRA, pmDEC
+        et_secs_i = str2et(string(utc_i))
+        yrs_J2000_tdb = et_secs_i/(daysec*yr)
+        α_corr_v[i] = ( dRA + yrs_J2000_tdb*pmRA/1000 ) / cos(constant_term(δ_i_rad)) # total debiasing correction in right ascension (arcsec)
+        δ_corr_v[i] = dDEC + yrs_J2000_tdb*pmDEC/1000 # total debiasing correction in declination (arcsec)
+    end
+    return α_corr_v, δ_corr_v # arcsec, arcsec
 end
 
 ### FWF reader, due to @aplavin
@@ -246,7 +278,11 @@ function readfwf(io, colspecs; skiprows=[], missingstrings=[])
     DataFrame([k => identity.(cols[k]) for k in keys(colspecs)])
 end
 
-# MPC minor planet optical observations format
+# MPC minor planet optical observations fixed-width format
+# References: https://minorplanetcenter.net/iau/info/OpticalObs.html
+# S. Chesley et al. (2010) Icarus 210, p. 158-181
+# Column 72: star catalog that was used in the reduction of the astrometry
+# Column 15: measurement technique, or observation type
 const mpc_format_mp = (mpnum=(1,5,String),
 provdesig=(6,12,String),
 discovery=(13,13,String),
@@ -271,3 +307,19 @@ obscode=(78,80,String)
 
 # MPC minor planet optical observations reader
 readmp(mpcfile::String) = readfwf(mpcfile, mpc_format_mp)
+
+mpc_catalog_flags = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
+    "n", "o", "p", "q", "r", "t", "u", "v", "w", "L",
+    "N", "Q", "R", "S", "U", "W"
+]
+
+catalog_names = ["USNO-A1.0", "USNO-SA1.0", "USNO-A2.0", "USNO-SA2.0", "UCAC-1",
+    "Tycho-2", "GSC-1.1", "GSC-1.2", "ACT", "GSC-ACT", "SDSS-DR8", "USNO-B1.0",
+    "PPM", "UCAC-4", "UCAC-2", "PPMXL", "UCAC-3", "NOMAD", "CMC-14",
+    "2MASS", "SDSS-DR7", "CMC-15", "SST-RC4", "URAT-1", "Gaia-DR1", "UCAC-5"
+]
+
+mpc_catalog_nomenclature = Dict{String, Tuple{Int, String}}()
+for i in eachindex(mpc_catalog_flags)
+    mpc_catalog_nomenclature[mpc_catalog_flags[i]] = (i, catalog_names[i])
+end
