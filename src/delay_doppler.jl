@@ -188,6 +188,10 @@ function tdb_utc(et::T) where {T<:Number}
     return (tt_tai + tai_utc) - tt_tdb_et # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
 end
 
+# TODO: add tdb_utc(utc) method!!!
+# strategy: given UTC, do UTC + (TT-TAI) + (TAI-UTC) to get TT
+# then, use ttmtdb(et) function iteratively (Newton) to compute TDB
+
 # function dtutc2et(t_utc::DateTime)
 #     tt_tai = 32.184
 #     jd_utc = datetime2julian(t_utc)
