@@ -25,7 +25,7 @@ using JLD
 using EarthOrientation, SOFA, SPICE
 using Dates
 using Quadmath
-using DataFrames
+using DataFrames: DataFrame
 using Healpix
 
 # integration parameters
