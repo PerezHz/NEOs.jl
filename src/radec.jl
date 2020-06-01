@@ -117,8 +117,9 @@ function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
     u2_norm = sqrt(u2_vec[1]^2 + u2_vec[2]^2 + u2_vec[3]^2)
 
     # Compute right ascension, declination angles
+    α_rad_ = mod2pi(atan(u2_vec[2], u2_vec[1]))
+    α_rad = mod2pi(α_rad_) # right ascension (rad)
     δ_rad = asin(u2_vec[3]/u2_norm) # declination (rad)
-    α_rad = atan(u2_vec[2], u2_vec[1]) # right ascension (rad)
 
     δ_as = rad2arcsec(δ_rad) # rad -> arcsec + debiasing
     α_as = rad2arcsec(α_rad) # rad -> arcsec + debiasing
@@ -179,6 +180,7 @@ function radec_mpc_vokr15(niter::Int=10; pm::Bool=true, lod::Bool=true,
     return vra, vdec
 end
 
+# Compute optical astrometric ra/dec ephemeris for a set of observations in a MPC-formatted file
 function radec_mpc(astopticalobsfile, niter::Int=10; pm::Bool=true, lod::Bool=true,
         eocorr::Bool=true, xve::Function=earth_pv,
         xvs::Function=sun_pv, xva::Function=apophis_pv_197)
@@ -227,7 +229,7 @@ function radec_mpc_corr(astopticalobsfile::String)
         # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
         # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
         # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
-        pix_ind = ang2pixRing(resol, π/2-constant_term(δ_i_rad), constant_term(α_i_rad))
+        pix_ind = ang2pixRing(resol, π/2-δ_i_rad, α_i_rad)
         cat_ind = mpc_catalog_nomenclature[obs_df.catalog[i]][1]
         @show pix_ind, cat_ind
         utc_i = DateTime(obs_df.yr[i], obs_df.month[i], obs_df.day[i]) + Microsecond( round(1e6*86400*obs_df.utc[i]) )
@@ -240,7 +242,7 @@ function radec_mpc_corr(astopticalobsfile::String)
         @show dRA, dDEC, pmRA, pmDEC
         et_secs_i = str2et(string(utc_i))
         yrs_J2000_tdb = et_secs_i/(daysec*yr)
-        α_corr_v[i] = ( dRA + yrs_J2000_tdb*pmRA/1000 ) / cos(constant_term(δ_i_rad)) # total debiasing correction in right ascension (arcsec)
+        α_corr_v[i] = ( dRA + yrs_J2000_tdb*pmRA/1000 ) / cos(δ_i_rad) # total debiasing correction in right ascension (arcsec)
         δ_corr_v[i] = dDEC + yrs_J2000_tdb*pmDEC/1000 # total debiasing correction in declination (arcsec)
     end
     return α_corr_v, δ_corr_v # arcsec, arcsec
