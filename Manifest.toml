@@ -148,9 +148,9 @@ uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
 [[DiffEqBase]]
 deps = ["ArrayInterface", "ChainRulesCore", "ConsoleProgressMonitor", "DataStructures", "Distributed", "DocStringExtensions", "FunctionWrappers", "IterativeSolvers", "IteratorInterfaceExtensions", "LabelledArrays", "LinearAlgebra", "Logging", "LoggingExtras", "MuladdMacro", "Parameters", "Printf", "ProgressLogging", "RecipesBase", "RecursiveArrayTools", "RecursiveFactorization", "Requires", "Roots", "SparseArrays", "StaticArrays", "Statistics", "SuiteSparse", "TableTraits", "TerminalLoggers", "TreeViews", "ZygoteRules"]
-git-tree-sha1 = "2ca9ee844cb2c907f870e2f1972556b64e4994df"
+git-tree-sha1 = "a37901f10b63ed3e413db3320cd6c305c771430d"
 uuid = "2b5f629d-d688-5b77-993f-72d75c75574e"
-version = "6.36.1"
+version = "6.36.3"
 
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
@@ -491,9 +491,9 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PlanetaryEphemeris]]
 deps = ["Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "Quadmath", "Revise", "TaylorIntegration", "TaylorSeries", "Test"]
-git-tree-sha1 = "b1af3422b701a132eca7ddc49675fd0314812021"
-repo-rev = "master"
-repo-url = "git@github.com:PerezHz/PlanetaryEphemeris.jl.git"
+git-tree-sha1 = "2ed4567a6eda32d1f2d8385e8daca440e3f3d6df"
+repo-rev = "jp/threads"
+repo-url = "https://github.com/PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
 version = "0.1.0"
 
@@ -750,9 +750,9 @@ uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
 [[VectorizationBase]]
 deps = ["CpuId", "LinearAlgebra"]
-git-tree-sha1 = "56423de8e50e538727b2e4f12ba247ef7339d1be"
+git-tree-sha1 = "a7eeff8fae4f11bd1ec140169ae2b10e26adf673"
 uuid = "3d5dd08c-fd9d-11e8-17fa-ed2836048c2f"
-version = "0.12.4"
+version = "0.12.6"
 
 [[Zlib_jll]]
 deps = ["Libdl", "Pkg"]
