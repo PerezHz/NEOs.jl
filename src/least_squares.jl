@@ -59,6 +59,6 @@ function newtonls_6v(res, w, x0, niters=5)
         @show sqrt(((Δx')*(C*Δx))/npar)
     end
     C = TaylorSeries.hessian(Q, x_new)/(2/nobs) # C = (2/m)*d2Q
-    Γ = inv(C)
+    Γ = inv(C[1:6,1:6])
     return x_new, Γ
 end
