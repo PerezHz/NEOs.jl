@@ -113,7 +113,10 @@ function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
     # u2_vec = u1_vec; u2_norm = sqrt(u2_vec[1]^2 + u2_vec[2]^2 + u2_vec[3]^2) # radial unit vector with grav deflection corr.
     # u2_vec = ( β_m1*u1_vec + f2*u1_norm*V_vec )/( 1+f1 ) # ESAA 2014, Eq. (7.118)
     # u2_norm = sqrt(u2_vec[1]^2 + u2_vec[2]^2 + u2_vec[3]^2)
-    u2_vec = u1_vec #/U_norm + V_vec # ESAA 2014, Eq. (7.118)
+    # u2_vec = u1_vec #/U_norm + V_vec # ESAA 2014, Eq. (7.118)
+    # u2_vec = u1_vec + u1_norm*V_vec # ESAA 2014, Eq. (7.119)
+    u2_vec = u1_vec
+    # u2_vec = u_vec
     u2_norm = sqrt(u2_vec[1]^2 + u2_vec[2]^2 + u2_vec[3]^2)
 
     # Compute right ascension, declination angles
@@ -208,7 +211,7 @@ function radec_mpc(astopticalobsfile, niter::Int=10; pm::Bool=true, lod::Bool=tr
 end
 
 # Compute ra/dec debiasing corrections following Eggl et al. (2019)
-function radec_mpc_corr(astopticalobsfile::String)
+function radec_mpc_corr(astopticalobsfile::String, table::String="2018")
 
     obs_df = readmp(astopticalobsfile)
     n_optical_obs = nrow(obs_df)
@@ -216,20 +219,35 @@ function radec_mpc_corr(astopticalobsfile::String)
     α_corr_v = Array{Float64}(undef, n_optical_obs)
     δ_corr_v = Array{Float64}(undef, n_optical_obs)
 
-    bias_file = joinpath(dirname(pathof(Apophis)), "../debias/debias_2018/bias.dat")
+    # Select debiasing table: 2014 corresponds to Farnocchia et al. (2015), 2018 corresponds to Eggl et al. (2020)
+    if table == "2018"
+        bias_file = joinpath(dirname(pathof(Apophis)), "../debias/debias_2018/bias.dat")
+        mpc_catalog_nomenclature = mpc_catalog_nomenclature_2018
+    elseif table == "2014"
+        bias_file = joinpath(dirname(pathof(Apophis)), "../debias/debias_2014/bias.dat")
+        mpc_catalog_nomenclature = mpc_catalog_nomenclature_2014
+    else
+        @error "Unknown debias table: $table"
+    end
+
     bias_matrix = readdlm(bias_file, comment_char='!', comments=true)
     NSIDE= 64 #The healpix tesselation resolution of the bias map from Eggl et al. (2019)
     resol = Resolution(NSIDE) # initialize healpix Resolution variable
 
     for i in 1:n_optical_obs
-        α_i_as = 15(3600obs_df.rah[i] + 60obs_df.ram[i] + obs_df.ras[i]) #arcsec
-        δ_i_as = 3600obs_df.decd[i] + 60obs_df.decm[i]+ obs_df.decs[i] #arcsec
-        α_i_rad = deg2rad(α_i_as/3600) #rad
-        δ_i_rad = deg2rad(δ_i_as/3600) #rad
+        α_i_as = 15(obs_df.rah[i] + obs_df.ram[i]/60 + obs_df.ras[i]/3600) # deg
+        δ_i_as = obs_df.decd[i] + obs_df.decm[i]/60 + obs_df.decs[i]/3600 # deg
+        α_i_rad = deg2rad(α_i_as) #rad
+        δ_i_rad = deg2rad(δ_i_as) #rad
         # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
         # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
         # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
         pix_ind = ang2pixRing(resol, π/2-δ_i_rad, α_i_rad)
+        if obs_df.catalog[i] == "t" && table == "2014"
+            α_corr_v[i] = 0.0
+            δ_corr_v[i] = 0.0
+            continue
+        end
         cat_ind = mpc_catalog_nomenclature[obs_df.catalog[i]][1]
         @show pix_ind, cat_ind
         utc_i = DateTime(obs_df.yr[i], obs_df.month[i], obs_df.day[i]) + Microsecond( round(1e6*86400*obs_df.utc[i]) )
@@ -310,18 +328,31 @@ obscode=(78,80,String)
 # MPC minor planet optical observations reader
 readmp(mpcfile::String) = readfwf(mpcfile, mpc_format_mp)
 
-mpc_catalog_flags = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
+mpc_catalog_flags_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
+"o", "p", "q", "r", "u", "v", "w", "L", "N"]
+
+catalog_names_2014 = ["USNO-A1.0", "USNO-SA1.0", "USNO-A2.0", "USNO-SA2.0",
+"UCAC-1", "Tycho-2", "GSC-1.1", "GSC-1.2", "ACT", "GSC-ACT", "USNO-B1.0",
+"PPM", "UCAC-4", "UCAC-2", "UCAC-3", "NOMAD", "CMC-14", "2MASS",
+"SDSS-DR7"]
+
+mpc_catalog_nomenclature_2014 = Dict{String, Tuple{Int, String}}()
+for i in eachindex(mpc_catalog_flags_2014)
+    mpc_catalog_nomenclature_2014[mpc_catalog_flags_2014[i]] = (i, catalog_names_2014[i])
+end
+
+mpc_catalog_flags_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
     "n", "o", "p", "q", "r", "t", "u", "v", "w", "L",
     "N", "Q", "R", "S", "U", "W"
 ]
 
-catalog_names = ["USNO-A1.0", "USNO-SA1.0", "USNO-A2.0", "USNO-SA2.0", "UCAC-1",
+catalog_names_2018 = ["USNO-A1.0", "USNO-SA1.0", "USNO-A2.0", "USNO-SA2.0", "UCAC-1",
     "Tycho-2", "GSC-1.1", "GSC-1.2", "ACT", "GSC-ACT", "SDSS-DR8", "USNO-B1.0",
     "PPM", "UCAC-4", "UCAC-2", "PPMXL", "UCAC-3", "NOMAD", "CMC-14",
     "2MASS", "SDSS-DR7", "CMC-15", "SST-RC4", "URAT-1", "Gaia-DR1", "UCAC-5"
 ]
 
-mpc_catalog_nomenclature = Dict{String, Tuple{Int, String}}()
-for i in eachindex(mpc_catalog_flags)
-    mpc_catalog_nomenclature[mpc_catalog_flags[i]] = (i, catalog_names[i])
+mpc_catalog_nomenclature_2018 = Dict{String, Tuple{Int, String}}()
+for i in eachindex(mpc_catalog_flags_2018)
+    mpc_catalog_nomenclature_2018[mpc_catalog_flags_2018[i]] = (i, catalog_names_2018[i])
 end

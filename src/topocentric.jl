@@ -48,6 +48,10 @@ function observer_position(station_code::Union{Int, String}, et::T;
         λ_deg = 203.74409 #deg
         u = 0.936241*RE #km
         v = +0.351543*RE #km
+    elseif station_code == "695" # Kitt Peak
+        λ_deg = 248.40533 #deg
+        u = 0.849504*RE #km
+        v = +0.526425*RE #km
     else
         @error "Unknown station code: $station_code"
     end
