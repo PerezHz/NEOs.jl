@@ -222,10 +222,10 @@ function radec_mpc_corr(astopticalobsfile::String, table::String="2018")
     # Select debiasing table: 2014 corresponds to Farnocchia et al. (2015), 2018 corresponds to Eggl et al. (2020)
     if table == "2018"
         bias_file = joinpath(dirname(pathof(Apophis)), "../debias/debias_2018/bias.dat")
-        mpc_catalog_nomenclature = mpc_catalog_nomenclature_2018
+        mpc_catalog_codes_201X = mpc_catalog_codes_2018
     elseif table == "2014"
         bias_file = joinpath(dirname(pathof(Apophis)), "../debias/debias_2014/bias.dat")
-        mpc_catalog_nomenclature = mpc_catalog_nomenclature_2014
+        mpc_catalog_codes_201X = mpc_catalog_codes_2014
     else
         @error "Unknown debias table: $table"
     end
@@ -235,33 +235,39 @@ function radec_mpc_corr(astopticalobsfile::String, table::String="2018")
     resol = Resolution(NSIDE) # initialize healpix Resolution variable
 
     for i in 1:n_optical_obs
-        α_i_as = 15(obs_df.rah[i] + obs_df.ram[i]/60 + obs_df.ras[i]/3600) # deg
-        δ_i_as = obs_df.decd[i] + obs_df.decm[i]/60 + obs_df.decs[i]/3600 # deg
-        α_i_rad = deg2rad(α_i_as) #rad
-        δ_i_rad = deg2rad(δ_i_as) #rad
-        # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
-        # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
-        # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
-        pix_ind = ang2pixRing(resol, π/2-δ_i_rad, α_i_rad)
-        if obs_df.catalog[i] == "t" && table == "2014"
+        if obs_df.catalog[i] ∉ mpc_catalog_codes_201X
+            # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
+            cnf = mpc_catalog_codes[obs_df.catalog[i]]
+            @warn "Catalog not found in table: $cnf . Setting debiasing corrections equal to zero."
             α_corr_v[i] = 0.0
             δ_corr_v[i] = 0.0
             continue
+        else
+            # Otherwise, if star catalog is present in debias table, compute corrections
+            α_i_as = 15(obs_df.rah[i] + obs_df.ram[i]/60 + obs_df.ras[i]/3600) # deg
+            δ_i_as = obs_df.decd[i] + obs_df.decm[i]/60 + obs_df.decs[i]/3600 # deg
+            α_i_rad = deg2rad(α_i_as) #rad
+            δ_i_rad = deg2rad(δ_i_as) #rad
+            # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
+            # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
+            # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
+            pix_ind = ang2pixRing(resol, π/2-δ_i_rad, α_i_rad)
+            cat_ind = findfirst(x->x==obs_df.catalog[i], mpc_catalog_codes_201X)
+            # @show pix_ind, cat_ind
+            # read dRA, pmRA, dDEC, pmDEC data from bias.dat
+            # dRA, position correction in RA*cos(DEC) at epoch J2000.0 [arcsec];
+            # dDEC, position correction in DEC at epoch J2000.0 [arcsec];
+            # pmRA, proper motion correction in RA*cos(DEC) [mas/yr];
+            # pmDEC, proper motion correction in DEC [mas/yr].
+            dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
+            # @show dRA, dDEC, pmRA, pmDEC
+            utc_i = DateTime(obs_df.yr[i], obs_df.month[i], obs_df.day[i]) + Microsecond( round(1e6*86400*obs_df.utc[i]) )
+            et_secs_i = str2et(string(utc_i))
+            tt_secs_i = et_secs_i - tt_tdb(et_secs_i)
+            yrs_J2000_tt = tt_secs_i/(daysec*yr)
+            α_corr_v[i] = ( dRA + yrs_J2000_tt*pmRA/1000 ) / cos(δ_i_rad) # total debiasing correction in right ascension (arcsec)
+            δ_corr_v[i] = dDEC + yrs_J2000_tt*pmDEC/1000 # total debiasing correction in declination (arcsec)
         end
-        cat_ind = mpc_catalog_nomenclature[obs_df.catalog[i]][1]
-        @show pix_ind, cat_ind
-        utc_i = DateTime(obs_df.yr[i], obs_df.month[i], obs_df.day[i]) + Microsecond( round(1e6*86400*obs_df.utc[i]) )
-        # read dRA, pmRA, dDEC, pmDEC data from bias.dat
-        # dRA, position correction in RA*cos(DEC) at epoch J2000.0 [arcsec];
-        # dDEC, position correction in DEC at epoch J2000.0 [arcsec];
-        # pmRA, proper motion correction in RA*cos(DEC) [mas/yr];
-        # pmDEC, proper motion correction in DEC [mas/yr].
-        dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
-        @show dRA, dDEC, pmRA, pmDEC
-        et_secs_i = str2et(string(utc_i))
-        yrs_J2000_tdb = et_secs_i/(daysec*yr)
-        α_corr_v[i] = ( dRA + yrs_J2000_tdb*pmRA/1000 ) / cos(δ_i_rad) # total debiasing correction in right ascension (arcsec)
-        δ_corr_v[i] = dDEC + yrs_J2000_tdb*pmDEC/1000 # total debiasing correction in declination (arcsec)
     end
     return α_corr_v, δ_corr_v # arcsec, arcsec
 end
@@ -328,31 +334,68 @@ obscode=(78,80,String)
 # MPC minor planet optical observations reader
 readmp(mpcfile::String) = readfwf(mpcfile, mpc_format_mp)
 
-mpc_catalog_flags_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
-"o", "p", "q", "r", "u", "v", "w", "L", "N"]
+# `mpc_catalog_nomenclature_2014` corresponds to debiasing tables included in Farnocchia et al. (2015)
+mpc_catalog_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
+"o", "p", "q", "r",
+"u", "v", "w", "L", "N"]
 
-catalog_names_2014 = ["USNO-A1.0", "USNO-SA1.0", "USNO-A2.0", "USNO-SA2.0",
-"UCAC-1", "Tycho-2", "GSC-1.1", "GSC-1.2", "ACT", "GSC-ACT", "USNO-B1.0",
-"PPM", "UCAC-4", "UCAC-2", "UCAC-3", "NOMAD", "CMC-14", "2MASS",
-"SDSS-DR7"]
-
-mpc_catalog_nomenclature_2014 = Dict{String, Tuple{Int, String}}()
-for i in eachindex(mpc_catalog_flags_2014)
-    mpc_catalog_nomenclature_2014[mpc_catalog_flags_2014[i]] = (i, catalog_names_2014[i])
-end
-
-mpc_catalog_flags_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
-    "n", "o", "p", "q", "r", "t", "u", "v", "w", "L",
-    "N", "Q", "R", "S", "U", "W"
+# `mpc_catalog_nomenclature_2018` corresponds to debiasing tables included in Eggl et al. (2020)
+mpc_catalog_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
+    "n", "o", "p", "q", "r",
+    "t", "u", "v", "w", "L", "N",
+    "Q", "R", "S", "U", "W"
 ]
 
-catalog_names_2018 = ["USNO-A1.0", "USNO-SA1.0", "USNO-A2.0", "USNO-SA2.0", "UCAC-1",
-    "Tycho-2", "GSC-1.1", "GSC-1.2", "ACT", "GSC-ACT", "SDSS-DR8", "USNO-B1.0",
-    "PPM", "UCAC-4", "UCAC-2", "PPMXL", "UCAC-3", "NOMAD", "CMC-14",
-    "2MASS", "SDSS-DR7", "CMC-15", "SST-RC4", "URAT-1", "Gaia-DR1", "UCAC-5"
-]
-
-mpc_catalog_nomenclature_2018 = Dict{String, Tuple{Int, String}}()
-for i in eachindex(mpc_catalog_flags_2018)
-    mpc_catalog_nomenclature_2018[mpc_catalog_flags_2018[i]] = (i, catalog_names_2018[i])
-end
+### MPC star catalog codes are were retrieved from the link below
+### https://minorplanetcenter.net/iau/info/CatalogueCodes.html
+mpc_catalog_codes = Dict(
+    "a" =>   "USNO-A1.0",
+    "b" =>   "USNO-SA1.0",
+    "c" =>   "USNO-A2.0",
+    "d" =>   "USNO-SA2.0",
+    "e" =>   "UCAC-1",
+    "f" =>   "Tycho-1",
+    "g" =>   "Tycho-2",
+    "h" =>   "GSC-1.0",
+    "i" =>   "GSC-1.1",
+    "j" =>   "GSC-1.2",
+    "k" =>   "GSC-2.2",
+    "l" =>   "ACT",
+    "m" =>   "GSC-ACT",
+    "n" =>   "SDSS-DR8",
+    "o" =>   "USNO-B1.0",
+    "p" =>   "PPM",
+    "q" =>   "UCAC-4",
+    "r" =>   "UCAC-2",
+    "s" =>   "USNO-B2.0",
+    "t" =>   "PPMXL",
+    "u" =>   "UCAC-3",
+    "v" =>   "NOMAD",
+    "w" =>   "CMC-14",
+    "x" =>   "Hipparcos 2",
+    "y" =>   "Hipparcos",
+    "z" =>   "GSC (version unspecified)",
+    "A" =>   "AC",
+    "B" =>   "SAO 1984",
+    "C" =>   "SAO",
+    "D" =>   "AGK 3",
+    "E" =>   "FK4",
+    "F" =>   "ACRS",
+    "G" =>   "Lick Gaspra Catalogue",
+    "H" =>   "Ida93 Catalogue",
+    "I" =>   "Perth 70",
+    "J" =>   "COSMOS/UKST Southern Sky Catalogue",
+    "K" =>   "Yale",
+    "L" =>   "2MASS",
+    "M" =>   "GSC-2.3",
+    "N" =>   "SDSS-DR7",
+    "O" =>   "SST-RC1",
+    "P" =>   "MPOSC3",
+    "Q" =>   "CMC-15",
+    "R" =>   "SST-RC4",
+    "S" =>   "URAT-1",
+    "T" =>   "URAT-2",
+    "U" =>   "Gaia-DR1",
+    "V" =>   "Gaia-DR2",
+    "W" =>   "UCAC-5"
+)
