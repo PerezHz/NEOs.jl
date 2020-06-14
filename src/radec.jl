@@ -223,15 +223,20 @@ function radec_mpc_corr(astopticalobsfile::String, table::String="2018")
     if table == "2018"
         bias_file = joinpath(dirname(pathof(Apophis)), "../debias/debias_2018/bias.dat")
         mpc_catalog_codes_201X = mpc_catalog_codes_2018
+        NSIDE= 64 #The healpix tesselation resolution of the bias map from Eggl et al. (2020)
+    elseif table == "hires2018"
+        bias_file = joinpath(dirname(pathof(Apophis)), "../debias/debias_hires2018/bias.dat")
+        mpc_catalog_codes_201X = mpc_catalog_codes_2018
+        NSIDE= 256 #The healpix tesselation resolution of the high-resolution bias map from Eggl et al. (2020)
     elseif table == "2014"
         bias_file = joinpath(dirname(pathof(Apophis)), "../debias/debias_2014/bias.dat")
         mpc_catalog_codes_201X = mpc_catalog_codes_2014
+        NSIDE= 64 #The healpix tesselation resolution of the bias map from Farnocchia et al. (2015)
     else
         @error "Unknown debias table: $table"
     end
 
     bias_matrix = readdlm(bias_file, comment_char='!', comments=true)
-    NSIDE= 64 #The healpix tesselation resolution of the bias map from Eggl et al. (2019)
     resol = Resolution(NSIDE) # initialize healpix Resolution variable
 
     for i in 1:n_optical_obs
