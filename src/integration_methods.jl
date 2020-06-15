@@ -39,15 +39,7 @@ function apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T,
     sign_tstep = copysign(1, tmax-t0)
 
     # Determine if specialized jetcoeffs! method exists
-    parse_eqs = parse_eqs && (length(methods(TaylorIntegration.jetcoeffs!)) > 2)
-    if parse_eqs
-        try
-            TaylorIntegration.jetcoeffs!(Val(f!), t, x, dx, params)
-        catch
-            parse_eqs = false
-        end
-    end
-    @show parse_eqs
+    parse_eqs = TaylorIntegration._determine_parsing!(parse_eqs, f!, t, x, dx, params)
 
     # Integration
     nsteps = 1
@@ -69,7 +61,7 @@ function apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T,
         @inbounds tv[nsteps] = t0
         @inbounds xv[:,nsteps] .= x0
         if nsteps > maxsteps
-            @info("""
+            @warn("""
             Maximum number of integration steps reached; exiting.
             """)
             break
@@ -117,15 +109,7 @@ function apophisinteg(f!, g, q0::Array{U,1}, t0::T, tmax::T, order::Int,
     sign_tstep = copysign(1, tmax-t0)
 
     # Determine if specialized jetcoeffs! method exists
-    parse_eqs = parse_eqs && (length(methods(TaylorIntegration.jetcoeffs!)) > 2)
-    if parse_eqs
-        try
-            TaylorIntegration.jetcoeffs!(Val(f!), t, x, dx, params)
-        catch
-            parse_eqs = false
-        end
-    end
-    @show parse_eqs
+    parse_eqs = TaylorIntegration._determine_parsing!(parse_eqs, f!, t, x, dx, params)
 
     # Some auxiliary arrays for root-finding/event detection/Poincaré surface of section evaluation
     g_tupl = g(dx, x, params, t)

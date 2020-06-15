@@ -153,13 +153,16 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
             )
         end
     else
-        @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, newtoniter=newtoniter)
+        @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, newtoniter=newtoniter, dense=true)
+        apophis_t0 = (jd0-J2000) # days since J2000 until initial integration time
+        apophis_t = sol_objs[1].t[:]
+        apophis_x = sol_objs[1].x[:,:]
+        apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
         sol = (
-            tv1 = Float64.(sol_objs[1][:]),
-            xv1 = convert(Array{eltype(q0)}, sol_objs[2][:,:]),
-            tvS1 = convert(Array{eltype(q0)}, sol_objs[3][:]),
-            xvS1 = convert(Array{eltype(q0)}, sol_objs[4][:,:]),
-            gvS1 = convert(Array{eltype(q0)}, sol_objs[5][:])
+            apophis=apophis,
+            tvS1=convert(Array{eltype(q0)}, sol_objs[2][:]),
+            xvS1=convert(Array{eltype(q0)}, sol_objs[3][:,:]),
+            gvS1=convert(Array{eltype(q0)}, sol_objs[4][:])
         )
     end
 
