@@ -1,0 +1,13 @@
+[debias]
+git-tree-sha1 = "5930a760459f8be729ef47a4ad740a23bcc050ac"
+lazy = true
+
+    [[debias.download]]
+    sha256 = "a0fb01a6849faa637495b900972017211da644be"
+    url = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/"
+    [[debias.download]]
+    sha256 = "0955037d299699c677751250ab208d0e202af90f"
+    url = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/"
+    [[debias.download]]
+    sha256 = "d14a38dd940219405229720bb7bb7fd12d255e6a"
+    url = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/"
