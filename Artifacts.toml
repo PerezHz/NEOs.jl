@@ -1,13 +1,23 @@
-[debias]
-git-tree-sha1 = "5930a760459f8be729ef47a4ad740a23bcc050ac"
+[debias_2014]
+git-tree-sha1 = "cf9204861dc4c82c5d922e3954bb02bca16fb480"
 lazy = true
 
-    [[debias.download]]
-    sha256 = "a0fb01a6849faa637495b900972017211da644be"
-    url = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/"
-    [[debias.download]]
+    [[debias_2014.download]]
     sha256 = "0955037d299699c677751250ab208d0e202af90f"
     url = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/"
-    [[debias.download]]
+
+[debias_2018]
+git-tree-sha1 = "7019732e9ecb591326ee2cd5cc06832eebb76d53"
+lazy = true
+
+    [[debias_2018.download]]
     sha256 = "d14a38dd940219405229720bb7bb7fd12d255e6a"
+    url = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/"
+
+[debias_hires2018]
+git-tree-sha1 = "5e060406ab681b588ea49d9724a4a3b1da09ba19"
+lazy = true
+
+    [[debias_hires2018.download]]
+    sha256 = "a4acbcda6e2f10a4402e5439fdd2297d1867b769"
     url = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/"
