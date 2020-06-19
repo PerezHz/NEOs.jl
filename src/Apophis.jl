@@ -27,7 +27,7 @@ using Dates
 using Quadmath
 using DataFrames: DataFrame, nrow
 using Healpix
-using Pkg.Artifacts
+using Pkg.Artifacts #: @artifact_str
 
 # integration parameters
 const order = 30

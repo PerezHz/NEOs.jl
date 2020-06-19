@@ -229,25 +229,20 @@ function radec_mpc_corr(mpcobsfile::String, table::String="2018")
     # debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
     if table == "2018"
         debias_path = artifact"debias_2018"
-        # @show debias_path
-        bias_file = joinpath(debias_path, "debias_2018/bias.dat")
         mpc_catalog_codes_201X = mpc_catalog_codes_2018
         NSIDE= 64 #The healpix tesselation resolution of the bias map from Eggl et al. (2020)
     elseif table == "hires2018"
         debias_path = artifact"debias_hires2018"
-        # @show debias_path
-        bias_file = joinpath(debias_path, "debias_hires2018/bias.dat")
         mpc_catalog_codes_201X = mpc_catalog_codes_2018
         NSIDE= 256 #The healpix tesselation resolution of the high-resolution bias map from Eggl et al. (2020)
     elseif table == "2014"
         debias_path = artifact"debias_2014"
-        # @show debias_path
-        bias_file = joinpath(debias_path, "debias_2014/bias.dat")
         mpc_catalog_codes_201X = mpc_catalog_codes_2014
         NSIDE= 64 #The healpix tesselation resolution of the bias map from Farnocchia et al. (2015)
     else
-        @error "Unknown debias table: $(table). Recognized tables are `2014`, `2018` and `hires2018`."
+        @error "Unknown bias map: $(table). Possible values are `2014`, `2018` and `hires2018`."
     end
+    bias_file = joinpath(debias_path, "bias.dat")
 
     bias_matrix = readdlm(bias_file, comment_char='!', comments=true)
     resol = Resolution(NSIDE) # initialize healpix Resolution variable
