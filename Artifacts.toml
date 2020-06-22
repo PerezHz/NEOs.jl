@@ -3,7 +3,7 @@ git-tree-sha1 = "de3fba2237359dc941a057d492c305afeccba133"
 lazy = true
 
     [[TTmTDBde430.download]]
-    sha256 = "1a6894810f515a7871142c3bc7f9da3be6a6f0fdf5eca34edecd77bdfb70cde4"
+    sha256 = "c599efe597200055c27cec38ddc769f5d3b3e301a481b9dcd8b9640d745508a1"
     url = "https://jpleph.s3-us-west-2.amazonaws.com/TTmTDBde430.tar.gz"
 
 [a99942]
@@ -11,7 +11,7 @@ git-tree-sha1 = "7cdf1265a22c52329651c4a71a9835d1b90f568e"
 lazy = true
 
     [[a99942.download]]
-    sha256 = "15954ff8a73a66dd9d3676e1004b9d9e3a5e90978d136332d8257ed37f360442"
+    sha256 = "d1cdcad22c8060e98d7ca116973b64bc65cdb5e62fb045637701b57aa146a434"
     url = "https://jpleph.s3-us-west-2.amazonaws.com/a99942.tar.gz"
 
 [de430]
@@ -19,7 +19,7 @@ git-tree-sha1 = "db3e3a765712a792a7f4a73634213d53fc0561ec"
 lazy = true
 
     [[de430.download]]
-    sha256 = "a625f2401ca71d0d00219991ef06a3ef94fa057f2fd8162e46ac08a0995f5187"
+    sha256 = "25458f6fc0219be7ff9fbd893a4cd6ed9927316824cb5c4062b642414884790d"
     url = "https://jpleph.s3-us-west-2.amazonaws.com/de430.tar.gz"
 
 [debias]
@@ -59,5 +59,5 @@ git-tree-sha1 = "2edbc8113673ba541874fb9b4db24489890af604"
 lazy = true
 
     [[naif0012.download]]
-    sha256 = "4990d2a81e7c1d6b437d97c68573542b4ca47ba94089883b4d0a40a0b798e4d1"
+    sha256 = "9b541ba5c3c0b1ddf7ed794209939e961d749db512ecfe173f6b4856a79663a0"
     url = "https://jpleph.s3-us-west-2.amazonaws.com/naif0012.tar.gz"
