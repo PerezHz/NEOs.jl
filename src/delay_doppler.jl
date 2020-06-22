@@ -1,12 +1,16 @@
-# construct path of JPL ephemerides
-const jplephpath = joinpath(dirname(pathof(Apophis)), "../jpleph")
-
-fname = joinpath(jplephpath, "ttmtdb_DE430_2003_2030.jld")
-ttmtdb = load(fname, "ttmtdb")
+# load ttmtdb as a TaylorInterpolant saved in .jld file
+const jldephpath = joinpath(pkgdir(Apophis), "jldeph", "ttmtdb_DE430_2003_2030.jld")
+const ttmtdb = load(jldephpath, "ttmtdb")
 
 # read JPL ephemerides (Apophis, Solar System, TT-TDB)
 function loadjpleph()
-    furnsh.( joinpath.(jplephpath, ["a99942_s197.bsp", "a99942_s199.bsp", "de430t.bsp", "naif0012.tls", "TTmTDB.de430.19feb2015.bsp"]) )
+    furnsh(
+        joinpath(artifact"naif0012", "naif0012.tls"),
+        joinpath(artifact"TTmTDBde430", "TTmTDB.de430.19feb2015.bsp"),
+        joinpath(artifact"de430", "de430_1850-2150.bsp"),
+        joinpath(artifact"a99942", "a99942_s197.bsp"),
+        joinpath(artifact"a99942", "a99942_s199.bsp"),
+    )
 end
 
 # this is an auxiliary function which converts a [x,y,z,vx,vy,vz] "state" vector from km,km/sec units to au,au/day
@@ -603,12 +607,12 @@ end
 
 function delay_doppler(sseph_file::String, asteph_file::String, asteroid_data_file::String)
     #Load time (t) and state (x) arrays, to construct a TaylorInterpolant object
-    ss16ast_eph_t = load(joinpath(Apophis.jplephpath, sseph_file), "ss16ast_eph_t")
-    ss16ast_eph_x = load(joinpath(Apophis.jplephpath, sseph_file), "ss16ast_eph_x")
+    ss16ast_eph_t = load(joinpath(jldephpath, sseph_file), "ss16ast_eph_t")
+    ss16ast_eph_x = load(joinpath(jldephpath, sseph_file), "ss16ast_eph_x")
     ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
 
     # Load TT-TDB DE430 ephemeris
-    furnsh( joinpath(jplephpath, "TTmTDB.de430.19feb2015.bsp") )
+    furnsh( joinpath(jldephpath, "TTmTDB.de430.19feb2015.bsp") )
 
     #recover asteroid integration from .jld file
     t = load(asteph_file, "t")

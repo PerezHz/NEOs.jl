@@ -160,7 +160,7 @@ function radec_mpc_vokr15(niter::Int=10; pm::Bool=true, lod::Bool=true,
         eocorr::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv,
         xva::Function=apophis_pv_197)
 
-    astopticalobsfile = joinpath(dirname(pathof(Apophis)), "../vokrouhlickyetal2015_mpc.dat")
+    astopticalobsfile = joinpath(pkgdir(Apophis), "vokrouhlickyetal2015_mpc.dat")
     vokr15 = readdlm(astopticalobsfile, ',', comments=true)
 
     utc1 = DateTime(vokr15[1,4], vokr15[1,5], vokr15[1,6]) + Microsecond( round(1e6*86400*vokr15[1,7]) )
