@@ -2,5 +2,5 @@
 *.out
 *.err
 notebooks/.ipynb_checkpoints
-jpleph/
+jldeph/
 notebooks/figs
