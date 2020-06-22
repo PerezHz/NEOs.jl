@@ -27,9 +27,9 @@ const jd0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #Julian date of integrati
 const t0 = 0.0 # integration initial time
 
 # path to local Solar System ephemeris file
-ss_eph_file = joinpath(apophisjlpath, "jpleph", "ss16ast343_eph_p5y_et.jld")
-#ss_eph_file = joinpath(apophisjlpath, "jpleph", "ss16ast343_eph_p24y_et.jld")
-#ss_eph_file = joinpath(apophisjlpath, "jpleph", "ss16ast343_eph_m4y_et.jld")
+ss_eph_file = joinpath(apophisjlpath, "jldeph", "ss16ast343_eph_p5y_et.jld")
+#ss_eph_file = joinpath(apophisjlpath, "jldeph", "ss16ast343_eph_p24y_et.jld")
+#ss_eph_file = joinpath(apophisjlpath, "jldeph", "ss16ast343_eph_m4y_et.jld")
 
 #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
 dq = Taylor1.(zeros(7), varorder)
@@ -59,6 +59,6 @@ println("*** Finished 2nd warmup with output")
 # ss16asteph = load(ss_eph_file, "ss16ast_eph")
 # astfname = "Apophis_jt.0.jld"
 # tx = load(astfname, "apophis")
-# furnsh( joinpath(apophisjlpath, "jpleph", "naif0012.tls") ) # load leapseconds kernel
-# furnsh( joinpath(apophisjlpath, "jpleph", "de430_1850-2150.bsp") ) # at least one SPK file must be loaded to read .tls file
+# furnsh( joinpath(apophisjlpath, "jldeph", "naif0012.tls") ) # load leapseconds kernel
+# furnsh( joinpath(apophisjlpath, "jldeph", "de430_1850-2150.bsp") ) # at least one SPK file must be loaded to read .tls file
 # Apophis.compute_radar_obs("deldop.jld", radarobsfile, tx, ss16asteph)

@@ -34,8 +34,8 @@ end
 end
 
 # path to local Solar System ephemeris file
-# ss_eph_file = joinpath(pkgdir(Apophis), "jpleph", "ss16ast343_eph_24yr_tx.jld")
-ss_eph_file = joinpath(pkgdir(Apophis), "jpleph", "ss16ast343_eph_5yr_tx.jld")
+# ss_eph_file = joinpath(pkgdir(Apophis), "jldeph", "ss16ast343_eph_24yr_tx.jld")
+ss_eph_file = joinpath(pkgdir(Apophis), "jldeph", "ss16ast343_eph_5yr_tx.jld")
 
 ss16asteph, acc_eph, newtonianNb_Potential = Apophis.loadeph(ss_eph_file)
 
