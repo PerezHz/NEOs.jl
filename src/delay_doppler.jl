@@ -1,6 +1,6 @@
 # load ttmtdb as a TaylorInterpolant saved in .jld file
-const jldephpath = joinpath(pkgdir(Apophis), "jldeph", "ttmtdb_DE430_2003_2030.jld")
-const ttmtdb = load(jldephpath, "ttmtdb")
+const jldephpath = joinpath(pkgdir(Apophis), "jldeph")
+const ttmtdb = load(joinpath(jldephpath, "ttmtdb_DE430_2003_2030.jld"), "ttmtdb")
 
 # read JPL ephemerides (Apophis, Solar System, TT-TDB)
 function loadjpleph()
