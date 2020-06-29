@@ -22,8 +22,9 @@ end
 # both U_y, U_norm are in units such that the heliocentric velocity of the planet is 1
 #k/h; h heliocentric revolutions of asteroid per k heliocentric revolutions of Earth
 # m_pl: planet mass normalized to Sun's mass, equal to Earth mass in solar masses by default
-function valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6)
-    a0p = (k/h)^(2/3)
+# a_pl: planetary heliocentric semimajor axis in au; default value is 1
+function valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6, a_pl=1.0)
+    a0p = a_pl*(k/h)^(2/3)
     cosθ = U_y/U_norm
     # @show cosθ, U_norm, U_y
     sinθ = sin(acos(cosθ)) #sqrt(1-cosθ^2) #  # TODO: CHECK SIGN
