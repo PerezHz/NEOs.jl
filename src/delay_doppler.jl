@@ -547,7 +547,7 @@ function delay_doppler(station_code::Int, et_r_secs::Real, F_tx::Real,
 end
 
 function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
-        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true, tc::Real=90.0,
+        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true, tc::Real=1.0,
         xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = str2et(string(t_r_utc))
@@ -555,7 +555,7 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
 end
 
 function delay_doppler2(station_code::Int, t_r_utc::DateTime, F_tx::Real,
-        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true, tc::Real=90.0,
+        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true, tc::Real=1.0,
         xve::Function=earth_pv, xvs::Function=sun_pv,
         xva::Function=apophis_pv_197)
     τe = delay(station_code, t_r_utc,  tc/2, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
@@ -565,7 +565,7 @@ function delay_doppler2(station_code::Int, t_r_utc::DateTime, F_tx::Real,
 end
 
 function delay_doppler(astradarfile::String,
-        niter::Int=10; pm::Bool=true, tc::Real=90.0, xve::Function=earth_pv,
+        niter::Int=10; pm::Bool=true, tc::Real=1.0, xve::Function=earth_pv,
         xvs::Function=sun_pv, xva::Function=apophis_pv_197)
 
     astradardata = process_radar_data_jpl(astradarfile)
@@ -575,7 +575,7 @@ function delay_doppler(astradarfile::String,
 end
 
 function delay_doppler(astradardata::Vector{RadarDataJPL{T}},
-        niter::Int=10; pm::Bool=true, tc::Real=90.0, xve::Function=earth_pv,
+        niter::Int=10; pm::Bool=true, tc::Real=1.0, xve::Function=earth_pv,
         xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T<:Number}
 
     et1 = str2et(string(astradardata[1].utcepoch))
