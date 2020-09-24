@@ -28,7 +28,7 @@ end
 # unit heliocentric transverse vector, au is 1 astronomical unit, r is the
 # asteroid's heliocentric range, A2 is a coefficient (with units of au/day^2),
 # and d = 2.0
-@taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph!(dq, q, params, t)
+ex1 = :(function RNp1BP_pN_A_J23E_J2S_ng_eph!(dq, q, params, t)
     local jd0 = params[4]
     local ss16asteph_t = evaleph(params[1], t, q[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
     local acceph_t = evaleph(params[2], t, q[1]) # params[2](t)*one(q[1]) #acc_eph(t)
@@ -421,9 +421,9 @@ end
     dq[7] = zero_q_1
 
     nothing
-end
+end)
 
-@taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
+ex2 = :(function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     local jd0 = params[4]
     local ss16asteph_t = evaleph(params[1], t, q[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
     local acceph_t = evaleph(params[2], t, q[1]) # params[2](t)*one(q[1]) #acc_eph(t)
@@ -816,4 +816,13 @@ end
     dq[7] = zero_q_1
 
     nothing
-end
+end)
+
+nex1 = TaylorIntegration._make_parsed_jetcoeffs(ex1)
+nex2 = TaylorIntegration._make_parsed_jetcoeffs(ex2)
+
+@eval $ex1
+@eval $ex2
+
+@eval $nex1
+@eval $nex2
