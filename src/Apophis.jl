@@ -1,6 +1,6 @@
 module Apophis
 
-__precompile__(false)
+# __precompile__(false)
 
 export propagate, observer_position, apophisdofs,
     ssdofs, delay_doppler, ismonostatic,
