@@ -403,9 +403,9 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PlanetaryEphemeris]]
 deps = ["AutoHashEquals", "Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "Quadmath", "Revise", "TaylorIntegration", "TaylorSeries"]
-git-tree-sha1 = "d2d10ded61ba5d5795a47d5d4c99f71d471a174e"
+git-tree-sha1 = "14f51d00a5a19e29f71bd4e201dc28ea4eb013ed"
 repo-rev = "jp/threads"
-repo-url = "https://github.com/PerezHz/PlanetaryEphemeris.jl.git"
+repo-url = "git@github.com:PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
 version = "0.1.0"
 
