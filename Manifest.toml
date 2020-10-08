@@ -392,10 +392,10 @@ uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 version = "0.12.1"
 
 [[Parsers]]
-deps = ["Dates", "Test"]
-git-tree-sha1 = "8077624b3c450b15c087944363606a6ba12f925e"
+deps = ["Dates"]
+git-tree-sha1 = "6fa4202675c05ba0f8268a6ddf07606350eda3ce"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "1.0.10"
+version = "1.0.11"
 
 [[Pkg]]
 deps = ["Dates", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "UUIDs"]
@@ -403,7 +403,7 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PlanetaryEphemeris]]
 deps = ["AutoHashEquals", "Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "Quadmath", "Revise", "TaylorIntegration", "TaylorSeries"]
-git-tree-sha1 = "14f51d00a5a19e29f71bd4e201dc28ea4eb013ed"
+git-tree-sha1 = "7c8c9daae75bd581c97374f72b2a0d84111a898d"
 repo-rev = "jp/threads"
 repo-url = "git@github.com:PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
@@ -584,7 +584,9 @@ version = "1.1.0"
 
 [[TaylorIntegration]]
 deps = ["DataStructures", "DiffEqBase", "Espresso", "InteractiveUtils", "LinearAlgebra", "Markdown", "Reexport", "Requires", "TaylorSeries"]
-git-tree-sha1 = "6caff4b647b8ff965d61378c87d478412593dc72"
+git-tree-sha1 = "4dcffbab81dc7612ee93c1e9f65adbc20182f322"
+repo-rev = "jp/fix_iss106"
+repo-url = "https://github.com/PerezHz/TaylorIntegration.jl.git"
 uuid = "92b13dbe-c966-51a2-8445-caca9f8a7d42"
 version = "0.8.3"
 
