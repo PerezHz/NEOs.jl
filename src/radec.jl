@@ -189,13 +189,12 @@ function radec_mpc(astopticalobsfile, niter::Int=10; pm::Bool=true, lod::Bool=tr
         xvs::Function=sun_pv, xva::Function=apophis_pv_197)
 
     obs_df = readmp(astopticalobsfile)
+    n_optical_obs = nrow(obs_df)
 
     utc1 = DateTime(obs_df.yr[1], obs_df.month[1], obs_df.day[1]) + Microsecond( round(1e6*86400*obs_df.utc[1]) )
     et1 = str2et(string(utc1))
     a1_et1 = xva(et1)[1]
     S = typeof(a1_et1)
-
-    n_optical_obs = nrow(obs_df)
 
     vra = Array{S}(undef, n_optical_obs)
     vdec = Array{S}(undef, n_optical_obs)
@@ -210,6 +209,100 @@ function radec_mpc(astopticalobsfile, niter::Int=10; pm::Bool=true, lod::Bool=tr
     return vra, vdec # arcsec, arcsec
 end
 
+function radec_table(mpcobsfile::String, niter::Int=10; pm::Bool=true,
+        lod::Bool=true, eocorr::Bool=true, debias_table::String="2018",
+        xve::Function=earth_pv, xvs::Function=sun_pv,
+        xva::Function=apophis_pv_197)
+
+    obs_t = table(readmp(mpcobsfile))
+    n_optical_obs = length(obs_t)
+
+    utc1 = DateTime(obs_t[1].yr, obs_t[1].month, obs_t[1].day) + Microsecond( round(1e6*86400*obs_t[1].utc) )
+    et1 = str2et(string(utc1))
+    a1_et1 = xva(et1)[1]
+    S = typeof(a1_et1)
+
+    α_obs = Array{Float64}(undef, n_optical_obs)
+    δ_obs = Array{Float64}(undef, n_optical_obs)
+    α_comp = Array{S}(undef, n_optical_obs)
+    δ_comp = Array{S}(undef, n_optical_obs)
+    α_corr = Array{Float64}(undef, n_optical_obs)
+    δ_corr = Array{Float64}(undef, n_optical_obs)
+    datetime_obs = Array{DateTime}(undef, n_optical_obs)
+
+    # Select debiasing table: 2014 corresponds to Farnocchia et al. (2015), 2018 corresponds to Eggl et al. (2020)
+    # debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
+    if debias_table == "2018"
+        debias_path = artifact"debias_2018"
+        mpc_catalog_codes_201X = mpc_catalog_codes_2018
+        NSIDE= 64 #The healpix tesselation resolution of the bias map from Eggl et al. (2020)
+    elseif debias_table == "hires2018"
+        debias_path = artifact"debias_hires2018"
+        mpc_catalog_codes_201X = mpc_catalog_codes_2018
+        NSIDE= 256 #The healpix tesselation resolution of the high-resolution bias map from Eggl et al. (2020)
+    elseif debias_table == "2014"
+        debias_path = artifact"debias_2014"
+        mpc_catalog_codes_201X = mpc_catalog_codes_2014
+        NSIDE= 64 #The healpix tesselation resolution of the bias map from Farnocchia et al. (2015)
+    else
+        @error "Unknown bias map: $(debias_table). Possible values are `2014`, `2018` and `hires2018`."
+    end
+    bias_file = joinpath(debias_path, "bias.dat")
+
+    bias_matrix = readdlm(bias_file, comment_char='!', comments=true)
+    resol = Resolution(NSIDE) # initialize healpix Resolution variable
+    @assert size(bias_matrix) == (resol.numOfPixels, 4length(mpc_catalog_codes_201X)) "Bias table file $bias_file dimensions do not match expected parameter NSIDE=$NSIDE and/or number of catalogs in table."
+
+    for i in 1:n_optical_obs
+        # observed values
+        δ_i_deg = sign(obs_t[i].decd)*(abs(obs_t[i].decd) + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
+        δ_i_rad = deg2rad(δ_i_deg) #rad
+        α_i_deg = 15(obs_t[i].rah + obs_t[i].ram/60 + obs_t[i].ras/3600) # deg
+        α_i_rad = deg2rad(α_i_deg) #rad
+        δ_obs[i] = 3600δ_i_deg # arcsec
+        α_obs[i] = 3600α_i_deg*cos(δ_i_rad) # arcsec
+        # computed values
+        datetime_obs[i] = DateTime(obs_t[i].yr, obs_t[i].month, obs_t[i].day) + Microsecond( round(1e6*86400*obs_t[i].utc) )
+        # utc_i = datetime_obs[i]
+        station_code_i = string(obs_t[i].obscode)
+        α_comp_as, δ_comp_as = radec(station_code_i, datetime_obs[i], niter, pm=pm, lod=lod,
+            eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+        α_comp[i] = α_comp_as*cos(δ_i_rad) # arcsec
+        δ_comp[i] = δ_comp_as # arcsec
+        if obs_t[i].catalog ∉ mpc_catalog_codes_201X
+            # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
+            @warn "Catalog not found in table: $(obs_t[i].catalog). Setting debiasing corrections equal to zero."
+            α_corr[i] = 0.0
+            δ_corr[i] = 0.0
+            continue
+        else
+            # Otherwise, if star catalog is present in debias table, compute corrections
+            # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
+            # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
+            # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
+            # since we use pix_ind to get the corresponding row number in bias.dat, it's not necessary to substract 1
+            pix_ind = ang2pixRing(resol, π/2-δ_i_rad, α_i_rad)
+            cat_ind = findfirst(x->x==obs_t[i].catalog, mpc_catalog_codes_201X)
+            # @show pix_ind, cat_ind
+            # read dRA, pmRA, dDEC, pmDEC data from bias.dat
+            # dRA, position correction in RA*cos(DEC) at epoch J2000.0 [arcsec];
+            # dDEC, position correction in DEC at epoch J2000.0 [arcsec];
+            # pmRA, proper motion correction in RA*cos(DEC) [mas/yr];
+            # pmDEC, proper motion correction in DEC [mas/yr].
+            dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
+            # @show dRA, dDEC, pmRA, pmDEC
+            # utc_i = DateTime(obs_t[i].yr, obs_t[i].month, obs_t[i].day) + Microsecond( round(1e6*86400*obs_t[i].utc) )
+            et_secs_i = str2et(string(datetime_obs[i]))
+            tt_secs_i = et_secs_i - tt_tdb(et_secs_i)
+            yrs_J2000_tt = tt_secs_i/(daysec*yr)
+            α_corr[i] = dRA + yrs_J2000_tt*pmRA/1000 # total debiasing correction in right ascension (arcsec)
+            δ_corr[i] = dDEC + yrs_J2000_tt*pmDEC/1000 # total debiasing correction in declination (arcsec)
+        end
+    end
+
+    return insertcolsafter(obs_t, length(columns(obs_t)), :dt_utc_obs => datetime_obs, :α_obs => α_obs, :δ_obs => δ_obs, :α_comp => α_comp, :δ_comp => δ_comp, :α_corr => α_corr, :δ_corr => δ_corr)
+end
+
 # Compute ra/dec astrometry debiasing corrections for MPC-formatted data in
 # `mpcobsfile`. Star catalog info is extracted from column 72 of each
 # observation row. Current debiasing table options are:
@@ -217,7 +310,7 @@ end
 # "2018" => Eggl et al. (2020)
 # "hires2018" => Eggl et al. (2020), high-resolution (NSIDE=256)
 # default `table` value is "2018".
-function radec_mpc_corr(mpcobsfile::String, table::String="2018")
+function radec_mpc_corr(mpcobsfile::String, debias_table::String="2018")
 
     obs_df = readmp(mpcobsfile)
     n_optical_obs = nrow(obs_df)
@@ -227,20 +320,20 @@ function radec_mpc_corr(mpcobsfile::String, table::String="2018")
 
     # Select debiasing table: 2014 corresponds to Farnocchia et al. (2015), 2018 corresponds to Eggl et al. (2020)
     # debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
-    if table == "2018"
+    if debias_table == "2018"
         debias_path = artifact"debias_2018"
         mpc_catalog_codes_201X = mpc_catalog_codes_2018
         NSIDE= 64 #The healpix tesselation resolution of the bias map from Eggl et al. (2020)
-    elseif table == "hires2018"
+    elseif debias_table == "hires2018"
         debias_path = artifact"debias_hires2018"
         mpc_catalog_codes_201X = mpc_catalog_codes_2018
         NSIDE= 256 #The healpix tesselation resolution of the high-resolution bias map from Eggl et al. (2020)
-    elseif table == "2014"
+    elseif debias_table == "2014"
         debias_path = artifact"debias_2014"
         mpc_catalog_codes_201X = mpc_catalog_codes_2014
         NSIDE= 64 #The healpix tesselation resolution of the bias map from Farnocchia et al. (2015)
     else
-        @error "Unknown bias map: $(table). Possible values are `2014`, `2018` and `hires2018`."
+        @error "Unknown bias map: $(debias_table). Possible values are `2014`, `2018` and `hires2018`."
     end
     bias_file = joinpath(debias_path, "bias.dat")
 
@@ -251,15 +344,14 @@ function radec_mpc_corr(mpcobsfile::String, table::String="2018")
     for i in 1:n_optical_obs
         if obs_df.catalog[i] ∉ mpc_catalog_codes_201X
             # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
-            cnf = mpc_catalog_codes[obs_df.catalog[i]]
-            @warn "Catalog not found in table: $(cnf). Setting debiasing corrections equal to zero."
+            @warn "Catalog not found in table: $(obs_df.catalog[i]). Setting debiasing corrections equal to zero."
             α_corr_v[i] = 0.0
             δ_corr_v[i] = 0.0
             continue
         else
             # Otherwise, if star catalog is present in debias table, compute corrections
             α_i_deg = 15(obs_df.rah[i] + obs_df.ram[i]/60 + obs_df.ras[i]/3600) # deg
-            δ_i_deg = obs_df.decd[i] + obs_df.decm[i]/60 + obs_df.decs[i]/3600 # deg
+            δ_i_deg = sign(obs_df.decd[i])*(abs(obs_df.decd[i]) + obs_df.decm[i]/60 + obs_df.decs[i]/3600) # deg
             α_i_rad = deg2rad(α_i_deg) #rad
             δ_i_rad = deg2rad(δ_i_deg) #rad
             # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
@@ -287,38 +379,6 @@ function radec_mpc_corr(mpcobsfile::String, table::String="2018")
     return α_corr_v, δ_corr_v # arcsec, arcsec
 end
 
-### FWF reader, due to @aplavin
-### https://gist.github.com/aplavin/224a31ea457b6e0ef0f4c1a20bd28850
-convert_val(::Type{String}, val::String) = val
-convert_val(::Type{Symbol}, val::String) = Symbol(val)
-convert_val(typ::Type{<:Integer}, val::String) = parse(typ, val)
-convert_val(typ::Type{<:AbstractFloat}, val::String) = parse(typ, replace(val, "D" => "E"))  # tables output from Fortran often have floats as 1D+5 instead of 1E+5
-# # usage:
-# read_fwf(
-#   "file.tab",
-#   (
-#     colname1=(1, 20, String),
-#     colname2=(100, 120, Int),
-#     # ...
-#   ),
-#   skiprows=[1, 2, 3, 7]
-# )
-function readfwf(io, colspecs; skiprows=[], missingstrings=[])
-    cols = Dict(
-        k => Vector{Union{typ, Missing}}(undef, 0)
-        for (k, (from, to, typ)) in pairs(colspecs)
-    )
-    for (irow, line) in eachline(io) |> enumerate
-        if irow ∈ skiprows continue end
-        for (k, (from, to, typ)) in pairs(colspecs)
-            s_val = from <= length(line) ? line[from:min(length(line), to)] : ""
-            f_val = s_val in missingstrings ? missing : convert_val(typ, s_val)
-            push!(cols[k], f_val)
-        end
-    end
-    DataFrame([k => identity.(cols[k]) for k in keys(colspecs)])
-end
-
 # MPC minor planet optical observations fixed-width format
 # Format is described in: https://minorplanetcenter.net/iau/info/OpticalObs.html
 # Format is discussed thoroughly in S. Chesley et al. (2010) Icarus 210, p. 158-181
@@ -332,7 +392,7 @@ j2000=(15,15,String),
 yr=(16,19,Int),
 month=(21,22,Int),
 day=(24,25,Int),
-utc=(26,31,Float64),
+utc=(26,32,Float64),
 rah=(33,34,Int),
 ram=(36,37,Int),
 ras=(39,44,Float64),
