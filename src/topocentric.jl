@@ -1,3 +1,48 @@
+### FWF reader, due to @aplavin
+### https://gist.github.com/aplavin/224a31ea457b6e0ef0f4c1a20bd28850
+convert_val(::Type{String}, val::String) = val
+convert_val(::Type{Symbol}, val::String) = Symbol(val)
+convert_val(typ::Type{<:Integer}, val::String) = parse(typ, val)
+convert_val(typ::Type{<:AbstractFloat}, val::String) = parse(typ, replace(val, "D" => "E"))  # tables output from Fortran often have floats as 1D+5 instead of 1E+5
+# # usage:
+# read_fwf(
+#   "file.tab",
+#   (
+#     colname1=(1, 20, String),
+#     colname2=(100, 120, Int),
+#     # ...
+#   ),
+#   skiprows=[1, 2, 3, 7]
+# )
+function readfwf(io, colspecs; skiprows=[], missingstrings=[])
+    cols = Dict(
+        k => Vector{Union{typ, Missing}}(undef, 0)
+        for (k, (from, to, typ)) in pairs(colspecs)
+    )
+    for (irow, line) in eachline(io) |> enumerate
+        if irow ∈ skiprows continue end
+        for (k, (from, to, typ)) in pairs(colspecs)
+            s_val = from <= length(line) ? line[from:min(length(line), to)] : ""
+            # @show irow line k typ s_val
+            f_val = s_val in missingstrings ? missing : convert_val(typ, s_val)
+            push!(cols[k], f_val)
+        end
+    end
+    DataFrame([k => identity.(cols[k]) for k in keys(colspecs)])
+end
+
+mpc_format_obscode = (Code=(1,3,String),
+Long=(5,13,Float64),
+cos=(14,21,Float64),
+sin=(22,30,Float64),
+Name=(31,80,String)
+)
+
+# MPC minor planet observatory code reader
+readmpcobs(mpcfile::String=joinpath(dirname(pathof(Apophis)), "ObsCodes.txt")) = table(readfwf(mpcfile, mpc_format_obscode, skiprows=union([1,247,249,251,252,260],1222:1230)))
+
+const mpcobscodes = readmpcobs()
+
 # et: ephemeris time (TDB seconds since J2000.0 epoch)
 function observer_position(station_code::Union{Int, String}, et::T;
         pm::Bool=true, lod::Bool=true, eocorr::Bool=true) where {T<:Number}
@@ -5,56 +50,17 @@ function observer_position(station_code::Union{Int, String}, et::T;
     # u: distance from spin axis (km), taken from Yeomans et al. (1992) u = r*cos(ϕ)
     # v: height above equatorial plane (km), taken from Yeomans et al. (1992) v = r*sin(ϕ)
     # East long data is consistent with MPC database (2019-Mar-7)
-    # TODO: add more radar stations
-    if station_code == 251 # Arecibo
-        # # Using Yeomans et al. (1992) Arecibo tracking station Earth-fixed position, since it gives the best 2012-2013 time-delay residuals for Apophis
-        # # station coordinates from MPC gives essentially the same residuals than Yeomans et al. (1992)
-        λ_deg = 293.24692 #deg
-        u = 6056.525 #km
-        v = 1994.665 #km
-    elseif station_code == 252 # Goldstone DSS 13 (Venus site), Fort Irwin
-        λ_deg = 243.2055410 #deg
-        u = 5215.524541 #km
-        v = 3660.912728 #km
-    elseif station_code == 253 # Goldstone DSS 14 (Mars site), Fort Irwin
-        λ_deg = 243.1104618 #deg
-        u = 5203.996911 #km
-        v = 3677.052277 #km
-    elseif station_code == 254 # Haystack, Westford, MA
-        λ_deg = 288.51128 #deg
-        u = 4700.514 #km
-        v = 4296.900 #km
-    elseif station_code == "V00" # Kitt Peak-Bok
-        λ_deg = 248.39981 #deg
-        u = 0.849456*RE #km
-        v = +0.526492*RE #km
-    elseif station_code == "T09" # Mauna Kea-UH/Tholen NEO Follow-Up (Subaru)
-        λ_deg = 204.52398 #deg
-        u = 0.941706*RE #km
-        v = +0.337237*RE #km
-    elseif station_code == "T12" # Mauna Kea-UH/Tholen NEO Follow-Up (2.24-m)
-        λ_deg = 204.53057 #deg
-        u = 0.941729*RE #km
-        v = +0.337199*RE #km
-    elseif station_code == "568" # Mauna Kea
-        λ_deg = 204.5278 #deg
-        u = 0.94171*RE #km
-        v = +0.33725*RE #km
-    elseif station_code == "H01" # Magdalena Ridge Observatory, Socorro
-        λ_deg = 252.81067 #deg
-        u = 0.830474*RE #km
-        v = +0.556096*RE #km
-    elseif station_code == "F51" # Pan-STARRS 1, Haleakala
-        λ_deg = 203.74409 #deg
-        u = 0.936241*RE #km
-        v = +0.351543*RE #km
-    elseif station_code == "695" # Kitt Peak
-        λ_deg = 248.40533 #deg
-        u = 0.849504*RE #km
-        v = +0.526425*RE #km
-    else
+    st_code_str = lpad(string(station_code), 3, "0")
+    # @show st_code_str filter(i->i.Code==st_code_str, mpcobscodes)
+    obscode = filter(i->i.Code==st_code_str, mpcobscodes)
+    if length(obscode) == 0
         @error "Unknown station code: $station_code"
+    elseif length(obscode) > 1
+        @warn "More than one observatory assigned to code: $station_code"
     end
+    λ_deg = select(obscode, :Long)[1]
+    u = select(obscode, :cos)[1]*RE
+    v = select(obscode, :sin)[1]*RE
     # cartesian components of Earth-fixed position of observer
     λ_rad = deg2rad(λ_deg) # rad
     x_gc = u*cos(λ_rad) #km
@@ -70,11 +76,14 @@ function observer_position(station_code::Union{Int, String}, et::T;
     return G_vec_ESAA, dG_vec_ESAA
 end
 
-# conversion of milli-arcseconds to radians
-mas2rad(x) = deg2rad(x/3.6e6) # mas/1000 -> arcsec; arcsec/3600 -> deg; deg2rad(deg) -> rad
-
 # conversion of radians to arcseconds
 rad2arcsec(x) = 3600rad2deg(x) # rad2deg(rad) -> deg; 3600deg -> arcsec
+
+# conversion of arcseconds to radians
+arcsec2rad(x) = deg2rad(x/3600) # arcsec/3600 -> deg; deg2rad(deg) -> rad
+
+# conversion of milli-arcseconds to radians
+mas2rad(x) = arcsec2rad(x/1000) # mas/1000 -> arcsec; arcsec2rad(arcsec) -> rad
 
 # Terrestrial-to-celestial rotation matrix (including polar motion)
 # Reproduction of Section 5.3 of SOFA Tools for Earth Attitude
@@ -151,33 +160,26 @@ end
 
 # IAU 1976/1980 nutation-precession matrix
 # tt: days since J2000.0 (TT)
+# IAU 1980 nutation angles Δψ (nutation in longitude), Δϵ (nutation in obliquity), both in radians
+# dde80, ddp80: nutation corrections wrt IAU 1976/1980 (in radians)
 # eocorr: EarthOrientation.jl corrections
-function nupr7680mat(tt; eocorr::Bool=true)
-        # IAU 1976 precession matrix, J2000.0 to date
-    # https://github.com/sisl/SOFA.jl/blob/be9ddfd412c5ab77b291b17decfd369041ef365b/src/pmat76.jl#L14
-    rp = iauPmat76(J2000, tt)
-    # IAU 1980 nutation angles Δψ (nutation in longitude), Δϵ (nutation in obliquity)
-    # Output of `SOFA.iauNut80` is in radians:
-    # https://github.com/sisl/SOFA.jl/blob/dc911b990dba79435399e1af0206e4acfc94c630/src/nut80.jl#L14
-    dp80, de80  = iauNut80(J2000, tt)
-    #Nutation corrections wrt IAU 1976/1980
-    # Output of `EarthOrientation.precession_nutation80` is in mas:
-    # https://github.com/JuliaAstro/EarthOrientation.jl/blob/529f12425a6331b133f989443aeb3fbbafd8f324/src/EarthOrientation.jl#L413
-    if eocorr
-        ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(J2000+tt)
-    else
-        ddp80_mas, dde80_mas = 0.0, 0.0
-    end
-    # Convert mas -> radians
-    ddp80 = mas2rad(ddp80_mas)
-    dde80 = mas2rad(dde80_mas)
-    # Add adjustments: frame bias, precession-rates, geophysical
-    dpsi = dp80 + ddp80 #rad
-    deps = de80 + dde80 #rad
-    # Mean obliquity (output in radians)
-    epsa = iauObl80(J2000, tt) # rad
-    # Form the matrix of nutation
-    rn = iauNumat(epsa, dpsi, deps)
+function nupr7680mat(tt, Δϵ_1980, ΔΨ_1980, dde80, ddp80; eocorr::Bool=true)
+    # IAU 1976 precession matrix, J2000.0 to date
+    rp = Rz(-PlanetaryEphemeris.zeta(tt))*Ry(PlanetaryEphemeris.Theta(tt))*Rz(-PlanetaryEphemeris.Zeta(tt))
+    # Add nutation corrections
+    dpsi = ΔΨ_1980 + ddp80 #rad
+    deps = Δϵ_1980 + dde80 #rad
+    # IAU 1980 nutation matrix (ESAA 1992)
+    # Eq. (5-152) from Moyer, 2003
+    # ϵ0 (rad): mean obliquity obliquity of the ecliptic
+    ϵ0 = PlanetaryEphemeris.ϵ̄(tt)
+    # Δϵ (rad): nutation in obliquity
+    Δϵ = deps
+    # Δψ (rad): nutation in longitude
+    Δψ = dpsi
+    # ϵ (rad): true obliquity of date
+    ϵ = ϵ0 + Δϵ
+    rn = Rx(-ϵ)*Rz(-Δψ)*Rx(ϵ0)
     # Combine the matrices:  PN = N x P (with frame-bias B included)
     return rn*rp
 end
@@ -191,10 +193,11 @@ function polarmotionmat(tt; pm::Bool=true)
         xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(J2000+tt)
         xp = deg2rad(xp_arcsec/3600)
         yp = deg2rad(yp_arcsec/3600)
-        W = iauRx(-yp, W)
-        W = iauRy(-xp, W)
+    else
+        xp = 0.0
+        yp = 0.0
     end
-    return W
+    return Ry(-xp)*Rx(-yp)
 end
 
 # Terrestrial-to-celestial rotation matrix (including polar motion)
@@ -212,8 +215,6 @@ function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true,
     jd0 = datetime2julian(DateTime(2008,9,24))
     t0_tt = et + ttmtdb(et)
     tt = t0_tt/daysec
-    # IAU 76/80 nutation-precession matrix
-    C = nupr7680mat(constant_term(tt), eocorr=eocorr)
 
     #Nutation corrections wrt IAU 1976/1980
     # Output of `EarthOrientation.precession_nutation80` is in mas:
@@ -227,10 +228,17 @@ function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true,
     ddp80 = mas2rad(ddp80_mas)
     dde80 = mas2rad(dde80_mas)
 
+    et_days = et/daysec # TDB days since J2000.0
     # Mean obliquity (output in radians)
-    epsa = iauObl80(J2000, constant_term(tt)) # rad
+    epsa = PlanetaryEphemeris.ϵ̄(et_days) # rad
+    # Lunar longitude of ascending node (measured from ecliptic)
+    Ω_M = PlanetaryEphemeris.Ω(et_days) # rad
+    # IAU 1980 nutation angles
+    _, Δϵ_1980, ΔΨ_1980 = nutation_fk5(J2000 + et_days)
     # Equation of the equinoxes `ee = GAST - GMST`, including nutation correction
-    ee = iauEqeq94(J2000, constant_term(tt)) + ddp80*cos(epsa)
+    # Expression from Eq. (5-184) of Moyer (2003): Δθ = ∆ψ cosϵ̄ + 0''.00264 sinΩ + 0''.000063 sin2Ω
+    # where the nutation in longitude includes corrections from IERS eop file
+    ee = (ΔΨ_1980+ddp80)*cos(epsa) + arcsec2rad( 0.00264sin(Ω_M) + 0.000063sin(2Ω_M) )
     # ΔUT1 = UT1-UTC (seconds)
     if eocorr
         dut1 = EarthOrientation.getΔUT1(constant_term(t_utc))
@@ -238,15 +246,13 @@ function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true,
         dut1 = 0.0
     end
     # UT1
-    date = floor(constant_term(t_utc)) + 0.5
-    time_secs = utc_secs - date*daysec
-    tut = (time_secs + dut1)/daysec
-
+    ut1 = utc_secs + dut1 # elapsed UT1 secs since J2000.0
+    ut1_days = ut1/daysec # elapsed UT1 days since J2000.0
     # Greenwich apparent sidereal time (IAU 1982/1994)
-    # jd1_ut1, jd2_ut1 = J2000, (utc_secs+dut1)/daysec
-    # gmst82 = iauGmst82( jd1_ut1, jd2_ut1 ) #rad
-    gmst82 = iauGmst82( J2000+date, constant_term(tut) ) #rad
-    gast = iauAnp( gmst82 + ee ) #rad
+    # Eq. (5-173) from Moyer (2003)
+    gmst82 = J2000toGMST(ut1_days)
+    gast = mod2pi( gmst82 + ee )
+
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
     Rz_minus_GAST = [
             cos(gast) -sin(gast) 0.0;
@@ -254,7 +260,7 @@ function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true,
             0.0 0.0 1.0
         ]
     if lod
-        β_dot = omega(EarthOrientation.getlod(t_utc))
+        β_dot = omega(EarthOrientation.getlod(constant_term(t_utc)))
     else
         β_dot = ω
     end
@@ -267,15 +273,18 @@ function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true,
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
     W = polarmotionmat(constant_term(tt), pm=pm)
 
-    W_inv = transpose(W)
-    C_inv = transpose(C)
+    # IAU 76/80 nutation-precession matrix
+    C = nupr7680mat(et_days, Δϵ_1980, ΔΨ_1980, dde80, ddp80, eocorr=eocorr)
+
+    W_inv = convert(Matrix{Float64}, transpose(W))
+    C_inv = convert(Matrix{Float64}, transpose(C))
 
     # g(t), \dot g(t) ESAA vectors
     g_vec_ESAA =  Rz_minus_GAST*(W_inv*pos_geo)
     dg_vec_ESAA = dRz_minus_GAST*(W_inv*pos_geo)
     # G(t), \dot G(t) ESAA vectors
-     G_vec_ESAA = convert(Vector{Float64}, C_inv* g_vec_ESAA)
-    dG_vec_ESAA = convert(Vector{Float64}, C_inv*dg_vec_ESAA)
+     G_vec_ESAA = C_inv* g_vec_ESAA
+    dG_vec_ESAA = C_inv*dg_vec_ESAA
     # return g(t), \dot g(t), GAST
     return G_vec_ESAA, dG_vec_ESAA, gast
 end
