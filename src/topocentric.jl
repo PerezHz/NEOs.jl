@@ -277,7 +277,7 @@ function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true,
     C = nupr7680mat(et_days, Δϵ_1980, ΔΨ_1980, dde80, ddp80, eocorr=eocorr)
 
     W_inv = convert(Matrix{Float64}, transpose(W))
-    C_inv = convert(Matrix{Float64}, transpose(C))
+    C_inv = transpose(C)
 
     # g(t), \dot g(t) ESAA vectors
     g_vec_ESAA =  Rz_minus_GAST*(W_inv*pos_geo)

@@ -82,6 +82,10 @@ const clightkms = 2.99792458E5 # speed of light, km/sec
 
 const jd0 = 2.4547335e6
 
+# Temporarily adding this until corresponding fix in TaylorSeries.jl is added to new release
+import Base: sincos
+sincos(a::Taylor1) = TaylorSeries.sincos(a)
+
 include("process_radar_data_jpl.jl")
 include("topocentric.jl")
 include("delay_doppler.jl")

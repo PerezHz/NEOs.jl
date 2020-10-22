@@ -285,7 +285,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
     # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
     et_t_secs = et_b_secs - τ_U
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = observer_position(station_code, constant_term(et_t_secs), pm=pm, lod=lod, eocorr=eocorr)
+    R_t, V_t = observer_position(station_code, et_t_secs, pm=pm, lod=lod, eocorr=eocorr)
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
     v_e_t_t = rv_e_t_t[4:6]
@@ -304,7 +304,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
     for i in 1:niter
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
         # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial conditions variations via et_t_secs
-        R_t, V_t = observer_position(station_code, constant_term(et_t_secs), pm=pm, lod=lod, eocorr=eocorr)
+        R_t, V_t = observer_position(station_code, et_t_secs, pm=pm, lod=lod, eocorr=eocorr)
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]
