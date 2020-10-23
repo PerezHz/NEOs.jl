@@ -278,6 +278,7 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     W_inv = convert(Matrix{Float64}, transpose(W))
     C_inv = transpose(C)
 
+    # eop_IAU1980 = get_iers_eop();
     # _mt2c = rECEFtoECI(DCM, ITRF(), GCRF(), t_utc, eop_IAU1980)
     # mt2c = convert(Matrix{eltype(_mt2c)}, _mt2c)
     mt2c = C_inv*Rz_minus_GAST*W_inv
