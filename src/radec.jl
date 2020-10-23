@@ -130,59 +130,6 @@ function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
     return α_as, δ_as # right ascension, declination (arcsec, arcsec)
 end
 
-function radec(astopticalobsfile::String,
-        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true,
-        xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
-    # astopticalobsfile = "tholenetal2013_radec_data.dat"
-    astopticalobsdata = readdlm(astopticalobsfile, ',', comments=true)
-
-    utc1 = DateTime(astopticalobsdata[1,1]) + Microsecond( round(1e6daysec*astopticalobsdata[1,2]) )
-    et1 = str2et(string(utc1))
-    a1_et1 = xva(et1)[1]
-    S = typeof(a1_et1)
-
-    n_optical_obs = size(astopticalobsdata)[1]
-
-    vra = Array{S}(undef, n_optical_obs)
-    vdec = Array{S}(undef, n_optical_obs)
-
-    for i in 1:n_optical_obs
-        utc_i = DateTime(astopticalobsdata[i,1]) + Microsecond( round(1e6daysec*astopticalobsdata[i,2]) )
-        station_code_i = string(astopticalobsdata[i,17])
-        vra[i], vdec[i] = radec(station_code_i, utc_i, niter, pm=pm, lod=lod,
-            eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
-    end
-
-    return vra, vdec
-end
-
-function radec_mpc_vokr15(niter::Int=10; pm::Bool=true, lod::Bool=true,
-        eocorr::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv,
-        xva::Function=apophis_pv_197)
-
-    astopticalobsfile = joinpath(pkgdir(Apophis), "vokrouhlickyetal2015_mpc.dat")
-    vokr15 = readdlm(astopticalobsfile, ',', comments=true)
-
-    utc1 = DateTime(vokr15[1,4], vokr15[1,5], vokr15[1,6]) + Microsecond( round(1e6*86400*vokr15[1,7]) )
-    et1 = str2et(string(utc1))
-    a1_et1 = xva(et1)[1]
-    S = typeof(a1_et1)
-
-    n_optical_obs = size(vokr15)[1]
-
-    vra = Array{S}(undef, n_optical_obs)
-    vdec = Array{S}(undef, n_optical_obs)
-
-    for i in 1:n_optical_obs
-        utc_i = DateTime(vokr15[i,4], vokr15[i,5], vokr15[i,6]) + Microsecond( round(1e6*86400*vokr15[i,7]) )
-        station_code_i = string(vokr15[i,20])
-        vra[i], vdec[i] = radec(station_code_i, utc_i, niter, pm=pm, lod=lod,
-            eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
-    end
-
-    return vra, vdec
-end
-
 # Compute optical astrometric ra/dec ephemeris for a set of observations in a MPC-formatted file
 function radec_mpc(astopticalobsfile, niter::Int=10; pm::Bool=true, lod::Bool=true,
         eocorr::Bool=true, xve::Function=earth_pv,
@@ -293,7 +240,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; pm::Bool=true,
             # @show dRA, dDEC, pmRA, pmDEC
             # utc_i = DateTime(obs_t[i].yr, obs_t[i].month, obs_t[i].day) + Microsecond( round(1e6*86400*obs_t[i].utc) )
             et_secs_i = str2et(string(datetime_obs[i]))
-            tt_secs_i = et_secs_i - tt_tdb(et_secs_i)
+            tt_secs_i = et_secs_i - ttmtdb(et_secs_i)
             yrs_J2000_tt = tt_secs_i/(daysec*yr)
             α_corr[i] = dRA + yrs_J2000_tt*pmRA/1000 # total debiasing correction in right ascension (arcsec)
             δ_corr[i] = dDEC + yrs_J2000_tt*pmDEC/1000 # total debiasing correction in declination (arcsec)
@@ -370,7 +317,7 @@ function radec_mpc_corr(mpcobsfile::String, debias_table::String="2018")
             # @show dRA, dDEC, pmRA, pmDEC
             utc_i = DateTime(obs_df.yr[i], obs_df.month[i], obs_df.day[i]) + Microsecond( round(1e6*86400*obs_df.utc[i]) )
             et_secs_i = str2et(string(utc_i))
-            tt_secs_i = et_secs_i - tt_tdb(et_secs_i)
+            tt_secs_i = et_secs_i - ttmtdb(et_secs_i)
             yrs_J2000_tt = tt_secs_i/(daysec*yr)
             α_corr_v[i] = ( dRA + yrs_J2000_tt*pmRA/1000 ) / cos(δ_i_rad) # total debiasing correction in right ascension (arcsec)
             δ_corr_v[i] = dDEC + yrs_J2000_tt*pmDEC/1000 # total debiasing correction in declination (arcsec)

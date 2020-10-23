@@ -5,9 +5,8 @@ function rvelea(dx, x, params, t)
     return true, (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
 end
 
-function loadeph(ephfile)
+function loadeph(ss16asteph_::TaylorInterpolant)
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    ss16asteph_ = load(ephfile, "ss16ast_eph")
     ss16asteph_t0 = (ss16asteph_.t0 ./ daysec) - (jd0-J2000)
     ss16asteph_t = (ss16asteph_.t ./ daysec)
     ephord = ss16asteph_.x[1].order
@@ -42,7 +41,7 @@ function loadeph(ephfile)
 end
 
 function save2jldandcheck(objname, sol)
-    outfilename = string(objname, "_jt.", myid()-1, ".jld")
+    outfilename = string(objname, "_jt.jld")
     return __save2jldandcheck(outfilename, sol)
 end
 
@@ -61,7 +60,7 @@ function __save2jldandcheck(outfilename, sol)
     for ind in eachindex(sol)
         varname = string(ind)
         #read varname from files and assign recovered variable to recovered_sol_i
-        recovered_sol_i = load(outfilename, varname)
+        recovered_sol_i = JLD.load(outfilename, varname)
         #check that varname was recovered succesfully
         @show recovered_sol_i == sol[ind]
     end
@@ -100,11 +99,12 @@ end
 function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         tspan::T, ephfile::String; output::Bool=true, newtoniter::Int=10,
         dense::Bool=false, dq::Vector=zeros(7), radarobsfile::String="",
-        quadmath::Bool=false) where {T<:Real}
+        opticalobsfile::String="", quadmath::Bool=false) where {T<:Real}
 
-    ss16asteph, acc_eph, newtonianNb_Potential = loadeph(ephfile)
+    ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
+    ss16asteph_auday, acc_eph, newtonianNb_Potential = loadeph(ss16asteph_et)
     jd0 = datetime2julian(DateTime(2008, 9, 24))
-    params = (ss16asteph, acc_eph, newtonianNb_Potential, jd0)
+    params = (ss16asteph_auday, acc_eph, newtonianNb_Potential, jd0)
     # get asteroid initial conditions
     q0 = initialcond(dq)
     @show q0
@@ -113,7 +113,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         _q0 = one(Float128)*q0
         _t0 = Float128(t0)
         _abstol = Float128(abstol)
-        _ss16asteph = TaylorInterpolant(Float128(ss16asteph.t0), Float128.(ss16asteph.t), map(x->Taylor1(Float128.(x.coeffs)), ss16asteph.x))
+        _ss16asteph = TaylorInterpolant(Float128(ss16asteph_auday.t0), Float128.(ss16asteph_auday.t), map(x->Taylor1(Float128.(x.coeffs)), ss16asteph_auday.x))
         _acc_eph = TaylorInterpolant(Float128(acc_eph.t0), Float128.(acc_eph.t), map(x->Taylor1(Float128.(x.coeffs)), acc_eph.x))
         _newtonianNb_Potential = TaylorInterpolant(Float128(newtonianNb_Potential.t0), Float128.(newtonianNb_Potential.t), map(x->Taylor1(Float128.(x.coeffs)), newtonianNb_Potential.x))
         _params = (_ss16asteph, _acc_eph, _newtonianNb_Potential, Float128(jd0))
@@ -129,14 +129,6 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
     # propagate orbit
     if dense
         @time interp = apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, dense=dense)
-        # et0 = (jd0-J2000)*daysec
-        # etv = interp.t[:]*daysec
-        # if eltype(interp.x) == Taylor1{Taylor1{Float64}}
-        #     interp_x_et = scaling.(interp.x[:,:], 1.0/86400)
-        # else
-        #     interp_x_et = map(x->x(Taylor1(order)/daysec), interp.x[:,:])
-        # end
-        # apophis = TaylorInterpolant(et0, etv, interp_x_et)
         if quadmath
             apophis_t0 = (jd0-J2000) # days since J2000 until initial integration time
             apophis_t = Float64.(interp.t[:])
@@ -169,20 +161,26 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
     #write solution and predicted values of observations (if requested) to .jld files
     if output
         outfilename = save2jldandcheck(objname, sol)
-        if dense
+        try
             # if requested by user, calculate computed (i.e., predicted) values of observations
-            compute_radar_obs(outfilename, radarobsfile, interp, ss16asteph)
+            furnsh(
+                joinpath(artifact"naif0012", "naif0012.tls"), # load leapseconds kernel
+                joinpath(artifact"de430", "de430_1850-2150.bsp"), # at least one SPK file must be loaded to read .tls file
+            )
+            compute_radar_obs("deldop_"*basename(radarobsfile)*".jld", radarobsfile, apophis, ss16asteph_et)
+            compute_optical_obs("radec_"*basename(opticalobsfile)*".jdb", opticalobsfile, apophis, ss16asteph_et)
+        catch e
+            @error "Unable to compute observation residuals" exception=(e, catch_backtrace())
         end
     end
 
     return nothing
 end
 
-function compute_radar_obs(outfilename::String, radarobsfile::String, apophis_interp, ss16asteph; tc::Real=3.0)
+function compute_radar_obs(outfilename::String, radarobsfile::String, apophis_interp, ss16asteph; tc::Real=1.0)
     if radarobsfile != ""
         asteroid_data = process_radar_data_jpl(radarobsfile)
         # TODO: check that first and last observation times are within interpolation interval
-        jd0 = datetime2julian(DateTime(2008,9,24))
         function apophis_et(et)
             return auday2kmsec(apophis_interp(et/daysec)[1:6])
         end
@@ -213,32 +211,10 @@ function compute_optical_obs(outfilename::String, opticalobsfile::String, apophi
         function sun_et(et)
             return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
         end
-        #compute right ascension and declination "ephemeris" (i.e., predicted values according to ephemeris)
-        vra, vdec = radec(opticalobsfile, xve=earth_et, xvs=sun_et, xva=apophis_et)
-        sol = (vra=vra, vdec=vdec)
+        # compute JuliaDB ra/dec table from MPC optical obs file, including ra/dec ephemeris (i.e., predicted values)
+        radec_table_jdb = radec_table(opticalobsfile, xve=earth_et, xvs=sun_et, xva=apophis_et)
         #save data to file
-        __save2jldandcheck(outfilename, sol)
-    end
-    return nothing
-end
-
-function compute_optical_obs_v15(outfilename::String, opticalobsfile::String, apophis_interp, ss16asteph) #opticalobsfile arg not really used right now
-    if opticalobsfile != ""
-        # TODO: check that first and last observation times are within interpolation interval
-        function apophis_et(et)
-            return auday2kmsec(apophis_interp(et/daysec)[1:6])
-        end
-        function earth_et(et)
-            return auday2kmsec(ss16asteph(et)[union(3*4-2:3*4,3*(N-1+4)-2:3*(N-1+4))])
-        end
-        function sun_et(et)
-            return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
-        end
-        #compute right ascension and declination "ephemeris" (i.e., predicted values according to ephemeris)
-        vra, vdec = radec_mpc_vokr15(xve=earth_et, xvs=sun_et, xva=apophis_et)
-        sol = (vra=vra, vdec=vdec)
-        #save data to file
-        __save2jldandcheck(outfilename, sol)
+        JuliaDB.save(radec_table_jdb, outfilename)
     end
     return nothing
 end

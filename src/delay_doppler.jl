@@ -1,6 +1,6 @@
 # load ttmtdb as a TaylorInterpolant saved in .jld file
 const jldephpath = joinpath(pkgdir(Apophis), "jldeph")
-const ttmtdb = load(joinpath(jldephpath, "ttmtdb_DE430_2003_2030.jld"), "ttmtdb")
+const ttmtdb = JLD.load(joinpath(jldephpath, "ttmtdb_DE430_2003_2030.jld"), "ttmtdb")
 
 # read JPL ephemerides (Apophis, Solar System, TT-TDB)
 function loadjpleph()
@@ -603,61 +603,4 @@ function delay_doppler(astradardata::Vector{RadarDataJPL{T}},
     doppler_index = findall(x->x.doppler_units=="Hz", astradardata)
 
     return vdelay[delay_index], vdoppler[doppler_index]
-end
-
-function delay_doppler(sseph_file::String, asteph_file::String, asteroid_data_file::String)
-    #Load time (t) and state (x) arrays, to construct a TaylorInterpolant object
-    ss16ast_eph_t = load(joinpath(jldephpath, sseph_file), "ss16ast_eph_t")
-    ss16ast_eph_x = load(joinpath(jldephpath, sseph_file), "ss16ast_eph_x")
-    ss16asteph = TaylorInterpolant(ss16ast_eph_t, ss16ast_eph_x)
-
-    # Load TT-TDB DE430 ephemeris
-    furnsh( joinpath(jldephpath, "TTmTDB.de430.19feb2015.bsp") )
-
-    #recover asteroid integration from .jld file
-    t = load(asteph_file, "t")
-    x = load(asteph_file, "x")
-
-    #construct Taylor interpolant
-    apophis = TaylorInterpolant(t, x)
-
-    function apophis_et(et)
-        return apophis( etsecs2julian(et) )[1:6]
-    end
-    function earth_et(et)
-        return ss16asteph( etsecs2julian(et) )[union(3*4-2:3*4,3*(N-1+4)-2:3*(N-1+4))]
-    end
-    function sun_et(et)
-        return ss16asteph( etsecs2julian(et) )[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))]
-    end
-
-    #compute time-delay and Doppler-shift "ephemeris" (i.e., predicted values according to ephemeris)
-    asteroid_data = process_radar_data_jpl(asteroid_data_file)
-    vdel, vdop = delay_doppler(asteroid_data; xve=earth_et, xvs=sun_et, xva=apophis_et)
-
-    sol = (vdel=vdel, vdop=vdop)
-
-    #write solution to .jld files
-    outfilename = "deldop.jld"
-    println("Saving observation predictions to file: $outfilename")
-    #first, deal with `tv_jpl_integ`
-    jldopen(outfilename, "w") do file
-        #loop over solution variables
-        for ind in eachindex(sol)
-            varname = string(ind)
-            println("Saving variable: ", varname)
-            write(file, varname, sol[ind])
-        end
-    end
-    println("Checking that all variables were saved correctly...")
-    #loop over solution variables
-    for ind in eachindex(sol)
-        varname = string(ind)
-        #read varname from files and assign recovered variable to recovered_sol_i
-        recovered_sol_i = load(outfilename, varname)
-        #check that varname was recovered succesfully
-        @show recovered_sol_i == sol[ind]
-    end
-    println("Saved solution")
-    return nothing
 end

@@ -28,7 +28,7 @@ using Quadmath
 using DataFrames: DataFrame, nrow
 using Healpix
 using Pkg.Artifacts #: @artifact_str
-using JuliaDB: table, select, filter, columns, insertcolsafter
+using JuliaDB #: table, select, filter, columns, insertcolsafter, save
 using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_iers_eop
 using StaticArrays: SArray
 
