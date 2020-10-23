@@ -70,7 +70,7 @@ function observer_position(station_code::Union{Int, String}, et::T;
     pos_geo = [x_gc, y_gc, z_gc] #km
 
     # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(et, pos_geo, pm=pm)
-    mt2c, dmt2c, gast = t2c_rotation_iau_76_80(et, pos_geo, pm=pm, lod=lod, eocorr=eocorr)
+    mt2c, dmt2c, gast = t2c_rotation_iau_76_80(et, pm=pm, lod=lod, eocorr=eocorr)
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
     return mt2c*pos_geo, dmt2c*pos_geo

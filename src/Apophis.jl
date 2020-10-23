@@ -10,7 +10,7 @@ export propagate, observer_position, apophisdofs,
     propagate_distributed, parallel_run,
     utcepoch, delay, delay_sigma, delay_units, doppler, doppler_sigma,
     doppler_units, freq, rcvr, xmit, bouncepoint, valsecchi_circle,
-    nrms, chi2, newtonls, newtonls_6v, diffcorr,
+    radec, radec_table, nrms, chi2, newtonls, newtonls_6v, diffcorr,
     readfwf, readmp
 
 using Distributed
