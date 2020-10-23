@@ -69,11 +69,11 @@ function observer_position(station_code::Union{Int, String}, et::T;
 
     pos_geo = [x_gc, y_gc, z_gc] #km
 
-    G_vec_ESAA, dG_vec_ESAA, gast = t2c_rotation_iau_76_80(et, pos_geo, pm=pm, lod=lod, eocorr=eocorr)
     # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(et, pos_geo, pm=pm)
+    mt2c, dmt2c, gast = t2c_rotation_iau_76_80(et, pos_geo, pm=pm, lod=lod, eocorr=eocorr)
 
     # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
-    return G_vec_ESAA, dG_vec_ESAA
+    return mt2c*pos_geo, dmt2c*pos_geo
 end
 
 # conversion of radians to arcseconds
@@ -187,7 +187,6 @@ end
 # Polar motion matrix (TIRS->ITRS, IERS 1996)
 # tt: days since J2000.0
 function polarmotionmat(tt; pm::Bool=true)
-    W = Array{Float64}(I, 3, 3)
     # Polar motion (arcsec->radians)
     if pm
         xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(J2000+tt)
@@ -206,8 +205,8 @@ end
 # "IAU 1976/1980/1982/1994, equinox based"
 # found at SOFA website, Mar 27, 2019
 # et: ephemeris time (TDB seconds since J2000.0 epoch)
-function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true,
-        lod::Bool=true, eocorr::Bool=true) where {T<:Number}
+function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
+        eocorr::Bool=true) where {T<:Number}
     # UTC (JD)
     utc_secs = et - tdb_utc(et)
     t_utc = J2000 + utc_secs/daysec
@@ -279,12 +278,10 @@ function t2c_rotation_iau_76_80(et::T, pos_geo::Vector; pm::Bool=true,
     W_inv = convert(Matrix{Float64}, transpose(W))
     C_inv = transpose(C)
 
-    # g(t), \dot g(t) ESAA vectors
-    g_vec_ESAA =  Rz_minus_GAST*(W_inv*pos_geo)
-    dg_vec_ESAA = dRz_minus_GAST*(W_inv*pos_geo)
-    # G(t), \dot G(t) ESAA vectors
-     G_vec_ESAA = C_inv* g_vec_ESAA
-    dG_vec_ESAA = C_inv*dg_vec_ESAA
-    # return g(t), \dot g(t), GAST
-    return G_vec_ESAA, dG_vec_ESAA, gast
+    # _mt2c = rECEFtoECI(DCM, ITRF(), GCRF(), t_utc, eop_IAU1980)
+    # mt2c = convert(Matrix{eltype(_mt2c)}, _mt2c)
+    mt2c = C_inv*Rz_minus_GAST*W_inv
+    dmt2c = C_inv*dRz_minus_GAST*W_inv
+
+    return mt2c, dmt2c, gast
 end
