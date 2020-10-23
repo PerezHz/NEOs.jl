@@ -167,8 +167,10 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
                 joinpath(artifact"naif0012", "naif0012.tls"), # load leapseconds kernel
                 joinpath(artifact"de430", "de430_1850-2150.bsp"), # at least one SPK file must be loaded to read .tls file
             )
-            compute_radar_obs("deldop_"*basename(radarobsfile)*".jld", radarobsfile, apophis, ss16asteph_et)
-            compute_optical_obs("radec_"*basename(opticalobsfile)*".jdb", opticalobsfile, apophis, ss16asteph_et)
+            println("compute_radar_obs")
+            @time compute_radar_obs("deldop_"*basename(radarobsfile)*".jld", radarobsfile, apophis, ss16asteph_et)
+            println("compute_optical_obs")
+            @time compute_optical_obs("radec_"*basename(opticalobsfile)*".jdb", opticalobsfile, apophis, ss16asteph_et)
         catch e
             @error "Unable to compute observation residuals" exception=(e, catch_backtrace())
         end
