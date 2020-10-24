@@ -42,7 +42,7 @@ ss_eph_file = joinpath(apophisjlpath, "jldeph", "ss16ast343_eph_p6y_et.jld")
 #dq[end][1] = 1e-14
 
 #### dq: perturbation to nominal initial condition (TaylorN jet transport)
-dq = set_variables("ξ", order=varorder, numvars=nv)
+dq = set_variables("δx", order=varorder, numvars=nv)
 for i in 1:6
     dq[i][1][i] = 1e-8
 end
