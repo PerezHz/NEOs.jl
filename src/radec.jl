@@ -314,7 +314,7 @@ function radec_mpc_corr(mpcobsfile::String, debias_table::String="2018")
     for i in 1:n_optical_obs
         if obs_df.catalog[i] ∉ mpc_catalog_codes_201X
             # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
-            if haskey(mpc_catalog_codes, obs_df.catalog[i]) && obs_df.catalog[i] != truth
+            if haskey(mpc_catalog_codes, obs_df.catalog[i])
                 if obs_df.catalog[i] != truth
                     catalog_not_found = mpc_catalog_codes[obs_df.catalog[i]]
                     @warn "Catalog not found in $(debias_table) table: $(catalog_not_found). Setting debiasing corrections equal to zero."
