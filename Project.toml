@@ -37,7 +37,7 @@ JuliaDB = "0.13"
 Quadmath = "0.5.4"
 Revise = "2.6.6"
 SPICE = "0.1.1"
-TaylorIntegration = "0.8.3"
+TaylorIntegration = "0.8.4"
 TaylorSeries = "0.10.8"
 julia = "1"
 
