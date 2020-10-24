@@ -99,7 +99,8 @@ end
 function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         tspan::T, ephfile::String; output::Bool=true, newtoniter::Int=10,
         dense::Bool=false, dq::Vector=zeros(7), radarobsfile::String="",
-        opticalobsfile::String="", quadmath::Bool=false) where {T<:Real}
+        opticalobsfile::String="", quadmath::Bool=false,
+        debias_table::String="2018") where {T<:Real}
 
     ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
     ss16asteph_auday, acc_eph, newtonianNb_Potential = loadeph(ss16asteph_et)
@@ -170,7 +171,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
             println("compute_radar_obs")
             @time compute_radar_obs("deldop_"*basename(radarobsfile)*".jld", radarobsfile, apophis, ss16asteph_et)
             println("compute_optical_obs")
-            @time compute_optical_obs("radec_"*basename(opticalobsfile)*".jdb", opticalobsfile, apophis, ss16asteph_et)
+            @time compute_optical_obs("radec_"*basename(opticalobsfile)*".jdb", opticalobsfile, apophis, ss16asteph_et, debias_table=debias_table)
         catch e
             @error "Unable to compute observation residuals" exception=(e, catch_backtrace())
         end
@@ -201,7 +202,8 @@ function compute_radar_obs(outfilename::String, radarobsfile::String, apophis_in
     return nothing
 end
 
-function compute_optical_obs(outfilename::String, opticalobsfile::String, apophis_interp, ss16asteph)
+function compute_optical_obs(outfilename::String, opticalobsfile::String,
+        apophis_interp, ss16asteph; debias_table::String="2018")
     if opticalobsfile != ""
         # TODO: check that first and last observation times are within interpolation interval
         function apophis_et(et)
@@ -214,7 +216,7 @@ function compute_optical_obs(outfilename::String, opticalobsfile::String, apophi
             return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
         end
         # compute JuliaDB ra/dec table from MPC optical obs file, including ra/dec ephemeris (i.e., predicted values)
-        radec_table_jdb = radec_table(opticalobsfile, xve=earth_et, xvs=sun_et, xva=apophis_et)
+        radec_table_jdb = radec_table(opticalobsfile, xve=earth_et, xvs=sun_et, xva=apophis_et, debias_table=debias_table)
         #save data to file
         JuliaDB.save(radec_table_jdb, outfilename)
     end
