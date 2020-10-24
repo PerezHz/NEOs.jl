@@ -17,7 +17,7 @@ const maxsteps = 10000
 const nyears = 6.0 #-5.0 #21.0
 const dense = false #true
 const quadmath = false # use quadruple precision
-const debias_table = "2014" # "2018", "hires2018"
+const debias_table = "2018" # "2014", "hires2018"
 const apophisjlpath = pkgdir(Apophis)
 # const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph!
 const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
@@ -26,12 +26,13 @@ const jd0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #Julian date of integrati
 const t0 = 0.0 # integration initial time
 
 #### observation data files (ra/dec, del/dop)
-# const opticalobsfile = joinpath(apophisjlpath, "tholen13_mpc_formatted.dat")
+#const opticalobsfile = joinpath(apophisjlpath, "tholen13_mpc_formatted.dat")
 #const radarobsfile = joinpath(apophisjlpath, "Apophis_JPL_data_2005_2006.dat")
 const opticalobsfile = "" #joinpath(apophisjlpath, "vokr15_mpc_formatted.dat") # #""
 const radarobsfile = "" #joinpath(apophisjlpath, "Apophis_JPL_data_2012_2013.dat") #""
 
 # path to local Solar System ephemeris file
+#ss_eph_file = joinpath(apophisjlpath, "jldeph", "ss16ast343_eph_m5y_et.jld")
 ss_eph_file = joinpath(apophisjlpath, "jldeph", "ss16ast343_eph_p6y_et.jld")
 
 #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
