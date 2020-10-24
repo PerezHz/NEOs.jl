@@ -205,8 +205,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; pm::Bool=true,
 
     for i in 1:n_optical_obs
         # observed values
-        δ_i_deg = sign(obs_t[i].decd)*(abs(obs_t[i].decd) + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
-        # the following if ... block handles the sign of declination, including edge cases in declination such as -00 01
+        # the following if block handles the sign of declination, including edge cases in declination such as -00 01
         if obs_t[i].signdec == "+"
             δ_i_deg = +(obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
         elseif obs_t[i].signdec == "-"
@@ -331,7 +330,7 @@ function radec_mpc_corr(mpcobsfile::String, debias_table::String="2018")
         else
             # Otherwise, if star catalog is present in debias table, compute corrections
             α_i_deg = 15(obs_df.rah[i] + obs_df.ram[i]/60 + obs_df.ras[i]/3600) # deg
-            # the following if ... block handles the sign of declination, including edge cases in declination such as -00 01
+            # the following if block handles the sign of declination, including edge cases in declination such as -00 01
             if obs_df.signdec[i] == "+"
                 δ_i_deg = +(obs_df.decd[i] + obs_df.decm[i]/60 + obs_df.decs[i]/3600) # deg
             elseif obs_df.signdec[i] == "-"
