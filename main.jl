@@ -26,27 +26,29 @@ const jd0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #Julian date of integrati
 const t0 = 0.0 # integration initial time
 
 #### observation data files (ra/dec, del/dop)
+const opticalobsfile = ""
+const radarobsfile = ""
 #const opticalobsfile = joinpath(apophisjlpath, "tholen13_mpc_formatted.dat")
 #const radarobsfile = joinpath(apophisjlpath, "Apophis_JPL_data_2005_2006.dat")
-const opticalobsfile = "" #joinpath(apophisjlpath, "vokr15_mpc_formatted.dat") # #""
-const radarobsfile = "" #joinpath(apophisjlpath, "Apophis_JPL_data_2012_2013.dat") #""
+#const opticalobsfile = joinpath(apophisjlpath, "vokr15_mpc_formatted.dat")
+#const radarobsfile = joinpath(apophisjlpath, "Apophis_JPL_data_2012_2013.dat")
 
 # path to local Solar System ephemeris file
 #ss_eph_file = joinpath(apophisjlpath, "jldeph", "ss16ast343_eph_m5y_et.jld")
 ss_eph_file = joinpath(apophisjlpath, "jldeph", "ss16ast343_eph_p6y_et.jld")
 
 #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
-dq = Taylor1.(zeros(7), varorder)
-dq[end][1] = 1e-14
+#dq = Taylor1.(zeros(7), varorder)
+#dq[end][1] = 1e-14
 
 #### dq: perturbation to nominal initial condition (TaylorN jet transport)
-# dq = set_variables("ξ", order=varorder, numvars=nv)
-# for i in 1:6
-#     dq[i][1][i] = 1e-8
-# end
-# if get_numvars() == 7
-#     dq[7][1][7] = 1e-14
-# end
+dq = set_variables("ξ", order=varorder, numvars=nv)
+for i in 1:6
+    dq[i][1][i] = 1e-8
+end
+if get_numvars() == 7
+    dq[7][1][7] = 1e-14
+end
 
 ####integrator warmup
 propagate(objname, dynamics, 1, t0, nyears, ss_eph_file, output=false, dense=dense, dq=dq, quadmath=quadmath)
