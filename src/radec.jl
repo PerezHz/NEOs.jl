@@ -183,14 +183,17 @@ function radec_table(mpcobsfile::String, niter::Int=10; pm::Bool=true,
         debias_path = artifact"debias_2018"
         mpc_catalog_codes_201X = mpc_catalog_codes_2018
         NSIDE= 64 #The healpix tesselation resolution of the bias map from Eggl et al. (2020)
+        truth = "V" # In 2018 debias table Gaia DR2 catalog is regarded as the truth
     elseif debias_table == "hires2018"
         debias_path = artifact"debias_hires2018"
         mpc_catalog_codes_201X = mpc_catalog_codes_2018
         NSIDE= 256 #The healpix tesselation resolution of the high-resolution bias map from Eggl et al. (2020)
+        truth = "V" # In 2018 debias table Gaia DR2 catalog is regarded as the truth
     elseif debias_table == "2014"
         debias_path = artifact"debias_2014"
         mpc_catalog_codes_201X = mpc_catalog_codes_2014
         NSIDE= 64 #The healpix tesselation resolution of the bias map from Farnocchia et al. (2015)
+        truth = "t" # In 2014 debias table PPMXL catalog is regarded as the truth
     else
         @error "Unknown bias map: $(debias_table). Possible values are `2014`, `2018` and `hires2018`."
     end
@@ -203,6 +206,15 @@ function radec_table(mpcobsfile::String, niter::Int=10; pm::Bool=true,
     for i in 1:n_optical_obs
         # observed values
         δ_i_deg = sign(obs_t[i].decd)*(abs(obs_t[i].decd) + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
+        # the following if ... block handles the sign of declination, including edge cases in declination such as -00 01
+        if obs_t[i].signdec == "+"
+            δ_i_deg = +(obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
+        elseif obs_t[i].signdec == "-"
+            δ_i_deg = -(obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
+        else
+            @warn "Could not parse declination sign: $(obs_t[i].signdec). Setting positive sign."
+            δ_i_deg =  (obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
+        end
         δ_i_rad = deg2rad(δ_i_deg) #rad
         α_i_deg = 15(obs_t[i].rah + obs_t[i].ram/60 + obs_t[i].ras/3600) # deg
         α_i_rad = deg2rad(α_i_deg) #rad
@@ -218,7 +230,16 @@ function radec_table(mpcobsfile::String, niter::Int=10; pm::Bool=true,
         δ_comp[i] = δ_comp_as # arcsec
         if obs_t[i].catalog ∉ mpc_catalog_codes_201X
             # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
-            @warn "Catalog not found in table: $(obs_t[i].catalog). Setting debiasing corrections equal to zero."
+            if haskey(mpc_catalog_codes, obs_t[i].catalog)
+                if obs_t[i].catalog != truth
+                    catalog_not_found = mpc_catalog_codes[obs_t[i].catalog]
+                    @warn "Catalog not found in $(debias_table) table: $(catalog_not_found). Setting debiasing corrections equal to zero."
+                end
+            elseif obs_t[i].catalog == " "
+                @warn "Catalog information not available in observation record. Setting debiasing corrections equal to zero."
+            else
+                @warn "Catalog code $(obs_t[i].catalog) does not correspond to MPC catalog code. Setting debiasing corrections equal to zero."
+            end
             α_corr[i] = 0.0
             δ_corr[i] = 0.0
             continue
@@ -271,14 +292,17 @@ function radec_mpc_corr(mpcobsfile::String, debias_table::String="2018")
         debias_path = artifact"debias_2018"
         mpc_catalog_codes_201X = mpc_catalog_codes_2018
         NSIDE= 64 #The healpix tesselation resolution of the bias map from Eggl et al. (2020)
+        truth = "V" # In 2018 debias table Gaia DR2 catalog is regarded as the truth
     elseif debias_table == "hires2018"
         debias_path = artifact"debias_hires2018"
         mpc_catalog_codes_201X = mpc_catalog_codes_2018
         NSIDE= 256 #The healpix tesselation resolution of the high-resolution bias map from Eggl et al. (2020)
+        truth = "V" # In 2018 debias table Gaia DR2 catalog is regarded as the truth
     elseif debias_table == "2014"
         debias_path = artifact"debias_2014"
         mpc_catalog_codes_201X = mpc_catalog_codes_2014
         NSIDE= 64 #The healpix tesselation resolution of the bias map from Farnocchia et al. (2015)
+        truth = "t" # In 2014 debias table PPMXL catalog is regarded as the truth
     else
         @error "Unknown bias map: $(debias_table). Possible values are `2014`, `2018` and `hires2018`."
     end
@@ -291,14 +315,31 @@ function radec_mpc_corr(mpcobsfile::String, debias_table::String="2018")
     for i in 1:n_optical_obs
         if obs_df.catalog[i] ∉ mpc_catalog_codes_201X
             # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
-            @warn "Catalog not found in table: $(obs_df.catalog[i]). Setting debiasing corrections equal to zero."
+            if haskey(mpc_catalog_codes, obs_df.catalog[i]) && obs_df.catalog[i] != truth
+                if obs_df.catalog[i] != truth
+                    catalog_not_found = mpc_catalog_codes[obs_df.catalog[i]]
+                    @warn "Catalog not found in $(debias_table) table: $(catalog_not_found). Setting debiasing corrections equal to zero."
+                end
+            elseif obs_df.catalog[i] == " "
+                @warn "Catalog information not available in observation record. Setting debiasing corrections equal to zero."
+            else
+                @warn "Catalog code $(obs_df.catalog[i]) does not correspond to MPC catalog code. Setting debiasing corrections equal to zero."
+            end
             α_corr_v[i] = 0.0
             δ_corr_v[i] = 0.0
             continue
         else
             # Otherwise, if star catalog is present in debias table, compute corrections
             α_i_deg = 15(obs_df.rah[i] + obs_df.ram[i]/60 + obs_df.ras[i]/3600) # deg
-            δ_i_deg = sign(obs_df.decd[i])*(abs(obs_df.decd[i]) + obs_df.decm[i]/60 + obs_df.decs[i]/3600) # deg
+            # the following if ... block handles the sign of declination, including edge cases in declination such as -00 01
+            if obs_df.signdec[i] == "+"
+                δ_i_deg = +(obs_df.decd[i] + obs_df.decm[i]/60 + obs_df.decs[i]/3600) # deg
+            elseif obs_df.signdec[i] == "-"
+                δ_i_deg = -(obs_df.decd[i] + obs_df.decm[i]/60 + obs_df.decs[i]/3600) # deg
+            else
+                @warn "Could not parse declination sign: $(obs_df.signdec[i]). Setting positive sign."
+                δ_i_deg =  (obs_df.decd[i] + obs_df.decm[i]/60 + obs_df.decs[i]/3600) # deg
+            end
             α_i_rad = deg2rad(α_i_deg) #rad
             δ_i_rad = deg2rad(δ_i_deg) #rad
             # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
@@ -343,7 +384,8 @@ utc=(26,32,Float64),
 rah=(33,34,Int),
 ram=(36,37,Int),
 ras=(39,44,Float64),
-decd=(45,47,Int),
+signdec=(45,45,String),
+decd=(46,47,Int),
 decm=(49,50,Int),
 decs=(52,56,Float64),
 info1=(57,65,String),
