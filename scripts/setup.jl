@@ -1,6 +1,7 @@
 @show Threads.nthreads()
 import Pkg
 Pkg.instantiate()
+Pkg.status(mode=Pkg.PKGMODE_MANIFEST)
 using Apophis
 
 using EarthOrientation, SatelliteToolbox
