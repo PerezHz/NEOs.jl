@@ -4,7 +4,6 @@ authors = ["Jorge Pérez <PerezHz@users.noreply.github.com>", "Luis Benet <lbene
 version = "0.1.0"
 
 [deps]
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
@@ -29,14 +28,13 @@ TaylorSeries = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-DataFrames = "0.21.1"
 EarthOrientation = "0.6.1"
 Healpix = "2.3.0"
 JLD = "0.10.0"
 JuliaDB = "0.13"
 Quadmath = "0.5.4"
 Revise = "2.6.6"
-SPICE = "0.1.1"
+SPICE = "0.2"
 TaylorIntegration = "0.8.4"
 TaylorSeries = "0.10.8"
 julia = "1"

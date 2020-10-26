@@ -28,7 +28,8 @@ function readfwf(io, colspecs; skiprows=[], missingstrings=[])
             push!(cols[k], f_val)
         end
     end
-    DataFrame([k => identity.(cols[k]) for k in keys(colspecs)])
+    d = [k => identity.(cols[k]) for k in keys(colspecs)] # form Dict from data
+    table((;d...)) # Dict -> NamedTuple -> IndexedTable
 end
 
 mpc_format_obscode = (Code=(1,3,String),

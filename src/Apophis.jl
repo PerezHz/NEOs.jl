@@ -25,7 +25,6 @@ using JLD
 using EarthOrientation, SOFA, SPICE
 using Dates
 using Quadmath
-using DataFrames: DataFrame, nrow
 using Healpix
 using Pkg.Artifacts #: @artifact_str
 using JuliaDB #: table, select, filter, columns, insertcolsafter, save

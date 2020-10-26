@@ -135,10 +135,10 @@ function radec_mpc(astopticalobsfile, niter::Int=10; pm::Bool=true, lod::Bool=tr
         eocorr::Bool=true, xve::Function=earth_pv,
         xvs::Function=sun_pv, xva::Function=apophis_pv_197)
 
-    obs_df = readmp(astopticalobsfile)
-    n_optical_obs = nrow(obs_df)
+    obs_t = readmp(astopticalobsfile)
+    n_optical_obs = length(obs_t)
 
-    utc1 = DateTime(obs_df.yr[1], obs_df.month[1], obs_df.day[1]) + Microsecond( round(1e6*86400*obs_df.utc[1]) )
+    utc1 = DateTime(obs_t[1].yr, obs_t[1].month, obs_t[1].day) + Microsecond( round(1e6*86400*obs_t[1].utc) )
     et1 = str2et(string(utc1))
     a1_et1 = xva(et1)[1]
     S = typeof(a1_et1)
@@ -147,8 +147,8 @@ function radec_mpc(astopticalobsfile, niter::Int=10; pm::Bool=true, lod::Bool=tr
     vdec = Array{S}(undef, n_optical_obs)
 
     for i in 1:n_optical_obs
-        utc_i = DateTime(obs_df.yr[i], obs_df.month[i], obs_df.day[i]) + Microsecond( round(1e6*86400*obs_df.utc[i]) )
-        station_code_i = string(obs_df.obscode[i])
+        utc_i = DateTime(obs_t[i].yr, obs_t[i].month, obs_t[i].day) + Microsecond( round(1e6*86400*obs_t[i].utc) )
+        station_code_i = string(obs_t[i].obscode)
         vra[i], vdec[i] = radec(station_code_i, utc_i, niter, pm=pm, lod=lod,
             eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
     end
@@ -161,7 +161,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; pm::Bool=true,
         xve::Function=earth_pv, xvs::Function=sun_pv,
         xva::Function=apophis_pv_197)
 
-    obs_t = table(readmp(mpcobsfile))
+    obs_t = readmp(mpcobsfile)
     n_optical_obs = length(obs_t)
 
     utc1 = DateTime(obs_t[1].yr, obs_t[1].month, obs_t[1].day) + Microsecond( round(1e6*86400*obs_t[1].utc) )
@@ -279,8 +279,8 @@ end
 # default `table` value is "2018".
 function radec_mpc_corr(mpcobsfile::String, debias_table::String="2018")
 
-    obs_df = readmp(mpcobsfile)
-    n_optical_obs = nrow(obs_df)
+    obs_t = readmp(mpcobsfile)
+    n_optical_obs = length(obs_t)
 
     α_corr_v = Array{Float64}(undef, n_optical_obs)
     δ_corr_v = Array{Float64}(undef, n_optical_obs)
@@ -312,32 +312,32 @@ function radec_mpc_corr(mpcobsfile::String, debias_table::String="2018")
     @assert size(bias_matrix) == (resol.numOfPixels, 4length(mpc_catalog_codes_201X)) "Bias table file $bias_file dimensions do not match expected parameter NSIDE=$NSIDE and/or number of catalogs in table."
 
     for i in 1:n_optical_obs
-        if obs_df.catalog[i] ∉ mpc_catalog_codes_201X
+        if obs_t[i].catalog ∉ mpc_catalog_codes_201X
             # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
-            if haskey(mpc_catalog_codes, obs_df.catalog[i])
-                if obs_df.catalog[i] != truth
-                    catalog_not_found = mpc_catalog_codes[obs_df.catalog[i]]
+            if haskey(mpc_catalog_codes, obs_t[i].catalog)
+                if obs_t[i].catalog != truth
+                    catalog_not_found = mpc_catalog_codes[obs_t[i].catalog]
                     @warn "Catalog not found in $(debias_table) table: $(catalog_not_found). Setting debiasing corrections equal to zero."
                 end
-            elseif obs_df.catalog[i] == " "
+            elseif obs_t[i].catalog == " "
                 @warn "Catalog information not available in observation record. Setting debiasing corrections equal to zero."
             else
-                @warn "Catalog code $(obs_df.catalog[i]) does not correspond to MPC catalog code. Setting debiasing corrections equal to zero."
+                @warn "Catalog code $(obs_t[i].catalog) does not correspond to MPC catalog code. Setting debiasing corrections equal to zero."
             end
             α_corr_v[i] = 0.0
             δ_corr_v[i] = 0.0
             continue
         else
             # Otherwise, if star catalog is present in debias table, compute corrections
-            α_i_deg = 15(obs_df.rah[i] + obs_df.ram[i]/60 + obs_df.ras[i]/3600) # deg
+            α_i_deg = 15(obs_t[i].rah + obs_t[i].ram/60 + obs_t[i].ras/3600) # deg
             # the following if block handles the sign of declination, including edge cases in declination such as -00 01
-            if obs_df.signdec[i] == "+"
-                δ_i_deg = +(obs_df.decd[i] + obs_df.decm[i]/60 + obs_df.decs[i]/3600) # deg
-            elseif obs_df.signdec[i] == "-"
-                δ_i_deg = -(obs_df.decd[i] + obs_df.decm[i]/60 + obs_df.decs[i]/3600) # deg
+            if obs_t[i].signdec == "+"
+                δ_i_deg = +(obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
+            elseif obs_t[i].signdec == "-"
+                δ_i_deg = -(obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
             else
-                @warn "Could not parse declination sign: $(obs_df.signdec[i]). Setting positive sign."
-                δ_i_deg =  (obs_df.decd[i] + obs_df.decm[i]/60 + obs_df.decs[i]/3600) # deg
+                @warn "Could not parse declination sign: $(obs_t[i].signdec). Setting positive sign."
+                δ_i_deg =  (obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
             end
             α_i_rad = deg2rad(α_i_deg) #rad
             δ_i_rad = deg2rad(δ_i_deg) #rad
@@ -346,7 +346,7 @@ function radec_mpc_corr(mpcobsfile::String, debias_table::String="2018")
             # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
             # since we use pix_ind to get the corresponding row number in bias.dat, it's not necessary to substract 1
             pix_ind = ang2pixRing(resol, π/2-δ_i_rad, α_i_rad)
-            cat_ind = findfirst(x->x==obs_df.catalog[i], mpc_catalog_codes_201X)
+            cat_ind = findfirst(x->x==obs_t[i].catalog, mpc_catalog_codes_201X)
             # @show pix_ind, cat_ind
             # read dRA, pmRA, dDEC, pmDEC data from bias.dat
             # dRA, position correction in RA*cos(DEC) at epoch J2000.0 [arcsec];
@@ -355,7 +355,7 @@ function radec_mpc_corr(mpcobsfile::String, debias_table::String="2018")
             # pmDEC, proper motion correction in DEC [mas/yr].
             dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
             # @show dRA, dDEC, pmRA, pmDEC
-            utc_i = DateTime(obs_df.yr[i], obs_df.month[i], obs_df.day[i]) + Microsecond( round(1e6*86400*obs_df.utc[i]) )
+            utc_i = DateTime(obs_t[i].yr, obs_t[i].month, obs_t[i].day) + Microsecond( round(1e6*86400*obs_t[i].utc) )
             et_secs_i = str2et(string(utc_i))
             tt_secs_i = et_secs_i - ttmtdb(et_secs_i)
             yrs_J2000_tt = tt_secs_i/(daysec*yr)
