@@ -205,15 +205,14 @@ end
 # end
 
 # Compute radar-astrometric round-trip time for an asteroid at
-# UTC instant `t_r_utc` from tracking station with code `station_code` from Earth,
-# Sun and asteroid ephemerides
+# UTC instant `t_r_utc` from tracking station with code `station_code`.
 # station_code: observing station identifier (MPC nomenclature)
 # t_r_utc: UTC time of echo reception (DateTime)
 # t_offset: time offset, to compute Doppler shifts by range differences (seconds)
 # niter: number of light-time solution iterations
-# xve: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second
-# xvs: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second
-# xva: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second
+# xve: Earth ephemeris wich takes TDB seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second
+# xvs: Sun ephemeris wich takes TDB seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second
+# xva: asteroid ephemeris wich takes TDB seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second
 function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
         niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true,
         xve::Function=earth_pv, xvs::Function=sun_pv,
@@ -354,9 +353,201 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
     return 1e6τ # total signal delay (μs)
 end
 
+# compute delay and doppler via autodiff ν = -F_tx*dτ/dt
+function delay_ad(station_code::Int, t_r_utc::DateTime,
+        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true,
+        xve::Function=earth_pv, xvs::Function=sun_pv,
+        xva::Function=apophis_pv_197)
+    et_r_secs = str2et(string(t_r_utc))
+    # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
+    R_r, V_r = observer_position(station_code, et_r_secs, pm=pm, lod=lod, eocorr=eocorr)
+    # Earth's barycentric position and velocity at receive time
+    rv_e_t_r = xve(et_r_secs)
+    r_e_t_r = rv_e_t_r[1:3]
+    v_e_t_r = rv_e_t_r[4:6]
+    # Receiver barycentric position and velocity at receive time
+    r_r_t_r = r_e_t_r + R_r
+    # Asteroid barycentric position and velocity at receive time
+    rv_a_t_r = xva(et_r_secs)
+    r_a_t_r = rv_a_t_r[1:3]
+    # Sun barycentric position and velocity at receive time
+    rv_s_t_r = xvs(et_r_secs)
+    r_s_t_r = rv_s_t_r[1:3]
+    # down-leg iteration
+    # τ_D first approximation: Eq. (1) Yeomans et al. (1992)
+    ρ_vec_r = r_a_t_r - r_r_t_r
+    ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
+    τ_D = ρ_r/clightkms # (seconds) -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
+    # bounce time, new estimate Eq. (2) Yeomans et al. (1992)
+    et_b_secs = et_r_secs - τ_D
+
+    Δτ_D = zero(τ_D)
+    Δτ_rel_D = zero(τ_D)
+    # Δτ_corona_D = zero(τ_D)
+    Δτ_tropo_D = zero(τ_D)
+
+    for i in 1:niter
+        # asteroid barycentric position (in au) at bounce time (TDB)
+        rv_a_t_b = xva(et_b_secs)
+        r_a_t_b = rv_a_t_b[1:3]
+        v_a_t_b = rv_a_t_b[4:6]
+        # Eq. (3) Yeomans et al. (1992)
+        ρ_vec_r = r_a_t_b - r_r_t_r
+        # Eq. (4) Yeomans et al. (1992)
+        ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
+        # compute down-leg Shapiro delay
+        # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, Δτ_rel_[D|U]
+        e_D_vec  = r_r_t_r - r_s_t_r
+        e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2) # heliocentric distance of Earth at t_r
+        rv_s_t_b = xvs(et_b_secs) # barycentric position and velocity of Sun at estimated bounce time
+        r_s_t_b = rv_s_t_b[1:3]
+        p_D_vec  = r_a_t_b - r_s_t_b
+        p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2) # heliocentric distance of asteroid at t_b
+        q_D = ρ_r #signal path distance (down-leg)
+        # Shapiro correction to time-delay
+        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)
+        # troposphere correction to time-delay
+        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r) # seconds
+        # Δτ_corona_D = corona_delay(constant_term.(r_a_t_b), r_r_t_r, r_s_t_r, F_tx, station_code) # seconds
+        Δτ_D = Δτ_rel_D # + Δτ_tropo_D #+ Δτ_corona_D # seconds
+        p_dot_23 = dot(ρ_vec_r, v_a_t_b)/ρ_r
+        Δt_2 = (τ_D - ρ_r/clightkms - Δτ_rel_D)/(1.0-p_dot_23/clightkms)
+        τ_D = τ_D - Δt_2
+        et_b_secs = et_r_secs - τ_D
+    end
+    rv_a_t_b = xva(et_b_secs)
+    r_a_t_b = rv_a_t_b[1:3]
+    v_a_t_b = rv_a_t_b[4:6]
+
+    # up-leg iteration
+    # τ_U first estimation: Eq. (5) Yeomans et al. (1992)
+    τ_U = τ_D
+    # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
+    et_t_secs = et_b_secs - τ_U
+    # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
+    R_t, V_t = observer_position(station_code, et_t_secs, pm=pm, lod=lod, eocorr=eocorr)
+    rv_e_t_t = xve(et_t_secs)
+    r_e_t_t = rv_e_t_t[1:3]
+    v_e_t_t = rv_e_t_t[4:6]
+    # Transmitter barycentric position and velocity of at transmit time
+    r_t_t_t = r_e_t_t + R_t
+    # Eq. (7) Yeomans et al. (1992)
+    ρ_vec_t = r_a_t_b - r_t_t_t
+    ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
+
+    Δτ_U = zero(τ_U)
+    Δτ_rel_U = zero(τ_U)
+    # Δτ_corona_U = zero(τ_U)
+    Δτ_tropo_U = zero(τ_U)
+
+    # println("   *** DOWNLEG LOOP ***")
+    for i in 1:niter
+        # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
+        # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial conditions variations via et_t_secs
+        R_t, V_t = observer_position(station_code, et_t_secs, pm=pm, lod=lod, eocorr=eocorr)
+        # Earth's barycentric position and velocity at the transmit time
+        rv_e_t_t = xve(et_t_secs)
+        r_e_t_t = rv_e_t_t[1:3]
+        v_e_t_t = rv_e_t_t[4:6]
+        # Barycentric position and velocity of the transmitter at the transmit time
+        r_t_t_t = r_e_t_t + R_t
+        v_t_t_t = v_e_t_t + V_t
+        # Eq. (7) Yeomans et al. (1992)
+        ρ_vec_t = r_a_t_b - r_t_t_t
+        ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
+        # compute up-leg Shapiro delay
+        # Sun barycentric position and velocity (in au, au/day) at transmit time (TDB)
+        rv_s_t_t = xvs(et_t_secs)
+        r_s_t_t = rv_s_t_t[1:3]
+        e_U_vec = r_t_t_t - r_s_t_t
+        e_U = sqrt(e_U_vec[1]^2 + e_U_vec[2]^2 + e_U_vec[3]^2) # heliocentric distance of Earth at t_t
+        rv_s_t_b = xvs(et_b_secs) # barycentric position/velocity of Sun at bounce time
+        r_s_t_b = rv_s_t_b[1:3]
+        p_U_vec = r_a_t_b - r_s_t_b
+        p_U = sqrt(p_U_vec[1]^2 + p_U_vec[2]^2 + p_U_vec[3]^2) # heliocentric distance of asteroid at t_b
+        q_U_vec = r_a_t_b - r_e_t_t
+        q_U = ρ_t # signal path distance (up-leg)
+        Δτ_rel_U = shapiro_delay(e_U, p_U, q_U) # seconds
+        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # seconds
+        # Δτ_corona_U = corona_delay(constant_term.(r_t_t_t), constant_term.(r_a_t_b), constant_term.(r_s_t_b), F_tx, station_code) # seconds
+        Δτ_U = Δτ_rel_U # + Δτ_tropo_U #+ Δτ_corona_U # seconds
+        p_dot_12 = -dot(ρ_vec_t, v_t_t_t)/ρ_t
+        Δt_1 = (τ_U - ρ_t/clightkms - Δτ_rel_U)/(1.0-p_dot_12/clightkms)
+        τ_U = τ_U - Δt_1
+        # transmit time, new estimate
+        et_t_secs = et_b_secs - τ_U
+    end
+
+    # compute TDB-UTC at transmit time
+    # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth are of order 0.01μs
+    # Δtt_tdb_station_t = - dot(v_e_t_t, r_t_t_t-r_e_t_t)/clightkms^2
+    tdb_utc_t = tdb_utc(et_t_secs) # + Δtt_tdb_station_t
+    # compute TDB-UTC at receive time
+    # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth  are of order 0.01μs
+    # Δtt_tdb_station_r = - dot(v_e_t_r, r_r_t_r-r_e_t_r)/clightkms^2
+    tdb_utc_r = tdb_utc(et_r_secs) # + Δtt_tdb_station_r
+
+    # compute total time delay (UTC seconds); relativistic delay is already included in τ_D, τ_U
+    # Eq. (9) Yeomans et al. (1992)
+    τ = (τ_D + τ_U) + (Δτ_tropo_D + Δτ_tropo_U) + (tdb_utc_t - tdb_utc_r) # seconds
+
+    return 1e6τ # total signal delay (μs)
+end
+
+function delay_doppler2(station_code::Int, t_r_utc::DateTime, F_tx::Real,
+        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true, tc::Real=1.0,
+        xve::Function=earth_pv, xvs::Function=sun_pv,
+        xva::Function=apophis_pv_197)
+    τe = delay(station_code, t_r_utc,  tc/2, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+    τn = delay(station_code, t_r_utc,   0.0, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+    τs = delay(station_code, t_r_utc, -tc/2, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+    return τn, -F_tx*((τe-τs)/tc)
+end
+
+function delay_doppler(astradarfile::String,
+        niter::Int=10; pm::Bool=true, tc::Real=1.0, xve::Function=earth_pv,
+        xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+
+    astradardata = process_radar_data_jpl(astradarfile)
+
+    vdel, vdop = delay_doppler(astradardata, niter, pm=pm, tc=tc, xve=xve, xvs=xvs, xva=xva)
+    return vdel, vdop
+end
+
+function delay_doppler(astradardata::Vector{RadarDataJPL{T}},
+        niter::Int=10; pm::Bool=true, tc::Real=1.0, xve::Function=earth_pv,
+        xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T<:Number}
+
+    et1 = str2et(string(astradardata[1].utcepoch))
+    a1_et1 = xva(et1)[1]
+    S = typeof(a1_et1)
+
+    vdelay = Array{S}(undef, length(astradardata))
+    vdoppler = Array{S}(undef, length(astradardata))
+
+    for i in eachindex(astradardata)
+        vdelay[i], vdoppler[i] = delay_doppler2(
+            astradardata[i].rcvr,
+            astradardata[i].utcepoch,
+            astradardata[i].freq,
+            niter,
+            pm = pm,
+            tc = tc,
+            xve = xve,
+            xvs = xvs,
+            xva = xva
+        )
+    end
+
+    delay_index = findall(x->x.delay_units=="us", astradardata)
+    doppler_index = findall(x->x.doppler_units=="Hz", astradardata)
+
+    return vdelay[delay_index], vdoppler[doppler_index]
+end
+
 # Compute round-trip time and Doppler shift radar astrometry for an asteroid at
 # UTC instant `t_r_utc` from tracking station with code `station_code` from Earth,
-# Sun and asteroid ephemerides
+# Sun and asteroid ephemerides. Dopplers are computed following Yeomans et al. (1992)
 # station_code: observing station identifier (MPC nomenclature)
 # et_r_secs: time of echo reception (TDB seconds since J2000.0 TDB)
 # F_tx: transmitter frequency (MHz)
@@ -364,6 +555,14 @@ end
 # xve: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in au and velocity in au/day
 # xvs: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in au and velocity in au/day
 # xva: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in au and velocity in au/day
+function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
+        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true, tc::Real=1.0,
+        xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+    # Transform receiving time from UTC to TDB seconds since j2000
+    et_r_secs = str2et(string(t_r_utc))
+    return delay_doppler(station_code, et_r_secs, F_tx, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+end
+
 function delay_doppler(station_code::Int, et_r_secs::Real, F_tx::Real,
         niter::Int=10; pm::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv,
         xva::Function=apophis_pv_197)
@@ -544,63 +743,4 @@ function delay_doppler(station_code::Int, et_r_secs::Real, F_tx::Real,
     ν = -F_tx*(doppler_c) # + doppler_c2)
 
     return 1e6τ, 1e6ν # total signal delay (μs) and Doppler shift (Hz)
-end
-
-function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
-        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true, tc::Real=1.0,
-        xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
-    # Transform receiving time from UTC to TDB seconds since j2000
-    et_r_secs = str2et(string(t_r_utc))
-    return delay_doppler(station_code, et_r_secs, F_tx, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
-end
-
-function delay_doppler2(station_code::Int, t_r_utc::DateTime, F_tx::Real,
-        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true, tc::Real=1.0,
-        xve::Function=earth_pv, xvs::Function=sun_pv,
-        xva::Function=apophis_pv_197)
-    τe = delay(station_code, t_r_utc,  tc/2, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
-    τn = delay(station_code, t_r_utc,   0.0, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
-    τs = delay(station_code, t_r_utc, -tc/2, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
-    return τn, -F_tx*((τe-τs)/tc)
-end
-
-function delay_doppler(astradarfile::String,
-        niter::Int=10; pm::Bool=true, tc::Real=1.0, xve::Function=earth_pv,
-        xvs::Function=sun_pv, xva::Function=apophis_pv_197)
-
-    astradardata = process_radar_data_jpl(astradarfile)
-
-    vdel, vdop = delay_doppler(astradardata, niter, pm=pm, tc=tc, xve=xve, xvs=xvs, xva=xva)
-    return vdel, vdop
-end
-
-function delay_doppler(astradardata::Vector{RadarDataJPL{T}},
-        niter::Int=10; pm::Bool=true, tc::Real=1.0, xve::Function=earth_pv,
-        xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T<:Number}
-
-    et1 = str2et(string(astradardata[1].utcepoch))
-    a1_et1 = xva(et1)[1]
-    S = typeof(a1_et1)
-
-    vdelay = Array{S}(undef, length(astradardata))
-    vdoppler = Array{S}(undef, length(astradardata))
-
-    for i in eachindex(astradardata)
-        vdelay[i], vdoppler[i] = delay_doppler2(
-            astradardata[i].rcvr,
-            astradardata[i].utcepoch,
-            astradardata[i].freq,
-            niter,
-            pm = pm,
-            tc = tc,
-            xve = xve,
-            xvs = xvs,
-            xva = xva
-        )
-    end
-
-    delay_index = findall(x->x.delay_units=="us", astradardata)
-    doppler_index = findall(x->x.doppler_units=="Hz", astradardata)
-
-    return vdelay[delay_index], vdoppler[doppler_index]
 end
