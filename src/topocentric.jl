@@ -211,6 +211,7 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     # UTC (JD)
     utc_secs = et - tdb_utc(et)
     t_utc = J2000 + utc_secs/daysec
+    t_utc_00 = constant_term(constant_term(t_utc))
     # TT
     jd0 = datetime2julian(DateTime(2008,9,24))
     t0_tt = et + ttmtdb(et)
@@ -220,7 +221,7 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     # Output of `EarthOrientation.precession_nutation80` is in mas:
     # https://github.com/JuliaAstro/EarthOrientation.jl/blob/529f12425a6331b133f989443aeb3fbbafd8f324/src/EarthOrientation.jl#L413
     if eocorr
-        ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(constant_term(t_utc))
+        ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(t_utc_00)
     else
         ddp80_mas, dde80_mas = 0.0, 0.0
     end
@@ -241,7 +242,7 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     ee = (ΔΨ_1980+ddp80)*cos(epsa) + arcsec2rad( 0.00264sin(Ω_M) + 0.000063sin(2Ω_M) )
     # ΔUT1 = UT1-UTC (seconds)
     if eocorr
-        dut1 = EarthOrientation.getΔUT1(constant_term(t_utc))
+        dut1 = EarthOrientation.getΔUT1(t_utc_00)
     else
         dut1 = 0.0
     end
@@ -252,22 +253,21 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     # Eq. (5-173) from Moyer (2003)
     gmst82 = J2000toGMST(ut1_days)
     gast = mod2pi( gmst82 + ee )
+    β_dot = lod ? omega(EarthOrientation.getlod(t_utc_00)) : ω
+    if isa(gast, Taylor1)
+        gast[1] = β_dot*one(gast[1])
+    end
 
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
     Rz_minus_GAST = [
-            cos(gast) -sin(gast) 0.0;
-            sin(gast) cos(gast) 0.0;
-            0.0 0.0 1.0
+            cos(gast) -sin(gast) zero(gast);
+            sin(gast) cos(gast) zero(gast);
+            zero(gast) zero(gast) one(gast)
         ]
-    if lod
-        β_dot = omega(EarthOrientation.getlod(constant_term(t_utc)))
-    else
-        β_dot = ω
-    end
     dRz_minus_GAST = (β_dot)*[
-            -sin(gast) -cos(gast) 0.0;
-            cos(gast) -sin(gast) 0.0;
-            0.0 0.0 0.0
+            -sin(gast) -cos(gast) zero(gast);
+            cos(gast) -sin(gast) zero(gast);
+            zero(gast) zero(gast) zero(gast)
         ]
 
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
@@ -282,6 +282,7 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     # eop_IAU1980 = get_iers_eop();
     # _mt2c = rECEFtoECI(DCM, ITRF(), GCRF(), t_utc, eop_IAU1980)
     # mt2c = convert(Matrix{eltype(_mt2c)}, _mt2c)
+    # Velocity transformation may be retrieved also from: SatelliteToolbox.svECEFtoECI
     mt2c = C_inv*Rz_minus_GAST*W_inv
     dmt2c = C_inv*dRz_minus_GAST*W_inv
 
