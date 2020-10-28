@@ -86,12 +86,6 @@ git-tree-sha1 = "aebbda0a7c644bd8739b34f2a1b1e48f114aab49"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 version = "0.9.17"
 
-[[CodeTracking]]
-deps = ["InteractiveUtils", "UUIDs"]
-git-tree-sha1 = "ccc043a0df446cac279dca29d13e2827b40aceb5"
-uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
-version = "0.5.12"
-
 [[CodecZlib]]
 deps = ["BinaryProvider", "Libdl", "TranscodingStreams"]
 git-tree-sha1 = "05916673a2627dd91b4969ff8ba6941bc85a960e"
@@ -231,9 +225,6 @@ git-tree-sha1 = "cad2e71389ecb2f4480e0de74faab04af13d7929"
 uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 version = "1.4.4"
 
-[[FileWatching]]
-uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
-
 [[Formatting]]
 deps = ["Printf"]
 git-tree-sha1 = "a0c901c29c0e7c763342751c0a94211d56c0de5c"
@@ -351,12 +342,6 @@ repo-url = "https://github.com/PerezHz/JuliaDB.jl.git"
 uuid = "a93385a2-3734-596a-9a66-3cfbb77141e6"
 version = "0.13.1"
 
-[[JuliaInterpreter]]
-deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
-git-tree-sha1 = "7b2a1b650cec61a7d8cd8ee9ee7a818b5764d502"
-uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
-version = "0.7.26"
-
 [[LabelledArrays]]
 deps = ["ArrayInterface", "LinearAlgebra", "MacroTools", "StaticArrays"]
 git-tree-sha1 = "5e04374019448f8509349948ab504f117e3b575a"
@@ -418,12 +403,6 @@ deps = ["DocStringExtensions", "LinearAlgebra", "OffsetArrays", "SIMDPirates", "
 git-tree-sha1 = "3242a8f411e19eda9adc49d0b877681975c11375"
 uuid = "bdcacae8-1622-11e9-2a5c-532679323890"
 version = "0.8.26"
-
-[[LoweredCodeUtils]]
-deps = ["JuliaInterpreter"]
-git-tree-sha1 = "dbd9336b43c2d6fa492efa09ba3bb10fbdbeeb64"
-uuid = "6f1432cf-f94c-5a45-995e-cdbf5db27b0b"
-version = "0.4.9"
 
 [[Lz4_jll]]
 deps = ["Libdl", "Pkg"]
@@ -529,8 +508,8 @@ deps = ["Dates", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "R
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PlanetaryEphemeris]]
-deps = ["AutoHashEquals", "Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "Quadmath", "Revise", "TaylorIntegration", "TaylorSeries"]
-git-tree-sha1 = "edeb59f31820d6ffab49d04aa6ebd662b27fbfa0"
+deps = ["AutoHashEquals", "Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "Quadmath", "TaylorIntegration", "TaylorSeries"]
+git-tree-sha1 = "0c35e761e99f5927c94272d437f9abbac5a9ea89"
 repo-rev = "jp/threads"
 repo-url = "git@github.com:PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
@@ -638,12 +617,6 @@ deps = ["UUIDs"]
 git-tree-sha1 = "28faf1c963ca1dc3ec87f166d92982e3c4a1f66d"
 uuid = "ae029012-a4dd-5104-9daa-d747884805df"
 version = "1.1.0"
-
-[[Revise]]
-deps = ["CodeTracking", "Distributed", "FileWatching", "JuliaInterpreter", "LibGit2", "LoweredCodeUtils", "OrderedCollections", "Pkg", "REPL", "UUIDs", "Unicode"]
-git-tree-sha1 = "d6b380e331f5ace89033617b575cfac40f9b312d"
-uuid = "295af30f-e4ad-537b-8983-00126c2a3abe"
-version = "2.7.6"
 
 [[Roots]]
 deps = ["Printf"]
