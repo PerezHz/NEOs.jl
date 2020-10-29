@@ -6,7 +6,7 @@ function rvelea(dx, x, params, t)
     return true, (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
 end
 
-function loadeph(ss16asteph_::TaylorInterpolant)
+function loadeph(ss16asteph_::TaylorInterpolant, μ::Vector)
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
     ss16asteph_t0 = (ss16asteph_.t0 ./ daysec) - (jd0-J2000)
     ss16asteph_t = (ss16asteph_.t ./ daysec)
@@ -102,25 +102,33 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         tspan::T, ephfile::String; output::Bool=true, newtoniter::Int=10,
         dense::Bool=false, dq::Vector=zeros(7), radarobsfile::String="",
         opticalobsfile::String="", quadmath::Bool=false,
-        debias_table::String="2018") where {T<:Real}
-
+        debias_table::String="2018", μ_ast::Vector=μ_ast343_DE430[1:end]) where {T<:Real}
+    # Julian date of integration start time
+    jd0 = datetime2julian(DateTime(2008, 9, 24))
     # get asteroid initial conditions
     q0 = initialcond(dq)
     @show q0
-
+    # load ephemeris
     ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
-    ss16asteph_auday, acc_eph, newtonianNb_Potential = loadeph(ss16asteph_et)
-    jd0 = datetime2julian(DateTime(2008, 9, 24))
     # Number of bodies
     Nm1 = size(ss16asteph_et.x)[2] ÷ 6 # number of massive bodies
     N = Nm1 + 1 # number of bodies, including NEA
+    # vector of G*m values
+    μ = vcat(μ_DE430[1:11], μ_ast[1:Nm1-11], zero(μ_DE430[1]))
+
+    # check: number of SS bodies (N) in ephemeris must be equal to length of GM vector (μ)
+    @assert N == length(μ) "Total number of bodies in ephemeris must be equal to length of GM vector μ"
+
+    # process ephemeris (switch from km,km/s units to au,au/day)
+    # compute Newtonian accelerations and potentials (used in post-Newtonian accelerations)
+    ss16asteph_auday, acc_eph, newtonianNb_Potential = loadeph(ss16asteph_et, μ)
 
     # interaction matrix with flattened bodies
     UJ_interaction = fill(false, N)
     # UJ_interaction[su] = true
     UJ_interaction[ea] = true
     # UJ_interaction[mo] = true
-    params = (ss16asteph_auday, acc_eph, newtonianNb_Potential, jd0, UJ_interaction, N)
+    params = (ss16asteph_auday, acc_eph, newtonianNb_Potential, jd0, UJ_interaction, N, μ)
 
     if quadmath
         _q0 = one(Float128)*q0
@@ -129,7 +137,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         _ss16asteph = TaylorInterpolant(Float128(ss16asteph_auday.t0), Float128.(ss16asteph_auday.t), map(x->Taylor1(Float128.(x.coeffs)), ss16asteph_auday.x))
         _acc_eph = TaylorInterpolant(Float128(acc_eph.t0), Float128.(acc_eph.t), map(x->Taylor1(Float128.(x.coeffs)), acc_eph.x))
         _newtonianNb_Potential = TaylorInterpolant(Float128(newtonianNb_Potential.t0), Float128.(newtonianNb_Potential.t), map(x->Taylor1(Float128.(x.coeffs)), newtonianNb_Potential.x))
-        _params = (_ss16asteph, _acc_eph, _newtonianNb_Potential, Float128(jd0), UJ_interaction, N)
+        _params = (_ss16asteph, _acc_eph, _newtonianNb_Potential, Float128(jd0), UJ_interaction, N, μ)
     else
         _q0 = q0
         _t0 = t0

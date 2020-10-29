@@ -36,7 +36,8 @@ end
     local S = eltype(q[1])
     local UJ_interaction = params[5] # interaction matrix with flattened bodies
     local N = params[6] # number of bodies, including NEA
-    local _1_to_Nm1 = 1:(N-1) # iterator over all bodies
+    local Nm1 = N-1
+    local μ = params[7] # vector of GM's
 
     # parameters related to speed of light, c
     local c_p2 = 29979.063823897606 # c^2 = 29979.063823897606 au^2/d^2
@@ -189,7 +190,7 @@ end
     newtonianNb_Potential[N] = zero_q_1
 
     #compute point-mass Newtonian accelerations, all bodies
-    for i in _1_to_Nm1
+    for i in 1:Nm1
         ui[i] = ss16asteph_t[3(N-1+i)-2]
         vi[i] = ss16asteph_t[3(N-1+i)-1]
         wi[i] = ss16asteph_t[3(N-1+i)  ]
@@ -306,7 +307,7 @@ end
     end #for, i
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
 
-    for i in _1_to_Nm1
+    for i in 1:Nm1
         temp_004 = newtonian1b_Potential[i] + newtonianNb_Potential[N]
         newtonianNb_Potential[N] = temp_004
         if UJ_interaction[i]
@@ -373,12 +374,12 @@ end
         pntempZ = sumpnz
     end
     # compute Newtonian accelerations due to Pluto and 16 asteroid perturbers
-    for i in 11:27
+    for i in 11:Nm1
         X_t_pn1[i] = c_p2*newton_acc_X[i]
         Y_t_pn1[i] = c_p2*newton_acc_Y[i]
         Z_t_pn1[i] = c_p2*newton_acc_Z[i]
     end #for i
-    for i in 11:27
+    for i in 11:Nm1
         termpnx = X_t_pn1[i]
         sumpnx = pntempX + termpnx
         pntempX = sumpnx
@@ -432,7 +433,8 @@ end
     local S = eltype(q[1])
     local UJ_interaction = params[5] # interaction matrix with flattened bodies
     local N = params[6] # number of bodies, including NEA
-    local _1_to_Nm1 = 1:(N-1) # iterator over all bodies
+    local Nm1 = N-1
+    local μ = params[7] # vector of GM's
 
     # parameters related to speed of light, c
     local c_p2 = 29979.063823897606 # c^2 = 29979.063823897606 au^2/d^2
@@ -585,7 +587,7 @@ end
     newtonianNb_Potential[N] = zero_q_1
 
     #compute point-mass Newtonian accelerations, all bodies
-    Threads.@threads for i in _1_to_Nm1
+    Threads.@threads for i in 1:Nm1
         ui[i] = ss16asteph_t[3(N-1+i)-2]
         vi[i] = ss16asteph_t[3(N-1+i)-1]
         wi[i] = ss16asteph_t[3(N-1+i)  ]
@@ -702,7 +704,7 @@ end
     end #for, i
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
 
-    for i in _1_to_Nm1
+    for i in 1:Nm1
         temp_004 = newtonian1b_Potential[i] + newtonianNb_Potential[N]
         newtonianNb_Potential[N] = temp_004
         if UJ_interaction[i]
@@ -769,12 +771,12 @@ end
         pntempZ = sumpnz
     end
     # compute Newtonian accelerations due to Pluto and 16 asteroid perturbers
-    Threads.@threads for i in 11:27
+    Threads.@threads for i in 11:Nm1
         X_t_pn1[i] = c_p2*newton_acc_X[i]
         Y_t_pn1[i] = c_p2*newton_acc_Y[i]
         Z_t_pn1[i] = c_p2*newton_acc_Z[i]
     end #for i
-    for i in 11:27
+    for i in 11:Nm1
         termpnx = X_t_pn1[i]
         sumpnx = pntempX + termpnx
         pntempX = sumpnx

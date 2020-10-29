@@ -67,13 +67,13 @@ end
 # Standard formula for relativistic (Shapiro) delay
 function shapiro_delay(e, p, q)
     shap = 0.0 #2μ[1]/(c_au_per_day^2)
-    shap_del_days = (2μ[1]/(c_au_per_day^3))*log( (e+p+q+shap)/(e+p-q+shap) ) # days
+    shap_del_days = (2PlanetaryEphemeris.μ[su]/(c_au_per_day^3))*log( (e+p+q+shap)/(e+p-q+shap) ) # days
     return shap_del_days*daysec # seconds
 end
 
 function shapiro_doppler(e, de, p, dp, q, dq, F_tx)
     # shap_del_diff = 2μ[1]*( (de+dp+dq)/(e+p+q) - (de+dp-dq)/(e+p-q) )/(c_au_per_day^3) # (adim.)
-    shap_del_diff = (4μ[1]/(c_au_per_day^3))*(  ( dq*(e+p) - q*(de+dp) )/( (e+p)^2 - q^2 )  ) # differential of Shapiro delay (adim.)
+    shap_del_diff = (4PlanetaryEphemeris.μ[su]/(c_au_per_day^3))*(  ( dq*(e+p) - q*(de+dp) )/( (e+p)^2 - q^2 )  ) # differential of Shapiro delay (adim.)
     shap_dop = -F_tx*shap_del_diff # ν = -F_tx*dτ/dt (units of F_tx) <-- Shapiro, Ash, Tausner (1966), footnote 10
     return shap_dop # (units of F_tx)
 end
@@ -596,7 +596,7 @@ function delay_doppler(station_code::Int, et_r_secs::Real, F_tx::Real,
     r_ts = sqrt(r_ts_vec[1]^2+r_ts_vec[2]^2+r_ts_vec[3]^2)
     r_rs_vec = r_r_t_r - r_s_t_r
     r_rs = sqrt(r_rs_vec[1]^2+r_rs_vec[2]^2+r_rs_vec[3]^2)
-    doppler_c2_t2 = (μ[1]*((au^3)/(daysec^2)))*( (1/r_ts) - (1/r_rs) ) # order c^-2, 2nd term
+    doppler_c2_t2 = (PlanetaryEphemeris.μ[su]*((au^3)/(daysec^2)))*( (1/r_ts) - (1/r_rs) ) # order c^-2, 2nd term
     doppler_c2_t3 = (  dot(v_t_t_t, v_t_t_t) - dot(v_r_t_r, v_r_t_r)  )/2  # order c^-2, 3rd term
     doppler_c2 = (doppler_c2_t1 + doppler_c2_t2 + doppler_c2_t3)/(clightkms^2)
     ν = -F_tx*(doppler_c) # + doppler_c2)

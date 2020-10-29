@@ -35,17 +35,10 @@ using InteractiveUtils
 const order = 30
 const abstol = 1.0E-30
 
-# vector of G*m values
-# Bodies included: Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn,
-# Uranus, Neptune, Pluto,
-# 1 Ceres, 4 Vesta, 2 Pallas, 10 Hygiea, 31 Euphrosyne, 704 Interamnia,
-# 511 Davida, 15 Eunomia, 3 Juno, 16 Psyche, 65 Cybele, 88 Thisbe, 48 Doris,
-# 52 Europa, 451 Patientia, 87 Sylvia
-# and Apophis as a massless test particle
-μ_ast = PlanetaryEphemeris.μ[12:27]
-# index 11 corresponds to Pluto, its mass is set to zero
-# const μ = vcat(PlanetaryEphemeris.μ[1:10], 0.0, μ_ast, 0.0)
-const μ = vcat(PlanetaryEphemeris.μ[1:11], μ_ast, 0.0)
+# vector of GM's (DE430 values)
+const μ_DE430 = PlanetaryEphemeris.μ
+const μ_B16_DE430 = μ_DE430[12:27] # DE430 GM's of 16 most massive asteroids
+const μ_ast343_DE430 = μ_DE430[12:end] # DE430 GM's of 343 main belt asteroids included in DE430 integration
 
 # standard value of nominal mean angular velocity of Earth (rad/sec), ESAA 2014 Sec 7.4.3.3 p. 296
 const ω = 7.2921151467e-5 # 7.292115e-5 rad/sec

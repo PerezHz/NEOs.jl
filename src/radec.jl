@@ -93,14 +93,14 @@ function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
     q_vec = Q_vec/sqrt(Q_vec[1]^2 + Q_vec[2]^2 + Q_vec[3]^2)
     E_H = sqrt(E_H_vec[1]^2 + E_H_vec[2]^2 + E_H_vec[3]^2)
     e_vec = E_H_vec/E_H
-    g1 = (2μ[1]/(c_au_per_day^2))/(E_H/au) # ESAA 2014, Eq. (7.115)
+    g1 = (2PlanetaryEphemeris.μ[su]/(c_au_per_day^2))/(E_H/au) # ESAA 2014, Eq. (7.115)
     g2 = 1 + dot(q_vec, e_vec)
     # @show g1, g2
     u1_vec = U_norm*(  u_vec + (g1/g2)*( dot(u_vec,q_vec)*e_vec - dot(e_vec,u_vec)*q_vec )  ) # ESAA 2014, Eq. (7.116)
 
     # Compute aberration of light, ESAA 2014 Section 7.4.1.5
     u1_norm = sqrt(u1_vec[1]^2 + u1_vec[2]^2 + u1_vec[3]^2)
-    # @show norm(u1_vec/U_norm), μ[1]/(c_au_per_day^2) # u1_vec/U_norm is a unit vector to order μ[1]/(c_au_per_day^2)
+    # @show norm(u1_vec/U_norm), PlanetaryEphemeris.μ[su]/(c_au_per_day^2) # u1_vec/U_norm is a unit vector to order PlanetaryEphemeris.μ[su]/(c_au_per_day^2)
     u_vec_new = u1_vec/u1_norm
     V_vec = v_r_t_r/clightkms
     V_norm = sqrt(V_vec[1]^2 + V_vec[2]^2 + V_vec[3]^2)
