@@ -29,12 +29,13 @@ end
 # asteroid's heliocentric range, A2 is a coefficient (with units of au/day^2),
 # and d = 2.0
 @taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph!(dq, q, params, t)
-    local jd0 = params[4]
+    local jd0 = params[4] # Julian date of start time
     local ss16asteph_t = evaleph(params[1], t, q[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
     local acceph_t = evaleph(params[2], t, q[1]) # params[2](t)*one(q[1]) #acc_eph(t)
     local newtonianNb_Potential_t = evaleph(params[3], t, q[1]) # params[3](t)*one(q[1]) #newtonianNb_Potential(t), massive bodies
     local S = eltype(q[1])
-    local N = length(μ) # number of bodies, including NEA
+    local UJ_interaction = params[5] # interaction matrix with flattened bodies
+    local N = params[6] # number of bodies, including NEA
     local _1_to_Nm1 = 1:(N-1) # iterator over all bodies
 
     # parameters related to speed of light, c
@@ -424,12 +425,13 @@ end
 end
 
 @taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
-    local jd0 = params[4]
+    local jd0 = params[4] # Julian date of start time
     local ss16asteph_t = evaleph(params[1], t, q[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
     local acceph_t = evaleph(params[2], t, q[1]) # params[2](t)*one(q[1]) #acc_eph(t)
     local newtonianNb_Potential_t = evaleph(params[3], t, q[1]) # params[3](t)*one(q[1]) #newtonianNb_Potential(t), massive bodies
     local S = eltype(q[1])
-    local N = length(μ) # number of bodies, including NEA
+    local UJ_interaction = params[5] # interaction matrix with flattened bodies
+    local N = params[6] # number of bodies, including NEA
     local _1_to_Nm1 = 1:(N-1) # iterator over all bodies
 
     # parameters related to speed of light, c

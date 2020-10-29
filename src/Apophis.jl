@@ -2,8 +2,7 @@ module Apophis
 
 # __precompile__(false)
 
-export propagate, observer_position, apophisdofs,
-    ssdofs, delay_doppler, ismonostatic,
+export propagate, observer_position, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_00_06, t2c_rotation_iau_76_80,
     process_radar_data_jpl, RadarDataJPL, julian2etsecs, etsecs2julian,
     RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!,
@@ -47,18 +46,6 @@ const abstol = 1.0E-30
 # index 11 corresponds to Pluto, its mass is set to zero
 # const μ = vcat(PlanetaryEphemeris.μ[1:10], 0.0, μ_ast, 0.0)
 const μ = vcat(PlanetaryEphemeris.μ[1:11], μ_ast, 0.0)
-const N = length(μ)
-
-# Matrix of J2 interactions included in DE430 ephemeris, according to Folkner et al., 2014
-const UJ_interaction = fill(false, N)
-# UJ_interaction[su] = true
-UJ_interaction[ea] = true
-# UJ_interaction[mo] = true
-
-const j2_body_index = findall(x->x, UJ_interaction)
-
-const apophisdofs = union(3N-2:3N, 6N-2:6N)
-const ssdofs = setdiff(1:6N, apophisdofs)
 
 # standard value of nominal mean angular velocity of Earth (rad/sec), ESAA 2014 Sec 7.4.3.3 p. 296
 const ω = 7.2921151467e-5 # 7.292115e-5 rad/sec
@@ -74,10 +61,10 @@ const S0_sun = 63.15E6 # Sun radiated power intensity at photosphere surface, Wa
 # const m2_s3_to_au2_day3 = 1e-6daysec^3/au^2 # conversion factor from m^2/sec^3 to au^2/day^3
 
 # vector of J2*R^2 values
-const Λ2 = zeros(N)
+const Λ2 = zeros(11)
 Λ2[ea] = 1.9679542578489185e-12
 # vector of J3*R^3 values
-const Λ3 = zeros(N)
+const Λ3 = zeros(11)
 Λ3[ea] = -1.962633335678878e-19
 const clightkms = 2.99792458E5 # speed of light, km/sec
 

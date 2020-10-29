@@ -1,6 +1,7 @@
 #numerator of Apophis radial velocity wrt Earth
 function rvelea(dx, x, params, t)
-    ss16asteph_t = ss16asteph_t = evaleph(params[1], t, x[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
+    ss16asteph_t = evaleph(params[1], t, x[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
+    N = params[6]
     xe = ss16asteph_t[union(3ea-2:3ea,3(N-1+ea)-2:3(N-1+ea))]
     return true, (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
 end
@@ -14,7 +15,8 @@ function loadeph(ss16asteph_::TaylorInterpolant)
     ss16asteph = TaylorInterpolant(ss16asteph_t0, ss16asteph_t, ss16asteph_x)
     #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
     # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
-    Nm1 = N-1
+    Nm1 = size(ss16asteph_x)[2] ÷ 6
+    N = Nm1 + 1
     acc_eph = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, 3Nm1))
     newtonianNb_Potential = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, Nm1))
     fill!(acc_eph.x, zero(ss16asteph.x[1]))
@@ -102,13 +104,23 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         opticalobsfile::String="", quadmath::Bool=false,
         debias_table::String="2018") where {T<:Real}
 
-    ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
-    ss16asteph_auday, acc_eph, newtonianNb_Potential = loadeph(ss16asteph_et)
-    jd0 = datetime2julian(DateTime(2008, 9, 24))
-    params = (ss16asteph_auday, acc_eph, newtonianNb_Potential, jd0)
     # get asteroid initial conditions
     q0 = initialcond(dq)
     @show q0
+
+    ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
+    ss16asteph_auday, acc_eph, newtonianNb_Potential = loadeph(ss16asteph_et)
+    jd0 = datetime2julian(DateTime(2008, 9, 24))
+    # Number of bodies
+    Nm1 = size(ss16asteph_et.x)[2] ÷ 6 # number of massive bodies
+    N = Nm1 + 1 # number of bodies, including NEA
+
+    # interaction matrix with flattened bodies
+    UJ_interaction = fill(false, N)
+    # UJ_interaction[su] = true
+    UJ_interaction[ea] = true
+    # UJ_interaction[mo] = true
+    params = (ss16asteph_auday, acc_eph, newtonianNb_Potential, jd0, UJ_interaction, N)
 
     if quadmath
         _q0 = one(Float128)*q0
@@ -117,7 +129,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         _ss16asteph = TaylorInterpolant(Float128(ss16asteph_auday.t0), Float128.(ss16asteph_auday.t), map(x->Taylor1(Float128.(x.coeffs)), ss16asteph_auday.x))
         _acc_eph = TaylorInterpolant(Float128(acc_eph.t0), Float128.(acc_eph.t), map(x->Taylor1(Float128.(x.coeffs)), acc_eph.x))
         _newtonianNb_Potential = TaylorInterpolant(Float128(newtonianNb_Potential.t0), Float128.(newtonianNb_Potential.t), map(x->Taylor1(Float128.(x.coeffs)), newtonianNb_Potential.x))
-        _params = (_ss16asteph, _acc_eph, _newtonianNb_Potential, Float128(jd0))
+        _params = (_ss16asteph, _acc_eph, _newtonianNb_Potential, Float128(jd0), UJ_interaction, N)
     else
         _q0 = q0
         _t0 = t0
@@ -182,12 +194,15 @@ end
 
 function compute_radar_obs(outfilename::String, radarobsfile::String, apophis_interp, ss16asteph; tc::Real=1.0)
     if radarobsfile != ""
+        Nm1 = size(ss16asteph.x)[2] ÷ 6
+        N = Nm1 + 1
         asteroid_data = process_radar_data_jpl(radarobsfile)
         # TODO: check that first and last observation times are within interpolation interval
         function apophis_et(et)
             return auday2kmsec(apophis_interp(et/daysec)[1:6])
         end
         function earth_et(et)
+
             return auday2kmsec(ss16asteph(et)[union(3*4-2:3*4,3*(N-1+4)-2:3*(N-1+4))])
         end
         function sun_et(et)
@@ -205,6 +220,8 @@ end
 function compute_optical_obs(outfilename::String, opticalobsfile::String,
         apophis_interp, ss16asteph; debias_table::String="2018")
     if opticalobsfile != ""
+        Nm1 = size(ss16asteph.x)[2] ÷ 6
+        N = Nm1 + 1
         # TODO: check that first and last observation times are within interpolation interval
         function apophis_et(et)
             return auday2kmsec(apophis_interp(et/daysec)[1:6])
