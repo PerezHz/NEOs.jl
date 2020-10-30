@@ -81,6 +81,22 @@ function newtonls(res, w, x0, niters=5)
     return x_new, Γ
 end
 
+function newtonls_Q(Q, nobs, x0, niters=5)
+    npar = length(x0)
+    x_new = x0
+    for i in 1:niters
+        dQ = TaylorSeries.gradient(Q)(x_new)
+        d2Q = TaylorSeries.hessian(Q, x_new)
+        Δx = - inv(d2Q)*dQ
+        x_new = x_new + Δx
+        C = d2Q/(2/nobs) # C = d2Q/(2/m)
+        @show sqrt(((Δx')*(C*Δx))/npar)
+    end
+    C = TaylorSeries.hessian(Q, x_new)/(2/nobs) # C = d2Q/(2/m)
+    Γ = inv(C)
+    return x_new, Γ
+end
+
 # specialized version of newtonls on 6 variables for parametrized orbit determination wrt A2 nongrav coefficient
 function newtonls_6v(res, w, x0, niters=5)
     @assert length(res) == length(w)
