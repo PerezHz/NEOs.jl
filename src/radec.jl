@@ -375,7 +375,7 @@ const mpc_format_mp = (mpnum=(1,5,String),
 provdesig=(6,12,String),
 discovery=(13,13,String),
 publishnote=(14,14,String),
-j2000=(15,15,String),
+j2000=(15,15,String), # TODO: change name (e.g., obstech) to indicate observation technique
 yr=(16,19,Int),
 month=(21,22,Int),
 day=(24,25,Int),
@@ -462,3 +462,60 @@ mpc_catalog_codes = Dict(
     "V" =>   "Gaia-DR2",
     "W" =>   "UCAC-5"
 )
+
+# Statistical weights from Veres et al, (2017)
+function weights_veres2017(row::NamedTuple)
+    w = one(row.α_obs) # unit weight (arcseconds)
+    # Table 2: epoch-dependent astrometric residuals
+    if row.obscode == "703"
+        return Date(row.dt_utc_obs) < Date(2014,1,1) ? w : 0.8w
+    elseif row.obscode == "691"
+        return Date(row.dt_utc_obs) < Date(2003,1,1) ? 0.6w : 0.5w
+    elseif row.obscode == "644"
+        return Date(row.dt_utc_obs) < Date(2003,9,1) ? 0.6w : 0.4w
+    # Table 3: most active CCD asteroid observers
+    elseif row.obscode ∈ ("704", "C51", "J75")
+        return w
+    elseif row.obscode == "G96"
+        return 0.5w
+    elseif row.obscode == "F51"
+        return 0.2w
+    elseif row.obscode ∈ ("G45", "608")
+        return 0.6w
+    elseif row.obscode == "699"
+        return 0.8w
+    elseif row.obscode ∈ ("D29", "E12")
+        return 0.75w
+    elseif row.catalog == " "
+        return 1.5w
+    elseif row.catalog != " "
+        return w
+    # Table 4:
+    elseif row.obscode ∈ ("645", "673", "H01")
+        return 0.3w
+    elseif row.obscode ∈ ("J04", "K92", "K93", "Q63", "Q64", "V37", "W85", "W86", "W87", "K91", "E10", "F65") #Tenerife + Las Cumbres
+        return 0.4w
+    elseif row.obscode ∈ ("689", "950", "W84")
+        return 0.5w
+    #elseif row.obscode ∈ ("G83", "309") # Applies only to program code assigned to M. Micheli
+    #    if row.catalog ∈ ("q", "t") # "q"=>"UCAC-4", "t"=>"PPMXL"
+    #        return 0.3w
+    #    elseif row.catalog ∈ ("U", "V") # Gaia-DR1, Gaia-DR2
+    #        return 0.2w
+    #    end
+    elseif row.obscode ∈ ("Y28")
+        if row.catalog ∈ ("t", "U", "V")
+            return 0.3w
+        end
+    elseif row.obscode ∈ ("568")
+        if row.catalog ∈ ("o", "s") # "o"=>"USNO-B1.0", "s"=>"USNO-B2.0"
+            return 0.5w
+        elseif row.catalog ∈ ("U", "V") # Gaia DR1, DR2
+            return 0.1w
+        elseif row.catalog ∈ ("t") #"t"=>"PPMXL"
+            return 0.2w
+        end
+    elseif row.obscode ∈ ("T09", "T12", "T14") && row.catalog ∈ ("U", "V") # Gaia DR1, DR2
+        return 0.1w
+    end
+end
