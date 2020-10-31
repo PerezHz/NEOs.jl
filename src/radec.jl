@@ -225,7 +225,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; pm::Bool=true,
         station_code_i = string(obs_t[i].obscode)
         α_comp_as, δ_comp_as = radec(station_code_i, datetime_obs[i], niter, pm=pm, lod=lod,
             eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
-        α_comp[i] = α_comp_as*cos(δ_i_rad) # arcsec
+        α_comp[i] = α_comp_as*cos(δ_i_rad) # multiply by metric factor cos(DEC)
         δ_comp[i] = δ_comp_as # arcsec
         if obs_t[i].catalog ∉ mpc_catalog_codes_201X
             # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
@@ -248,7 +248,10 @@ function radec_table(mpcobsfile::String, niter::Int=10; pm::Bool=true,
             # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
             # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
             # since we use pix_ind to get the corresponding row number in bias.dat, it's not necessary to substract 1
+            # @show α_i_rad δ_i_rad π/2-δ_i_rad
             pix_ind = ang2pixRing(resol, π/2-δ_i_rad, α_i_rad)
+            # Healpix.pix2angRing(resol, pix_ind)
+            # @show Healpix.pix2angRing(resol, pix_ind)
             cat_ind = findfirst(x->x==obs_t[i].catalog, mpc_catalog_codes_201X)
             # @show pix_ind, cat_ind
             # read dRA, pmRA, dDEC, pmDEC data from bias.dat

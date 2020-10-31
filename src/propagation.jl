@@ -173,6 +173,8 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
         sol = (
             apophis=apophis,
+            tv = apophis_t0 .+ apophis_t,
+            xv = apophis_x(),
             tvS1=convert(Array{eltype(q0)}, sol_objs[2][:]),
             xvS1=convert(Array{eltype(q0)}, sol_objs[3][:,:]),
             gvS1=convert(Array{eltype(q0)}, sol_objs[4][:])
@@ -188,10 +190,14 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
                 joinpath(artifact"naif0012", "naif0012.tls"), # load leapseconds kernel
                 joinpath(artifact"de430", "de430_1850-2150.bsp"), # at least one SPK file must be loaded to read .tls file
             )
-            println("compute_radar_obs")
-            @time compute_radar_obs("deldop_"*basename(radarobsfile)*".jld", radarobsfile, apophis, ss16asteph_et)
-            println("compute_optical_obs")
-            @time compute_optical_obs("radec_"*basename(opticalobsfile)*".jdb", opticalobsfile, apophis, ss16asteph_et, debias_table=debias_table)
+            if radarobsfile != ""
+                println("compute_radar_obs")
+                @time compute_radar_obs("deldop_"*basename(radarobsfile)*".jld", radarobsfile, apophis, ss16asteph_et)
+            end
+            if opticalobsfile != ""
+                println("compute_optical_obs")
+                @time compute_optical_obs("radec_"*basename(opticalobsfile)*".jdb", opticalobsfile, apophis, ss16asteph_et, debias_table=debias_table)
+            end
         catch e
             @error "Unable to compute observation residuals" exception=(e, catch_backtrace())
         end
