@@ -467,7 +467,7 @@ mpc_catalog_codes = Dict(
 )
 
 # Statistical weights from Veres et al, (2017)
-function weights_veres2017(row::NamedTuple)
+function w8sveres17(row::NamedTuple)
     w = one(row.α_obs) # unit weight (arcseconds)
     # Table 2: epoch-dependent astrometric residuals
     if row.obscode == "703"
