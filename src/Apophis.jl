@@ -10,7 +10,7 @@ export propagate, observer_position, delay_doppler, ismonostatic,
     utcepoch, delay, delay_sigma, delay_units, doppler, doppler_sigma,
     doppler_units, freq, rcvr, xmit, bouncepoint, valsecchi_circle,
     radec, radec_table, nrms, chi2, newtonls, newtonls_6v, diffcorr,
-    newtonls_Q, readfwf, readmp, w8sveres17, bopik
+    newtonls_Q, readfwf, readmp, w8sveres17, bopik, yarkp2adot, pv2kep
 
 using Distributed
 using TaylorIntegration
@@ -20,7 +20,8 @@ import PlanetaryEphemeris
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun,
     t2c_jpl_de430, pole_rotation, au, J2000, c_au_per_day, R_sun,
     c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx, Ry, Rz,
-    semimajoraxis, eccentricity, inclination
+    semimajoraxis, eccentricity, inclination, longascnode, argperi,
+    timeperipass
 using JLD
 using EarthOrientation, SOFA, SPICE
 using Dates
@@ -88,6 +89,21 @@ function orthonormalize(dcm::SArray{Tuple{3,3},T,2,9} where {T<:Union{Taylor1,Ta
     en₃  = enj₃ / norm(enj₃)
 
     SArray(  hcat(hcat(en₁, en₂), en₃)  )
+end
+
+function yarkp2adot(A2, a, e, μ_S)
+    return 2A2/(sqrt(a)*(1-e^2)*sqrt(μ_S))
+end
+
+function pv2kep(xas, μ_S)
+    ec0 = eccentricity(xas..., μ_S, 0.0)
+    a0 = semimajoraxis(xas..., μ_S, 0.0)
+    qr0 = a0*(1-ec0)
+    tp0 = timeperipass(jd0, xas..., μ_S, 0.0)
+    Ω0 = rad2deg(longascnode(xas...))
+    ω0 = rad2deg(argperi(xas..., μ_S, 0.0))
+    i0 = rad2deg(inclination(xas...))
+    return (e=ec0, q=qr0, tp=tp0, Ω=Ω0, ω=ω0, i=i0, a=a0)
 end
 
 include("process_radar_data_jpl.jl")
