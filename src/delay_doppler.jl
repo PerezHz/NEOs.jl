@@ -186,8 +186,7 @@ function tdb_utc(et::T) where {T<:Number}
     jd_utc = J2000 + utc_secs/daysec
     dt_utc = julian2datetime(jd_utc)
     fd_utc = (jd_utc+0.5) - floor(jd_utc+0.5)
-    # @show jd_utc_r, dt_utc_r, fd_utc_r
-    j, tai_utc = iauDat(year(dt_utc), month(dt_utc), day(dt_utc), fd_utc)
+    tai_utc = get_ΔAT(jd_utc)
     # @show tt_tdb_et
     return (tt_tai + tai_utc) - tt_tdb_et # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
 end
