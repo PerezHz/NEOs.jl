@@ -116,3 +116,22 @@ function newtonls_6v(res, w, x0, niters=5)
     Γ = inv(C[1:6,1:6])
     return x_new, Γ
 end
+
+function newtonls_A2(res, w, x0, niters=5)
+    @assert length(res) == length(w)
+    nobs = length(res)
+    npar = length(x0)
+    Q = sum(w .* (res.^2))/nobs
+    x_new = x0
+    for i in 1:niters
+        dQ = TaylorSeries.gradient(Q)(x_new)
+        d2Q = TaylorSeries.hessian(Q, x_new)
+        Δx = - inv(d2Q)*dQ
+        x_new[7] = x_new[7] + Δx[7]
+        C = d2Q/(2/nobs) # C = d2Q/(2/m)
+        @show sqrt(((Δx')*(C*Δx))/npar)
+    end
+    C = TaylorSeries.hessian(Q, x_new)/(2/nobs) # C = d2Q/(2/m)
+    Γ = inv(C)
+    return x_new, Γ, C
+end
