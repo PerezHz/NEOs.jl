@@ -23,13 +23,13 @@ using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun,
     semimajoraxis, eccentricity, inclination, longascnode, argperi,
     timeperipass
 using JLD
-using EarthOrientation, SOFA, SPICE
+using EarthOrientation, SPICE
 using Dates
 using Quadmath
 using Healpix
 using Pkg.Artifacts #: @artifact_str
 using JuliaDB #: table, select, filter, columns, insertcolsafter, save
-using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_iers_eop
+using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_iers_eop, get_ΔAT
 using StaticArrays: SArray
 using InteractiveUtils
 
@@ -66,11 +66,10 @@ const clightkms = 2.99792458E5 # speed of light, km/sec
 const jd0 = 2.4547335e6
 
 # isless and sincos overloads needed to make rECEFtoECI work with TaylorSeries
-import Base: isless, sincos
+import Base: isless
 isless(a::Union{Taylor1,TaylorN}, b::Union{Taylor1,TaylorN}) = isless(constant_term(a), constant_term(b))
 isless(a::Real, b::Union{Taylor1,TaylorN}) = isless(a, constant_term(b))
 isless(a::Union{Taylor1,TaylorN}, b::Real) = isless(constant_term(a), b)
-sincos(a::Union{Taylor1,TaylorN}) = TaylorSeries.sincos(a)
 
 import ReferenceFrameRotations: orthonormalize
 # This method extends orthonormalize to handle Taylor1 and TaylorN
