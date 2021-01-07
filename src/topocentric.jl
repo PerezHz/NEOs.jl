@@ -254,9 +254,9 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     gmst82 = J2000toGMST(ut1_days)
     gast = mod2pi( gmst82 + ee )
     β_dot = lod ? omega(EarthOrientation.getlod(t_utc_00)) : ω
-    if isa(gast, Taylor1)
-        gast[1] = β_dot*one(gast[1])
-    end
+    # if isa(gast, Taylor1)
+    #     gast[1] = β_dot*one(gast[1])
+    # end
 
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
     Rz_minus_GAST = [
