@@ -102,7 +102,8 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         tspan::T, ephfile::String; output::Bool=true, newtoniter::Int=10,
         dense::Bool=false, dq::Vector=zeros(7), radarobsfile::String="",
         opticalobsfile::String="", quadmath::Bool=false,
-        debias_table::String="2018", μ_ast::Vector=μ_ast343_DE430[1:end]) where {T<:Real}
+        debias_table::String="2018", μ_ast::Vector=μ_ast343_DE430[1:end],
+        lyap::Bool=false) where {T<:Real}
     # Julian date of integration start time
     jd0 = datetime2julian(DateTime(2008, 9, 24))
     # get asteroid initial conditions
@@ -112,6 +113,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
     ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
     # Number of bodies
     Nm1 = size(ss16asteph_et.x)[2] ÷ 6 # number of massive bodies
+    @show Nm1
     N = Nm1 + 1 # number of bodies, including NEA
     # vector of G*m values
     μ = vcat(μ_DE430[1:11], μ_ast[1:Nm1-11], zero(μ_DE430[1]))
@@ -165,6 +167,13 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
             sol = (apophis=apophis,
             )
         end
+    elseif lyap
+        @time sol_objs = lyap_apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps)
+        sol = (
+            tv=convert(Array{eltype(q0)}, sol_objs[1][:]),
+            xv=convert(Array{eltype(q0)}, sol_objs[2][:,:]),
+            λv=convert(Array{eltype(q0)}, sol_objs[3][:,:])
+        )
     else
         @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, newtoniter=newtoniter, dense=true)
         apophis_t0 = (jd0-J2000) # days since J2000 until initial integration time
