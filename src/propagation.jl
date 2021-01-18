@@ -16,7 +16,6 @@ function loadeph(ss16asteph_::TaylorInterpolant, μ::Vector)
     #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
     # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
     Nm1 = size(ss16asteph_x)[2] ÷ 6
-    N = Nm1 + 1
     acc_eph = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, 3Nm1))
     newtonianNb_Potential = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, Nm1))
     fill!(acc_eph.x, zero(ss16asteph.x[1]))
