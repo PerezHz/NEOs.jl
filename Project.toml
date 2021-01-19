@@ -29,7 +29,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 [compat]
 EarthOrientation = "0.6.1"
 Healpix = "2.3.0"
-JLD = "0.12.0"
+JLD = "0.12.1"
 Quadmath = "0.5.4"
 SPICE = "0.2"
 TaylorIntegration = "0.8.5"
