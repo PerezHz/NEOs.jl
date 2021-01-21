@@ -10,7 +10,8 @@ export propagate, observer_position, delay_doppler, ismonostatic,
     utcepoch, delay, delay_sigma, delay_units, doppler, doppler_sigma,
     doppler_units, freq, rcvr, xmit, bouncepoint, valsecchi_circle,
     radec, radec_table, nrms, chi2, newtonls, newtonls_6v, diffcorr,
-    newtonls_Q, readfwf, readmp, w8sveres17, bopik, yarkp2adot, pv2kep
+    newtonls_Q, readfwf, readmp, w8sveres17, bopik, yarkp2adot, pv2kep,
+    x0_JPL_s197, x0_JPL_s199
 
 using Distributed
 using TaylorIntegration

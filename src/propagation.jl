@@ -99,14 +99,14 @@ end
 
 function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         tspan::T, ephfile::String; output::Bool=true, newtoniter::Int=10,
-        dense::Bool=false, dq::Vector=zeros(7), radarobsfile::String="",
+        dense::Bool=false, q0::Vector=initialcond(), radarobsfile::String="",
         opticalobsfile::String="", quadmath::Bool=false,
         debias_table::String="2018", μ_ast::Vector=μ_ast343_DE430[1:end],
         lyap::Bool=false) where {T<:Real}
     # Julian date of integration start time
     jd0 = datetime2julian(DateTime(2008, 9, 24))
     # get asteroid initial conditions
-    q0 = initialcond(dq)
+    @assert length(q0) == 7
     @show q0
     # load ephemeris
     ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
