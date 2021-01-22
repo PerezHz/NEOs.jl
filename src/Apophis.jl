@@ -95,11 +95,11 @@ function yarkp2adot(A2, a, e, μ_S)
     return 2A2/(sqrt(a)*(1-e^2)*sqrt(μ_S))
 end
 
-function pv2kep(xas, μ_S)
+function pv2kep(xas, μ_S, jd=jd0)
     ec0 = eccentricity(xas..., μ_S, 0.0)
     a0 = semimajoraxis(xas..., μ_S, 0.0)
     qr0 = a0*(1-ec0)
-    tp0 = timeperipass(jd0, xas..., μ_S, 0.0)
+    tp0 = timeperipass(jd, xas..., μ_S, 0.0)
     Ω0 = rad2deg(longascnode(xas...))
     ω0 = rad2deg(argperi(xas..., μ_S, 0.0))
     i0 = rad2deg(inclination(xas...))
