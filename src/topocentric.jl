@@ -86,79 +86,6 @@ arcsec2rad(x) = deg2rad(x/3600) # arcsec/3600 -> deg; deg2rad(deg) -> rad
 # conversion of milli-arcseconds to radians
 mas2rad(x) = arcsec2rad(x/1000) # mas/1000 -> arcsec; arcsec2rad(arcsec) -> rad
 
-# Terrestrial-to-celestial rotation matrix (including polar motion)
-# Reproduction of Section 5.3 of SOFA Tools for Earth Attitude
-# "IAU 2000A, CIO based, using classical angles"
-# found at SOFA website, Mar 27, 2019
-# Some modifications were applied, using TaylorSeries.jl, in order to compute
-# the geocentric velocity of the observer, following the guidelines from
-# ESAA 2014, Sec 7.4.3.3 (page 295)
-# et: ephemeris time (TDB seconds since J2000.0 epoch)
-function t2c_rotation_iau_00_06(et::Float64, pos_geo::Vector; pm::Bool=true)
-    # UTC
-    t_utc = DateTime(et2utc(constant_term(et), "ISOC", 3))
-    t0_utc = UTCEpoch(t_utc)
-    t0_utc_jul = datetime2julian(t_utc)
-
-    # UT1
-    # dut1 = EarthOrientation.getΔUT1(t_utc) # UT1-UTC (seconds)
-    t0_ut1 = UT1Epoch(t0_utc)
-    t0_ut1_jd1, t0_ut1_jd2 = julian_twopart(t0_ut1)
-    # Earth rotation angle
-    era = iauEra00( t0_ut1_jd1.Δt, t0_ut1_jd2.Δt ) #rad
-    # this trick allows us to compute the whole Celestial->Terrestrial matrix and its first derivative
-    # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
-    eraT1 = era + ω*Taylor1(1) #rad/day
-    # eraT1 = era + omega(getlod(t_utc))*Taylor1(1) #rad/day
-    # Rz(-ERA)
-    Rz_minus_era_T1 = [cos(eraT1) sin(-eraT1) zero(eraT1);
-        sin(eraT1) cos(eraT1) zero(eraT1);
-        zero(eraT1) zero(eraT1) one(eraT1)
-    ]
-    Rz_minus_ERA = Rz_minus_era_T1()
-    # dRz(-ERA)/dt
-    dRz_minus_era_T1 = differentiate.(Rz_minus_era_T1)
-    dRz_minus_ERA = dRz_minus_era_T1()
-
-    # TT
-    t0_tt = TTEpoch(t0_utc)
-    t0_tt_jd1, t0_tt_jd2 = julian_twopart(t0_tt)
-    # Polar motion (arcsec->radians)
-    W = Array{Float64}(I, 3, 3)
-    if pm
-        xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(t_utc)
-        xp = deg2rad(xp_arcsec/3600)
-        yp = deg2rad(yp_arcsec/3600)
-        # Polar motion matrix (TIRS->ITRS, IERS 2003)
-        sp = iauSp00( t0_tt_jd1.Δt, t0_tt_jd2.Δt )
-        W = iauPom00( xp, yp, sp)
-    end
-    W_inv = inv(W)
-
-    # CIP and CIO, IAU 2000A
-    x, y, s = iauXys00a( t0_tt_jd1.Δt, t0_tt_jd2.Δt )
-    # CIP offsets wrt IAU 2000A (mas->radians)
-    dx00_mas, dy00_mas = EarthOrientation.precession_nutation00(t_utc)
-    dx00 = mas2rad(dx00_mas)
-    dy00 = mas2rad(dy00_mas)
-    # Add CIP corrections
-    x += dx00
-    y += dy00
-    # GCRS to CIRS matrix
-    C = iauC2ixys( x, y, s)
-    C_inv = inv(C) # CIRS -> GCRS
-
-    # g(t), \dot g(t) ESAA vectors
-     g_vec_ESAA =  Rz_minus_ERA*(W_inv*pos_geo)
-    dg_vec_ESAA = dRz_minus_ERA*(W_inv*pos_geo)
-
-    # G(t), \dot G(t) ESAA vectors
-     G_vec_ESAA = convert(Vector{Float64}, C_inv* g_vec_ESAA)
-    dG_vec_ESAA = convert(Vector{Float64}, C_inv*dg_vec_ESAA)
-
-    return G_vec_ESAA, dG_vec_ESAA, era
-end
-
 # IAU 1976/1980 nutation-precession matrix
 # tt: days since J2000.0 (TT)
 # IAU 1980 nutation angles Δψ (nutation in longitude), Δϵ (nutation in obliquity), both in radians
@@ -202,9 +129,6 @@ end
 
 # Terrestrial-to-celestial rotation matrix (including polar motion)
 # Using 1976/1980 Earth orientation/rotation model
-# Reproduction of Section 5.2 of SOFA Tools for Earth Attitude
-# "IAU 1976/1980/1982/1994, equinox based"
-# found at SOFA website, Mar 27, 2019
 # et: ephemeris time (TDB seconds since J2000.0 epoch)
 function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
         eocorr::Bool=true) where {T<:Number}
