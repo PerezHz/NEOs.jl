@@ -3,7 +3,7 @@ module Apophis
 # __precompile__(false)
 
 export propagate, observer_position, delay_doppler, ismonostatic,
-    mas2rad, t2c_rotation_iau_00_06, t2c_rotation_iau_76_80,
+    mas2rad, t2c_rotation_iau_76_80,
     process_radar_data_jpl, RadarDataJPL, julian2etsecs, etsecs2julian,
     RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!,
     propagate_distributed, parallel_run,
@@ -64,8 +64,6 @@ const Λ3 = zeros(11)
 Λ3[ea] = -1.962633335678878e-19
 const clightkms = 2.99792458E5 # speed of light, km/sec
 
-const jd0 = 2.4547335e6
-
 # isless and sincos overloads needed to make rECEFtoECI work with TaylorSeries
 import Base: isless
 isless(a::Union{Taylor1,TaylorN}, b::Union{Taylor1,TaylorN}) = isless(constant_term(a), constant_term(b))
@@ -95,7 +93,7 @@ function yarkp2adot(A2, a, e, μ_S)
     return 2A2/(sqrt(a)*(1-e^2)*sqrt(μ_S))
 end
 
-function pv2kep(xas, μ_S, jd=jd0)
+function pv2kep(xas, μ_S, jd=J2000)
     ec0 = eccentricity(xas..., μ_S, 0.0)
     a0 = semimajoraxis(xas..., μ_S, 0.0)
     qr0 = a0*(1-ec0)
