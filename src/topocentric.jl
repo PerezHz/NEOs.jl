@@ -137,7 +137,6 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     t_utc = J2000 + utc_secs/daysec
     t_utc_00 = constant_term(constant_term(t_utc))
     # TT
-    jd0 = datetime2julian(DateTime(2008,9,24))
     t0_tt = et + ttmtdb(et)
     tt = t0_tt/daysec
 

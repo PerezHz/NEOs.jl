@@ -8,14 +8,14 @@ end
 
 function loadeph(ss16asteph_::TaylorInterpolant, μ::Vector)
     # read Solar System ephemeris (Sun+8 planets+Moon+Pluto+16 main belt asteroids)
-    ss16asteph_t0 = (ss16asteph_.t0 ./ daysec) - (jd0-J2000)
+    ss16asteph_t0 = (ss16asteph_.t0 ./ daysec)
     ss16asteph_t = (ss16asteph_.t ./ daysec)
     ephord = ss16asteph_.x[1].order
     ss16asteph_x = map(x->x(Taylor1(ephord)*daysec), ss16asteph_.x)
     ss16asteph = TaylorInterpolant(ss16asteph_t0, ss16asteph_t, ss16asteph_x)
     #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
     # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
-    Nm1 = size(ss16asteph_x)[2] ÷ 6
+    Nm1 = (size(ss16asteph_x)[2]-13) ÷ 6
     acc_eph = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, 3Nm1))
     newtonianNb_Potential = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, Nm1))
     fill!(acc_eph.x, zero(ss16asteph.x[1]))
@@ -97,21 +97,20 @@ function scaling(a::Taylor1{Taylor1{T}}, c::T) where {T<:Real}
     return a(x)
 end
 
-function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
+function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
         tspan::T, ephfile::String; output::Bool=true, newtoniter::Int=10,
         dense::Bool=false, q0::Vector=initialcond(), radarobsfile::String="",
         opticalobsfile::String="", quadmath::Bool=false,
         debias_table::String="2018", μ_ast::Vector=μ_ast343_DE430[1:end],
-        lyap::Bool=false) where {T<:Real}
-    # Julian date of integration start time
-    jd0 = datetime2julian(DateTime(2008, 9, 24))
+        lyap::Bool=false, order::Int=order, abstol::T=abstol) where {T<:Real}
     # get asteroid initial conditions
     @assert length(q0) == 7
     @show q0
+    @show jd0, jd0-J2000
     # load ephemeris
     ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
     # Number of bodies
-    Nm1 = size(ss16asteph_et.x)[2] ÷ 6 # number of massive bodies
+    Nm1 = (size(ss16asteph_et.x)[2]-13) ÷ 6 # number of massive bodies
     @show Nm1
     N = Nm1 + 1 # number of bodies, including NEA
     # vector of G*m values
@@ -133,7 +132,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
 
     if quadmath
         _q0 = one(Float128)*q0
-        _t0 = Float128(t0)
+        _t0 = zero(Float128)
         _abstol = Float128(abstol)
         _ss16asteph = TaylorInterpolant(Float128(ss16asteph_auday.t0), Float128.(ss16asteph_auday.t), map(x->Taylor1(Float128.(x.coeffs)), ss16asteph_auday.x))
         _acc_eph = TaylorInterpolant(Float128(acc_eph.t0), Float128.(acc_eph.t), map(x->Taylor1(Float128.(x.coeffs)), acc_eph.x))
@@ -141,7 +140,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         _params = (_ss16asteph, _acc_eph, _newtonianNb_Potential, Float128(jd0), UJ_interaction, N, μ)
     else
         _q0 = q0
-        _t0 = t0
+        _t0 = zero(Float64)
         _abstol = abstol
         _params = params
     end
@@ -152,7 +151,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
     if dense
         @time interp = apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, dense=dense)
         if quadmath
-            apophis_t0 = (jd0-J2000) # days since J2000 until initial integration time
+            apophis_t0 = Float64(jd0-J2000) # days since J2000 until initial integration time
             apophis_t = Float64.(interp.t[:])
             apophis_x = convert(Array{Taylor1{eltype(q0)}}, interp.x[:,:])
             apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
@@ -175,7 +174,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, t0::T,
         )
     else
         @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, newtoniter=newtoniter, dense=true)
-        apophis_t0 = (jd0-J2000) # days since J2000 until initial integration time
+        apophis_t0 = (_params[4]-J2000) # days since J2000 until initial integration time
         apophis_t = sol_objs[1].t[:]
         apophis_x = sol_objs[1].x[:,:]
         apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
@@ -216,7 +215,7 @@ end
 
 function compute_radar_obs(outfilename::String, radarobsfile::String, apophis_interp, ss16asteph; tc::Real=1.0)
     if radarobsfile != ""
-        Nm1 = size(ss16asteph.x)[2] ÷ 6
+        Nm1 = (size(ss16asteph.x)[2]-13) ÷ 6
         N = Nm1 + 1
         asteroid_data = process_radar_data_jpl(radarobsfile)
         # TODO: check that first and last observation times are within interpolation interval
@@ -242,7 +241,7 @@ end
 function compute_optical_obs(outfilename::String, opticalobsfile::String,
         apophis_interp, ss16asteph; debias_table::String="2018")
     if opticalobsfile != ""
-        Nm1 = size(ss16asteph.x)[2] ÷ 6
+        Nm1 = (size(ss16asteph.x)[2]-13) ÷ 6
         N = Nm1 + 1
         # TODO: check that first and last observation times are within interpolation interval
         function apophis_et(et)
