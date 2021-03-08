@@ -8,8 +8,9 @@ function apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
     # Force Apophis time-step to be no larger than planetary ephemeris time-step
     et0_days = (params[4]-J2000)
     et_days = t[0] + et0_days
-    ind, _ = PlanetaryEphemeris.getinterpindex(params[1], et_days)
-    next_ind = t[0] > zero(T) ? ind+1 : ind-1
+    ind, Δt = PlanetaryEphemeris.getinterpindex(params[1], et_days)
+    eph_next_et_days = (params[1].t[ind+1]+params[1].t0)
+    next_ind = (issorted(params[1].t, rev=true) && eph_next_et_days == et_days) ? ind+2 : ind+1
     eph_next_et_days = (params[1].t[next_ind]+params[1].t0)
     Δt = abs( eph_next_et_days - et_days )
     δt = min(δt, Δt)
