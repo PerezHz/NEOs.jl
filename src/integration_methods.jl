@@ -12,7 +12,6 @@ function apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
     next_ind = t[0] > zero(T) ? ind+1 : ind-1
     eph_next_et_days = (params[1].t[next_ind]+params[1].t0)
     Δt = abs( eph_next_et_days - et_days )
-    @show δt Δt
     δt = min(δt, Δt)
     return δt
 end
