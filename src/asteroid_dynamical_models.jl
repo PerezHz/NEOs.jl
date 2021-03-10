@@ -43,7 +43,7 @@ end
 # and d = 2.0
 @taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph!(dq, q, params, t)
     local jd0 = params[4] # Julian date of start time
-    local dsj2k = t+(jd0-2.451545e6) # days since J2000.0 = 2.451545e6
+    local dsj2k = t+(jd0-JD_J2000) # days since J2000.0 = 2.451545e6
     local ss16asteph_t = evaleph(params[1], dsj2k, q[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
     local acceph_t = evaleph(params[2], dsj2k, q[1]) # params[2](t)*one(q[1]) #acc_eph(t)
     local newtonianNb_Potential_t = evaleph(params[3], dsj2k, q[1]) # params[3](t)*one(q[1]) #newtonianNb_Potential(t), massive bodies
@@ -440,7 +440,7 @@ end
 
 @taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     local jd0 = params[4] # Julian date of start time
-    local dsj2k = t+(jd0-2.451545e6) # days since J2000.0 = 2.451545e6
+    local dsj2k = t+(jd0-JD_J2000) # days since J2000.0 = 2.451545e6
     local ss16asteph_t = evaleph(params[1], dsj2k, q[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
     local acceph_t = evaleph(params[2], dsj2k, q[1]) # params[2](t)*one(q[1]) #acc_eph(t)
     local newtonianNb_Potential_t = evaleph(params[3], dsj2k, q[1]) # params[3](t)*one(q[1]) #newtonianNb_Potential(t), massive bodies

@@ -19,7 +19,7 @@ using Printf, DelimitedFiles, Test, LinearAlgebra
 using Dates: DateTime, julian2datetime, datetime2julian
 import PlanetaryEphemeris
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun,
-    t2c_jpl_de430, pole_rotation, au, J2000, c_au_per_day, R_sun,
+    t2c_jpl_de430, pole_rotation, au, c_au_per_day, R_sun,
     c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx, Ry, Rz,
     semimajoraxis, eccentricity, inclination, longascnode, argperi,
     timeperipass
@@ -30,7 +30,7 @@ using Quadmath
 using Healpix
 using Pkg.Artifacts #: @artifact_str
 using JuliaDB #: table, select, filter, columns, insertcolsafter, save
-using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_iers_eop, get_ΔAT
+using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_iers_eop, get_ΔAT, JD_J2000
 using StaticArrays: SArray
 using InteractiveUtils
 
@@ -93,7 +93,7 @@ function yarkp2adot(A2, a, e, μ_S)
     return 2A2/(sqrt(a)*(1-e^2)*sqrt(μ_S))
 end
 
-function pv2kep(xas, μ_S, jd=J2000)
+function pv2kep(xas, μ_S, jd=JD_J2000)
     ec0 = eccentricity(xas..., μ_S, 0.0)
     a0 = semimajoraxis(xas..., μ_S, 0.0)
     qr0 = a0*(1-ec0)

@@ -56,12 +56,12 @@ dtt_tdb(et) = getpv(1000000001, 1000000000, constant_term(et))[4] # units: secon
 
 # Convert julian days to ephemeris seconds since J2000
 function julian2etsecs(jd)
-    return (jd-J2000)*daysec
+    return (jd-JD_J2000)*daysec
 end
 
 # Convert ephemeris seconds since J2000 to julian days
 function etsecs2julian(et)
-    return J2000 + et/daysec
+    return JD_J2000 + et/daysec
 end
 
 # Standard formula for relativistic (Shapiro) delay
@@ -182,7 +182,7 @@ function tdb_utc(et::T) where {T<:Number}
     tt_tdb_et = ttmtdb(et)
     tt_tai = 32.184
     utc_secs = constant_term(et) - deltet(constant_term(et), "ET") # used only to determine ΔAT; no high-precision needed
-    jd_utc = J2000 + utc_secs/daysec
+    jd_utc = JD_J2000 + utc_secs/daysec
     dt_utc = julian2datetime(jd_utc)
     fd_utc = (jd_utc+0.5) - floor(jd_utc+0.5)
     tai_utc = get_ΔAT(jd_utc)

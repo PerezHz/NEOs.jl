@@ -117,7 +117,7 @@ end
 function polarmotionmat(tt; pm::Bool=true)
     # Polar motion (arcsec->radians)
     if pm
-        xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(J2000+tt)
+        xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(JD_J2000+tt)
         xp = deg2rad(xp_arcsec/3600)
         yp = deg2rad(yp_arcsec/3600)
     else
@@ -134,7 +134,7 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
         eocorr::Bool=true) where {T<:Number}
     # UTC (JD)
     utc_secs = et - tdb_utc(et)
-    t_utc = J2000 + utc_secs/daysec
+    t_utc = JD_J2000 + utc_secs/daysec
     t_utc_00 = constant_term(constant_term(t_utc))
     # TT
     t0_tt = et + ttmtdb(et)
@@ -158,7 +158,7 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     # Lunar longitude of ascending node (measured from ecliptic)
     Ω_M = PlanetaryEphemeris.Ω(et_days) # rad
     # IAU 1980 nutation angles
-    _, Δϵ_1980, ΔΨ_1980 = nutation_fk5(J2000 + et_days)
+    _, Δϵ_1980, ΔΨ_1980 = nutation_fk5(JD_J2000 + et_days)
     # Equation of the equinoxes `ee = GAST - GMST`, including nutation correction
     # Expression from Eq. (5-184) of Moyer (2003): Δθ = ∆ψ cosϵ̄ + 0''.00264 sinΩ + 0''.000063 sin2Ω
     # where the nutation in longitude includes corrections from IERS eop file
@@ -195,16 +195,15 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
 
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
     W = polarmotionmat(constant_term(tt), pm=pm)
+    W_inv = convert(Matrix{Float64}, transpose(W))
 
     # IAU 76/80 nutation-precession matrix
     C = nupr7680mat(et_days, Δϵ_1980, ΔΨ_1980, dde80, ddp80, eocorr=eocorr)
-
-    W_inv = convert(Matrix{Float64}, transpose(W))
     C_inv = transpose(C)
+    # eop_IAU1980 = get_iers_eop()
+    # _mt2c = SatelliteToolbox.rECItoECI(DCM, SatelliteToolbox.TOD(), SatelliteToolbox.GCRF(), t_utc, eop_IAU1980)
+    # C_inv = convert(Matrix{eltype(_mt2c)}, _mt2c)
 
-    # eop_IAU1980 = get_iers_eop();
-    # _mt2c = rECEFtoECI(DCM, ITRF(), GCRF(), t_utc, eop_IAU1980)
-    # mt2c = convert(Matrix{eltype(_mt2c)}, _mt2c)
     # Velocity transformation may be retrieved also from: SatelliteToolbox.svECEFtoECI
     mt2c = C_inv*Rz_minus_GAST*W_inv
     dmt2c = C_inv*dRz_minus_GAST*W_inv

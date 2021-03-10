@@ -106,7 +106,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
     # get asteroid initial conditions
     @assert length(q0) == 7
     @show q0
-    @show jd0, jd0-J2000
+    @show jd0, jd0-JD_J2000
     # load ephemeris
     ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
     # Number of bodies
@@ -151,14 +151,14 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
     if dense
         @time interp = apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, dense=dense)
         if quadmath
-            apophis_t0 = Float64(jd0-J2000) # days since J2000 until initial integration time
+            apophis_t0 = Float64(jd0-JD_J2000) # days since J2000 until initial integration time
             apophis_t = Float64.(interp.t[:])
             apophis_x = convert(Array{Taylor1{eltype(q0)}}, interp.x[:,:])
             apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
             sol = (apophis=apophis,
             )
         else
-            apophis_t0 = (jd0-J2000) # days since J2000 until initial integration time
+            apophis_t0 = (jd0-JD_J2000) # days since J2000 until initial integration time
             apophis_t = interp.t[:]
             apophis_x = interp.x[:,:]
             apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
@@ -174,7 +174,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
         )
     else
         @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, newtoniter=newtoniter, dense=true)
-        apophis_t0 = (_params[4]-J2000) # days since J2000 until initial integration time
+        apophis_t0 = (_params[4]-JD_J2000) # days since J2000 until initial integration time
         apophis_t = sol_objs[1].t[:]
         apophis_x = sol_objs[1].x[:,:]
         apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
