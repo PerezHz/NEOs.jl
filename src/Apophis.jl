@@ -30,8 +30,12 @@ using Quadmath
 using Healpix
 using Pkg.Artifacts #: @artifact_str
 using JuliaDB #: table, select, filter, columns, insertcolsafter, save
-using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_iers_eop, get_ΔAT, JD_J2000
-using StaticArrays: SArray
+import SatelliteToolbox
+using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_iers_eop,
+    get_ΔAT, JD_J2000, EOPData_IAU1980, parse_iers_eop_iau_1980, rECItoECI, DCM,
+    TOD, GCRF, ITRF, rECItoECI, PEF, SatelliteStateVector, satsv
+import RemoteFiles
+using StaticArrays: SArray, @SVector
 using InteractiveUtils
 
 # integration parameters
