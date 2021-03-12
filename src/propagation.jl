@@ -223,11 +223,10 @@ function compute_radar_obs(outfilename::String, radarobsfile::String, apophis_in
             return auday2kmsec(apophis_interp(et/daysec)[1:6])
         end
         function earth_et(et)
-
-            return auday2kmsec(ss16asteph(et)[union(3*4-2:3*4,3*(N-1+4)-2:3*(N-1+4))])
+            return auday2kmsec(ss16asteph(et)[union(3*4-2:3*4,3*(Nm1+4)-2:3*(Nm1+4))])
         end
         function sun_et(et)
-            return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
+            return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(Nm1+1)-2:3*(Nm1+1))])
         end
         #compute time-delay and Doppler-shift "ephemeris" (i.e., predicted values according to ephemeris)
         vdel, vdop = delay_doppler(asteroid_data, tc=tc, xve=earth_et, xvs=sun_et, xva=apophis_et)
