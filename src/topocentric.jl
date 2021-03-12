@@ -44,6 +44,25 @@ readmpcobs(mpcfile::String=joinpath(dirname(pathof(Apophis)), "ObsCodes.txt")) =
 
 const mpcobscodes = readmpcobs()
 
+# Functions get_eop_iau1980, get_eop_iau2000a were adapted from SatelliteToolbox.jl; MIT-licensed
+# these functions avoid the use of @eval
+# https://github.com/JuliaSpace/SatelliteToolbox.jl/blob/b95e7f54f85c26744c64270841c874631f5addf1/src/transformations/eop.jl#L87
+function get_eop_iau1980()
+    eop_iau1980_rf = RemoteFiles.@RemoteFile(EOP_IAU1980_RF, "https://datacenter.iers.org/data/latestVersion/223_EOP_C04_14.62-NOW.IAU1980223.txt", file="EOP_IAU1980.TXT", updates=:daily)
+    RemoteFiles.download(EOP_IAU1980_RF)
+    eop = readdlm(RemoteFiles.path(eop_iau1980_rf); skipblanks=true, skipstart=14)
+    SatelliteToolbox.parse_iers_eop_iau_1980(eop)
+end
+function get_eop_iau2000a()
+    eop_iau2000a_rf = RemoteFiles.@RemoteFile(EOP_IAU2000A_RF, "https://datacenter.iers.org/data/latestVersion/224_EOP_C04_14.62-NOW.IAU2000A224.txt", file="EOP_IAU2000A.TXT", updates=:daily)
+    RemoteFiles.download(EOP_IAU2000A_RF)
+    eop = readdlm(RemoteFiles.path(eop_iau2000a_rf); skipblanks=true, skipstart=14)
+    SatelliteToolbox.parse_iers_eop_iau_2000A(eop)
+end
+
+eop_IAU1980 = get_eop_iau1980()
+eop_IAU2000A = get_eop_iau2000a()
+
 # et: ephemeris time (TDB seconds since J2000.0 epoch)
 function observer_position(station_code::Union{Int, String}, et::T;
         pm::Bool=true, lod::Bool=true, eocorr::Bool=true) where {T<:Number}
@@ -70,11 +89,20 @@ function observer_position(station_code::Union{Int, String}, et::T;
 
     pos_geo = [x_gc, y_gc, z_gc] #km
 
-    # G_vec_ESAA, dG_vec_ESAA, era = t2c_rotation_iau_00_06(et, pos_geo, pm=pm)
-    mt2c, dmt2c, gast = t2c_rotation_iau_76_80(et, pm=pm, lod=lod, eocorr=eocorr)
+    # mt2c, dmt2c, gast = t2c_rotation_iau_76_80(et, pm=pm, lod=lod, eocorr=eocorr)
+    # r_c = mt2c*pos_geo
+    # v_c = dmt2c*pos_geo
 
-    # Apply rotation from geocentric, Earth-fixed frame to inertial (celestial) frame
-    return mt2c*pos_geo, dmt2c*pos_geo
+    utc_secs = et - tdb_utc(et)
+    jd_utc = JD_J2000 + utc_secs/daysec
+    sv_geo = SatelliteToolbox.satsv(jd_utc, pos_geo, zeros(3), zeros(3))
+    # Transform state vector coordinates from geocentric, Earth-fixed frame to inertial (celestial) frame
+    sv_c = SatelliteToolbox.svECEFtoECI(sv_geo, Val(:ITRF), Val(:GCRF), jd_utc, eop_IAU1980)
+    # sv_c = SatelliteToolbox.svECEFtoECI(sv_geo, Val(:ITRF), Val(:GCRF), jd_utc, eop_IAU2000A)
+    r_c = convert(Vector{eltype(sv_c.r)}, sv_c.r)
+    v_c = convert(Vector{eltype(sv_c.v)}, sv_c.v)
+
+    return r_c, v_c
 end
 
 # conversion of radians to arcseconds
@@ -166,6 +194,7 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     # ΔUT1 = UT1-UTC (seconds)
     if eocorr
         dut1 = EarthOrientation.getΔUT1(t_utc_00)
+        # dut1 = eop_IAU1980.UT1_UTC(t_utc)
     else
         dut1 = 0.0
     end
@@ -177,9 +206,6 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     gmst82 = J2000toGMST(ut1_days)
     gast = mod2pi( gmst82 + ee )
     β_dot = lod ? omega(EarthOrientation.getlod(t_utc_00)) : ω
-    # if isa(gast, Taylor1)
-    #     gast[1] = β_dot*one(gast[1])
-    # end
 
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
     Rz_minus_GAST = [
@@ -194,15 +220,16 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
         ]
 
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
-    W = polarmotionmat(constant_term(tt), pm=pm)
+    W = polarmotionmat(constant_term(constant_term(tt)), pm=pm)
     W_inv = convert(Matrix{Float64}, transpose(W))
+    # _W_inv = SatelliteToolbox.rECEFtoECEF(DCM, ITRF(), PEF(), t_utc, eop_IAU1980)
+    # W_inv = convert(Matrix{eltype(_W_inv)}, _W_inv)
 
     # IAU 76/80 nutation-precession matrix
     C = nupr7680mat(et_days, Δϵ_1980, ΔΨ_1980, dde80, ddp80, eocorr=eocorr)
     C_inv = transpose(C)
-    # eop_IAU1980 = get_iers_eop()
-    # _mt2c = SatelliteToolbox.rECItoECI(DCM, SatelliteToolbox.TOD(), SatelliteToolbox.GCRF(), t_utc, eop_IAU1980)
-    # C_inv = convert(Matrix{eltype(_mt2c)}, _mt2c)
+    # _C_inv = SatelliteToolbox.rECItoECI(DCM, TOD(), GCRF(), t_utc, eop_IAU1980)
+    # C_inv = convert(Matrix{eltype(_C_inv)}, _C_inv)
 
     # Velocity transformation may be retrieved also from: SatelliteToolbox.svECEFtoECI
     mt2c = C_inv*Rz_minus_GAST*W_inv
