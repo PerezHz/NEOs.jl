@@ -181,12 +181,12 @@ end
 function tdb_utc(et::T) where {T<:Number}
     tt_tdb_et = ttmtdb(et)
     tt_tai = 32.184
-    utc_secs = constant_term(et) - deltet(constant_term(et), "ET") # used only to determine ΔAT; no high-precision needed
+    et_00 = constant_term(constant_term(et))
+    utc_secs = et_00 - deltet(et_00, "ET") # used only to determine ΔAT; no high-precision needed
     jd_utc = JD_J2000 + utc_secs/daysec
     dt_utc = julian2datetime(jd_utc)
     fd_utc = (jd_utc+0.5) - floor(jd_utc+0.5)
     tai_utc = get_ΔAT(jd_utc)
-    # @show tt_tdb_et
     return (tt_tai + tai_utc) - tt_tdb_et # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
 end
 
@@ -353,13 +353,16 @@ end
 
 function delay_doppler2(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true,
-        tc::Real=1.0, xve=earth_pv, xvs=sun_pv, xva=apophis_pv_197)
-    # τ = delay(station_code, t_r_utc, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
-    # return τ[0], -F_tx*τ[1]
-    τe = delay(station_code, t_r_utc,  tc/2, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
-    τn = delay(station_code, t_r_utc,   0.0, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
-    τs = delay(station_code, t_r_utc, -tc/2, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
-    return τn, -F_tx*((τe-τs)/tc)
+        tc::Real=1.0, xve=earth_pv, xvs=sun_pv, xva=apophis_pv_197, autodiff::Bool=true)
+    if autodiff
+        τ = delay(station_code, t_r_utc, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+        return τ[0], -F_tx*τ[1]
+    else
+        τe = delay(station_code, t_r_utc,  tc/2, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+        τn = delay(station_code, t_r_utc,   0.0, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+        τs = delay(station_code, t_r_utc, -tc/2, niter, pm=pm, lod=lod, eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+        return τn, -F_tx*((τe-τs)/tc)
+    end
 end
 
 function delay_doppler(astradarfile::String, niter::Int=10; pm::Bool=true,
@@ -607,36 +610,20 @@ end
 function delay(station_code::Int, t_r_utc::DateTime,
         niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true,
         xve::TaylorInterpolant=earth_pv, xvs::TaylorInterpolant=sun_pv,
-        xva::TaylorInterpolant=apophis_pv_197)
+        xva::TaylorInterpolant=apophis_pv_197, t1ord::Int=xva.x[1].order)
     q1 = xva.x[1] # auxiliary to evaluate JT ephemeris
     et_r_secs_0 = str2et(string(t_r_utc))
-    et_r_secs = Taylor1([et_r_secs_0,1.0].*one(q1[0]))
-    # @show et_r_secs_0 et_r_secs typeof(et_r_secs)
-    # @show typeof(q1) q1.order q1[1].order
+    et_r_secs = Taylor1([et_r_secs_0,1.0].*one(q1[0]), t1ord)
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    _R_r, _V_r = observer_position(station_code, et_r_secs[0], pm=pm, lod=lod, eocorr=eocorr)
-    # @show _R_r _V_r
-    R_r = map((x,y)->Taylor1([x,y]), _R_r, _V_r)
-    V_r = map(x->Taylor1([x,zero(x)]), _V_r)
-    # @show R_r V_r
+    R_r, _ = observer_position(station_code, et_r_secs, pm=pm, lod=lod, eocorr=eocorr)
     # Earth's barycentric position and velocity at receive time
-    rv_e_t_r = xve(et_r_secs[0])
-    r_e_t_r = map((x,y)->Taylor1([x,y]), rv_e_t_r[1:3], rv_e_t_r[4:6])
-    v_e_t_r = map(x->Taylor1([x,zero(x)]), rv_e_t_r[4:6])
-    # @show r_e_t_r norm(r_e_t_r)/au norm(v_e_t_r)
+    r_e_t_r = xve(et_r_secs)[1:3]
     # Receiver barycentric position and velocity at receive time
     r_r_t_r = r_e_t_r + R_r
     # Asteroid barycentric position and velocity at receive time
-    rv_a_t_r = xva(et_r_secs[0][0])
-    r_a_t_r = map((x,y)->Taylor1([x,y]), rv_a_t_r[1:3], rv_a_t_r[4:6])
-    v_a_t_r = map(x->Taylor1([x,zero(x)]), rv_a_t_r[4:6])
-    # @show rv_a_t_r
-    # @show r_a_t_r
+    r_a_t_r = xva(et_r_secs)[1:3]
     # Sun barycentric position and velocity at receive time
-    rv_s_t_r = xvs(et_r_secs[0])
-    r_s_t_r = map((x,y)->Taylor1([x,y]), rv_s_t_r[1:3], rv_s_t_r[4:6])
-    v_s_t_r = map(x->Taylor1([x,zero(x)]), rv_s_t_r[4:6])
-    # @show r_s_t_r
+    r_s_t_r = xvs(et_r_secs)[1:3]
     # down-leg iteration
     # τ_D first approximation: Eq. (1) Yeomans et al. (1992)
     ρ_vec_r = r_a_t_r - r_r_t_r
@@ -647,7 +634,7 @@ function delay(station_code::Int, t_r_utc::DateTime,
     # bounce time, new estimate Eq. (2) Yeomans et al. (1992)
     # @show et_r_secs
     et_b_secs = et_r_secs - τ_D
-    # @show et_b_secs
+    # @show et_b_secs et_r_secs
 
     Δτ_D = zero(τ_D)
     Δτ_rel_D = zero(τ_D)
@@ -657,11 +644,9 @@ function delay(station_code::Int, t_r_utc::DateTime,
 
     for i in 1:niter
         # asteroid barycentric position (in au) at bounce time (TDB)
-        rv_a_t_b = xva(et_b_secs[0][0])
-        # @show rv_a_t_b
-        r_a_t_b = map((x,y)->Taylor1([x,y]), rv_a_t_b[1:3], rv_a_t_b[4:6])
-        v_a_t_b = map(x->Taylor1([x,zero(x)]), rv_a_t_b[4:6])
-        # @show r_a_t_b v_a_t_b
+        rv_a_t_b = xva(et_b_secs)
+        r_a_t_b = rv_a_t_b[1:3]
+        v_a_t_b = rv_a_t_b[4:6]
         # Eq. (3) Yeomans et al. (1992)
         ρ_vec_r = r_a_t_b - r_r_t_r
         # Eq. (4) Yeomans et al. (1992)
@@ -672,8 +657,8 @@ function delay(station_code::Int, t_r_utc::DateTime,
         e_D_vec  = r_r_t_r - r_s_t_r
         # @show e_D_vec
         e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2) # heliocentric distance of Earth at t_r
-        rv_s_t_b = xvs(et_b_secs[0]) # barycentric position and velocity of Sun at estimated bounce time
-        r_s_t_b = map((x,y)->Taylor1([x,y]), rv_s_t_b[1:3], rv_s_t_b[4:6])
+        # barycentric position and velocity of Sun at estimated bounce time
+        r_s_t_b = xvs(et_b_secs)[1:3]
         # @show r_s_t_b
         p_D_vec  = r_a_t_b - r_s_t_b
         p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2) # heliocentric distance of asteroid at t_b
@@ -695,25 +680,23 @@ function delay(station_code::Int, t_r_utc::DateTime,
         et_b_secs = et_r_secs - τ_D
     end
     # @show τ_D
-    rv_a_t_b = xva(et_b_secs[0][0])
-    r_a_t_b = map((x,y)->Taylor1([x,y]), rv_a_t_b[1:3], rv_a_t_b[4:6])
-    v_a_t_b = map(x->Taylor1([x,zero(x)]), rv_a_t_b[4:6])
+    rv_a_t_b = xva(et_b_secs)
+    r_a_t_b = rv_a_t_b[1:3]
+    v_a_t_b = rv_a_t_b[4:6]
 
     # up-leg iteration
     # τ_U first estimation: Eq. (5) Yeomans et al. (1992)
     τ_U = τ_D
     # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
     et_t_secs = et_b_secs - τ_U
-    # @show τ_U et_t_secs
+    # @show τ_U et_t_secs et_b_secs et_r_secs
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    _R_t, _V_t = observer_position(station_code, et_t_secs[0], pm=pm, lod=lod, eocorr=eocorr)
-    # @show _R_t _V_t
-    R_t = map((x,y)->Taylor1([x,y]), _R_t, _V_t)
-    V_t = map(x->Taylor1([x,zero(x)]), _V_t)
+    R_t, V_t = observer_position(station_code, et_t_secs, pm=pm, lod=lod, eocorr=eocorr)
     # @show R_t V_t
-    rv_e_t_t = xve(et_t_secs[0])
-    r_e_t_t = map((x,y)->Taylor1([x,y]), rv_e_t_t[1:3], rv_e_t_t[4:6])
-    v_e_t_t = map(x->Taylor1([x,zero(x)]), rv_e_t_t[4:6])
+    # Earth's barycentric position and velocity at transmit time
+    rv_e_t_t = xve(et_t_secs)
+    r_e_t_t = rv_e_t_t[1:3]
+    v_e_t_t = rv_e_t_t[4:6]
     # @show r_e_t_t norm(r_e_t_t)/au norm(v_e_t_t)
     # Transmitter barycentric position and velocity of at transmit time
     r_t_t_t = r_e_t_t + R_t
@@ -731,13 +714,11 @@ function delay(station_code::Int, t_r_utc::DateTime,
     # println("   *** DOWNLEG LOOP ***")
     for i in 1:niter
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-        _R_t, _V_t = observer_position(station_code, et_t_secs[0], pm=pm, lod=lod, eocorr=eocorr)
-        R_t = map((x,y)->Taylor1([x,y]), _R_t, _V_t)
-        V_t = map(x->Taylor1([x,zero(x)]), _V_t)
-        # Earth's barycentric position and velocity at the transmit time
-        rv_e_t_t = xve(et_t_secs[0])
-        r_e_t_t = map((x,y)->Taylor1([x,y]), rv_e_t_t[1:3], rv_e_t_t[4:6])
-        v_e_t_t = map(x->Taylor1([x,zero(x)]), rv_e_t_t[4:6])
+        R_t, V_t = observer_position(station_code, et_t_secs, pm=pm, lod=lod, eocorr=eocorr)
+        # Earth's barycentric position and velocity at transmit time
+        rv_e_t_t = xve(et_t_secs)
+        r_e_t_t = rv_e_t_t[1:3]
+        v_e_t_t = rv_e_t_t[4:6]
         # Barycentric position and velocity of the transmitter at the transmit time
         r_t_t_t = r_e_t_t + R_t
         v_t_t_t = v_e_t_t + V_t
@@ -747,14 +728,12 @@ function delay(station_code::Int, t_r_utc::DateTime,
         # @show ρ_t
         # compute up-leg Shapiro delay
         # Sun barycentric position and velocity (in au, au/day) at transmit time (TDB)
-        rv_s_t_t = xvs(et_t_secs[0])
-        r_s_t_t = map((x,y)->Taylor1([x,y]), rv_s_t_t[1:3], rv_s_t_t[4:6])
+        r_s_t_t = xvs(et_t_secs)[1:3]
         e_U_vec = r_t_t_t - r_s_t_t
         # @show e_U_vec
         e_U = sqrt(e_U_vec[1]^2 + e_U_vec[2]^2 + e_U_vec[3]^2) # heliocentric distance of Earth at t_t
         # @show e_U
-        rv_s_t_b = xvs(et_b_secs[0]) # barycentric position/velocity of Sun at bounce time
-        r_s_t_b = map((x,y)->Taylor1([x,y]), rv_s_t_b[1:3], rv_s_t_b[4:6])
+        r_s_t_b = xvs(et_b_secs)[1:3] # barycentric position/velocity of Sun at bounce time
         p_U_vec = r_a_t_b - r_s_t_b
         p_U = sqrt(p_U_vec[1]^2 + p_U_vec[2]^2 + p_U_vec[3]^2) # heliocentric distance of asteroid at t_b
         # @show p_U
@@ -777,11 +756,11 @@ function delay(station_code::Int, t_r_utc::DateTime,
     # compute TDB-UTC at transmit time
     # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth are of order 0.01μs
     # Δtt_tdb_station_t = - dot(v_e_t_t, r_t_t_t-r_e_t_t)/clightkms^2
-    tdb_utc_t = tdb_utc(et_t_secs[0]) # + Δtt_tdb_station_t
+    tdb_utc_t = tdb_utc(et_t_secs) # + Δtt_tdb_station_t
     # compute TDB-UTC at receive time
     # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth  are of order 0.01μs
     # Δtt_tdb_station_r = - dot(v_e_t_r, r_r_t_r-r_e_t_r)/clightkms^2
-    tdb_utc_r = tdb_utc(et_r_secs[0]) # + Δtt_tdb_station_r
+    tdb_utc_r = tdb_utc(et_r_secs) # + Δtt_tdb_station_r
     # @show tdb_utc_t tdb_utc_r
 
     # # compute total time delay (UTC seconds); relativistic delay is already included in τ_D, τ_U
