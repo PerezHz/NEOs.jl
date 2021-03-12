@@ -213,22 +213,37 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
     return nothing
 end
 
-function compute_radar_obs(outfilename::String, radarobsfile::String, apophis_interp, ss16asteph; tc::Real=1.0)
+function compute_radar_obs(outfilename::String, radarobsfile::String, apophis::TaylorInterpolant, ss16asteph::TaylorInterpolant; tc::Real=1.0)
     if radarobsfile != ""
         Nm1 = (size(ss16asteph.x)[2]-13) ÷ 6
         N = Nm1 + 1
+        # read radar astrometry file
         asteroid_data = process_radar_data_jpl(radarobsfile)
         # TODO: check that first and last observation times are within interpolation interval
-        function apophis_et(et)
-            return auday2kmsec(apophis_interp(et/daysec)[1:6])
-        end
-        function earth_et(et)
-            return auday2kmsec(ss16asteph(et)[union(3*4-2:3*4,3*(Nm1+4)-2:3*(Nm1+4))])
-        end
-        function sun_et(et)
-            return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(Nm1+1)-2:3*(Nm1+1))])
-        end
-        #compute time-delay and Doppler-shift "ephemeris" (i.e., predicted values according to ephemeris)
+
+        # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
+        # asteroid/small-body
+        asteph_ord = apophis.x[1].order
+        asteph_t0 = apophis.t0*daysec
+        asteph_t = apophis.t*daysec
+        asteph_r = au*map(x->x(Taylor1(asteph_ord)/daysec), apophis.x[:,1:3])
+        asteph_v = (au/daysec)*map(x->x(Taylor1(asteph_ord)/daysec), apophis.x[:,4:6])
+        asteph_x = hcat(asteph_r, asteph_v)
+        apophis_et = TaylorInterpolant(asteph_t0, asteph_t, asteph_x)
+        # Sun (su=1)
+        sseph_t0 = ss16asteph.t0
+        sseph_t = ss16asteph.t
+        sseph_x = ss16asteph.x
+        sun_r = au*sseph_x[:,nbodyind(Nm1,su)[1:3]]
+        sun_v = (au/daysec)*sseph_x[:,nbodyind(Nm1,su)[4:6]]
+        sun_x = hcat(sun_r, sun_v)
+        sun_et = TaylorInterpolant(sseph_t0, sseph_t, sun_x)
+        # Earth (ea=4)
+        earth_r = au*sseph_x[:,nbodyind(Nm1,ea)[1:3]]
+        earth_v = (au/daysec)*sseph_x[:,nbodyind(Nm1,ea)[4:6]]
+        earth_x = hcat(earth_r, earth_v)
+        earth_et = TaylorInterpolant(sseph_t0, sseph_t, earth_x)
+        #compute time-delay and Doppler-shift ephemeris (i.e., predictions)
         vdel, vdop = delay_doppler(asteroid_data, tc=tc, xve=earth_et, xvs=sun_et, xva=apophis_et)
         sol = (vdel=vdel, vdop=vdop)
         #save data to file
