@@ -47,15 +47,15 @@ const mpcobscodes = readmpcobs()
 # Functions get_eop_iau1980, get_eop_iau2000a were adapted from SatelliteToolbox.jl; MIT-licensed
 # these functions avoid the use of @eval
 # https://github.com/JuliaSpace/SatelliteToolbox.jl/blob/b95e7f54f85c26744c64270841c874631f5addf1/src/transformations/eop.jl#L87
-function get_eop_iau1980()
-    eop_iau1980_rf = RemoteFiles.@RemoteFile(EOP_IAU1980_RF, "https://datacenter.iers.org/data/latestVersion/223_EOP_C04_14.62-NOW.IAU1980223.txt", file="EOP_IAU1980.TXT", updates=:daily)
-    RemoteFiles.download(EOP_IAU1980_RF)
+function get_eop_iau1980(; force=false)
+    eop_iau1980_rf = RemoteFiles.@RemoteFile(EOP_IAU1980_RF, "https://datacenter.iers.org/data/latestVersion/223_EOP_C04_14.62-NOW.IAU1980223.txt", file="EOP_IAU1980.TXT", updates=:weekly)
+    RemoteFiles.download(EOP_IAU1980_RF, force=force)
     eop = readdlm(RemoteFiles.path(eop_iau1980_rf); skipblanks=true, skipstart=14)
     SatelliteToolbox.parse_iers_eop_iau_1980(eop)
 end
-function get_eop_iau2000a()
-    eop_iau2000a_rf = RemoteFiles.@RemoteFile(EOP_IAU2000A_RF, "https://datacenter.iers.org/data/latestVersion/224_EOP_C04_14.62-NOW.IAU2000A224.txt", file="EOP_IAU2000A.TXT", updates=:daily)
-    RemoteFiles.download(EOP_IAU2000A_RF)
+function get_eop_iau2000a(; force=false)
+    eop_iau2000a_rf = RemoteFiles.@RemoteFile(EOP_IAU2000A_RF, "https://datacenter.iers.org/data/latestVersion/224_EOP_C04_14.62-NOW.IAU2000A224.txt", file="EOP_IAU2000A.TXT", updates=:weekly)
+    RemoteFiles.download(EOP_IAU2000A_RF, force=force)
     eop = readdlm(RemoteFiles.path(eop_iau2000a_rf); skipblanks=true, skipstart=14)
     SatelliteToolbox.parse_iers_eop_iau_2000A(eop)
 end
@@ -64,8 +64,8 @@ eop_IAU1980 = get_eop_iau1980()
 eop_IAU2000A = get_eop_iau2000a()
 
 # et: ephemeris time (TDB seconds since J2000.0 epoch)
-function observer_position(station_code::Union{Int, String}, et::T;
-        pm::Bool=true, lod::Bool=true, eocorr::Bool=true) where {T<:Number}
+function observer_position(station_code::Union{Int, String}, et::T; eo::Bool=true,
+        eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T<:Number}
     # λ_deg: East longitude (deg)
     # u: distance from spin axis (km), taken from Yeomans et al. (1992) u = r*cos(ϕ)
     # v: height above equatorial plane (km), taken from Yeomans et al. (1992) v = r*sin(ϕ)
@@ -89,7 +89,7 @@ function observer_position(station_code::Union{Int, String}, et::T;
 
     pos_geo = [x_gc, y_gc, z_gc] #km
 
-    # mt2c, dmt2c, gast = t2c_rotation_iau_76_80(et, pm=pm, lod=lod, eocorr=eocorr)
+    # mt2c, dmt2c, gast = t2c_rotation_iau_76_80(et, eo=eo)
     # r_c = mt2c*pos_geo
     # v_c = dmt2c*pos_geo
 
@@ -97,8 +97,11 @@ function observer_position(station_code::Union{Int, String}, et::T;
     jd_utc = JD_J2000 + utc_secs/daysec
     sv_geo = SatelliteToolbox.satsv(jd_utc, pos_geo, zeros(3), zeros(3))
     # Transform state vector coordinates from geocentric, Earth-fixed frame to inertial (celestial) frame
-    sv_c = SatelliteToolbox.svECEFtoECI(sv_geo, Val(:ITRF), Val(:GCRF), jd_utc, eop_IAU1980)
-    # sv_c = SatelliteToolbox.svECEFtoECI(sv_geo, Val(:ITRF), Val(:GCRF), jd_utc, eop_IAU2000A)
+    if eo
+        sv_c = SatelliteToolbox.svECEFtoECI(sv_geo, Val(:ITRF), Val(:GCRF), jd_utc, eop)
+    else
+        sv_c = SatelliteToolbox.svECEFtoECI(sv_geo, Val(:ITRF), Val(:GCRF), jd_utc)
+    end
     r_c = convert(Vector{eltype(sv_c.r)}, sv_c.r)
     v_c = convert(Vector{eltype(sv_c.v)}, sv_c.v)
 
@@ -118,8 +121,8 @@ mas2rad(x) = arcsec2rad(x/1000) # mas/1000 -> arcsec; arcsec2rad(arcsec) -> rad
 # tt: days since J2000.0 (TT)
 # IAU 1980 nutation angles Δψ (nutation in longitude), Δϵ (nutation in obliquity), both in radians
 # dde80, ddp80: nutation corrections wrt IAU 1976/1980 (in radians)
-# eocorr: EarthOrientation.jl corrections
-function nupr7680mat(tt, Δϵ_1980, ΔΨ_1980, dde80, ddp80; eocorr::Bool=true)
+# eo: Earth orientation corrections from IERS
+function nupr7680mat(tt, Δϵ_1980, ΔΨ_1980, dde80, ddp80)
     # IAU 1976 precession matrix, J2000.0 to date
     rp = Rz(-PlanetaryEphemeris.zeta(tt))*Ry(PlanetaryEphemeris.Theta(tt))*Rz(-PlanetaryEphemeris.Zeta(tt))
     # Add nutation corrections
@@ -142,9 +145,9 @@ end
 
 # Polar motion matrix (TIRS->ITRS, IERS 1996)
 # tt: days since J2000.0
-function polarmotionmat(tt; pm::Bool=true)
+function polarmotionmat(tt; eo::Bool=true)
     # Polar motion (arcsec->radians)
-    if pm
+    if eo
         xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(JD_J2000+tt)
         xp = deg2rad(xp_arcsec/3600)
         yp = deg2rad(yp_arcsec/3600)
@@ -158,8 +161,7 @@ end
 # Terrestrial-to-celestial rotation matrix (including polar motion)
 # Using 1976/1980 Earth orientation/rotation model
 # et: ephemeris time (TDB seconds since J2000.0 epoch)
-function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
-        eocorr::Bool=true) where {T<:Number}
+function t2c_rotation_iau_76_80(et::T; eo::Bool=true) where {T<:Number}
     # UTC (JD)
     utc_secs = et - tdb_utc(et)
     t_utc = JD_J2000 + utc_secs/daysec
@@ -171,7 +173,7 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     #Nutation corrections wrt IAU 1976/1980
     # Output of `EarthOrientation.precession_nutation80` is in mas:
     # https://github.com/JuliaAstro/EarthOrientation.jl/blob/529f12425a6331b133f989443aeb3fbbafd8f324/src/EarthOrientation.jl#L413
-    if eocorr
+    if eo
         ddp80_mas, dde80_mas = EarthOrientation.precession_nutation80(t_utc_00)
     else
         ddp80_mas, dde80_mas = 0.0, 0.0
@@ -192,7 +194,7 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     # where the nutation in longitude includes corrections from IERS eop file
     ee = (ΔΨ_1980+ddp80)*cos(epsa) + arcsec2rad( 0.00264sin(Ω_M) + 0.000063sin(2Ω_M) )
     # ΔUT1 = UT1-UTC (seconds)
-    if eocorr
+    if eo
         dut1 = EarthOrientation.getΔUT1(t_utc_00)
         # dut1 = eop_IAU1980.UT1_UTC(t_utc)
     else
@@ -205,7 +207,7 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
     # Eq. (5-173) from Moyer (2003)
     gmst82 = J2000toGMST(ut1_days)
     gast = mod2pi( gmst82 + ee )
-    β_dot = lod ? omega(EarthOrientation.getlod(t_utc_00)) : ω
+    β_dot = eo ? omega(EarthOrientation.getlod(t_utc_00)) : ω
 
     # For more details, see ESAA 2014, p. 295, Sec. 7.4.3.3, Eqs. 7.137-7.140
     Rz_minus_GAST = [
@@ -220,13 +222,13 @@ function t2c_rotation_iau_76_80(et::T; pm::Bool=true, lod::Bool=true,
         ]
 
     # Polar motion matrix (TIRS->ITRS, IERS 1996)
-    W = polarmotionmat(constant_term(constant_term(tt)), pm=pm)
+    W = polarmotionmat(constant_term(constant_term(tt)), eo=eo)
     W_inv = convert(Matrix{Float64}, transpose(W))
     # _W_inv = SatelliteToolbox.rECEFtoECEF(DCM, ITRF(), PEF(), t_utc, eop_IAU1980)
     # W_inv = convert(Matrix{eltype(_W_inv)}, _W_inv)
 
     # IAU 76/80 nutation-precession matrix
-    C = nupr7680mat(et_days, Δϵ_1980, ΔΨ_1980, dde80, ddp80, eocorr=eocorr)
+    C = nupr7680mat(et_days, Δϵ_1980, ΔΨ_1980, dde80, ddp80)
     C_inv = transpose(C)
     # _C_inv = SatelliteToolbox.rECItoECI(DCM, TOD(), GCRF(), t_utc, eop_IAU1980)
     # C_inv = convert(Matrix{eltype(_C_inv)}, _C_inv)
