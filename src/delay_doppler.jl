@@ -206,7 +206,7 @@ end
 # UTC instant `t_r_utc` from tracking station with code `station_code`.
 # station_code: observing station identifier (MPC nomenclature)
 # t_r_utc: UTC time of echo reception (DateTime)
-# t_offset: time offset, to compute Doppler shifts by range differences (seconds)
+# t_offset: time offset wrt echo reception time, to compute Doppler shifts by range differences (seconds)
 # niter: number of light-time solution iterations
 # xve: Earth ephemeris wich takes TDB seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second
 # xvs: Sun ephemeris wich takes TDB seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second
@@ -350,7 +350,8 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
     return 1e6τ # total signal delay (μs)
 end
 
-# compute delay and doppler via autodiff ν = -F_tx*dτ/dt
+# Compute Taylor series expansion of time-delay observable around echo reception
+# time. This allows to compute dopplers via autodiff using ν = -F_tx*dτ/dt
 # NOTE: Works only with TaylorInterpolant ephemeris
 function delay(station_code::Int, t_r_utc::DateTime,
         niter::Int=10; eo::Bool=true, xve::TaylorInterpolant=earth_pv,
@@ -529,18 +530,11 @@ function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
     end
 end
 
-function delay_doppler(astradarfile::String, niter::Int=10; eo::Bool=true,
-        tc::Real=1.0, xve=earth_pv, xvs=sun_pv, xva=apophis_pv_197, tord::Int=10)
+function delay_doppler(astradarfile::String,
+        niter::Int=10; eo::Bool=true, tc::Real=1.0, xve=earth_pv, xvs=sun_pv,
+        xva=apophis_pv_197, autodiff::Bool=true, tord::Int=10)
 
     astradardata = process_radar_data_jpl(astradarfile)
-
-    vdel, vdop = delay_doppler(astradardata, niter, eo=eo, tc=tc, xve=xve, xvs=xvs, xva=xva, tord=tord)
-    return vdel, vdop
-end
-
-function delay_doppler(astradardata::Vector{RadarDataJPL{T}},
-        niter::Int=10; eo::Bool=true, tc::Real=1.0, xve=earth_pv, xvs=sun_pv,
-        xva=apophis_pv_197, autodiff::Bool=true, tord::Int=10) where {T<:Number}
 
     et1 = str2et(string(astradardata[1].utcepoch))
     a1_et1 = xva(et1)[1]
@@ -565,10 +559,30 @@ function delay_doppler(astradardata::Vector{RadarDataJPL{T}},
         )
     end
 
-    delay_index = findall(x->x.delay_units=="us", astradardata)
-    doppler_index = findall(x->x.doppler_units=="Hz", astradardata)
+    delay_index = map(x->x.delay_units=="us", astradardata)
+    doppler_index = map(x->x.doppler_units=="Hz", astradardata)
 
-    return vdelay[delay_index], vdoppler[doppler_index]
+    radobs_t = table(
+        (
+            dt_utc_obs=utcepoch.(astradardata),
+            τ_obs=delay.(astradardata),
+            ν_obs=doppler.(astradardata),
+            τ_comp=vdelay,
+            ν_comp=vdoppler,
+            σ_τ=delay_sigma.(astradardata),
+            σ_ν=doppler_sigma.(astradardata),
+            τ_units=delay_units.(astradardata),
+            ν_units=doppler_units.(astradardata),
+            freq=freq.(astradardata),
+            rcvr=rcvr.(astradardata),
+            xmit=xmit.(astradardata),
+            bouncepoint=bouncepoint.(astradardata),
+            delay_index=delay_index,
+            doppler_index=doppler_index
+        )
+    )
+
+    return radobs_t
 end
 
 # Compute round-trip time and Doppler shift radar astrometry for an asteroid at
