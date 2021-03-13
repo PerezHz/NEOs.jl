@@ -151,6 +151,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
     α_corr = Array{Float64}(undef, n_optical_obs)
     δ_corr = Array{Float64}(undef, n_optical_obs)
     datetime_obs = Array{DateTime}(undef, n_optical_obs)
+    w8s = Array{Float64}(undef, n_optical_obs)
 
     # Select debiasing table: 2014 corresponds to Farnocchia et al. (2015), 2018 corresponds to Eggl et al. (2020)
     # debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
@@ -201,6 +202,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
         α_comp_as, δ_comp_as = radec(station_code_i, datetime_obs[i], niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
         α_comp[i] = α_comp_as*cos(δ_i_rad) # multiply by metric factor cos(DEC)
         δ_comp[i] = δ_comp_as # arcsec
+        w8s[i] = w8sveres17(station_code_i, datetime_obs[i], obs_t[i].catalog)
         if obs_t[i].catalog ∉ mpc_catalog_codes_201X
             # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
             if haskey(mpc_catalog_codes, obs_t[i].catalog)
@@ -244,103 +246,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
         end
     end
 
-    return insertcolsafter(obs_t, length(columns(obs_t)), :dt_utc_obs => datetime_obs, :α_obs => α_obs, :δ_obs => δ_obs, :α_comp => α_comp, :δ_comp => δ_comp, :α_corr => α_corr, :δ_corr => δ_corr)
-end
-
-# Compute ra/dec astrometry debiasing corrections for MPC-formatted data in
-# `mpcobsfile`. Star catalog info is extracted from column 72 of each
-# observation row. Current debiasing table options are:
-# "2014" => Farnocchia et al. (2015)
-# "2018" => Eggl et al. (2020)
-# "hires2018" => Eggl et al. (2020), high-resolution (NSIDE=256)
-# default `table` value is "2018".
-function radec_mpc_corr(mpcobsfile::String, debias_table::String="2018")
-
-    obs_t = readmp(mpcobsfile)
-    n_optical_obs = length(obs_t)
-
-    α_corr_v = Array{Float64}(undef, n_optical_obs)
-    δ_corr_v = Array{Float64}(undef, n_optical_obs)
-
-    # Select debiasing table: 2014 corresponds to Farnocchia et al. (2015), 2018 corresponds to Eggl et al. (2020)
-    # debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
-    if debias_table == "2018"
-        debias_path = artifact"debias_2018"
-        mpc_catalog_codes_201X = mpc_catalog_codes_2018
-        NSIDE= 64 #The healpix tesselation resolution of the bias map from Eggl et al. (2020)
-        truth = "V" # In 2018 debias table Gaia DR2 catalog is regarded as the truth
-    elseif debias_table == "hires2018"
-        debias_path = artifact"debias_hires2018"
-        mpc_catalog_codes_201X = mpc_catalog_codes_2018
-        NSIDE= 256 #The healpix tesselation resolution of the high-resolution bias map from Eggl et al. (2020)
-        truth = "V" # In 2018 debias table Gaia DR2 catalog is regarded as the truth
-    elseif debias_table == "2014"
-        debias_path = artifact"debias_2014"
-        mpc_catalog_codes_201X = mpc_catalog_codes_2014
-        NSIDE= 64 #The healpix tesselation resolution of the bias map from Farnocchia et al. (2015)
-        truth = "t" # In 2014 debias table PPMXL catalog is regarded as the truth
-    else
-        @error "Unknown bias map: $(debias_table). Possible values are `2014`, `2018` and `hires2018`."
-    end
-    bias_file = joinpath(debias_path, "bias.dat")
-
-    bias_matrix = readdlm(bias_file, comment_char='!', comments=true)
-    resol = Resolution(NSIDE) # initialize healpix Resolution variable
-    @assert size(bias_matrix) == (resol.numOfPixels, 4length(mpc_catalog_codes_201X)) "Bias table file $bias_file dimensions do not match expected parameter NSIDE=$NSIDE and/or number of catalogs in table."
-
-    for i in 1:n_optical_obs
-        if obs_t[i].catalog ∉ mpc_catalog_codes_201X
-            # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
-            if haskey(mpc_catalog_codes, obs_t[i].catalog)
-                if obs_t[i].catalog != truth
-                    catalog_not_found = mpc_catalog_codes[obs_t[i].catalog]
-                    @warn "Catalog not found in $(debias_table) table: $(catalog_not_found). Setting debiasing corrections equal to zero."
-                end
-            elseif obs_t[i].catalog == " "
-                @warn "Catalog information not available in observation record. Setting debiasing corrections equal to zero."
-            else
-                @warn "Catalog code $(obs_t[i].catalog) does not correspond to MPC catalog code. Setting debiasing corrections equal to zero."
-            end
-            α_corr_v[i] = 0.0
-            δ_corr_v[i] = 0.0
-            continue
-        else
-            # Otherwise, if star catalog is present in debias table, compute corrections
-            α_i_deg = 15(obs_t[i].rah + obs_t[i].ram/60 + obs_t[i].ras/3600) # deg
-            # the following if block handles the sign of declination, including edge cases in declination such as -00 01
-            if obs_t[i].signdec == "+"
-                δ_i_deg = +(obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
-            elseif obs_t[i].signdec == "-"
-                δ_i_deg = -(obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
-            else
-                @warn "Could not parse declination sign: $(obs_t[i].signdec). Setting positive sign."
-                δ_i_deg =  (obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
-            end
-            α_i_rad = deg2rad(α_i_deg) #rad
-            δ_i_rad = deg2rad(δ_i_deg) #rad
-            # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
-            # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
-            # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
-            # since we use pix_ind to get the corresponding row number in bias.dat, it's not necessary to substract 1
-            pix_ind = ang2pixRing(resol, π/2-δ_i_rad, α_i_rad)
-            cat_ind = findfirst(x->x==obs_t[i].catalog, mpc_catalog_codes_201X)
-            # @show pix_ind, cat_ind
-            # read dRA, pmRA, dDEC, pmDEC data from bias.dat
-            # dRA, position correction in RA*cos(DEC) at epoch J2000.0 [arcsec];
-            # dDEC, position correction in DEC at epoch J2000.0 [arcsec];
-            # pmRA, proper motion correction in RA*cos(DEC) [mas/yr];
-            # pmDEC, proper motion correction in DEC [mas/yr].
-            dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
-            # @show dRA, dDEC, pmRA, pmDEC
-            utc_i = DateTime(obs_t[i].yr, obs_t[i].month, obs_t[i].day) + Microsecond( round(1e6*86400*obs_t[i].utc) )
-            et_secs_i = str2et(string(utc_i))
-            tt_secs_i = et_secs_i - ttmtdb(et_secs_i)
-            yrs_J2000_tt = tt_secs_i/(daysec*yr)
-            α_corr_v[i] = ( dRA + yrs_J2000_tt*pmRA/1000 ) / cos(δ_i_rad) # total debiasing correction in right ascension (arcsec)
-            δ_corr_v[i] = dDEC + yrs_J2000_tt*pmDEC/1000 # total debiasing correction in declination (arcsec)
-        end
-    end
-    return α_corr_v, δ_corr_v # arcsec, arcsec
+    return insertcolsafter(obs_t, length(columns(obs_t)), :dt_utc_obs => datetime_obs, :α_obs => α_obs, :δ_obs => δ_obs, :α_comp => α_comp, :δ_comp => δ_comp, :α_corr => α_corr, :δ_corr => δ_corr, :σ => w8s)
 end
 
 # MPC minor planet optical observations fixed-width format
@@ -440,63 +346,66 @@ mpc_catalog_codes = Dict(
     "W" =>   "UCAC-5"
 )
 
-# Statistical weights from Veres et al, (2017)
+# Statistical weights from Veres et al. (2017)
 function w8sveres17(row::NamedTuple)
-    w = one(row.α_obs) # unit weight (arcseconds)
+    return w8sveres17(row.obscode, row.dt_utc_obs, row.catalog)
+end
+function w8sveres17(obscode::Union{Int,String}, dt_utc_obs::DateTime, catalog::String)
+    w = 1.0 # unit weight (arcseconds)
     # Table 2: epoch-dependent astrometric residuals
-    if row.obscode == "703"
-        return Date(row.dt_utc_obs) < Date(2014,1,1) ? w : 0.8w
-    elseif row.obscode == "691"
-        return Date(row.dt_utc_obs) < Date(2003,1,1) ? 0.6w : 0.5w
-    elseif row.obscode == "644"
-        return Date(row.dt_utc_obs) < Date(2003,9,1) ? 0.6w : 0.4w
+    if obscode == "703"
+        return Date(dt_utc_obs) < Date(2014,1,1) ? w : 0.8w
+    elseif obscode == "691"
+        return Date(dt_utc_obs) < Date(2003,1,1) ? 0.6w : 0.5w
+    elseif obscode == "644"
+        return Date(dt_utc_obs) < Date(2003,9,1) ? 0.6w : 0.4w
     # Table 3: most active CCD asteroid observers
-    elseif row.obscode ∈ ("704", "C51", "J75")
+    elseif obscode ∈ ("704", "C51", "J75")
         return w
-    elseif row.obscode == "G96"
+    elseif obscode == "G96"
         return 0.5w
-    elseif row.obscode == "F51"
+    elseif obscode == "F51"
         return 0.2w
-    elseif row.obscode ∈ ("G45", "608")
+    elseif obscode ∈ ("G45", "608")
         return 0.6w
-    elseif row.obscode == "699"
+    elseif obscode == "699"
         return 0.8w
-    elseif row.obscode ∈ ("D29", "E12")
+    elseif obscode ∈ ("D29", "E12")
         return 0.75w
     # Table 4:
-    elseif row.obscode ∈ ("645", "673", "H01")
+    elseif obscode ∈ ("645", "673", "H01")
         return 0.3w
-    elseif row.obscode ∈ ("J04", "K92", "K93", "Q63", "Q64", "V37", "W85", "W86", "W87", "K91", "E10", "F65") #Tenerife + Las Cumbres
+    elseif obscode ∈ ("J04", "K92", "K93", "Q63", "Q64", "V37", "W85", "W86", "W87", "K91", "E10", "F65") #Tenerife + Las Cumbres
         return 0.4w
-    elseif row.obscode ∈ ("689", "950", "W84")
+    elseif obscode ∈ ("689", "950", "W84")
         return 0.5w
-    #elseif row.obscode ∈ ("G83", "309") # Applies only to program code assigned to M. Micheli
-    #    if row.catalog ∈ ("q", "t") # "q"=>"UCAC-4", "t"=>"PPMXL"
+    #elseif obscode ∈ ("G83", "309") # Applies only to program code assigned to M. Micheli
+    #    if catalog ∈ ("q", "t") # "q"=>"UCAC-4", "t"=>"PPMXL"
     #        return 0.3w
-    #    elseif row.catalog ∈ ("U", "V") # Gaia-DR1, Gaia-DR2
+    #    elseif catalog ∈ ("U", "V") # Gaia-DR1, Gaia-DR2
     #        return 0.2w
     #    end
-    elseif row.obscode ∈ ("Y28",)
-        if row.catalog ∈ ("t", "U", "V")
+    elseif obscode ∈ ("Y28",)
+        if catalog ∈ ("t", "U", "V")
             return 0.3w
         else
             return w
         end
-    elseif row.obscode ∈ ("568",)
-        if row.catalog ∈ ("o", "s") # "o"=>"USNO-B1.0", "s"=>"USNO-B2.0"
+    elseif obscode ∈ ("568",)
+        if catalog ∈ ("o", "s") # "o"=>"USNO-B1.0", "s"=>"USNO-B2.0"
             return 0.5w
-        elseif row.catalog ∈ ("U", "V") # Gaia DR1, DR2
+        elseif catalog ∈ ("U", "V") # Gaia DR1, DR2
             return 0.1w
-        elseif row.catalog ∈ ("t",) #"t"=>"PPMXL"
+        elseif catalog ∈ ("t",) #"t"=>"PPMXL"
             return 0.2w
         else
             return w
         end
-    elseif row.obscode ∈ ("T09", "T12", "T14") && row.catalog ∈ ("U", "V") # Gaia DR1, DR2
+    elseif obscode ∈ ("T09", "T12", "T14") && catalog ∈ ("U", "V") # Gaia DR1, DR2
         return 0.1w
-    elseif row.catalog == " "
+    elseif catalog == " "
         return 1.5w
-    elseif row.catalog != " "
+    elseif catalog != " "
         return w
     else
         return w
