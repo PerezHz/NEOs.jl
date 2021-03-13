@@ -4,20 +4,18 @@
 # station_code: observing station identifier (MPC nomenclature)
 # t_r_utc: UTC time of astrometric observation (DateTime)
 # niter: number of light-time solution iterations
-# pm: compute polar motion corrections
-# lod: compute corrections due to variations in length of day
-# eocorr: compute corrections due to Earth orientation parameters
+# eo: compute corrections due to Earth orientation, LOD, polar motion
 # debias: compute debiasing according to Eggl et al. (2019)
 # catalog: Stellar catalog used in astrometric reduction, MPC nomenclature ("a", "b", "c", etc...)
 # xve: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second
 # xvs: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second
 # xva: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second
 function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
-        niter::Int=10; pm::Bool=true, lod::Bool=true, eocorr::Bool=true,
-        xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+        niter::Int=10; eo::Bool=true, xve::Function=earth_pv,
+        xvs::Function=sun_pv, xva::Function=apophis_pv_197)
     et_r_secs = str2et(string(t_r_utc))
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, V_r = observer_position(station_code, et_r_secs, pm=pm, lod=lod, eocorr=eocorr)
+    R_r, V_r = observer_position(station_code, et_r_secs, eo=eo)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]
@@ -97,32 +95,12 @@ function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
     g2 = 1 + dot(q_vec, e_vec)
     # @show g1, g2
     u1_vec = U_norm*(  u_vec + (g1/g2)*( dot(u_vec,q_vec)*e_vec - dot(e_vec,u_vec)*q_vec )  ) # ESAA 2014, Eq. (7.116)
-
-    # Compute aberration of light, ESAA 2014 Section 7.4.1.5
     u1_norm = sqrt(u1_vec[1]^2 + u1_vec[2]^2 + u1_vec[3]^2)
-    # @show norm(u1_vec/U_norm), PlanetaryEphemeris.μ[su]/(c_au_per_day^2) # u1_vec/U_norm is a unit vector to order PlanetaryEphemeris.μ[su]/(c_au_per_day^2)
-    u_vec_new = u1_vec/u1_norm
-    V_vec = v_r_t_r/clightkms
-    V_norm = sqrt(V_vec[1]^2 + V_vec[2]^2 + V_vec[3]^2)
-    β_m1 = sqrt(1-V_norm^2) # β^-1
-    # @show norm(v_r_t_r), V_norm, β_m1
-    # @show β_m1
-    f1 = dot(u_vec_new, V_vec)
-    f2 = 1 + f1/(1+β_m1)
-    # u2_vec = ρ_vec_r; u2_norm = ρ_r # uncorrected radial unit vector
-    # u2_vec = u1_vec; u2_norm = sqrt(u2_vec[1]^2 + u2_vec[2]^2 + u2_vec[3]^2) # radial unit vector with grav deflection corr.
-    # u2_vec = ( β_m1*u1_vec + f2*u1_norm*V_vec )/( 1+f1 ) # ESAA 2014, Eq. (7.118)
-    # u2_norm = sqrt(u2_vec[1]^2 + u2_vec[2]^2 + u2_vec[3]^2)
-    # u2_vec = u1_vec #/U_norm + V_vec # ESAA 2014, Eq. (7.118)
-    # u2_vec = u1_vec + u1_norm*V_vec # ESAA 2014, Eq. (7.119)
-    u2_vec = u1_vec
-    # u2_vec = u_vec
-    u2_norm = sqrt(u2_vec[1]^2 + u2_vec[2]^2 + u2_vec[3]^2)
 
     # Compute right ascension, declination angles
-    α_rad_ = mod2pi(atan(u2_vec[2], u2_vec[1]))
+    α_rad_ = mod2pi(atan(u1_vec[2], u1_vec[1]))
     α_rad = mod2pi(α_rad_) # right ascension (rad)
-    δ_rad = asin(u2_vec[3]/u2_norm) # declination (rad)
+    δ_rad = asin(u1_vec[3]/u1_norm) # declination (rad)
 
     δ_as = rad2arcsec(δ_rad) # rad -> arcsec + debiasing
     α_as = rad2arcsec(α_rad) # rad -> arcsec + debiasing
@@ -131,9 +109,8 @@ function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
 end
 
 # Compute optical astrometric ra/dec ephemeris for a set of observations in a MPC-formatted file
-function radec_mpc(astopticalobsfile, niter::Int=10; pm::Bool=true, lod::Bool=true,
-        eocorr::Bool=true, xve::Function=earth_pv,
-        xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+function radec_mpc(astopticalobsfile, niter::Int=10; eo::Bool=true,
+        xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
 
     obs_t = readmp(astopticalobsfile)
     n_optical_obs = length(obs_t)
@@ -149,17 +126,15 @@ function radec_mpc(astopticalobsfile, niter::Int=10; pm::Bool=true, lod::Bool=tr
     for i in 1:n_optical_obs
         utc_i = DateTime(obs_t[i].yr, obs_t[i].month, obs_t[i].day) + Microsecond( round(1e6*86400*obs_t[i].utc) )
         station_code_i = string(obs_t[i].obscode)
-        vra[i], vdec[i] = radec(station_code_i, utc_i, niter, pm=pm, lod=lod,
-            eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+        vra[i], vdec[i] = radec(station_code_i, utc_i, niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
     end
 
     return vra, vdec # arcsec, arcsec
 end
 
-function radec_table(mpcobsfile::String, niter::Int=10; pm::Bool=true,
-        lod::Bool=true, eocorr::Bool=true, debias_table::String="2018",
-        xve::Function=earth_pv, xvs::Function=sun_pv,
-        xva::Function=apophis_pv_197)
+function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
+        debias_table::String="2018", xve::Function=earth_pv,
+        xvs::Function=sun_pv, xva::Function=apophis_pv_197)
 
     obs_t = readmp(mpcobsfile)
     n_optical_obs = length(obs_t)
@@ -223,8 +198,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; pm::Bool=true,
         datetime_obs[i] = DateTime(obs_t[i].yr, obs_t[i].month, obs_t[i].day) + Microsecond( round(1e6*86400*obs_t[i].utc) )
         # utc_i = datetime_obs[i]
         station_code_i = string(obs_t[i].obscode)
-        α_comp_as, δ_comp_as = radec(station_code_i, datetime_obs[i], niter, pm=pm, lod=lod,
-            eocorr=eocorr, xve=xve, xvs=xvs, xva=xva)
+        α_comp_as, δ_comp_as = radec(station_code_i, datetime_obs[i], niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
         α_comp[i] = α_comp_as*cos(δ_i_rad) # multiply by metric factor cos(DEC)
         δ_comp[i] = δ_comp_as # arcsec
         if obs_t[i].catalog ∉ mpc_catalog_codes_201X
@@ -489,10 +463,6 @@ function w8sveres17(row::NamedTuple)
         return 0.8w
     elseif row.obscode ∈ ("D29", "E12")
         return 0.75w
-    elseif row.catalog == " "
-        return 1.5w
-    elseif row.catalog != " "
-        return w
     # Table 4:
     elseif row.obscode ∈ ("645", "673", "H01")
         return 0.3w
@@ -506,19 +476,29 @@ function w8sveres17(row::NamedTuple)
     #    elseif row.catalog ∈ ("U", "V") # Gaia-DR1, Gaia-DR2
     #        return 0.2w
     #    end
-    elseif row.obscode ∈ ("Y28")
+    elseif row.obscode ∈ ("Y28",)
         if row.catalog ∈ ("t", "U", "V")
             return 0.3w
+        else
+            return w
         end
-    elseif row.obscode ∈ ("568")
+    elseif row.obscode ∈ ("568",)
         if row.catalog ∈ ("o", "s") # "o"=>"USNO-B1.0", "s"=>"USNO-B2.0"
             return 0.5w
         elseif row.catalog ∈ ("U", "V") # Gaia DR1, DR2
             return 0.1w
-        elseif row.catalog ∈ ("t") #"t"=>"PPMXL"
+        elseif row.catalog ∈ ("t",) #"t"=>"PPMXL"
             return 0.2w
+        else
+            return w
         end
     elseif row.obscode ∈ ("T09", "T12", "T14") && row.catalog ∈ ("U", "V") # Gaia DR1, DR2
         return 0.1w
+    elseif row.catalog == " "
+        return 1.5w
+    elseif row.catalog != " "
+        return w
+    else
+        return w
     end
 end
