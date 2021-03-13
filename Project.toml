@@ -1,6 +1,6 @@
 name = "Apophis"
 uuid = "b41c07a2-2abb-11e9-070a-c3c1b239e7df"
-authors = ["Jorge Pérez <PerezHz@users.noreply.github.com>", "Luis Benet <lbenet@users.noreply.github.com>"]
+authors = ["Jorge A. Pérez Hernández", "Luis Benet"]
 version = "0.1.0"
 
 [deps]
