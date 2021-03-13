@@ -31,9 +31,9 @@ using Healpix
 using Pkg.Artifacts #: @artifact_str
 using JuliaDB #: table, select, filter, columns, insertcolsafter, save
 import SatelliteToolbox
-using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_iers_eop,
+using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI,
     get_ΔAT, JD_J2000, EOPData_IAU1980, parse_iers_eop_iau_1980, rECItoECI, DCM,
-    TOD, GCRF, ITRF, rECItoECI, PEF, SatelliteStateVector, satsv
+    TOD, GCRF, ITRF, rECItoECI, PEF, satsv, EOPData_IAU2000A
 import RemoteFiles
 using StaticArrays: SArray, @SVector
 using InteractiveUtils
