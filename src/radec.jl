@@ -246,7 +246,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
         end
     end
 
-    return insertcolsafter(obs_t, length(columns(obs_t)), :dt_utc_obs => datetime_obs, :α_obs => α_obs, :δ_obs => δ_obs, :α_comp => α_comp, :δ_comp => δ_comp, :α_corr => α_corr, :δ_corr => δ_corr, :σ => w8s)
+    return transform(obs_t, :dt_utc_obs => datetime_obs, :α_obs => α_obs, :δ_obs => δ_obs, :α_comp => α_comp, :δ_comp => δ_comp, :α_corr => α_corr, :δ_corr => δ_corr, :σ => w8s)
 end
 
 # MPC minor planet optical observations fixed-width format
