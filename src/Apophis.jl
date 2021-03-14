@@ -29,7 +29,7 @@ using Dates
 using Quadmath
 using Healpix
 using Pkg.Artifacts #: @artifact_str
-using JuliaDB #: table, select, filter, columns, insertcolsafter, save
+using JuliaDB
 import SatelliteToolbox
 using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI,
     get_ΔAT, JD_J2000, EOPData_IAU1980, parse_iers_eop_iau_1980, rECItoECI, DCM,
