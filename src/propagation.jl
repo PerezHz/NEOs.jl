@@ -102,7 +102,8 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
         dense::Bool=false, q0::Vector=initialcond(), radarobsfile::String="",
         opticalobsfile::String="", quadmath::Bool=false,
         debias_table::String="2018", μ_ast::Vector=μ_ast343_DE430[1:end],
-        lyap::Bool=false, order::Int=order, abstol::T=abstol) where {T<:Real}
+        lyap::Bool=false, order::Int=order, abstol::T=abstol, tord::Int=10,
+        niter::Int=5) where {T<:Real}
     # get asteroid initial conditions
     @assert length(q0) == 7
     @show q0
@@ -151,18 +152,18 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
     if dense
         @time interp = apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, dense=dense)
         if quadmath
-            apophis_t0 = Float64(jd0-JD_J2000) # days since J2000 until initial integration time
-            apophis_t = Float64.(interp.t[:])
-            apophis_x = convert(Array{Taylor1{eltype(q0)}}, interp.x[:,:])
-            apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
-            sol = (apophis=apophis,
+            asteph_t0 = Float64(jd0-JD_J2000) # days since J2000 until initial integration time
+            asteph_t = Float64.(interp.t[:])
+            asteph_x = convert(Array{Taylor1{eltype(q0)}}, interp.x[:,:])
+            asteph = TaylorInterpolant(asteph_t0, asteph_t, asteph_x)
+            sol = (asteph=asteph,
             )
         else
-            apophis_t0 = (jd0-JD_J2000) # days since J2000 until initial integration time
-            apophis_t = interp.t[:]
-            apophis_x = interp.x[:,:]
-            apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
-            sol = (apophis=apophis,
+            asteph_t0 = (jd0-JD_J2000) # days since J2000 until initial integration time
+            asteph_t = interp.t[:]
+            asteph_x = interp.x[:,:]
+            asteph = TaylorInterpolant(asteph_t0, asteph_t, asteph_x)
+            sol = (asteph=asteph,
             )
         end
     elseif lyap
@@ -174,14 +175,14 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
         )
     else
         @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, _params; maxsteps=maxsteps, newtoniter=newtoniter, dense=true)
-        apophis_t0 = (_params[4]-JD_J2000) # days since J2000 until initial integration time
-        apophis_t = sol_objs[1].t[:]
-        apophis_x = sol_objs[1].x[:,:]
-        apophis = TaylorInterpolant(apophis_t0, apophis_t, apophis_x)
+        asteph_t0 = (_params[4]-JD_J2000) # days since J2000 until initial integration time
+        asteph_t = sol_objs[1].t[:]
+        asteph_x = sol_objs[1].x[:,:]
+        asteph = TaylorInterpolant(asteph_t0, asteph_t, asteph_x)
         sol = (
-            apophis=apophis,
-            tv = apophis_t0 .+ apophis_t,
-            xv = apophis_x(),
+            asteph=asteph,
+            tv = asteph_t0 .+ asteph_t,
+            xv = asteph_x(),
             tvS1=convert(Array{eltype(q0)}, sol_objs[2][:]),
             xvS1=convert(Array{eltype(q0)}, sol_objs[3][:,:]),
             gvS1=convert(Array{eltype(q0)}, sol_objs[4][:])
@@ -199,11 +200,11 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
             )
             if radarobsfile != ""
                 println("compute_radar_obs")
-                @time compute_radar_obs("deldop_"*basename(radarobsfile)*".jld", radarobsfile, apophis, ss16asteph_et)
+                @time compute_radar_obs("deldop_"*basename(radarobsfile)*".jdb", radarobsfile, asteph, ss16asteph_et, tord=tord, niter=niter)
             end
             if opticalobsfile != ""
                 println("compute_optical_obs")
-                @time compute_optical_obs("radec_"*basename(opticalobsfile)*".jdb", opticalobsfile, apophis, ss16asteph_et, debias_table=debias_table)
+                @time compute_optical_obs("radec_"*basename(opticalobsfile)*".jdb", opticalobsfile, asteph, ss16asteph_et, debias_table=debias_table)
             end
         catch e
             @error "Unable to compute observation residuals" exception=(e, catch_backtrace())
@@ -215,7 +216,7 @@ end
 
 function compute_radar_obs(outfilename::String, radarobsfile::String,
         asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant; tc::Real=1.0,
-        autodiff::Bool=true, tord::Int=asteph.x[1].order)
+        autodiff::Bool=true, tord::Int=10, niter::Int=5)
     @assert isfile(radarobsfile) "Cannot open file: $radarobsfile"
     Nm1 = (size(ss16asteph.x)[2]-13) ÷ 6
     N = Nm1 + 1
@@ -245,7 +246,7 @@ function compute_radar_obs(outfilename::String, radarobsfile::String,
     earth_x = hcat(earth_r, earth_v)
     earth_et = TaylorInterpolant(sseph_t0, sseph_t, earth_x)
     # construct JuliaDB delay/doppler table from JPL radar obs file, including delay/doppler ephemeris (i.e., predicted values)
-    deldop_table_jdb = delay_doppler(radarobsfile, xve=earth_et, xvs=sun_et, xva=asteph_et, tc=tc, tord=tord, autodiff=autodiff)
+    deldop_table_jdb = delay_doppler(radarobsfile, niter, xve=earth_et, xvs=sun_et, xva=asteph_et, tc=tc, tord=tord, autodiff=autodiff)
     #save data to file
     println("Saving data to file: $outfilename")
     JuliaDB.save(deldop_table_jdb, outfilename)
@@ -253,7 +254,7 @@ function compute_radar_obs(outfilename::String, radarobsfile::String,
 end
 
 function compute_optical_obs(outfilename::String, opticalobsfile::String,
-        asteph, ss16asteph; debias_table::String="2018")
+        asteph, ss16asteph; debias_table::String="2018", niter::Int=5)
     @assert isfile(opticalobsfile) "Cannot open file: $opticalobsfile"
     Nm1 = (size(ss16asteph.x)[2]-13) ÷ 6
     N = Nm1 + 1
@@ -268,7 +269,7 @@ function compute_optical_obs(outfilename::String, opticalobsfile::String,
         return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
     end
     # construct JuliaDB ra/dec table from MPC optical obs file, including ra/dec ephemeris (i.e., predicted values)
-    radec_table_jdb = radec_table(opticalobsfile, xve=earth_et, xvs=sun_et, xva=asteph_et, debias_table=debias_table)
+    radec_table_jdb = radec_table(opticalobsfile, niter, xve=earth_et, xvs=sun_et, xva=asteph_et, debias_table=debias_table)
     #save data to file
     println("Saving data to file: $outfilename")
     JuliaDB.save(radec_table_jdb, outfilename)
