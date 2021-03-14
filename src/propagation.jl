@@ -204,7 +204,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
             end
             if opticalobsfile != ""
                 println("compute_optical_obs")
-                @time compute_optical_obs("radec_"*basename(opticalobsfile)*".jdb", opticalobsfile, asteph, ss16asteph_et, debias_table=debias_table)
+                @time compute_optical_obs("radec_"*basename(opticalobsfile)*".jdb", opticalobsfile, asteph, ss16asteph_et, debias_table=debias_table, niter=niter)
             end
         catch e
             @error "Unable to compute observation residuals" exception=(e, catch_backtrace())
