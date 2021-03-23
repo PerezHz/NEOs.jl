@@ -1,8 +1,10 @@
 #numerator of Apophis radial velocity wrt Earth
 function rvelea(dx, x, params, t)
-    ss16asteph_t = evaleph(params[1], t, x[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
+    jd0 = params[4] # Julian date of start time
+    dsj2k = t+(jd0-JD_J2000) # days since J2000.0 = 2.451545e6
+    ss16asteph_t = evaleph(params[1], dsj2k, x[1]) # params[2](t)*one(q[1]) #ss16asteph(t)
     N = params[6]
-    xe = ss16asteph_t[union(3ea-2:3ea,3(N-1+ea)-2:3(N-1+ea))]
+    xe = ss16asteph_t[nbodyind(N-1,ea)]
     return true, (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
 end
 
@@ -98,7 +100,14 @@ function scaling(a::Taylor1{Taylor1{T}}, c::T) where {T<:Real}
 end
 
 function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
-        tspan::T, ephfile::String; output::Bool=true, newtoniter::Int=10,
+        tspan::T, ephfile::String; kwargs...) where {T<:Real}
+    # load ephemeris
+    ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
+    propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et; kwargs...)
+end
+
+function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
+        tspan::T, ss16asteph_et::TaylorInterpolant; output::Bool=true, newtoniter::Int=10,
         dense::Bool=false, q0::Vector=initialcond(), radarobsfile::String="",
         opticalobsfile::String="", quadmath::Bool=false,
         debias_table::String="2018", μ_ast::Vector=μ_ast343_DE430[1:end],
@@ -108,8 +117,6 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
     @assert length(q0) == 7
     @show q0
     @show jd0, jd0-JD_J2000
-    # load ephemeris
-    ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
     # Number of bodies
     Nm1 = (size(ss16asteph_et.x)[2]-13) ÷ 6 # number of massive bodies
     @show Nm1
@@ -211,7 +218,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
         end
     end
 
-    return nothing
+    return sol
 end
 
 function compute_radar_obs(outfilename::String, radarobsfile::String,
