@@ -1371,6 +1371,7 @@ F65 203.7424 0.93624 +0.35154 Haleakala-Faulkes Telescope North
 F84 210.3842 0.95330 -0.30100 Hibiscus Observatory, Punaauia
 F85 210.3842 0.95330 -0.30100 Tiki Observatory, Punaauia
 F86 210.383810.953304-0.301004Moana Observatory, Punaauia
+G05   5.466380.787180+0.614801Piconcillo, Sierra Morena
 G06   4.671500.619980+0.781996Dordrecht, Sterrenburg
 G07   3.063860.719394+0.692378Millau Observatory
 G08   1.996940.748752+0.660794Observatorio Les Pedritxes, Matadepera
@@ -1379,6 +1380,7 @@ G10 354.450550.792574+0.607765Clavier Observatory, Lora Del Rio
 G11   7.183790.630712+0.773465Breitenweg Observatory, Herkenrath
 G12   8.3306 0.62140 +0.78090 Sternwarte EG, Lippstadt
 G13   9.771690.451874+0.889103Astronomihagen, Fannrem
+G14   7.005200.725247+0.686239Novaloop Observatory, Mougins
 G16  13.348690.787948+0.613701OmegaLab Observatory, Palermo
 G17  11.202610.723508+0.688023BAS Observatory, Scandicci
 G18  11.263830.712881+0.698948ALMO Observatory, Padulle
@@ -1701,7 +1703,7 @@ J34 355.227110.748695+0.660858La Fecha
 J35 356.029110.792167+0.608432Tucci Observatory, Martos
 J36 356.945190.765179+0.641659Observatorio DiezALaOnce, Illana
 J37 353.064690.796893+0.602104Huelva
-J38 353.608900.726876+0.684507Observatorio La Vara, Valdes
+J38 353.609240.726887+0.684518Observatorio La Vara, Valdes
 J39 344.5636 0.88429 +0.46547 Ingenio
 J40 355.558470.802546+0.594601Malaga
 J41 353.8189 0.59779 +0.79897 Raheny
@@ -1910,7 +1912,7 @@ L44   6.221110.688185+0.723360AstroVal, Le Chenit
 L45  15.062430.793975+0.605979ObsCT, Catania
 L46 356.119390.762017+0.645574Observatorio Majadahonda
 L47  12.507110.725542+0.685961Osservatorio Astronomico, Piobbico
-L48  23.568730.674816+0.735566Baia Mare
+L48  23.568730.674816+0.735566CNVL Observatory, Baia Mare
 L49  13.007300.671444+0.738747VEGA-Sternwarte, Dorfleiten
 L50  34.0114 0.71157 +0.70039 GenShtab Observatory, Nauchnij
 L51  34.0164 0.71169 +0.70028 MARGO, Nauchnij
@@ -1951,6 +1953,9 @@ L85  15.863250.766873+0.639830BiAnto Observatory, Lauria
 L86   9.2631 0.71140 +0.70062 Giordano Bruno Observatory, Brallo
 L87  16.361890.919631-0.392204Moonbase South Observatory, Hakos
 L88  16.5422 0.77721 +0.62746 Stazione Astronomica Le Pleiadi, Pantane
+L89  11.144390.722146+0.689445PAO, Prato
+L90  15.979490.784120+0.618560ABObservatory, Rosarno
+L91  13.8078 0.74776 +0.66189 Antares MTM Observatory, S. Donato
 L93   1.772210.752844+0.65601 Garraf Observatory, Sant Pere de Ribes
 L94 354.145610.728187+0.683146Observatorio MOMA, Oviedo
 L95 358.951590.793164+0.607000Observatorio Astronomico de Cartagena
@@ -1972,6 +1977,7 @@ N50  78.963830.842176+0.538692Himalayan Chandra Telescope, IAO, Hanle
 N51  78.964610.842178+0.538687GROWTH India Telescope, IAO, Hanle
 N55  80.026230.846497+0.532089Corona Borealis Observatory, Ngari
 N56  80.026750.846503+0.532073Zijinshan-Beimian Survey, Ali
+N82  85.954940.641844+0.764450Multa Observatory
 N87  87.175030.727076+0.684720Nanshan Station, Xinjiang Observatory
 N88  87.173220.727098+0.684697Xingming Observatory #3, Nanshan
 N89  87.179060.727107+0.684682Xingming Observatory #2, Nanshan
@@ -2036,6 +2042,7 @@ T09 204.523980.941706+0.337237Mauna Kea-UH/Tholen NEO Follow-Up (Subaru)
 T10 204.522410.941706+0.337212Submillimeter Array, Mauna Kea (SMA)
 T12 204.530570.941729+0.337199Mauna Kea-UH/Tholen NEO Follow-Up (2.24-m)
 T14 204.531130.941714+0.337236Mauna Kea-UH/Tholen NEO Follow-Up (CFHT)
+U52 237.451110.749240+0.660270Shasta Valley Observatory, Grenada
 U53 237.1603 0.70274 +0.70909 Murray Hill Observatory, Beaverton
 U54 237.312860.782952+0.620081Hume Observatory, Santa Rosa
 U55 237.414560.653977+0.753984Golden Ears Observatory, Maple Ridge
@@ -2124,6 +2131,7 @@ W50 281.254040.813127+0.580167Apex
 W54 282.289440.785431+0.616890Mark Slade Remote Observatory, Wilderness
 W55 282.583890.773703+0.631447Natelli Observatory, Frederick
 W61 283.744920.713380+0.698447Leeside Observatory, Elgin
+W62 284.137610.758729+0.649276Comet Hunter Observatory2, New Ringgold
 W63 284.309580.996767+0.082976Observatorio Astronomico UTP, Pereira
 W65 284.791690.697761+0.713966Observatoire GOZ, Montpellier
 W66 285.053810.756278+0.652109SVH Observatory, Blairstown
