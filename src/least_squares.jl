@@ -1,7 +1,7 @@
 #normalized root mean square error
 function nrms(res, w)
     @assert length(res) == length(w)
-    return sqrt( sum(res .* w .* res)/length(res) )
+    return sqrt( chi2(res, w)/length(res) )
 end
 
 # chi square
@@ -66,7 +66,7 @@ function newtonls(res, w, x0, niters=5)
     @assert length(res) == length(w)
     nobs = length(res)
     npar = length(x0)
-    Q = sum(w .* (res.^2))/nobs
+    Q = chi2(res, w)/nobs
     x_new = x0
     for i in 1:niters
         dQ = TaylorSeries.gradient(Q)(x_new)
@@ -102,7 +102,7 @@ function newtonls_6v(res, w, x0, niters=5)
     @assert length(res) == length(w)
     nobs = length(res)
     npar = 6 # length(x0)
-    Q = sum(w .* (res.^2))/nobs
+    Q = chi2(res, w)/nobs
     x_new = x0
     for i in 1:niters
         dQ = TaylorSeries.gradient(Q)(x_new)[1:6]
@@ -121,7 +121,7 @@ function newtonls_A2(res, w, x0, niters=5)
     @assert length(res) == length(w)
     nobs = length(res)
     npar = length(x0)
-    Q = sum(w .* (res.^2))/nobs
+    Q = chi2(res, w)/nobs
     x_new = x0
     for i in 1:niters
         dQ = TaylorSeries.gradient(Q)(x_new)

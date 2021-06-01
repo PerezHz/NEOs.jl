@@ -23,7 +23,7 @@ function bopik(xae, xes)
     # osculating semimajor axis at closest approach (negative since hyperbolic)
     a = semimajoraxis(xae..., μ_E, 0.0)
     # asymptotic inbound velocity v_\infty (au/day)
-    v_infty = sqrt(μ_E/(-a));
+    v_infty = sqrt(μ_E/(-a))
     # h = r × v
     hvec = cross(xae[1:3], xae[4:6])
     h = sqrt(hvec[1]^2 + hvec[2]^2 + hvec[3]^2)
@@ -38,12 +38,10 @@ function bopik(xae, xes)
     P_v = evec./e
     # periapsis velocity (unit vector)
     Q_v = cross(hvec, P_v)./h
-    # @show P_v(-5.5) Q_v(-5.5)
     #inbound asymptote direction
     S_v = (P_v + (sqrt(e^2 - 1))Q_v)/e
     # B-vector: "vector from the planet center to the intersection between the B-plane and the asymptote"
     Bvec = cross(S_v, hvec)./v_infty
-    # @show Bvec() Bvec(-5.5)
     # Earth impact cross section ("critical B")
     b_E = crosssection(μ_E, RE/au, v_infty)
     # @show b_E
@@ -60,11 +58,11 @@ function bopik(xae, xes)
     B_dot_ζ = dot(Bvec, ζ_v)
 
     # computation of U vector
-    res = xes[1:3] # Earth's heliocentric position, au
-    res_norm = norm(res) # Earth's heliocentric range, au
-    res_unit = res/res_norm # Earth's heliocentric radius unit vector
+    # res = xes[1:3] # Earth's heliocentric position, au
+    # res_norm = norm(res) # Earth's heliocentric range, au
+    # res_unit = res/res_norm # Earth's heliocentric radius unit vector
     # @show res_norm
-    ves = xes[4:6]*au/daysec # Earth's velocity, km/s
+    ves = v_pl*au/daysec # Earth's velocity, km/s
     ves_norm = norm(ves) # Earth's speed, km/s
     ves_unit = ves/ves_norm # Earth's velocity unit vector
     # X-Y angle (degrees)
@@ -73,9 +71,10 @@ function bopik(xae, xes)
     cosθ = dot(S_v, ves_unit)
     # @show cosθ()
     v_infty_kms = v_infty*au/daysec # asteroid unperturbed speed, km/sec
-    # @show v_infty_kms
+    # @show v_infty_kms()
     # The norm of \vec{U} in appropriate units
-    U_norm = v_infty_kms/ves_norm
+    U_unit = (2pi*au)/(yr*daysec) # 1 U in km/s
+    U_norm = v_infty_kms/U_unit
     # U_y
     U_y = U_norm*cosθ
     # @show U_y U_norm
