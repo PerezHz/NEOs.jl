@@ -226,6 +226,12 @@ git-tree-sha1 = "c3f4470b5b1ae4a60598e8286e901b9604143d05"
 uuid = "6912e4f1-e036-58b0-9138-08d1e6358ea9"
 version = "0.6.1"
 
+[[Expect]]
+deps = ["Printf"]
+git-tree-sha1 = "6cbef19848f067d2968395ce64df46d40b59b05a"
+uuid = "6a31a4e8-6e70-5a2d-b005-bc2d500d80a5"
+version = "0.3.1"
+
 [[ExponentialUtilities]]
 deps = ["LinearAlgebra", "Printf", "Requires", "SparseArrays"]
 git-tree-sha1 = "4e7db935d55d4a11acb74856ee6cb113a7808c6f"
@@ -248,6 +254,12 @@ deps = ["CFITSIO", "Printf", "Reexport"]
 git-tree-sha1 = "2fa19c79f9656db6468034a8da14612c19b175d5"
 uuid = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
 version = "0.16.5"
+
+[[FTPClient]]
+deps = ["LibCURL", "URIParser"]
+git-tree-sha1 = "fcdcac297167852b23bae6d7bb3bf82a726ff70c"
+uuid = "01fcc997-4f28-56b8-8a06-30002c134abb"
+version = "1.2.1"
 
 [[FastRounding]]
 deps = ["ErrorfreeArithmetic", "Test"]
@@ -312,6 +324,12 @@ deps = ["Artifacts", "JLLWrappers", "LibCURL_jll", "Libdl", "OpenSSL_jll", "Pkg"
 git-tree-sha1 = "fd83fa0bde42e01952757f01149dd968c06c4dba"
 uuid = "0234f1f7-429e-5d53-9886-15a909be8d59"
 version = "1.12.0+1"
+
+[[HORIZONS]]
+deps = ["Dates", "DelimitedFiles", "Expect", "FTPClient"]
+git-tree-sha1 = "9ec7af4d404cf39229e9ea6acfeb17bc06ecdcc9"
+uuid = "5a3ac768-beb4-554a-9c98-3342fe3377f5"
+version = "0.3.1"
 
 [[HTTP]]
 deps = ["Base64", "Dates", "IniFile", "MbedTLS", "Sockets"]
@@ -411,6 +429,12 @@ deps = ["AbstractTrees"]
 git-tree-sha1 = "71be1eb5ad19cb4f61fa8c73395c0338fd092ae0"
 uuid = "1d6d02ad-be62-4b6b-8a6d-2f90e265016e"
 version = "0.1.2"
+
+[[LibCURL]]
+deps = ["LibCURL_jll", "MozillaCACerts_jll"]
+git-tree-sha1 = "cdbe7465ab7b52358804713a53c7fe1dac3f8a3f"
+uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
+version = "0.6.3"
 
 [[LibCURL_jll]]
 deps = ["LibSSH2_jll", "Libdl", "MbedTLS_jll", "Pkg", "Zlib_jll", "nghttp2_jll"]
@@ -517,6 +541,12 @@ git-tree-sha1 = "916b850daad0d46b8c71f65f719c49957e9513ed"
 uuid = "78c3b35d-d492-501b-9361-3d52fe80e533"
 version = "0.7.1"
 
+[[MozillaCACerts_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "f1662575f7bf53c73c2bbc763bace4b024de822c"
+uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
+version = "2021.1.19+0"
+
 [[MuladdMacro]]
 git-tree-sha1 = "c6190f9a7fc5d9d5915ab29f2134421b12d24a68"
 uuid = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
@@ -602,8 +632,8 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PlanetaryEphemeris]]
 deps = ["AutoHashEquals", "Dates", "DelimitedFiles", "JLD", "LinearAlgebra", "Printf", "Quadmath", "TaylorIntegration", "TaylorSeries"]
-git-tree-sha1 = "635e2c406f861eddd7058e55322439151a7cfa3a"
-repo-rev = "jp/threads"
+git-tree-sha1 = "e4baebbfb6424b0462ba75adb8dd2330490eb4b7"
+repo-rev = "main"
 repo-url = "git@github.com:PerezHz/PlanetaryEphemeris.jl.git"
 uuid = "d83715d0-7e5f-11e9-1a59-4137b20d8363"
 version = "0.1.0"
@@ -888,6 +918,12 @@ deps = ["Test"]
 git-tree-sha1 = "8d0d7a3fe2f30d6a7f833a5f19f7c7a5b396eae6"
 uuid = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 version = "0.3.0"
+
+[[URIParser]]
+deps = ["Unicode"]
+git-tree-sha1 = "53a9f49546b8d2dd2e688d216421d050c9a31d0d"
+uuid = "30578b45-9adc-5946-b283-645ec420af67"
+version = "0.4.1"
 
 [[UUIDs]]
 deps = ["Random", "SHA"]
