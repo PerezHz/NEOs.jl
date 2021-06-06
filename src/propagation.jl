@@ -1,4 +1,4 @@
-#numerator of Apophis radial velocity wrt Earth
+#numerator of asteroid radial velocity wrt Earth
 function rvelea(dx, x, params, t)
     jd0 = params[4] # Julian date of start time
     dsj2k = t+(jd0-JD_J2000) # days since J2000.0 = 2.451545e6
@@ -15,14 +15,14 @@ function loadeph(ss16asteph_::TaylorInterpolant, μ::Vector)
     ephord = ss16asteph_.x[1].order
     ss16asteph_x = map(x->x(Taylor1(ephord)*daysec), ss16asteph_.x)
     ss16asteph = TaylorInterpolant(ss16asteph_t0, ss16asteph_t, ss16asteph_x)
-    #compute point-mass Newtonian accelerations from ephemeris: all bodies except Apophis
-    # accelerations of "everybody else" are needed when evaluating Apophis post-Newtonian acceleration
+    #compute point-mass Newtonian accelerations from ephemeris: all bodies except asteroid
+    # accelerations of "everybody else" are needed when evaluating asteroid post-Newtonian acceleration
     Nm1 = (size(ss16asteph_x)[2]-13) ÷ 6
     acc_eph = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, 3Nm1))
     newtonianNb_Potential = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, Nm1))
     fill!(acc_eph.x, zero(ss16asteph.x[1]))
     fill!(newtonianNb_Potential.x, zero(ss16asteph.x[1]))
-    _1_to_Nm1 = Base.OneTo(Nm1) # iterator over all bodies except Apophis
+    _1_to_Nm1 = Base.OneTo(Nm1) # iterator over all bodies except asteroid
     for j in _1_to_Nm1
         for i in _1_to_Nm1
             # i == j && continue

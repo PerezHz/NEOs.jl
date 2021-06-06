@@ -18,7 +18,7 @@ end
 # xes: planet's heliocentric position/velocity vector at asteroid's closest approach in au,au/day
 function bopik(xae, xes)
     μ_E = PlanetaryEphemeris.μ[ea]
-    # Apophis geocentric range at 2029 closest approach (au)
+    # asteroid geocentric range at 2029 closest approach (au)
     rae = sqrt(xae[1]^2 + xae[2]^2 + xae[3]^2)
     # osculating semimajor axis at closest approach (negative since hyperbolic)
     a = semimajoraxis(xae..., μ_E, 0.0)
@@ -45,7 +45,7 @@ function bopik(xae, xes)
     # Earth impact cross section ("critical B")
     b_E = crosssection(μ_E, RE/au, v_infty)
     # @show b_E
-    # Earth's heliocentric velocity at Apophis 2029 CA as a function of A2 (au/day)
+    # Earth's heliocentric velocity at CA
     v_pl = xes[4:6]
     #ξ-axis is essentially the MOID (Valsecchi et al, 2003)
     ξ_v_unnormalized = cross(v_pl, S_v)

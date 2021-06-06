@@ -6,7 +6,7 @@ function apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
     # Compute the step-size of the integration using `abstol`
     δt = TaylorIntegration.stepsize(x, abstol)
 
-    # # Force Apophis time-step to be no larger than planetary ephemeris time-step
+    # # Force asteroid time-step to be no larger than planetary ephemeris time-step
     # et0_days = (params[4]-JD_J2000)
     # et_days = t[0] + et0_days
     # ind, Δt = PlanetaryEphemeris.getinterpindex(params[1], et_days)
@@ -42,7 +42,7 @@ function lyap_apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
     # Compute the step-size of the integration using `abstol`
     δt = TaylorIntegration.stepsize(view(x, 1:dof), abstol)
 
-    # # Force Apophis time-step to be no larger than planetary ephemeris time-step
+    # # Force asteroid time-step to be no larger than planetary ephemeris time-step
     # et0_days = (params[4]-JD_J2000)
     # et_days = t[0] + et0_days
     # ind, Δt = PlanetaryEphemeris.getinterpindex(params[1], et_days)

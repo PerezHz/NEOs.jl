@@ -1,8 +1,8 @@
 # load ttmtdb as a TaylorInterpolant saved in .jld file
-const jldephpath = joinpath(pkgdir(Apophis), "jldeph")
+const jldephpath = joinpath(pkgdir(NEO), "jldeph")
 const ttmtdb = JLD.load(joinpath(jldephpath, "ttmtdb_DE430_2003_2030.jld"), "ttmtdb")
 
-# read JPL ephemerides (Apophis, Solar System, TT-TDB)
+# read JPL ephemerides (asteroid, Solar System, TT-TDB)
 function loadjpleph()
     furnsh(
         joinpath(artifact"naif0012", "naif0012.tls"),
@@ -184,8 +184,6 @@ function tdb_utc(et::T) where {T<:Number}
     et_00 = constant_term(constant_term(et))
     utc_secs = et_00 - deltet(et_00, "ET") # used only to determine ΔAT; no high-precision needed
     jd_utc = JD_J2000 + utc_secs/daysec
-    dt_utc = julian2datetime(jd_utc)
-    fd_utc = (jd_utc+0.5) - floor(jd_utc+0.5)
     tai_utc = get_ΔAT(jd_utc)
     return (tt_tai + tai_utc) - tt_tdb_et # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
 end

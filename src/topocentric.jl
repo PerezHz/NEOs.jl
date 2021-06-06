@@ -40,7 +40,7 @@ Name=(31,80,String)
 )
 
 # MPC minor planet observatory code reader
-readmpcobs(mpcfile::String=joinpath(dirname(pathof(Apophis)), "ObsCodes.txt")) = table(readfwf(mpcfile, mpc_format_obscode, skiprows=union([1,247,249,251,252,260],1222:1230)))
+readmpcobs(mpcfile::String=joinpath(dirname(pathof(NEO)), "ObsCodes.txt")) = table(readfwf(mpcfile, mpc_format_obscode, skiprows=union([1,247,249,251,252,260],1222:1230)))
 
 const mpcobscodes = readmpcobs()
 
