@@ -27,7 +27,7 @@ using EarthOrientation, SPICE
 using Dates
 using Quadmath
 using Healpix
-using Pkg.Artifacts #: @artifact_str
+using LazyArtifacts #: @artifact_str
 using JuliaDB
 import SatelliteToolbox
 using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI,

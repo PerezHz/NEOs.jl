@@ -1,6 +1,5 @@
 # load ttmtdb as a TaylorInterpolant saved in .jld file
-const jldephpath = joinpath(pkgdir(NEO), "jldeph")
-const ttmtdb = JLD.load(joinpath(jldephpath, "ttmtdb_DE430_2003_2030.jld"), "ttmtdb")
+const ttmtdb = JLD.load(joinpath(artifact"ttmtdb_DE430_2003_2030", "ttmtdb_DE430_2003_2030.jld"), "ttmtdb")
 
 # read JPL ephemerides (asteroid, Solar System, TT-TDB)
 function loadjpleph()

@@ -4,7 +4,7 @@ lazy = true
 
     [[TTmTDBde430.download]]
     sha256 = "c599efe597200055c27cec38ddc769f5d3b3e301a481b9dcd8b9640d745508a1"
-    url = "https://jpleph.s3-us-west-2.amazonaws.com/TTmTDBde430.tar.gz"
+    url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/TTmTDBde430.tar.gz"
 
 [a99942]
 git-tree-sha1 = "7cdf1265a22c52329651c4a71a9835d1b90f568e"
@@ -12,7 +12,7 @@ lazy = true
 
     [[a99942.download]]
     sha256 = "d1cdcad22c8060e98d7ca116973b64bc65cdb5e62fb045637701b57aa146a434"
-    url = "https://jpleph.s3-us-west-2.amazonaws.com/a99942.tar.gz"
+    url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/a99942.tar.gz"
 
 [de430]
 git-tree-sha1 = "db3e3a765712a792a7f4a73634213d53fc0561ec"
@@ -20,7 +20,7 @@ lazy = true
 
     [[de430.download]]
     sha256 = "25458f6fc0219be7ff9fbd893a4cd6ed9927316824cb5c4062b642414884790d"
-    url = "https://jpleph.s3-us-west-2.amazonaws.com/de430.tar.gz"
+    url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/de430.tar.gz"
 
 [debias]
 git-tree-sha1 = "aab2e58391eda4d2c47c02d0991c9f0d001b2ab3"
@@ -60,4 +60,12 @@ lazy = true
 
     [[naif0012.download]]
     sha256 = "d9b1c3d944f671eca8177e29384accbdb5f4b3fbe4603a4bb2e0bdbf7a900fb4"
-    url = "https://jpleph.s3-us-west-2.amazonaws.com/naif0012.tar.gz"
+    url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/naif0012.tar.gz"
+
+[ttmtdb_DE430_2003_2030]
+git-tree-sha1 = "df339d66fd4ee9ac4788877fc11166651a256c76"
+lazy = true
+
+    [[ttmtdb_DE430_2003_2030.download]]
+    sha256 = "df09ad03e9b2aae32fe5046528fd45ed38b7b2dad00825d2f430317aafb4e87d"
+    url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/ttmtdb_DE430_2003_2030.tar.gz"
