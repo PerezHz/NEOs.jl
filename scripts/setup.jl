@@ -2,7 +2,7 @@
 import Pkg
 Pkg.instantiate()
 Pkg.status(mode=Pkg.PKGMODE_MANIFEST)
-using NEO
+using NEOs
 
 using EarthOrientation, SatelliteToolbox
 #EarthOrientation.update()

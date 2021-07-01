@@ -2,7 +2,7 @@
 #julia -t <number-of-threads> --project=@. main.jl
 #Single thread:
 #julia --project=@. main.jl
-using NEO
+using NEOs
 using Dates
 using TaylorIntegration
 using JLD
@@ -18,7 +18,7 @@ const nyears = 6.0 #-5.0 #21.0
 const dense = false #true
 const quadmath = false # use quadruple precision
 const debias_table = "2018" # "2014", "hires2018"
-const apophisjlpath = pkgdir(NEO)
+const apophisjlpath = pkgdir(NEOs)
 # const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph!
 const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
 const jd0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #Julian date of integration initial time

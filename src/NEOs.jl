@@ -1,4 +1,4 @@
-module NEO
+module NEOs
 
 # __precompile__(false)
 
