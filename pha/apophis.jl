@@ -34,7 +34,8 @@ radarfile_fwd = joinpath(neosjlpath, "data", "99942_RADAR_2021.dat")
 
 ### path to local Solar System ephemeris file
 # ss_eph_file = joinpath(neosjlpath, "jldeph", "sseph343ast016_p30y_et_J2000.jld")
-ss_eph_file = "./sseph343ast016_p30y_et_J2000.jld"
+# ss_eph_file = "./sseph343ast016_p30y_et_J2000.jld"
+ss_eph_file = "./sseph343ast016_p100y_et.jld"
 
 #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
 #dq = Taylor1.(zeros(7), varorder)
