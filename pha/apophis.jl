@@ -14,8 +14,8 @@ varorder = 1 # varorder is the order corresponding to the jet transport perturba
 nv = 7 #number of TaylorN variables
 objname = "Apophis"
 maxsteps = 10000
-nyears_bwd = -13.0 # years in backward integration
-nyears_fwd = 10.0 # years in forward integration
+nyears_bwd = -18.0 # years in backward integration
+nyears_fwd = 9.0 # years in forward integration
 dense = false #true
 quadmath = false # use quadruple precision
 lyap = false #true # compute Lyapunov exponents
@@ -33,8 +33,8 @@ radarfile_bwd = joinpath(neosjlpath, "data", "99942_RADAR_2005_2013.dat")
 radarfile_fwd = joinpath(neosjlpath, "data", "99942_RADAR_2021.dat")
 
 ### path to local Solar System ephemeris file
-ss_eph_file = joinpath(neosjlpath, "jldeph", "sseph343ast016_p30y_et_J2000.jld")
-# ss_eph_file = "./sseph343ast016_p100y_et.jld"
+# ss_eph_file = joinpath(neosjlpath, "jldeph", "sseph343ast016_p30y_et_J2000.jld")
+ss_eph_file = "./sseph343ast016_p30y_et_J2000.jld"
 
 #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
 #dq = Taylor1.(zeros(7), varorder)
