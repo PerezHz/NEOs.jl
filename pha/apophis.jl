@@ -10,7 +10,7 @@ using PlanetaryEphemeris
 @show Threads.nthreads()
 
 #script parameters (TODO: use ArgParse.jl instead)
-varorder = 1 # varorder is the order corresponding to the jet transport perturbation
+varorder = 5 # varorder is the order corresponding to the jet transport perturbation
 nv = 7 #number of TaylorN variables
 objname = "Apophis"
 maxsteps = 10000
