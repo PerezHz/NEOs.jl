@@ -1,5 +1,7 @@
 # NEOs.jl
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5152449.svg)](https://doi.org/10.5281/zenodo.5152449)
+
 `NEOs.jl` is a Near-Earth Object orbital propagator and
 fitter in Julia. `NEOs.jl` exploits jet transport techniques via
 [TaylorIntegration.jl](https://github.com/PerezHzTaylorIntegration.jl).
