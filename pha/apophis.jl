@@ -61,16 +61,3 @@ println("*** Finished warmup")
 propagate(objname*"_bwd", dynamics, maxsteps, jd0, nyears_bwd, ss_eph_file, dense=dense, q0=q0, quadmath=quadmath, order=order, abstol=abstol, radarobsfile=radarfile_bwd, opticalobsfile=optfile_bwd, tord=10, niter=5)
 propagate(objname*"_fwd", dynamics, maxsteps, jd0, nyears_fwd, ss_eph_file, dense=dense, q0=q0, quadmath=quadmath, order=order, abstol=abstol, radarobsfile=radarfile_fwd, opticalobsfile=optfile_fwd, tord=10, niter=5)
 println("*** Finished asteroid ephemeris integration")
-
-
-# ###### Compute observation ephemeris
-# astfname_bwd = "Apophis_bwd_jt.jld"
-# astfname_fwd = "Apophis_fwd_jt.jld"
-# asteph_bwd = JLD.load(astfname_bwd, "asteph")
-# asteph_fwd = JLD.load(astfname_fwd, "asteph")
-# ss16asteph_et = JLD.load(ss_eph_file, "ss16ast_eph")
-# NEOs.loadjpleph()
-# NEOs.compute_optical_obs("radec_2004_2020_o$(varorder)v$(nv).jdb", optfile_bwd, asteph_bwd, ss16asteph_et)
-# NEOs.compute_optical_obs("radec_2020_2021_o$(varorder)v$(nv).jdb", optfile_fwd, asteph_bwd, ss16asteph_et)
-# NEOs.compute_radar_obs("deldop_2005_2013_o$(varorder)v$(nv).jdb", radarfile_bwd, asteph_bwd, ss16asteph_et, tord=10)
-# NEOs.compute_radar_obs("deldop_2021_o$(varorder)v$(nv).jdb", radarfile_fwd, asteph_bwd, ss16asteph_et, tord=10)
