@@ -17,13 +17,13 @@ ftp_jpl = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/"
 names_debias = ["debias", "debias_2014", "debias_2018", "debias_hires2018"]
 urls_debias = ftp_jpl .* names_debias .* ".tgz"
 
-names_lsk_spk = ["naif0012", "de430", "TTmTDBde430", "a99942", "ttmtdb_DE430_2003_2030"]
+names_lsk_spk = ["naif0012", "de430", "TTmTDBde430", "a99942", "ttmtdb_DE430_1995_2030"]
 urls_lsk_spk = [
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/naif0012.tar.gz",
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/de430.tar.gz",
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/TTmTDBde430.tar.gz",
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/a99942.tar.gz",
-    "https://raw.githubusercontent.com/PerezHz/jpleph/main/ttmtdb_DE430_2003_2030.tar.gz"
+    "https://raw.githubusercontent.com/PerezHz/jpleph/main/ttmtdb_DE430_1995_2030.tar.gz"
 ]
 
 urls_ = vcat(urls_lsk_spk, urls_debias)
