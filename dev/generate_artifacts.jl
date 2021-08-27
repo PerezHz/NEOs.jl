@@ -7,6 +7,7 @@ using Pkg.Artifacts
 using Pkg.PlatformEngines
 using Pkg.PlatformEngines: sha256
 using Pkg
+# using Downloads: download
 Pkg.PlatformEngines.probe_platform_engines!()
 
 # This is the path to the Artifacts.toml we will manipulate
