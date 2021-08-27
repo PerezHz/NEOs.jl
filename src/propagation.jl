@@ -252,11 +252,16 @@ function compute_radar_obs(outfilename::String, radarobsfile::String,
     earth_v = (au/daysec)*sseph_x[:,nbodyind(Nm1,ea)[4:6]]
     earth_x = hcat(earth_r, earth_v)
     earth_et = TaylorInterpolant(sseph_t0, sseph_t, earth_x)
-    # construct JuliaDB delay/doppler table from JPL radar obs file, including delay/doppler ephemeris (i.e., predicted values)
-    deldop_table_jdb = delay_doppler(radarobsfile, niter, xve=earth_et, xvs=sun_et, xva=asteph_et, tc=tc, tord=tord, autodiff=autodiff)
+    # construct DataFrame with delay/doppler data from JPL radar obs file, including delay/doppler ephemeris (i.e., predicted values)
+    deldop_table_jld = delay_doppler(radarobsfile, niter, xve=earth_et, xvs=sun_et, xva=asteph_et, tc=tc, tord=tord, autodiff=autodiff)
     #save data to file
     println("Saving data to file: $outfilename")
-    JuliaDB.save(deldop_table_jdb, outfilename)
+    jldopen(outfilename, "w") do file
+        addrequire(file, DataFrames)
+        addrequire(file, TaylorSeries)
+        # write variables to jld file
+        JLD.write(file, "deldop_table", deldop_table_jld)
+    end
     return nothing
 end
 
@@ -275,10 +280,15 @@ function compute_optical_obs(outfilename::String, opticalobsfile::String,
     function sun_et(et)
         return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
     end
-    # construct JuliaDB ra/dec table from MPC optical obs file, including ra/dec ephemeris (i.e., predicted values)
+    # construct DataFrame with ra/dec data from MPC optical obs file, including ra/dec ephemeris (i.e., predicted values)
     radec_table_jdb = radec_table(opticalobsfile, niter, xve=earth_et, xvs=sun_et, xva=asteph_et, debias_table=debias_table)
     #save data to file
     println("Saving data to file: $outfilename")
-    JuliaDB.save(radec_table_jdb, outfilename)
+    jldopen(outfilename, "w") do file
+        addrequire(file, DataFrames)
+        addrequire(file, TaylorSeries)
+        # write variables to jld file
+        JLD.write(file, "radec_table", radec_table_jdb)
+    end
     return nothing
 end
