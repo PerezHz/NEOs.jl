@@ -28,10 +28,10 @@ using Dates
 using Quadmath
 using Healpix
 using LazyArtifacts #: @artifact_str
-using JuliaDB
+using DataFrames
 import SatelliteToolbox
 using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI,
-    get_ΔAT, JD_J2000, EOPData_IAU1980, parse_iers_eop_iau_1980, rECItoECI, DCM,
+    get_ΔAT, JD_J2000, EOPData_IAU1980, rECItoECI, DCM,
     TOD, GCRF, ITRF, rECItoECI, PEF, satsv, EOPData_IAU2000A
 import RemoteFiles
 using StaticArrays: SArray, @SVector
@@ -67,8 +67,8 @@ const Λ3 = zeros(11)
 Λ3[ea] = -1.962633335678878e-19
 const clightkms = 2.99792458E5 # speed of light, km/sec
 
-# isless and sincos overloads needed to make rECEFtoECI work with TaylorSeries
-import Base: isless
+# isless overloads workaround to make rECEFtoECI work with TaylorSeries
+import Base.isless
 isless(a::Union{Taylor1,TaylorN}, b::Union{Taylor1,TaylorN}) = isless(constant_term(a), constant_term(b))
 isless(a::Real, b::Union{Taylor1,TaylorN}) = isless(a, constant_term(b))
 isless(a::Union{Taylor1,TaylorN}, b::Real) = isless(constant_term(a), b)

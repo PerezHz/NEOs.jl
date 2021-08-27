@@ -559,7 +559,7 @@ function delay_doppler(astradarfile::String,
     delay_index = map(x->x.delay_units=="us", astradardata)
     doppler_index = map(x->x.doppler_units=="Hz", astradardata)
 
-    radobs_t = table(
+    radobs_t = DataFrame(
         (
             dt_utc_obs=utcepoch.(astradardata),
             τ_obs=delay.(astradardata),

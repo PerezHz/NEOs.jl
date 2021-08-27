@@ -113,7 +113,7 @@ function radec_mpc(astopticalobsfile, niter::Int=10; eo::Bool=true,
         xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
 
     obs_t = readmp(astopticalobsfile)
-    n_optical_obs = length(obs_t)
+    n_optical_obs = nrow(obs_t)
 
     utc1 = DateTime(obs_t[1].yr, obs_t[1].month, obs_t[1].day) + Microsecond( round(1e6*86400*obs_t[1].utc) )
     et1 = str2et(string(utc1))
@@ -137,9 +137,9 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
         xvs::Function=sun_pv, xva::Function=apophis_pv_197)
 
     obs_t = readmp(mpcobsfile)
-    n_optical_obs = length(obs_t)
+    n_optical_obs = nrow(obs_t)
 
-    utc1 = DateTime(obs_t[1].yr, obs_t[1].month, obs_t[1].day) + Microsecond( round(1e6*86400*obs_t[1].utc) )
+    utc1 = DateTime(obs_t.yr[1], obs_t.month[1], obs_t.day[1]) + Microsecond( round(1e6*86400*obs_t.utc[1]) )
     et1 = str2et(string(utc1))
     a1_et1 = xva(et1)[1]
     S = typeof(a1_et1)
@@ -182,38 +182,38 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
     for i in 1:n_optical_obs
         # observed values
         # the following if block handles the sign of declination, including edge cases in declination such as -00 01
-        if obs_t[i].signdec == "+"
-            δ_i_deg = +(obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
-        elseif obs_t[i].signdec == "-"
-            δ_i_deg = -(obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
+        if obs_t.signdec[i] == "+"
+            δ_i_deg = +(obs_t.decd[i] + obs_t.decm[i]/60 + obs_t.decs[i]/3600) # deg
+        elseif obs_t.signdec[i] == "-"
+            δ_i_deg = -(obs_t.decd[i] + obs_t.decm[i]/60 + obs_t.decs[i]/3600) # deg
         else
             @warn "Could not parse declination sign: $(obs_t[i].signdec). Setting positive sign."
-            δ_i_deg =  (obs_t[i].decd + obs_t[i].decm/60 + obs_t[i].decs/3600) # deg
+            δ_i_deg =  (obs_t.decd[i] + obs_t.decm[i]/60 + obs_t.decs[i]/3600) # deg
         end
         δ_i_rad = deg2rad(δ_i_deg) #rad
-        α_i_deg = 15(obs_t[i].rah + obs_t[i].ram/60 + obs_t[i].ras/3600) # deg
+        α_i_deg = 15(obs_t.rah[i] + obs_t.ram[i]/60 + obs_t.ras[i]/3600) # deg
         α_i_rad = deg2rad(α_i_deg) #rad
         δ_obs[i] = 3600δ_i_deg # arcsec
         α_obs[i] = 3600α_i_deg*cos(δ_i_rad) # arcsec
         # computed values
-        datetime_obs[i] = DateTime(obs_t[i].yr, obs_t[i].month, obs_t[i].day) + Microsecond( round(1e6*86400*obs_t[i].utc) )
+        datetime_obs[i] = DateTime(obs_t.yr[i], obs_t.month[i], obs_t.day[i]) + Microsecond( round(1e6*86400*obs_t.utc[i]) )
         # utc_i = datetime_obs[i]
-        station_code_i = string(obs_t[i].obscode)
+        station_code_i = string(obs_t.obscode[i])
         α_comp_as, δ_comp_as = radec(station_code_i, datetime_obs[i], niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
         α_comp[i] = α_comp_as*cos(δ_i_rad) # multiply by metric factor cos(DEC)
         δ_comp[i] = δ_comp_as # arcsec
-        w8s[i] = w8sveres17(station_code_i, datetime_obs[i], obs_t[i].catalog)
-        if obs_t[i].catalog ∉ mpc_catalog_codes_201X
+        w8s[i] = w8sveres17(station_code_i, datetime_obs[i], obs_t.catalog[i])
+        if obs_t.catalog[i] ∉ mpc_catalog_codes_201X
             # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
-            if haskey(mpc_catalog_codes, obs_t[i].catalog)
-                if obs_t[i].catalog != truth
-                    catalog_not_found = mpc_catalog_codes[obs_t[i].catalog]
+            if haskey(mpc_catalog_codes, obs_t.catalog[i])
+                if obs_t.catalog[i] != truth
+                    catalog_not_found = mpc_catalog_codes[obs_t.catalog[i]]
                     @warn "Catalog not found in $(debias_table) table: $(catalog_not_found). Setting debiasing corrections equal to zero."
                 end
-            elseif obs_t[i].catalog == " "
+            elseif obs_t.catalog[i] == " "
                 @warn "Catalog information not available in observation record. Setting debiasing corrections equal to zero."
             else
-                @warn "Catalog code $(obs_t[i].catalog) does not correspond to MPC catalog code. Setting debiasing corrections equal to zero."
+                @warn "Catalog code $(obs_t.catalog[i]) does not correspond to MPC catalog code. Setting debiasing corrections equal to zero."
             end
             α_corr[i] = 0.0
             δ_corr[i] = 0.0
@@ -228,7 +228,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
             pix_ind = ang2pixRing(resol, π/2-δ_i_rad, α_i_rad)
             # Healpix.pix2angRing(resol, pix_ind)
             # @show Healpix.pix2angRing(resol, pix_ind)
-            cat_ind = findfirst(x->x==obs_t[i].catalog, mpc_catalog_codes_201X)
+            cat_ind = findfirst(x->x==obs_t.catalog[i], mpc_catalog_codes_201X)
             # @show pix_ind, cat_ind
             # read dRA, pmRA, dDEC, pmDEC data from bias.dat
             # dRA, position correction in RA*cos(DEC) at epoch J2000.0 [arcsec];
@@ -237,7 +237,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
             # pmDEC, proper motion correction in DEC [mas/yr].
             dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
             # @show dRA, dDEC, pmRA, pmDEC
-            # utc_i = DateTime(obs_t[i].yr, obs_t[i].month, obs_t[i].day) + Microsecond( round(1e6*86400*obs_t[i].utc) )
+            # utc_i = DateTime(obs_t.yr[i], obs_t.month[i], obs_t.day[i]) + Microsecond( round(1e6*86400*obs_t.utc[i]) )
             et_secs_i = str2et(string(datetime_obs[i]))
             tt_secs_i = et_secs_i - ttmtdb(et_secs_i)
             yrs_J2000_tt = tt_secs_i/(daysec*yr)
@@ -246,7 +246,18 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
         end
     end
 
-    return transform(obs_t, :dt_utc_obs => datetime_obs, :α_obs => α_obs, :δ_obs => δ_obs, :α_comp => α_comp, :δ_comp => δ_comp, :α_corr => α_corr, :δ_corr => δ_corr, :σ => w8s)
+    # add columns
+    obs_t.dt_utc_obs = datetime_obs
+    obs_t.α_obs = α_obs
+    obs_t.δ_obs = δ_obs
+    obs_t.α_comp = α_comp
+    obs_t.δ_comp = δ_comp
+    obs_t.α_corr = α_corr
+    obs_t.δ_corr = δ_corr
+    obs_t.σ = w8s
+    select
+
+    return obs_t
 end
 
 # MPC minor planet optical observations fixed-width format

@@ -29,7 +29,7 @@ function readfwf(io, colspecs; skiprows=[], missingstrings=[])
         end
     end
     d = [k => identity.(cols[k]) for k in keys(colspecs)] # form Dict from data
-    table((;d...)) # Dict -> NamedTuple -> IndexedTable
+    return DataFrame(d)
 end
 
 mpc_format_obscode = (Code=(1,3,String),
@@ -40,7 +40,7 @@ Name=(31,80,String)
 )
 
 # MPC minor planet observatory code reader
-readmpcobs(mpcfile::String=joinpath(dirname(pathof(NEOs)), "ObsCodes.txt")) = table(readfwf(mpcfile, mpc_format_obscode, skiprows=union([1,247,249,251,252,260],1222:1230)))
+readmpcobs(mpcfile::String=joinpath(dirname(pathof(NEOs)), "ObsCodes.txt")) = readfwf(mpcfile, mpc_format_obscode, skiprows=union([1,247,249,251,252,260],1222:1230))
 
 const mpcobscodes = readmpcobs()
 
@@ -48,16 +48,16 @@ const mpcobscodes = readmpcobs()
 # these functions avoid the use of @eval
 # https://github.com/JuliaSpace/SatelliteToolbox.jl/blob/b95e7f54f85c26744c64270841c874631f5addf1/src/transformations/eop.jl#L87
 function get_eop_iau1980(; force=false)
-    eop_iau1980_rf = RemoteFiles.@RemoteFile(EOP_IAU1980_RF, "https://datacenter.iers.org/data/latestVersion/223_EOP_C04_14.62-NOW.IAU1980223.txt", file="EOP_IAU1980.TXT", updates=:weekly)
+    eop_iau1980_rf = RemoteFiles.@RemoteFile(EOP_IAU1980_RF, "https://datacenter.iers.org/data/csv/finals.all.csv", file="EOP_IAU1980.TXT", updates=:weekly)
     RemoteFiles.download(EOP_IAU1980_RF, force=force)
-    eop = readdlm(RemoteFiles.path(eop_iau1980_rf); skipblanks=true, skipstart=14)
-    SatelliteToolbox.parse_iers_eop_iau_1980(eop)
+    eop, ~ = readdlm(RemoteFiles.path(eop_iau1980_rf), ';'; header = true)
+    SatelliteToolbox._parse_iers_eop_iau_1980(eop)
 end
 function get_eop_iau2000a(; force=false)
-    eop_iau2000a_rf = RemoteFiles.@RemoteFile(EOP_IAU2000A_RF, "https://datacenter.iers.org/data/latestVersion/224_EOP_C04_14.62-NOW.IAU2000A224.txt", file="EOP_IAU2000A.TXT", updates=:weekly)
+    eop_iau2000a_rf = RemoteFiles.@RemoteFile(EOP_IAU2000A_RF, "https://datacenter.iers.org/data/csv/finals2000A.all.csv", file="EOP_IAU2000A.TXT", updates=:weekly)
     RemoteFiles.download(EOP_IAU2000A_RF, force=force)
-    eop = readdlm(RemoteFiles.path(eop_iau2000a_rf); skipblanks=true, skipstart=14)
-    SatelliteToolbox.parse_iers_eop_iau_2000A(eop)
+    eop, ~ = readdlm(RemoteFiles.path(eop_iau2000a_rf), ';'; header = true)
+    SatelliteToolbox._parse_iers_eop_iau_2000A(eop)
 end
 
 eop_IAU1980 = get_eop_iau1980()
@@ -67,20 +67,19 @@ eop_IAU2000A = get_eop_iau2000a()
 function observer_position(station_code::Union{Int, String}, et::T; eo::Bool=true,
         eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T<:Number}
     # λ_deg: East longitude (deg)
-    # u: distance from spin axis (km), taken from Yeomans et al. (1992) u = r*cos(ϕ)
-    # v: height above equatorial plane (km), taken from Yeomans et al. (1992) v = r*sin(ϕ)
-    # East long data is consistent with MPC database (2019-Mar-7)
+    # u: distance from spin axis (km), u = r*cos(ϕ)
+    # v: height above equatorial plane (km), v = r*sin(ϕ)
     st_code_str = lpad(string(station_code), 3, "0")
     # @show st_code_str filter(i->i.Code==st_code_str, mpcobscodes)
     obscode = filter(i->i.Code==st_code_str, mpcobscodes)
-    if length(obscode) == 0
+    if nrow(obscode) == 0
         @error "Unknown station code: $station_code"
-    elseif length(obscode) > 1
+    elseif nrow(obscode) > 1
         @warn "More than one observatory assigned to code: $station_code"
     end
-    λ_deg = select(obscode, :Long)[1]
-    u = select(obscode, :cos)[1]*RE
-    v = select(obscode, :sin)[1]*RE
+    λ_deg = obscode.Long[1]
+    u = obscode.cos[1]*RE
+    v = obscode.sin[1]*RE
     # cartesian components of Earth-fixed position of observer
     λ_rad = deg2rad(λ_deg) # rad
     x_gc = u*cos(λ_rad) #km
