@@ -42,7 +42,9 @@ for (url, name) in map((x,y)->(x,y), urls_, names_)
         artfct_hash = create_artifact() do artifact_dir
             # We create the artifact by simply downloading a few files into the new artifact directory
             @show url
-            tarball = download(url, joinpath(artifact_dir, basename(url)))
+            tmp_dir = mktempdir()
+            tarball = download(url, joinpath(tmp_dir, basename(url)))
+            # @show tarball tmp_dir
             try
                 tarball_hash = open(tarball) do file
                     bytes2hex(sha256(file))
