@@ -63,9 +63,9 @@ lazy = true
     url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/naif0012.tar.gz"
 
 [ttmtdb_DE430_1995_2030]
-git-tree-sha1 = "6192df48c9694fa442d9eb75733e015191b316d6"
+git-tree-sha1 = "c2c28ea69dc87777ccfdee562c8fd7584f6c5b9b"
 lazy = true
 
     [[ttmtdb_DE430_1995_2030.download]]
-    sha256 = "71e9768334419364a742d4e148c6671b877f081b0a3b0f7bd8b53847c24bf9d1"
+    sha256 = "8049c3c4eec16323f2d7527239271bc18f2d42272c9be785d7a74a367add2e51"
     url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/ttmtdb_DE430_1995_2030.tar.gz"
