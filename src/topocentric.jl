@@ -39,10 +39,13 @@ sin=(22,30,Float64),
 Name=(31,80,String)
 )
 
-# MPC minor planet observatory code reader
-readmpcobs(mpcfile::String=joinpath(dirname(pathof(NEOs)), "ObsCodes.txt")) = readfwf(mpcfile, mpc_format_obscode, skiprows=union([1,247,249,251,252,260],1222:1230))
+# lines in ObsCodes.txt corresponding to space telescopes
+spaceobs = union([1,247,249,251,252,260,269], 1223:1232)
 
-const mpcobscodes = readmpcobs()
+# MPC minor planet observatory code reader
+readmpcobs(mpcfile::String=joinpath(dirname(pathof(NEOs)), "ObsCodes.txt")) = readfwf(mpcfile, mpc_format_obscode, skiprows=spaceobs)
+
+mpcobscodes = readmpcobs()
 
 # Functions get_eop_iau1980, get_eop_iau2000a were adapted from SatelliteToolbox.jl; MIT-licensed
 # these functions avoid the use of @eval
