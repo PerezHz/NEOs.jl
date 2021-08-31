@@ -10,7 +10,7 @@ using PlanetaryEphemeris
 @show Threads.nthreads()
 
 #script parameters (TODO: use ArgParse.jl instead)
-varorder = 1 # varorder is the order corresponding to the jet transport perturbation
+varorder = 5 # varorder is the order corresponding to the jet transport perturbation
 nv = 7 #number of TaylorN variables
 objname = "Bennu"
 maxsteps = 10000
@@ -34,6 +34,7 @@ radarfile_fwd = joinpath(neosjlpath, "data", "101955_RADAR_2011.dat")
 
 ### path to local Solar System ephemeris file
 ss_eph_file = "./sseph343ast016_p56y_et.jld"
+ss16asteph_et = JLD.load(ss_eph_file, "ss16ast_eph")
 
 #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
 #dq = Taylor1.(zeros(7), varorder)
@@ -51,13 +52,13 @@ end
 ### initial conditions from Bennu JPL solution \#97 ### Note: JPL sol \#97 uses nongrav function g(r)=(1 au)/r^2.25, while we use g(r)=(1 au)/r^2
 jd0 = datetime2julian(DateTime(2011,1,1)) # JDTDB = 2455562.5
 q00 = [-1.1951358208617802, -0.20726185835689961, -0.11201678544935807, 8.881637772597003e-5, -0.013056288090844732, -0.007377624521045638]
-q0 = vcat(q00, -4.614425051841E-14) #.+ dq
+q0 = vcat(q00, 0.0) .+ dq ####vcat(q00, -4.614425051841E-14) #.+ dq
 
 ####integrator warmup
-propagate(objname, dynamics, 1, jd0, nyears_fwd, ss_eph_file, output=false, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol)
+propagate(objname, dynamics, 1, jd0, nyears_fwd, ss16asteph_et, output=false, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol)
 println("*** Finished warmup")
 
 ######Full jet transport integration
-propagate(objname*"_bwd", dynamics, maxsteps, jd0, nyears_bwd, ss_eph_file, dense=dense, q0=q0, quadmath=quadmath, order=order, abstol=abstol, radarobsfile=radarfile_bwd, opticalobsfile=optfile_bwd, tord=10, niter=5)
-propagate(objname*"_fwd", dynamics, maxsteps, jd0, nyears_fwd, ss_eph_file, dense=dense, q0=q0, quadmath=quadmath, order=order, abstol=abstol, radarobsfile=radarfile_fwd, opticalobsfile=optfile_fwd, tord=10, niter=5)
+propagate(objname*"_bwd", dynamics, maxsteps, jd0, nyears_bwd, ss16asteph_et, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol, radarobsfile=radarfile_bwd, opticalobsfile=optfile_bwd, tord=10, niter=5)
+propagate(objname*"_fwd", dynamics, maxsteps, jd0, nyears_fwd, ss16asteph_et, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol, radarobsfile=radarfile_fwd, opticalobsfile=optfile_fwd, tord=10, niter=5)
 println("*** Finished asteroid ephemeris integration")

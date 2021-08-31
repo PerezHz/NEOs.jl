@@ -15,7 +15,7 @@ nv = 7 #number of TaylorN variables
 objname = "Apophis"
 maxsteps = 10000
 nyears_bwd = -18.0 # years in backward integration
-nyears_fwd = 9.0 # years in forward integration
+nyears_fwd = 2.0 # years in forward integration
 dense = false #true
 quadmath = false # use quadruple precision
 lyap = false #true # compute Lyapunov exponents
@@ -34,6 +34,7 @@ radarfile_fwd = joinpath(neosjlpath, "data", "99942_RADAR_2021.dat")
 
 ### path to local Solar System ephemeris file
 ss_eph_file = "./sseph343ast016_p31y_et.jld"
+ss16asteph_et = JLD.load(ss_eph_file, "ss16ast_eph")
 
 #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
 #dq = Taylor1.(zeros(7), varorder)
@@ -54,10 +55,10 @@ q00 = [-0.18034747703273316, 0.9406910666200128, 0.3457360259054398, -0.01626594
 q0 = vcat(q00, 0.0) .+ dq
 
 ####integrator warmup
-propagate(objname, dynamics, 1, jd0, nyears_fwd, ss_eph_file, output=false, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol)
+propagate(objname, dynamics, 1, jd0, nyears_fwd, ss16asteph_et, output=false, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol)
 println("*** Finished warmup")
 
 ######Full jet transport integration
-propagate(objname*"_bwd", dynamics, maxsteps, jd0, nyears_bwd, ss_eph_file, dense=dense, q0=q0, quadmath=quadmath, order=order, abstol=abstol, radarobsfile=radarfile_bwd, opticalobsfile=optfile_bwd, tord=10, niter=5)
-propagate(objname*"_fwd", dynamics, maxsteps, jd0, nyears_fwd, ss_eph_file, dense=dense, q0=q0, quadmath=quadmath, order=order, abstol=abstol, radarobsfile=radarfile_fwd, opticalobsfile=optfile_fwd, tord=10, niter=5)
+propagate(objname*"_bwd", dynamics, maxsteps, jd0, nyears_bwd, ss16asteph_et, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol, radarobsfile=radarfile_bwd, opticalobsfile=optfile_bwd, tord=10, niter=5)
+propagate(objname*"_fwd", dynamics, maxsteps, jd0, nyears_fwd, ss16asteph_et, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol, radarobsfile=radarfile_fwd, opticalobsfile=optfile_fwd, tord=10, niter=5)
 println("*** Finished asteroid ephemeris integration")
