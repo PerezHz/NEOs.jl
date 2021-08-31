@@ -203,7 +203,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
         α_comp[i] = α_comp_as*cos(δ_i_rad) # multiply by metric factor cos(DEC)
         δ_comp[i] = δ_comp_as # arcsec
         w8s[i] = w8sveres17(station_code_i, datetime_obs[i], obs_t.catalog[i])
-        if obs_t.catalog[i] ∉ mpc_catalog_codes_201X
+        if (obs_t.catalog[i] ∉ mpc_catalog_codes_201X) && obs_t.catalog[i] != "Y"
             # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
             if haskey(mpc_catalog_codes, obs_t.catalog[i])
                 if obs_t.catalog[i] != truth
@@ -228,7 +228,12 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
             pix_ind = ang2pixRing(resol, π/2-δ_i_rad, α_i_rad)
             # Healpix.pix2angRing(resol, pix_ind)
             # @show Healpix.pix2angRing(resol, pix_ind)
-            cat_ind = findfirst(x->x==obs_t.catalog[i], mpc_catalog_codes_201X)
+            ### Handle edge case: in new MPC catalog nomenclature, "UCAC-5"->"Y"; but in debias tables "UCAC-5"->"W"
+            if obs_t.catalog[i] == "Y"
+                cat_ind = findfirst(x->x=="W", mpc_catalog_codes_201X)
+            else
+                cat_ind = findfirst(x->x==obs_t.catalog[i], mpc_catalog_codes_201X)
+            end
             # @show pix_ind, cat_ind
             # read dRA, pmRA, dDEC, pmDEC data from bias.dat
             # dRA, position correction in RA*cos(DEC) at epoch J2000.0 [arcsec];
@@ -291,12 +296,12 @@ obscode=(78,80,String)
 # MPC minor planet optical observations reader
 readmp(mpcfile::String) = readfwf(mpcfile, mpc_format_mp)
 
-# `mpc_catalog_nomenclature_2014` corresponds to debiasing tables included in Farnocchia et al. (2015)
+# `mpc_catalog_codes_2014` corresponds to debiasing tables included in Farnocchia et al. (2015)
 mpc_catalog_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
 "o", "p", "q", "r",
 "u", "v", "w", "L", "N"]
 
-# `mpc_catalog_nomenclature_2018` corresponds to debiasing tables included in Eggl et al. (2020)
+# `mpc_catalog_codes_2018` corresponds to debiasing tables included in Eggl et al. (2020)
 mpc_catalog_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
     "n", "o", "p", "q", "r",
     "t", "u", "v", "w", "L", "N",
@@ -354,8 +359,12 @@ mpc_catalog_codes = Dict(
     "T" =>   "URAT-2",
     "U" =>   "Gaia-DR1",
     "V" =>   "Gaia-DR2",
-    "W" =>   "UCAC-5"
-)
+    # "W" =>   "UCAC-5"
+    "W" =>   "Gaia-DR3",
+    "X" =>   "Gaia-EDR3",
+    "Y" =>   "UCAC-5",
+    "Z" =>   "ATLAS-2"
+  )
 
 # Statistical weights from Veres et al. (2017)
 function w8sveres17(row::NamedTuple)
