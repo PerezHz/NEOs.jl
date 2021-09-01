@@ -36,17 +36,23 @@ radarfile_fwd = joinpath(neosjlpath, "data", "101955_RADAR_2011.dat")
 ss_eph_file = "./sseph343ast016_p56y_et.jld"
 ss16asteph_et = JLD.load(ss_eph_file, "ss16ast_eph")
 
-#### dq: perturbation to nominal initial condition (Taylor1 jet transport)
-#dq = Taylor1.(zeros(7), varorder)
-#dq[end][1] = 1e-14
-
-# dq: perturbation to nominal initial condition (TaylorN jet transport)
-dq = set_variables("δx", order=varorder, numvars=nv)
-for i in 1:6
-   dq[i][1][i] = 1e-8
-end
-if get_numvars() == 7
-   dq[7][1][7] = 1e-14
+### TaylorN variables setup
+if lyap
+    ### setup TaylorN variables with order=1, numvars=7
+    TNvars = set_variables("δx", order=1, numvars=7)
+    dq=zeros(7)
+else
+    #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
+    #dq = Taylor1.(zeros(7), varorder)
+    #dq[end][1] = 1e-14
+    # dq: perturbation to nominal initial condition (TaylorN jet transport)
+    dq = set_variables("δx", order=varorder, numvars=nv)
+    for i in 1:6
+        dq[i][1][i] = 1e-8
+    end
+    if get_numvars() == 7
+        dq[7][1][7] = 1e-14
+    end
 end
 
 ### initial conditions from Bennu JPL solution \#97 ### Note: JPL sol \#97 uses nongrav function g(r)=(1 au)/r^2.25, while we use g(r)=(1 au)/r^2
