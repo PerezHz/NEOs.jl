@@ -40,7 +40,9 @@ ss16asteph_et = JLD.load(ss_eph_file, "ss16ast_eph")
 if lyap
     ### setup TaylorN variables with order=1, numvars=7
     TNvars = set_variables("δx", order=1, numvars=7)
-    dq=zeros(7)
+    # dq corresponding to solution OR7 for Apophis
+    dq_OR7 = [-8.053250543083672e-7, -6.4934453239292154e-9, -3.552581604396334e-8, 2.382431039885935e-9, -1.3384789262277344e-8, -4.6746457798167725e-9, -2.892614243659006e-14]
+    dq = dq_OR7
 else
     #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
     #dq = Taylor1.(zeros(7), varorder)
