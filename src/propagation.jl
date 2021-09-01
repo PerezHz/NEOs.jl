@@ -199,22 +199,24 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
     #write solution and predicted values of observations (if requested) to .jld files
     if output
         outfilename = save2jldandcheck(objname, sol)
-        try
-            # if requested by user, calculate computed (i.e., predicted) values of observations
-            furnsh(
-                joinpath(artifact"naif0012", "naif0012.tls"), # load leapseconds kernel
-                joinpath(artifact"de430", "de430_1850-2150.bsp"), # at least one SPK file must be loaded to read .tls file
-            )
-            if radarobsfile != ""
-                println("compute_radar_obs")
-                @time compute_radar_obs("deldop_"*basename(radarobsfile)*".jld", radarobsfile, asteph, ss16asteph_et, tord=tord, niter=niter)
+        # if requested by user, calculate computed (i.e., predicted) values of observations
+        if !lyap # don't compute observation ephemeris when "in Lyapunov spectra mode"
+            try
+                furnsh(
+                    joinpath(artifact"naif0012", "naif0012.tls"), # load leapseconds kernel
+                    joinpath(artifact"de430", "de430_1850-2150.bsp"), # at least one SPK file must be loaded to read .tls file
+                )
+                if radarobsfile != ""
+                    println("compute_radar_obs")
+                    @time compute_radar_obs("deldop_"*basename(radarobsfile)*".jld", radarobsfile, asteph, ss16asteph_et, tord=tord, niter=niter)
+                end
+                if opticalobsfile != ""
+                    println("compute_optical_obs")
+                    @time compute_optical_obs("radec_"*basename(opticalobsfile)*".jld", opticalobsfile, asteph, ss16asteph_et, debias_table=debias_table, niter=niter)
+                end
+            catch e
+                @error "Unable to compute observation residuals" exception=(e, catch_backtrace())
             end
-            if opticalobsfile != ""
-                println("compute_optical_obs")
-                @time compute_optical_obs("radec_"*basename(opticalobsfile)*".jld", opticalobsfile, asteph, ss16asteph_et, debias_table=debias_table, niter=niter)
-            end
-        catch e
-            @error "Unable to compute observation residuals" exception=(e, catch_backtrace())
         end
     end
 
