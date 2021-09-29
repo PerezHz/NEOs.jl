@@ -11,7 +11,7 @@ using PlanetaryEphemeris
 
 #script parameters (TODO: use ArgParse.jl instead)
 varorder = 5 # varorder is the order corresponding to the jet transport perturbation
-nv = 7 #number of TaylorN variables
+nv = 8 #number of TaylorN variables
 objname = "Apophis"
 maxsteps = 10000
 nyears_bwd = -18.0 # years in backward integration
@@ -38,10 +38,10 @@ ss16asteph_et = JLD.load(ss_eph_file, "ss16ast_eph")
 
 ### TaylorN variables setup
 if lyap
-    ### setup TaylorN variables with order=1, numvars=7
-    TNvars = set_variables("δx", order=1, numvars=7)
+    ### setup TaylorN variables with order=1, numvars=nv
+    TNvars = set_variables("δx", order=1, numvars=nv)
     # dq corresponding to solution OR7 for Apophis
-    dq_OR7 = [-8.053250543083672e-7, -6.4934453239292154e-9, -3.552581604396334e-8, 2.382431039885935e-9, -1.3384789262277344e-8, -4.6746457798167725e-9, -2.892614243659006e-14]
+    dq_OR7 = [-8.053250543083672e-7, -6.4934453239292154e-9, -3.552581604396334e-8, 2.382431039885935e-9, -1.3384789262277344e-8, -4.6746457798167725e-9, -2.892614243659006e-14, 0.0]
     dq = dq_OR7
 else
     #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
@@ -52,15 +52,16 @@ else
     for i in 1:6
         dq[i][1][i] = 1e-8
     end
-    if get_numvars() == 7
+    if get_numvars() == 8
         dq[7][1][7] = 1e-14
+        dq[8][1][8] = 1e-13
     end
 end
 
 ### initial conditions from Apophis JPL solution #197 at the Dec-17-2020.0 (TDB) epoch
 jd0 = datetime2julian(DateTime(2020,12,17)) # JDTDB = 2459200.5
 q00 = [-0.18034747703273316, 0.9406910666200128, 0.3457360259054398, -0.016265942170279046, 4.392889725556651e-5, -0.00039519931615139716] ### JPL solution #197 at 2020Dec17.0 (TDB)
-q0 = vcat(q00, 0.0) .+ dq
+q0 = vcat(q00, 0.0, 0.0) .+ dq
 
 ####integrator warmup
 propagate(objname, dynamics, 1, jd0, nyears_fwd, ss16asteph_et, output=false, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol)

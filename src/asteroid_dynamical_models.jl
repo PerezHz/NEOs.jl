@@ -413,21 +413,27 @@ end
     hz = (X[1]*V[1])-(Y[1]*U[1])
 
     #cartesian components of transversal unit vector:
-    tunitx0 = (hz*Y[1]) - (hy*Z[1]) # Note: Y[1] = y_Sun - y_Apophis, etc.
-    tunity0 = (hx*Z[1]) - (hz*X[1])
-    tunitz0 = (hy*X[1]) - (hx*Y[1])
-    hmag = sqrt( ((tunitx0^2)+(tunity0^2))+(tunitz0^2) )
-    tunitx = tunitx0/hmag
-    tunity = tunity0/hmag
-    tunitz = tunitz0/hmag
+    t_x = (hz*Y[1]) - (hy*Z[1]) # Note: Y[1] = y_Sun - y_Apophis, etc.
+    t_y = (hx*Z[1]) - (hz*X[1])
+    t_z = (hy*X[1]) - (hx*Y[1])
+    t_norm = sqrt( ((t_x^2)+(t_y^2))+(t_z^2) )
+    t_x_unit = t_x/t_norm
+    t_y_unit = t_y/t_norm
+    t_z_unit = t_z/t_norm
 
-    # evaluate non-grav acceleration of NEA (Yarkovsky):
+    # cartesian components of radial unit vector:
+    r_x_unit = -(X[1]/r_p1d2[1])
+    r_y_unit = -(Y[1]/r_p1d2[1])
+    r_z_unit = -(Z[1]/r_p1d2[1])
+
+    # evaluate non-grav acceleration (solar radiation pressure, Yarkovsky):
     g_r = r_p2[1]
     A2_t_g_r = q[7]/g_r
+    A1_t_g_r = q[8]/g_r
 
-    NGAx = A2_t_g_r*tunitx
-    NGAy = A2_t_g_r*tunity
-    NGAz = A2_t_g_r*tunitz
+    NGAx = (A2_t_g_r*t_x_unit) + (A1_t_g_r*r_x_unit)
+    NGAy = (A2_t_g_r*t_y_unit) + (A1_t_g_r*r_y_unit)
+    NGAz = (A2_t_g_r*t_z_unit) + (A1_t_g_r*r_z_unit)
 
     dq[4] = ( postNewtonX + accX ) + NGAx
     dq[5] = ( postNewtonY + accY ) + NGAy
@@ -810,21 +816,27 @@ end
     hz = (X[1]*V[1])-(Y[1]*U[1])
 
     #cartesian components of transversal unit vector:
-    tunitx0 = (hz*Y[1]) - (hy*Z[1]) # Note: Y[1] = y_Sun - y_Apophis, etc.
-    tunity0 = (hx*Z[1]) - (hz*X[1])
-    tunitz0 = (hy*X[1]) - (hx*Y[1])
-    hmag = sqrt( ((tunitx0^2)+(tunity0^2))+(tunitz0^2) )
-    tunitx = tunitx0/hmag
-    tunity = tunity0/hmag
-    tunitz = tunitz0/hmag
+    t_x = (hz*Y[1]) - (hy*Z[1]) # Note: Y[1] = y_Sun - y_Apophis, etc.
+    t_y = (hx*Z[1]) - (hz*X[1])
+    t_z = (hy*X[1]) - (hx*Y[1])
+    t_norm = sqrt( ((t_x^2)+(t_y^2))+(t_z^2) )
+    t_x_unit = t_x/t_norm
+    t_y_unit = t_y/t_norm
+    t_z_unit = t_z/t_norm
 
-    # evaluate non-grav acceleration of NEA (Yarkovsky):
+    # cartesian components of radial unit vector:
+    r_x_unit = -(X[1]/r_p1d2[1])
+    r_y_unit = -(Y[1]/r_p1d2[1])
+    r_z_unit = -(Z[1]/r_p1d2[1])
+
+    # evaluate non-grav acceleration (solar radiation pressure, Yarkovsky):
     g_r = r_p2[1]
     A2_t_g_r = q[7]/g_r
+    A1_t_g_r = q[8]/g_r
 
-    NGAx = A2_t_g_r*tunitx
-    NGAy = A2_t_g_r*tunity
-    NGAz = A2_t_g_r*tunitz
+    NGAx = (A2_t_g_r*t_x_unit) + (A1_t_g_r*r_x_unit)
+    NGAy = (A2_t_g_r*t_y_unit) + (A1_t_g_r*r_y_unit)
+    NGAz = (A2_t_g_r*t_z_unit) + (A1_t_g_r*r_z_unit)
 
     dq[4] = ( postNewtonX + accX ) + NGAx
     dq[5] = ( postNewtonY + accY ) + NGAy

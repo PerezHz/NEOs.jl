@@ -114,7 +114,7 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
         lyap::Bool=false, order::Int=order, abstol::T=abstol, tord::Int=10,
         niter::Int=5) where {T<:Real}
     # get asteroid initial conditions
-    @assert length(q0) == 7
+    @assert length(q0) == 8
     @show q0
     @show jd0, jd0-JD_J2000
     # Number of bodies
