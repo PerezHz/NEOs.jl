@@ -26,7 +26,7 @@ using JLD
 using EarthOrientation, SPICE
 using Dates
 using Quadmath
-using Healpix
+using Healpix: ang2pixRing, Resolution
 using LazyArtifacts
 using DataFrames
 import SatelliteToolbox

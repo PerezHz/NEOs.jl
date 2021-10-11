@@ -239,12 +239,6 @@ git-tree-sha1 = "7a541ee92e2f8b16356ed6066d0c44b85984b780"
 uuid = "d4d017d3-3776-5f7e-afef-a10c40355c18"
 version = "1.9.0"
 
-[[FITSIO]]
-deps = ["CFITSIO", "Printf", "Reexport", "Tables"]
-git-tree-sha1 = "ba5eb4020e474b1c1d4952f91dd7bbfb97b5bf98"
-uuid = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
-version = "0.16.9"
-
 [[FTPClient]]
 deps = ["LibCURL", "URIParser"]
 git-tree-sha1 = "fcdcac297167852b23bae6d7bb3bf82a726ff70c"
@@ -332,10 +326,10 @@ uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 version = "0.9.13"
 
 [[Healpix]]
-deps = ["FITSIO", "Printf", "RecipesBase", "Test"]
-git-tree-sha1 = "f753b15832fc0876cd80fdec7978700ba832d05d"
+deps = ["CFITSIO", "LazyArtifacts", "Libsharp", "Pkg", "Printf", "RecipesBase", "Test"]
+git-tree-sha1 = "d258dae11794a5fb5b64ed4b3968a88450e5841b"
 uuid = "9f4e344d-96bc-545a-84a3-ae6b9e1b672b"
-version = "2.3.0"
+version = "3.0.0"
 
 [[HostCPUFeatures]]
 deps = ["IfElse", "Libdl", "Static"]
@@ -467,6 +461,12 @@ uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
 
 [[Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+
+[[Libsharp]]
+deps = ["Libdl", "libsharp2_jll"]
+git-tree-sha1 = "02f955af0f2fcc172fc7c37c3a52360797de8043"
+uuid = "ac8d63fe-4615-43ae-9860-9cd4a3820532"
+version = "0.1.0"
 
 [[LightGraphs]]
 deps = ["ArnoldiMethod", "DataStructures", "Distributed", "Inflate", "LinearAlgebra", "Random", "SharedArrays", "SimpleTraits", "SparseArrays", "Statistics"]
@@ -1012,6 +1012,12 @@ deps = ["MacroTools"]
 git-tree-sha1 = "9e7a1e8ca60b742e508a315c17eef5211e7fbfd7"
 uuid = "700de1a5-db45-46bc-99cf-38207098b444"
 version = "0.2.1"
+
+[[libsharp2_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "f4cae22b4df5c0e52e62d53a3cbf20fdc9607b6d"
+uuid = "180207a7-b08e-5162-af94-7d62a04fe081"
+version = "1.0.2+0"
 
 [[nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]

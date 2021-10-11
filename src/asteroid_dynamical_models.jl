@@ -815,7 +815,7 @@ end
     hy = (Z[1]*U[1])-(X[1]*W[1])
     hz = (X[1]*V[1])-(Y[1]*U[1])
 
-    #cartesian components of transversal unit vector:
+    #cartesian components of transversal unit vector: t = r × h
     t_x = (hz*Y[1]) - (hy*Z[1]) # Note: Y[1] = y_Sun - y_Apophis, etc.
     t_y = (hx*Z[1]) - (hz*X[1])
     t_z = (hy*X[1]) - (hx*Y[1])

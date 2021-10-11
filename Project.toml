@@ -33,7 +33,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 EarthOrientation = "0.7"
-Healpix = "2.3.0"
+Healpix = "3"
 JLD = "0.12"
 Quadmath = "0.5"
 RemoteFiles = "0.4"
