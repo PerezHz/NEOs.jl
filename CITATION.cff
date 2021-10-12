@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Pérez-Hernández"
+  given-names: "Jorge A."
+  orcid: "https://orcid.org/0000-0003-1460-7762"
+- family-names: "Benet"
+  given-names: "Luis"
+  orcid: "https://orcid.org/0000-0002-8470-9054"
+title: "NEOs.jl"
+type: software
+version: 0.1.0
+date-released: "2021-08-01"
+identifiers:
+  - description: The concept DOI of the software (cite all versions)
+    type: doi
+    value: "10.5281/zenodo.5152449"
+  - description: The versioned DOI for version 0.1.0 of the software
+    type: doi
+    value: "10.5281/zenodo.5152450"
+license: "MIT"
+repository-code: "https://github.com/PerezHz/NEOs.jl"
