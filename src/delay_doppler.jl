@@ -1,190 +1,446 @@
-# load ttmtdb as a TaylorInterpolant saved in .jld file
+# Load TT-TDB (ttmtdb) as a TaylorInterpolant saved in .jld file 
 const ttmtdb = JLD.load(joinpath(artifact"ttmtdb_DE430_1995_2030", "ttmtdb_DE430_1995_2030.jld"), "ttmtdb")
 
-# read JPL ephemerides (asteroid, Solar System, TT-TDB)
+# Read JPL ephemerides (asteroid, Solar System, TT-TDB)
+@doc raw"""
+    loadjpleph()
+
+Reads JPL ephemerides (asteroid, Solar System, TT-TDB).
+
+See also [`SPICE.furnsh`](@ref).
+"""
 function loadjpleph()
     furnsh(
+        # NAIF IDs
         joinpath(artifact"naif0012", "naif0012.tls"),
+        # JPL DE430 TT-TDB
         joinpath(artifact"TTmTDBde430", "TTmTDB.de430.19feb2015.bsp"),
+        # JPL DE430 ephemerides
         joinpath(artifact"de430", "de430_1850-2150.bsp"),
+        # JPL #197 solution for Apophis
         joinpath(artifact"a99942", "a99942_s197.bsp"),
+        # JPL #199 solution for Apophis
         joinpath(artifact"a99942", "a99942_s199.bsp"),
     )
 end
 
-# this is an auxiliary function which converts a [x,y,z,vx,vy,vz] "state" vector from km,km/sec units to au,au/day
+@doc raw"""
+    kmsec2auday(pv)
+
+Converts a ``[x, y, z, v_x, v_y, v_z]`` "state" vector from km, km/sec units to au, au/day.
+
+See also [`auday2kmsec`](@ref).
+"""
 function kmsec2auday(pv)
-    pv /= au # (km, km/sec) -> (au, au/sec)
+    pv /= au          # (km, km/sec) -> (au, au/sec)
     pv[4:6] *= daysec # (au, au/sec) -> (au, au/day)
     return pv
 end
 
-# this is an auxiliary function which converts a [x,y,z,vx,vy,vz] "state" vector from au,au/day units to km,km/sec
+@doc raw"""
+    auday2kmsec(pv)
+
+Converts a ``[x, y, z, v_x, v_y, v_z]`` "state" vector from au, au/day units to km, km/sec.
+
+See also [`kmsec2auday`](@ref).
+"""
 function auday2kmsec(pv)
-    pv *= au # (au, au/day) -> (km, km/day)
+    pv *= au          # (au, au/day) -> (km, km/day)
     pv[4:6] /= daysec # (km, km/day) -> (km, km/sec)
     return pv
 end
 
-# get [x,y,z,vx,vy,vz] geometric "state" vector at TDB instant `et` from
+# Get [x,y,z,vx,vy,vz] geometric "state" vector at TDB instant `et` from
 # SPK-formatted ephemeris file wrt J2000 frame
+@doc raw"""
+    getpv(target::Int, observer::Int, et)
+
+Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec) at 
+TDB instant `et` from SPK-formatted ephemeris file with respect to J2000 frame.
+
+See also [`SPICE.spkgeo`](@ref).
+"""
 function getpv(target::Int, observer::Int, et)
     return spkgeo(target, et, "J2000", observer)[1] # units: km,km/sec
 end
 
 # NAIF IDs:
-#0: Solar System Barycenter
-#10: Sun (heliocenter)
-#2099942: Apophis
-#399: Earth (geocenter)
-#301: Moon
-#1000000001 from body 1000000000: TT-TDB
+# 0: Solar System Barycenter
+# 10: Sun (heliocenter)
+# 2099942: Apophis
+# 399: Earth (geocenter)
+# 301: Moon
+# 1000000001 from body 1000000000: TT-TDB
 # Here, we follow the convention from the CSPICE, library, that the ephemeris
 # time is referred to the J2000 frame epoch:
 # https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/spk.html#Terminology
 # argument `et` represents "ephemeris seconds" (TDB seconds) since J2000.0 TDB epoch
 # position and velocity are assumed to be returned in km, km/sec, resp., by spkgeo
 # https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/spkgeo_c.html (see: Detailed ouput section)
+
+@doc raw"""
+    apophis_pv_197(et)
+
+Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
+of Apophis at TDB instant `et` from JPL #197 solution with respect to J2000 frame.
+    
+See also [`getpv`](@ref).
+"""
 apophis_pv_197(et) = getpv(9904406, 0, constant_term(et)) # units: km, km/second
+
+@doc raw"""
+    apophis_pv_199(et)        
+
+Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
+of Apophis at TDB instant `et` from JPL #199 solution with respect to J2000 frame.
+    
+See also [`getpv`](@ref).
+"""
 apophis_pv_199(et) = getpv(2099942, 0, constant_term(et)) # units: km, km/second
+
+@doc raw"""
+    sun_pv(et)
+
+Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
+of the Sun at TDB instant `et` with respect to J2000 frame.
+    
+See also [`getpv`](@ref).
+"""
 sun_pv(et) = getpv(10, 0, constant_term(et)) # units: km, km/second
+
+@doc raw"""
+    earth_pv(et)
+
+Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
+of the Earth at TDB instant `et` with respect to J2000 frame.
+    
+See also [`getpv`](@ref).
+"""
 earth_pv(et) = getpv(399, 0, constant_term(et)) # units: km, km/second
+
+@doc raw"""
+    moon_pv(et)
+
+Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
+of the Moon at TDB instant `et` with respect to J2000 frame.
+    
+See also [`getpv`](@ref).
+"""
 moon_pv(et) = getpv(301, 0, constant_term(et)) # units: km, km/second
+
+@doc raw"""
+    tt_tdb(et)
+
+Returns the difference TT-TDB (in units of sec) at TDB instant `et` with respect to J2000 
+frame.
+    
+See also [`getpv`](@ref).
+"""
 tt_tdb(et) = getpv(1000000001, 1000000000, constant_term(et))[1] # units: seconds
+
+@doc raw"""
+    dtt_tdb(et)
+
+Returns the rate of change of TT-TDB (in units of sec/sec) at TDB instant `et` with respect 
+to J2000 frame.
+    
+See also [`getpv`](@ref).
+"""
 dtt_tdb(et) = getpv(1000000001, 1000000000, constant_term(et))[4] # units: seconds/seconds
 
-# Convert julian days to ephemeris seconds since J2000
+@doc raw"""
+    julian2etsecs(jd)
+
+Converts `jd` julian days to ephemeris seconds since J2000.
+
+See also [`etsecs2julian`](@ref).
+"""
 function julian2etsecs(jd)
     return (jd-JD_J2000)*daysec
 end
 
 # Convert ephemeris seconds since J2000 to julian days
+@doc raw"""
+    etsecs2julian(et)
+
+Converts `et` ephemeris seconds since J2000 to julian days. 
+
+See also [`julian2etsecs`](@ref).
+"""
 function etsecs2julian(et)
     return JD_J2000 + et/daysec
 end
 
-# Standard formula for relativistic (Shapiro) delay
+@doc raw"""
+    shapiro_delay(e, p, q)
+
+Returns the relativistic (Shapiro) time-delay in seconds 
+```math
+\Delta\tau[\text{rel}] = \frac{2\mu_\odot}{c^3}\log\left|\frac{d_{E,S} + d_{A,S} + d_{A,E}}{d_{E,S}+d_{A,S}-d_{A, E}}\right|,
+```
+where ``\mu_\odot = GM_\odot`` is the mass parameter of the sun, and ``d_{E,S}``, ``d_{A,S}``
+and ``d_{A,E}`` are the heliocentric distance of the Earth, the asteroid's heliocentric 
+distance, and the asteroid's  geocentric distance, respectively. 
+
+See https://doi.org/10.1103/PhysRevLett.13.789.
+
+# Arguments
+
+- `e`: heliocentric distance of the Earth. 
+- `p`: asteroid's heliocentric distance.
+- `q`: asteroid's geocentric distance. 
+"""
 function shapiro_delay(e, p, q)
-    shap = 0.0 #2μ[1]/(c_au_per_day^2)
+    shap = 0.0 # 2μ[1]/(c_au_per_day^2)
     shap_del_days = (2PlanetaryEphemeris.μ[su]/(c_au_per_day^3))*log( (e+p+q+shap)/(e+p-q+shap) ) # days
     return shap_del_days*daysec # seconds
 end
 
+@doc raw"""
+    shapiro_doppler(e, de, p, dp, q, dq, F_tx)
+
+Returns the Doppler shift (in units of `F_tx`)
+```math
+\Delta\nu = -\nu\frac{d\Delta\tau}{dt},
+```
+where ``\nu`` is the frequency and ``\frac{d\Delta\tau}{dt}`` is the differential of the 
+Shapiro delay. See also [`shapiro_delay`](@ref). 
+
+See https://doi.org/10.1103/PhysRevLett.17.933.
+
+# Arguments
+
+- `e`: heliocentric distance of the Earth. 
+- `de`: differential of `e`. 
+- `p`: asteroid's heliocentric distance.
+- `dp`: differential of `p`. 
+- `q`: asteroid's geocentric distance. 
+- `dq`: differential of `q`. 
+- `F_tx`: transmitter frequency (MHz).
+"""
 function shapiro_doppler(e, de, p, dp, q, dq, F_tx)
     # shap_del_diff = 2μ[1]*( (de+dp+dq)/(e+p+q) - (de+dp-dq)/(e+p-q) )/(c_au_per_day^3) # (adim.)
     shap_del_diff = (4PlanetaryEphemeris.μ[su]/(c_au_per_day^3))*(  ( dq*(e+p) - q*(de+dp) )/( (e+p)^2 - q^2 )  ) # differential of Shapiro delay (adim.)
-    shap_dop = -F_tx*shap_del_diff # ν = -F_tx*dτ/dt (units of F_tx) <-- Shapiro, Ash, Tausner (1966), footnote 10
+    # ν = -F_tx*dτ/dt (units of F_tx)
+    # See footnote 10 of https://doi.org/10.1103/PhysRevLett.17.933
+    shap_dop = -F_tx*shap_del_diff
     return shap_dop # (units of F_tx)
 end
 
-# Density of ionized electrons in interplanetary medium (ESAA 2014, p. 323, Sec. 8.7.5, Eq. 8.22)
-# ESAA 2014 in turn refers to Muhleman and Anderson (1981)
-# Ostro (1993) gives a reference to Anderson (1978), where this model is fitted to Mariner 9 ranging data
-# Reading https://gssc.esa.int/navipedia/index.php/Ionospheric_Delay
-# Helped a lot to clarify things, especially the 40.3, although they talk about Earth's ionosphere
-# Another valuable source is Standish, E.M., Astron. Astrophys. 233, 252-271 (1990)
-# Ne: ionized electrons density: electrons/cm^3
-# p1: signal departure point (transmitter/bounce) (au)
-# p2: signal arrival point (bounce/receiver) (au)
-# r_s_t0: Barycentric position (au) of Sun at initial time of propagation of signal path (bounce time for down-leg; transmit time for up-leg)
-# ds: current distance travelled by ray from emission point (au)
-# ΔS: total distance between p1 and p2 (au)
+@doc raw"""
+    Ne(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}, ds::U, ΔS::Real) where {S<:Number, U<:Number}
+
+Returns the density of ionized electrons (in electrons/cm^3) in interplanetary medium
+```math
+N_e = \frac{A}{r^6} + \frac{ab/\sqrt{a^2\sin^2\beta + b^2\cos^2\beta}}{r^2},
+```
+where ``r`` is the heliocentric distance expressed in units of the solar radius, ``\beta`` is
+the solar latitude, and ``A``, ``a``, ``b`` are the solar corona parameters. 
+
+See (Explanatory Supplement to the Astronomical Almanac 2014, p. 323, Sec. 8.7.5, Eq. 8.22). 
+ESAA 2014 in turn refers to Muhleman and Anderson (1981). Ostro (1993) gives a reference to 
+Anderson (1978), where this model is fitted to Mariner 9 ranging data. Reading https://gssc.esa.int/navipedia/index.php/Ionospheric_Delay
+helped a lot to clarify things, especially the 40.3, although they talk about Earth's 
+ionosphere. Another valuable source is Standish, E.M., Astron. Astrophys. 233, 252-271 (1990).
+    
+# Arguments 
+- `p1`: signal departure point (transmitter/bounce) (au).
+- `p2`: signal arrival point (bounce/receiver) (au).
+- `r_s_t0`: Barycentric position (au) of Sun at initial time of propagation of signal path (bounce time for down-leg; transmit time for up-leg).
+- `ds`: current distance travelled by ray from emission point (au).
+- `ΔS`: total distance between p1 and p2 (au).
+"""
 function Ne(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}, ds::U, ΔS::Real) where {S<:Number, U<:Number}
     # s: linear parametrization of ray path, such that
-    # s=0 -> point on ray path is at p1; s=1 -> point on ray path is at p2
+    # s = 0 -> point on ray path is at p1; s = 1 -> point on ray path is at p2
     s = ds/ΔS
+    # Rescale Taylor polynomial
     s_p2_p1 = map(x->s*x, Taylor1.(p2-p1, s.order))
-    r_vec = Taylor1.(p1, s.order) + s_p2_p1 - Taylor1.(r_s_t0, s.order) # heliocentric position (au) of point on ray path at time t_tdb_jul (Julian days)
-    r = sqrt( r_vec[1]^2 + r_vec[2]^2 + r_vec[3]^2 ) # heliocentric distance (au) of point on ray path at time t_tdb_jul (Julian days)
-    # compute heliocentric position vector of point on ray path wrt Sun's rotation pole and equator (i.e., heliographic)
+    # Heliocentric position (au) of point on ray path at time t_tdb_jul (Julian days)
+    r_vec = Taylor1.(p1, s.order) + s_p2_p1 - Taylor1.(r_s_t0, s.order) 
+    # Heliocentric distance (au) of point on ray path at time t_tdb_jul (Julian days)
+    r = sqrt( r_vec[1]^2 + r_vec[2]^2 + r_vec[3]^2 )
+    # Compute heliocentric position vector of point on ray path wrt Sun's rotation pole 
+    # and equator (i.e., heliographic)
     α_p_sun_rad = deg2rad(α_p_sun)
     δ_p_sun_rad = deg2rad(δ_p_sun)
     r_vec_heliographic = inv( pole_rotation(α_p_sun_rad, δ_p_sun_rad) )*r_vec
-    # compute heliographic solar latitude (Anderson, 1978) of point on ray path
-    β = asin( r_vec_heliographic[3]/r ) # ecliptic solar latitude of point on ray path (rad)
+    # Compute heliographic solar latitude (Anderson, 1978) of point on ray path
+    β = asin( r_vec_heliographic[3]/r ) # Ecliptic solar latitude of point on ray path (rad)
+    # Heliocentric distance
     r_sr = r/R_sun
+    # First term of Ne
     Ne_t1 = (A_sun/r_sr^6)
+    # Second term of Ne
     Ne_t2 = ( (a_sun*b_sun)/sqrt((a_sun*sin(β))^2 + (b_sun*cos(β))^2) )/(r_sr^2)
+    # Density of ionized electrons
     Ne_val = Ne_t1 + Ne_t2
     return Ne_val
 end
 
-# Integral of Ne, evaluated with TaylorIntegration.jl
 # TODO: @taylorize!
-# p1: signal departure point (transmitter/bounce) (au)
-# p2: signal arrival point (bounce/receiver) (au)
-# r_s_t0: Barycentric position (au) of Sun at initial time of propagation of signal path (bounce time for down-leg; transmit time for up-leg)
-# output is in units of electrons/cm^2
+@doc raw"""
+    Ne_path_integral(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}) where {S<:Number}
+
+Returns the path integral of the density of ionized electrons in interplanetary medium ``N_e``
+in units of electrons/cm^2, evaluated with `TaylorIntegration`. 
+
+# Arguments 
+
+- `p1`: signal departure point (transmitter/bounce) (au).
+- `p2`: signal arrival point (bounce/receiver) (au).
+- `r_s_t0`: Barycentric position (au) of Sun at initial time of propagation of signal path (bounce time for down-leg; transmit time for up-leg).
+"""
 function Ne_path_integral(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}) where {S<:Number}
-    ΔS = (100_000au)*norm(p2-p1) # total distance between p1 and p2, in centimeters
-    # kernel of path integral; distance parameter `s` and total distance `ΔS` is in cm
-    function int_kernel(x, params, s)
+    # Total distance between p1 and p2, in centimeters
+    ΔS = (100_000au)*norm(p2-p1) 
+    # Kernel of path integral; distance parameter `s` and total distance `ΔS` is in cm
+    function int_kernel(x, params, s) 
         return Ne(p1, p2, r_s_t0, s, ΔS)
     end
-    # do path integral
+    # Do path integral
+
+    # Initial condition
     i0 = zero(p1[1])
-    tT = Taylor1(24)
     iT = Taylor1(i0, 24)
+    # Independent variable
+    tT = Taylor1(24)
+    # Integration 
     TaylorIntegration.jetcoeffs!(int_kernel, tT, iT, nothing)
+    # Evaluate path integral in total distance ΔS
     return iT(ΔS)
 end
 
-# Time-delay due to thin plasma of solar corona
-# Ne: ionized electrons density: electrons/cm^3
-# p1: signal departure point (transmitter/bounce for up/down-link, resp.) (au)
-# p2: signal arrival point (bounce/receiver for up/down-link, resp.) (au)
-# t_tdb_jd1, t_tdb_jd2: Two-part Julian date (TDB) of signal path (bounce time for downlink; transmit time for uplink)
-# F_tx: transmitter frequency (MHz)
-# From https://gssc.esa.int/navipedia/index.php/Ionospheric_Delay it seems that
-# ESAA 2014 text probably should say that in the formula for Δτ_corona,
-# the expression 40.3*Ne/f^2 is adimensional, where Ne [electrons/centimeters^3] and f is in Hz
-# therefore, the integral (40.3/f^2)*∫Ne*ds is in centimeters, where ds is in centimeters
-# and the expression (40.3/(c*f^2))*∫Ne*ds, with c in centimeters/second, is in seconds
+@doc raw"""
+    corona_delay(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}, F_tx::U, station_code::Int) where {S<:Number, U<:Real}
+
+Returns the time-delay (in sec) due to thin plasma of solar corona 
+```math
+\Delta\tau_\text{cor} = \frac{40.3}{cf^2}\int_{P_1}^{P_2}N_e \ ds,
+```math
+where ``c`` is the speed of light (cm/sec), ``f`` is the frequency (Hz), ``N_e`` is the density
+of ionized electrons in interplanetary medium (electrons/cm^3), and ``s`` is the linear 
+distance (cm). ``N_e`` is computed by [`Ne`](@ref) and integrated via `TaylorIntegration` in 
+[`Ne_path_integral`](@ref).
+
+From [Ionospheric Delay](https://gssc.esa.int/navipedia/index.php/Ionospheric_Delay) it seems
+that ESAA 2014 text probably should say that in the formula for ``\Delta\tau_\text{cor}``, 
+the expression ``40.3 N_e/f^2`` is adimensional, where ``Ne`` is in electrons/cm^3 and ``f`` is
+in Hz therefore, the integral ``(40.3/f^2)\int Ne \ ds`` is in centimeters, where ``ds`` is in
+cm and the expression ``(40.3/(cf^2))\int Ne \ ds``, with ``c`` in cm/sec, is in seconds.
+
+# Arguments 
+
+- `p1`: signal departure point (transmitter/bounce for up/down-link, resp.) (au).
+- `p2`: signal arrival point (bounce/receiver for up/down-link, resp.) (au).
+- `t_tdb_jd1`, `t_tdb_jd2`: Two-part Julian date (TDB) of signal path (bounce time for downlink; transmit time for uplink).
+- `r_s_t0`: Barycentric position (au) of Sun at initial time of propagation of signal path (bounce time for down-leg; transmit time for up-leg).
+- `F_tx`: transmitter frequency (MHz).
+- `station_code`: observing station identifier (MPC nomenclature).
+"""
 function corona_delay(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S}, F_tx::U, station_code::Int) where {S<:Number, U<:Real}
-    # for the time being, we're removing the terms associated with higher-order terms in the variationals (ie, Yarkovsky)
+    # For the time being, we're removing the terms associated with higher-order terms in the
+    # variationals (ie, Yarkovsky)
     int_path = Ne_path_integral(p1, p2, r_s_t0) # (electrons/cm^2)
+    # Time delay due to solar corona
     Δτ_corona = 40.3e-6int_path/(c_cm_per_sec*(F_tx)^2) # seconds
     return Δτ_corona # seconds
 end
 
-# *VERY* elementary computation of zenith distance
-# r_antenna: position of antenna at receive/transmit time in celestial frame wrt geocenter
-# ρ_vec_ae: slant-range vector from antenna to asteroid
+@doc raw"""
+    zenith_distance(r_antenna::Vector{T}, ρ_vec_ae::Vector{S}) where {T<:Number, S<:Number}
+
+**VERY** elementary computation of zenith distance.
+
+# Arguments
+
+- `r_antenna`: position of antenna at receive/transmit time in celestial frame wrt geocenter.
+- `ρ_vec_ae`: slant-range vector from antenna to asteroid.
+"""
 function zenith_distance(r_antenna::Vector{T}, ρ_vec_ae::Vector{S}) where {T<:Number, S<:Number}
+    # Magnitude of geocentric antenna position
     norm_r_antenna = sqrt(r_antenna[1]^2 + r_antenna[2]^2 + r_antenna[3]^2)
+    # Magnitude of slant-range vector from antenna to asteroid
     norm_ρ_vec_ae = sqrt(ρ_vec_ae[1]^2 + ρ_vec_ae[2]^2 + ρ_vec_ae[3]^2)
+    # cos( angle between r_antenna and ρ_vec_ae)
     cos_antenna_slant = dot(r_antenna, ρ_vec_ae)/(norm_r_antenna*norm_ρ_vec_ae)
+    # zenith distance
     return acos(cos_antenna_slant)
 end
 
-# Time delay from the Earth's troposphere for radio frequencies
-# oscillates between 0.007μs and 0.225μs for z between 0 and π/2 rad
-# z: zenith distance (radians)
+@doc raw"""
+    tropo_delay(z)    
+
+Returns the time delay (in sec) due to Earth's troposphere for radio frequencies
+```math
+\Delta\tau_\text{tropo} = \frac{7 \ \text{nsec}}{\cos z + \frac{0.0014}{0.045 + \cot z}},
+```
+where ``z`` is the zenith distance at the antenna. This time delay oscillates between 
+0.007``\mu``s and 0.225``\mu``s for ``z`` between 0 and ``\pi/2`` rad.
+
+See also [`zenith_distance`](@doc).
+
+# Arguments 
+
+- `z`: zenith distance (radians).
+"""
 tropo_delay(z) = (7e-9)/( cos(z) + 0.0014/(0.045+cot(z)) ) # seconds
 
+@doc raw"""
+    tropo_delay(r_antenna::Vector{T}, ρ_vec_ae::Vector{S}) where {T<:Number, S<:Number}
+
+Returns the time delay (in sec) due to Earth's troposphere for radio frequencies. The function
+first computes the zenith distance ``z`` via [`zenith_distance`](@ref) and then substitutes
+into the fisrt method of [`tropo_delay`](@ref).
+
+# Arguments
+
+- `r_antenna`: position of antenna at receive/transmit time in celestial frame wrt geocenter.
+- `ρ_vec_ae`: slant-range vector from antenna to asteroid.
+"""
 function tropo_delay(r_antenna::Vector{T}, ρ_vec_ae::Vector{S}) where {T<:Number, S<:Number}
-    zd = zenith_distance(r_antenna, ρ_vec_ae)
+    # zenith distance
+    zd = zenith_distance(r_antenna, ρ_vec_ae) # rad
+    # Time delay due to Earth's troposphere
     return tropo_delay(zd) # seconds
 end
 
-# auxiliary function to compute (TDB-UTC); useful to convert TDB to UTC via UTC + (TDB-UTC) and viceversa
-# TDB: Solar System barycentric ephemeris time
-# et: TDB seconds since J2000.0 (TDB)
-# TT: Terrestrial time
-# TAI: International Atomic Time
-# UTC: Coordinated Universal Time
-# TDB-UTC = (TDB-TAI) + (TAI-UTC)
-#         = (TDB-TT) + (TT-TAI) + (TAI-UTC)
-#         = (TDB-TT) + (32.184 s) + ΔAT
-# does not include correction due to position of measurement station v_E*(r_S.r_E)/c^2 (Folkner et al. 2014; Moyer, 2003)
+@doc raw"""
+    tdb_utc(et::T) where {T<:Number}
+
+Auxiliary function to compute (TDB-UTC)
+```math
+\begin{align*}
+TDB-UTC & = (TDB-TAI) + (TAI-UTC) \\ 
+        & = (TDB-TT) + (TT-TAI) + (TAI-UTC) \\
+        & = (TDB-TT) + 32.184 s + ΔAT,
+\end{align*}
+```
+where TDB is the Solar System barycentric ephemeris time, TT is the Terrestrial time, 
+TAI is the International Atomic Time, and UTC is the Coordinated Universal Time.
+
+This function is useful to convert TDB to UTC via UTC + (TDB-UTC) and viceversa. This function
+does not include correction due to position of measurement station ``v_E(r_S.r_E)/c^2`` 
+(Folkner et al. 2014; Moyer, 2003). 
+
+# Arguments
+
+- `et::T`: TDB seconds since J2000.0. 
+""" 
 function tdb_utc(et::T) where {T<:Number}
+    # TT-TDB
     tt_tdb_et = ttmtdb(et)
+    # TT-TAI 
     tt_tai = 32.184
+    
     et_00 = constant_term(constant_term(et))
-    utc_secs = et_00 - deltet(et_00, "ET") # used only to determine ΔAT; no high-precision needed
+    # Used only to determine ΔAT; no high-precision needed
+    utc_secs = et_00 - deltet(et_00, "ET") 
+    # ΔAT
     jd_utc = JD_J2000 + utc_secs/daysec
     tai_utc = get_ΔAT(jd_utc)
-    return (tt_tai + tai_utc) - tt_tdb_et # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
+    # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
+    return (tt_tai + tai_utc) - tt_tdb_et 
 end
 
 # TODO: add tdb_utc(utc) method!!!
@@ -199,18 +455,29 @@ end
 #     return et
 # end
 
-# Compute radar-astrometric round-trip time for an asteroid at
-# UTC instant `t_r_utc` from tracking station with code `station_code`.
-# station_code: observing station identifier (MPC nomenclature)
-# t_r_utc: UTC time of echo reception (DateTime)
-# t_offset: time offset wrt echo reception time, to compute Doppler shifts by range differences (seconds)
-# niter: number of light-time solution iterations
-# xve: Earth ephemeris wich takes TDB seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second
-# xvs: Sun ephemeris wich takes TDB seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second
-# xva: asteroid ephemeris wich takes TDB seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second
+@doc raw"""
+    delay(station_code::Int, t_r_utc::DateTime, t_offset::Real, niter::Int=10; eo::Bool=true,
+          xve=earth_pv, xvs=sun_pv, xva=apophis_pv_197)
+
+Compute radar-astrometric round-trip time (``\mu``s) for an asteroid at UTC instant `t_r_utc`
+from tracking station with code `station_code`. 
+
+See https://doi.org/10.1086/116062.
+
+# Arguments 
+
+- `station_code`: observing station identifier (MPC nomenclature). 
+- `t_r_utc`: UTC time of echo reception (DateTime).
+- `t_offset`: time offset wrt echo reception time, to compute Doppler shifts by range differences (seconds).
+- `niter`: number of light-time solution iterations. 
+- `xve`: Earth ephemeris wich takes TDB seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second.
+- `xvs`: Sun ephemeris wich takes TDB seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second.
+- `xva`: asteroid ephemeris wich takes TDB seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second.
+"""
 function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
         niter::Int=10; eo::Bool=true, xve=earth_pv, xvs=sun_pv,
         xva=apophis_pv_197)
+    # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = str2et(string(t_r_utc)) + t_offset
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
     R_r, V_r = observer_position(station_code, et_r_secs, eo=eo)
@@ -226,77 +493,109 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
     # Sun barycentric position and velocity at receive time
     rv_s_t_r = xvs(et_r_secs)
     r_s_t_r = rv_s_t_r[1:3]
-    # down-leg iteration
-    # τ_D first approximation: Eq. (1) Yeomans et al. (1992)
+    
+    # Down-leg iteration
+    # τ_D first approximation
+    # See equation (1) of https://doi.org/10.1086/116062
     ρ_vec_r = r_a_t_r - r_r_t_r
     ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
-    τ_D = ρ_r/clightkms # (seconds) -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
-    # bounce time, new estimate Eq. (2) Yeomans et al. (1992)
+    # -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
+    τ_D = ρ_r/clightkms # (seconds) 
+    # Bounce time, new estimate 
+    # See equation (2) of https://doi.org/10.1086/116062
     et_b_secs = et_r_secs - τ_D
 
-    Δτ_D = zero(τ_D)
-    Δτ_rel_D = zero(τ_D)
-    # Δτ_corona_D = zero(τ_D)
-    Δτ_tropo_D = zero(τ_D)
+    # Allocate memmory for time delays
+    Δτ_D = zero(τ_D)            # Total time delay
+    Δτ_rel_D = zero(τ_D)        # Shapiro delay 
+    # Δτ_corona_D = zero(τ_D)   # Delay due to Solar corona
+    Δτ_tropo_D = zero(τ_D)      # Delay due to Earth's troposphere
 
     for i in 1:niter
-        # asteroid barycentric position (in au) at bounce time (TDB)
+        # Asteroid barycentric position (in au) and velocity (in au/day) at bounce time (TDB)
         rv_a_t_b = xva(et_b_secs)
         r_a_t_b = rv_a_t_b[1:3]
         v_a_t_b = rv_a_t_b[4:6]
-        # Eq. (3) Yeomans et al. (1992)
+        # Estimated position of the asteroid's center of mass relative to the recieve point 
+        # See equation (3) of https://doi.org/10.1086/116062.
         ρ_vec_r = r_a_t_b - r_r_t_r
-        # Eq. (4) Yeomans et al. (1992)
+        # Magnitude of ρ_vec_r
+        # See equation (4) of https://doi.org/10.1086/116062.
         ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
-        # compute down-leg Shapiro delay
-        # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, Δτ_rel_[D|U]
+
+        # Compute down-leg Shapiro delay
+        # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, 
+        # Δτ_rel_[D|U]
+
+        # Earth's position at t_r
         e_D_vec  = r_r_t_r - r_s_t_r
-        e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2) # heliocentric distance of Earth at t_r
-        rv_s_t_b = xvs(et_b_secs) # barycentric position and velocity of Sun at estimated bounce time
+        # Heliocentric distance of Earth at t_r
+        e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2) 
+        # Barycentric position and velocity of Sun at estimated bounce time
+        rv_s_t_b = xvs(et_b_secs) 
         r_s_t_b = rv_s_t_b[1:3]
+        # Heliocentric position of asteroid at t_b
         p_D_vec  = r_a_t_b - r_s_t_b
-        p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2) # heliocentric distance of asteroid at t_b
-        q_D = ρ_r #signal path distance (down-leg)
+        # Heliocentric distance of asteroid at t_b
+        p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2) 
+        # Signal path distance (down-leg)
+        q_D = ρ_r 
+
         # Shapiro correction to time-delay
-        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)
-        # troposphere correction to time-delay
-        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r) # seconds
+        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D) # seconds
+        # Troposphere correction to time-delay
+        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)  # seconds
         # Δτ_corona_D = corona_delay(constant_term.(r_a_t_b), r_r_t_r, r_s_t_r, F_tx, station_code) # seconds
+        # Total time-delay
         Δτ_D = Δτ_rel_D # + Δτ_tropo_D #+ Δτ_corona_D # seconds
+
+        # New estimate 
         p_dot_23 = dot(ρ_vec_r, v_a_t_b)/ρ_r
+        # Time delay correction
         Δt_2 = (τ_D - ρ_r/clightkms - Δτ_rel_D)/(1.0-p_dot_23/clightkms)
+        # Time delay new estimate 
         τ_D = τ_D - Δt_2
+        # Bounce time, new estimate 
+        # See equation (2) of https://doi.org/10.1086/116062
         et_b_secs = et_r_secs - τ_D
+
     end
+    # Asteroid's barycentric position and velocity at bounce time t_b
     rv_a_t_b = xva(et_b_secs)
     r_a_t_b = rv_a_t_b[1:3]
     v_a_t_b = rv_a_t_b[4:6]
 
-    # up-leg iteration
-    # τ_U first estimation: Eq. (5) Yeomans et al. (1992)
+    # Up-leg iteration
+    # τ_U first estimation
+    # See equation (5) of https://doi.org/10.1086/116062
     τ_U = τ_D
-    # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
+    # Transmit time, 1st estimate 
+    # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_b_secs - τ_U
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
     R_t, V_t = observer_position(station_code, et_t_secs, eo=eo)
+    # Barycentric position and velocity of the Earth at transmit time 
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
     v_e_t_t = rv_e_t_t[4:6]
     # Transmitter barycentric position and velocity of at transmit time
     r_t_t_t = r_e_t_t + R_t
-    # Eq. (7) Yeomans et al. (1992)
+    # Up-leg vector at transmit time
+    # See equation (7) of https://doi.org/10.1086/116062
     ρ_vec_t = r_a_t_b - r_t_t_t
+    # Magnitude of up-leg vector 
     ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
 
-    Δτ_U = zero(τ_U)
-    Δτ_rel_U = zero(τ_U)
-    # Δτ_corona_U = zero(τ_U)
-    Δτ_tropo_U = zero(τ_U)
+    # Allocate memmory for time delays
+    Δτ_U = zero(τ_U)            # Total time delay
+    Δτ_rel_U = zero(τ_U)        # Shapiro delay  
+    # Δτ_corona_U = zero(τ_U)   # Delay due to Solar corona  
+    Δτ_tropo_U = zero(τ_U)      # Delay due to Earth's troposphere
 
-    # println("   *** DOWNLEG LOOP ***")
     for i in 1:niter
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-        # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial conditions variations via et_t_secs
+        # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial 
+        # conditions variations via et_t_secs
         R_t, V_t = observer_position(station_code, et_t_secs, eo=eo)
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t = xve(et_t_secs)
@@ -305,57 +604,110 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
         # Barycentric position and velocity of the transmitter at the transmit time
         r_t_t_t = r_e_t_t + R_t
         v_t_t_t = v_e_t_t + V_t
-        # Eq. (7) Yeomans et al. (1992)
+        # Up-leg vector and its magnitude at transmit time
+        # See equation (7) of https://doi.org/10.1086/116062
         ρ_vec_t = r_a_t_b - r_t_t_t
         ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
-        # compute up-leg Shapiro delay
+
+        # Compute up-leg Shapiro delay
+
         # Sun barycentric position and velocity (in au, au/day) at transmit time (TDB)
         rv_s_t_t = xvs(et_t_secs)
         r_s_t_t = rv_s_t_t[1:3]
+        # Heliocentric position of Earth at t_t
         e_U_vec = r_t_t_t - r_s_t_t
-        e_U = sqrt(e_U_vec[1]^2 + e_U_vec[2]^2 + e_U_vec[3]^2) # heliocentric distance of Earth at t_t
-        rv_s_t_b = xvs(et_b_secs) # barycentric position/velocity of Sun at bounce time
+        # Heliocentric distance of Earth at t_t
+        e_U = sqrt(e_U_vec[1]^2 + e_U_vec[2]^2 + e_U_vec[3]^2)
+        # Barycentric position/velocity of Sun at bounce time
+        rv_s_t_b = xvs(et_b_secs) 
         r_s_t_b = rv_s_t_b[1:3]
+        # Heliocentric position of asteroid at t_b
         p_U_vec = r_a_t_b - r_s_t_b
-        p_U = sqrt(p_U_vec[1]^2 + p_U_vec[2]^2 + p_U_vec[3]^2) # heliocentric distance of asteroid at t_b
+        # Heliocentric distance of asteroid at t_b
+        p_U = sqrt(p_U_vec[1]^2 + p_U_vec[2]^2 + p_U_vec[3]^2) 
+        
         q_U_vec = r_a_t_b - r_e_t_t
-        q_U = ρ_t # signal path distance (up-leg)
+        # Signal path distance (up-leg)
+        q_U = ρ_t 
+        # Shapiro correction to time-delay 
         Δτ_rel_U = shapiro_delay(e_U, p_U, q_U) # seconds
-        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # seconds
+        # Troposphere correction to time-delay
+        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t)  # seconds
+        # Delay due to Solar corona 
         # Δτ_corona_U = corona_delay(constant_term.(r_t_t_t), constant_term.(r_a_t_b), constant_term.(r_s_t_b), F_tx, station_code) # seconds
+        # Total time delay 
         Δτ_U = Δτ_rel_U # + Δτ_tropo_U #+ Δτ_corona_U # seconds
+
+        # New estimate 
         p_dot_12 = -dot(ρ_vec_t, v_t_t_t)/ρ_t
+        # Time-delay correction 
         Δt_1 = (τ_U - ρ_t/clightkms - Δτ_rel_U)/(1.0-p_dot_12/clightkms)
+        # Time delay new estimate 
         τ_U = τ_U - Δt_1
-        # transmit time, new estimate
+        # Transmit time, new estimate
+        # See equation (6) of https://doi.org/10.1086/116062
         et_t_secs = et_b_secs - τ_U
     end
 
-    # compute TDB-UTC at transmit time
-    # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth are of order 0.01μs
+    # Compute TDB-UTC at transmit time
+    # Corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position 
+    # of measurement station on Earth are of order 0.01μs
     # Δtt_tdb_station_t = - dot(v_e_t_t, r_t_t_t-r_e_t_t)/clightkms^2
     tdb_utc_t = tdb_utc(et_t_secs) # + Δtt_tdb_station_t
-    # compute TDB-UTC at receive time
-    # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth  are of order 0.01μs
+    
+    # Compute TDB-UTC at receive time
+    # Corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position 
+    # of measurement station on Earth  are of order 0.01μs
     # Δtt_tdb_station_r = - dot(v_e_t_r, r_r_t_r-r_e_t_r)/clightkms^2
     tdb_utc_r = tdb_utc(et_r_secs) # + Δtt_tdb_station_r
 
-    # compute total time delay (UTC seconds); relativistic delay is already included in τ_D, τ_U
-    # Eq. (9) Yeomans et al. (1992)
+    # Compute total time delay (UTC seconds); relativistic delay is already included in τ_D, τ_U
+    # See equation (9) of https://doi.org/10.1086/116062
     τ = (τ_D + τ_U) + (Δτ_tropo_D + Δτ_tropo_U) + (tdb_utc_t - tdb_utc_r) # seconds
 
-    return 1e6τ # total signal delay (μs)
+    # Total signal delay (μs)
+    return 1e6τ 
 end
 
-# Compute Taylor series expansion of time-delay observable around echo reception
-# time. This allows to compute dopplers via autodiff using ν = -F_tx*dτ/dt
-# NOTE: Works only with TaylorInterpolant ephemeris
+@doc raw"""
+    delay(station_code::Int, t_r_utc::DateTime, niter::Int=10; eo::Bool=true, 
+          xve::TaylorInterpolant=earth_pv, xvs::TaylorInterpolant=sun_pv, 
+          xva::TaylorInterpolant=apophis_pv_197, tord::Int=xva.x[1].order)
+
+Compute Taylor series expansion of time-delay observable around echo reception time. This
+allows to compute dopplers via automatic differentiation using 
+```math
+\nu = -f\frac{d\tau}{dt},
+```
+where ``f`` is the transmitter frequency (MHz) and ``\tau`` is the time-delay at reception 
+time ``t``. 
+
+See https://doi.org/10.1086/116062.
+
+**Note:** Works only with `TaylorInterpolant` ephemeris. See 
+[`PlanetaryEphemeris.TaylorInterpolant`](@ref).
+
+# Arguments 
+
+- `station_code`: observing station identifier (MPC nomenclature). 
+- `t_r_utc`: UTC time of echo reception (DateTime).
+- `niter`: number of light-time solution iterations. 
+- `eo`: wheter to use `EarthOrientation` or not. 
+- `xve`: Earth ephemeris wich takes TDB seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second.
+- `xvs`: Sun ephemeris wich takes TDB seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second.
+- `xva`: asteroid ephemeris wich takes TDB seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second.
+- `tord`: order of Taylor expansions. 
+"""
 function delay(station_code::Int, t_r_utc::DateTime,
         niter::Int=10; eo::Bool=true, xve::TaylorInterpolant=earth_pv,
         xvs::TaylorInterpolant=sun_pv, xva::TaylorInterpolant=apophis_pv_197,
         tord::Int=xva.x[1].order)
-    q1 = xva.x[1] # auxiliary to evaluate JT ephemeris
+
+    # Auxiliary to evaluate JT ephemeris
+    q1 = xva.x[1] 
+    # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs_0 = str2et(string(t_r_utc))
+    # et_r_secs_0 a a Taylor polynomial
     et_r_secs = Taylor1([et_r_secs_0,1.0].*one(q1[0]), tord)
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
     R_r, _ = observer_position(station_code, et_r_secs, eo=eo)
@@ -367,96 +719,110 @@ function delay(station_code::Int, t_r_utc::DateTime,
     r_a_t_r = xva(et_r_secs)[1:3]
     # Sun barycentric position and velocity at receive time
     r_s_t_r = xvs(et_r_secs)[1:3]
-    # down-leg iteration
-    # τ_D first approximation: Eq. (1) Yeomans et al. (1992)
+
+    # Down-leg iteration
+    # τ_D first approximation
+    # See equation (1) of https://doi.org/10.1086/116062
     ρ_vec_r = r_a_t_r - r_r_t_r
     ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
-    # @show ρ_r
-    τ_D = ρ_r/clightkms # (seconds) -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
-    # @show τ_D
-    # bounce time, new estimate Eq. (2) Yeomans et al. (1992)
-    # @show et_r_secs
+    # -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
+    τ_D = ρ_r/clightkms # (seconds) 
+    # Bounce time, new estimate 
+    # See equation (2) of https://doi.org/10.1086/116062
     et_b_secs = et_r_secs - τ_D
-    # @show et_b_secs et_r_secs
-
-    Δτ_D = zero(τ_D)
-    Δτ_rel_D = zero(τ_D)
-    # Δτ_corona_D = zero(τ_D)
-    Δτ_tropo_D = zero(τ_D)
-    # @show Δτ_D
-
+    
+    # Allocate memmory for time delays
+    Δτ_D = zero(τ_D)            # Total time delay
+    Δτ_rel_D = zero(τ_D)        # Shapiro delay 
+    # Δτ_corona_D = zero(τ_D)   # Delay due to Solar corona
+    Δτ_tropo_D = zero(τ_D)      # Delay due to Earth's troposphere
+    
     for i in 1:niter
-        # asteroid barycentric position (in au) at bounce time (TDB)
+        # Asteroid barycentric position (in au) at bounce time (TDB)
         rv_a_t_b = xva(et_b_secs)
         r_a_t_b = rv_a_t_b[1:3]
         v_a_t_b = rv_a_t_b[4:6]
-        # Eq. (3) Yeomans et al. (1992)
+        # Estimated position of the asteroid's center of mass relative to the recieve point 
+        # See equation (3) of https://doi.org/10.1086/116062.
         ρ_vec_r = r_a_t_b - r_r_t_r
-        # Eq. (4) Yeomans et al. (1992)
+        # Magnitude of ρ_vec_r
+        # See equation (4) of https://doi.org/10.1086/116062.
         ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
-        # @show ρ_r
-        # compute down-leg Shapiro delay
-        # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, Δτ_rel_[D|U]
+        
+        # Compute down-leg Shapiro delay
+        # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, 
+        # Δτ_rel_[D|U]
+
+        # Earth's position at t_r
         e_D_vec  = r_r_t_r - r_s_t_r
-        # @show e_D_vec
-        e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2) # heliocentric distance of Earth at t_r
-        # barycentric position and velocity of Sun at estimated bounce time
+        # Heliocentric distance of Earth at t_r
+        e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2)
+        # Barycentric position of Sun at estimated bounce time
         r_s_t_b = xvs(et_b_secs)[1:3]
-        # @show r_s_t_b
+        # Heliocentric position of asteroid at t_b
         p_D_vec  = r_a_t_b - r_s_t_b
-        p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2) # heliocentric distance of asteroid at t_b
-        q_D = ρ_r #signal path distance (down-leg)
+        # Heliocentric distance of asteroid at t_b
+        p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2)
+        # Signal path distance (down-leg)
+        q_D = ρ_r
+
         # Shapiro correction to time-delay
-        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)
-        # @show Δτ_rel_D
-        # troposphere correction to time-delay
-        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r) # seconds
-        # @show Δτ_tropo_D
+        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D) # seconds
+        # Troposphere correction to time-delay
+        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)  # seconds
+        # Solar corona correction to time-delay
         # Δτ_corona_D = corona_delay(constant_term.(r_a_t_b), r_r_t_r, r_s_t_r, F_tx, station_code) # seconds
+        # Total time-delay
         Δτ_D = Δτ_rel_D # + Δτ_tropo_D #+ Δτ_corona_D # seconds
-        # @show Δτ_D
+        
+        # New estimate 
         p_dot_23 = dot(ρ_vec_r, v_a_t_b)/ρ_r
-        # @show p_dot_23
+        # Time delay correction
         Δt_2 = (τ_D - ρ_r/clightkms - Δτ_rel_D)/(1.0-p_dot_23/clightkms)
-        # @show Δt_2
+        # Time delay new estimate 
         τ_D = τ_D - Δt_2
+        # Bounce time, new estimate 
+        # See equation (2) of https://doi.org/10.1086/116062
         et_b_secs = et_r_secs - τ_D
+
     end
-    # @show τ_D
+
+    # Asteroid's barycentric position and velocity at bounce time t_b
     rv_a_t_b = xva(et_b_secs)
     r_a_t_b = rv_a_t_b[1:3]
     v_a_t_b = rv_a_t_b[4:6]
 
-    # up-leg iteration
-    # τ_U first estimation: Eq. (5) Yeomans et al. (1992)
+    # Up-leg iteration
+    # τ_U first estimation
+    # See equation (5) of https://doi.org/10.1086/116062
     τ_U = τ_D
-    # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
+    # Transmit time, 1st estimate 
+    # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_b_secs - τ_U
-    # @show τ_U et_t_secs et_b_secs et_r_secs
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
     R_t, V_t = observer_position(station_code, et_t_secs, eo=eo)
-    # @show R_t V_t
-    # Earth's barycentric position and velocity at transmit time
+    # Barycentric position and velocity of the Earth at transmit time 
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
     v_e_t_t = rv_e_t_t[4:6]
-    # @show r_e_t_t norm(r_e_t_t)/au norm(v_e_t_t)
     # Transmitter barycentric position and velocity of at transmit time
     r_t_t_t = r_e_t_t + R_t
-    # # Eq. (7) Yeomans et al. (1992)
+    # Up-leg vector at transmit time
+    # See equation (7) of https://doi.org/10.1086/116062
     ρ_vec_t = r_a_t_b - r_t_t_t
+    # Magnitude of up-leg vector 
     ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
-    # @show ρ_t
 
-    Δτ_U = zero(τ_U)
-    Δτ_rel_U = zero(τ_U)
-    # Δτ_corona_U = zero(τ_U)
-    Δτ_tropo_U = zero(τ_U)
-    # @show Δτ_U
+    # Allocate memmory for time delays
+    Δτ_U = zero(τ_U)            # Total time delay
+    Δτ_rel_U = zero(τ_U)        # Shapiro delay  
+    # Δτ_corona_U = zero(τ_U)   # Delay due to Solar corona  
+    Δτ_tropo_U = zero(τ_U)      # Delay due to Earth's troposphere
 
-    # println("   *** DOWNLEG LOOP ***")
     for i in 1:niter
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
+        # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial 
+        # conditions variations via et_t_secs
         R_t, V_t = observer_position(station_code, et_t_secs, eo=eo)
         # Earth's barycentric position and velocity at transmit time
         rv_e_t_t = xve(et_t_secs)
@@ -465,82 +831,155 @@ function delay(station_code::Int, t_r_utc::DateTime,
         # Barycentric position and velocity of the transmitter at the transmit time
         r_t_t_t = r_e_t_t + R_t
         v_t_t_t = v_e_t_t + V_t
-        # Eq. (7) Yeomans et al. (1992)
+        # Up-leg vector and its magnitude at transmit time
+        # See equation (7) of https://doi.org/10.1086/116062
         ρ_vec_t = r_a_t_b - r_t_t_t
         ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
-        # @show ρ_t
-        # compute up-leg Shapiro delay
+
+
+        # Compute up-leg Shapiro delay
+
         # Sun barycentric position and velocity (in au, au/day) at transmit time (TDB)
         r_s_t_t = xvs(et_t_secs)[1:3]
+        # Heliocentric position of Earth at t_t
         e_U_vec = r_t_t_t - r_s_t_t
-        # @show e_U_vec
-        e_U = sqrt(e_U_vec[1]^2 + e_U_vec[2]^2 + e_U_vec[3]^2) # heliocentric distance of Earth at t_t
-        # @show e_U
-        r_s_t_b = xvs(et_b_secs)[1:3] # barycentric position/velocity of Sun at bounce time
+        # Heliocentric distance of Earth at t_t
+        e_U = sqrt(e_U_vec[1]^2 + e_U_vec[2]^2 + e_U_vec[3]^2)
+        # Barycentric position/velocity of Sun at bounce time
+        r_s_t_b = xvs(et_b_secs)[1:3]
+        # Heliocentric position of asteroid at t_b
         p_U_vec = r_a_t_b - r_s_t_b
-        p_U = sqrt(p_U_vec[1]^2 + p_U_vec[2]^2 + p_U_vec[3]^2) # heliocentric distance of asteroid at t_b
-        # @show p_U
+        # Heliocentric distance of asteroid at t_b
+        p_U = sqrt(p_U_vec[1]^2 + p_U_vec[2]^2 + p_U_vec[3]^2) 
         q_U_vec = r_a_t_b - r_e_t_t
-        q_U = ρ_t # signal path distance (up-leg)
-        # @show q_U
+        # Signal path distance (up-leg)
+        q_U = ρ_t 
+
+        # Shapiro correction to time-delay 
         Δτ_rel_U = shapiro_delay(e_U, p_U, q_U) # seconds
-        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # seconds
+        # Troposphere correction to time-delay
+        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t)  # seconds
+        # Delay due to Solar corona 
         # Δτ_corona_U = corona_delay(constant_term.(r_t_t_t), constant_term.(r_a_t_b), constant_term.(r_s_t_b), F_tx, station_code) # seconds
+        # Total time delay 
         Δτ_U = Δτ_rel_U # + Δτ_tropo_U #+ Δτ_corona_U # seconds
-        # @show Δτ_U
+        
+        # New estimate 
         p_dot_12 = -dot(ρ_vec_t, v_t_t_t)/ρ_t
+        # Time-delay correction 
         Δt_1 = (τ_U - ρ_t/clightkms - Δτ_rel_U)/(1.0-p_dot_12/clightkms)
-        # @show Δt_1
+        # Time delay new estimate 
         τ_U = τ_U - Δt_1
-        # transmit time, new estimate
+        # Transmit time, new estimate
+        # See equation (6) of https://doi.org/10.1086/116062
         et_t_secs = et_b_secs - τ_U
     end
 
-    # compute TDB-UTC at transmit time
-    # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth are of order 0.01μs
+    # Compute TDB-UTC at transmit time
+    # Corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position 
+    # of measurement station on Earth are of order 0.01μs
     # Δtt_tdb_station_t = - dot(v_e_t_t, r_t_t_t-r_e_t_t)/clightkms^2
     tdb_utc_t = tdb_utc(et_t_secs) # + Δtt_tdb_station_t
-    # compute TDB-UTC at receive time
-    # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth  are of order 0.01μs
+    
+    # Compute TDB-UTC at receive time
+    # Corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position 
+    # of measurement station on Earth  are of order 0.01μs
     # Δtt_tdb_station_r = - dot(v_e_t_r, r_r_t_r-r_e_t_r)/clightkms^2
     tdb_utc_r = tdb_utc(et_r_secs) # + Δtt_tdb_station_r
-    # @show tdb_utc_t tdb_utc_r
 
-    # # compute total time delay (UTC seconds); relativistic delay is already included in τ_D, τ_U
-    # # Eq. (9) Yeomans et al. (1992)
+    # Compute total time delay (UTC seconds); relativistic delay is already included in τ_D, τ_U
+    # See equation (9) of https://doi.org/10.1086/116062
     τ = (τ_D + τ_U) + (Δτ_tropo_D + Δτ_tropo_U) + (tdb_utc_t - tdb_utc_r) # seconds
 
-    return 1e6τ # total signal delay (μs)
+    # Total signal delay (μs)
+    return 1e6τ 
 end
 
+@doc raw"""
+    delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real, niter::Int=10; 
+                  eo::Bool=true, tc::Real=1.0, xve=earth_pv, xvs=sun_pv, xva=apophis_pv_197, 
+                  autodiff::Bool=true, tord::Int=10)
+
+Returns time-delay and Doppler shift. 
+
+# Arguments 
+
+- `station_code`: observing station identifier (MPC nomenclature). 
+- `t_r_utc`: UTC time of echo reception (DateTime).
+- `F_tx`: transmitter frequency (MHz).
+- `niter`: number of light-time solution iterations. 
+- `eo`: wheter to use `EarthOrientation` or not. 
+- `tc`: time offset wrt echo reception time, to compute Doppler shifts by range differences (seconds).
+- `xve`: Earth ephemeris wich takes TDB seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second.
+- `xvs`: Sun ephemeris wich takes TDB seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second.
+- `xva`: asteroid ephemeris wich takes TDB seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second.
+- `autodiff`: wheter to use the automatic differentiation method of [`delay`](@ref) or not. 
+- `tord`: order of Taylor expansions. 
+"""
 function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
         niter::Int=10; eo::Bool=true, tc::Real=1.0, xve=earth_pv, xvs=sun_pv,
         xva=apophis_pv_197, autodiff::Bool=true, tord::Int=10)
+
+    # Automatic differentiation method of delay 
     if autodiff
+        # Time delay 
         τ = delay(station_code, t_r_utc, niter, eo=eo, xve=xve, xvs=xvs, xva=xva, tord=tord)
+        # Time delay, Doppler shift
         return τ[0], -F_tx*τ[1]
+    # No automatic differentiation method of delay 
     else
         τe = delay(station_code, t_r_utc,  tc/2, niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
         τn = delay(station_code, t_r_utc,   0.0, niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
         τs = delay(station_code, t_r_utc, -tc/2, niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
+        # Time delay, Doppler shift 
         return τn, -F_tx*((τe-τs)/tc)
     end
+
 end
 
+@doc raw"""
+    delay_doppler(astradarfile::String, niter::Int=10; eo::Bool=true, tc::Real=1.0, 
+                  xve=earth_pv, xvs=sun_pv, xva=apophis_pv_197, autodiff::Bool=true, 
+                  tord::Int=10)
+
+Returns a `DataFrame` with the time delays and Doppler shifts associated with the radar
+measurements of file `astradarfile`. 
+
+See also [`process_radar_data_jpl`](@ref). 
+
+# Arguments
+
+- `astradarfile::String`: radar data file. 
+- `niter::Int`: number of light-time solution iterations. 
+- `eo`: wheter to use `EarthOrientation` or not.
+- `tc`: time offset wrt echo reception time, to compute Doppler shifts by range differences (seconds).
+- `xve`: Earth ephemeris wich takes TDB seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second.
+- `xvs`: Sun ephemeris wich takes TDB seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second.
+- `xva`: asteroid ephemeris wich takes TDB seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second.
+- `autodiff`: wheter to use the automatic differentiation method of [`delay`](@ref) or not. 
+- `tord`: order of Taylor expansions. 
+"""
 function delay_doppler(astradarfile::String,
         niter::Int=10; eo::Bool=true, tc::Real=1.0, xve=earth_pv, xvs=sun_pv,
         xva=apophis_pv_197, autodiff::Bool=true, tord::Int=10)
 
+    # Read radar measurements
     astradardata = process_radar_data_jpl(astradarfile)
-
+    # 
     et1 = str2et(string(astradardata[1].utcepoch))
+    # 
     a1_et1 = xva(et1)[1]
+    # 
     S = typeof(a1_et1)
 
+    # Time delays 
     vdelay = Array{S}(undef, length(astradardata))
+    # Doppler shifts
     vdoppler = Array{S}(undef, length(astradardata))
 
+    # Iterate over the measurements
     for i in eachindex(astradardata)
+        # Compute time delay and doppler shift 
         vdelay[i], vdoppler[i] = delay_doppler(
             astradardata[i].rcvr,
             astradardata[i].utcepoch,
@@ -555,43 +994,53 @@ function delay_doppler(astradarfile::String,
             tord = tord
         )
     end
-
+    # Rows with time delays 
     delay_index = map(x->x.delay_units=="us", astradardata)
+    # Rows with Doppler shifts 
     doppler_index = map(x->x.doppler_units=="Hz", astradardata)
-
+    # Time delays / Doppler shifts table 
     radobs_t = DataFrame(
         (
-            dt_utc_obs=utcepoch.(astradardata),
-            τ_obs=delay.(astradardata),
-            ν_obs=doppler.(astradardata),
-            τ_comp=vdelay,
-            ν_comp=vdoppler,
-            σ_τ=delay_sigma.(astradardata),
-            σ_ν=doppler_sigma.(astradardata),
-            τ_units=delay_units.(astradardata),
-            ν_units=doppler_units.(astradardata),
-            freq=freq.(astradardata),
-            rcvr=rcvr.(astradardata),
-            xmit=xmit.(astradardata),
-            bouncepoint=bouncepoint.(astradardata),
-            delay_index=delay_index,
-            doppler_index=doppler_index
+            dt_utc_obs=utcepoch.(astradardata),        # UTD time 
+            τ_obs=delay.(astradardata),                # Observed time delay 
+            ν_obs=doppler.(astradardata),              # Observed Doppler shift   
+            τ_comp=vdelay,                             # Computed time delay 
+            ν_comp=vdoppler,                           # Computed Doppler shift 
+            σ_τ=delay_sigma.(astradardata),            # Observed time delay uncertainty    
+            σ_ν=doppler_sigma.(astradardata),          # Observed Doppler shift uncertainty 
+            τ_units=delay_units.(astradardata),        # Time delay units   
+            ν_units=doppler_units.(astradardata),      # Doppler shift units  
+            freq=freq.(astradardata),                  # Frequency
+            rcvr=rcvr.(astradardata),                  # ID of reciever antenna
+            xmit=xmit.(astradardata),                  # ID of emission antenna
+            bouncepoint=bouncepoint.(astradardata),    # Bounce point  
+            delay_index=delay_index,                   # Rows with time delays 
+            doppler_index=doppler_index                # Rows with Doppler shifts 
         )
     )
-
+    # Return time delays / Doppler shifts table 
     return radobs_t
 end
 
-# Compute round-trip time and Doppler shift radar astrometry for an asteroid at
-# UTC instant `t_r_utc` from tracking station with code `station_code` from Earth,
-# Sun and asteroid ephemerides. Dopplers are computed following Yeomans et al. (1992)
-# station_code: observing station identifier (MPC nomenclature)
-# et_r_secs: time of echo reception (TDB seconds since J2000.0 TDB)
-# F_tx: transmitter frequency (MHz)
-# niter: number of light-time solution iterations
-# xve: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in au and velocity in au/day
-# xvs: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in au and velocity in au/day
-# xva: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in au and velocity in au/day
+@doc raw"""
+    delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime, F_tx::Real, 
+                                niter::Int=10; eo::Bool=true, xve=earth_pv, xvs=sun_pv,
+                                xva=apophis_pv_197)
+
+Compute round-trip time (in ``\mu``s) and Doppler shift (Hz) radar astrometry for an asteroid at 
+UTC instant `t_r_utc` from tracking station with code `station_code` from Earth, Sun and 
+asteroid ephemerides. Dopplers are computed following https://doi.org/10.1086/116062.
+
+# Arguments
+
+- `station_code`: observing station identifier (MPC nomenclature).
+- `et_r_secs`: time of echo reception (TDB seconds since J2000.0 TDB).
+- `F_tx`: transmitter frequency (MHz).
+- `niter`: number of light-time solution iterations.
+- `xve`: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in au and velocity in au/day.
+- `xvs`: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in au and velocity in au/day.
+- `xva`: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in au and velocity in au/day.
+"""
 function delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime,
         F_tx::Real, niter::Int=10; eo::Bool=true, xve=earth_pv, xvs=sun_pv,
         xva=apophis_pv_197)
@@ -614,91 +1063,121 @@ function delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime,
     rv_s_t_r = xvs(et_r_secs)
     r_s_t_r = rv_s_t_r[1:3]
     v_s_t_r = rv_s_t_r[4:6]
-    # down-leg iteration
-    # τ_D first approximation: Eq. (1) Yeomans et al. (1992)
+
+    # Down-leg iteration
+    # τ_D first approximation
+    # See equation (1) of https://doi.org/10.1086/116062
     ρ_vec_r = r_a_t_r - r_r_t_r
     ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
-    τ_D = ρ_r/clightkms # (seconds) -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
-    # bounce time, 1st estimate, Eq. (2) Yeomans et al. (1992)
+    # -R_b/c, but delay is wrt asteroid center (Brozovic et al., 2018)
+    τ_D = ρ_r/clightkms # (seconds) 
+    # Bounce time, 1st estimate
+    # See equation (2) of https://doi.org/10.1086/116062
     et_b_secs = et_r_secs - τ_D
-    # asteroid barycentric position (in au) at bounce time (TDB)
+    # Asteroid barycentric position (in au) at bounce time (TDB)
     rv_a_t_b = xva(et_b_secs)
     r_a_t_b = rv_a_t_b[1:3]
     v_a_t_b = rv_a_t_b[4:6]
 
-    Δτ_D = zero(τ_D)
-    Δτ_rel_D = zero(τ_D)
-    # Δτ_corona_D = zero(τ_D)
-    Δτ_tropo_D = zero(τ_D)
+    # Allocate memmory for time delays
+    Δτ_D = zero(τ_D)            # Total time delay
+    Δτ_rel_D = zero(τ_D)        # Shapiro delay 
+    # Δτ_corona_D = zero(τ_D)   # Delay due to Solar corona
+    Δτ_tropo_D = zero(τ_D)      # Delay due to Earth's troposphere
 
     for i in 1:niter
-        # Eq. (3) Yeomans et al. (1992)
+        # Estimated position of the asteroid's center of mass relative to the recieve point 
+        # See equation (3) of https://doi.org/10.1086/116062.
         ρ_vec_r = r_a_t_b - r_r_t_r
         ρ_vec_dot_r = v_a_t_b - v_r_t_r
-        # Eq. (4) Yeomans et al. (1992)
+        # Magnitude of ρ_vec_r
+        # See equation (4) of https://doi.org/10.1086/116062.
         ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
-        τ_D = ρ_r/clightkms # (seconds) -R_b/c (COM correction) + Δτ_D (relativistic, tropo, iono...)
-        # bounce time, new estimate Eq. (2) Yeomans et al. (1992)
+        
+        # -R_b/c (COM correction) + Δτ_D (relativistic, tropo, iono...)
+        τ_D = ρ_r/clightkms # (seconds) 
+        # Bounce time, new estimate 
+        # See equation (2) of https://doi.org/10.1086/116062.
         et_b_secs = et_r_secs - τ_D
-        # asteroid barycentric position (in au) at bounce time (TDB)
+        # Asteroid barycentric position (in au) at bounce time (TDB)
         rv_a_t_b = xva(et_b_secs)
         r_a_t_b = rv_a_t_b[1:3]
         v_a_t_b = rv_a_t_b[4:6]
-        # compute down-leg Shapiro delay
-        # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, Δτ_rel_[D|U]
+
+        # Compute down-leg Shapiro delay
+        # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, 
+        # Δτ_rel_[D|U]
+
+        # Earth's position at t_r
         e_D_vec  = r_e_t_r - r_s_t_r
         de_D_vec = v_e_t_r - v_s_t_r
-        e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2) # heliocentric distance of Earth at t_r
-        rv_s_t_b = xvs(et_b_secs) # barycentric position and velocity of Sun at estimated bounce time
+        # Heliocentric distance of Earth at t_r
+        e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2)
+        # Barycentric position and velocity of Sun at estimated bounce time
+        rv_s_t_b = xvs(et_b_secs) 
         r_s_t_b = rv_s_t_b[1:3]
         v_s_t_b = rv_s_t_b[4:6]
+        # Heliocentric position and velocity of asteroid at t_b
         p_D_vec  = constant_term.(r_a_t_b - r_s_t_b)
         dp_D_vec = constant_term.(v_a_t_b - v_s_t_b)
-        p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2) # heliocentric distance of asteroid at t_b
+        # Heliocentric distance of asteroid at t_b
+        p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2)
+        # Signal path distance (down-leg)
         q_D_vec  = constant_term.(r_a_t_b - r_e_t_r)
         dq_D_vec = constant_term.(v_a_t_b - v_e_t_r)
-        q_D = sqrt(q_D_vec[1]^2 + q_D_vec[2]^2 + q_D_vec[3]^2) #signal path distance (down-leg)
+        q_D = sqrt(q_D_vec[1]^2 + q_D_vec[2]^2 + q_D_vec[3]^2)
+
         # Shapiro correction to time-delay
-        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)
-        # troposphere correction to time-delay
-        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r) # seconds
+        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D) # seconds
+        # Troposphere correction to time-delay
+        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)  # seconds
+        # Solar corona correction to time-delay
         # Δτ_corona_D = corona_delay(constant_term.(r_a_t_b), r_r_t_r, r_s_t_r, F_tx, station_code) # seconds
+        # Total time-delay
         Δτ_D = Δτ_rel_D + Δτ_tropo_D #+ Δτ_corona_D # seconds
+
     end
+    # Total time delay 
     τ_D = τ_D + Δτ_D
-    # get latest estimates of ρ_vec_r and ρ_r
-    # Eq. (3) Yeomans et al. (1992)
+    # Get latest estimates of ρ_vec_r and ρ_r
+    # See equation (3) of https://doi.org/10.1086/116062
     ρ_vec_r = r_a_t_b - r_r_t_r
-    # Eq. (4) Yeomans et al. (1992)
+    # See equation (4) of https://doi.org/10.1086/116062
     ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
 
-    # up-leg iteration
-    # τ_U first estimation: Eq. (5) Yeomans et al. (1992)
+    # Up-leg iteration
+    # τ_U first estimation
+    # See equation (5) of https://doi.org/10.1086/116062
     τ_U = τ_D
-    # transmit time, 1st estimate Eq. (6) Yeomans et al. (1992)
+    # Transmit time, 1st estimate 
+    # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_r_secs - (τ_U+τ_D)
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
     R_t, V_t = observer_position(station_code, constant_term(et_t_secs), eo=eo)
+    # Barycentric position and velocity of the Earth at transmit time 
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
     v_e_t_t = rv_e_t_t[4:6]
-    # Transmitter barycentric position and velocity of at transmit time
+    # Transmitter barycentric position and velocity at transmit time
     r_t_t_t = r_e_t_t + R_t
     v_t_t_t = v_e_t_t + V_t
-    # Eq. (7) Yeomans et al. (1992)
+    # See equation (7) of https://doi.org/10.1086/116062
     ρ_vec_t = r_a_t_b - r_t_t_t
     ρ_vec_dot_t = v_a_t_b - v_t_t_t
     ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
 
-    Δτ_U = zero(τ_U)
-    Δτ_rel_U = zero(τ_U)
-    # Δτ_corona_U = zero(τ_U)
-    Δτ_tropo_U = zero(τ_U)
+    # Allocate memmory for time delays
+    Δτ_U = zero(τ_U)            # Total time delay
+    Δτ_rel_U = zero(τ_U)        # Shapiro delay  
+    # Δτ_corona_U = zero(τ_U)   # Delay due to Solar corona  
+    Δτ_tropo_U = zero(τ_U)      # Delay due to Earth's troposphere
 
     for i in 1:niter
-        # Eq. (8) Yeomans et al. (1992)
-        τ_U = ρ_t/clightkms # (seconds) -R_b/c (COM correction) + Δτ_U (relativistic, tropo, iono...)
-        # transmit time, new estimate
+        # See equation (8) of https://doi.org/10.1086/116062
+        # -R_b/c (COM correction) + Δτ_U (relativistic, tropo, iono...)
+        τ_U = ρ_t/clightkms # (seconds) 
+        # Transmit time, new estimate
+        # See equation (6) of https://doi.org/10.1086/116062
         et_t_secs = et_r_secs-(τ_U+τ_D)
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
         R_t, V_t = observer_position(station_code, constant_term(et_t_secs), eo=eo)
@@ -709,69 +1188,95 @@ function delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime,
         # Barycentric position and velocity of the transmitter at the transmit time
         r_t_t_t = r_e_t_t + R_t
         v_t_t_t = v_e_t_t + V_t
-        # Eq. (7) Yeomans et al. (1992)
+        # See equation (7) of https://doi.org/10.1086/116062
         ρ_vec_t = r_a_t_b - r_t_t_t
         ρ_vec_dot_t = v_a_t_b - v_t_t_t
         ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
-        # compute up-leg Shapiro delay
+
+        # Compute up-leg Shapiro delay
+
         # Sun barycentric position and velocity (in au, au/day) at transmit time (TDB)
         rv_s_t_t = xvs( et_t_secs )
         r_s_t_t = rv_s_t_t[1:3]
         v_s_t_t = rv_s_t_t[4:6]
+        # Earth barycentric position and velocity at transmit time 
         e_U_vec = constant_term.(r_e_t_t - r_s_t_t)
         de_U_vec = constant_term.(v_e_t_t - v_s_t_t)
-        e_U = sqrt(e_U_vec[1]^2 + e_U_vec[2]^2 + e_U_vec[3]^2) # heliocentric distance of Earth at t_t
-        rv_s_t_b = xvs(et_b_secs) # barycentric position/velocity of Sun at bounce time
+        # Heliocentric distance of Earth at t_t
+        e_U = sqrt(e_U_vec[1]^2 + e_U_vec[2]^2 + e_U_vec[3]^2)
+        # Barycentric position/velocity of Sun at bounce time
+        rv_s_t_b = xvs(et_b_secs) 
         r_s_t_b = rv_s_t_b[1:3]
         v_s_t_b = rv_s_t_b[4:6]
+        # Heliocentric position and velocity of the asteroid at bounce time 
         p_U_vec = constant_term.(r_a_t_b - r_s_t_b)
         dp_U_vec = constant_term.(v_a_t_b - v_s_t_b)
-        p_U = sqrt(p_U_vec[1]^2 + p_U_vec[2]^2 + p_U_vec[3]^2) # heliocentric distance of asteroid at t_b
+        # Heliocentric distance of asteroid at t_b
+        p_U = sqrt(p_U_vec[1]^2 + p_U_vec[2]^2 + p_U_vec[3]^2) 
+        # Signal path (up-leg)
         q_U_vec = constant_term.(r_a_t_b - r_e_t_t)
         dq_U_vec = constant_term.(v_a_t_b - v_e_t_t)
-        q_U = sqrt(q_U_vec[1]^2 + q_U_vec[2]^2 + q_U_vec[3]^2) # signal path (up-leg)
+        q_U = sqrt(q_U_vec[1]^2 + q_U_vec[2]^2 + q_U_vec[3]^2) 
+
+        # Time-delays 
+        # Shapiro delay 
         Δτ_rel_U = shapiro_delay(e_U, p_U, q_U) # seconds
-        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t) # seconds
+        # Troposphere correction to time delay
+        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t)  # seconds
+        # Solar corona correctino to time delay
         # Δτ_corona_U = corona_delay(constant_term.(r_t_t_t), constant_term.(r_a_t_b), constant_term.(r_s_t_b), F_tx, station_code) # seconds
+        # Total time delay 
         Δτ_U = Δτ_rel_U + Δτ_tropo_U #+ Δτ_corona_U # seconds
     end
     # Sun barycentric position (in au) at transmit time (TDB)
     r_s_t_t = xvs(et_t_secs)[1:3]
+    # Total time delay 
     τ_U = τ_U + Δτ_U
 
-    # compute TDB-UTC at transmit time
-    # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth are of order 0.01μs
+    # Compute TDB-UTC at transmit time
+    # Corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position 
+    # of measurement station on Earth are of order 0.01μs
     # Δtt_tdb_station_t = - dot(v_e_t_t/daysec, r_t_t_t-r_e_t_t)/c_au_per_sec^2
     tdb_utc_t = tdb_utc(constant_term(et_t_secs)) #+ Δtt_tdb_station_t
-    # compute TDB-UTC at receive time
-    # corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position of measurement station on Earth  are of order 0.01μs
+    
+    # Compute TDB-UTC at receive time
+    # Corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position 
+    # of measurement station on Earth  are of order 0.01μs
     # Δtt_tdb_station_r = dot(v_e_t_r/daysec, r_r_t_r-r_e_t_r)/c_au_per_sec^2
     tdb_utc_r = tdb_utc(et_r_secs) #+ Δtt_tdb_station_r
 
-    # compute total time delay (UTC seconds)
-    # Eq. (9) Yeomans et al. (1992)
+    # Compute total time delay (UTC seconds)
+    # See equation (9) of https://doi.org/10.1086/116062
     τ = (τ_U + τ_D) + (tdb_utc_t - tdb_utc_r)
 
-    # compute Doppler shift ν
-    # Eq. (10) Yeomans et al. (1992)
+    # Compute Doppler shift ν
+    # See equation (10) of https://doi.org/10.1086/116062
     ρ_vec_dot_t = v_a_t_b - v_t_t_t
     ρ_vec_dot_r = v_a_t_b - v_r_t_r
-    # Eq. (11) Yeomans et al. (1992)
+    # See equation (11) of https://doi.org/10.1086/116062
     ρ_dot_t = dot(ρ_vec_t, ρ_vec_dot_t)/ρ_t
     ρ_dot_r = dot(ρ_vec_r, ρ_vec_dot_r)/ρ_r
-    # Eq. (12) Yeomans et al. (1992)
+
+    # See equation (12) of https://doi.org/10.1086/116062   
+    # Order 1, only term  
     doppler_c = (ρ_dot_t+ρ_dot_r)/clightkms
+    # Order 1/c^2, first three terms 
     p_t = dot(ρ_vec_t, v_t_t_t)/ρ_t
     p_r = dot(ρ_vec_r, v_r_t_r)/ρ_r
-    doppler_c2_t1 = ρ_dot_t*p_t - ρ_dot_r*p_r - ρ_dot_t*ρ_dot_r # order c^-2, 1st term
+    doppler_c2_t1 = ρ_dot_t*p_t - ρ_dot_r*p_r - ρ_dot_t*ρ_dot_r 
+    # Order 1/c^2, GM_S terms 
     r_ts_vec = r_t_t_t - r_s_t_t
     r_ts = sqrt(r_ts_vec[1]^2+r_ts_vec[2]^2+r_ts_vec[3]^2)
     r_rs_vec = r_r_t_r - r_s_t_r
     r_rs = sqrt(r_rs_vec[1]^2+r_rs_vec[2]^2+r_rs_vec[3]^2)
-    doppler_c2_t2 = (PlanetaryEphemeris.μ[su]*((au^3)/(daysec^2)))*( (1/r_ts) - (1/r_rs) ) # order c^-2, 2nd term
-    doppler_c2_t3 = (  dot(v_t_t_t, v_t_t_t) - dot(v_r_t_r, v_r_t_r)  )/2  # order c^-2, 3rd term
+    doppler_c2_t2 = (PlanetaryEphemeris.μ[su]*((au^3)/(daysec^2)))*( (1/r_ts) - (1/r_rs) )
+    # Order 1/c^2, last term 
+    doppler_c2_t3 = (  dot(v_t_t_t, v_t_t_t) - dot(v_r_t_r, v_r_t_r)  )/2 
+
+    # Total Doppler shift 
     doppler_c2 = (doppler_c2_t1 + doppler_c2_t2 + doppler_c2_t3)/(clightkms^2)
     ν = -F_tx*(doppler_c) # + doppler_c2)
 
-    return 1e6τ, 1e6ν # total signal delay (μs) and Doppler shift (Hz)
+    # Total signal delay (μs) and Doppler shift (Hz)
+    return 1e6τ, 1e6ν 
 end
