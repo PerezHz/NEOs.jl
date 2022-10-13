@@ -87,7 +87,7 @@ bouncepoint(rdata::RadarDataJPL) = rdata.bouncepoint
 @doc raw"""
     ismonostatic(rdata::RadarDataJPL)
 
-Checks wheter the setup is monostatic, i.e., reciever and transmitter are the same. 
+Checks whether the setup is monostatic, i.e., receiver and transmitter are the same. 
 """
 ismonostatic(rdata::RadarDataJPL) = rdata.rcvr == rdata.xmit
 

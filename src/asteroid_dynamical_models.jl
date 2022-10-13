@@ -116,14 +116,10 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
     local UJ_interaction = params[5] 
     # Number of bodies, including NEA
     local N = params[6] 
-    # Number of bodies, except Apophis
+    # Number of bodies, except for the asteroid
     local Nm1 = N-1
     # Vector of mass parameters GM's
     local μ = params[7] 
-
-    # Parameters related to speed of light, c
-    local c_p2 = 29979.063823897606      # c^2 = 29979.063823897606 au^2/d^2
-    local c_m2 = 3.3356611996764786e-5   # c^-2 = 3.3356611996764786e-5 d^2/au^2
 
     # zero(q[1])
     local zero_q_1 = auxzero(q[1]) 
@@ -133,18 +129,18 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
 
-    # Position of the i-th body - position of Apophis
+    # Position of the i-th body - position of the asteroid
     X = Array{S}(undef, N)         # X-axis component
     Y = Array{S}(undef, N)         # Y-axis component
     Z = Array{S}(undef, N)         # Z-axis component
 
-    # Distance between the i-th body and Apophis
-    r_p2 = Array{S}(undef, N)      # r_{i,Apophis}^2
-    r_p1d2 = Array{S}(undef, N)    # sqrt(r_p2) <-> r_{i, Apophis}
-    r_p3d2 = Array{S}(undef, N)    # r_p2^1.5 <-> r_{i, Apophis}^3 
-    r_p7d2 = Array{S}(undef, N)    # r_p2^3.5 <-> r_{i, Apophis}^7
+    # Distance between the i-th body and the asteroid
+    r_p2 = Array{S}(undef, N)      # r_{i,asteroid}^2
+    r_p1d2 = Array{S}(undef, N)    # sqrt(r_p2) <-> r_{i, asteroid}
+    r_p3d2 = Array{S}(undef, N)    # r_p2^1.5 <-> r_{i, asteroid}^3 
+    r_p7d2 = Array{S}(undef, N)    # r_p2^3.5 <-> r_{i, asteroid}^7
 
-    # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, Apophis}^3
+    # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
     newtonianCoeff = Array{S}(undef, N)
 
     # Velocity of the i-th body
@@ -154,22 +150,22 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
 
     # Post-Newtonian stuff
 
-    # Velocity of the i-th body - velocity of Apophis
+    # Velocity of the i-th body - velocity of the asteroid
     U = Array{S}(undef, N)         # X-axis component
     V = Array{S}(undef, N)         # Y-axis component
     W = Array{S}(undef, N)         # Z-axis component
 
-    # 4 * Velocity of Apophis - 3 * velocity of the i-th body
+    # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
     _4U_m_3X = Array{S}(undef, N)  # X-axis component
     _4V_m_3Y = Array{S}(undef, N)  # Y-axis component
     _4W_m_3Z = Array{S}(undef, N)  # Z-axis component
 
-    # v_{i,j}v_{Apophis,j} j = x, y, z
-    UU = Array{S}(undef, N)        # v_{i,x}v_{Apophis,x}
-    VV = Array{S}(undef, N)        # v_{i,y}v_{Apophis,y}
-    WW = Array{S}(undef, N)        # v_{i,z}v_{Apophis,z}
+    # v_{i,j}v_{asteroid,j} j = x, y, z
+    UU = Array{S}(undef, N)        # v_{i,x}v_{asteroid,x}
+    VV = Array{S}(undef, N)        # v_{i,y}v_{asteroid,y}
+    WW = Array{S}(undef, N)        # v_{i,z}v_{asteroid,z}
 
-    # Newtonian potential of 1 body \mu_i / r_{i, Apophis}
+    # Newtonian potential of 1 body \mu_i / r_{i, asteroid}
     newtonian1b_Potential = Array{S}(undef, N)
     # Newtonian potential of N bodies 
     # \sum_{i\neq l} \frac{\mu_i}{r_{il}} or
@@ -177,14 +173,14 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
     newtonianNb_Potential = Array{S}(undef, N)
     
     # Newtonian coefficient * difference between two positions, i.e.,
-    # \mu_i * (\mathbf{r_i} - \mathbf{r_Apophis}) / r_{ij}^3
+    # \mu_i * (\mathbf{r_i} - \mathbf{r_asteroid}) / r_{ij}^3
     newton_acc_X = Array{S}(undef, N)   # X-axis component
     newton_acc_Y = Array{S}(undef, N)   # Y-axis component
     newton_acc_Z = Array{S}(undef, N)   # Z-axis component
 
     # Combinations of velocities
     v2 = Array{S}(undef, N)             # Velocity magnitude squared ||\mathbf{v}_i||^2
-    vi_dot_vj = Array{S}(undef, N)      # # <Velocity of the i-th body, velocity of Apophis>
+    vi_dot_vj = Array{S}(undef, N)      # # <Velocity of the i-th body, velocity of the asteroid>
 
     # Second term without (\mathbf{v}_i - \mathbf{v}_j)
     pn2 = Array{S}(undef, N)            
@@ -276,7 +272,7 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
     # -J_n * R^n / r^m 
     # J_n: n-th zonal harmonic coefficient
     # R: radius of the body
-    # r: distance between the body and Apophis
+    # r: distance between the body and the asteroid
     Λ2j_div_r4 = Array{S}(undef, N)   # J_2 * R^2 / r^4
     Λ3j_div_r5 = Array{S}(undef, N)   # J_3 * R^3 / r^5
 
@@ -351,15 +347,15 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
         ui[i] = ss16asteph_t[3(N-1+i)-2]    # X-axis component
         vi[i] = ss16asteph_t[3(N-1+i)-1]    # Y-axis component
         wi[i] = ss16asteph_t[3(N-1+i)  ]    # Z-axis component
-        # Position of the i-th body - position of Apophis
+        # Position of the i-th body - position of the asteroid
         X[i] = ss16asteph_t[3i-2]-q[1]      # X-axis component
         Y[i] = ss16asteph_t[3i-1]-q[2]      # Y-axis component
         Z[i] = ss16asteph_t[3i  ]-q[3]      # Z-axis component
-        # Velocity of the i-th body - velocity of Apophis
+        # Velocity of the i-th body - velocity of the asteroid
         U[i] = ui[i]-dq[1]                  # X-axis component
         V[i] = vi[i]-dq[2]                  # Y-axis component
         W[i] = wi[i]-dq[3]                  # Z-axis component
-        # 4 * Velocity of Apophis - 3 * velocity of the i-th body
+        # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
         _4U_m_3X[i] = (4dq[1]) - (3ui[i])   # X-axis component
         _4V_m_3Y[i] = (4dq[2]) - (3vi[i])   # Y-axis component
         _4W_m_3Z[i] = (4dq[3]) - (3wi[i])   # Z-axis component
@@ -367,31 +363,31 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
         pn2x = X[i]*_4U_m_3X[i]
         pn2y = Y[i]*_4V_m_3Y[i]
         pn2z = Z[i]*_4W_m_3Z[i]
-        # v_{ij}v_{Apophisj} j = x, y, z
+        # v_{ij}v_{asteroid} j = x, y, z
         UU[i] = ui[i]*dq[1]
         VV[i] = vi[i]*dq[2]
         WW[i] = wi[i]*dq[3]
-        # <Velocity of the i-th body, velocity of Apophis>
+        # <Velocity of the i-th body, velocity of the asteroid>
         vi_dot_vj[i] = ( UU[i]+VV[i] ) + WW[i]
-        # Distance between the i-th body and Apophis
-        r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,Apophis}^2
-        r_p1d2[i] = sqrt(r_p2[i])                   # sqrt(r_p2) <-> r_{i,Apophis}
-        r_p3d2[i] = r_p2[i]^1.5                     # r_p2^1.5 <-> r_{i, Apophis}^3 
-        r_p7d2[i] = r_p2[i]^3.5                     # r_p2^3.5 <-> r_{i, Apophis}^7
+        # Distance between the i-th body and the asteroid
+        r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,asteroid}^2
+        r_p1d2[i] = sqrt(r_p2[i])                   # sqrt(r_p2) <-> r_{i,asteroid}
+        r_p3d2[i] = r_p2[i]^1.5                     # r_p2^1.5 <-> r_{i, asteroid}^3 
+        r_p7d2[i] = r_p2[i]^3.5                     # r_p2^3.5 <-> r_{i, asteroid}^7
 
-        # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, Apophis}^3
+        # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
         newtonianCoeff[i] =  μ[i]/r_p3d2[i]
 
-        # Second term without (\mathbf{v}_i - \mathbf{v}_Apophis)
+        # Second term without (\mathbf{v}_i - \mathbf{v}_asteroid)
         pn2[i] = newtonianCoeff[i]*(( pn2x+pn2y ) + pn2z)
 
         # Newtonian coefficient * difference between two positions, i.e.,
-        # \mu_i * (\mathbf{r_i} - \mathbf{r_Apophis}) / r_{ij}^3        
+        # \mu_i * (\mathbf{r_i} - \mathbf{r_asteroid}) / r_{ij}^3        
         newton_acc_X[i] = X[i]*newtonianCoeff[i]
         newton_acc_Y[i] = Y[i]*newtonianCoeff[i]
         newton_acc_Z[i] = Z[i]*newtonianCoeff[i]
 
-        # Newtonian potential of 1 body \mu_i / r_{i, Apophis}
+        # Newtonian potential of 1 body \mu_i / r_{i, asteroid}
         newtonian1b_Potential[i] = μ[i]/r_p1d2[i]
         # Third term without newtonian accelerations \mathbf{a}_i
         pn3[i] = 3.5newtonian1b_Potential[i]
@@ -438,7 +434,7 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
             # -J_n * R^n / r^m 
             # J_n: n-th zonal harmonic coefficient
             # R: radius of the body
-            # r: distance between the body and Apophis
+            # r: distance between the body and the asteroid
             Λ2j_div_r4[i] = (-Λ2[i])/(r_p2[i]^2)    # J_2 * R^2 / r^4
             Λ3j_div_r5[i] = (-Λ3[i])/(r_p1d2[i]^5)  # J_3 * R^3 / r^5
             
@@ -509,7 +505,7 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
         # Velocity magnitude of the i-th body
         v2[i] = ( (ui[i]^2)+(vi[i]^2) ) + (wi[i]^2)
     end
-    # Apophis velocity magnitude
+    # Asteroid velocity magnitude
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
 
     for i in 1:Nm1
@@ -549,7 +545,7 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
         sj2_plus_2si2_minus_4vivj[i] = ( (2v2[i]) - (4vi_dot_vj[i]) ) + v2[N]
         # -4\sum - \sum + \dot{s}_j^2 + 2\dot{s}_i^2  - 4<, > terms inside {} 
         ϕs_and_vs[i] = sj2_plus_2si2_minus_4vivj[i] - ϕi_plus_4ϕj[i]
-        # (\mathbf{r}_i - \mathbf{r}_Apophis)\cdot\mathbf{v_i}
+        # (\mathbf{r}_i - \mathbf{r}_asteroid)\cdot\mathbf{v_i}
         Xij_t_Ui = X[i]*ui[i]
         Yij_t_Vi = Y[i]*vi[i]
         Zij_t_Wi = Z[i]*wi[i]
@@ -557,7 +553,7 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
         # The expression below inside the (...)^2 should have a minus sign in front of the 
         # numerator, but upon squaring it is eliminated, so at the end of the day, it is 
         # irrelevant ;)
-        # (\mathbf{r}_i - \mathbf{r}_Apophis)\cdot\mathbf{v_i} / r_{i, Apophis}
+        # (\mathbf{r}_i - \mathbf{r}_asteroid)\cdot\mathbf{v_i} / r_{i, asteroid}
         pn1t7 = (Rij_dot_Vi^2)/r_p2[i]
         # Everything inside the {} except for the first and last terms
         pn1t2_7 = ϕs_and_vs[i] - (1.5pn1t7)
@@ -628,8 +624,8 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
     hy = (Z[1]*U[1])-(X[1]*W[1])   # Y-axis component
     hz = (X[1]*V[1])-(Y[1]*U[1])   # Z-axis component
 
-    # Cartesian components of transversal vector t = h × (\mathbf{r}_Sun - \mathbf{r}_Apophis)
-    t_x = (hz*Y[1]) - (hy*Z[1])    # Note: Y[1] = y_Sun - y_Apophis, etc.
+    # Cartesian components of transversal vector t = h × (\mathbf{r}_Sun - \mathbf{r}_asteroid)
+    t_x = (hz*Y[1]) - (hy*Z[1])    # Note: Y[1] = y_Sun - y_asteroid, etc.
     t_y = (hx*Z[1]) - (hz*X[1])
     t_z = (hy*X[1]) - (hx*Y[1])
     # Norm of transversal vector
@@ -645,11 +641,11 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
     r_z_unit = -(Z[1]/r_p1d2[1])
 
     # Evaluate non-grav acceleration (solar radiation pressure, Yarkovsky)
-    g_r = r_p2[1]           # Distance Sun-Apophis
+    g_r = r_p2[1]           # Distance Sun-asteroid
     A2_t_g_r = q[7]/g_r     # Yarkovsky effect
     A1_t_g_r = q[8]/g_r     # Radiation pressure
 
-    # Non gravitational acceleration: Yarkovsky + Apophis
+    # Non gravitational acceleration: Yarkovsky + radiation pressure
     NGAx = (A2_t_g_r*t_x_unit) + (A1_t_g_r*r_x_unit)
     NGAy = (A2_t_g_r*t_y_unit) + (A1_t_g_r*r_y_unit)
     NGAz = (A2_t_g_r*t_z_unit) + (A1_t_g_r*r_z_unit)
@@ -690,14 +686,10 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
     local UJ_interaction = params[5] 
     # Number of bodies, including NEA
     local N = params[6] 
-    # Number of bodies, except Apophis
+    # Number of bodies, except the asteroid
     local Nm1 = N-1
     # Vector of mass parameters GM's
     local μ = params[7] 
-
-    # Parameters related to speed of light, c
-    local c_p2 = 29979.063823897606      # c^2 = 29979.063823897606 au^2/d^2
-    local c_m2 = 3.3356611996764786e-5   # c^-2 = 3.3356611996764786e-5 d^2/au^2
 
     # zero(q[1])
     local zero_q_1 = auxzero(q[1]) 
@@ -707,18 +699,18 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
 
-    # Position of the i-th body - position of Apophis
+    # Position of the i-th body - position of the asteroid
     X = Array{S}(undef, N)         # X-axis component
     Y = Array{S}(undef, N)         # Y-axis component
     Z = Array{S}(undef, N)         # Z-axis component
 
-    # Distance between the i-th body and Apophis
-    r_p2 = Array{S}(undef, N)      # r_{i,Apophis}^2
-    r_p1d2 = Array{S}(undef, N)    # sqrt(r_p2) <-> r_{i, Apophis}
-    r_p3d2 = Array{S}(undef, N)    # r_p2^1.5 <-> r_{i, Apophis}^3 
-    r_p7d2 = Array{S}(undef, N)    # r_p2^3.5 <-> r_{i, Apophis}^7
+    # Distance between the i-th body and the asteroid
+    r_p2 = Array{S}(undef, N)      # r_{i,asteroid}^2
+    r_p1d2 = Array{S}(undef, N)    # sqrt(r_p2) <-> r_{i, asteroid}
+    r_p3d2 = Array{S}(undef, N)    # r_p2^1.5 <-> r_{i, asteroid}^3 
+    r_p7d2 = Array{S}(undef, N)    # r_p2^3.5 <-> r_{i, asteroid}^7
 
-    # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, Apophis}^3
+    # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
     newtonianCoeff = Array{S}(undef, N)
 
     # Velocity of the i-th body
@@ -728,22 +720,22 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
 
     # Post-Newtonian stuff
 
-    # Velocity of the i-th body - velocity of Apophis
+    # Velocity of the i-th body - velocity of the asteroid
     U = Array{S}(undef, N)         # X-axis component
     V = Array{S}(undef, N)         # Y-axis component
     W = Array{S}(undef, N)         # Z-axis component
 
-    # 4 * Velocity of Apophis - 3 * velocity of the i-th body
+    # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
     _4U_m_3X = Array{S}(undef, N)  # X-axis component
     _4V_m_3Y = Array{S}(undef, N)  # Y-axis component
     _4W_m_3Z = Array{S}(undef, N)  # Z-axis component
 
-    # v_{i,j}v_{Apophis,j} j = x, y, z
-    UU = Array{S}(undef, N)        # v_{i,x}v_{Apophis,x}
-    VV = Array{S}(undef, N)        # v_{i,y}v_{Apophis,y}
-    WW = Array{S}(undef, N)        # v_{i,z}v_{Apophis,z}
+    # v_{i,j}v_{asteroid,j} j = x, y, z
+    UU = Array{S}(undef, N)        # v_{i,x}v_{asteroid,x}
+    VV = Array{S}(undef, N)        # v_{i,y}v_{asteroid,y}
+    WW = Array{S}(undef, N)        # v_{i,z}v_{asteroid,z}
 
-    # Newtonian potential of 1 body \mu_i / r_{i, Apophis}
+    # Newtonian potential of 1 body \mu_i / r_{i, asteroid}
     newtonian1b_Potential = Array{S}(undef, N)
     # Newtonian potential of N bodies 
     # \sum_{i\neq l} \frac{\mu_i}{r_{il}} or
@@ -751,14 +743,14 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
     newtonianNb_Potential = Array{S}(undef, N)
     
     # Newtonian coefficient * difference between two positions, i.e.,
-    # \mu_i * (\mathbf{r_i} - \mathbf{r_Apophis}) / r_{ij}^3
+    # \mu_i * (\mathbf{r_i} - \mathbf{r_asteroid}) / r_{ij}^3
     newton_acc_X = Array{S}(undef, N)   # X-axis component
     newton_acc_Y = Array{S}(undef, N)   # Y-axis component
     newton_acc_Z = Array{S}(undef, N)   # Z-axis component
 
     # Combinations of velocities
     v2 = Array{S}(undef, N)             # Velocity magnitude squared ||\mathbf{v}_i||^2
-    vi_dot_vj = Array{S}(undef, N)      # <Velocity of the i-th body, velocity of Apophis>
+    vi_dot_vj = Array{S}(undef, N)      # <Velocity of the i-th body, velocity of the asteroid>
 
     # Second term without (\mathbf{v}_i - \mathbf{v}_j)
     pn2 = Array{S}(undef, N)            
@@ -850,7 +842,7 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
     # -J_n * R^n / r^m 
     # J_n: n-th zonal harmonic coefficient
     # R: radius of the body
-    # r: distance between the body and Apophis
+    # r: distance between the body and the asteroid
     Λ2j_div_r4 = Array{S}(undef, N)   # J_2 * R^2 / r^4
     Λ3j_div_r5 = Array{S}(undef, N)   # J_3 * R^3 / r^5
 
@@ -926,17 +918,17 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
         vi[i] = ss16asteph_t[3(N-1+i)-1]    # Y-axis component
         wi[i] = ss16asteph_t[3(N-1+i)  ]    # Z-axis component
 
-        # Position of the i-th body - position of Apophis
+        # Position of the i-th body - position of the asteroid
         X[i] = ss16asteph_t[3i-2]-q[1]      # X-axis component
         Y[i] = ss16asteph_t[3i-1]-q[2]      # Y-axis component
         Z[i] = ss16asteph_t[3i  ]-q[3]      # Z-axis component
 
-        # Velocity of the i-th body - velocity of Apophis
+        # Velocity of the i-th body - velocity of the asteroid
         U[i] = ui[i]-dq[1]                  # X-axis component
         V[i] = vi[i]-dq[2]                  # Y-axis component
         W[i] = wi[i]-dq[3]                  # Z-axis component
 
-        # 4 * Velocity of Apophis - 3 * velocity of the i-th body
+        # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
         _4U_m_3X[i] = (4dq[1]) - (3ui[i])   # X-axis component
         _4V_m_3Y[i] = (4dq[2]) - (3vi[i])   # Y-axis component
         _4W_m_3Z[i] = (4dq[3]) - (3wi[i])   # Z-axis component
@@ -946,33 +938,33 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
         pn2y = Y[i]*_4V_m_3Y[i]
         pn2z = Z[i]*_4W_m_3Z[i]
 
-        # v_{ij}v_{Apophisj} j = x, y, z
+        # v_{ij}v_{asteroid} j = x, y, z
         UU[i] = ui[i]*dq[1]
         VV[i] = vi[i]*dq[2]
         WW[i] = wi[i]*dq[3]
 
-        # <Velocity of the i-th body, velocity of Apophis>
+        # <Velocity of the i-th body, velocity of the asteroid>
         vi_dot_vj[i] = ( UU[i]+VV[i] ) + WW[i]
 
-        # Distance between the i-th body and Apophis
-        r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,Apophis}^2
-        r_p1d2[i] = sqrt(r_p2[i])                   # sqrt(r_p2) <-> r_{i,Apophis}
-        r_p3d2[i] = r_p2[i]^1.5                     # r_p2^1.5 <-> r_{i, Apophis}^3 
-        r_p7d2[i] = r_p2[i]^3.5                     # r_p2^3.5 <-> r_{i, Apophis}^7
+        # Distance between the i-th body and the asteroid
+        r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,asteroid}^2
+        r_p1d2[i] = sqrt(r_p2[i])                   # sqrt(r_p2) <-> r_{i,asteroid}
+        r_p3d2[i] = r_p2[i]^1.5                     # r_p2^1.5 <-> r_{i, asteroid}^3 
+        r_p7d2[i] = r_p2[i]^3.5                     # r_p2^3.5 <-> r_{i, asteroid}^7
 
-        # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, Apophis}^3
+        # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
         newtonianCoeff[i] =  μ[i]/r_p3d2[i]
 
-        # Second term without (\mathbf{v}_i - \mathbf{v}_Apophis)
+        # Second term without (\mathbf{v}_i - \mathbf{v}_asteroid)
         pn2[i] = newtonianCoeff[i]*(( pn2x+pn2y ) + pn2z)
         
         # Newtonian coefficient * difference between two positions, i.e.,
-        # \mu_i * (\mathbf{r_i} - \mathbf{r_Apophis}) / r_{ij}^3        
+        # \mu_i * (\mathbf{r_i} - \mathbf{r_asteroid}) / r_{ij}^3        
         newton_acc_X[i] = X[i]*newtonianCoeff[i]
         newton_acc_Y[i] = Y[i]*newtonianCoeff[i]
         newton_acc_Z[i] = Z[i]*newtonianCoeff[i]
 
-        # Newtonian potential of 1 body \mu_i / r_{i, Apophis}
+        # Newtonian potential of 1 body \mu_i / r_{i, asteroid}
         newtonian1b_Potential[i] = μ[i]/r_p1d2[i]
         # Third term without newtonian accelerations \mathbf{a}_i
         pn3[i] = 3.5newtonian1b_Potential[i]
@@ -1018,7 +1010,7 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
             # -J_n * R^n / r^m 
             # J_n: n-th zonal harmonic coefficient
             # R: radius of the body
-            # r: distance between the body and Apophis
+            # r: distance between the body and the asteroid
             Λ2j_div_r4[i] = (-Λ2[i])/(r_p2[i]^2)    # J_2 * R^2 / r^4
             Λ3j_div_r5[i] = (-Λ3[i])/(r_p1d2[i]^5)  # J_3 * R^3 / r^5
             
@@ -1089,7 +1081,7 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
         # Velocity magnitude of the i-th body
         v2[i] = ( (ui[i]^2)+(vi[i]^2) ) + (wi[i]^2)
     end
-    # Apophis velocity magnitude
+    # Asteroid velocity magnitude
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
 
     for i in 1:Nm1
@@ -1129,7 +1121,7 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
         sj2_plus_2si2_minus_4vivj[i] = ( (2v2[i]) - (4vi_dot_vj[i]) ) + v2[N]
         # -4\sum - \sum + \dot{s}_j^2 + 2\dot{s}_i^2  - 4<, > terms inside {} 
         ϕs_and_vs[i] = sj2_plus_2si2_minus_4vivj[i] - ϕi_plus_4ϕj[i]
-        # (\mathbf{r}_i - \mathbf{r}_Apophis)\cdot\mathbf{v_i}
+        # (\mathbf{r}_i - \mathbf{r}_asteroid)\cdot\mathbf{v_i}
         Xij_t_Ui = X[i]*ui[i]
         Yij_t_Vi = Y[i]*vi[i]
         Zij_t_Wi = Z[i]*wi[i]
@@ -1137,7 +1129,7 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
         # The expression below inside the (...)^2 should have a minus sign in front of the 
         # numerator, but upon squaring it is eliminated, so at the end of the day, it is 
         # irrelevant ;)
-        # (\mathbf{r}_i - \mathbf{r}_Apophis)\cdot\mathbf{v_i} / r_{i, Apophis}
+        # (\mathbf{r}_i - \mathbf{r}_asteroid)\cdot\mathbf{v_i} / r_{i, asteroid}
         pn1t7 = (Rij_dot_Vi^2)/r_p2[i]
         # Everything inside the {} except for the first and last terms
         pn1t2_7 = ϕs_and_vs[i] - (1.5pn1t7)
@@ -1207,8 +1199,8 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
     hy = (Z[1]*U[1])-(X[1]*W[1])   # Y-axis component
     hz = (X[1]*V[1])-(Y[1]*U[1])   # Z-axis component
 
-    # Cartesian components of transversal vector t = h × (\mathbf{r}_Sun - \mathbf{r}_Apophis)
-    t_x = (hz*Y[1]) - (hy*Z[1])    # Note: Y[1] = y_Sun - y_Apophis, etc.
+    # Cartesian components of transversal vector t = h × (\mathbf{r}_Sun - \mathbf{r}_asteroid)
+    t_x = (hz*Y[1]) - (hy*Z[1])    # Note: Y[1] = y_Sun - y_asteroid, etc.
     t_y = (hx*Z[1]) - (hz*X[1])
     t_z = (hy*X[1]) - (hx*Y[1])
     # Norm of transversal vector
@@ -1224,11 +1216,11 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
     r_z_unit = -(Z[1]/r_p1d2[1])
 
     # Evaluate non-grav acceleration (solar radiation pressure, Yarkovsky)
-    g_r = r_p2[1]           # Distance Sun-Apophis
+    g_r = r_p2[1]           # Distance Sun-asteroid
     A2_t_g_r = q[7]/g_r     # Yarkovsky effect
     A1_t_g_r = q[8]/g_r     # Radiation pressure
 
-    # Non gravitational acceleration: Yarkovsky + Apophis
+    # Non gravitational acceleration: Yarkovsky + radiation pressure
     NGAx = (A2_t_g_r*t_x_unit) + (A1_t_g_r*r_x_unit)
     NGAy = (A2_t_g_r*t_y_unit) + (A1_t_g_r*r_y_unit)
     NGAz = (A2_t_g_r*t_z_unit) + (A1_t_g_r*r_z_unit)
