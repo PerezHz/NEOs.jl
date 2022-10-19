@@ -69,9 +69,9 @@ function loadeph(ss16asteph_::TaylorInterpolant, μ::Vector)
             end
         end
         # Fill acelerations by differentiating velocities 
-        acc_eph.x[:,3j-2] .= differentiate.(ss16asteph.x[:,3(Nm1+j)-2])  # X-axis component
-        acc_eph.x[:,3j-1] .= differentiate.(ss16asteph.x[:,3(Nm1+j)-1])  # Y-axis component
-        acc_eph.x[:,3j  ] .= differentiate.(ss16asteph.x[:,3(Nm1+j)  ])  # Z-axis component
+        acc_eph.x[:,3j-2] .= PlanetaryEphemeris.ordpres_differentiate.(ss16asteph.x[:,3(Nm1+j)-2])  # X-axis component
+        acc_eph.x[:,3j-1] .= PlanetaryEphemeris.ordpres_differentiate.(ss16asteph.x[:,3(Nm1+j)-1])  # Y-axis component
+        acc_eph.x[:,3j  ] .= PlanetaryEphemeris.ordpres_differentiate.(ss16asteph.x[:,3(Nm1+j)  ])  # Z-axis component
     end
 
     return ss16asteph, acc_eph, newtonianNb_Potential
@@ -132,9 +132,9 @@ initial guess and `niters` is the number of iterations.
 """
 function taylor_minimum(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
     # First derivative 
-    dpol = differentiate(pol)
+    dpol = PlanetaryEphemeris.ordpres_differentiate(pol)
     # Second derivative
-    dpol2 = differentiate(dpol)
+    dpol2 = PlanetaryEphemeris.ordpres_differentiate(dpol)
     # Initial guess
     xnewton::T = x0
     #@show xnewton
@@ -156,7 +156,7 @@ initial guess and `niters` is the number of iterations.
 """
 function taylor_roots(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
     # First derivative
-    dpol = differentiate(pol)
+    dpol = PlanetaryEphemeris.ordpres_differentiate(pol)
     # Initial guess
     xnewton::T = x0
     #@show xnewton
