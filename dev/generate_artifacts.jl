@@ -24,7 +24,7 @@ urls_lsk_spk = [
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/de430.tar.gz",
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/TTmTDBde430.tar.gz",
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/a99942.tar.gz",
-    "https://raw.githubusercontent.com/PerezHz/jpleph/main/ttmtdb_DE430_1995_2030.tar.gz"
+    "https://raw.githubusercontent.com/PerezHz/jpleph/main/ttmtdb_DE430_1995_2030_20221103.tar.gz"
 ]
 
 urls_ = vcat(urls_lsk_spk, urls_debias)

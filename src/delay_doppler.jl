@@ -1,8 +1,9 @@
 # Load TT-TDB (ttmtdb) as a TaylorInterpolant saved in .jld file
 # const ttmtdb = JLD.load(joinpath(artifact"ttmtdb_DE430_1995_2030", "ttmtdb_DE430_1995_2030.jld"), "ttmtdb")
-const ttmtdb_t0 = JLD.load("/Users/Jorge/projects/NEOs/ttmtdb_DE430_1995_2030_20221103.jld", "t0")
-const ttmtdb_t = JLD.load("/Users/Jorge/projects/NEOs/ttmtdb_DE430_1995_2030_20221103.jld", "t")
-const ttmtdb_x_coeffs = JLD.load("/Users/Jorge/projects/NEOs/ttmtdb_DE430_1995_2030_20221103.jld", "x_coeffs")
+const ttmtdb_artifact_path = joinpath(artifact"ttmtdb_DE430_1995_2030", "ttmtdb_DE430_1995_2030_20221103.jld")
+const ttmtdb_t0 = JLD.load(ttmtdb_artifact_path, "t0")
+const ttmtdb_t = JLD.load(ttmtdb_artifact_path, "t")
+const ttmtdb_x_coeffs = JLD.load(ttmtdb_artifact_path, "x_coeffs")
 const ttmtdb = TaylorInterpolant(ttmtdb_t0, ttmtdb_t, Taylor1.(ttmtdb_x_coeffs))
 
 # Read JPL ephemerides (asteroid, Solar System, TT-TDB)
