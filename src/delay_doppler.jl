@@ -1,5 +1,4 @@
 # Load TT-TDB (ttmtdb) as a TaylorInterpolant saved in .jld file
-# const ttmtdb = JLD.load(joinpath(artifact"ttmtdb_DE430_1995_2030", "ttmtdb_DE430_1995_2030.jld"), "ttmtdb")
 const ttmtdb_artifact_path = joinpath(artifact"ttmtdb_DE430_1995_2030", "ttmtdb_DE430_1995_2030_20221103.jld")
 const ttmtdb_t0 = JLD.load(ttmtdb_artifact_path, "t0")
 const ttmtdb_t = JLD.load(ttmtdb_artifact_path, "t")
