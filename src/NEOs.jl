@@ -35,6 +35,7 @@ using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI,
     TOD, GCRF, ITRF, rECItoECI, PEF, satsv, EOPData_IAU2000A
 import RemoteFiles
 using StaticArrays: SArray, @SVector
+using TaylorSeries
 using InteractiveUtils
 
 @doc raw"""
