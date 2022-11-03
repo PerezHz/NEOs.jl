@@ -1,3 +1,11 @@
+@doc raw"""
+    apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}}, dx::Vector{Taylor1{U}}, 
+                 xaux::Vector{Taylor1{U}}, abstol::T, params, parse_eqs::Bool=true) where {T<:Real, U<:Number}
+
+Specialized method of `TaylorIntegration.stepsize` for the integration of Apophis. 
+
+See also [`TaylorIntegration.stepsize`](@ref).
+"""
 function apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
         dx::Vector{Taylor1{U}}, xaux::Vector{Taylor1{U}}, abstol::T, params,
         parse_eqs::Bool=true) where {T<:Real, U<:Number}
@@ -6,7 +14,7 @@ function apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
     # Compute the step-size of the integration using `abstol`
     δt = TaylorIntegration.stepsize(x, abstol)
 
-    # # Force asteroid time-step to be no larger than planetary ephemeris time-step
+    # Force asteroid time-step to be no larger than planetary ephemeris time-step
     # et0_days = (params[4]-JD_J2000)
     # et_days = t[0] + et0_days
     # ind, Δt = PlanetaryEphemeris.getinterpindex(params[1], et_days)
@@ -19,6 +27,18 @@ function apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
     return δt
 end
 
+@doc raw"""
+    lyap_apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}}, dx::Vector{Taylor1{U}}, 
+                      xaux::Vector{Taylor1{U}}, δx::Array{TaylorN{Taylor1{U}},1}, 
+                      dδx::Array{TaylorN{Taylor1{U}},1}, jac::Array{Taylor1{U},2}, 
+                      abstol::T, _δv::Vector{TaylorN{Taylor1{U}}}, varsaux::Array{Taylor1{U},3},
+                      params, parse_eqs::Bool=true, jacobianfunc! =nothing) where {T<:Real, U<:Number}
+
+Specialized method of `TaylorIntegration.lyap_taylorstep` for the calculation of the Lyapunov
+spectrum of Apophis. 
+
+See also [`TaylorIntegration.lyap_taylorstep`](@ref).
+"""
 function lyap_apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
         dx::Vector{Taylor1{U}}, xaux::Vector{Taylor1{U}},
         δx::Array{TaylorN{Taylor1{U}},1}, dδx::Array{TaylorN{Taylor1{U}},1},
@@ -42,7 +62,7 @@ function lyap_apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
     # Compute the step-size of the integration using `abstol`
     δt = TaylorIntegration.stepsize(view(x, 1:dof), abstol)
 
-    # # Force asteroid time-step to be no larger than planetary ephemeris time-step
+    # Force asteroid time-step to be no larger than planetary ephemeris time-step
     # et0_days = (params[4]-JD_J2000)
     # et_days = t[0] + et0_days
     # ind, Δt = PlanetaryEphemeris.getinterpindex(params[1], et_days)
@@ -55,6 +75,14 @@ function lyap_apophisstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}},
     return δt
 end
 
+@doc raw"""
+    apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T, params = nothing;
+                 maxsteps::Int=500, parse_eqs::Bool=true, dense::Bool=false) where {T<:Real, U<:Number}
+
+Specialized method of `TaylorIntegration.taylorinteg` for the integration of Apophis.
+
+See also [`TaylorIntegration.taylorinteg`](@ref). 
+"""
 function apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T,
         params = nothing; maxsteps::Int=500, parse_eqs::Bool=true, dense::Bool=false) where {T<:Real, U<:Number}
 
@@ -118,8 +146,18 @@ function apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T,
     end
 end
 
-#TODO: allow backwards integration
-# root-finding integration method
+
+# TODO: allow backwards integration
+@doc raw"""
+    apophisinteg(f!, g, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T, 
+                 params = nothing; maxsteps::Int=500, parse_eqs::Bool=true, dense::Bool=false,
+                 eventorder::Int=0, newtoniter::Int=10, nrabstol::T=eps(T)) where {T <: Real,U <: Number}
+
+Specialized method of the root-finding version of `TaylorIntegration.taylorinteg` for the 
+integration of Apophis. 
+
+See also [`TaylorIntegration.taylorinteg`](@ref). 
+"""
 function apophisinteg(f!, g, q0::Array{U,1}, t0::T, tmax::T, order::Int,
         abstol::T, params = nothing; maxsteps::Int=500, parse_eqs::Bool=true,
         dense::Bool=false, eventorder::Int=0, newtoniter::Int=10,
@@ -220,6 +258,15 @@ function apophisinteg(f!, g, q0::Array{U,1}, t0::T, tmax::T, order::Int,
     end
 end
 
+@doc raw"""
+    lyap_apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T, order::Int, abstol::T,
+                      params = nothing, jacobianfunc! =nothing; maxsteps::Int=500, 
+                      parse_eqs::Bool=true) where {T<:Real, U<:Number}
+
+Specialized method of `TaylorIntegration.lyap_taylorinteg` for the integration of Apophis.
+
+See also [`TaylorIntegration.lyap_taylorinteg`](@ref). 
+"""
 function lyap_apophisinteg(f!, q0::Array{U,1}, t0::T, tmax::T,
         order::Int, abstol::T, params = nothing, jacobianfunc! =nothing;
         maxsteps::Int=500, parse_eqs::Bool=true) where {T<:Real, U<:Number}

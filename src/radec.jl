@@ -1,18 +1,24 @@
-# Compute astrometric right ascension and declination for an asteroid at
-# UTC instant `t_r_utc` from tracking station with code `station_code` from Earth,
-# Sun and asteroid ephemerides
-# station_code: observing station identifier (MPC nomenclature)
-# t_r_utc: UTC time of astrometric observation (DateTime)
-# niter: number of light-time solution iterations
-# eo: compute corrections due to Earth orientation, LOD, polar motion
-# debias: compute debiasing according to Eggl et al. (2019)
-# catalog: Stellar catalog used in astrometric reduction, MPC nomenclature ("a", "b", "c", etc...)
-# xve: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second
-# xvs: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second
-# xva: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second
-function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
-        niter::Int=10; eo::Bool=true, xve::Function=earth_pv,
-        xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+@doc raw"""
+    radec(station_code::Union{Int,String}, t_r_utc::DateTime, niter::Int=10; eo::Bool=true, 
+          xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+
+Compute astrometric right ascension and declination (both in arcsec) for an asteroid at 
+UTC instant `t_r_utc` from tracking station with code `station_code` from Earth, Sun and 
+asteroid ephemerides.
+
+# Arguments 
+
+- `station_code::Union{Int, String}`: observing station identifier (MPC nomenclature).
+- `t_r_utc::DateTime`: UTC time of astrometric observation (DateTime).
+- `niter::Int`: number of light-time solution iterations.
+- `eo::Bool`: compute corrections due to Earth orientation, LOD, polar motion.
+- `xve::Function`: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second.
+- `xvs::Function`: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second.
+- `xva::Function`: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second.
+"""
+function radec(station_code::Union{Int,String}, t_r_utc::DateTime, niter::Int=10; 
+               eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+    # Transform receiving time from UTC to TDB seconds since J2000
     et_r_secs = str2et(string(t_r_utc))
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
     R_r, V_r = observer_position(station_code, et_r_secs, eo=eo)
@@ -29,77 +35,109 @@ function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
     # Sun barycentric position and velocity at receive time
     rv_s_t_r = xvs(et_r_secs)
     r_s_t_r = rv_s_t_r[1:3]
-    # down-leg iteration
-    # τ_D first approximation: Eq. (1) Yeomans et al. (1992)
+    
+    # Down-leg iteration
+    # τ_D first approximation
+    # See equation (1) of https://doi.org/10.1086/116062
     ρ_vec_r = r_a_t_r - r_r_t_r
     ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
-    τ_D = ρ_r/clightkms # (seconds) -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
-    # bounce time, new estimate Eq. (2) Yeomans et al. (1992)
+    # -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
+    τ_D = ρ_r/clightkms # (seconds) 
+    # Bounce time, new estimate
+    # See equation (2) of https://doi.org/10.1086/116062
     et_b_secs = et_r_secs - τ_D
 
-    Δτ_D = zero(τ_D)
-    Δτ_rel_D = zero(τ_D)
-    # Δτ_corona_D = zero(τ_D)
-    Δτ_tropo_D = zero(τ_D)
+    # Allocate memmory for time-delays 
+    Δτ_D = zero(τ_D)               # Total time delay
+    Δτ_rel_D = zero(τ_D)           # Shapiro delay  
+    # Δτ_corona_D = zero(τ_D)      # Delay due to Solar corona
+    Δτ_tropo_D = zero(τ_D)         # Delay due to Earth's troposphere
 
     for i in 1:niter
-        # asteroid barycentric position (in au) at bounce time (TDB)
+        # Asteroid barycentric position (in au) and velocity (in au/day) at bounce time (TDB)
         rv_a_t_b = xva(et_b_secs)
         r_a_t_b = rv_a_t_b[1:3]
         v_a_t_b = rv_a_t_b[4:6]
-        # Eq. (3) Yeomans et al. (1992)
+        # Estimated position of the asteroid's center of mass relative to the recieve point 
+        # See equation (3) of https://doi.org/10.1086/116062
         ρ_vec_r = r_a_t_b - r_r_t_r
-        # Eq. (4) Yeomans et al. (1992)
+        # Magnitude of ρ_vec_r
+        # See equation (4) of https://doi.org/10.1086/116062
         ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
-        # compute down-leg Shapiro delay
-        # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, Δτ_rel_[D|U]
+
+        # Compute down-leg Shapiro delay
+        # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay, 
+        # Δτ_rel_[D|U]
+
+        # Earth's position at t_r
         e_D_vec  = r_r_t_r - r_s_t_r
-        e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2) # heliocentric distance of Earth at t_r
-        rv_s_t_b = xvs(et_b_secs) # barycentric position and velocity of Sun at estimated bounce time
+        # Heliocentric distance of Earth at t_r
+        e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2) 
+        # Barycentric position of Sun at estimated bounce time
+        rv_s_t_b = xvs(et_b_secs) 
         r_s_t_b = rv_s_t_b[1:3]
+        # Heliocentric position of asteroid at t_b
         p_D_vec  = r_a_t_b - r_s_t_b
-        p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2) # heliocentric distance of asteroid at t_b
-        q_D = ρ_r #signal path distance (down-leg)
+        # Heliocentric distance of asteroid at t_b
+        p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2) 
+        # Signal path distance (down-leg)
+        q_D = ρ_r 
+
         # Shapiro correction to time-delay
-        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)
-        # # troposphere correction to time-delay
+        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)  # seconds
+        # Troposphere correction to time-delay
         # Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r) # seconds
+        # Solar corona correction to time-delay
         # Δτ_corona_D = corona_delay(constant_term.(r_a_t_b), r_r_t_r, r_s_t_r, F_tx, station_code) # seconds
+        # Total time-delay
         Δτ_D = Δτ_rel_D # + Δτ_tropo_D #+ Δτ_corona_D # seconds
+
+        # New estimate 
         p_dot_23 = dot(ρ_vec_r, v_a_t_b)/ρ_r
+        # Time delay correction
         Δt_2 = (τ_D - ρ_r/clightkms - Δτ_rel_D)/(1.0-p_dot_23/clightkms)
+        # Time delay new estimate 
         τ_D = τ_D - Δt_2
+        # Bounce time, new estimate 
+        # See equation (2) of https://doi.org/10.1086/116062
         et_b_secs = et_r_secs - τ_D
     end
+    # Asteroid barycentric position (in au) and velocity (in au/day) at bounce time (TDB)
     rv_a_t_b = xva(et_b_secs)
     r_a_t_b = rv_a_t_b[1:3]
     v_a_t_b = rv_a_t_b[4:6]
-
+    # Estimated position of the asteroid's center of mass relative to the recieve point 
+    # See equation (3) of https://doi.org/10.1086/116062
     ρ_vec_r = r_a_t_b - r_r_t_r
+    # Magnitude of ρ_vec_r
+    # See equation (4) of https://doi.org/10.1086/116062
     ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
 
     # TODO: add aberration and atmospheric refraction corrections
 
-    # Compute gravitational deflection of light, ESAA 2014 Section 7.4.1.4
-    E_H_vec = r_r_t_r -r_s_t_r # ESAA 2014, Eq. (7.104)
-    U_vec = ρ_vec_r #r_a_t_b - r_e_t_r # ESAA 2014, Eq. (7.112)
-    U_norm = ρ_r # sqrt(U_vec[1]^2 + U_vec[2]^2 + U_vec[3]^2)
+    # Compute gravitational deflection of light
+    # See Explanatory Supplement to the Astronomical Almanac (ESAA) 2014 Section 7.4.1.4
+    E_H_vec = r_r_t_r -r_s_t_r    # ESAA 2014, equation (7.104)
+    U_vec = ρ_vec_r               # r_a_t_b - r_e_t_r, ESAA 2014, equation (7.112)
+    U_norm = ρ_r                  # sqrt(U_vec[1]^2 + U_vec[2]^2 + U_vec[3]^2)
     u_vec = U_vec/U_norm
-    rv_s_t_b = xvs(et_b_secs) # barycentric position and velocity of Sun at converged bounce time
+    # Barycentric position and velocity of Sun at converged bounce time
+    rv_s_t_b = xvs(et_b_secs) 
     r_s_t_b = rv_s_t_b[1:3]
-    Q_vec = r_a_t_b - r_s_t_b # ESAA 2014, Eq. (7.113)
+    Q_vec = r_a_t_b - r_s_t_b     # ESAA 2014, equation (7.113)
     q_vec = Q_vec/sqrt(Q_vec[1]^2 + Q_vec[2]^2 + Q_vec[3]^2)
     E_H = sqrt(E_H_vec[1]^2 + E_H_vec[2]^2 + E_H_vec[3]^2)
     e_vec = E_H_vec/E_H
-    g1 = (2PlanetaryEphemeris.μ[su]/(c_au_per_day^2))/(E_H/au) # ESAA 2014, Eq. (7.115)
+    # See ESAA 2014, equation (7.115)
+    g1 = (2PlanetaryEphemeris.μ[su]/(c_au_per_day^2))/(E_H/au) 
     g2 = 1 + dot(q_vec, e_vec)
-    # @show g1, g2
-    u1_vec = U_norm*(  u_vec + (g1/g2)*( dot(u_vec,q_vec)*e_vec - dot(e_vec,u_vec)*q_vec )  ) # ESAA 2014, Eq. (7.116)
+    # See ESAA 2014, equation (7.116)
+    u1_vec = U_norm*(  u_vec + (g1/g2)*( dot(u_vec,q_vec)*e_vec - dot(e_vec,u_vec)*q_vec )  ) 
     u1_norm = sqrt(u1_vec[1]^2 + u1_vec[2]^2 + u1_vec[3]^2)
 
     # Compute right ascension, declination angles
     α_rad_ = mod2pi(atan(u1_vec[2], u1_vec[1]))
-    α_rad = mod2pi(α_rad_) # right ascension (rad)
+    α_rad = mod2pi(α_rad_)          # right ascension (rad)
     δ_rad = asin(u1_vec[3]/u1_norm) # declination (rad)
 
     δ_as = rad2arcsec(δ_rad) # rad -> arcsec + debiasing
@@ -108,80 +146,159 @@ function radec(station_code::Union{Int,String}, t_r_utc::DateTime,
     return α_as, δ_as # right ascension, declination (arcsec, arcsec)
 end
 
-# Compute optical astrometric ra/dec ephemeris for a set of observations in a MPC-formatted file
-function radec_mpc(astopticalobsfile, niter::Int=10; eo::Bool=true,
-        xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+@doc raw"""
+    radec_mpc(astopticalobsfile, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, 
+              xvs::Function=sun_pv, xva::Function=apophis_pv_197)
 
+Compute optical astrometric ra/dec (both in arcsec) ephemeris for a set of observations 
+in a MPC-formatted file.
+
+See also [`radec`](@ref).
+
+# Arguments
+
+- `astopticalobsfile`: source MPC-formatted file. 
+- `niter::Int`: number of light-time solution iterations.
+- `eo::Bool`: compute corrections due to Earth orientation, LOD, polar motion.
+- `xve::Function`: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second.
+- `xvs::Function`: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second.
+- `xva::Function`: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second.
+"""
+function radec_mpc(astopticalobsfile, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, 
+                   xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+    # Read file 
     obs_t = readmp(astopticalobsfile)
+    # Number of observations
     n_optical_obs = nrow(obs_t)
-
+    # UTC time of first astrometric observation
     utc1 = DateTime(obs_t[1].yr, obs_t[1].month, obs_t[1].day) + Microsecond( round(1e6*86400*obs_t[1].utc) )
+    # TDB seconds since J2000.0 for first astrometric observation
     et1 = str2et(string(utc1))
+    # Asteroid ephemeris at et1
     a1_et1 = xva(et1)[1]
+    # Tipe of asteroid ephemeris 
     S = typeof(a1_et1)
 
+    # Right ascension
     vra = Array{S}(undef, n_optical_obs)
+    # Declination
     vdec = Array{S}(undef, n_optical_obs)
 
+    # Iterate over the number of observations
     for i in 1:n_optical_obs
+        # UTC time of i-th astrometric observation
         utc_i = DateTime(obs_t[i].yr, obs_t[i].month, obs_t[i].day) + Microsecond( round(1e6*86400*obs_t[i].utc) )
+        # Station code of i-th observation 
         station_code_i = string(obs_t[i].obscode)
+        # i-th right ascension and declination
         vra[i], vdec[i] = radec(station_code_i, utc_i, niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
     end
 
     return vra, vdec # arcsec, arcsec
 end
 
+@doc raw"""
+    radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true, debias_table::String="2018",
+                xve::Function=earth_pv, xvs::Function=sun_pv, xva::Function=apophis_pv_197)
+
+
+Compute optical astrometric ra/dec (both in arcsec) ephemeris for a set of observations 
+in a MPC-formatted file.
+
+Returns a table with ra/dec astrometry (observed + computed + corrections + statistical
+weights) for a set of observations in a MPC_formatted file. 
+
+See also [`radec`](@ref), [`w8sveres17`](@ref) and [`Healpix.ang2pixRing`](@ref). 
+
+# Arguments
+
+- `mpcobsfile::String`: source MPC-formatted file. 
+- `niter::Int`: number of light-time solution iterations.
+- `eo::Bool`: compute corrections due to Earth orientation, LOD, polar motion.
+- `debias_table::String`: debias table for optical observations. 
+- `xve::Function`: Earth ephemeris wich takes et seconds since J2000 as input and returns Earth barycentric position in km and velocity in km/second.
+- `xvs::Function`: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second.
+- `xva::Function`: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second.
+"""
 function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
         debias_table::String="2018", xve::Function=earth_pv,
         xvs::Function=sun_pv, xva::Function=apophis_pv_197)
 
+    # Read file 
     obs_t = readmp(mpcobsfile)
+    # Number of observations 
     n_optical_obs = nrow(obs_t)
 
+    # UTC time of first astrometric observation
     utc1 = DateTime(obs_t.yr[1], obs_t.month[1], obs_t.day[1]) + Microsecond( round(1e6*86400*obs_t.utc[1]) )
+    # TDB seconds since J2000.0 for first astrometric observation
     et1 = str2et(string(utc1))
+    # Asteroid ephemeris at et1
     a1_et1 = xva(et1)[1]
+    # Tipe of asteroid ephemeris 
     S = typeof(a1_et1)
-
+    
+    # Observed right ascension
     α_obs = Array{Float64}(undef, n_optical_obs)
+    # Observed declination
     δ_obs = Array{Float64}(undef, n_optical_obs)
+
+    # Computed right ascension
     α_comp = Array{S}(undef, n_optical_obs)
+    # Computed declination
     δ_comp = Array{S}(undef, n_optical_obs)
+    
+    # Total debiasing correction in right ascension (arcsec)
     α_corr = Array{Float64}(undef, n_optical_obs)
+    # Total debiasing correction in declination (arcsec)
     δ_corr = Array{Float64}(undef, n_optical_obs)
+    
+    # Computed values
     datetime_obs = Array{DateTime}(undef, n_optical_obs)
     w8s = Array{Float64}(undef, n_optical_obs)
 
-    # Select debiasing table: 2014 corresponds to Farnocchia et al. (2015), 2018 corresponds to Eggl et al. (2020)
-    # debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
+    # Select debiasing table: 
+    # - 2014 corresponds to https://doi.org/10.1016/j.icarus.2014.07.033
+    # - 2018 corresponds to https://doi.org/10.1016/j.icarus.2019.113596
+    # Debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
     if debias_table == "2018"
         debias_path = artifact"debias_2018"
         mpc_catalog_codes_201X = mpc_catalog_codes_2018
-        NSIDE= 64 #The healpix tesselation resolution of the bias map from Eggl et al. (2020)
-        truth = "V" # In 2018 debias table Gaia DR2 catalog is regarded as the truth
+        # The healpix tesselation resolution of the bias map from https://doi.org/10.1016/j.icarus.2019.113596
+        NSIDE= 64 
+        # In 2018 debias table Gaia DR2 catalog is regarded as the truth
+        truth = "V" 
     elseif debias_table == "hires2018"
         debias_path = artifact"debias_hires2018"
         mpc_catalog_codes_201X = mpc_catalog_codes_2018
-        NSIDE= 256 #The healpix tesselation resolution of the high-resolution bias map from Eggl et al. (2020)
-        truth = "V" # In 2018 debias table Gaia DR2 catalog is regarded as the truth
+        # The healpix tesselation resolution of the high-resolution bias map from https://doi.org/10.1016/j.icarus.2019.113596
+        NSIDE= 256 
+        # In 2018 debias table Gaia DR2 catalog is regarded as the truth
+        truth = "V" 
     elseif debias_table == "2014"
         debias_path = artifact"debias_2014"
         mpc_catalog_codes_201X = mpc_catalog_codes_2014
-        NSIDE= 64 #The healpix tesselation resolution of the bias map from Farnocchia et al. (2015)
-        truth = "t" # In 2014 debias table PPMXL catalog is regarded as the truth
+        # The healpix tesselation resolution of the bias map from https://doi.org/10.1016/j.icarus.2014.07.033
+        NSIDE= 64 
+        # In 2014 debias table PPMXL catalog is regarded as the truth
+        truth = "t" 
     else
         @error "Unknown bias map: $(debias_table). Possible values are `2014`, `2018` and `hires2018`."
     end
+    # Debias table file 
     bias_file = joinpath(debias_path, "bias.dat")
-
+    # Read bias matrix 
     bias_matrix = readdlm(bias_file, comment_char='!', comments=true)
-    resol = Resolution(NSIDE) # initialize healpix Resolution variable
+    # Initialize healpix Resolution variable
+    resol = Resolution(NSIDE) 
+    # Compatibility between bias matrix and resolution 
     @assert size(bias_matrix) == (resol.numOfPixels, 4length(mpc_catalog_codes_201X)) "Bias table file $bias_file dimensions do not match expected parameter NSIDE=$NSIDE and/or number of catalogs in table."
 
+    # Iterate over the observations 
     for i in 1:n_optical_obs
-        # observed values
-        # the following if block handles the sign of declination, including edge cases in declination such as -00 01
+        # Observed values
+        # the following if block handles the sign of declination, including edge cases 
+        # in declination such as -00 01
         if obs_t.signdec[i] == "+"
             δ_i_deg = +(obs_t.decd[i] + obs_t.decm[i]/60 + obs_t.decs[i]/3600) # deg
         elseif obs_t.signdec[i] == "-"
@@ -190,19 +307,29 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
             @warn "Could not parse declination sign: $(obs_t[i].signdec). Setting positive sign."
             δ_i_deg =  (obs_t.decd[i] + obs_t.decm[i]/60 + obs_t.decs[i]/3600) # deg
         end
-        δ_i_rad = deg2rad(δ_i_deg) #rad
+        # Observed declination
+        δ_i_rad = deg2rad(δ_i_deg)          # rad
+        # Observed right ascension
         α_i_deg = 15(obs_t.rah[i] + obs_t.ram[i]/60 + obs_t.ras[i]/3600) # deg
-        α_i_rad = deg2rad(α_i_deg) #rad
-        δ_obs[i] = 3600δ_i_deg # arcsec
+        α_i_rad = deg2rad(α_i_deg)          #rad
+        # Observed ra/dec 
+        δ_obs[i] = 3600δ_i_deg              # arcsec
         α_obs[i] = 3600α_i_deg*cos(δ_i_rad) # arcsec
-        # computed values
+
+        # Computed values
         datetime_obs[i] = DateTime(obs_t.yr[i], obs_t.month[i], obs_t.day[i]) + Microsecond( round(1e6*86400*obs_t.utc[i]) )
         # utc_i = datetime_obs[i]
+        # Station code 
         station_code_i = string(obs_t.obscode[i])
+        # Computed ra/dec
         α_comp_as, δ_comp_as = radec(station_code_i, datetime_obs[i], niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
-        α_comp[i] = α_comp_as*cos(δ_i_rad) # multiply by metric factor cos(DEC)
-        δ_comp[i] = δ_comp_as # arcsec
+        # Multiply by metric factor cos(DEC)
+        α_comp[i] = α_comp_as*cos(δ_i_rad)  # arcsec 
+        δ_comp[i] = δ_comp_as               # arcsec
+        # Statistical weights from Veres et al. (2017)
         w8s[i] = w8sveres17(station_code_i, datetime_obs[i], obs_t.catalog[i])
+
+
         if (obs_t.catalog[i] ∉ mpc_catalog_codes_201X) && obs_t.catalog[i] != "Y"
             # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
             if haskey(mpc_catalog_codes, obs_t.catalog[i])
@@ -228,7 +355,7 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
             pix_ind = ang2pixRing(resol, π/2-δ_i_rad, α_i_rad)
             # Healpix.pix2angRing(resol, pix_ind)
             # @show Healpix.pix2angRing(resol, pix_ind)
-            ### Handle edge case: in new MPC catalog nomenclature, "UCAC-5"->"Y"; but in debias tables "UCAC-5"->"W"
+            # Handle edge case: in new MPC catalog nomenclature, "UCAC-5"->"Y"; but in debias tables "UCAC-5"->"W"
             if obs_t.catalog[i] == "Y"
                 cat_ind = findfirst(x->x=="W", mpc_catalog_codes_201X)
             else
@@ -246,19 +373,27 @@ function radec_table(mpcobsfile::String, niter::Int=10; eo::Bool=true,
             et_secs_i = str2et(string(datetime_obs[i]))
             tt_secs_i = et_secs_i - ttmtdb(et_secs_i)
             yrs_J2000_tt = tt_secs_i/(daysec*yr)
-            α_corr[i] = dRA + yrs_J2000_tt*pmRA/1000 # total debiasing correction in right ascension (arcsec)
-            δ_corr[i] = dDEC + yrs_J2000_tt*pmDEC/1000 # total debiasing correction in declination (arcsec)
+            # Total debiasing correction in right ascension (arcsec)
+            α_corr[i] = dRA + yrs_J2000_tt*pmRA/1000 
+            # Total debiasing correction in declination (arcsec)
+            δ_corr[i] = dDEC + yrs_J2000_tt*pmDEC/1000 
         end
     end
 
-    # add columns
-    obs_t.dt_utc_obs = datetime_obs
-    obs_t.α_obs = α_obs
+    # Add columns
+
+    # Time of observation
+    obs_t.dt_utc_obs = datetime_obs       
+    # Observed ra/dec 
+    obs_t.α_obs = α_obs                   
     obs_t.δ_obs = δ_obs
-    obs_t.α_comp = α_comp
-    obs_t.δ_comp = δ_comp
+    # Computed ra/dec 
+    obs_t.α_comp = α_comp                 
+    obs_t.δ_comp = δ_comp                 
+    # Total debiasing correction in ra/dec
     obs_t.α_corr = α_corr
     obs_t.δ_corr = δ_corr
+    # Statistical weights
     obs_t.σ = w8s
     select
 
@@ -267,7 +402,7 @@ end
 
 # MPC minor planet optical observations fixed-width format
 # Format is described in: https://minorplanetcenter.net/iau/info/OpticalObs.html
-# Format is discussed thoroughly in S. Chesley et al. (2010) Icarus 210, p. 158-181
+# Format is discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.2010.06.003
 # Column 72: star catalog that was used in the reduction of the astrometry
 # Column 15: measurement technique, or observation type
 const mpc_format_mp = (mpnum=(1,5,String),
@@ -296,20 +431,20 @@ obscode=(78,80,String)
 # MPC minor planet optical observations reader
 readmp(mpcfile::String) = readfwf(mpcfile, mpc_format_mp)
 
-# `mpc_catalog_codes_2014` corresponds to debiasing tables included in Farnocchia et al. (2015)
+# `mpc_catalog_codes_2014` corresponds to debiasing tables included in https://doi.org/10.1016/j.icarus.2014.07.033
 mpc_catalog_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
 "o", "p", "q", "r",
 "u", "v", "w", "L", "N"]
 
-# `mpc_catalog_codes_2018` corresponds to debiasing tables included in Eggl et al. (2020)
+# `mpc_catalog_codes_2018` corresponds to debiasing tables included in https://doi.org/10.1016/j.icarus.2019.113596
 mpc_catalog_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m",
     "n", "o", "p", "q", "r",
     "t", "u", "v", "w", "L", "N",
     "Q", "R", "S", "U", "W"
 ]
 
-### MPC star catalog codes are were retrieved from the link below
-### https://minorplanetcenter.net/iau/info/CatalogueCodes.html
+# MPC star catalog codes are were retrieved from the link below
+# https://minorplanetcenter.net/iau/info/CatalogueCodes.html
 mpc_catalog_codes = Dict(
     "a" =>   "USNO-A1.0",
     "b" =>   "USNO-SA1.0",
@@ -366,12 +501,25 @@ mpc_catalog_codes = Dict(
     "Z" =>   "ATLAS-2"
   )
 
-# Statistical weights from Veres et al. (2017)
+@doc raw"""
+    w8sveres17(row::NamedTuple)
+
+Returns the statistical weight from Veres et al. (2017) corresponding to a row of a 
+MPC-formatted file. 
+""" 
 function w8sveres17(row::NamedTuple)
     return w8sveres17(row.obscode, row.dt_utc_obs, row.catalog)
 end
+
+@doc raw"""
+    w8sveres17(obscode::Union{Int,String}, dt_utc_obs::DateTime, catalog::String)
+
+Returns the statistical weight from Veres et al. (2017) corresponding to the observatory with
+code `obscode` in time `dt_utc_obs` and catalog `catalog`. 
+"""
 function w8sveres17(obscode::Union{Int,String}, dt_utc_obs::DateTime, catalog::String)
-    w = 1.0 # unit weight (arcseconds)
+    # Unit weight (arcseconds)
+    w = 1.0 
     # Table 2: epoch-dependent astrometric residuals
     if obscode == "703"
         return Date(dt_utc_obs) < Date(2014,1,1) ? w : 0.8w
