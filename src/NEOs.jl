@@ -2,6 +2,8 @@ module NEOs
 
 # __precompile__(false)
 
+export hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, update_observatories_mpc
+
 export propagate, observer_position, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_76_80,
     process_radar_data_jpl, RadarDataJPL, julian2etsecs, etsecs2julian,
@@ -11,6 +13,8 @@ export propagate, observer_position, delay_doppler, ismonostatic,
     radec, radec_table, nrms, chi2, newtonls, newtonls_6v, diffcorr,
     newtonls_Q, readfwf, readmp, w8sveres17, bopik, yarkp2adot, pv2kep,
     x0_JPL_s197, x0_JPL_s199
+
+import Base: hash, ==, show, sort, sort!
 
 using Distributed
 using TaylorIntegration
@@ -25,6 +29,7 @@ using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun,
 using JLD
 using EarthOrientation, SPICE
 using Dates
+import Dates: DateTime
 using Quadmath
 using Healpix: ang2pixRing, Resolution
 using LazyArtifacts
@@ -37,6 +42,7 @@ import RemoteFiles
 using StaticArrays: SArray, @SVector
 using TaylorSeries
 using InteractiveUtils
+using HTTP: get
 
 @doc raw"""
     omega(lod)
@@ -145,10 +151,9 @@ function pv2kep(xas, μ_S, jd=JD_J2000)
 end
 
 include("constants.jl")
+include("observations/process_radec.jl")
 include("process_radar_data_jpl.jl")
-include("topocentric.jl")
 include("delay_doppler.jl")
-include("radec.jl")
 include("asteroid_dynamical_models.jl")
 include("initial_conditions.jl")
 include("integration_methods.jl")

@@ -89,7 +89,7 @@ See also [`readfwf`](@ref).
 readmpcobs(mpcfile::String=joinpath(dirname(pathof(NEOs)), "ObsCodes.txt")) = readfwf(mpcfile, mpc_format_obscode, skiprows=spaceobs)
 
 # MPC observatory codes 
-mpcobscodes = readmpcobs()
+#mpcobscodes = readmpcobs()
 
 # Functions get_eop_iau1980, get_eop_iau2000a were adapted from SatelliteToolbox.jl; MIT-licensed
 # these functions avoid the use of @eval

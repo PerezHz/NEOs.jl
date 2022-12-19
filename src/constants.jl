@@ -1,3 +1,6 @@
+# Path to NEOs src directory 
+const src_path = dirname(pathof(NEOs))
+
 # Integration parameters
 const order = 30
 const abstol = 1.0E-30
