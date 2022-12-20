@@ -2,7 +2,8 @@ module NEOs
 
 # __precompile__(false)
 
-export hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, update_observatories_mpc
+export hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, update_observatories_mpc,
+       unknownobs, isunknown
 
 export propagate, observer_position, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_76_80,
