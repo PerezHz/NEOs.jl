@@ -4,16 +4,18 @@ module NEOs
 
 export hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, update_observatories_mpc,
        unknownobs, isunknown
-export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc  
+export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc 
+export datetime2et, load_leap_seconds, observer_position 
+export radec, radec_mpc, radec_table, w8sveres17
 
-export propagate, observer_position, delay_doppler, ismonostatic,
+export propagate, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_76_80,
     process_radar_data_jpl, RadarDataJPL, julian2etsecs, etsecs2julian,
     RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!,
     utcepoch, delay, delay_sigma, delay_units, doppler, doppler_sigma,
     doppler_units, freq, rcvr, xmit, bouncepoint, valsecchi_circle,
-    radec, radec_table, nrms, chi2, newtonls, newtonls_6v, diffcorr,
-    newtonls_Q, readfwf, readmp, w8sveres17, bopik, yarkp2adot, pv2kep,
+    nrms, chi2, newtonls, newtonls_6v, diffcorr,
+    newtonls_Q, readmp, bopik, yarkp2adot, pv2kep,
     x0_JPL_s197, x0_JPL_s199
 
 import Base: hash, ==, show, isless

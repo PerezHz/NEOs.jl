@@ -1,5 +1,7 @@
 # Path to NEOs src directory 
 const src_path = dirname(pathof(NEOs))
+# Path to NEOs data directory
+const observations_path = joinpath(src_path, "observations/")
 
 # Integration parameters
 const order = 30

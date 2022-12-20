@@ -1,95 +1,53 @@
-# Fixed Width Format (FWF) reader, due to @aplavin
-# See https://gist.github.com/aplavin/224a31ea457b6e0ef0f4c1a20bd28850
+# Path to leap seconds kernel 
+const naif_path = joinpath(observations_path, "naif0012.tls")
 
 @doc raw"""
-    convert_val(::Type{String}, val::String)
-    convert_val(::Type{Symbol}, val::String)
-    convert_val(typ::Type{<:Integer}, val::String)
-    convert_val(typ::Type{<:AbstractFloat}, val::String)
+    load_leap_seconds()
 
-Converts `val` to the corresponding type. 
+Loads leap seconds kernel. 
 """
-convert_val(::Type{String}, val::String) = val
-convert_val(::Type{Symbol}, val::String) = Symbol(val)
-convert_val(typ::Type{<:Integer}, val::String) = parse(typ, val)
-# Tables output from Fortran often have floats as 1D+5 instead of 1E+5
-convert_val(typ::Type{<:AbstractFloat}, val::String) = parse(typ, replace(val, "D" => "E"))  
-
-@doc raw"""
-    readfwf(io, colspecs; skiprows=[], missingstrings=[])
-
-Reads a Fixed Width Format (FWF) file and returns a `DataFrame` with the data. 
-
-# Arguments 
-
-- `io`: FWF source file. 
-- `colspecs`: columns specifications. 
-- `skiprows`: rows to skip. 
-- `missingstrings`: strings to treat as `missing`. 
-
-# Example
-
-```julia-repl
-julia> readfwf(
-    "file.tab",
-    (
-        colname1=(1, 20, String),
-        colname2=(100, 120, Int),
-        # ...
-    ),
-    skiprows=[1, 2, 3, 7]
-)
-```
-"""
-function readfwf(io, colspecs; skiprows=[], missingstrings=[])
-    # Columns 
-    cols = Dict(
-        k => Vector{Union{typ, Missing}}(undef, 0)
-        for (k, (from, to, typ)) in pairs(colspecs)
-    )
-    # Iterate over the FWF file 
-    for (irow, line) in eachline(io) |> enumerate
-        # Skip rows in skiprows
-        if irow ∈ skiprows continue end
-        # Iterate over the columns
-        for (k, (from, to, typ)) in pairs(colspecs)
-            # Parse line  
-            s_val = from <= length(line) ? line[from:min(length(line), to)] : ""
-            # Convert line to typ 
-            f_val = s_val in missingstrings ? missing : convert_val(typ, s_val)
-            # Add the column to the dictionary 
-            push!(cols[k], f_val)
-        end
-    end
-    # Form Dict from data
-    d = [k => identity.(cols[k]) for k in keys(colspecs)]
-    # Return DataFrame 
-    return DataFrame(d)
+function load_leap_seconds()
+    furnsh(naif_path)
 end
 
-# Columns specifications for Minor Planet Center (MPC) observatory codes file ObsCodes.txt 
-mpc_format_obscode = (Code=(1,3,String),
-Long=(5,13,Float64),
-cos=(14,21,Float64),
-sin=(22,30,Float64),
-Name=(31,80,String)
-)
+@doc raw"""
+    datetime2et(x::DateTime)
+    datetime2et(x::RadecMPC{T}) where {T <: AbstractFloat}
+    
+Retuns the  TDB seconds past the J2000 epoch.
+"""
+function datetime2et(x::DateTime)
+    return str2et(string(x))
+end     
 
-# Lines in ObsCodes.txt corresponding to space telescopes
-spaceobs = union([1,247,249,251,252,260,269], 1223:1232)
+datetime2et(x::RadecMPC{T}) where {T <: AbstractFloat} = datetime2et(x.date)
 
 @doc raw"""
-    readmpcobs(mpcfile::String=joinpath(dirname(pathof(NEOs)), "ObsCodes.txt"))
+    rad2arcsec(x)
 
-Reads the Minor Planet Center (MPC) observatory codes file `ObsCodes.txt` and returns a
-`DataFrame` with the data. 
+Converts radians to arcseconds. 
 
-See also [`readfwf`](@ref). 
+See also [`arcsec2rad`](@ref) and [`mas2rad`](@ref).
 """
-readmpcobs(mpcfile::String=joinpath(dirname(pathof(NEOs)), "ObsCodes.txt")) = readfwf(mpcfile, mpc_format_obscode, skiprows=spaceobs)
+rad2arcsec(x) = 3600 * rad2deg(x) # rad2deg(rad) -> deg; 3600 * deg -> arcsec
 
-# MPC observatory codes 
-#mpcobscodes = readmpcobs()
+@doc raw"""
+    arcsec2rad(x)
+
+Converts arcseconds to radians. 
+
+See also [`rad2arcsec`](@ref) and [`mas2rad`](@ref).
+"""
+arcsec2rad(x) = deg2rad(x / 3600) # arcsec/3600 -> deg; deg2rad(deg) -> rad
+
+@doc raw"""
+    mas2rad(x)
+
+Converts milli-arcseconds to radians. 
+
+See also [`rad2arcsec`](@ref) and [`arcsec2rad`](@ref).
+"""
+mas2rad(x) = arcsec2rad(x / 1000) # mas/1000 -> arcsec; arcsec2rad(arcsec) -> rad
 
 # Functions get_eop_iau1980, get_eop_iau2000a were adapted from SatelliteToolbox.jl; MIT-licensed
 # these functions avoid the use of @eval
@@ -101,11 +59,17 @@ readmpcobs(mpcfile::String=joinpath(dirname(pathof(NEOs)), "ObsCodes.txt")) = re
 Adaptation of [`SatelliteToolbox.get_iers_eop_iau_1980`](@ref) that avoids the use of `@eval`.
 See https://github.com/JuliaSpace/SatelliteToolbox.jl/blob/master/src/transformations/eop.jl.
 """
-function get_eop_iau1980(; force=false)
+function get_eop_iau1980(; force = false)
     # Remote file 
-    eop_iau1980_rf = RemoteFiles.@RemoteFile(EOP_IAU1980_RF, "https://datacenter.iers.org/data/csv/finals.all.csv", file="EOP_IAU1980.TXT", updates=:weekly)
+    eop_iau1980_rf = RemoteFiles.@RemoteFile(
+        EOP_IAU1980_RF, 
+        "https://datacenter.iers.org/data/csv/finals.all.csv", 
+        file = "EOP_IAU1980.TXT",
+        dir = observations_path, 
+        updates = :weekly
+    )
     # Download remote file 
-    RemoteFiles.download(EOP_IAU1980_RF, force=force)
+    RemoteFiles.download(EOP_IAU1980_RF, force = force)
     # Read delimited file 
     eop, ~ = readdlm(RemoteFiles.path(eop_iau1980_rf), ';'; header = true)
     # Parse eop 
@@ -118,11 +82,17 @@ end
 Adaptation of [`SatelliteToolbox.get_iers_eop_iau_2000A`](@ref) that avoids the use of `@eval`.
 See https://github.com/JuliaSpace/SatelliteToolbox.jl/blob/master/src/transformations/eop.jl.
 """
-function get_eop_iau2000a(; force=false)
+function get_eop_iau2000a(; force = false)
     # Remote file 
-    eop_iau2000a_rf = RemoteFiles.@RemoteFile(EOP_IAU2000A_RF, "https://datacenter.iers.org/data/csv/finals2000A.all.csv", file="EOP_IAU2000A.TXT", updates=:weekly)
+    eop_iau2000a_rf = RemoteFiles.@RemoteFile(
+        EOP_IAU2000A_RF, 
+        "https://datacenter.iers.org/data/csv/finals2000A.all.csv", 
+        file = "EOP_IAU2000A.TXT", 
+        dir = observations_path, 
+        updates = :weekly
+    )
     # Download remote file 
-    RemoteFiles.download(EOP_IAU2000A_RF, force=force)
+    RemoteFiles.download(EOP_IAU2000A_RF, force = force)
     # Read delimited file 
     eop, ~ = readdlm(RemoteFiles.path(eop_iau2000a_rf), ';'; header = true)
     # Parse eop 
@@ -130,13 +100,12 @@ function get_eop_iau2000a(; force=false)
 end
 
 # Earth orientation parameters (eop) 1980
-eop_IAU1980 = get_eop_iau1980()
+const eop_IAU1980 = get_eop_iau1980()
 # Earth orientation parameters (eop) 2000
-eop_IAU2000A = get_eop_iau2000a()
+const eop_IAU2000A = get_eop_iau2000a()
 
 @doc raw"""
-    observer_position(station_code::Union{Int, String}, et::T; eo::Bool=true, 
-                      eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T<:Number}
+    observer_position(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
 
 Returns the observer's position and velocity in Earth-Centered Inertial (ECI) reference frame.
 
@@ -144,51 +113,44 @@ See also [`SatelliteToolbox.satsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@
 
 # Arguments 
 
-- `station_code::Union{Int, String}`:  observing station identifier (MPC nomenclature).
-- `et::T`: ephemeris time (TDB seconds since J2000.0 epoch).
+- `obs::RadecMPC{T}`: observation instant.
 - `eo::Bool=true`: wheter to use Earth Orientation Parameters (eop) or not. 
 - `eop::Union{EOPData_IAU1980, EOPData_IAU2000A}`: Earth Orientation Parameters (eop).
 """
-function observer_position(station_code::Union{Int, String}, et::T; eo::Bool=true,
-        eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T<:Number}
-    # λ_deg: East longitude (deg)
-    # u: distance from spin axis (km), u = r*cos(ϕ)
-    # v: height above equatorial plane (km), v = r*sin(ϕ)
+function observer_position(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
 
-    # Add pading to station code to match FWF file 
-    st_code_str = lpad(string(station_code), 3, "0")
-    # Row of FWF file corresponding to the given observatory
-    obscode = filter(i->i.Code==st_code_str, mpcobscodes)
-    # The code do not correspond to any observatory
-    if nrow(obscode) == 0
-        @error "Unknown station code: $station_code"
-    # The code corresponds to more than one observatory
-    elseif nrow(obscode) > 1
-        @warn "More than one observatory assigned to code: $station_code"
-    end
+    observatory = obs.observatory
+
+    @assert !isunknown(observatory) "Cannot compute position for unknown observatory."
+    @assert hascoord(observatory) "Cannot compute position for observatory without coordinates"
+
+    # λ_deg: longitude [degrees east of Greenwich]
+    # u: distance from spin axis [km], u = ρ*cos(ϕ')
+    # v: height above equatorial plane [km], v = ρ*sin(ϕ'),
+    #  where ϕ' is the geocentric latitude and ρ is the geocentric distance in km
+
     # Cilindrical components of Earth-fixed position of observer
-    λ_deg = obscode.Long[1]
-    u = obscode.cos[1]*RE
-    v = obscode.sin[1]*RE
+    λ_deg = observatory.long
+    u = observatory.cos * RE
+    v = observatory.sin * RE
     # Cartesian components of Earth-fixed position of observer
     λ_rad = deg2rad(λ_deg)       # rad
-    x_gc = u*cos(λ_rad)          # km
-    y_gc = u*sin(λ_rad)          # km
+    x_gc = u * cos(λ_rad)        # km
+    y_gc = u * sin(λ_rad)        # km
     z_gc = v                     # km
     # Earth-fixed position of observer 
     pos_geo = [x_gc, y_gc, z_gc] # km
 
-    # mt2c, dmt2c, gast = t2c_rotation_iau_76_80(et, eo=eo)
-    # r_c = mt2c*pos_geo
-    # v_c = dmt2c*pos_geo
-
     # UTC seconds 
+    et = datetime2et(obs)
     utc_secs = et - tdb_utc(et)
     # Julian days UTC 
     jd_utc = JD_J2000 + utc_secs/daysec
     # State vector 
     sv_geo = SatelliteToolbox.satsv(jd_utc, pos_geo, zeros(3), zeros(3))
-    # Transform state vector coordinates from geocentric, Earth-fixed frame to inertial (celestial) frame
+    # Transform position/velocity from Earth-Centered, Earth-fixed frame to Earth-Centered Inertial frame
+    # ITRF: International Terrestrial Reference Frame
+    # GCRF: Geocentric Celestial Reference Frame
     # Use earth orientation parameters
     if eo
         sv_c = SatelliteToolbox.svECEFtoECI(sv_geo, Val(:ITRF), Val(:GCRF), jd_utc, eop)
@@ -203,33 +165,6 @@ function observer_position(station_code::Union{Int, String}, et::T; eo::Bool=tru
 
     return r_c, v_c
 end
-
-@doc raw"""
-    rad2arcsec(x)
-
-Converts radians to arcseconds. 
-
-See also [`arcsec2rad`](@ref) and [`mas2rad`](@ref).
-"""
-rad2arcsec(x) = 3600rad2deg(x) # rad2deg(rad) -> deg; 3600deg -> arcsec
-
-@doc raw"""
-    arcsec2rad(x)
-
-Converts arcseconds to radians. 
-
-See also [`rad2arcsec`](@ref) and [`mas2rad`](@ref).
-"""
-arcsec2rad(x) = deg2rad(x/3600) # arcsec/3600 -> deg; deg2rad(deg) -> rad
-
-@doc raw"""
-    mas2rad(x)
-
-Converts milli-arcseconds to radians. 
-
-See also [`rad2arcsec`](@ref) and [`arcsec2rad`](@ref).
-"""
-mas2rad(x) = arcsec2rad(x/1000) # mas/1000 -> arcsec; arcsec2rad(arcsec) -> rad
 
 @doc raw"""
     nupr7680mat(tt, Δϵ_1980, ΔΨ_1980, dde80, ddp80) 
