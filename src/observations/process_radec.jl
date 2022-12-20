@@ -22,7 +22,7 @@ Compute astrometric right ascension and declination (both in arcsec) for a set o
 function compute_radec(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, 
                        xva::Function=apophis_pv_197) where {T <: AbstractFloat}
     # Transform receiving time from UTC to TDB seconds since J2000
-    et_r_secs = datetime2et(t_r_utc)
+    et_r_secs = datetime2et(obs)
     # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
     R_r, V_r = observer_position(obs, eo=eo)
     # Earth's barycentric position and velocity at receive time
@@ -417,7 +417,7 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true
     for i in 1:n_optical_obs
 
         # Time of observation 
-        datetime_obs = obs[i].date
+        datetime_obs[i] = obs[i].date
         
         # Observed ra/dec
         # Note: ra is multiplied by a metric factor cos(dec) to match the format of debiasing corrections 
