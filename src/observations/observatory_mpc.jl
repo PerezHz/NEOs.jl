@@ -154,6 +154,7 @@ function read_observatories_mpc(filename::String)
     return obs
 end
 
+# Header of MPC observatories file 
 const mpc_observatories_header = "Code  Long.   cos      sin    Name"
 
 @doc raw"""
@@ -189,7 +190,7 @@ function parse_observatories_mpc(text::String)
 end
 
 # Path to mpc observatories file 
-const ObsCodes_path = joinpath(src_path, "observations/ObsCodes.txt")
+const ObsCodes_path = joinpath(observations_path, "ObsCodes.txt")
 # List of mpc observatories
 const mpc_observatories = Ref{Vector{ObservatoryMPC{Float64}}}(read_observatories_mpc(ObsCodes_path))
 

@@ -5,29 +5,6 @@ const ttmtdb_t = JLD.load(ttmtdb_artifact_path, "t")
 const ttmtdb_x_coeffs = JLD.load(ttmtdb_artifact_path, "x_coeffs")
 const ttmtdb = TaylorInterpolant(ttmtdb_t0, ttmtdb_t, Taylor1.(ttmtdb_x_coeffs))
 
-# Read JPL ephemerides (asteroid, Solar System, TT-TDB)
-@doc raw"""
-    loadjpleph()
-
-Reads JPL ephemerides (asteroid, Solar System, TT-TDB).
-
-See also [`SPICE.furnsh`](@ref).
-"""
-function loadjpleph()
-    furnsh(
-        # NAIF IDs
-        joinpath(artifact"naif0012", "naif0012.tls"),
-        # JPL DE430 TT-TDB
-        joinpath(artifact"TTmTDBde430", "TTmTDB.de430.19feb2015.bsp"),
-        # JPL DE430 ephemerides
-        joinpath(artifact"de430", "de430_1850-2150.bsp"),
-        # JPL #197 solution for Apophis
-        joinpath(artifact"a99942", "a99942_s197.bsp"),
-        # JPL #199 solution for Apophis
-        joinpath(artifact"a99942", "a99942_s199.bsp"),
-    )
-end
-
 @doc raw"""
     kmsec2auday(pv)
 

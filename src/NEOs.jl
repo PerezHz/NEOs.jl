@@ -5,8 +5,8 @@ module NEOs
 export hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, update_observatories_mpc,
        unknownobs, isunknown
 export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc 
-export datetime2et, load_leap_seconds, observer_position 
-export radec, radec_mpc, radec_table, w8sveres17
+export loadjpleph, datetime2et, rad2arcsec, arcsec2rad, observer_position 
+export compute_radec, w8sveres17, radec_astrometry
 
 export propagate, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_76_80,

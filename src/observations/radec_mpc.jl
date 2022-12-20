@@ -198,11 +198,22 @@ function RadecMPC(m::RegexMatch)
         Meta.parse(m["δ_min"]), 
         Meta.parse(m["δ_sec"])
     )
-    i = findfirst(x -> x.code == string(m["obscode"]), mpc_observatories[])
-    if isnothing(i)
+    # Find indexes in mpc_observatories that matches obscode 
+    obscode = string(m["obscode"])
+    idxs = findall(x -> x.code == obscode, mpc_observatories[])
+    L_i = length(idxs)
+
+    # No observatory matches obscode
+    if L_i == 0
+        @warn "Unknown observatory code $obscode"
         observatory = unknownobs()
+    # At least one observatory matches obscode
     else
-        observatory = mpc_observatories[][i]
+        observatory = mpc_observatories[][idxs[1]]
+        # More than one observatory mathces obscode
+        if L_i > 1
+            @warn "More than one observatory has code $obscode, selecting first: $(observatory.name)"
+        end
     end
     
     return RadecMPC(

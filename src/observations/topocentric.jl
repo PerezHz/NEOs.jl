@@ -1,13 +1,23 @@
-# Path to leap seconds kernel 
-const naif_path = joinpath(observations_path, "naif0012.tls")
-
 @doc raw"""
-    load_leap_seconds()
+    loadjpleph()
 
-Loads leap seconds kernel. 
+Loads JPL ephemerides (NAIF IDs, DE430 TT-TDB and ephemerides, #197 and #199 solutions for Apophis).
+
+See also [`SPICE.furnsh`](@ref).
 """
-function load_leap_seconds()
-    furnsh(naif_path)
+function loadjpleph()
+    furnsh(
+        # NAIF IDs
+        joinpath(artifact"naif0012", "naif0012.tls"),
+        # JPL DE430 TT-TDB
+        joinpath(artifact"TTmTDBde430", "TTmTDB.de430.19feb2015.bsp"),
+        # JPL DE430 ephemerides
+        joinpath(artifact"de430", "de430_1850-2150.bsp"),
+        # JPL #197 solution for Apophis
+        joinpath(artifact"a99942", "a99942_s197.bsp"),
+        # JPL #199 solution for Apophis
+        joinpath(artifact"a99942", "a99942_s199.bsp"),
+    )
 end
 
 @doc raw"""
@@ -114,7 +124,7 @@ See also [`SatelliteToolbox.satsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@
 # Arguments 
 
 - `obs::RadecMPC{T}`: observation instant.
-- `eo::Bool=true`: wheter to use Earth Orientation Parameters (eop) or not. 
+- `eo::Bool=true`: whether to use Earth Orientation Parameters (eop) or not. 
 - `eop::Union{EOPData_IAU1980, EOPData_IAU2000A}`: Earth Orientation Parameters (eop).
 """
 function observer_position(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
@@ -130,9 +140,9 @@ function observer_position(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_I
     #  where ϕ' is the geocentric latitude and ρ is the geocentric distance in km
 
     # Cilindrical components of Earth-fixed position of observer
-    λ_deg = observatory.long
-    u = observatory.cos * RE
-    v = observatory.sin * RE
+    λ_deg = observatory.long     # deg 
+    u = observatory.cos * RE     # km 
+    v = observatory.sin * RE     # km 
     # Cartesian components of Earth-fixed position of observer
     λ_rad = deg2rad(λ_deg)       # rad
     x_gc = u * cos(λ_rad)        # km

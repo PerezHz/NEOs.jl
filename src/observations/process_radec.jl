@@ -3,26 +3,27 @@ include("radec_mpc.jl")
 include("topocentric.jl")
 
 @doc raw"""
-    radec(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, 
-          xva::Function=apophis_pv_197) where {T <: AbstractFloat}
+    compute_radec(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, 
+                  xva::Function=apophis_pv_197) where {T <: AbstractFloat}
+    compute_radec(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, 
+                  xva::Function=apophis_pv_197) where {T <: AbstractFloat}
 
-Compute astrometric right ascension and declination (both in arcsec) for an asteroid at instant `obs` from Earth, Sun and 
-asteroid ephemerides.
+Compute astrometric right ascension and declination (both in arcsec) for a set of MPC-formatted observations.
 
 # Arguments 
 
-- `obs::RadecMPC{T}`: observation instant.
+- `obs::RadecMPC{T}/Vector{RadecMPC{T}}`: observations.
 - `niter::Int`: number of light-time solution iterations.
 - `eo::Bool`: compute corrections due to Earth orientation, LOD, polar motion.
 - `xve::Function`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 - `xvs::Function`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 - `xva::Function`: asteroid ephemeris wich takes [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
-function radec(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, 
-               xva::Function=apophis_pv_197) where {T <: AbstractFloat}
+function compute_radec(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, 
+                       xva::Function=apophis_pv_197) where {T <: AbstractFloat}
     # Transform receiving time from UTC to TDB seconds since J2000
     et_r_secs = datetime2et(t_r_utc)
-    # Compute geocentric position/velocity of receiving antenna in inertial frame (km, km/s)
+    # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
     R_r, V_r = observer_position(obs, eo=eo)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
@@ -148,25 +149,8 @@ function radec(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true, xve::Function=ear
     return α_as, δ_as # right ascension, declination both in arcsec
 end
 
-@doc raw"""
-    radec_mpc(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, 
-              xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T <: AbstractFloat}
-
-Compute optical astrometric ra/dec (both in arcsec) ephemeris for a set of MPC-formatted observations.
-
-See also [`radec`](@ref).
-
-# Arguments
-
-- `obs::Vector{RadecMPC{T}}`: vector of observations. 
-- `niter::Int`: number of light-time solution iterations.
-- `eo::Bool`: compute corrections due to Earth orientation, LOD, polar motion.
-- `xve::Function`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xvs::Function`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xva::Function`: asteroid ephemeris wich takes [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-"""
-function radec_mpc(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, 
-                   xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T <: AbstractFloat}
+function compute_radec(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, 
+                       xva::Function=apophis_pv_197) where {T <: AbstractFloat}
     
     # Number of observations
     n_optical_obs = length(obs)
@@ -186,189 +170,19 @@ function radec_mpc(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, xve::
 
     # Iterate over the number of observations
     for i in 1:n_optical_obs
-        vra[i], vdec[i] = radec(obs[i], niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
+        vra[i], vdec[i] = compute_radec(obs[i], niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
     end
 
     return vra, vdec # arcsec, arcsec
 end
 
-function select_debiasing_table(debias_table::String = "2018")
-    # Select debiasing table: 
-    # - 2014 corresponds to https://doi.org/10.1016/j.icarus.2014.07.033
-    # - 2018 corresponds to https://doi.org/10.1016/j.icarus.2019.113596
-    # Debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
-    if debias_table == "2018"
-        debias_path = artifact"debias_2018"
-        mpc_catalog_codes_201X = mpc_catalog_codes_2018
-        # The healpix tesselation resolution of the bias map from https://doi.org/10.1016/j.icarus.2019.113596
-        NSIDE= 64 
-        # In 2018 debias table Gaia DR2 catalog is regarded as the truth
-        truth = "V" 
-    elseif debias_table == "hires2018"
-        debias_path = artifact"debias_hires2018"
-        mpc_catalog_codes_201X = mpc_catalog_codes_2018
-        # The healpix tesselation resolution of the high-resolution bias map from https://doi.org/10.1016/j.icarus.2019.113596
-        NSIDE= 256 
-        # In 2018 debias table Gaia DR2 catalog is regarded as the truth
-        truth = "V" 
-    elseif debias_table == "2014"
-        debias_path = artifact"debias_2014"
-        mpc_catalog_codes_201X = mpc_catalog_codes_2014
-        # The healpix tesselation resolution of the bias map from https://doi.org/10.1016/j.icarus.2014.07.033
-        NSIDE= 64 
-        # In 2014 debias table PPMXL catalog is regarded as the truth
-        truth = "t" 
-    else
-        @error "Unknown bias map: $(debias_table). Possible values are `2014`, `2018` and `hires2018`."
-    end
-
-    # Debias table file 
-    bias_file = joinpath(debias_path, "bias.dat")
-    # Read bias matrix 
-    bias_matrix = readdlm(bias_file, comment_char='!', comments=true)
-    # Initialize healpix Resolution variable
-    resol = Resolution(NSIDE) 
-    # Compatibility between bias matrix and resolution 
-    @assert size(bias_matrix) == (resol.numOfPixels, 4length(mpc_catalog_codes_201X)) "Bias table file $bias_file dimensions do not match expected parameter NSIDE=$NSIDE and/or number of catalogs in table."
-
-    return mpc_catalog_codes_201X, truth, resol, bias_matrix
-end
-
-@doc raw"""
-    radec_table(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true,
-        debias_table::String="2018", xve::Function=earth_pv,
-        xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T <: AbstractFloat}
-
-
-Returns ra/dec astrometry (observed + computed + corrections + statistical weights) for a set of observations. 
-
-See also [`radec`](@ref), [`w8sveres17`](@ref) and [`Healpix.ang2pixRing`](@ref). 
-
-# Arguments
-
-- `obs::RadecMPC{T}`: vector of observations. 
-- `niter::Int`: number of light-time solution iterations.
-- `eo::Bool`: compute corrections due to Earth orientation, LOD, polar motion.
-- `debias_table::String`: debias table for optical observations. 
-- `xve::Function`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xvs::Function`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xva::Function`: asteroid ephemeris wich takes [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-"""
-function radec_table(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true,
-        debias_table::String="2018", xve::Function=earth_pv,
-        xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T <: AbstractFloat}
-
-    # Number of observations 
-    n_optical_obs = length(obs)
-
-    # UTC time of first astrometric observation
-    utc1 = obs[1].date 
-    # TDB seconds since J2000.0 for first astrometric observation
-    et1 = datetime2et(utc1)
-    # Asteroid ephemeris at et1
-    a1_et1 = xva(et1)[1]
-    # Tipe of asteroid ephemeris 
-    S = typeof(a1_et1)
-    
-    # Observed right ascension
-    α_obs = Array{Float64}(undef, n_optical_obs)
-    # Observed declination
-    δ_obs = Array{Float64}(undef, n_optical_obs)
-
-    # Computed right ascension
-    α_comp = Array{S}(undef, n_optical_obs)
-    # Computed declination
-    δ_comp = Array{S}(undef, n_optical_obs)
-    
-    # Total debiasing correction in right ascension (arcsec)
-    α_corr = Array{Float64}(undef, n_optical_obs)
-    # Total debiasing correction in declination (arcsec)
-    δ_corr = Array{Float64}(undef, n_optical_obs)
-    
-    # Computed values
-    datetime_obs = Array{DateTime}(undef, n_optical_obs)
-    # Statistical weights
-    w8s = Array{Float64}(undef, n_optical_obs)
-
-    # Select debias table 
-    mpc_catalog_codes_201X, truth, resol, bias_matrix
-
-    # Iterate over the observations 
-    for i in 1:n_optical_obs
-        
-        # Observed ra/dec
-        # Note: ra is multiplied by a metric factor cos(dec) to match the format of debiasing corrections 
-        δ_obs[i] = rad2arcsec(obs[i].δ)                 # arcsec
-        α_obs[i] = rad2arcsec(obs[i].α) * cos(obs[i].δ) # arcsec
-
-        # Computed ra/dec
-        α_comp_as, δ_comp_as = radec(obs[i], niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
-        δ_comp_rad = arcsec2rad(δ_comp_as)
-        # Multiply by metric factor cos(dec)
-        α_comp[i] = α_comp_as * cos(δ_comp_rad)  # arcsec 
-        δ_comp[i] = δ_comp_as                    # arcsec
-
-        # Statistical weights from Veres et al. (2017)
-        w8s[i] = w8sveres17(obs[i])
-
-        if (obs[i].catalog ∉ mpc_catalog_codes_201X) && obs[i].catalog != "Y"
-            # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
-            if haskey(mpc_catalog_codes, obs[i].catalog)
-                if obs[i].catalog != truth
-                    catalog_not_found = mpc_catalog_codes[obs[i].catalog]
-                    @warn "Catalog not found in $(debias_table) table: $(catalog_not_found). Setting debiasing corrections equal to zero."
-                end
-            elseif obs[i].catalog == " "
-                @warn "Catalog information not available in observation record. Setting debiasing corrections equal to zero."
-            else
-                @warn "Catalog code $(obs[i].catalog) does not correspond to MPC catalog code. Setting debiasing corrections equal to zero."
-            end
-            α_corr[i] = 0.0
-            δ_corr[i] = 0.0
-            continue
-        else
-            # Otherwise, if star catalog is present in debias table, compute corrections
-            # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
-            # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
-            # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
-            # since we use pix_ind to get the corresponding row number in bias.dat, it's not necessary to substract 1
-            pix_ind = ang2pixRing(resol, π/2 - obs[i].δ, obs[i].α)
-            
-            # Handle edge case: in new MPC catalog nomenclature, "UCAC-5"->"Y"; but in debias tables "UCAC-5"->"W"
-            if obs[i].catalog == "Y"
-                cat_ind = findfirst(x -> x == "W", mpc_catalog_codes_201X)
-            else
-                cat_ind = findfirst(x -> x == obs[i].catalog, mpc_catalog_codes_201X)
-            end
-            
-            # Read dRA, pmRA, dDEC, pmDEC data from bias.dat
-            # dRA: position correction in RA * cos(DEC) at epoch J2000.0 [arcsec]
-            # dDEC: position correction in DEC at epoch J2000.0 [arcsec]
-            # pmRA: proper motion correction in RA*cos(DEC) [mas/yr]
-            # pmDEC: proper motion correction in DEC [mas/yr]
-            dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
-
-            et_secs_i = datetime2et(obs[i].date)
-            tt_secs_i = et_secs_i - ttmtdb(et_secs_i)
-            yrs_J2000_tt = tt_secs_i/(daysec*yr)
-            # Total debiasing correction in right ascension (arcsec)
-            α_corr[i] = dRA + yrs_J2000_tt*pmRA/1_000 
-            # Total debiasing correction in declination (arcsec)
-            δ_corr[i] = dDEC + yrs_J2000_tt*pmDEC/1_000 
-        end
-    end
-
-    # Return time of observation, observed ra/dec, computed ra/dec, total debiasing correction in ra/dec and statistical weights
-    return datetime_obs, α_obs, δ_obs, α_comp, δ_comp, α_corr, δ_corr, w8s
-end
-
-# `mpc_catalog_codes_2014` corresponds to debiasing tables included in https://doi.org/10.1016/j.icarus.2014.07.033
+# MPC Catalogs corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2014.07.033
 const mpc_catalog_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "o", "p", "q", "r",
-                          "u", "v", "w", "L", "N"]
+                                "u", "v", "w", "L", "N"]
 
-# `mpc_catalog_codes_2018` corresponds to debiasing tables included in https://doi.org/10.1016/j.icarus.2019.113596
+# MPC Catalogs corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2019.113596
 const mpc_catalog_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "n", "o", "p", "q", 
-                          "r", "t", "u", "v", "w", "L", "N", "Q", "R", "S", "U", "W"]
+                                "r", "t", "u", "v", "w", "L", "N", "Q", "R", "S", "U", "W"]
 
 # MPC star catalog codes were retrieved from the link below
 # https://minorplanetcenter.net/iau/info/CatalogueCodes.html
@@ -427,6 +241,48 @@ const mpc_catalog_codes = Dict(
     "Y" =>   "UCAC-5",
     "Z" =>   "ATLAS-2"
   )
+
+function select_debiasing_table(debias_table::String = "2018")
+    # Select debiasing table: 
+    # - 2014 corresponds to https://doi.org/10.1016/j.icarus.2014.07.033
+    # - 2018 corresponds to https://doi.org/10.1016/j.icarus.2019.113596
+    # Debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
+    if debias_table == "2018"
+        debias_path = artifact"debias_2018"
+        mpc_catalog_codes_201X = mpc_catalog_codes_2018
+        # The healpix tesselation resolution of the bias map from https://doi.org/10.1016/j.icarus.2019.113596
+        NSIDE= 64 
+        # In 2018 debias table Gaia DR2 catalog is regarded as the truth
+        truth = "V" 
+    elseif debias_table == "hires2018"
+        debias_path = artifact"debias_hires2018"
+        mpc_catalog_codes_201X = mpc_catalog_codes_2018
+        # The healpix tesselation resolution of the high-resolution bias map from https://doi.org/10.1016/j.icarus.2019.113596
+        NSIDE= 256 
+        # In 2018 debias table Gaia DR2 catalog is regarded as the truth
+        truth = "V" 
+    elseif debias_table == "2014"
+        debias_path = artifact"debias_2014"
+        mpc_catalog_codes_201X = mpc_catalog_codes_2014
+        # The healpix tesselation resolution of the bias map from https://doi.org/10.1016/j.icarus.2014.07.033
+        NSIDE= 64 
+        # In 2014 debias table PPMXL catalog is regarded as the truth
+        truth = "t" 
+    else
+        @error "Unknown bias map: $(debias_table). Possible values are `2014`, `2018` and `hires2018`."
+    end
+
+    # Debias table file 
+    bias_file = joinpath(debias_path, "bias.dat")
+    # Read bias matrix 
+    bias_matrix = readdlm(bias_file, comment_char='!', comments=true)
+    # Initialize healpix Resolution variable
+    resol = Resolution(NSIDE) 
+    # Compatibility between bias matrix and resolution 
+    @assert size(bias_matrix) == (resol.numOfPixels, 4length(mpc_catalog_codes_201X)) "Bias table file $bias_file dimensions do not match expected parameter NSIDE=$NSIDE and/or number of catalogs in table."
+
+    return mpc_catalog_codes_201X, truth, resol, bias_matrix
+end
 
 @doc raw"""
     w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
@@ -499,4 +355,135 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
     else
         return w
     end
+end
+
+@doc raw"""
+    radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, debias_table::String="2018", xve::Function=earth_pv,
+                     xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T <: AbstractFloat}
+
+Returns ra/dec astrometry (observed + computed + corrections + statistical weights) for a set of observations. 
+
+See also [`compute_radec`](@ref), [`w8sveres17`](@ref) and [`Healpix.ang2pixRing`](@ref). 
+
+# Arguments
+
+- `obs::Vector{RadecMPC{T}}`: vector of observations. 
+- `niter::Int`: number of light-time solution iterations.
+- `eo::Bool`: compute corrections due to Earth orientation, LOD, polar motion.
+- `debias_table::String`: debias table for optical observations. 
+- `xve::Function`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `xvs::Function`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `xva::Function`: asteroid ephemeris wich takes [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+"""
+function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, debias_table::String="2018", xve::Function=earth_pv,
+                          xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T <: AbstractFloat}
+
+    # Number of observations 
+    n_optical_obs = length(obs)
+
+    # UTC time of first astrometric observation
+    utc1 = obs[1].date 
+    # TDB seconds since J2000.0 for first astrometric observation
+    et1 = datetime2et(utc1)
+    # Asteroid ephemeris at et1
+    a1_et1 = xva(et1)[1]
+    # Tipe of asteroid ephemeris 
+    S = typeof(a1_et1)
+    
+    # Observed right ascension
+    α_obs = Array{Float64}(undef, n_optical_obs)
+    # Observed declination
+    δ_obs = Array{Float64}(undef, n_optical_obs)
+
+    # Computed right ascension
+    α_comp = Array{S}(undef, n_optical_obs)
+    # Computed declination
+    δ_comp = Array{S}(undef, n_optical_obs)
+    
+    # Total debiasing correction in right ascension (arcsec)
+    α_corr = Array{Float64}(undef, n_optical_obs)
+    # Total debiasing correction in declination (arcsec)
+    δ_corr = Array{Float64}(undef, n_optical_obs)
+    
+    # Times of observations 
+    datetime_obs = Array{DateTime}(undef, n_optical_obs)
+    # Statistical weights
+    w8s = Array{Float64}(undef, n_optical_obs)
+
+    # Select debias table 
+    mpc_catalog_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
+
+    # Iterate over the observations 
+    for i in 1:n_optical_obs
+
+        # Time of observation 
+        datetime_obs = obs[i].date
+        
+        # Observed ra/dec
+        # Note: ra is multiplied by a metric factor cos(dec) to match the format of debiasing corrections 
+        δ_obs[i] = rad2arcsec(obs[i].δ)                 # arcsec
+        α_obs[i] = rad2arcsec(obs[i].α) * cos(obs[i].δ) # arcsec
+
+        # Computed ra/dec
+        α_comp_as, δ_comp_as = compute_radec(obs[i], niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
+        δ_comp_rad = arcsec2rad(δ_comp_as)
+        # Multiply by metric factor cos(dec)
+        α_comp[i] = α_comp_as * cos(δ_comp_rad)  # arcsec 
+        δ_comp[i] = δ_comp_as                    # arcsec
+
+        # Statistical weights from Veres et al. (2017)
+        w8s[i] = w8sveres17(obs[i])
+
+        # Catalog of i-th observation 
+        catalog_i = obs[i].catalog
+
+        if (catalog_i ∉ mpc_catalog_codes_201X) && catalog_i != "Y"
+            # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
+            if haskey(mpc_catalog_codes, catalog_i)
+                if catalog_i != truth
+                    catalog_not_found = mpc_catalog_codes[catalog_i]
+                    @warn "Catalog not found in $(debias_table) table: $(catalog_not_found). Setting debiasing corrections equal to zero."
+                end
+            elseif catalog_i == " "
+                @warn "Catalog information not available in observation record. Setting debiasing corrections equal to zero."
+            else
+                @warn "Catalog code $catalog_i does not correspond to MPC catalog code. Setting debiasing corrections equal to zero."
+            end
+            α_corr[i] = 0.0
+            δ_corr[i] = 0.0
+            continue
+        else
+            # Otherwise, if star catalog is present in debias table, compute corrections
+            # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
+            # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
+            # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
+            # since we use pix_ind to get the corresponding row number in bias.dat, it's not necessary to substract 1
+            pix_ind = ang2pixRing(resol, π/2 - obs[i].δ, obs[i].α)
+            
+            # Handle edge case: in new MPC catalog nomenclature, "UCAC-5"->"Y"; but in debias tables "UCAC-5"->"W"
+            if catalog_i == "Y"
+                cat_ind = findfirst(x -> x == "W", mpc_catalog_codes_201X)
+            else
+                cat_ind = findfirst(x -> x == catalog_i, mpc_catalog_codes_201X)
+            end
+            
+            # Read dRA, pmRA, dDEC, pmDEC data from bias.dat
+            # dRA: position correction in RA * cos(DEC) at epoch J2000.0 [arcsec]
+            # dDEC: position correction in DEC at epoch J2000.0 [arcsec]
+            # pmRA: proper motion correction in RA*cos(DEC) [mas/yr]
+            # pmDEC: proper motion correction in DEC [mas/yr]
+            dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
+
+            et_secs_i = datetime2et(obs[i].date)
+            tt_secs_i = et_secs_i - ttmtdb(et_secs_i)
+            yrs_J2000_tt = tt_secs_i/(daysec*yr)
+            # Total debiasing correction in right ascension (arcsec)
+            α_corr[i] = dRA + yrs_J2000_tt*pmRA/1_000 
+            # Total debiasing correction in declination (arcsec)
+            δ_corr[i] = dDEC + yrs_J2000_tt*pmDEC/1_000 
+        end
+    end
+
+    # Return time of observation, observed ra/dec, computed ra/dec, total debiasing correction in ra/dec and statistical weights
+    return datetime_obs, α_obs, δ_obs, α_comp, δ_comp, α_corr, δ_corr, w8s
 end
