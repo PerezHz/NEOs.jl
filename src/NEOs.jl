@@ -4,6 +4,7 @@ module NEOs
 
 export hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, update_observatories_mpc,
        unknownobs, isunknown
+export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc  
 
 export propagate, observer_position, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_76_80,
@@ -15,7 +16,8 @@ export propagate, observer_position, delay_doppler, ismonostatic,
     newtonls_Q, readfwf, readmp, w8sveres17, bopik, yarkp2adot, pv2kep,
     x0_JPL_s197, x0_JPL_s199
 
-import Base: hash, ==, show, sort, sort!
+import Base: hash, ==, show, isless
+import Dates: DateTime
 
 using Distributed
 using TaylorIntegration
@@ -30,7 +32,6 @@ using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun,
 using JLD
 using EarthOrientation, SPICE
 using Dates
-import Dates: DateTime
 using Quadmath
 using Healpix: ang2pixRing, Resolution
 using LazyArtifacts

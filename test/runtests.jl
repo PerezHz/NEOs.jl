@@ -2,6 +2,7 @@
 
 testfiles = (
     "observatory_mpc.jl",
+    "radec_mpc.jl",
     )
 
 for file in testfiles

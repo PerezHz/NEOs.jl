@@ -1,5 +1,5 @@
-include("radec_mpc.jl")
 include("observatory_mpc.jl")
+include("radec_mpc.jl")
 include("topocentric.jl")
 
 @doc raw"""

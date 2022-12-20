@@ -157,6 +157,20 @@ end
 const mpc_observatories_header = "Code  Long.   cos      sin    Name"
 
 @doc raw"""
+    get_raw_html(url::String)
+
+Returns the raw html text of webpage `url`.
+"""
+function get_raw_html(url::String)
+    # Get raw html 
+    resp = get(url)
+    # Convert to string 
+    text = String(resp.body)
+    
+    return text
+end
+
+@doc raw"""
     parse_observatories_mpc(text::String)
 
 Returns de matches of `NEOs.mpc_observatory_regex` in `text` as `ObservatoryMPC`.

@@ -19,7 +19,7 @@ and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.20
 - `band::String`: magnitude band. 
 - `catalog::String`: catalog. 
 - `info2::String`: additional information. 
-- `obscode::String`: observatory code. 
+- `observatory::ObservatoryMPC{T}`: observatory. 
 """
 struct RadecMPC{T <: AbstractFloat} 
     num::String 
@@ -35,27 +35,27 @@ struct RadecMPC{T <: AbstractFloat}
     band::String
     catalog::String
     info2::String
-    obscode::String
+    observatory::ObservatoryMPC{T}
     # Inner constructor 
     function RadecMPC{T}(num::String, tmpdesig::String, discovery::String, publishnote::String, 
                          obstech::String, date::DateTime, α::T, δ::T, info1::String, mag::String, 
-                         band::String, catalog::String, info2::String, obscode::String) where {T <: AbstractFloat}
+                         band::String, catalog::String, info2::String, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
         new{T}(num, tmpdesig, discovery, publishnote, obstech, date, α, δ, info1, mag, band, 
-               catalog, info2, obscode)
+               catalog, info2, observatory)
     end
 end
 
 # Outer constructor
 function RadecMPC(num::String, tmpdesig::String, discovery::String, publishnote::String, 
                   obstech::String, date::DateTime, α::T, δ::T, info1::String, mag::String, 
-                  band::String, catalog::String, info2::String, obscode::String) where {T <: AbstractFloat} 
+                  band::String, catalog::String, info2::String, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat} 
     RadecMPC{T}(num, tmpdesig, discovery, publishnote, obstech, date, α, δ, info1, mag, band,
-                catalog, info2, obscode)
+                catalog, info2, observatory)
 end
 
-# Two RadecMPC are equal if ther date, α, δ and observatory code are equal
+# Two RadecMPC are equal if ther date, α, δ and observatory are equal
 function hash(a::RadecMPC{T}, h::UInt) where {T <: AbstractFloat}
-    return hash((a.date, a.α, a.δ, a.obscode), h)
+    return hash((a.date, a.α, a.δ, a.observatory), h)
 end
 
 function ==(a::RadecMPC{T}, b::RadecMPC{T}) where {T <: AbstractFloat}
@@ -64,18 +64,18 @@ end
 
 # Print method for RadecMPC
 # Examples: 
-# id: N00hp15 α: 608995.65 δ: -25653.3 t: 2020-12-04T10:41:43.209 obs: 703
-# id: 99942 α: 422475.3 δ: 97289.49 t: 2021-05-12T06:28:35.904 obs: F51
+# N00hp15 α: 608995.65 δ: -25653.3 t: 2020-12-04T10:41:43.209 obs: 703
+# 99942 α: 422475.3 δ: 97289.49 t: 2021-05-12T06:28:35.904 obs: F51
 function show(io::IO, m::RadecMPC{T}) where {T <: AbstractFloat} 
     # If there is no number, use temporary designation
     id_str = filter(!isspace, m.num) == "" ? m.tmpdesig : m.num
 
-    print(io, "id: ", id_str, " α: ", m.α, " δ: ", m.δ, " t: ", m.date,
-              " obs: ", m.obscode)
+    print(io, id_str, " α: ", m.α, " δ: ", m.δ, " t: ", m.date,
+              " obs: ", m.observatory.name)
 end
 
-sort(obs::Vector{RadecMPC{T}}) where {T <: AbstractFloat} = sort(obs, by = x -> x.date)
-sort!(obs::Vector{RadecMPC{T}}) where {T <: AbstractFloat} = sort!(obs, by = x -> x.date)
+# Order in RadecMPC is given by date 
+isless(a::RadecMPC{T}, b::RadecMPC{T}) where {T <: AbstractFloat} = a.date < b.date
 
 # Regular expression to parse an optical measurement in MPC format
 const mpc_radec_regex = Regex(join(
@@ -198,6 +198,12 @@ function RadecMPC(m::RegexMatch)
         Meta.parse(m["δ_min"]), 
         Meta.parse(m["δ_sec"])
     )
+    i = findfirst(x -> x.code == string(m["obscode"]), mpc_observatories[])
+    if isnothing(i)
+        observatory = unknownobs()
+    else
+        observatory = mpc_observatories[][i]
+    end
     
     return RadecMPC(
         string(m["num"]),
@@ -213,7 +219,7 @@ function RadecMPC(m::RegexMatch)
         string(m["band"]),
         string(m["catalog"]),
         string(m["info2"]),
-        string(m["obscode"])
+        observatory
     )
 end
 
@@ -240,16 +246,243 @@ function read_radec_mpc(filename::String)
 end
 
 @doc raw"""
-    get_raw_html(url::String = "https://minorplanetcenter.net/mpec/K20/K20YA9.html")
+    parse_radec_mpc(text::String)
+    parse_radec_mpc(f::Function, text::String)
 
-Returns the raw html text of webpage `url`.
+Returns the matches of `NEOs.mpc_radec_regex` in `text`. A function `f(m::RegexMatch) -> Bool` 
+can be passed to filter the matches. 
 """
-function get_raw_html(url::String = "https://minorplanetcenter.net/mpec/K20/K20YA9.html")
-    # Get raw html 
-    resp = get(url)
-    # Convert to string 
-    text = String(resp.body)
+function parse_radec_mpc(f::Function, text::String)
+
+    # Vector of observations 
+    radecs = Vector{RadecMPC{Float64}}(undef, 0)
+    # Iterate over the matches 
+    for m in eachmatch(mpc_radec_regex, text)
+        # Filter by f
+        if f(m)
+            push!(radecs, RadecMPC(m))
+        end
+    end
+    # If there is at least one observation
+    if length(radecs) > 0
+        # Sort observations by date
+        sort!(radecs)
+        # Eliminate repeated observations
+        unique!(radecs)
+    end
     
-    return text
+    return radecs
+end
+parse_radec_mpc(text::String) = parse_radec_mpc(t -> true, text)
+
+# MPC main page url 
+const mpc_url = "https://minorplanetcenter.net"
+
+# Regex for next circular url 
+const next_circular_regex = r"<a href=\"(?P<next>.*)\"><img src=\"/iau/figs/RArrow.gif\""
+
+@doc raw"""
+    search_circulars_mpc(url1::String, url2::String; max_iter::Int = 10_000)
+    search_circulars_mpc(f::Function, url1::String, url2::String; max_iter::Int = 10_000)
+
+Iterates MPC circulars from `url1` to `url2` and returns the matches of `NEOs.mpc_radec_regex`. 
+A function `f(m::RegexMatch) -> Bool` can be passed to filter the observations. If `url2` is not
+reached before `max_iter` iterations, the function will print a warning and return the 
+matches found so far. 
+"""
+function search_circulars_mpc(f::Function, url1::String, url2::String; max_iter::Int = 10_000)
+
+    # Vector of observations
+    obs = Vector{RadecMPC{Float64}}(undef, 0)
+    
+    # Number of urls checked 
+    n = 0
+    # First url 
+    u = url1
+
+    while true 
+        n += 1
+        if n > max_iter
+            @warn("$n pages checked before getting to $url2")
+            break 
+        end
+        # Raw html text of webpage u 
+        text = get_raw_html(u)
+        # Observations found in text 
+        obs_ = parse_radec_mpc(f, text)
+        # Add new observations 
+        obs = vcat(obs, obs_) 
+        # Final url 
+        if u == url2
+            break
+        end
+        # Next circular url 
+        next = match(next_circular_regex, text)["next"]
+        u = mpc_url * next
+    end
+    # If there is at least one observation
+    if length(obs) > 0
+        # Sort observations by date 
+        sort!(obs)
+        # Eliminate repeated observations
+        unique!(obs)
+    end
+
+    return obs
 end
 
+search_circulars_mpc(url1::String, url2::String; max_iter::Int = 10_000) = search_circulars_mpc(t -> true, url1, url2; max_iter = max_iter)
+
+@doc raw"""
+    mpc_date_str(date::DateTime)
+
+Returns the date in MPC format. 
+"""
+function mpc_date_str(date::DateTime)
+    
+    # Year string 
+    year_s = lpad(Dates.year(date), 4)
+    # Month string 
+    month_s = lpad(Dates.month(date), 2, "0")
+    # Hours [days] 
+    hrs = Dates.hour(date) / 24
+    # Minutes [days] 
+    min = Dates.minute(date) / 24 / 60
+    # Seconds [days] 
+    sec = Dates.second(date) / 24 / 60 / 60
+    # Milliseconds [days] 
+    mls = Dates.millisecond(date) / 24 / 60 / 60 / 1_000
+    # Days 
+    day_val = Dates.day(date) + hrs + min + sec + mls
+    # Days string 
+    day_s = @sprintf("%09.6f", day_val)
+    # Join everything 
+    date_s = join([
+        year_s,
+        " ",
+        month_s,
+        " ",
+        day_s,
+    ])
+
+    return date_s
+end
+
+@doc raw"""
+    mpc_α_str(α::T) where {T <: Number}
+
+Returns the right ascension [rad] in MPC format. 
+"""
+function mpc_α_str(α::T) where {T <: Number}
+    # Convert rad to deg 
+    α_deg = rad2deg(α)
+    # Hours 
+    hrs_, hrs = modf(α_deg / 15)
+    hrs = Int(hrs)
+    # Hours string 
+    hrs_s = lpad(hrs, 2, "0")
+    # Minutes 
+    min_, min = modf(60 * hrs_)
+    min = Int(min)
+    # Minutes string 
+    min_s = lpad(min, 2, "0")
+    # Seconds 
+    sec = 60 * min_
+    # Seconds string 
+    sec_s = @sprintf("%06.3f", sec)
+    # Join everything
+    α_s = join([
+        hrs_s,
+        " ",
+        min_s,
+        " ",
+        sec_s,
+    ])
+
+    return α_s 
+end
+
+@doc raw"""
+    mpc_δ_str(δ::T) where {T <: Number}
+
+Returns the declination [rad] in MPC format. 
+"""
+function mpc_δ_str(δ::T) where {T <: Number}
+    # Sign string 
+    sgn_s = δ >= 0 ? "+" : "-"
+    # Convert rad to deg 
+    δ_deg = abs(rad2deg(δ))
+    # Degrees 
+    deg_, deg = modf(δ_deg)
+    deg = Int(deg)
+    # Degrees string 
+    deg_s = lpad(deg, 2, "0")
+    # Minutes 
+    min_, min = modf(60 * deg_)
+    min = Int(min)
+    # Minutes string 
+    min_s = lpad(min, 2, "0")
+    # Seconds
+    sec = 60 * min_
+    # Seconds string 
+    sec_s = @sprintf("%05.2f", sec)
+    # Join everything
+    δ_s = join([
+        sgn_s,
+        deg_s,
+        " ",
+        min_s,
+        " ",
+        sec_s,
+    ])
+
+    return δ_s 
+end
+
+@doc raw"""
+    mpc_radec_str(obs::RadecMPC{T}) where {T <: AbstractFloat}
+
+Returns an observation in MPC format. 
+"""
+function mpc_radec_str(obs::RadecMPC{T}) where {T <: AbstractFloat}
+    # Date string 
+    date_s = mpc_date_str(obs.date)
+    # Right ascension string 
+    α_s = mpc_α_str(obs.α)
+    # Declination string 
+    δ_s = mpc_δ_str(obs.δ)
+    # Join everything
+    obs_s = join([
+        obs.num,
+        obs.tmpdesig,
+        obs.discovery,
+        obs.publishnote,
+        obs.obstech,
+        date_s,
+        α_s,
+        δ_s,
+        obs.info1,
+        obs.mag,
+        obs.band,
+        obs.catalog,
+        obs.info2,
+        obs.observatory.code,
+        "\n"
+    ])
+
+    return obs_s
+end
+
+@doc raw"""
+    write_radec_mpc(obs::Vector{RadecMPC{T}}, filename::String) where {T <: AbstractFloat}
+
+Writes `obs` to `filename` in MPC format. 
+"""
+function write_radec_mpc(obs::Vector{RadecMPC{T}}, filename::String) where {T <: AbstractFloat}
+    open(filename, "w") do file
+        for i in eachindex(obs)
+            line = mpc_radec_str(obs[i])
+            write(file, line)
+        end 
+    end
+end
