@@ -1,3 +1,5 @@
+include("units.jl")
+include("jpl_eph.jl")
 include("observatory_mpc.jl")
 include("radec_mpc.jl")
 include("topocentric.jl")
@@ -24,7 +26,7 @@ function compute_radec(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true, xve::Func
     # Transform receiving time from UTC to TDB seconds since J2000
     et_r_secs = datetime2et(obs)
     # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
-    R_r, V_r = observer_position(obs, eo=eo)
+    R_r, V_r = geocentric(obs, eo=eo)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]

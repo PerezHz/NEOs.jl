@@ -2,11 +2,21 @@ module NEOs
 
 # __precompile__(false)
 
+# Units 
+export kmsec2auday, auday2kmsec, julian2etsecs, etsecs2julian, datetime2et, rad2arcsec, arcsec2rad, mas2rad
+# JPL Ephemerides 
+export loadjpleph, sun_pv, earth_pv, moon_pv, apophis_pv_197, apophis_pv_199
+# ObservatoryMPC 
 export hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, update_observatories_mpc,
        unknownobs, isunknown
+# RadecMPC
 export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc 
-export loadjpleph, datetime2et, rad2arcsec, arcsec2rad, observer_position 
+# Topocentric
+export geocentric 
+# Process radec 
 export compute_radec, w8sveres17, radec_astrometry
+# Gauss method 
+export gauss_method_core
 
 export propagate, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_76_80,
@@ -47,6 +57,7 @@ using StaticArrays: SArray, @SVector
 using TaylorSeries
 using InteractiveUtils
 using HTTP: get
+using Roots: find_zeros
 
 @doc raw"""
     omega(lod)
@@ -156,6 +167,7 @@ end
 
 include("constants.jl")
 include("observations/process_radec.jl")
+include("propagation/gauss_method.jl")
 include("process_radar_data_jpl.jl")
 include("delay_doppler.jl")
 include("asteroid_dynamical_models.jl")

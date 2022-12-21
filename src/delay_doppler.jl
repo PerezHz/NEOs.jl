@@ -1,157 +1,3 @@
-# Load TT-TDB (ttmtdb) as a TaylorInterpolant saved in .jld file
-const ttmtdb_artifact_path = joinpath(artifact"ttmtdb_DE430_1995_2030", "ttmtdb_DE430_1995_2030_20221103.jld")
-const ttmtdb_t0 = JLD.load(ttmtdb_artifact_path, "t0")
-const ttmtdb_t = JLD.load(ttmtdb_artifact_path, "t")
-const ttmtdb_x_coeffs = JLD.load(ttmtdb_artifact_path, "x_coeffs")
-const ttmtdb = TaylorInterpolant(ttmtdb_t0, ttmtdb_t, Taylor1.(ttmtdb_x_coeffs))
-
-@doc raw"""
-    kmsec2auday(pv)
-
-Converts a ``[x, y, z, v_x, v_y, v_z]`` "state" vector from km, km/sec units to au, au/day.
-
-See also [`auday2kmsec`](@ref).
-"""
-function kmsec2auday(pv)
-    pv /= au          # (km, km/sec) -> (au, au/sec)
-    pv[4:6] *= daysec # (au, au/sec) -> (au, au/day)
-    return pv
-end
-
-@doc raw"""
-    auday2kmsec(pv)
-
-Converts a ``[x, y, z, v_x, v_y, v_z]`` "state" vector from au, au/day units to km, km/sec.
-
-See also [`kmsec2auday`](@ref).
-"""
-function auday2kmsec(pv)
-    pv *= au          # (au, au/day) -> (km, km/day)
-    pv[4:6] /= daysec # (km, km/day) -> (km, km/sec)
-    return pv
-end
-
-# Get [x,y,z,vx,vy,vz] geometric "state" vector at TDB instant `et` from
-# SPK-formatted ephemeris file wrt J2000 frame
-@doc raw"""
-    getpv(target::Int, observer::Int, et)
-
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec) at
-TDB instant `et` from SPK-formatted ephemeris file with respect to J2000 frame.
-
-See also [`SPICE.spkgeo`](@ref).
-"""
-function getpv(target::Int, observer::Int, et)
-    return spkgeo(target, et, "J2000", observer)[1] # units: km,km/sec
-end
-
-# NAIF IDs:
-# 0: Solar System Barycenter
-# 10: Sun (heliocenter)
-# 2099942: Apophis
-# 399: Earth (geocenter)
-# 301: Moon
-# 1000000001 from body 1000000000: TT-TDB
-# Here, we follow the convention from the CSPICE, library, that the ephemeris
-# time is referred to the J2000 frame epoch:
-# https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/spk.html#Terminology
-# argument `et` represents "ephemeris seconds" (TDB seconds) since J2000.0 TDB epoch
-# position and velocity are assumed to be returned in km, km/sec, resp., by spkgeo
-# https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/spkgeo_c.html (see: Detailed ouput section)
-
-@doc raw"""
-    apophis_pv_197(et)
-
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
-of Apophis at TDB instant `et` from JPL #197 solution with respect to J2000 frame.
-
-See also [`getpv`](@ref).
-"""
-apophis_pv_197(et) = getpv(9904406, 0, constant_term(et)) # units: km, km/second
-
-@doc raw"""
-    apophis_pv_199(et)
-
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
-of Apophis at TDB instant `et` from JPL #199 solution with respect to J2000 frame.
-
-See also [`getpv`](@ref).
-"""
-apophis_pv_199(et) = getpv(2099942, 0, constant_term(et)) # units: km, km/second
-
-@doc raw"""
-    sun_pv(et)
-
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
-of the Sun at TDB instant `et` with respect to J2000 frame.
-
-See also [`getpv`](@ref).
-"""
-sun_pv(et) = getpv(10, 0, constant_term(et)) # units: km, km/second
-
-@doc raw"""
-    earth_pv(et)
-
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
-of the Earth at TDB instant `et` with respect to J2000 frame.
-
-See also [`getpv`](@ref).
-"""
-earth_pv(et) = getpv(399, 0, constant_term(et)) # units: km, km/second
-
-@doc raw"""
-    moon_pv(et)
-
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
-of the Moon at TDB instant `et` with respect to J2000 frame.
-
-See also [`getpv`](@ref).
-"""
-moon_pv(et) = getpv(301, 0, constant_term(et)) # units: km, km/second
-
-@doc raw"""
-    tt_tdb(et)
-
-Returns the difference TT-TDB (in units of sec) at TDB instant `et` with respect to J2000
-frame.
-
-See also [`getpv`](@ref).
-"""
-tt_tdb(et) = getpv(1000000001, 1000000000, constant_term(et))[1] # units: seconds
-
-@doc raw"""
-    dtt_tdb(et)
-
-Returns the rate of change of TT-TDB (in units of sec/sec) at TDB instant `et` with respect
-to J2000 frame.
-
-See also [`getpv`](@ref).
-"""
-dtt_tdb(et) = getpv(1000000001, 1000000000, constant_term(et))[4] # units: seconds/seconds
-
-@doc raw"""
-    julian2etsecs(jd)
-
-Converts `jd` julian days to ephemeris seconds since J2000.
-
-See also [`etsecs2julian`](@ref).
-"""
-function julian2etsecs(jd)
-    return (jd-JD_J2000)*daysec
-end
-
-# Convert ephemeris seconds since J2000 to julian days
-@doc raw"""
-    etsecs2julian(et)
-
-Converts `et` ephemeris seconds since J2000 to julian days.
-
-See also [`julian2etsecs`](@ref).
-"""
-function etsecs2julian(et)
-    return JD_J2000 + et/daysec
-end
-
 @doc raw"""
     shapiro_delay(e, p, q)
 
@@ -461,7 +307,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = str2et(string(t_r_utc)) + t_offset
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, V_r = observer_position(station_code, et_r_secs, eo=eo)
+    R_r, V_r = geocentric(station_code, et_r_secs, eo=eo)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]
@@ -554,7 +400,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_b_secs - τ_U
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = observer_position(station_code, et_t_secs, eo=eo)
+    R_t, V_t = geocentric(station_code, et_t_secs, eo=eo)
     # Barycentric position and velocity of the Earth at transmit time
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
@@ -577,7 +423,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
         # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial
         # conditions variations via et_t_secs
-        R_t, V_t = observer_position(station_code, et_t_secs, eo=eo)
+        R_t, V_t = geocentric(station_code, et_t_secs, eo=eo)
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]
@@ -691,7 +537,7 @@ function delay(station_code::Int, t_r_utc::DateTime,
     # et_r_secs_0 a a Taylor polynomial
     et_r_secs = Taylor1([et_r_secs_0,1.0].*one(q1[0]), tord)
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, _ = observer_position(station_code, et_r_secs, eo=eo)
+    R_r, _ = geocentric(station_code, et_r_secs, eo=eo)
     # Earth's barycentric position and velocity at receive time
     r_e_t_r = xve(et_r_secs)[1:3]
     # Receiver barycentric position and velocity at receive time
@@ -781,7 +627,7 @@ function delay(station_code::Int, t_r_utc::DateTime,
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_b_secs - τ_U
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = observer_position(station_code, et_t_secs, eo=eo)
+    R_t, V_t = geocentric(station_code, et_t_secs, eo=eo)
     # Barycentric position and velocity of the Earth at transmit time
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
@@ -804,7 +650,7 @@ function delay(station_code::Int, t_r_utc::DateTime,
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
         # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial
         # conditions variations via et_t_secs
-        R_t, V_t = observer_position(station_code, et_t_secs, eo=eo)
+        R_t, V_t = geocentric(station_code, et_t_secs, eo=eo)
         # Earth's barycentric position and velocity at transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]
@@ -1028,7 +874,7 @@ function delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime,
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = str2et(string(t_r_utc))
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, V_r = observer_position(station_code, et_r_secs, eo=eo)
+    R_r, V_r = geocentric(station_code, et_r_secs, eo=eo)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]
@@ -1134,7 +980,7 @@ function delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime,
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_r_secs - (τ_U+τ_D)
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = observer_position(station_code, constant_term(et_t_secs), eo=eo)
+    R_t, V_t = geocentric(station_code, constant_term(et_t_secs), eo=eo)
     # Barycentric position and velocity of the Earth at transmit time
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
@@ -1161,7 +1007,7 @@ function delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime,
         # See equation (6) of https://doi.org/10.1086/116062
         et_t_secs = et_r_secs-(τ_U+τ_D)
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-        R_t, V_t = observer_position(station_code, constant_term(et_t_secs), eo=eo)
+        R_t, V_t = geocentric(station_code, constant_term(et_t_secs), eo=eo)
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]

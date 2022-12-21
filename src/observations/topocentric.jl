@@ -1,64 +1,3 @@
-@doc raw"""
-    loadjpleph()
-
-Loads JPL ephemerides (NAIF IDs, DE430 TT-TDB and ephemerides, #197 and #199 solutions for Apophis).
-
-See also [`SPICE.furnsh`](@ref).
-"""
-function loadjpleph()
-    furnsh(
-        # NAIF IDs
-        joinpath(artifact"naif0012", "naif0012.tls"),
-        # JPL DE430 TT-TDB
-        joinpath(artifact"TTmTDBde430", "TTmTDB.de430.19feb2015.bsp"),
-        # JPL DE430 ephemerides
-        joinpath(artifact"de430", "de430_1850-2150.bsp"),
-        # JPL #197 solution for Apophis
-        joinpath(artifact"a99942", "a99942_s197.bsp"),
-        # JPL #199 solution for Apophis
-        joinpath(artifact"a99942", "a99942_s199.bsp"),
-    )
-end
-
-@doc raw"""
-    datetime2et(x::DateTime)
-    datetime2et(x::RadecMPC{T}) where {T <: AbstractFloat}
-    
-Retuns the  TDB seconds past the J2000 epoch.
-"""
-function datetime2et(x::DateTime)
-    return str2et(string(x))
-end     
-
-datetime2et(x::RadecMPC{T}) where {T <: AbstractFloat} = datetime2et(x.date)
-
-@doc raw"""
-    rad2arcsec(x)
-
-Converts radians to arcseconds. 
-
-See also [`arcsec2rad`](@ref) and [`mas2rad`](@ref).
-"""
-rad2arcsec(x) = 3600 * rad2deg(x) # rad2deg(rad) -> deg; 3600 * deg -> arcsec
-
-@doc raw"""
-    arcsec2rad(x)
-
-Converts arcseconds to radians. 
-
-See also [`rad2arcsec`](@ref) and [`mas2rad`](@ref).
-"""
-arcsec2rad(x) = deg2rad(x / 3600) # arcsec/3600 -> deg; deg2rad(deg) -> rad
-
-@doc raw"""
-    mas2rad(x)
-
-Converts milli-arcseconds to radians. 
-
-See also [`rad2arcsec`](@ref) and [`arcsec2rad`](@ref).
-"""
-mas2rad(x) = arcsec2rad(x / 1000) # mas/1000 -> arcsec; arcsec2rad(arcsec) -> rad
-
 # Functions get_eop_iau1980, get_eop_iau2000a were adapted from SatelliteToolbox.jl; MIT-licensed
 # these functions avoid the use of @eval
 # https://github.com/JuliaSpace/SatelliteToolbox.jl/blob/b95e7f54f85c26744c64270841c874631f5addf1/src/transformations/eop.jl#L87
@@ -115,9 +54,9 @@ const eop_IAU1980 = get_eop_iau1980()
 const eop_IAU2000A = get_eop_iau2000a()
 
 @doc raw"""
-    observer_position(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+    geocentric(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
 
-Returns the observer's position and velocity in Earth-Centered Inertial (ECI) reference frame.
+Returns the observer's `[x, y, z, v_x, v_y, v_z]` geometric "state" vector in Earth-Centered Inertial (ECI) reference frame.
 
 See also [`SatelliteToolbox.satsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@ref).
 
@@ -127,7 +66,7 @@ See also [`SatelliteToolbox.satsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@
 - `eo::Bool=true`: whether to use Earth Orientation Parameters (eop) or not. 
 - `eop::Union{EOPData_IAU1980, EOPData_IAU2000A}`: Earth Orientation Parameters (eop).
 """
-function observer_position(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+function geocentric(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
 
     observatory = obs.observatory
 
@@ -173,7 +112,7 @@ function observer_position(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_I
     # Inertial velocity
     v_c = convert(Vector{eltype(sv_c.v)}, sv_c.v)
 
-    return r_c, v_c
+    return vcat(r_c, v_c)
 end
 
 @doc raw"""
