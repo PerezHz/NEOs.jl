@@ -54,9 +54,49 @@ const eop_IAU1980 = get_eop_iau1980()
 const eop_IAU2000A = get_eop_iau2000a()
 
 @doc raw"""
-    geocentric(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+    obs_pos_ECEF(obs::RadecMPC{T}) where {T <: AbstractFloat}
 
-Returns the observer's `[x, y, z, v_x, v_y, v_z]` geometric "state" vector in Earth-Centered Inertial (ECI) reference frame.
+Returns the observer's geocentric `[x, y, z]` position vector in Earth-Centered Earth-Fixed (ECEF) reference frame.
+
+# Arguments 
+
+- `obs::RadecMPC{T}`: observation instant.
+"""
+function obs_pos_ECEF(obs::RadecMPC{T}) where {T <: AbstractFloat}
+
+    # Site of observation 
+    observatory = obs.observatory
+
+    # Make sure observatory has coordinates 
+    @assert !isunknown(observatory) "Cannot compute position for unknown observatory."
+    @assert hascoord(observatory) "Cannot compute position for observatory [$(observatory.code)] without coordinates"
+
+    # λ_deg: longitude [degrees east of Greenwich]
+    # u: distance from spin axis [km], u = ρ*cos(ϕ')
+    # v: height above equatorial plane [km], v = ρ*sin(ϕ'),
+    #  where ϕ' is the geocentric latitude and ρ is the geocentric distance in km
+
+    # Cilindrical components of Earth-Centered Earth-Fixed position of observer
+    λ_deg = observatory.long     # deg 
+    u = observatory.cos * RE     # km 
+    v = observatory.sin * RE     # km 
+
+    # Cartesian components of Earth-Centered Earth-Fixed position of observer
+    λ_rad = deg2rad(λ_deg)       # rad
+    x_gc = u * cos(λ_rad)        # km
+    y_gc = u * sin(λ_rad)        # km
+    z_gc = v                     # km
+
+    # Earth-Centered Earth-Fixed position position of observer 
+    pos_ECEF = [x_gc, y_gc, z_gc] # km
+
+    return pos_ECEF
+end
+
+@doc raw"""
+    obs_pv_ECI(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+
+Returns the observer's geocentric `[x, y, z, v_x, v_y, v_z]` "state" vector in Earth-Centered Inertial (ECI) reference frame.
 
 See also [`SatelliteToolbox.satsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@ref).
 
@@ -66,53 +106,39 @@ See also [`SatelliteToolbox.satsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@
 - `eo::Bool=true`: whether to use Earth Orientation Parameters (eop) or not. 
 - `eop::Union{EOPData_IAU1980, EOPData_IAU2000A}`: Earth Orientation Parameters (eop).
 """
-function geocentric(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+function obs_pv_ECI(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
 
-    observatory = obs.observatory
+    # Earth-Centered Earth-Fixed position position of observer 
+    pos_ECEF = obs_pos_ECEF(obs)
 
-    @assert !isunknown(observatory) "Cannot compute position for unknown observatory."
-    @assert hascoord(observatory) "Cannot compute position for observatory without coordinates"
-
-    # λ_deg: longitude [degrees east of Greenwich]
-    # u: distance from spin axis [km], u = ρ*cos(ϕ')
-    # v: height above equatorial plane [km], v = ρ*sin(ϕ'),
-    #  where ϕ' is the geocentric latitude and ρ is the geocentric distance in km
-
-    # Cilindrical components of Earth-fixed position of observer
-    λ_deg = observatory.long     # deg 
-    u = observatory.cos * RE     # km 
-    v = observatory.sin * RE     # km 
-    # Cartesian components of Earth-fixed position of observer
-    λ_rad = deg2rad(λ_deg)       # rad
-    x_gc = u * cos(λ_rad)        # km
-    y_gc = u * sin(λ_rad)        # km
-    z_gc = v                     # km
-    # Earth-fixed position of observer 
-    pos_geo = [x_gc, y_gc, z_gc] # km
-
-    # UTC seconds 
+    # ET seconds 
     et = datetime2et(obs)
+    # UTC seconds 
     utc_secs = et - tdb_utc(et)
     # Julian days UTC 
     jd_utc = JD_J2000 + utc_secs/daysec
     # State vector 
-    sv_geo = SatelliteToolbox.satsv(jd_utc, pos_geo, zeros(3), zeros(3))
-    # Transform position/velocity from Earth-Centered, Earth-fixed frame to Earth-Centered Inertial frame
+    pv_ECEF = SatelliteToolbox.satsv(jd_utc, pos_ECEF, zeros(3), zeros(3))
+
+    # Transform position/velocity from Earth-Centered Earth-fixed (ECEF) frame to Earth-Centered Inertial (ECI) frame
     # ITRF: International Terrestrial Reference Frame
     # GCRF: Geocentric Celestial Reference Frame
+
     # Use earth orientation parameters
     if eo
-        sv_c = SatelliteToolbox.svECEFtoECI(sv_geo, Val(:ITRF), Val(:GCRF), jd_utc, eop)
+        pv_ECI = SatelliteToolbox.svECEFtoECI(pv_ECEF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
     # Not use earth orientation parameters        
     else
-        sv_c = SatelliteToolbox.svECEFtoECI(sv_geo, Val(:ITRF), Val(:GCRF), jd_utc)
+        pv_ECI = SatelliteToolbox.svECEFtoECI(pv_ECEF, Val(:ITRF), Val(:GCRF), jd_utc)
     end
-    # Inertial position 
-    r_c = convert(Vector{eltype(sv_c.r)}, sv_c.r)
-    # Inertial velocity
-    v_c = convert(Vector{eltype(sv_c.v)}, sv_c.v)
 
-    return vcat(r_c, v_c)
+    # Inertial position 
+    p_ECI = convert(Vector{eltype(pv_ECI.r)}, pv_ECI.r)
+    # Inertial velocity
+    v_ECI = convert(Vector{eltype(pv_ECI.v)}, pv_ECI.v)
+
+    # Concat position and velocity 
+    return vcat(p_ECI, v_ECI)
 end
 
 @doc raw"""

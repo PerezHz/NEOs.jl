@@ -307,7 +307,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = str2et(string(t_r_utc)) + t_offset
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, V_r = geocentric(station_code, et_r_secs, eo=eo)
+    R_r, V_r = obs_pv_ECI(station_code, et_r_secs, eo=eo)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]
@@ -400,7 +400,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_b_secs - τ_U
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = geocentric(station_code, et_t_secs, eo=eo)
+    R_t, V_t = obs_pv_ECI(station_code, et_t_secs, eo=eo)
     # Barycentric position and velocity of the Earth at transmit time
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
@@ -423,7 +423,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
         # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial
         # conditions variations via et_t_secs
-        R_t, V_t = geocentric(station_code, et_t_secs, eo=eo)
+        R_t, V_t = obs_pv_ECI(station_code, et_t_secs, eo=eo)
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]
@@ -537,7 +537,7 @@ function delay(station_code::Int, t_r_utc::DateTime,
     # et_r_secs_0 a a Taylor polynomial
     et_r_secs = Taylor1([et_r_secs_0,1.0].*one(q1[0]), tord)
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, _ = geocentric(station_code, et_r_secs, eo=eo)
+    R_r, _ = obs_pv_ECI(station_code, et_r_secs, eo=eo)
     # Earth's barycentric position and velocity at receive time
     r_e_t_r = xve(et_r_secs)[1:3]
     # Receiver barycentric position and velocity at receive time
@@ -627,7 +627,7 @@ function delay(station_code::Int, t_r_utc::DateTime,
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_b_secs - τ_U
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = geocentric(station_code, et_t_secs, eo=eo)
+    R_t, V_t = obs_pv_ECI(station_code, et_t_secs, eo=eo)
     # Barycentric position and velocity of the Earth at transmit time
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
@@ -650,7 +650,7 @@ function delay(station_code::Int, t_r_utc::DateTime,
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
         # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial
         # conditions variations via et_t_secs
-        R_t, V_t = geocentric(station_code, et_t_secs, eo=eo)
+        R_t, V_t = obs_pv_ECI(station_code, et_t_secs, eo=eo)
         # Earth's barycentric position and velocity at transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]
@@ -874,7 +874,7 @@ function delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime,
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = str2et(string(t_r_utc))
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, V_r = geocentric(station_code, et_r_secs, eo=eo)
+    R_r, V_r = obs_pv_ECI(station_code, et_r_secs, eo=eo)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]
@@ -980,7 +980,7 @@ function delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime,
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_r_secs - (τ_U+τ_D)
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = geocentric(station_code, constant_term(et_t_secs), eo=eo)
+    R_t, V_t = obs_pv_ECI(station_code, constant_term(et_t_secs), eo=eo)
     # Barycentric position and velocity of the Earth at transmit time
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
@@ -1007,7 +1007,7 @@ function delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime,
         # See equation (6) of https://doi.org/10.1086/116062
         et_t_secs = et_r_secs-(τ_U+τ_D)
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-        R_t, V_t = geocentric(station_code, constant_term(et_t_secs), eo=eo)
+        R_t, V_t = obs_pv_ECI(station_code, constant_term(et_t_secs), eo=eo)
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]

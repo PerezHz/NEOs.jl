@@ -12,11 +12,11 @@ export hascoord, read_observatories_mpc, parse_observatories_mpc, write_observat
 # RadecMPC
 export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc 
 # Topocentric
-export geocentric 
+export obs_pos_ECEF, obs_pv_ECI 
 # Process radec 
 export compute_radec, w8sveres17, radec_astrometry
 # Gauss method 
-export gauss_method_core
+export gauss_method
 
 export propagate, delay_doppler, ismonostatic,
     mas2rad, t2c_rotation_iau_76_80,
@@ -53,7 +53,7 @@ using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI,
     get_ΔAT, JD_J2000, EOPData_IAU1980, rECItoECI, DCM,
     TOD, GCRF, ITRF, rECItoECI, PEF, satsv, EOPData_IAU2000A
 import RemoteFiles
-using StaticArrays: SArray, @SVector
+using StaticArrays: SVector, SArray, @SVector
 using TaylorSeries
 using InteractiveUtils
 using HTTP: get
