@@ -452,6 +452,10 @@ function mpc_radec_str(obs::RadecMPC{T}) where {T <: AbstractFloat}
     α_s = mpc_α_str(obs.α)
     # Declination string 
     δ_s = mpc_δ_str(obs.δ)
+    # Catalogue string 
+    catalogue_s = isunknown(obs.catalogue) ? " " : obs.catalogue.code
+    # Observatory string 
+    obscode_s = isunknown(obs.observatory) ? "   " : obs.observatory.code
     # Join everything
     obs_s = join([
         obs.num,
@@ -465,9 +469,9 @@ function mpc_radec_str(obs::RadecMPC{T}) where {T <: AbstractFloat}
         obs.info1,
         obs.mag,
         obs.band,
-        obs.catalogue.code,
+        catalogue_s,
         obs.info2,
-        obs.observatory.code,
+        obscode_s,
         "\n"
     ])
 
