@@ -1,7 +1,7 @@
 # Path to NEOs src directory 
 const src_path = dirname(pathof(NEOs))
 # Path to NEOs data directory
-const observations_path = joinpath(src_path, "observations/")
+const observations_path = joinpath(src_path, "observations")
 
 # Integration parameters
 const order = 30
@@ -11,7 +11,7 @@ const abstol = 1.0E-30
 const μ_DE430 = PlanetaryEphemeris.μ
 const μ_B16_DE430 = μ_DE430[12:27]     # DE430 GM's of 16 most massive asteroids
 const μ_ast343_DE430 = μ_DE430[12:end] # DE430 GM's of 343 main belt asteroids included in DE430 integration
-# Gravitational parameter of the Sun 
+# Gravitational parameter of the Sun [au^2 / day^3]
 const μ_S = PlanetaryEphemeris.GMS  
 
 # Standard value of nominal mean angular velocity of Earth (rad/sec)
@@ -27,7 +27,7 @@ const b_sun = 3.91e5  # [cm^-3]
 # Sun radiated power intensity at photosphere surface, Watt/meter^2
 const S0_sun = 63.15E6 
 # Conversion factor from m^2/sec^3 to au^2/day^3
-# const m2_s3_to_au2_day3 = 1e-6daysec^3/au^2 
+const m2_s3_to_au2_day3 = 1e-6daysec^3/au^2 
 
 # Vector of J_2*R^2 values
 # J_2: second zonal harmonic coefficient

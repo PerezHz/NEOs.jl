@@ -1,5 +1,7 @@
 include("units.jl")
 include("jpl_eph.jl")
+include("osculating.jl")
+include("catalogue_mpc.jl")
 include("observatory_mpc.jl")
 include("radec_mpc.jl")
 include("topocentric.jl")
@@ -180,71 +182,13 @@ function compute_radec(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, x
     return vra, vdec # arcsec, arcsec
 end
 
-# MPC Catalogs corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2014.07.033
-const mpc_catalog_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "o", "p", "q", "r",
+# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2014.07.033
+const mpc_catalogue_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "o", "p", "q", "r",
                                 "u", "v", "w", "L", "N"]
 
-# MPC Catalogs corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2019.113596
-const mpc_catalog_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "n", "o", "p", "q", 
+# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2019.113596
+const mpc_catalogue_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "n", "o", "p", "q", 
                                 "r", "t", "u", "v", "w", "L", "N", "Q", "R", "S", "U", "W"]
-
-# MPC star catalog codes were retrieved from the link below
-# https://minorplanetcenter.net/iau/info/CatalogueCodes.html
-const mpc_catalog_codes = Dict(
-    "a" =>   "USNO-A1.0",
-    "b" =>   "USNO-SA1.0",
-    "c" =>   "USNO-A2.0",
-    "d" =>   "USNO-SA2.0",
-    "e" =>   "UCAC-1",
-    "f" =>   "Tycho-1",
-    "g" =>   "Tycho-2",
-    "h" =>   "GSC-1.0",
-    "i" =>   "GSC-1.1",
-    "j" =>   "GSC-1.2",
-    "k" =>   "GSC-2.2",
-    "l" =>   "ACT",
-    "m" =>   "GSC-ACT",
-    "n" =>   "SDSS-DR8",
-    "o" =>   "USNO-B1.0",
-    "p" =>   "PPM",
-    "q" =>   "UCAC-4",
-    "r" =>   "UCAC-2",
-    "s" =>   "USNO-B2.0",
-    "t" =>   "PPMXL",
-    "u" =>   "UCAC-3",
-    "v" =>   "NOMAD",
-    "w" =>   "CMC-14",
-    "x" =>   "Hipparcos 2",
-    "y" =>   "Hipparcos",
-    "z" =>   "GSC (version unspecified)",
-    "A" =>   "AC",
-    "B" =>   "SAO 1984",
-    "C" =>   "SAO",
-    "D" =>   "AGK 3",
-    "E" =>   "FK4",
-    "F" =>   "ACRS",
-    "G" =>   "Lick Gaspra Catalogue",
-    "H" =>   "Ida93 Catalogue",
-    "I" =>   "Perth 70",
-    "J" =>   "COSMOS/UKST Southern Sky Catalogue",
-    "K" =>   "Yale",
-    "L" =>   "2MASS",
-    "M" =>   "GSC-2.3",
-    "N" =>   "SDSS-DR7",
-    "O" =>   "SST-RC1",
-    "P" =>   "MPOSC3",
-    "Q" =>   "CMC-15",
-    "R" =>   "SST-RC4",
-    "S" =>   "URAT-1",
-    "T" =>   "URAT-2",
-    "U" =>   "Gaia-DR1",
-    "V" =>   "Gaia-DR2",
-    # "W" =>   "UCAC-5"
-    "W" =>   "Gaia-DR3",
-    "X" =>   "Gaia-EDR3",
-    "Y" =>   "UCAC-5",
-    "Z" =>   "ATLAS-2"
-  )
 
 function select_debiasing_table(debias_table::String = "2018")
     # Select debiasing table: 
@@ -253,24 +197,24 @@ function select_debiasing_table(debias_table::String = "2018")
     # Debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
     if debias_table == "2018"
         debias_path = artifact"debias_2018"
-        mpc_catalog_codes_201X = mpc_catalog_codes_2018
+        mpc_catalogue_codes_201X = mpc_catalogue_codes_2018
         # The healpix tesselation resolution of the bias map from https://doi.org/10.1016/j.icarus.2019.113596
         NSIDE= 64 
-        # In 2018 debias table Gaia DR2 catalog is regarded as the truth
+        # In 2018 debias table Gaia DR2 catalogue is regarded as the truth
         truth = "V" 
     elseif debias_table == "hires2018"
         debias_path = artifact"debias_hires2018"
-        mpc_catalog_codes_201X = mpc_catalog_codes_2018
+        mpc_catalogue_codes_201X = mpc_catalogue_codes_2018
         # The healpix tesselation resolution of the high-resolution bias map from https://doi.org/10.1016/j.icarus.2019.113596
         NSIDE= 256 
-        # In 2018 debias table Gaia DR2 catalog is regarded as the truth
+        # In 2018 debias table Gaia DR2 catalogue is regarded as the truth
         truth = "V" 
     elseif debias_table == "2014"
         debias_path = artifact"debias_2014"
-        mpc_catalog_codes_201X = mpc_catalog_codes_2014
+        mpc_catalogue_codes_201X = mpc_catalogue_codes_2014
         # The healpix tesselation resolution of the bias map from https://doi.org/10.1016/j.icarus.2014.07.033
         NSIDE= 64 
-        # In 2014 debias table PPMXL catalog is regarded as the truth
+        # In 2014 debias table PPMXL catalogue is regarded as the truth
         truth = "t" 
     else
         @error "Unknown bias map: $(debias_table). Possible values are `2014`, `2018` and `hires2018`."
@@ -283,9 +227,9 @@ function select_debiasing_table(debias_table::String = "2018")
     # Initialize healpix Resolution variable
     resol = Resolution(NSIDE) 
     # Compatibility between bias matrix and resolution 
-    @assert size(bias_matrix) == (resol.numOfPixels, 4length(mpc_catalog_codes_201X)) "Bias table file $bias_file dimensions do not match expected parameter NSIDE=$NSIDE and/or number of catalogs in table."
+    @assert size(bias_matrix) == (resol.numOfPixels, 4length(mpc_catalogue_codes_201X)) "Bias table file $bias_file dimensions do not match expected parameter NSIDE=$NSIDE and/or number of catalogs in table."
 
-    return mpc_catalog_codes_201X, truth, resol, bias_matrix
+    return mpc_catalogue_codes_201X, truth, resol, bias_matrix
 end
 
 @doc raw"""
@@ -297,7 +241,7 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
     
     obscode = obs.observatory.code
     dt_utc_obs = obs.date
-    catalog = obs.catalog
+    catalogue = obs.catalogue.code
 
     # Unit weight (arcseconds)
     w = 1.0 
@@ -329,32 +273,32 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
     elseif obscode ∈ ("689", "950", "W84")
         return 0.5w
     #elseif obscode ∈ ("G83", "309") # Applies only to program code assigned to M. Micheli
-    #    if catalog ∈ ("q", "t") # "q"=>"UCAC-4", "t"=>"PPMXL"
+    #    if catalogue ∈ ("q", "t") # "q"=>"UCAC-4", "t"=>"PPMXL"
     #        return 0.3w
-    #    elseif catalog ∈ ("U", "V") # Gaia-DR1, Gaia-DR2
+    #    elseif catalogue ∈ ("U", "V") # Gaia-DR1, Gaia-DR2
     #        return 0.2w
     #    end
     elseif obscode ∈ ("Y28",)
-        if catalog ∈ ("t", "U", "V")
+        if catalogue ∈ ("t", "U", "V")
             return 0.3w
         else
             return w
         end
     elseif obscode ∈ ("568",)
-        if catalog ∈ ("o", "s") # "o"=>"USNO-B1.0", "s"=>"USNO-B2.0"
+        if catalogue ∈ ("o", "s") # "o"=>"USNO-B1.0", "s"=>"USNO-B2.0"
             return 0.5w
-        elseif catalog ∈ ("U", "V") # Gaia DR1, DR2
+        elseif catalogue ∈ ("U", "V") # Gaia DR1, DR2
             return 0.1w
-        elseif catalog ∈ ("t",) #"t"=>"PPMXL"
+        elseif catalogue ∈ ("t",) #"t"=>"PPMXL"
             return 0.2w
         else
             return w
         end
-    elseif obscode ∈ ("T09", "T12", "T14") && catalog ∈ ("U", "V") # Gaia DR1, DR2
+    elseif obscode ∈ ("T09", "T12", "T14") && catalogue ∈ ("U", "V") # Gaia DR1, DR2
         return 0.1w
-    elseif catalog == " "
+    elseif catalogue == ""
         return 1.5w
-    elseif catalog != " "
+    elseif catalogue != ""
         return w
     else
         return w
@@ -415,7 +359,7 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true
     w8s = Array{Float64}(undef, n_optical_obs)
 
     # Select debias table 
-    mpc_catalog_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
+    mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
 
     # Iterate over the observations 
     for i in 1:n_optical_obs
@@ -438,37 +382,37 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true
         # Statistical weights from Veres et al. (2017)
         w8s[i] = w8sveres17(obs[i])
 
-        # Catalog of i-th observation 
-        catalog_i = obs[i].catalog
+        # Catalogue code of i-th observation 
+        catcode_i = obs[i].catalogue.code
 
-        if (catalog_i ∉ mpc_catalog_codes_201X) && catalog_i != "Y"
-            # Handle case: if star catalog not present in debiasing table, then set corrections equal to zero
-            if haskey(mpc_catalog_codes, catalog_i)
-                if catalog_i != truth
-                    catalog_not_found = mpc_catalog_codes[catalog_i]
-                    @warn "Catalog not found in $(debias_table) table: $(catalog_not_found). Setting debiasing corrections equal to zero."
+        if (catcode_i ∉ mpc_catalogue_codes_201X) && catcode_i != "Y"
+            # Handle case: if star catalogue not present in debiasing table, then set corrections equal to zero
+            catalog_i = search_cat_code(catcode_i)
+            if !isunknown(catalog_i)
+                if catcode_i != truth
+                    @warn "Catalogue not found in $(debias_table) table: $(catalog_i.name). Setting debiasing corrections equal to zero."
                 end
-            elseif catalog_i == " "
+            elseif catcode_i == ""
                 @warn "Catalog information not available in observation record. Setting debiasing corrections equal to zero."
             else
-                @warn "Catalog code $catalog_i does not correspond to MPC catalog code. Setting debiasing corrections equal to zero."
+                @warn "Catalog code $catcode_i does not correspond to MPC catalogue code. Setting debiasing corrections equal to zero."
             end
             α_corr[i] = 0.0
             δ_corr[i] = 0.0
             continue
         else
-            # Otherwise, if star catalog is present in debias table, compute corrections
+            # Otherwise, if star catalogue is present in debias table, compute corrections
             # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
             # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
             # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
             # since we use pix_ind to get the corresponding row number in bias.dat, it's not necessary to substract 1
             pix_ind = ang2pixRing(resol, π/2 - obs[i].δ, obs[i].α)
             
-            # Handle edge case: in new MPC catalog nomenclature, "UCAC-5"->"Y"; but in debias tables "UCAC-5"->"W"
-            if catalog_i == "Y"
-                cat_ind = findfirst(x -> x == "W", mpc_catalog_codes_201X)
+            # Handle edge case: in new MPC catalogue nomenclature, "UCAC-5"->"Y"; but in debias tables "UCAC-5"->"W"
+            if catcode_i == "Y"
+                cat_ind = findfirst(x -> x == "W", mpc_catalogue_codes_201X)
             else
-                cat_ind = findfirst(x -> x == catalog_i, mpc_catalog_codes_201X)
+                cat_ind = findfirst(x -> x == catcode_i, mpc_catalogue_codes_201X)
             end
             
             # Read dRA, pmRA, dDEC, pmDEC data from bias.dat

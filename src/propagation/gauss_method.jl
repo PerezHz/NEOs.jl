@@ -82,7 +82,7 @@ end
 Returns the 1st order approximation to Lagrange's f function. 
 """
 function f_Lagrange(r, τ)
-    return 1 - μ_S*(τ^2)/(2*r^3)
+    return 1 - μ_S * (τ^2) / 2 / (r^3)
 end
 
 @doc raw"""
@@ -91,7 +91,7 @@ end
 Returns the 1st order approximation to Lagrange's g function.
 """
 function g_Lagrange(r, τ)
-    return τ - μ_S*(τ^3)/(6*r^3)
+    return τ - μ_S * (τ^3) / 6 / (r^3)
 end
 
 @doc raw"""
@@ -108,7 +108,8 @@ function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T
 
     # Check we have exactly three observations 
     m = length(obs)
-    @assert m == 3 "Core Gauss method requires three observations (got $m)"
+    @assert m == 3 "Core Gauss method requires exactly three observations, got $m"
+
     # Make sure observations are in temporal order 
     sort!(obs)
 
@@ -125,9 +126,9 @@ function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T
 
     # NEO's topocentric position unit vectors 
     ρ_vec = zeros(3, 3)
-    ρ_vec[1, :] = neo_pv_I(obs[1])[1:3]
-    ρ_vec[2, :] = neo_pv_I(obs[2])[1:3]
-    ρ_vec[3, :] = neo_pv_I(obs[3])[1:3]
+    ρ_vec[1, :] = neo_pos_EF(obs[1])
+    ρ_vec[2, :] = neo_pos_EF(obs[2])
+    ρ_vec[3, :] = neo_pos_EF(obs[3])
 
     # Observer's heliocentric positions 
     R_vec = zeros(3, 3)
@@ -405,6 +406,7 @@ function gauss_method_iterator(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, at
             gauss_method_refinement(τ_1, τ_3, r_vec[2, :], v_2_vec, D, R_vec, ρ_vec, f_1, g_1, f_3, g_3; kep_iters = kep_iters, atol = atol)
 
         if !success
+            @warn "Unsuccessful refinement"
             return r_vec0, v_2_vec0, R_vec, ρ_vec, ρ0, t
         end
     end 
@@ -417,14 +419,8 @@ function gauss_method(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, atol = 3e-1
     
     m = length(obs)
 
-    e = zeros(m-2)
-    q = zeros(m-2)
-    tp = zeros(m-2)
-    Ω = zeros(m-2)
-    ω = zeros(m-2)
-    i = zeros(m-2)
-    a = zeros(m-2)
-
+    osc = Vector{OsculatingElements{T}}(undef, m-2)
+    
     for j in 1:m-2
         obs_ = obs[[j, j+1, j+2]]
 
@@ -436,23 +432,15 @@ function gauss_method(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, atol = 3e-1
         end
 
         try
-            e[j], q[j], tp[j], Ω[j], ω[j], i[j], a[j] = pv2kep(vcat(r_vec[2, :], v_2_vec), μ_S, t[2])
+            osc[j] = pv2kep(vcat(r_vec[2, :], v_2_vec), μ_S, t[2])
         catch
-            e[j], q[j], tp[j], Ω[j], ω[j], i[j], a[j] = fill(NaN, 7)
+            osc[j] = OsculatingElements()
         end
 
     end
 
-    filter!(!isnan, e)
-    filter!(!isnan, q)
-    filter!(!isnan, tp)
-    filter!(!isnan, Ω)
-    filter!(!isnan, ω)
-    filter!(!isnan, i)
-    filter!(!isnan, a)
+    filter!(!isnan, osc)
 
-    return  mean(e), mean(q), mean(tp), mean(Ω), mean(ω), mean(i), mean(a)
+    return mean(osc)
 
 end
-
-mean(x) = sum(x) / length(x)

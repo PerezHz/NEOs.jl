@@ -17,7 +17,7 @@ and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.20
 - `info1::String`: additional information. 
 - `mag::String`: observed magnitude. 
 - `band::String`: magnitude band. 
-- `catalog::String`: catalog. 
+- `catalogue::CatalogueMPC`: catalogue. 
 - `info2::String`: additional information. 
 - `observatory::ObservatoryMPC{T}`: observatory. 
 """
@@ -33,24 +33,24 @@ struct RadecMPC{T <: AbstractFloat}
     info1::String
     mag::String
     band::String
-    catalog::String
+    catalogue::CatalogueMPC
     info2::String
     observatory::ObservatoryMPC{T}
     # Inner constructor 
     function RadecMPC{T}(num::String, tmpdesig::String, discovery::String, publishnote::String, 
                          obstech::String, date::DateTime, α::T, δ::T, info1::String, mag::String, 
-                         band::String, catalog::String, info2::String, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
+                         band::String, catalogue::CatalogueMPC, info2::String, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
         new{T}(num, tmpdesig, discovery, publishnote, obstech, date, α, δ, info1, mag, band, 
-               catalog, info2, observatory)
+               catalogue, info2, observatory)
     end
 end
 
 # Outer constructor
 function RadecMPC(num::String, tmpdesig::String, discovery::String, publishnote::String, 
                   obstech::String, date::DateTime, α::T, δ::T, info1::String, mag::String, 
-                  band::String, catalog::String, info2::String, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat} 
+                  band::String, catalogue::CatalogueMPC, info2::String, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat} 
     RadecMPC{T}(num, tmpdesig, discovery, publishnote, obstech, date, α, δ, info1, mag, band,
-                catalog, info2, observatory)
+                catalogue, info2, observatory)
 end
 
 # Two RadecMPC are equal if ther date, α, δ and observatory are equal
@@ -121,8 +121,8 @@ const mpc_radec_regex = Regex(join(
         raw"(?P<mag>.{5})",
         # Band regex (column 71)
         raw"(?P<band>.{1})",
-        # Catalog regex (column 72)
-        raw"(?P<catalog>.{1})",
+        # Catalogue regex (column 72)
+        raw"(?P<catalogue>.{1})",
         # Info 2 regex (columns 73-77)
         raw"(?P<info2>.{5})",
         # Observatory code regex (columns 78-80)
@@ -201,23 +201,10 @@ function RadecMPC(m::RegexMatch)
         Meta.parse(m["δ_min"]), 
         Meta.parse(m["δ_sec"])
     )
-    # Find indexes in mpc_observatories that matches obscode 
-    obscode = string(m["obscode"])
-    idxs = findall(x -> x.code == obscode, mpc_observatories[])
-    L_i = length(idxs)
-
-    # No observatory matches obscode
-    if L_i == 0
-        @warn "Unknown observatory code $obscode"
-        observatory = unknownobs()
-    # At least one observatory matches obscode
-    else
-        observatory = mpc_observatories[][idxs[1]]
-        # More than one observatory mathces obscode
-        if L_i > 1
-            @warn "More than one observatory has code $obscode, selecting first: $(observatory.name)"
-        end
-    end
+    # Find catalogue in mpc_catalogues[] that matches catalogue 
+    catalogue = search_cat_code(string(m["catalogue"]))
+    # Find observatory in mpc_observatories[] that matches obscode 
+    observatory = search_obs_code(string(m["obscode"]))
     
     return RadecMPC(
         string(m["num"]),
@@ -231,7 +218,7 @@ function RadecMPC(m::RegexMatch)
         string(m["info1"]),
         string(m["mag"]),
         string(m["band"]),
-        string(m["catalog"]),
+        catalogue,
         string(m["info2"]),
         observatory
     )
@@ -478,7 +465,7 @@ function mpc_radec_str(obs::RadecMPC{T}) where {T <: AbstractFloat}
         obs.info1,
         obs.mag,
         obs.band,
-        obs.catalog,
+        obs.catalogue.code,
         obs.info2,
         obs.observatory.code,
         "\n"

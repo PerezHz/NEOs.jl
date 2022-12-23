@@ -30,7 +30,7 @@ end
 @doc raw"""
     getpv(target::Int, observer::Int, et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec) at
+Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec) at
 TDB instant `et` from SPK-formatted ephemeris file with respect to J2000 frame.
 
 See also [`SPICE.spkgeo`](@ref).
@@ -56,7 +56,7 @@ end
 @doc raw"""
     sun_pv(et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
+Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Sun at TDB instant `et` with respect to J2000 frame.
 
 See also [`getpv`](@ref).
@@ -66,7 +66,7 @@ sun_pv(et) = getpv(10, 0, constant_term(et)) # units: km, km/second
 @doc raw"""
     earth_pv(et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
+Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Earth at TDB instant `et` with respect to J2000 frame.
 
 See also [`getpv`](@ref).
@@ -76,7 +76,7 @@ earth_pv(et) = getpv(399, 0, constant_term(et)) # units: km, km/second
 @doc raw"""
     moon_pv(et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
+Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Moon at TDB instant `et` with respect to J2000 frame.
 
 See also [`getpv`](@ref).
@@ -86,7 +86,7 @@ moon_pv(et) = getpv(301, 0, constant_term(et)) # units: km, km/second
 @doc raw"""
     apophis_pv_197(et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
+Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of Apophis at TDB instant `et` from JPL #197 solution with respect to J2000 frame.
 
 See also [`getpv`](@ref).
@@ -96,7 +96,7 @@ apophis_pv_197(et) = getpv(9904406, 0, constant_term(et)) # units: km, km/second
 @doc raw"""
     apophis_pv_199(et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` geometric "state" vector (in units of km, km/sec)
+Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of Apophis at TDB instant `et` from JPL #199 solution with respect to J2000 frame.
 
 See also [`getpv`](@ref).

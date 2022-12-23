@@ -179,7 +179,7 @@ Returns de matches of `NEOs.mpc_observatory_regex` in `text` as `ObservatoryMPC`
 function parse_observatories_mpc(text::String)
     # Eliminate observatories file header 
     text = replace(text, mpc_observatories_header => "")
-    # Vector of mpc_observatories 
+    # Vector of MPC observatories 
     obs = Vector{ObservatoryMPC{Float64}}(undef, 0)
     # Iterate over the matches 
     for m in eachmatch(mpc_observatory_regex, text)
@@ -311,4 +311,33 @@ function update_observatories_mpc()
     global mpc_observatories[] = read_observatories_mpc(ObsCodes_path)
 
     return 
+end
+
+@doc raw"""
+    search_obs_code(obscode::String)
+
+Returns the observatory in `NEOs.mpc_observatories` that matches `obscode`.
+"""
+function search_obs_code(obscode::String)
+    
+    # Find indexes in mpc_observatories that match obscode
+    idxs = findall(x -> x.code == obscode, mpc_observatories[])
+    L_i = length(idxs)
+
+    # No observatory matches obscode
+    if L_i == 0
+        @warn "Unknown observatory code $obscode"
+        observatory = unknownobs()
+    # At least one observatory matches obscode
+    else
+        observatory = mpc_observatories[][idxs[1]]
+        # More than one observatory matches obscode
+        if L_i > 1
+            @warn("""More than one observatory $(mpc_observatories[][idxs]) has code $obscode, 
+            selecting first: $(observatory.name)""")
+        end
+    end
+    
+    return observatory 
+    
 end

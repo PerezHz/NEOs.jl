@@ -1,7 +1,7 @@
 @doc raw"""
     kmsec2auday(pv)
 
-Converts a `[x, y, z, v_x, v_y, v_z]` "state" vector from km, km/sec units to au, au/day.
+Converts a `[x, y, z, v_x, v_y, v_z]` state vector from km, km/sec to au, au/day.
 
 See also [`auday2kmsec`](@ref).
 """
@@ -14,7 +14,7 @@ end
 @doc raw"""
     auday2kmsec(pv)
 
-Converts a `[x, y, z, v_x, v_y, v_z]` "state" vector from au, au/day units to km, km/sec.
+Converts a `[x, y, z, v_x, v_y, v_z]` state vector from au, au/day to km, km/sec.
 
 See also [`kmsec2auday`](@ref).
 """
@@ -51,6 +51,8 @@ end
     datetime2et(x::RadecMPC{T}) where {T <: AbstractFloat}
     
 Retuns the TDB seconds past the J2000 epoch.
+
+See also [`SPICE.str2et`](@ref).
 """
 function datetime2et(x::DateTime)
     return str2et(string(x))

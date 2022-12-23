@@ -6,9 +6,13 @@ module NEOs
 export kmsec2auday, auday2kmsec, julian2etsecs, etsecs2julian, datetime2et, rad2arcsec, arcsec2rad, mas2rad
 # JPL Ephemerides 
 export loadjpleph, sun_pv, earth_pv, moon_pv, apophis_pv_197, apophis_pv_199
+# Osculating 
+export OsculatingElements, pv2kep
+# CatalogueMPC
+export unknowncat, read_catalogues_mpc, parse_catalogues_mpc, write_catalogues_mpc, update_catalogues_mpc, search_cat_code
 # ObservatoryMPC 
 export hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, update_observatories_mpc,
-       unknownobs, isunknown
+       unknownobs, isunknown, search_obs_code
 # RadecMPC
 export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc 
 # Topocentric
@@ -18,18 +22,17 @@ export compute_radec, w8sveres17, radec_astrometry
 # Gauss method 
 export gauss_method
 
-export propagate, delay_doppler, ismonostatic,
-    mas2rad, t2c_rotation_iau_76_80,
-    process_radar_data_jpl, RadarDataJPL, julian2etsecs, etsecs2julian,
-    RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!,
+export propagate, delay_doppler, ismonostatic, t2c_rotation_iau_76_80,
+    process_radar_data_jpl, RadarDataJPL, RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!,
     utcepoch, delay, delay_sigma, delay_units, doppler, doppler_sigma,
     doppler_units, freq, rcvr, xmit, bouncepoint, valsecchi_circle,
     nrms, chi2, newtonls, newtonls_6v, diffcorr,
-    newtonls_Q, readmp, bopik, yarkp2adot, pv2kep,
+    newtonls_Q, readmp, bopik, yarkp2adot,
     x0_JPL_s197, x0_JPL_s199
 
-import Base: hash, ==, show, isless
+import Base: hash, ==, show, isless, isnan
 import Dates: DateTime
+import Statistics: mean 
 
 using Distributed
 using TaylorIntegration
@@ -123,46 +126,6 @@ See https://doi.org/10.1016/j.icarus.2013.02.004.
 """
 function yarkp2adot(A2, a, e, μ_S)
     return 2A2/(sqrt(a)*(1-e^2)*sqrt(μ_S))
-end
-
-@doc raw"""
-    pv2kep(xas, μ_S, jd=JD_J2000)
-
-Computes the orbital elements of the asteroid with state vector `xas`. Returns a named tuple
-with fields:
-
-- `e`: eccentricity.
-
-- `q`: perihelion distance.
-
-- `tp`: time of pericenter passage. 
-
-- `Ω`: longitude of ascending node (deg).
-
-- `ω`: argument of pericentre (deg).
-
-- `i`: inclination (deg). 
-
-- `a`: semimajor axis. 
-
-See also [`eccentricity`](@ref), [`semimajoraxis`](@ref), [`timeperipass`](@ref),
-[`longascnode`](@ref), [`argperi`](@ref) and [`inclination`](@ref).
-
-# Arguments 
-
-- `xas`: State vector of the asteroid `[x, y, z, v_x, v_y, v_z]`. 
-- `μ_S`: Mass parameter of the Sun.
-- `jd`: Julian days since J2000. 
-"""
-function pv2kep(xas, μ_S, jd=JD_J2000)
-    ec0 = eccentricity(xas..., μ_S, 0.0)
-    a0 = semimajoraxis(xas..., μ_S, 0.0)
-    qr0 = a0*(1-ec0)
-    tp0 = timeperipass(jd, xas..., μ_S, 0.0)
-    Ω0 = rad2deg(longascnode(xas...))
-    ω0 = rad2deg(argperi(xas..., μ_S, 0.0))
-    i0 = rad2deg(inclination(xas...))
-    return (e=ec0, q=qr0, tp=tp0, Ω=Ω0, ω=ω0, i=i0, a=a0)
 end
 
 include("constants.jl")
