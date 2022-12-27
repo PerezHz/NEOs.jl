@@ -1,61 +1,22 @@
 @doc raw"""
-    neo_pos_EF(obs::RadecMPC{T}) where {T <: AbstractFloat}
+    neo_pos_topo(obs::RadecMPC{T}) where {T <: AbstractFloat}
 
-Returns the NEO's topocentric position unit vector in Earth-Fixed reference frame.
+Returns the NEO's topocentric position unit vector.
 """
-function neo_pos_EF(obs::RadecMPC{T}) where {T <: AbstractFloat}
+function neo_pos_topo(obs::RadecMPC{T}) where {T <: AbstractFloat}
     
     sin_α, cos_α = sincos(obs.α)
     sin_δ, cos_δ = sincos(obs.δ)
 
-    pos_EF = [cos_δ * cos_α, cos_δ * sin_α, sin_δ]
+    pos = [cos_δ * cos_α, cos_δ * sin_α, sin_δ]
 
-    return pos_EF
-end
-
-@doc raw"""
-    neo_pv_I(obs::RadecMPC{T}) where {T <: AbstractFloat}
-
-Returns the NEO's topocentric position unit vector in Inertial reference frame. 
-"""
-function neo_pv_I(obs::RadecMPC{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: Number}
-
-    # Topocentric position in Earth-Fixed frame 
-    pos_EF = neo_pos_EF(obs)
-
-    # ET seconds 
-    et = datetime2et(obs)
-    # UTC seconds
-    utc_secs = et - tdb_utc(et)
-    # Julian days UTC 
-    jd_utc = JD_J2000 + utc_secs/daysec
-    # State vector 
-    pv_EF = SatelliteToolbox.satsv(jd_utc, pos_EF, zeros(3), zeros(3))
-
-    # Transform position/velocity fromEarth-fixed (EF) frame to Inertial (I) frame
-    # ITRF: International Terrestrial Reference Frame
-    # GCRF: Geocentric Celestial Reference Frame
-
-    # Use earth orientation parameters
-    if eo
-        pv_I = SatelliteToolbox.svECEFtoECI(pv_EF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
-    # Not use earth orientation parameters        
-    else
-        pv_I = SatelliteToolbox.svECEFtoECI(pv_EF, Val(:ITRF), Val(:GCRF), jd_utc)
-    end
-
-    # Inertial position 
-    p_I = convert(Vector{eltype(pv_I.r)}, pv_I.r)
-    # Inertial velocity
-    v_I = convert(Vector{eltype(pv_I.v)}, pv_I.v)
-
-    return vcat(p_I, v_I) 
+    return pos
 end
 
 @doc raw"""
     obs_pv_hel(obs::RadecMPC{T}) where {T <: AbstractFloat}
 
-Returns the observer's  heliocentric `[x, y, z, v_x, v_y, v_z]` "state" vector. 
+Returns the observer's  heliocentric `[x, y, z, v_x, v_y, v_z]` state vector in units of au, au/day. 
 """
 function obs_pv_hel(obs::RadecMPC{T}) where {T <: AbstractFloat}
 
@@ -94,15 +55,19 @@ function g_Lagrange(r, τ)
     return τ - μ_S * (τ^3) / 6 / (r^3)
 end
 
+function vectors2matrix(x::T) where {T <: AbstractVector}
+    return permutedims(reduce(hcat, x))
+end
+
 @doc raw"""
     gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T <: AbstractFloat}
 
-Core Gauss method of Initial Orbit determination (IOD).
+Core Gauss method of Initial Orbit determination (IOD). See Algorithm 5.5 in page 274 https://doi.org/10.1016/C2016-0-02107-1.
 
 # Arguments 
 
 - `obs::Vector{RadecMPC{T}}`: three observations.
-- `root_idx::Int = 1`: index of Lagrange equation root. 
+- `root_idx::Int = 1`: index of Lagrange equation solution in case of multiple roots. 
 """
 function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T <: AbstractFloat}
 
@@ -110,14 +75,14 @@ function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T
     m = length(obs)
     @assert m == 3 "Core Gauss method requires exactly three observations, got $m"
 
+    # Sucess of gauss core method 
+    success = true 
+
     # Make sure observations are in temporal order 
     sort!(obs)
 
     # Julian dates of observation 
-    t = zeros(3)
-    t[1] = datetime2julian(obs[1].date)
-    t[2] = datetime2julian(obs[2].date)
-    t[3] = datetime2julian(obs[3].date)
+    t = datetime2julian.(date.(obs))
 
     # Time intervals 
     τ_1 = t[1] - t[2]
@@ -125,16 +90,10 @@ function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T
     τ = τ_3 - τ_1
 
     # NEO's topocentric position unit vectors 
-    ρ_vec = zeros(3, 3)
-    ρ_vec[1, :] = neo_pos_EF(obs[1])
-    ρ_vec[2, :] = neo_pos_EF(obs[2])
-    ρ_vec[3, :] = neo_pos_EF(obs[3])
+    ρ_vec = vectors2matrix(neo_pos_topo.(obs))
 
     # Observer's heliocentric positions 
-    R_vec = zeros(3, 3)
-    R_vec[1, :] = obs_pv_hel(obs[1])[1:3]
-    R_vec[2, :] = obs_pv_hel(obs[2])[1:3]
-    R_vec[3, :] = obs_pv_hel(obs[3])[1:3]
+    R_vec = vectors2matrix(obs_pv_hel.(obs))[:, 1:3]
 
     # Cross products 
     p_vec = zeros(3, 3)
@@ -171,15 +130,25 @@ function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T
     n_sol = length(sol)
 
     if n_sol == 0
-        r_2 = 1.
+
+        success = false 
+
         @warn("""No solutions found for Lagrange equation r^8 + $a r^6 + $b r^3 + $c = 0; 
-        Setting default to 1.""")
+        Cannot procede""")
+
+        return fill(NaN, 3, 3), fill(NaN, 3), D, R_vec, ρ_vec, τ_1, τ_3, NaN, NaN, NaN, NaN, fill(NaN, 3), t, success
+
     elseif n_sol == 1
+        
         r_2 = sol[1]
+
     else 
+
         r_2 = sol[root_idx]
+
         @warn("""More than one solution $sol found for Lagrange equation r^8 + $a r^6 + $b r^3 + $c = 0;
         Selecting root with index $root_idx""")
+
     end 
 
     # Slant ranges 
@@ -196,10 +165,7 @@ function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T
     ρ[3] = (num_3 / den_3 - D[3, 3]) / D_0
 
     # Heliocentric position of the NEO 
-    r_vec = zeros(3, 3)
-    r_vec[1, :] = R_vec[1, :] + ρ[1] * ρ_vec[1, :]
-    r_vec[2, :] = R_vec[2, :] + ρ[2] * ρ_vec[2, :]
-    r_vec[3, :] = R_vec[3, :] + ρ[3] * ρ_vec[3, :]
+    r_vec = R_vec .+ ρ.*ρ_vec
 
     # f, g Lagrange coefficients
     f_1 = f_Lagrange(r_2, τ_1)
@@ -211,9 +177,14 @@ function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T
     # Heliocentric velocity of the NEO 
     v_2_vec = (- f_3 * r_vec[1, :] + f_1 * r_vec[3, :]) / (f_1*g_3 - f_3*g_1)
 
-    return r_vec, v_2_vec, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, ρ, t
+    return r_vec, v_2_vec, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, ρ, t, success
 end
 
+@doc raw"""
+    stumpC(z::T) where {T <: Real}
+
+Evaluates Stumpff function C(z). 
+"""
 function stumpC(z::T) where {T <: Real}
     if z > 0
         c = (1 - cos(sqrt(z))) / z
@@ -226,6 +197,11 @@ function stumpC(z::T) where {T <: Real}
     return c
 end
 
+@doc raw"""
+    stumpS(z::T) where {T <: Real}
+
+Evaluates Stumpff function S(z). 
+"""
 function stumpS(z::T) where {T <: Real}
     if z > 0
         s = (sqrt(z) - sin(sqrt(z))) / sqrt(z)^3
@@ -267,7 +243,7 @@ Solves the universal Kepler equation for the universal anomaly.
 - `r_2_vec::Vector{T}`: heliocentric position vector.
 - `v_2_vec::Vector{T}`: heliocentric velocity vector.
 - `kep_iters::Int`: number of iterations for Newton's method. 
-- `atol::T`: absoluto tolerance. 
+- `atol::T`: absolute tolerance. 
 """
 function univkepler(τ::T, r_2_vec::Vector{T}, v_2_vec::Vector{T}; kep_iters::Int = 10, atol::T = 3e-14) where {T <: AbstractFloat}
     
@@ -375,11 +351,8 @@ function gauss_method_refinement(τ_1::T, τ_3::T, r_2_vec::Vector{T}, v_2_vec::
     ρ[3] = (-D[1, 3]*c_1/c_3 + D[2, 3]/c_3 - D[3, 3]) / D_0
 
     # Updated NEO's heliocentric position
-    r_vec = zeros(3, 3)
-    r_vec[1, :] = R_vec[1, :] + ρ[1] * ρ_vec[1, :]
-    r_vec[2, :] = R_vec[2, :] + ρ[2] * ρ_vec[2, :]
-    r_vec[3, :] = R_vec[3, :] + ρ[3] * ρ_vec[3, :]
-
+    r_vec = R_vec .+ ρ.*ρ_vec
+    
     # Updated NEO's barycentric velocity
     v_2_vec = (-f_3_new * r_vec[1, :] + f_1_new * r_vec[3, :]) / den
 
@@ -394,53 +367,79 @@ function gauss_method_iterator(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, at
                                root_idx::Int = 1) where {T <: AbstractFloat}
 
     # Core Gauss method 
-    r_vec, v_2_vec, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, ρ, t = gauss_method_core(obs; root_idx = root_idx)
+    r_vec, v_2_vec, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, ρ, t, success = gauss_method_core(obs; root_idx = root_idx)
 
+    # Copy core valus as backup
     r_vec0 = copy(r_vec)
     v_2_vec0 = copy(v_2_vec)
     ρ0 = copy(ρ)
 
+    if !success
+        @warn "Unsuccessful Core Gauss method"
+
+        return r_vec0, v_2_vec0, ρ0, t, success
+    end 
+
     # Gauss refinment 
     for i in 1:ref_iters
+
         r_vec, v_2_vec, ρ, f_1, g_1, f_3, g_3, success = 
             gauss_method_refinement(τ_1, τ_3, r_vec[2, :], v_2_vec, D, R_vec, ρ_vec, f_1, g_1, f_3, g_3; kep_iters = kep_iters, atol = atol)
 
         if !success
             @warn "Unsuccessful refinement"
-            return r_vec0, v_2_vec0, R_vec, ρ_vec, ρ0, t
+            return r_vec0, v_2_vec0, ρ0, t, success
         end
+
     end 
 
-    return r_vec, v_2_vec, R_vec, ρ_vec, ρ, t
+    return r_vec, v_2_vec, ρ, t, success
 end 
 
 function gauss_method(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, atol = 3e-14, ref_iters::Int = 10, 
                       root_idx::Int = 1) where {T <: AbstractFloat}
     
+    # Number of observations 
     m = length(obs)
 
+    # Vector of osculating orbita elements 
     osc = Vector{OsculatingElements{T}}(undef, m-2)
     
+    # Iterate over consecutive triplets 
     for j in 1:m-2
+        # Current triplet
         obs_ = obs[[j, j+1, j+2]]
+        # Gauss method 
+        r_vec, v_2_vec, ρ, t, success = gauss_method_iterator(obs_; kep_iters = kep_iters, atol = atol, ref_iters = ref_iters,
+                                                              root_idx = root_idx)
 
-        r_vec, v_2_vec, R_vec, ρ_vec, ρ, t = gauss_method_iterator(obs_; kep_iters = kep_iters, atol = atol, ref_iters = ref_iters,
-                                                                   root_idx = root_idx)
+        if !success
+            osc[j] = OsculatingElements()
+        end
 
+        # Correct times for light propagation                                                              
         for k in eachindex(t)
             t[k] = t[k] - ρ[k] / c_au_per_day
         end
-
+        # Try computing orbital elements 
         try
             osc[j] = pv2kep(vcat(r_vec[2, :], v_2_vec), μ_S, t[2])
         catch
+            @warn "Cannot compute orbital elements for state vector $(vcat(r_vec[2, :], v_2_vec)) at epoch $(t[2])"
             osc[j] = OsculatingElements()
         end
 
     end
 
+    # Eliminate NaN orbital elements 
     filter!(!isnan, osc)
 
+    if length(osc) == 0
+        @warn("Cannot compute orbital elements for any triplet.")
+        return OsculatingElements()
+    end 
+
+    # Average orbital elements 
     return mean(osc)
 
 end

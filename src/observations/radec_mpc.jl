@@ -80,6 +80,8 @@ isless(a::RadecMPC{T}, b::RadecMPC{T}) where {T <: AbstractFloat} = a.date < b.d
 # Convert DateTime to ephemerides seconds past J2000
 datetime2et(x::RadecMPC{T}) where {T <: AbstractFloat} = datetime2et(x.date)
 
+date(x::RadecMPC{T}) where {T <: AbstractFloat} = getfield(x, :date)
+
 # Regular expression to parse an optical measurement in MPC format
 const mpc_radec_regex = Regex(join(
     [
