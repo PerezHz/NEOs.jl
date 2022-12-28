@@ -376,7 +376,7 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true
         α_comp_as, δ_comp_as = compute_radec(obs[i], niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
         δ_comp_rad = arcsec2rad(δ_comp_as)
         # Multiply by metric factor cos(dec)
-        α_comp[i] = α_comp_as * cos(δ_comp_rad)  # arcsec 
+        α_comp[i] = α_comp_as * cos(obs.δ[i])  # arcsec 
         δ_comp[i] = δ_comp_as                    # arcsec
 
         # Statistical weights from Veres et al. (2017)

@@ -93,6 +93,11 @@ function obs_pos_ECEF(obs::RadecMPC{T}) where {T <: AbstractFloat}
     return pos_ECEF
 end
 
+# isless overloads workaround to make rECEFtoECI work with TaylorSeries
+isless(a::Union{Taylor1,TaylorN}, b::Union{Taylor1,TaylorN}) = isless(constant_term(a), constant_term(b))
+isless(a::Real, b::Union{Taylor1,TaylorN}) = isless(a, constant_term(b))
+isless(a::Union{Taylor1,TaylorN}, b::Real) = isless(constant_term(a), b)
+
 @doc raw"""
     obs_pv_ECI(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
 
@@ -139,6 +144,25 @@ function obs_pv_ECI(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980,
 
     # Concat position and velocity 
     return vcat(p_ECI, v_ECI)
+end
+
+# This method extends orthonormalize to handle Taylor1 and TaylorN
+# The ReferenceFrameRotations.jl package is licensed under the MIT "Expat" License
+# Copyright (c) 2014-2019: Ronan Arraes Jardim Chagas.
+# See https://github.com/JuliaSpace/ReferenceFrameRotations.jl
+function orthonormalize(dcm::SArray{Tuple{3,3},T,2,9} where {T<:Union{Taylor1,TaylorN}})
+    e₁ = dcm[:,1]
+    e₂ = dcm[:,2]
+    e₃ = dcm[:,3]
+
+    en₁  = e₁/norm(e₁)
+    enj₂ =   e₂ - (en₁⋅e₂)*en₁
+    en₂  = enj₂ / norm(enj₂)
+    enj₃ =   e₃ - (en₁⋅e₃)*en₁
+    enj₃ = enj₃ - (en₂⋅enj₃)*en₂
+    en₃  = enj₃ / norm(enj₃)
+
+    SArray(  hcat(hcat(en₁, en₂), en₃)  )
 end
 
 @doc raw"""
@@ -199,6 +223,19 @@ function polarmotionmat(tt; eo::Bool=true)
     end
     return Ry(-xp)*Rx(-yp)
 end
+
+@doc raw"""
+    omega(lod)
+
+Returns the angular velocity of the earth in units of rad/sec
+```math
+\omega = (72921151.467064 - 0.843994809\text{LOD})\times 10^{-12},
+```
+where LOD is the length of the day in milliseconds. 
+
+See https://www.iers.org/IERS/EN/Science/EarthRotation/UT1LOD.html.
+"""
+omega(lod) = (1e-12)*(72921151.467064 - 0.843994809lod)
 
 @doc raw"""
     t2c_rotation_iau_76_80(et::T; eo::Bool=true) where {T<:Number}
