@@ -14,15 +14,17 @@ export unknowncat, read_catalogues_mpc, parse_catalogues_mpc, write_catalogues_m
 export hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, update_observatories_mpc,
        unknownobs, isunknown, search_obs_code
 # RadecMPC
-export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc 
+export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc, date 
 # Topocentric
 export obs_pos_ECEF, obs_pv_ECI 
 # Process radec 
 export compute_radec, w8sveres17, radec_astrometry
 # Gauss method 
 export gauss_method
+# Propagate 
+export propagate
 
-export propagate, delay_doppler, ismonostatic, t2c_rotation_iau_76_80,
+export delay_doppler, ismonostatic, t2c_rotation_iau_76_80,
     process_radar_data_jpl, RadarDataJPL, RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!,
     utcepoch, delay, delay_sigma, delay_units, doppler, doppler_sigma,
     doppler_units, freq, rcvr, xmit, bouncepoint, valsecchi_circle,
@@ -131,12 +133,12 @@ end
 include("constants.jl")
 include("observations/process_radec.jl")
 include("propagation/gauss_method.jl")
+include("propagation/propagation.jl")
 include("process_radar_data_jpl.jl")
 include("delay_doppler.jl")
 include("asteroid_dynamical_models.jl")
 include("initial_conditions.jl")
 include("integration_methods.jl")
-include("propagation.jl")
 include("b_plane.jl")
 include("least_squares.jl")
 

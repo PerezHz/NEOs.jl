@@ -435,3 +435,77 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true
     # Return time of observation, observed ra/dec, computed ra/dec, total debiasing correction in ra/dec and statistical weights
     return datetime_obs, α_obs, δ_obs, α_comp, δ_comp, α_corr, δ_corr, w8s
 end
+
+@doc raw"""
+    compute_optical_obs(outfilename::String, opticalobsfile::String, asteph, ss16asteph;
+                        debias_table::String="2018", niter::Int=5)
+
+Computes ra/dec astrometry and saves the result to a file.             
+
+# Arguments 
+
+- `outfilename::String`: file where to save optical observations. 
+- `opticalobsfile::String`: file where to retrieve optical observations. 
+- `asteph::TaylorInterpolant`: asteroid's ephemeris. 
+- `ss16asteph::TaylorInterpolant`: solar system ephemeris. 
+- `debias_table::String`: debias table. 
+- `niter::Int`: number of light-time solution iterations. 
+"""
+function compute_optical_obs(outfilename::String, opticalobsfile::String, asteph, ss16asteph;
+                             debias_table::String="2018", niter::Int=5)
+
+    # Check that opticalobsfile is a file 
+    @assert isfile(opticalobsfile) "Cannot open file: $opticalobsfile"
+
+    # Read optical observations 
+    radec = read_radec_mpc(opticalobsfile)
+
+    # Check that first and last observation times are within interpolation interval
+    Δt_0 = radec[1].date - asteph.t0 
+    Δt_f = radec[end].date - asteph.t0
+    t_min, t_max = minmax(asteph.t[1], asteph.t[end]) 
+    @assert t_min ≤ Δt_0 ≤ Δt_f ≤ t_max 
+
+    # Number of massive bodies
+    Nm1 = (size(ss16asteph.x)[2]-13) ÷ 6
+
+    # Number of bodies, including NEA
+    N = Nm1 + 1 
+
+    # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
+
+    # Asteroid 
+    function asteph_et(et)
+        return auday2kmsec(asteph(et/daysec)[1:6])
+    end
+    # Earth 
+    function earth_et(et)
+        return auday2kmsec(ss16asteph(et)[union(3*4-2:3*4,3*(N-1+4)-2:3*(N-1+4))])
+    end
+    # Sun 
+    function sun_et(et)
+        return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
+    end
+
+    # Compute ra/dec astrometry
+    datetime_obs, α_obs, δ_obs, α_comp, δ_comp, α_corr, δ_corr, w8s = radec_astrometry(radec, niter, xve=earth_et, xvs=sun_et, xva=asteph_et, debias_table=debias_table)
+
+    # Save data to file
+    println("Saving data to file: $outfilename")
+    jldopen(outfilename, "w") do file
+        addrequire(file, TaylorSeries)    # Require TaylorSeries 
+        # Write variables to jld file
+        JLD.write(file, 
+            "datetime_obs", datetime_obs,
+            "α_obs", α_obs, 
+            "δ_obs", δ_obs,
+            "α_comp", α_comp, 
+            "δ_comp", δ_comp,
+            "α_corr", α_corr,
+            "δ_corr", δ_corr,
+            "w8s", w8s
+        )
+    end
+
+    return nothing
+end
