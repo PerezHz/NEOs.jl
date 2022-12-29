@@ -1,3 +1,5 @@
+include("b_plane.jl")
+
 @doc raw"""
     nrms(res, w)
     

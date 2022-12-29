@@ -53,15 +53,8 @@ using HTTP: get
 using Roots: find_zeros
 
 include("constants.jl")
-include("observations/process_radec.jl")
-include("propagation/gauss_method.jl")
+include("observations/process_radar.jl")
 include("propagation/propagation.jl")
-include("process_radar_data_jpl.jl")
-include("delay_doppler.jl")
-include("asteroid_dynamical_models.jl")
-include("initial_conditions.jl")
-include("integration_methods.jl")
-include("b_plane.jl")
-include("least_squares.jl")
+include("postprocessing/least_squares.jl")
 
 end

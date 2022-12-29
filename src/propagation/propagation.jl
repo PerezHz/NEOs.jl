@@ -1,3 +1,8 @@
+include("gauss_method.jl")
+include("initial_conditions.jl")
+include("asteroid_dynamical_models.jl")
+include("integration_methods.jl")
+
 @doc raw"""
     rvelea(dx, x, params, t)
 
