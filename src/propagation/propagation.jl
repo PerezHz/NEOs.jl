@@ -186,6 +186,11 @@ end
 
 @doc raw"""
     propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, 
+              ss16asteph_et::TaylorInterpolant, ::Val{true/false}, ::Val{true/false}, 
+              ::Val{true/false}; output::Bool = true, newtoniter::Int = 10, 
+              q0::Vector = initialcond(), μ_ast::Vector = μ_ast343_DE430[1:end], 
+              order::Int=order, abstol::T = abstol) where {T <: Real}
+    propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, 
               ephfile::String; kwargs...) where {T<:Real}
 
 Integrates the orbit of an asteroid via the Taylor method. 
@@ -196,8 +201,24 @@ Integrates the orbit of an asteroid via the Taylor method.
 - `dynamics::Function`: dynamical model function.
 - `maxsteps::Int`: maximum number of steps for the integration.
 - `jd0::T`: initial Julian date.
-- `tspan::T`: time span of the integration (in Julian days). 
+- `tspan::T`: time span of the integration [in Julian days]. 
+- `ss16asteph_et::TaylorInterpolant`: solar system ephemeris.
 - `ephfile::String`: file with solar system ephemeris. 
+
+# Val arguments (order is important)
+
+- Whether to use quadruple precision or not `Val(true/false)`.
+- Whether to output the Taylor polynomials generated at each timestep or not `Val(true/false)`.
+- Whether to compute Lyapunov exponents or not `Val(true/false)`.
+
+# Keyword arguments
+
+- `output::Bool`: whether to write the output to a file (`true`) or not.
+- `newtoniter::Int`: number of iterations for root-finding integration. 
+- `q0::Vector`: vector of initial conditions.
+- `μ_ast::Vector`: vector of gravitational parameters. 
+- `order::Int=order`: order of the Taylor expansions to be used in the integration. 
+- `abstol::T`: absolute tolerance.
 """
 function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
         tspan::T, ephfile::String; kwargs...) where {T<:Real}
@@ -207,13 +228,9 @@ function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
     propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et; kwargs...)
 end
 
-const V_true = :(Val{true})
-const V_false = :(Val{false})
-const V_true_false = (V_true, V_false)
-
 for V_quadmath in V_true_false
     @eval begin
-        function propagate_params(ss16asteph_et::TaylorInterpolant, ::$V_quadmath; q0::Vector=initialcond(), 
+        function propagate_params(jd0::T, ss16asteph_et::TaylorInterpolant, ::$V_quadmath; q0::Vector=initialcond(), 
                                   μ_ast::Vector = μ_ast343_DE430[1:end], abstol::T=abstol) where {T <: Real}
  
             # Number of massive bodies
@@ -301,15 +318,14 @@ end
 for (V_quadmath, V_dense, V_lyap) in Iterators.product(V_true_false, V_true_false, V_true_false)
     @eval begin
         function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
-                           ::$V_quadmath, ::$V_dense, ::$V_lyap; output::Bool = true, newtoniter::Int=10, q0::Vector=initialcond(), 
-                           radarobsfile::String="", opticalobsfile::String="", debias_table::String="2018", μ_ast::Vector=μ_ast343_DE430[1:end],
-                           order::Int=order, abstol::T=abstol, tord::Int=10, niter::Int=5) where {T <: Real}
+                           ::$V_quadmath, ::$V_dense, ::$V_lyap; output::Bool = true, newtoniter::Int = 10, q0::Vector = initialcond(), 
+                           μ_ast::Vector = μ_ast343_DE430[1:end], order::Int=order, abstol::T=abstol) where {T <: Real}
         
             # Parameters for apophisinteg 
             if $V_quadmath == Val{true}
-                _q0, _t0, _abstol, _params = propagate_params(ss16asteph_et, Val(true); q0 = q0, μ_ast = μ_ast, abstol = abstol)
+                _q0, _t0, _abstol, _params = propagate_params(jd0, ss16asteph_et, Val(true); q0 = q0, μ_ast = μ_ast, abstol = abstol)
             else 
-                _q0, _t0, _abstol, _params = propagate_params(ss16asteph_et, Val(false); q0 = q0, μ_ast = μ_ast, abstol = abstol)
+                _q0, _t0, _abstol, _params = propagate_params(jd0, ss16asteph_et, Val(false); q0 = q0, μ_ast = μ_ast, abstol = abstol)
             end
         
             # Final time of integration
@@ -322,7 +338,7 @@ for (V_quadmath, V_dense, V_lyap) in Iterators.product(V_true_false, V_true_fals
             if $V_dense == Val{true}
 
                 # Propagation 
-                @time interp = apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, _params; maxsteps = maxsteps, dense = true)
+                @time interp = apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps)
 
                 # Use quadruple precision 
                 if $V_quadmath == Val{true}
@@ -347,8 +363,8 @@ for (V_quadmath, V_dense, V_lyap) in Iterators.product(V_true_false, V_true_fals
             else
 
                 # Propagation 
-                @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, _params; maxsteps = maxsteps, 
-                                              newtoniter = newtoniter, dense = true)
+                @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps, 
+                                              newtoniter = newtoniter)
                 # Days since J2000 until initial integration time
                 asteph_t0 = (_params[4]-JD_J2000) 
                 # Vector of times 
@@ -387,101 +403,3 @@ for (V_quadmath, V_dense, V_lyap) in Iterators.product(V_true_false, V_true_fals
         end
     end
 end 
-
-@doc raw"""
-    propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, 
-              ss16asteph_et::TaylorInterpolant; output::Bool=true, newtoniter::Int=10,
-              dense::Bool=false, q0::Vector=initialcond(), radarobsfile::String="",
-              opticalobsfile::String="", quadmath::Bool=false, debias_table::String="2018", 
-              μ_ast::Vector=μ_ast343_DE430[1:end], lyap::Bool=false, order::Int=order, 
-              abstol::T=abstol, tord::Int=10, niter::Int=5) where {T<:Real}
-
-Integrates the orbit of an asteroid via the Taylor method. 
-
-# Arguments 
-- `objname::String`: name of the object. 
-- `dynamics::Function`: dynamical model function.
-- `maxsteps::Int`: maximum number of steps for the integration.
-- `jd0::T`: initial Julian date.
-- `tspan::T`: time span of the integration (in Julian days). 
-- `ss16asteph_et::TaylorInterpolant`: solar system ephemeris. 
-- `output::Bool`: whether to write the output to a file (`true`) or not.
-- `newtoniter::Int`: number of iterations for root-finding integration. 
-- `dense::Bool`: whether to save the Taylor polynomials at each step (`true`) or not.
-- `q0::Vector`: vector of initial conditions.
-- `radarobsfile::String`: file with radar observations.
-- `opticalobsfile::String`: file with optical observations. 
-- `quadmath::Bool`: whether to use quadruple precision (`true`) or not. 
-- `debias_table::String`: debias table for optical observations. 
-- `μ_ast::Vector`: vector of mass parameters. 
-- `lyap::Bool`: wheter to compute the Lyapunov spectrum (`true`) or not. 
-- `order::Int=order`: order of the Taylor expansions to be used in the integration. 
-- `abstol::T`: absolute tolerance.
-- `tord::Int`: order of Taylor expansions for computing time delays and Doppler shifts. 
-- `niter::Int`: number of iterations for computing radar and optical observations. 
-""" propagate
-
-@doc raw"""
-    compute_radar_obs(outfilename::String, radarobsfile::String, asteph::TaylorInterpolant, 
-                      ss16asteph::TaylorInterpolant; tc::Real=1.0, autodiff::Bool=true, 
-                      tord::Int=10, niter::Int=5)
-
-Computes time delays and Doppler shifts and saves the result to a file. 
-
-# Arguments 
-
-- `outfilename::String`: file where to save radar observations. 
-- `radarobsfile::String`: file where to retrieve radar observations. 
-- `asteph::TaylorInterpolant`: asteroid's ephemeris. 
-- `ss16asteph::TaylorInterpolant`: solar system ephemeris. 
-- `tc::Real`: time offset wrt echo reception time, to compute Doppler shifts by range differences (seconds).
-- `autodiff::Bool`: wheter to use the automatic differentiation method of [`delay`](@ref) or not. 
-- `tord::Int`: order of Taylor expansions. 
-- `niter::Int`: number of light-time solution iterations. 
-"""
-function compute_radar_obs(outfilename::String, radarobsfile::String, asteph::TaylorInterpolant,
-                           ss16asteph::TaylorInterpolant; tc::Real=1.0, autodiff::Bool=true, 
-                           tord::Int=10, niter::Int=5)
-    # Check that radarobsfile is a file 
-    @assert isfile(radarobsfile) "Cannot open file: $radarobsfile"
-    # Number of massive bodies 
-    Nm1 = (size(ss16asteph.x)[2]-13) ÷ 6
-    # Number of bodies, including NEA
-    N = Nm1 + 1
-    # TODO: check that first and last observation times are within interpolation interval
-    # asteroid/small-body
-    # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
-    asteph_ord = asteph.x[1].order
-    asteph_t0 = asteph.t0*daysec
-    asteph_t = asteph.t*daysec
-    asteph_r = au*map(x->x(Taylor1(asteph_ord)/daysec), asteph.x[:,1:3])
-    asteph_v = (au/daysec)*map(x->x(Taylor1(asteph_ord)/daysec), asteph.x[:,4:6])
-    asteph_x = hcat(asteph_r, asteph_v)
-    asteph_et = TaylorInterpolant(asteph_t0, asteph_t, asteph_x)
-    # Sun (su=1)
-    # Change x, v units, resp., from au, au/day to km, km/sec
-    sseph_t0 = ss16asteph.t0
-    sseph_t = ss16asteph.t
-    sseph_x = ss16asteph.x
-    sun_r = au*sseph_x[:,nbodyind(Nm1,su)[1:3]]
-    sun_v = (au/daysec)*sseph_x[:,nbodyind(Nm1,su)[4:6]]
-    sun_x = hcat(sun_r, sun_v)
-    sun_et = TaylorInterpolant(sseph_t0, sseph_t, sun_x)
-    # Earth (ea=4)
-    # Change x, v units, resp., from au, au/day to km, km/sec
-    earth_r = au*sseph_x[:,nbodyind(Nm1,ea)[1:3]]
-    earth_v = (au/daysec)*sseph_x[:,nbodyind(Nm1,ea)[4:6]]
-    earth_x = hcat(earth_r, earth_v)
-    earth_et = TaylorInterpolant(sseph_t0, sseph_t, earth_x)
-    # Construct DataFrame with delay/doppler data from JPL radar obs file, including delay/doppler ephemeris (i.e., predicted values)
-    deldop_table_jld = delay_doppler(radarobsfile, niter, xve=earth_et, xvs=sun_et, xva=asteph_et, tc=tc, tord=tord, autodiff=autodiff)
-    # Save data to file
-    println("Saving data to file: $outfilename")
-    jldopen(outfilename, "w") do file
-        addrequire(file, DataFrames)         # Require DataFrames 
-        addrequire(file, TaylorSeries)       # Require TaylorSeries 
-        # Write variables to jld file
-        JLD.write(file, "deldop_table", deldop_table_jld)
-    end
-    return nothing
-end

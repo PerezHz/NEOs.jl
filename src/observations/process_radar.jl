@@ -1116,3 +1116,68 @@ function delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime,
     # Total signal delay (μs) and Doppler shift (Hz)
     return 1e6τ, 1e6ν
 end
+
+@doc raw"""
+    compute_radar_obs(outfilename::String, radarobsfile::String, asteph::TaylorInterpolant, 
+                      ss16asteph::TaylorInterpolant; tc::Real=1.0, autodiff::Bool=true, 
+                      tord::Int=10, niter::Int=5)
+
+Computes time delays and Doppler shifts and saves the result to a file. 
+
+# Arguments 
+
+- `outfilename::String`: file where to save radar observations. 
+- `radarobsfile::String`: file where to retrieve radar observations. 
+- `asteph::TaylorInterpolant`: asteroid's ephemeris. 
+- `ss16asteph::TaylorInterpolant`: solar system ephemeris. 
+- `tc::Real`: time offset wrt echo reception time, to compute Doppler shifts by range differences (seconds).
+- `autodiff::Bool`: wheter to use the automatic differentiation method of [`delay`](@ref) or not. 
+- `tord::Int`: order of Taylor expansions. 
+- `niter::Int`: number of light-time solution iterations. 
+"""
+function compute_radar_obs(outfilename::String, radarobsfile::String, asteph::TaylorInterpolant,
+                           ss16asteph::TaylorInterpolant; tc::Real=1.0, autodiff::Bool=true, 
+                           tord::Int=10, niter::Int=5)
+    # Check that radarobsfile is a file 
+    @assert isfile(radarobsfile) "Cannot open file: $radarobsfile"
+    # Number of massive bodies 
+    Nm1 = (size(ss16asteph.x)[2]-13) ÷ 6
+    # Number of bodies, including NEA
+    N = Nm1 + 1
+    # TODO: check that first and last observation times are within interpolation interval
+    # asteroid/small-body
+    # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
+    asteph_ord = asteph.x[1].order
+    asteph_t0 = asteph.t0*daysec
+    asteph_t = asteph.t*daysec
+    asteph_r = au*map(x->x(Taylor1(asteph_ord)/daysec), asteph.x[:,1:3])
+    asteph_v = (au/daysec)*map(x->x(Taylor1(asteph_ord)/daysec), asteph.x[:,4:6])
+    asteph_x = hcat(asteph_r, asteph_v)
+    asteph_et = TaylorInterpolant(asteph_t0, asteph_t, asteph_x)
+    # Sun (su=1)
+    # Change x, v units, resp., from au, au/day to km, km/sec
+    sseph_t0 = ss16asteph.t0
+    sseph_t = ss16asteph.t
+    sseph_x = ss16asteph.x
+    sun_r = au*sseph_x[:,nbodyind(Nm1,su)[1:3]]
+    sun_v = (au/daysec)*sseph_x[:,nbodyind(Nm1,su)[4:6]]
+    sun_x = hcat(sun_r, sun_v)
+    sun_et = TaylorInterpolant(sseph_t0, sseph_t, sun_x)
+    # Earth (ea=4)
+    # Change x, v units, resp., from au, au/day to km, km/sec
+    earth_r = au*sseph_x[:,nbodyind(Nm1,ea)[1:3]]
+    earth_v = (au/daysec)*sseph_x[:,nbodyind(Nm1,ea)[4:6]]
+    earth_x = hcat(earth_r, earth_v)
+    earth_et = TaylorInterpolant(sseph_t0, sseph_t, earth_x)
+    # Construct DataFrame with delay/doppler data from JPL radar obs file, including delay/doppler ephemeris (i.e., predicted values)
+    deldop_table_jld = delay_doppler(radarobsfile, niter, xve=earth_et, xvs=sun_et, xva=asteph_et, tc=tc, tord=tord, autodiff=autodiff)
+    # Save data to file
+    println("Saving data to file: $outfilename")
+    jldopen(outfilename, "w") do file
+        addrequire(file, DataFrames)         # Require DataFrames 
+        addrequire(file, TaylorSeries)       # Require TaylorSeries 
+        # Write variables to jld file
+        JLD.write(file, "deldop_table", deldop_table_jld)
+    end
+    return nothing
+end
