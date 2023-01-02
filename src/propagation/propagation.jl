@@ -1,5 +1,4 @@
 include("gauss_method.jl")
-include("initial_conditions.jl")
 include("asteroid_dynamical_models.jl")
 include("integration_methods.jl")
 
@@ -85,13 +84,13 @@ end
 @doc raw"""
     save2jldandcheck(objname, sol)
 
-Saves `sol` in a file `objname_jt.jld`. 
+Saves `sol` in a file `objname_jt.jld2`. 
 
 See also [`__save2jldandcheck`](@ref). 
 """
 function save2jldandcheck(objname, sol)
     # Name of the file 
-    outfilename = string(objname, "_jt.jld")
+    outfilename = string(objname, "_jt.jld2")
     # Save sol in outfilename
     return __save2jldandcheck(outfilename, sol)
 end
@@ -104,7 +103,7 @@ Saves `sol` in `outfilename`.
 function __save2jldandcheck(outfilename, sol)
     println("Saving solution to file: $outfilename")
     # Open file 
-    jldopen(outfilename, "w") do file
+    JLD2.jldopen(outfilename, "w") do file
         # Loop over solution variables
         for ind in eachindex(sol)
             # Name of the variable 
@@ -121,7 +120,7 @@ function __save2jldandcheck(outfilename, sol)
         # Name of the variable 
         varname = string(ind)
         # Read varname from files and assign recovered variable to recovered_sol_i
-        recovered_sol_i = JLD.load(outfilename, varname)
+        recovered_sol_i = JLD2.load(outfilename, varname)
         # Check that varname was recovered succesfully
         @show recovered_sol_i == sol[ind]
     end
@@ -204,6 +203,7 @@ Integrates the orbit of an asteroid via the Taylor method.
 - `tspan::T`: time span of the integration [in Julian days]. 
 - `ss16asteph_et::TaylorInterpolant`: solar system ephemeris.
 - `ephfile::String`: file with solar system ephemeris. 
+- `q0::Vector{T}`: vector of initial conditions.
 
 # Val arguments (order is important)
 
@@ -215,7 +215,6 @@ Integrates the orbit of an asteroid via the Taylor method.
 
 - `output::Bool`: whether to write the output to a file (`true`) or not.
 - `newtoniter::Int`: number of iterations for root-finding integration. 
-- `q0::Vector`: vector of initial conditions.
 - `μ_ast::Vector`: vector of gravitational parameters. 
 - `order::Int=order`: order of the Taylor expansions to be used in the integration. 
 - `abstol::T`: absolute tolerance.
@@ -223,15 +222,15 @@ Integrates the orbit of an asteroid via the Taylor method.
 function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
         tspan::T, ephfile::String; kwargs...) where {T<:Real}
     # Load ephemeris
-    ss16asteph_et = JLD.load(ephfile, "ss16ast_eph")
+    ss16asteph_et = JLD2.load(ephfile, "ss16ast_eph")
     # Propagate 
     propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et; kwargs...)
 end
 
 for V_quadmath in V_true_false
     @eval begin
-        function propagate_params(jd0::T, ss16asteph_et::TaylorInterpolant, ::$V_quadmath; q0::Vector=initialcond(), 
-                                  μ_ast::Vector = μ_ast343_DE430[1:end], abstol::T=abstol) where {T <: Real}
+        function propagate_params(jd0::T, ss16asteph_et::TaylorInterpolant, q0::Vector{U}, ::$V_quadmath; 
+                                  μ_ast::Vector = μ_ast343_DE430[1:end], abstol::T=abstol) where {T <: Real, U <: Number}
  
             # Number of massive bodies
             Nm1 = (size(ss16asteph_et.x)[2]-13) ÷ 6 
@@ -283,123 +282,130 @@ for V_quadmath in V_true_false
         
         end 
 
-        function propagate_dense_sol(jd0::T, q0::Vector, interp, ::$V_quadmath) where {T <: Real}
+        function propagate_dense(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
+                                 q0::Vector{U}, ::$V_quadmath; output::Bool = true, μ_ast::Vector = μ_ast343_DE430[1:end], 
+                                 order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number}
 
+            # Parameters for apophisinteg 
             if $V_quadmath == Val{true}
-                # Days since J2000 until initial integration time
-                asteph_t0 = Float64(jd0 - JD_J2000)
-                # Vector of times 
-                asteph_t = Float64.(interp.t[:])
-                # Matrix of dense polynomials
-                asteph_x = convert(Array{Taylor1{eltype(q0)}}, interp.x[:,:])
-                
-            # Use double precision
-            else
-                # Days since J2000 until initial integration time
-                asteph_t0 = (jd0 - JD_J2000) 
-                # Vector of times
-                asteph_t = interp.t[:]
-                # Matrix of dense polynomials
-                asteph_x = interp.x[:,:]
-                
+                _q0, _t0, _abstol, _params = propagate_params(jd0, ss16asteph_et, q0, Val(true); μ_ast = μ_ast, abstol = abstol)
+            else 
+                _q0, _t0, _abstol, _params = propagate_params(jd0, ss16asteph_et, q0, Val(false); μ_ast = μ_ast, abstol = abstol)
             end
+
+            println("Initial time of integration: ", julian2datetime(jd0))
+            # Final time of integration (days)
+            _tmax = _t0 + tspan*yr 
+            println("Final time of integration: ", julian2datetime(jd0 + _tmax))
+
+            # Propagate orbit
+
+            # Dense output (save Taylor polynomials in each step)
+            @time interp = apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps)
+
+            # Days since J2000 until initial integration time
+            asteph_t0 = T(jd0 - JD_J2000)
+            # Vector of times 
+            asteph_t = T.(interp.t[:])
+            # Matrix of dense polynomials
+            asteph_x = convert(Array{Taylor1{U}}, interp.x[:,:])
             # TaylorInterpolant 
             asteph = TaylorInterpolant(asteph_t0, asteph_t, asteph_x)
             # Solution 
             sol = (asteph=asteph,)
 
-            return sol 
-
-        end 
-
-    end
-end 
-
-for (V_quadmath, V_dense, V_lyap) in Iterators.product(V_true_false, V_true_false, V_true_false)
-    @eval begin
-        function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
-                           ::$V_quadmath, ::$V_dense, ::$V_lyap; output::Bool = true, newtoniter::Int = 10, q0::Vector = initialcond(), 
-                           μ_ast::Vector = μ_ast343_DE430[1:end], order::Int=order, abstol::T=abstol) where {T <: Real}
-        
-            # Parameters for apophisinteg 
-            if $V_quadmath == Val{true}
-                _q0, _t0, _abstol, _params = propagate_params(jd0, ss16asteph_et, Val(true); q0 = q0, μ_ast = μ_ast, abstol = abstol)
-            else 
-                _q0, _t0, _abstol, _params = propagate_params(jd0, ss16asteph_et, Val(false); q0 = q0, μ_ast = μ_ast, abstol = abstol)
-            end
-        
-            # Final time of integration
-            _tmax = _t0 + tspan*yr 
-            println("Final time of integration: ", _tmax)
-            
-            # Propagate orbit
-        
-            # Dense output (save Taylor polynomials in each step)
-            if $V_dense == Val{true}
-
-                # Propagation 
-                @time interp = apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps)
-
-                # Use quadruple precision 
-                if $V_quadmath == Val{true}
-                    sol = propagate_dense_sol(jd0, q0, interp, Val(true))
-                # Use double precision
-                else 
-                    sol = propagate_dense_sol(jd0, q0, interp, Val(false))
-                end 
-
-            # Lyapunov spectrum
-            elseif $V_lyap == Val{true}
-
-                # Propagation 
-                @time sol_objs = lyap_apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, _params; maxsteps = maxsteps)
-                # Solution 
-                sol = (
-                    tv=convert(Array{eltype(q0)}, sol_objs[1][:]),
-                    xv=convert(Array{eltype(q0)}, sol_objs[2][:,:]),
-                    λv=convert(Array{eltype(q0)}, sol_objs[3][:,:])
-                )
-            # Not dense or lyap
-            else
-
-                # Propagation 
-                @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps, 
-                                              newtoniter = newtoniter)
-                # Days since J2000 until initial integration time
-                asteph_t0 = (_params[4]-JD_J2000) 
-                # Vector of times 
-                asteph_t = sol_objs[1].t[:]
-                # Matrix of polynomials
-                asteph_x = sol_objs[1].x[:,:]
-                # TaylorInterpolant
-                asteph = TaylorInterpolant(asteph_t0, asteph_t, asteph_x)
-                # Solution 
-                sol = (                    
-                    asteph = asteph,                                       # TaylorInterpolant
-                    tv = asteph_t0 .+ asteph_t,                            # Vector of times 
-                    xv = asteph_x(),                                       # Polynomials evaluated at t = 0
-                    tvS1 = convert(Array{eltype(q0)}, sol_objs[2][:]),     # 
-                    xvS1 = convert(Array{eltype(q0)}, sol_objs[3][:,:]),   # 
-                    gvS1 = convert(Array{eltype(q0)}, sol_objs[4][:])      # 
-                )
-
-            end
-        
             # Write solution and predicted values of observations (if requested) to .jld files
             if output
                 # Name of the file 
-                outfilename = save2jldandcheck(objname, sol)
-                # If requested by user, calculate computed (i.e., predicted) values of observations
-                if $V_lyap == Val{false} # Don't compute observation ephemeris when "in Lyapunov spectra mode"
-                    furnsh(
-                        joinpath(artifact"naif0012", "naif0012.tls"),     # Load leapseconds kernel
-                        joinpath(artifact"de430", "de430_1850-2150.bsp"), # at least one SPK file must be loaded to read .tls file
-                    )
-                end
+                _ = save2jldandcheck(objname, sol)
             end
-        
+
+            return sol 
+
+        end
+
+        function propagate_lyap(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
+                                q0::Vector{U}, ::$V_quadmath; output::Bool = true, μ_ast::Vector = μ_ast343_DE430[1:end],
+                                order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number}
+
+            # Parameters for apophisinteg 
+            if $V_quadmath == Val{true}
+                _q0, _t0, _abstol, _params = propagate_params(jd0, ss16asteph_et, q0, Val(true); μ_ast = μ_ast, abstol = abstol)
+            else 
+                _q0, _t0, _abstol, _params = propagate_params(jd0, ss16asteph_et, q0, Val(false); μ_ast = μ_ast, abstol = abstol)
+            end
+
+            println("Initial time of integration: ", julian2datetime(jd0))
+            # Final time of integration (days)
+            _tmax = _t0 + tspan*yr 
+            println("Final time of integration: ", julian2datetime(jd0 + _tmax))
+
+            # Propagate orbit
+            @time sol_objs = lyap_apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, Val(false), _params; maxsteps = maxsteps)
+
+            # Solution 
+            sol = (
+                tv = convert(Array{U}, sol_objs[1][:]),
+                xv = convert(Array{U}, sol_objs[2][:,:]),
+                λv = convert(Array{U}, sol_objs[3][:,:])
+            )
+
+            # Write solution and predicted values of observations (if requested) to .jld files
+            if output
+                # Name of the file 
+                _ = save2jldandcheck(objname, sol)
+            end
+
             return sol
 
         end
+
+        function propagate_root(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
+                                q0::Vector{U}, ::$V_quadmath; output::Bool = true, newtoniter::Int = 10,
+                                μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number}
+
+            # Parameters for apophisinteg 
+            if $V_quadmath == Val{true}
+                _q0, _t0, _abstol, _params = propagate_params(jd0, ss16asteph_et, q0, Val(true); μ_ast = μ_ast, abstol = abstol)
+            else 
+                _q0, _t0, _abstol, _params = propagate_params(jd0, ss16asteph_et, q0, Val(false); μ_ast = μ_ast, abstol = abstol)
+            end
+
+            println("Initial time of integration: ", julian2datetime(jd0))
+            # Final time of integration (days)
+            _tmax = _t0 + tspan*yr 
+            println("Final time of integration: ", julian2datetime(jd0 + _tmax))
+
+            # Propagate orbit
+            @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps, 
+                                          newtoniter = newtoniter)
+            # Days since J2000 until initial integration time
+            asteph_t0 = (_params[4] - JD_J2000) 
+            # Vector of times 
+            asteph_t = sol_objs[1].t[:]
+            # Matrix of polynomials
+            asteph_x = sol_objs[1].x[:,:]
+            # TaylorInterpolant
+            asteph = TaylorInterpolant(asteph_t0, asteph_t, asteph_x)
+            # Solution 
+            sol = (                    
+                asteph = asteph,                              # TaylorInterpolant
+                tv = asteph_t0 .+ asteph_t,                   # Vector of times 
+                xv = asteph_x(),                              # Polynomials evaluated at t = 0
+                tvS1 = convert(Array{U}, sol_objs[2][:]),     # Coordinates when rvelea has a zero 
+                xvS1 = convert(Array{U}, sol_objs[3][:,:]),   
+                gvS1 = convert(Array{U}, sol_objs[4][:])      # Zeros of rvelea
+            )
+
+            # Write solution and predicted values of observations (if requested) to .jld files
+            if output
+                # Name of the file 
+                _ = save2jldandcheck(objname, sol)
+            end
+
+            return sol
+
+        end
+
     end
 end 

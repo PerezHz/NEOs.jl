@@ -22,7 +22,7 @@ export compute_radec, w8sveres17, radec_astrometry
 # Gauss method 
 export gauss_method
 # Propagate 
-export propagate
+export propagate_dense, propagate_lyap, propagate_root
 
 export delay_doppler, ismonostatic, t2c_rotation_iau_76_80,
     process_radar_data_jpl, RadarDataJPL, RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!,
@@ -38,7 +38,7 @@ import Statistics: mean
 import ReferenceFrameRotations: orthonormalize
 import PlanetaryEphemeris, SatelliteToolbox, RemoteFiles
 
-using Distributed, JLD, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
+using Distributed, JLD, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
       Dates, EarthOrientation, SPICE, Quadmath, LazyArtifacts, DataFrames, TaylorSeries,
       InteractiveUtils
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pole_rotation, 

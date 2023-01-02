@@ -129,14 +129,21 @@ end
 
 function (osc::OsculatingElements{T})(t::T) where {T <: AbstractFloat}
 
-    f = PlanetaryEphemeris.time2truean(osc.a, osc.e, μ_S, t, osc.tp)
+    # Mean motion 
+    n = PlanetaryEphemeris.meanmotion(μ_S, osc.a)
+    # Mean anomaly 
+    M = PlanetaryEphemeris.meananomaly(n, t, osc.tp)
+    # Eccentric anomaly
+    E = PlanetaryEphemeris.eccentricanomaly(osc.e, M)
+    # True anomaly
+    f = PlanetaryEphemeris.trueanomaly(osc.e, E)
     
-    # 4.- Get distance to the central body 
+    # Distance to the central body 
     r = osc.a * (1 - osc.e^2) / (1 + osc.e * cos(f))
     
     # 5.- Obtain position and velocity in the orbital frame 
     r_o = r .* [cos(f), sin(f), 0.0]
-    #v_o = (sqrt(μ_S*osc.a)/r) .* [-sin(E), sqrt(1 - osc.e^2) * cos(E), 0.0]
+    v_o = (sqrt(μ_S*osc.a)/r) .* [-sin(E), sqrt(1 - osc.e^2) * cos(E), 0.0]
     
     # 6.- Transform r_o and v_o to the inertial frame 
     ω = deg2rad(osc.ω)
@@ -145,9 +152,9 @@ function (osc::OsculatingElements{T})(t::T) where {T <: AbstractFloat}
 
     A = Rz(-Ω) * Rx(-i) * Rz(-ω)
     r_i = A * r_o
-    #v_i = A * v_o
+    v_i = A * v_o
 
-    return vcat(r_i)#, v_i)
+    return vcat(r_i, v_i)
 end 
 
 @doc raw"""

@@ -3,7 +3,7 @@
 # Single-threaded:
 # julia --project=@. pha/apoophis.jl --help  
 
-using ArgParse, NEOs, PlanetaryEphemeris, Dates, TaylorIntegration, JLD
+using ArgParse, NEOs, PlanetaryEphemeris, Dates, TaylorIntegration, JLD2
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -57,7 +57,7 @@ function parse_commandline()
         "--ss_eph_file"
             help = "Path to local Solar System ephemeris file"
             arg_type = String 
-            default = "./sseph343ast016_p31y_et.jld"
+            default = "./sseph343ast016_p31y_et.jld2"
     end
 
     return parse_args(s)
@@ -73,7 +73,7 @@ function main()
     # Dynamical function 
     dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
 
-    ss16asteph_et = JLD.load(parsed_args["ss_eph_file"], "ss16ast_eph")
+    ss16asteph_et = JLD2.load(parsed_args["ss_eph_file"], "ss16ast_eph")
 
     # TaylorN variables setup
     if parsed_args["lyap"]
@@ -100,18 +100,15 @@ function main()
     q0 = vcat(q00, 0.0, 0.0) .+ dq
 
     println("*** Integrator warmup")
-    NEOs.propagate(parsed_args["objname"], dynamics, 1, jd0, parsed_args["nyears_fwd"], ss16asteph_et, Val(parsed_args["quadmath"]),
-                   Val(parsed_args["dense"]), Val(parsed_args["lyap"]), output = false, q0 = q0, order = parsed_args["order"], 
-                   abstol = parsed_args["abstol"])
+    NEOs.propagate_root(parsed_args["objname"], dynamics, 1, jd0, parsed_args["nyears_fwd"], ss16asteph_et, q0, 
+                        Val(parsed_args["quadmath"]), output = false, order = parsed_args["order"], abstol = parsed_args["abstol"])
     println("*** Finished warmup")
 
     println("*** Full jet transport integration")
-    NEOs.propagate(parsed_args["objname"]*"_bwd", dynamics, parsed_args["maxsteps"], jd0, parsed_args["nyears_bwd"], ss16asteph_et, 
-                   Val(parsed_args["quadmath"]), Val(parsed_args["dense"]), Val(parsed_args["lyap"]), q0 = q0, 
-                   order = parsed_args["order"], abstol = parsed_args["abstol"])
-    NEOs.propagate(parsed_args["objname"]*"_fwd", dynamics, parsed_args["maxsteps"], jd0, parsed_args["nyears_fwd"], ss16asteph_et, 
-                   Val(parsed_args["quadmath"]), Val(parsed_args["dense"]), Val(parsed_args["lyap"]), q0 = q0, 
-                   order = parsed_args["order"], abstol = parsed_args["abstol"])
+    NEOs.propagate_root(parsed_args["objname"]*"_bwd", dynamics, parsed_args["maxsteps"], jd0, parsed_args["nyears_bwd"], ss16asteph_et, 
+                        q0, Val(parsed_args["quadmath"]), order = parsed_args["order"], abstol = parsed_args["abstol"])
+    NEOs.propagate_root(parsed_args["objname"]*"_fwd", dynamics, parsed_args["maxsteps"], jd0, parsed_args["nyears_fwd"], ss16asteph_et, 
+                        q0, Val(parsed_args["quadmath"]), order = parsed_args["order"], abstol = parsed_args["abstol"])
     println("*** Finished asteroid ephemeris integration")
 
 end
