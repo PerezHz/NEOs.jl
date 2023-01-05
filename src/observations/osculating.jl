@@ -141,11 +141,11 @@ function (osc::OsculatingElements{T})(t::T) where {T <: AbstractFloat}
     # Distance to the central body 
     r = osc.a * (1 - osc.e^2) / (1 + osc.e * cos(f))
     
-    # 5.- Obtain position and velocity in the orbital frame 
+    # Obtain position and velocity in the orbital frame 
     r_o = r .* [cos(f), sin(f), 0.0]
     v_o = (sqrt(μ_S*osc.a)/r) .* [-sin(E), sqrt(1 - osc.e^2) * cos(E), 0.0]
     
-    # 6.- Transform r_o and v_o to the inertial frame 
+    # Transform r_o and v_o to the inertial frame 
     ω = deg2rad(osc.ω)
     i = deg2rad(osc.i)
     Ω = deg2rad(osc.Ω)
@@ -154,7 +154,13 @@ function (osc::OsculatingElements{T})(t::T) where {T <: AbstractFloat}
     r_i = A * r_o
     v_i = A * v_o
 
-    return vcat(r_i, v_i)
+    pv_i = vcat(r_i, v_i)
+
+    # Barycentric state vector of the sun 
+    et = julian2etsecs(t)
+    sun_bar = kmsec2auday(sun_pv(et))
+
+    return  pv_i .+ sun_bar
 end 
 
 @doc raw"""

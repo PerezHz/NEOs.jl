@@ -1,95 +1,105 @@
 @doc raw"""
-    RadarDataJPL{T}
+    RadarJPL{T <: AbstractFloat}
 
-Radar measurements.
+A radar measurement in JPL format.
 
 # Fields
 
-- `object::String`: object name.
-- `utcepoch::DateTime`: UTC time. 
-- `delay::T`: time-delay.
-- `delay_sigma`: time-delay uncertainty.
-- `delay_units::String`: units of time delay. 
-- `doppler`: Doppler shift.
-- `doppler_sigma`: Doppler shift uncertainty.
-- `doppler_units`: units of Doppler shift.
+- `id::String`: object's name and number.
+- `date::DateTime`: date of observation. 
+- `τ::T`: time-delay.
+- `τ_σ`: time-delay uncertainty.
+- `τ_units::String`: units of time delay. 
+- `Δν`: Doppler shift.
+- `Δν_σ`: Doppler shift uncertainty.
+- `Δν_units`: units of Doppler shift.
 - `freq`: frequency of the measurement.
 - `rcvr`: ID of reciever antenna.
 - `xmit`: ID of emission antenna. 
 - `bouncepoint`: bounce point. 
+
+---
+
+    RadarJPL(delay::RegexMatch, doppler::RegexMatch)
+    RadarJPL(delay::RegexMatch, doppler::Val{false})
+    RadarJPL(delay::Val{false}, doppler::RegexMatch)
+    RadarJPL(delay::Val{false}, doppler::Val{false})
+
+Converts a match of `NEOs.jpl_radar_regex` to `RadarJPL`. A `Val{false}` indicates that one or both of the measurements 
+(time delay or Doppler shift) are missing. 
 """
-struct RadarDataJPL{T}
-    object::String
-    utcepoch::DateTime
-    delay::T
-    delay_sigma::T
-    delay_units::String
-    doppler::T
-    doppler_sigma::T
-    doppler_units::String
+struct RadarJPL{T <: AbstractFloat}
+    id::String
+    date::DateTime
+    Δτ::T
+    Δτ_σ::T
+    Δτ_units::String
+    Δν::T
+    Δν_σ::T
+    Δν_units::String
     freq::T
     rcvr::Int
     xmit::Int
     bouncepoint::String
     # Inner constructor
-    function RadarDataJPL{T}(
-        object::String,
-        utcepoch::DateTime,
-        delay::T,
-        delay_sigma::T,
-        delay_units::String,
-        doppler::T,
-        doppler_sigma::T,
-        doppler_units::String,
-        freq::T,
-        rcvr::Int,
-        xmit::Int,
-        bouncepoint::String
-    ) where {T<:Number}
-        return new{T}(object, utcepoch, delay, delay_sigma, delay_units,
-            doppler, doppler_sigma, doppler_units, freq, rcvr, xmit, bouncepoint)
+    function RadarJPL{T}(id::String, date::DateTime, Δτ::T, Δτ_σ::T, Δτ_units::String, Δν::T, Δν_σ::T, Δν_units::String, 
+                             freq::T, rcvr::Int, xmit::Int, bouncepoint::String) where {T <: AbstractFloat}
+        return new{T}(id, date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, xmit, bouncepoint)
     end
 end
 
-# Outer constructors
-RadarDataJPL(r::RadarDataJPL{T}) where {T<:Number} = r
-function RadarDataJPL(object::String,
-    utcepoch::DateTime,
-    delay::T,
-    delay_sigma::T,
-    delay_units::String,
-    doppler::T,
-    doppler_sigma::T,
-    doppler_units::String,
-    freq::T,
-    rcvr::Int,
-    xmit::Int,
-    bouncepoint::String
-) where {T<:Number}
-    return RadarDataJPL{T}(object, utcepoch, delay, delay_sigma, delay_units,
-        doppler, doppler_sigma, doppler_units, freq, rcvr, xmit, bouncepoint)
+# Outer constructor
+function RadarJPL(id::String, date::DateTime, Δτ::T, Δτ_σ::T, Δτ_units::String, Δν::T, Δν_σ::T, Δν_units::String, freq::T, 
+                      rcvr::Int, xmit::Int, bouncepoint::String) where {T <: AbstractFloat}
+    return RadarJPL{T}(id, date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, xmit, bouncepoint)
 end
 
-# Functions to get specific fields ofe a RadarDataJPL object 
+hasdelay(r::RadarJPL{T}) where {T <: AbstractFloat} = !isnan(r.Δτ)
+hasdoppler(r::RadarJPL{T}) where {T <: AbstractFloat} = !isnan(r.Δν)
 
-utcepoch(rdata::RadarDataJPL) = rdata.utcepoch
-delay(rdata::RadarDataJPL) = rdata.delay
-delay_sigma(rdata::RadarDataJPL) = rdata.delay_sigma
-delay_units(rdata::RadarDataJPL) = rdata.delay_units
-doppler(rdata::RadarDataJPL) = rdata.doppler
-doppler_sigma(rdata::RadarDataJPL) = rdata.doppler_sigma
-doppler_units(rdata::RadarDataJPL) = rdata.doppler_units
-freq(rdata::RadarDataJPL) = rdata.freq
-rcvr(rdata::RadarDataJPL) = rdata.rcvr
-xmit(rdata::RadarDataJPL) = rdata.xmit
-bouncepoint(rdata::RadarDataJPL) = rdata.bouncepoint
+# Print method for RadarJPL
+# Examples: 
+# 99942 Apophis (2004 MN4) Δτ: 1.9202850713e8 us Δν: -102512.9059 Hz t: 2005-01-29T00:00:00
+# 99942 Apophis (2004 MN4) Δν: -100849.1434 Hz t: 2005-01-27T23:31:00
+# 99942 Apophis (2004 MN4) Δτ: 9.743930871e7 us t: 2013-01-03T10:00:00
+function show(io::IO, r::RadarJPL{T}) where {T <: AbstractFloat} 
+
+    delay = hasdelay(r)
+    doppler = hasdoppler(r)
+
+    if delay && doppler
+        measurement_s = join([" Δτ: ", string(r.Δτ), " ", r.Δτ_units, " Δν: ", string(r.Δν), " ", r.Δν_units])
+    elseif delay
+        measurement_s = join([" Δτ: ", string(r.Δτ), " ", r.Δτ_units])
+    elseif doppler
+        measurement_s = join([" Δν: ", string(r.Δν), " ", r.Δν_units])
+    else 
+        measurement_s = " No measurements "
+    end 
+
+    print(io, r.id, measurement_s, " t: ", r.date)
+
+end
+
+# Functions to get specific fields of a RadarJPL object 
+data(r::RadarJPL{T}) where {T <: AbstractFloat} = r.date
+delay(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δτ
+delay_sigma(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δτ_σ
+delay_units(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δτ_units
+doppler(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δν
+doppler_sigma(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δν_units
+doppler_units(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δν_units
+freq(r::RadarJPL{T}) where {T <: AbstractFloat} = r.freq
+rcvr(r::RadarJPL{T}) where {T <: AbstractFloat} = r.rcvr
+xmit(r::RadarJPL{T}) where {T <: AbstractFloat} = r.xmit
+bouncepoint(r::RadarJPL{T}) where {T <: AbstractFloat} = r.bouncepoint
 
 @doc raw"""
-    ismonostatic(rdata::RadarDataJPL)
+    ismonostatic(rdata::RadarJPL)
 
 Checks whether the setup is monostatic, i.e., receiver and transmitter are the same. 
 """
-ismonostatic(rdata::RadarDataJPL) = rdata.rcvr == rdata.xmit
+ismonostatic(r::RadarJPL{T}) where {T <: AbstractFloat} = r.rcvr == r.xmit
 
 @doc raw"""
     issband(f_MHz::T) where {T<:Real}
@@ -107,88 +117,193 @@ Checks whether the transmission frequency `f_MHz` (in MHz) belongs to the X band
 """
 isxband(f_MHz::T) where {T<:Real} = 8000.0 ≤ f_MHz ≤ 12000.0
 
-@doc raw"""
-    process_radar_data_jpl(radar_data_jpl_file_path::String)
+# Regular expression to parse an optical measurement in MPC format
+const jpl_radar_regex = Regex(join(
+    [
+        # ID regex + tab 
+        raw"(?P<id>.*)\t",
+        # Date regex + tab
+        raw"(?P<date>.*)\t",
+        # Measurement regex + tab
+        raw"(?P<measurement>.*)\t",
+        # Uncertainty regex + tab
+        raw"(?P<uncertainty>.*)\t",
+        # Units regex + tab
+        raw"(?P<units>.*)\t",
+        # Frequency regex + tab
+        raw"(?P<freq>.*)\t",
+        # Reciever regex + tab
+        raw"(?P<rcvr>.*)\t",
+        # Emitter regex + tab
+        raw"(?P<xmit>.*)\t",
+        # Bouncepoint regex + end of line 
+        raw"(?P<bouncepoint>.*)"
+    ]
+))
+# Format of date in JPL radar data files 
+const jpl_radar_dateformat = "y-m-d H:M:S"
 
-Parses the file of radar data `radar_data_jpl` and returns a vector of 
-`RadarDataJPL` objects, each one corresponding to one measurement in `radar_data_jpl`. 
-"""
-function process_radar_data_jpl(radar_data_jpl_file_path::String)
-    # Read radar data file 
-    radar_data_jpl = readdlm(radar_data_jpl_file_path, '\t')
-    # Desired format of date
-    dataformat_jpl = "y-m-d H:M:S"
-    # Transform date (second column) to desired format 
-    jpl_datetime = DateTime.(radar_data_jpl[:,2], dataformat_jpl)
-    # Find time delays (rows in units of us) 
-    del_ind = findall(x->x=="us", radar_data_jpl[:,5])
-    # Find Doppler shifts (rows in units of Hz)
-    dop_ind = findall(x->x=="Hz", radar_data_jpl[:,5])
-    # Sort dates
-    jpl_datetime_unrep = sort(
-    union(
-        DateTime.(radar_data_jpl[del_ind,2], dataformat_jpl),
-        DateTime.(radar_data_jpl[dop_ind,2], dataformat_jpl)
-        )
-    )
-    # Allocate memmory for rada data 
-    radar_data_jpl_processed = Array{Any}(undef, length(jpl_datetime_unrep), 12)
+for (X, Y) in Iterators.product( (:(Val{false}), :(RegexMatch)), (:(Val{false}), :(RegexMatch)) )
+    @eval begin 
+        function RadarJPL(delay::$X, doppler::$Y)
 
-    # Iterate over each row 
-    for i in eachindex(jpl_datetime_unrep)
-        # Searh the i-th row (in sorted)
-        inds = findall(x->x==jpl_datetime_unrep[i], jpl_datetime)
-        # If there is only one measurement in the corresponding date...
-        if length(inds) == 1
-            # If the measurement is a time delay 
-            if radar_data_jpl[inds[1],5] == "us"
-                # i-th row 
-                x = vcat(radar_data_jpl[inds[1],1], jpl_datetime_unrep[i], radar_data_jpl[inds[1],3:5], [NaN, NaN, "X"], radar_data_jpl[inds[1], 6:end])
-            # Elseif the measurement is a Doppler shift
-            elseif radar_data_jpl[inds[1],5] == "Hz"
-                # i-th row 
-                x = vcat(radar_data_jpl[inds[1],1], jpl_datetime_unrep[i], [NaN, NaN, "X"], radar_data_jpl[inds[1],3:5], radar_data_jpl[inds[1], 6:end])
-            # Else the measurement is neither a time delay or a Doppler shift 
-            else
-                @warn "Measurement units not us nor Hz"
+            if $X == RegexMatch
+                id = string(delay["id"])
+            elseif $Y == RegexMatch
+                id = string(doppler["id"])
+            else 
+                id = ""
+            end 
+
+            if $X == RegexMatch
+                date = DateTime(delay["date"], jpl_radar_dateformat)
+            elseif $Y == RegexMatch
+                date = DateTime(doppler["date"], jpl_radar_dateformat)
+            else 
+                date = DateTime(2000, 1, 1)
+            end 
+
+            if $X == RegexMatch
+                Δτ = Meta.parse(delay["measurement"])
+                Δτ_σ = Meta.parse(delay["uncertainty"])
+                Δτ_units = string(delay["units"])
+            else 
+                Δτ = NaN
+                Δτ_σ = NaN
+                Δτ_units = ""
+            end  
+
+            if $Y == RegexMatch
+                Δν = Meta.parse(doppler["measurement"])
+                Δν_σ = Meta.parse(doppler["uncertainty"])
+                Δν_units = string(doppler["units"])
+            else 
+                Δν = NaN
+                Δν_σ = NaN
+                Δν_units = ""
+            end  
+
+            if $X == RegexMatch
+                freq = string(delay["freq"])
+            elseif $Y == RegexMatch
+                freq = string(doppler["freq"])
+            else 
+                freq = ""
+            end 
+
+            if $X == RegexMatch
+                freq = Float64(Meta.parse(delay["freq"]))
+            elseif $Y == RegexMatch
+                freq = Float64(Meta.parse(doppler["freq"]))
+            else 
+                freq = NaN
             end
-            # Add i-th row 
-            radar_data_jpl_processed[i,:] .= x
-        # Else if there are two measurements in the corresponding date...
-        elseif length(inds) == 2
-            # First measurement is a time delay, second is a Doppler shift
-            if radar_data_jpl[inds[1],5] == "us"
-                # i-th row 
-                y = vcat(radar_data_jpl[inds[1],1], jpl_datetime_unrep[i], radar_data_jpl[inds[1],3:5], radar_data_jpl[inds[2],3:5], radar_data_jpl[inds[1], 6:end])
-            # First measurement is a Doppler shift, second is a time delay
-            elseif radar_data_jpl[inds[1],5] == "Hz"
-                # i-th row 
-                y = vcat(radar_data_jpl[inds[1],1], jpl_datetime_unrep[i], radar_data_jpl[inds[2],3:5], radar_data_jpl[inds[1],3:5], radar_data_jpl[inds[1], 6:end])
-            # neither of the two former cases 
-            else
-                @warn "Measurement units not us nor Hz"
+
+            if $X == RegexMatch
+                rcvr = Meta.parse(delay["rcvr"])
+            elseif $Y == RegexMatch
+                rcvr = Meta.parse(doppler["rcvr"])
+            else 
+                rcvr = 0
             end
-            # Add i-th row 
-            radar_data_jpl_processed[i,:] .= y
-        # Neither one or two measurements in the corresponding date 
-        else
-            @warn "length(inds) != 1 && length(inds) != 2"
+
+            if $X == RegexMatch
+                xmit = Meta.parse(delay["xmit"])
+            elseif $Y == RegexMatch
+                xmit = Meta.parse(doppler["xmit"])
+            else 
+                xmit = 0
+            end
+
+            if $X == RegexMatch
+                bouncepoint = string(delay["bouncepoint"])
+            elseif $Y == RegexMatch
+                bouncepoint = string(doppler["bouncepoint"])
+            else 
+                bouncepoint = ""
+            end
+            
+            return RadarJPL(id, date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, xmit, bouncepoint)
         end
-    end
-    # Return vector of RadarDataJPL objects
-    radar_data_vec = RadarDataJPL.(
-        String.(radar_data_jpl_processed[:,1]),     # Name of the object
-        DateTime.(radar_data_jpl_processed[:,2]),   # UTC time 
-        Float64.(radar_data_jpl_processed[:,3]),    # time delay 
-        Float64.(radar_data_jpl_processed[:,4]),    # time delay uncertainty
-        String.(radar_data_jpl_processed[:,5]),     # time delay units
-        Float64.(radar_data_jpl_processed[:,6]),    # Doppler shift
-        Float64.(radar_data_jpl_processed[:,7]),    # Doppler shift uncertainty
-        String.(radar_data_jpl_processed[:,8]),     # Doppler shift units 
-        Float64.(radar_data_jpl_processed[:,9]),    # Frequency
-        Int.(radar_data_jpl_processed[:,10]),       # ID of reciever antenna
-        Int.(radar_data_jpl_processed[:,11]),       # ID of transmitter antenna
-        String.(radar_data_jpl_processed[:,12])     # Bounce point 
-    )
-    return radar_data_vec
-end
+    end 
+end 
+
+@doc raw"""
+    read_radar_jpl(filename::String)
+
+Returns the matches of `NEOs.jpl_radar_regex` in `filename` as `RadarJPL`.
+"""
+function read_radar_jpl(filename::String)
+
+    # Read lines of mpc formatted file 
+    lines = readlines(filename)
+    # Apply regular expressions
+    matches = match.(jpl_radar_regex, lines)
+    # Eliminate nothings
+    filter!(!isnothing, matches)
+    # Number of matches 
+    m = length(matches)
+
+    # Dates of observation (as string)
+    dates = getindex.(matches, "date")
+    # Eliminate repeated dates 
+    unique!(dates)
+    # Number of dates 
+    m_dates = length(dates)
+
+    # Time delays 
+    delay = filter(x -> x["units"] == "us", matches)
+    # Number of time delays 
+    m_Δτ = length(delay)
+    # Doppler shifts
+    doppler = filter(x -> x["units"] == "Hz", matches)
+    # Number of Doppler shifts
+    m_Δν = length(doppler)
+
+    # Check if there were observations with unknown units 
+    if m > m_Δτ + m_Δν
+        @warn("""$(m - m_Δτ - m_Δν) observations have units other than  us (time delay) or Hz (doppler shift)""")
+    end 
+
+    # Vector of radar observations
+    radar = Vector{RadarJPL{Float64}}(undef, m_dates)
+    # Time delay index
+    i_τ = 1
+    # Doppler shift index 
+    i_ν = 1
+
+    # Iterate over the dates 
+    for i in eachindex(dates)
+        # The i_τ-th time delay has the i-th date 
+        if (i_τ <= m_Δτ) && (delay[i_τ]["date"] == dates[i])
+            Δτ = delay[i_τ]
+            i_τ += 1 
+            flag_τ = true 
+        else 
+            flag_τ = false 
+        end  
+
+        # The i_ν-th Doppler shift has the i-th date 
+        if (i_ν <= m_Δν) && (doppler[i_ν]["date"] == dates[i])
+            Δν = doppler[i_ν]
+            i_ν += 1 
+            flag_ν = true 
+        else 
+            flag_ν = false 
+        end  
+
+        if flag_τ && flag_ν
+            radar[i] = RadarJPL(Δτ, Δν)
+        elseif flag_τ 
+            radar[i] = RadarJPL(Δτ, Val(false))
+        elseif flag_ν
+            radar[i] = RadarJPL(Val(false), Δν)
+        else 
+            @warn("""Date $(dates[i]) has no time delay nor Doppler shift measurements""")
+            radar[i] = RadarJPL(Val(false), Val(false))
+        end
+
+    end 
+
+    return radar 
+end 
