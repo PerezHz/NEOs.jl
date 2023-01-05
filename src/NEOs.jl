@@ -21,7 +21,7 @@ export obs_pos_ECEF, obs_pv_ECI, t2c_rotation_iau_76_80
 export compute_radec, w8sveres17, radec_astrometry
 # RadarJPL
 export delay_doppler, ismonostatic, delay, delay_sigma, delay_units, doppler, doppler_sigma, doppler_units, 
-       freq, rcvr, xmit, bouncepoint, read_radar_jpl
+       freq, rcvr, xmit, bouncepoint, read_radar_jpl, write_radar_jpl
 # Gauss method 
 export gauss_method
 # Asteroid dynamical models 

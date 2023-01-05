@@ -54,6 +54,16 @@ function RadarJPL(id::String, date::DateTime, Δτ::T, Δτ_σ::T, Δτ_units::S
     return RadarJPL{T}(id, date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, xmit, bouncepoint)
 end
 
+
+# Two RadarJPL are equal if ther date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, xmit and bouncepoint are equal
+function hash(a::RadarJPL{T}, h::UInt) where {T <: AbstractFloat}
+    return hash((a.date, a.Δτ, a.Δτ_σ, a.Δτ_units, a.Δν, a.Δν_σ, a.Δν_units, a.freq, a.rcvr, a.xmit, a.bouncepoint), h)
+end
+
+function ==(a::RadarJPL{T}, b::RadarJPL{T}) where {T <: AbstractFloat}
+    return hash(a) == hash(b)
+end
+
 hasdelay(r::RadarJPL{T}) where {T <: AbstractFloat} = !isnan(r.Δτ)
 hasdoppler(r::RadarJPL{T}) where {T <: AbstractFloat} = !isnan(r.Δν)
 
@@ -141,7 +151,7 @@ const jpl_radar_regex = Regex(join(
     ]
 ))
 # Format of date in JPL radar data files 
-const jpl_radar_dateformat = "y-m-d H:M:S"
+const jpl_radar_dateformat = "yyyy-mm-dd HH:MM:SS"
 
 for (X, Y) in Iterators.product( (:(Val{false}), :(RegexMatch)), (:(Val{false}), :(RegexMatch)) )
     @eval begin 
@@ -307,3 +317,64 @@ function read_radar_jpl(filename::String)
 
     return radar 
 end 
+
+@doc raw"""
+    jpl_radar_str(radar::RadarJPL{T}) where {T <: AbstractFloat}
+
+Returns an observation in JPL format. 
+"""
+function jpl_radar_str(radar::RadarJPL{T}) where {T <: AbstractFloat}
+
+    if hasdelay(radar)
+        delay_s = join([
+            radar.id, 
+            Dates.format(radar.date, jpl_radar_dateformat), 
+            @sprintf("%.2f", radar.Δτ), 
+            @sprintf("%1.3f", radar.Δτ_σ),
+            radar.Δτ_units,
+            @sprintf("%.0f", radar.freq),
+            radar.rcvr, 
+            radar.xmit, 
+            radar.bouncepoint, 
+            ""
+        ], "\t", "\n")
+    else 
+        delay_s = ""
+    end 
+
+    if hasdoppler(radar)
+        doppler_s = join([
+            radar.id, 
+            Dates.format(radar.date, jpl_radar_dateformat), 
+            @sprintf("%.4f", radar.Δν),
+            @sprintf("%1.3f", radar.Δν_σ), 
+            radar.Δν_units,
+            @sprintf("%.0f", radar.freq),
+            radar.rcvr, 
+            radar.xmit, 
+            radar.bouncepoint, 
+            ""
+        ], "\t", "\n")
+    else 
+        doppler_s = ""
+    end 
+
+    # Join everything
+    radar_s = join([delay_s, doppler_s])
+
+    return radar_s
+end
+
+@doc raw"""
+    write_radar_jpl(radar::Vector{RadarJPL{T}}, filename::String) where {T <: AbstractFloat}
+
+Writes `radar` to `filename` in JPL format. 
+"""
+function write_radar_jpl(radar::Vector{RadarJPL{T}}, filename::String) where {T <: AbstractFloat}
+    open(filename, "w") do file
+        for i in eachindex(radar)
+            line = jpl_radar_str(radar[i])
+            write(file, line)
+        end 
+    end
+end

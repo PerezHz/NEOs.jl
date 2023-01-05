@@ -2115,6 +2115,7 @@ T14 204.531130.941714+0.337236Canada-France-Hawaii Telescope, Maunakea
 T15 204.530940.941727+0.337214Gemini North Observatory, Maunakea
 T16 204.525700.941703+0.337250W. M. Keck Observatory, Keck 1, Maunakea
 T17 204.525800.941700+0.337256W. M. Keck Observatory, Keck 2, Maunakea
+T35 210.390200.953686-0.299837Astronomical Society of Tahiti
 U52 237.451110.749240+0.660270Shasta Valley Observatory, Grenada
 U53 237.160300.702740+0.709090Murray Hill Observatory, Beaverton
 U54 237.312860.782952+0.620081Hume Observatory, Santa Rosa
@@ -2143,6 +2144,7 @@ U82 243.615190.827368+0.560036CS3-Palmer Divide Station, Landers
 U83 243.573110.841238+0.539380Mount Laguna Observatory
 U96 246.686000.579007+0.812698Athabasca University Geophysical Observatory
 U97 248.332920.818306+0.573452JPL SynTrack Robotic Telescope 3, Flagstaff
+U98 249.743000.849529+0.526090NAC Observatory, Benson
 V00 248.399810.849456+0.526492Kitt Peak-Bok
 V01 248.239110.762243+0.645493Mountainville Observatory, Alpine
 V02 248.057940.835743+0.547377Command Module, Tempe
