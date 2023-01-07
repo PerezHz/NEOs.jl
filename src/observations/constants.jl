@@ -1,13 +1,13 @@
 # Path to NEOs src directory 
 const src_path = dirname(pathof(NEOs))
-# Path to NEOs data directory
+# Path to NEOs observations directory
 const observations_path = joinpath(src_path, "observations")
 
 # Integration parameters
 const order = 30
 const abstol = 1.0E-30
 
-# Vector of GM's (DE430 values)
+# Vector of GM's (DE430 values) [au^2 / day^3]
 const μ_DE430 = PlanetaryEphemeris.μ
 const μ_B16_DE430 = μ_DE430[12:27]     # DE430 GM's of 16 most massive asteroids
 const μ_ast343_DE430 = μ_DE430[12:end] # DE430 GM's of 343 main belt asteroids included in DE430 integration
@@ -39,9 +39,9 @@ const Λ2 = zeros(11)
 # R: radius of the body 
 const Λ3 = zeros(11)
 Λ3[ea] = -1.962633335678878e-19  # Earth
+
 # Speed of light
 const clightkms = 2.99792458E5   # km/sec
-
 # Parameters related to speed of light, c
 const c_p2 = 29979.063823897606      # c^2 = 29979.063823897606 au^2/d^2
 const c_m2 = 3.3356611996764786e-5   # c^-2 = 3.3356611996764786e-5 d^2/au^2

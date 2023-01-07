@@ -1,7 +1,7 @@
 @doc raw"""
     ObservatoryMPC{T <: AbstractFloat} 
 
-An optical observatory in MPC format. The format is described in https://minorplanetcenter.net/iau/lists/ObsCodesF.html.
+An observatory in MPC format. The format is described in https://minorplanetcenter.net/iau/lists/ObsCodesF.html.
 
 # Fields 
 
@@ -74,7 +74,7 @@ const mpc_observatory_regex = Regex(join(
 @doc raw"""
     parse_observatory_float(x::String)
 
-Parses `x`; if the result is not a `Float64`, returns `NaN`. 
+Parse `x`; if the result is not a `Float64`, returns `NaN`. 
 """
 function parse_observatory_float(x::String)
     # Try parsing x 
@@ -91,7 +91,7 @@ end
 @doc raw"""
     hascoord(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
 
-Checks whether `m` has non `NaN` coordinates. 
+Check whether `m` has non `NaN` coordinates. 
 """
 function hascoord(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
     return !isnan(m.long) && !isnan(m.cos) && !isnan(m.sin)
@@ -100,25 +100,21 @@ end
 @doc raw"""
     unknownobs()
 
-Returns a `ObservatoryMPC` with no code, coordinates or name. 
+Return a `ObservatoryMPC` with no code, coordinates or name. 
 """
-function unknownobs()
-    return ObservatoryMPC("", NaN, NaN, NaN, "")
-end
+unknownobs() = ObservatoryMPC("", NaN, NaN, NaN, "")
 
 @doc raw"""
     isunknown(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
 
-Checks whether `m` equals `unknownobs()`.
+Check whether `m` equals `unknownobs()`.
 """
-function isunknown(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
-    return m == unknownobs()
-end 
+isunknown(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m == unknownobs()
 
 @doc raw"""
     ObservatoryMPC(m::RegexMatch)
 
-Converts a match of `NEOs.mpc_observatory_regex` to `ObservatoryMPC`.
+Convert a match of `NEOs.mpc_observatory_regex` to `ObservatoryMPC`.
 """
 function ObservatoryMPC(m::RegexMatch)
     
@@ -139,7 +135,7 @@ end
 @doc raw"""
     read_observatories_mpc(filename::String)
 
-Returns the matches of `NEOs.mpc_observatory_regex` in `filename` as `ObservatoryMPC`.
+Return the matches of `NEOs.mpc_observatory_regex` in `filename` as `ObservatoryMPC`.
 """
 function read_observatories_mpc(filename::String)
     # Read lines of mpc formatted file (except header)
@@ -158,23 +154,9 @@ end
 const mpc_observatories_header = "Code  Long.   cos      sin    Name"
 
 @doc raw"""
-    get_raw_html(url::String)
-
-Returns the raw html text of webpage `url`.
-"""
-function get_raw_html(url::String)
-    # Get raw html 
-    resp = get(url)
-    # Convert to string 
-    text = String(resp.body)
-    
-    return text
-end
-
-@doc raw"""
     parse_observatories_mpc(text::String)
 
-Returns de matches of `NEOs.mpc_observatory_regex` in `text` as `ObservatoryMPC`.
+Return de matches of `NEOs.mpc_observatory_regex` in `text` as `ObservatoryMPC`.
 """
 function parse_observatories_mpc(text::String)
     # Eliminate observatories file header 
@@ -197,7 +179,7 @@ const mpc_observatories = Ref{Vector{ObservatoryMPC{Float64}}}(read_observatorie
 @doc raw"""
     mpc_long_str(x::T) where {T <: AbstractFloat}
 
-Converts `x` to a string according to the `long` field in MPC format.
+Convert `x` to a string according to the `long` field in MPC format.
 """
 function mpc_long_str(x::T) where {T <: AbstractFloat}
     # NaN => empty string 
@@ -213,7 +195,7 @@ end
 @doc raw"""
     mpc_cos_str(x::T) where {T <: AbstractFloat}
 
-Converts `x` to a string according to the `cos` field in MPC format.
+Convert `x` to a string according to the `cos` field in MPC format.
 """
 function mpc_cos_str(x::T) where {T <: AbstractFloat}
     # NaN => empty string 
@@ -228,7 +210,7 @@ end
 @doc raw"""
     mpc_sin_str(x::T) where {T <: AbstractFloat}
 
-Converts `x` to a string according to the `sin` field in MPC format.
+Convert `x` to a string according to the `sin` field in MPC format.
 """
 function mpc_sin_str(x::T) where {T <: AbstractFloat}
     # NaN => empty string
@@ -249,7 +231,7 @@ end
 @doc raw"""
     mpc_observatory_str(obs::ObservatoryMPC{T}) where {T <: AbstractFloat}
 
-Converts `obs` to a string acoording to MPC format.
+Convert `obs` to a string acoording to MPC format.
 """
 function mpc_observatory_str(obs::ObservatoryMPC{T}) where {T <: AbstractFloat}
     # Longitude string 
@@ -275,7 +257,7 @@ end
 @doc raw"""
     write_observatories_mpc(obs::Vector{ObservatoryMPC{T}}, filename::String) where {T <: AbstractFloat}
 
-Writes `obs` to `filename` in MPC format. 
+Write `obs` to `filename` in MPC format. 
 """
 function write_observatories_mpc(obs::Vector{ObservatoryMPC{T}}, filename::String) where {T <: AbstractFloat}
     open(filename, "w") do file
@@ -292,7 +274,7 @@ end
 @doc raw"""
     update_observatories_mpc()
 
-Updates the local observatories file.
+Update the local observatories file.
 """
 function update_observatories_mpc()
     # Download source file 
@@ -316,7 +298,7 @@ end
 @doc raw"""
     search_obs_code(obscode::String)
 
-Returns the observatory in `NEOs.mpc_observatories` that matches `obscode`.
+Return the observatory in `NEOs.mpc_observatories` that matches `obscode`.
 """
 function search_obs_code(obscode::String)
     
@@ -326,7 +308,6 @@ function search_obs_code(obscode::String)
 
     # No observatory matches obscode
     if L_i == 0
-        @warn "Unknown observatory code $obscode"
         observatory = unknownobs()
     # At least one observatory matches obscode
     else

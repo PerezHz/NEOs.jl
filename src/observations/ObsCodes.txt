@@ -765,10 +765,10 @@ Code  Long.   cos      sin    Name
 789 284.594000.731880+0.679220Litchfield Observatory, Clinton
 790 284.283500.703430+0.708400Dominion Observatory, Ottawa
 791 284.523600.767130+0.639370Flower and Cook Observatory, Philadelphia
-792 288.300000.753000+0.657000University of Rhode Island, Quonochontaug
+792 288.299050.751746+0.657236University of Rhode Island, Quonochontaug
 793 286.220000.736600+0.674070Dudley Observatory, Albany (before 1893)
 794 286.110000.747890+0.661610Vassar College Observatory, Poughkeepsie
-795 286.012300.758900+0.649100Rutherford
+795 286.038610.757969+0.650106Rutherford
 796 286.450000.755000+0.654000Stamford
 797 287.075100.752180+0.656760Yale Observatory, New Haven
 798 287.015400.750930+0.658220Yale Observatory, Bethany
@@ -959,10 +959,10 @@ Code  Long.   cos      sin    Name
 983 353.795250.805167+0.591067San Fernando
 984 357.269750.631671+0.772658Eastfield
 985 357.531700.608010+0.791300Telford
-986 358.750000.624000+0.779000Ascot
+986 359.360530.625049+0.777992Ascot
 987 355.373500.586580+0.807210Isle of Man Observatory, Foxdale
 988 355.706000.562250+0.824210Glasgow
-989 357.690000.600000+0.797000Wilfred Hall Observatory, Preston
+989 357.405820.591888+0.803341Wilfred Hall Observatory, Preston
 990 356.312100.762600+0.644870Madrid
 991 356.927800.597500+0.799190Liverpool (since 1867)
 992 356.999500.597300+0.799300Liverpool (before 1867)

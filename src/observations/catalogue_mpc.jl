@@ -26,11 +26,29 @@ function ==(a::CatalogueMPC, b::CatalogueMPC)
     return hash(a) == hash(b)
 end
 
+@doc raw"""
+    unknowncat()
+
+Return a `CatalogueMPC` with no code or name. 
+"""
+function unknowncat()
+    return CatalogueMPC("", "")
+end
+
+@doc raw"""
+    isunknown(m::CatalogueMPC)
+
+Check whether `m` equals `unknowncat()`.
+"""
+function isunknown(m::CatalogueMPC)
+    return m == unknowncat()
+end 
+
+
 # Print method for CatalogueMPC 
 # Examples: 
-# Unknown observatory
-# Spitzer Space Telescope [245]
-# Greenwich [000] long: 0.0 cos: 0.62411 sin: 0.77873
+# Unknown catalogue
+# USNO-A1.0 [a]
 function show(io::IO, m::CatalogueMPC)
     if isunknown(m)
         print(io, "Unknown catalogue")
@@ -46,38 +64,16 @@ const mpc_catalogues_url = "https://minorplanetcenter.net/iau/info/CatalogueCode
 const mpc_catalogue_regex = r"\s{2}(?P<code>\w{1})\s{4}(?P<name>.*)"
 
 @doc raw"""
-    unknowncat()
-
-Returns a `CatalogueMPC` with no code or name. 
-"""
-function unknowncat()
-    return CatalogueMPC("", "")
-end
-
-@doc raw"""
-    isunknown(m::CatalogueMPC)
-
-Checks whether `m` equals `unknowncat()`.
-"""
-function isunknown(m::CatalogueMPC)
-    return m == unknowncat()
-end 
-
-@doc raw"""
     CatalogueMPC(m::RegexMatch)
 
-Converts a match of `NEOs.mpc_catalogue_regex` to `CatalogueMPC`.
+Convert a match of `NEOs.mpc_catalogue_regex` to `CatalogueMPC`.
 """
-function CatalogueMPC(m::RegexMatch)
-
-    return CatalogueMPC(string(m["code"]), string(m["name"]))
-
-end
+CatalogueMPC(m::RegexMatch) = CatalogueMPC(string(m["code"]), string(m["name"]))
 
 @doc raw"""
     read_catalogues_mpc(filename::String)
 
-Returns the matches of `NEOs.mpc_catalogue_regex` in `filename` as `CatalogueMPC`.
+Return the matches of `NEOs.mpc_catalogue_regex` in `filename` as `CatalogueMPC`.
 """
 function read_catalogues_mpc(filename::String)
     # Read lines of mpc formatted file (except header)
@@ -92,13 +88,27 @@ function read_catalogues_mpc(filename::String)
     return cats
 end
 
+@doc raw"""
+    get_raw_html(url::String)
+
+Return the raw html text of webpage `url`.
+"""
+function get_raw_html(url::String)
+    # Get raw html 
+    resp = get(url)
+    # Convert to string 
+    text = String(resp.body)
+    
+    return text
+end
+
 # Header of MPC catalogues file 
 const mpc_catalogues_header = "Char   Catalogue"
 
 @doc raw"""
     parse_catalogues_mpc(text::String)
 
-Returns de matches of `NEOs.mpc_catalogue_regex` in `text` as `CatalogueMPC`.
+Return de matches of `NEOs.mpc_catalogue_regex` in `text` as `CatalogueMPC`.
 """
 function parse_catalogues_mpc(text::String)
     # Eliminate catalogues file header 
@@ -121,7 +131,7 @@ const mpc_catalogues = Ref{Vector{CatalogueMPC}}(read_catalogues_mpc(CatalogueCo
 @doc raw"""
     mpc_catalogue_str(cat::CatalogueMPC)
 
-Converts `cats` to a string acoording to MPC format.
+Convert `cat` to a string according to MPC format.
 """
 function mpc_catalogue_str(cat::CatalogueMPC)
     # Code string 
@@ -139,7 +149,7 @@ end
 @doc raw"""
     write_catalogues_mpc(cats::Vector{CatalogueMPC}, filename::String)
 
-Writes `cats` to `filename` in MPC format. 
+Write `cats` to `filename` in MPC format. 
 """
 function write_catalogues_mpc(cats::Vector{CatalogueMPC}, filename::String)
     open(filename, "w") do file
@@ -156,7 +166,7 @@ end
 @doc raw"""
     update_catalogues_mpc()
 
-Updates the local catalogues file.
+Update the local catalogues file.
 """
 function update_catalogues_mpc()
     # Download source file 
@@ -180,7 +190,7 @@ end
 @doc raw"""
     search_cat_code(catcode::String)
 
-Returns the catalogue in `NEOs.mpc_cataloges` that matches `catcode`.
+Return the catalogue in `NEOs.mpc_cataloges` that matches `catcode`.
 """
 function search_cat_code(catcode::String)
     
@@ -190,7 +200,6 @@ function search_cat_code(catcode::String)
 
     # No catalog matches catcode
     if L_i == 0
-        @warn "Unknown catalogue code $catcode"
         catalogue = unknowncat()
     # At least one catalogue matches catcode
     else

@@ -2,17 +2,18 @@ module NEOs
 
 # __precompile__(false)
 
+# CatalogueMPC
+export unknowncat, isunknown, read_catalogues_mpc, parse_catalogues_mpc, write_catalogues_mpc, update_catalogues_mpc, 
+       search_cat_code
+# ObservatoryMPC 
+export hascoord, unknownobs, isunknown, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, 
+       update_observatories_mpc, search_obs_code
 # Units 
 export kmsec2auday, auday2kmsec, julian2etsecs, etsecs2julian, datetime2et, rad2arcsec, arcsec2rad, mas2rad
 # JPL Ephemerides 
 export loadjpleph, sun_pv, earth_pv, moon_pv, apophis_pv_197, apophis_pv_199
 # Osculating 
 export OsculatingElements, pv2kep, yarkp2adot
-# CatalogueMPC
-export unknowncat, read_catalogues_mpc, parse_catalogues_mpc, write_catalogues_mpc, update_catalogues_mpc, search_cat_code
-# ObservatoryMPC 
-export hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, update_observatories_mpc,
-       unknownobs, isunknown, search_obs_code
 # RadecMPC
 export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc, date 
 # Topocentric
@@ -51,7 +52,6 @@ using StaticArrays: SVector, SArray, @SVector
 using HTTP: get
 using Roots: find_zeros
 
-include("constants.jl")
 include("observations/process_radar.jl")
 include("propagation/propagation.jl")
 include("postprocessing/least_squares.jl")

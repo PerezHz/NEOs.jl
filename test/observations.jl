@@ -3,40 +3,103 @@
 using NEOs
 using Test
 
-@testset "Read/write catalogues file" begin
+using NEOs: mpc_catalogue_regex, CatalogueMPC, CatalogueCodes_path, observations_path
 
-    cats_1 = read_catalogues_mpc(NEOs.CatalogueCodes_path)
-    check_file = joinpath(NEOs.src_path, "observations/CatalogueCodes_.txt")
-    write_catalogues_mpc(cats_1, check_file)
-    cats_2 = read_catalogues_mpc(check_file)
-    rm(check_file)
+@testset "CatalogueMPC" begin  
 
-    @test cats_1 == cats_2
-end
+    # Parse CatalogueMPC
+    gaia_s = "  6    Gaia2016"
+    gaia_m = match(mpc_catalogue_regex, gaia_s)
+    gaia = CatalogueMPC(gaia_m)
+    @test gaia.code == "6"
+    @test gaia.name == "Gaia2016"
 
-@testset "Update catalogues file" begin
+    # Unknown catalogue
+    unkcat = unknowncat()
+    @test isunknown(unkcat)
+    @test !isunknown(gaia)
+
+    # Catalogue equality
+    @test unkcat == unkcat
+    @test gaia == gaia 
+    @test gaia != unkcat
     
+    # Read/write catalogues file
+    source_cat = read_catalogues_mpc(CatalogueCodes_path)
+    check_file = joinpath(observations_path, "CatalogueCodes_.txt")
+    write_catalogues_mpc(source_cat, check_file)
+    check_cat = read_catalogues_mpc(check_file)
+    rm(check_file)
+    @test source_cat == check_cat
+
+    # Update catalogues file 
     update_catalogues_mpc()
     @test isa(NEOs.mpc_catalogues[], Vector{NEOs.CatalogueMPC}) 
 
-end
+    # Search catalogue code 
+    cat = search_cat_code("6")
+    @test cat == gaia
+end 
 
-@testset "Read/write observatories file" begin
+using NEOs: mpc_observatory_regex, ObservatoryMPC, ObsCodes_path
 
-    obs_1 = read_observatories_mpc(NEOs.ObsCodes_path)
-    check_file = joinpath(NEOs.src_path, "observations/ObsCodes_.txt")
-    write_observatories_mpc(obs_1, check_file)
-    obs_2 = read_observatories_mpc(check_file)
-    rm(check_file)
-
-    @test obs_1 == obs_2
-end
-
-@testset "Update observatories file" begin
+@testset "ObservatoryMPC" begin
     
+    # Parse ObservatoryMPC
+    arecibo_s = "251 293.246920.949577+0.312734Arecibo"
+    arecibo_m = match(mpc_observatory_regex, arecibo_s)
+    arecibo = ObservatoryMPC(arecibo_m)
+    @test arecibo.code == "251"
+    @test arecibo.long == 293.24692
+    @test arecibo.cos == 0.949577
+    @test arecibo.sin == +0.312734
+    @test arecibo.name == "Arecibo"
+
+    hubble_s = "250                           Hubble Space Telescope"
+    hubble_m = match(mpc_observatory_regex, hubble_s)
+    hubble = ObservatoryMPC(hubble_m)
+    @test hubble.code == "250"
+    @test isnan(hubble.long)
+    @test isnan(hubble.cos)
+    @test isnan(hubble.sin)
+    @test hubble.name == "Hubble Space Telescope"
+
+    # Unknown observatory
+    unkobs = unknownobs()
+    @test isunknown(unkobs)
+    @test !isunknown(arecibo)
+    @test !isunknown(hubble)
+
+    # hascoord
+    @test hascoord(arecibo)
+    @test !hascoord(hubble)
+    @test !hascoord(unkobs)
+
+    # Catalogue equality
+    @test unkobs == unkobs
+    @test arecibo == arecibo
+    @test hubble == hubble
+    @test arecibo != unkobs
+    @test hubble != unkobs
+    @test arecibo != hubble
+
+    # Read/write observatories file
+    source_obs = read_observatories_mpc(ObsCodes_path)
+    check_file = joinpath(observations_path, "ObsCodes_.txt")
+    write_observatories_mpc(source_obs, check_file)
+    check_obs = read_observatories_mpc(check_file)
+    rm(check_file)
+    @test source_obs == check_obs
+
+    # Update observatories file
     update_observatories_mpc()
     @test isa(NEOs.mpc_observatories[], Vector{NEOs.ObservatoryMPC{Float64}}) 
 
+    # Search observatory code 
+    obs = search_obs_code("250")
+    @test obs == hubble
+    obs = search_obs_code("251")
+    @test obs == arecibo
 end
 
 @testset "Read/write radec file" begin

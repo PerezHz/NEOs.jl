@@ -1,12 +1,13 @@
-include("units.jl")
-include("jpl_eph.jl")
-include("osculating.jl")
+include("constants.jl")
 include("catalogue_mpc.jl")
 include("observatory_mpc.jl")
 include("radec_mpc.jl")
+include("radar_jpl.jl")
+include("units.jl")
+include("jpl_eph.jl")
+include("osculating.jl")
 include("topocentric.jl")
 include("process_radec.jl")
-include("radar_jpl.jl")
 
 @doc raw"""
     shapiro_delay(e, p, q)
@@ -311,13 +312,12 @@ See https://doi.org/10.1086/116062.
 - `xvs`: Sun ephemeris wich takes TDB seconds since J2000 as input and returns Sun barycentric position in km and velocity in km/second.
 - `xva`: asteroid ephemeris wich takes TDB seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second.
 """
-function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
-        niter::Int=10; eo::Bool=true, xve=earth_pv, xvs=sun_pv,
-        xva=apophis_pv_197)
+function delay(radar::RadarJPL{T}, t_offset::Real, niter::Int=10; eo::Bool=true, xve=earth_pv, xvs=sun_pv,
+               xva=apophis_pv_197) where {T <: AbstractFloat}
     # Transform receiving time from UTC to TDB seconds since j2000
-    et_r_secs = str2et(string(t_r_utc)) + t_offset
+    et_r_secs = datetime2et(radar) + t_offset
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, V_r = obs_pv_ECI(station_code, et_r_secs, eo=eo)
+    R_r, V_r = obs_pv_ECI(radar, eo = eo)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]
@@ -410,7 +410,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_b_secs - τ_U
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = obs_pv_ECI(station_code, et_t_secs, eo=eo)
+    R_t, V_t = obs_pv_ECI(radar, eo = eo)
     # Barycentric position and velocity of the Earth at transmit time
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
@@ -433,7 +433,7 @@ function delay(station_code::Int, t_r_utc::DateTime, t_offset::Real,
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
         # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial
         # conditions variations via et_t_secs
-        R_t, V_t = obs_pv_ECI(station_code, et_t_secs, eo=eo)
+        R_t, V_t = obs_pv_ECI(radar, eo = eo)
         # Earth's barycentric position and velocity at the transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]
@@ -535,19 +535,17 @@ See https://doi.org/10.1086/116062.
 - `xva`: asteroid ephemeris wich takes TDB seconds since J2000 as input and returns asteroid barycentric position in km and velocity in km/second.
 - `tord`: order of Taylor expansions.
 """
-function delay(station_code::Int, t_r_utc::DateTime,
-        niter::Int=10; eo::Bool=true, xve::TaylorInterpolant=earth_pv,
-        xvs::TaylorInterpolant=sun_pv, xva::TaylorInterpolant=apophis_pv_197,
-        tord::Int=xva.x[1].order)
+function delay(radar::RadarJPL{T}, niter::Int=10; eo::Bool=true, xve::TaylorInterpolant=earth_pv, xvs::TaylorInterpolant=sun_pv, 
+               xva::TaylorInterpolant=apophis_pv_197, tord::Int=xva.x[1].order) where {T <: AbstractFloat}
 
     # Auxiliary to evaluate JT ephemeris
     q1 = xva.x[1]
     # Transform receiving time from UTC to TDB seconds since j2000
-    et_r_secs_0 = str2et(string(t_r_utc))
+    et_r_secs_0 = datetime2et(radar)
     # et_r_secs_0 a a Taylor polynomial
     et_r_secs = Taylor1([et_r_secs_0,1.0].*one(q1[0]), tord)
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, _ = obs_pv_ECI(station_code, et_r_secs, eo=eo)
+    R_r, _ = obs_pv_ECI(radar, eo = eo)
     # Earth's barycentric position and velocity at receive time
     r_e_t_r = xve(et_r_secs)[1:3]
     # Receiver barycentric position and velocity at receive time
@@ -637,7 +635,7 @@ function delay(station_code::Int, t_r_utc::DateTime,
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_b_secs - τ_U
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    R_t, V_t = obs_pv_ECI(station_code, et_t_secs, eo=eo)
+    R_t, V_t = obs_pv_ECI(radar, eo = eo)
     # Barycentric position and velocity of the Earth at transmit time
     rv_e_t_t = xve(et_t_secs)
     r_e_t_t = rv_e_t_t[1:3]
@@ -660,7 +658,7 @@ function delay(station_code::Int, t_r_utc::DateTime,
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
         # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial
         # conditions variations via et_t_secs
-        R_t, V_t = obs_pv_ECI(station_code, et_t_secs, eo=eo)
+        R_t, V_t = obs_pv_ECI(radar, eo = eo)
         # Earth's barycentric position and velocity at transmit time
         rv_e_t_t = xve(et_t_secs)
         r_e_t_t = rv_e_t_t[1:3]
@@ -753,21 +751,20 @@ Returns time-delay and Doppler shift.
 - `autodiff`: wheter to use the automatic differentiation method of [`delay`](@ref) or not.
 - `tord`: order of Taylor expansions.
 """
-function delay_doppler(station_code::Int, t_r_utc::DateTime, F_tx::Real,
-        niter::Int=10; eo::Bool=true, tc::Real=1.0, xve=earth_pv, xvs=sun_pv,
-        xva=apophis_pv_197, autodiff::Bool=true, tord::Int=10)
+function delay_doppler(radar::RadarJPL{T}, F_tx::Real, niter::Int=10; eo::Bool=true, tc::Real=1.0, xve=earth_pv, xvs=sun_pv,
+                       xva=apophis_pv_197, autodiff::Bool=true, tord::Int=10) where {T <: AbstractFloat}
 
     # Automatic differentiation method of delay
     if autodiff
         # Time delay
-        τ = delay(station_code, t_r_utc, niter, eo=eo, xve=xve, xvs=xvs, xva=xva, tord=tord)
+        τ = delay(radar, niter, eo=eo, xve=xve, xvs=xvs, xva=xva, tord=tord)
         # Time delay, Doppler shift
         return τ[0], -F_tx*τ[1]
     # No automatic differentiation method of delay
     else
-        τe = delay(station_code, t_r_utc,  tc/2, niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
-        τn = delay(station_code, t_r_utc,   0.0, niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
-        τs = delay(station_code, t_r_utc, -tc/2, niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
+        τe = delay(radar,  tc/2, niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
+        τn = delay(radar,   0.0, niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
+        τs = delay(radar, -tc/2, niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
         # Time delay, Doppler shift
         return τn, -F_tx*((τe-τs)/tc)
     end
@@ -796,12 +793,11 @@ See also [`process_radar_data_jpl`](@ref).
 - `autodiff`: wheter to use the automatic differentiation method of [`delay`](@ref) or not.
 - `tord`: order of Taylor expansions.
 """
-function delay_doppler(astradarfile::String,
-        niter::Int=10; eo::Bool=true, tc::Real=1.0, xve=earth_pv, xvs=sun_pv,
-        xva=apophis_pv_197, autodiff::Bool=true, tord::Int=10)
+function delay_doppler(astradarfile::String, niter::Int=10; eo::Bool=true, tc::Real=1.0, xve=earth_pv, xvs=sun_pv,
+                       xva=apophis_pv_197, autodiff::Bool=true, tord::Int=10)
 
     # Read radar measurements
-    astradardata = process_radar_data_jpl(astradarfile)
+    astradardata = read_radar_jpl(astradarfile)
     #
     et1 = str2et(string(astradardata[1].utcepoch))
     #
@@ -878,13 +874,12 @@ asteroid ephemerides. Dopplers are computed following https://doi.org/10.1086/11
 - `xvs`: Sun ephemeris wich takes et seconds since J2000 as input and returns Sun barycentric position in au and velocity in au/day.
 - `xva`: asteroid ephemeris wich takes et seconds since J2000 as input and returns asteroid barycentric position in au and velocity in au/day.
 """
-function delay_doppler_yeomansetal92(station_code::Int, t_r_utc::DateTime,
-        F_tx::Real, niter::Int=10; eo::Bool=true, xve=earth_pv, xvs=sun_pv,
-        xva=apophis_pv_197)
+function delay_doppler_yeomansetal92(radar::RadarJPL{T}, F_tx::Real, niter::Int=10; eo::Bool=true, xve=earth_pv, xvs=sun_pv,
+                                     xva=apophis_pv_197) where {T <: AbstractFloat}
     # Transform receiving time from UTC to TDB seconds since j2000
-    et_r_secs = str2et(string(t_r_utc))
+    et_r_secs = datetime2et(radar)
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    R_r, V_r = obs_pv_ECI(station_code, et_r_secs, eo=eo)
+    R_r, V_r = obs_pv_ECI(radar, eo = eo)
     # Earth's barycentric position and velocity at receive time
     rv_e_t_r = xve(et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]

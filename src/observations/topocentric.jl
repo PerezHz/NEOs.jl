@@ -53,19 +53,18 @@ const eop_IAU1980 = get_eop_iau1980()
 # Earth orientation parameters (eop) 2000
 const eop_IAU2000A = get_eop_iau2000a()
 
+_observatory(r::RadecMPC{T}) where {T <: AbstractFloat} = r.observatory
+_observatory(r::RadarJPL{T}) where {T <: AbstractFloat} = r.rcvr
+
 @doc raw"""
-    obs_pos_ECEF(obs::RadecMPC{T}) where {T <: AbstractFloat}
+    obs_pos_ECEF(obs::T) where {T <: AbstractObservation}
 
 Returns the observer's geocentric `[x, y, z]` position vector in Earth-Centered Earth-Fixed (ECEF) reference frame.
-
-# Arguments 
-
-- `obs::RadecMPC{T}`: observation instant.
 """
-function obs_pos_ECEF(obs::RadecMPC{T}) where {T <: AbstractFloat}
+function obs_pos_ECEF(obs::T) where {T <: AbstractObservation}
 
     # Site of observation 
-    observatory = obs.observatory
+    observatory = _observatory(obs)
 
     # Make sure observatory has coordinates 
     @assert !isunknown(observatory) "Cannot compute position for unknown observatory."
@@ -99,7 +98,7 @@ isless(a::Real, b::Union{Taylor1,TaylorN}) = isless(a, constant_term(b))
 isless(a::Union{Taylor1,TaylorN}, b::Real) = isless(constant_term(a), b)
 
 @doc raw"""
-    obs_pv_ECI(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+    obs_pv_ECI(obs::T; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractObservation}
 
 Returns the observer's geocentric `[x, y, z, v_x, v_y, v_z]` "state" vector in Earth-Centered Inertial (ECI) reference frame.
 
@@ -111,7 +110,7 @@ See also [`SatelliteToolbox.satsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@
 - `eo::Bool=true`: whether to use Earth Orientation Parameters (eop) or not. 
 - `eop::Union{EOPData_IAU1980, EOPData_IAU2000A}`: Earth Orientation Parameters (eop).
 """
-function obs_pv_ECI(obs::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+function obs_pv_ECI(obs::T; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractObservation}
 
     # Earth-Centered Earth-Fixed position position of observer 
     pos_ECEF = obs_pos_ECEF(obs)

@@ -1,5 +1,5 @@
 @doc raw"""
-    RadarJPL{T <: AbstractFloat}
+    RadarJPL{T <: AbstractFloat} <: AbstractObservation
 
 A radar measurement in JPL format.
 
@@ -8,15 +8,15 @@ A radar measurement in JPL format.
 - `id::String`: object's name and number.
 - `date::DateTime`: date of observation. 
 - `τ::T`: time-delay.
-- `τ_σ`: time-delay uncertainty.
+- `τ_σ::T`: time-delay uncertainty.
 - `τ_units::String`: units of time delay. 
-- `Δν`: Doppler shift.
-- `Δν_σ`: Doppler shift uncertainty.
-- `Δν_units`: units of Doppler shift.
-- `freq`: frequency of the measurement.
-- `rcvr`: ID of reciever antenna.
-- `xmit`: ID of emission antenna. 
-- `bouncepoint`: bounce point. 
+- `Δν::T`: Doppler shift.
+- `Δν_σ::T`: Doppler shift uncertainty.
+- `Δν_units::String`: units of Doppler shift.
+- `freq::T`: frequency of the measurement.
+- `rcvr::ObservatoryMPC{T}`: ID of reciever antenna.
+- `xmit::ObservatoryMPC{T}`: ID of emission antenna. 
+- `bouncepoint::String`: bounce point. 
 
 ---
 
@@ -28,7 +28,7 @@ A radar measurement in JPL format.
 Converts a match of `NEOs.jpl_radar_regex` to `RadarJPL`. A `Val{false}` indicates that one or both of the measurements 
 (time delay or Doppler shift) are missing. 
 """
-struct RadarJPL{T <: AbstractFloat}
+struct RadarJPL{T <: AbstractFloat} <: AbstractObservation
     id::String
     date::DateTime
     Δτ::T
@@ -38,19 +38,19 @@ struct RadarJPL{T <: AbstractFloat}
     Δν_σ::T
     Δν_units::String
     freq::T
-    rcvr::Int
-    xmit::Int
+    rcvr::ObservatoryMPC{T}
+    xmit::ObservatoryMPC{T}
     bouncepoint::String
     # Inner constructor
     function RadarJPL{T}(id::String, date::DateTime, Δτ::T, Δτ_σ::T, Δτ_units::String, Δν::T, Δν_σ::T, Δν_units::String, 
-                             freq::T, rcvr::Int, xmit::Int, bouncepoint::String) where {T <: AbstractFloat}
+                             freq::T, rcvr::ObservatoryMPC{T}, xmit::ObservatoryMPC{T}, bouncepoint::String) where {T <: AbstractFloat}
         return new{T}(id, date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, xmit, bouncepoint)
     end
 end
 
 # Outer constructor
 function RadarJPL(id::String, date::DateTime, Δτ::T, Δτ_σ::T, Δτ_units::String, Δν::T, Δν_σ::T, Δν_units::String, freq::T, 
-                      rcvr::Int, xmit::Int, bouncepoint::String) where {T <: AbstractFloat}
+                      rcvr::ObservatoryMPC{T}, xmit::ObservatoryMPC{T}, bouncepoint::String) where {T <: AbstractFloat}
     return RadarJPL{T}(id, date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, xmit, bouncepoint)
 end
 
@@ -87,9 +87,12 @@ function show(io::IO, r::RadarJPL{T}) where {T <: AbstractFloat}
         measurement_s = " No measurements "
     end 
 
-    print(io, r.id, measurement_s, " t: ", r.date)
+    print(io, r.id, measurement_s, " t: ", r.date, " obs: ", r.rcvr.name)
 
 end
+
+# Convert DateTime to ephemerides seconds past J2000
+datetime2et(r::RadarJPL{T}) where {T <: AbstractFloat} = datetime2et(r.date)
 
 # Functions to get specific fields of a RadarJPL object 
 data(r::RadarJPL{T}) where {T <: AbstractFloat} = r.date
@@ -194,14 +197,6 @@ for (X, Y) in Iterators.product( (:(Val{false}), :(RegexMatch)), (:(Val{false}),
             end  
 
             if $X == RegexMatch
-                freq = string(delay["freq"])
-            elseif $Y == RegexMatch
-                freq = string(doppler["freq"])
-            else 
-                freq = ""
-            end 
-
-            if $X == RegexMatch
                 freq = Float64(Meta.parse(delay["freq"]))
             elseif $Y == RegexMatch
                 freq = Float64(Meta.parse(doppler["freq"]))
@@ -210,17 +205,17 @@ for (X, Y) in Iterators.product( (:(Val{false}), :(RegexMatch)), (:(Val{false}),
             end
 
             if $X == RegexMatch
-                rcvr = Meta.parse(delay["rcvr"])
+                rcvr = search_obs_code(string(delay["rcvr"]))
             elseif $Y == RegexMatch
-                rcvr = Meta.parse(doppler["rcvr"])
+                rcvr = search_obs_code(string(doppler["rcvr"]))
             else 
                 rcvr = 0
             end
 
             if $X == RegexMatch
-                xmit = Meta.parse(delay["xmit"])
+                xmit = search_obs_code(string(delay["xmit"]))
             elseif $Y == RegexMatch
-                xmit = Meta.parse(doppler["xmit"])
+                xmit = search_obs_code(string(doppler["xmit"]))
             else 
                 xmit = 0
             end
@@ -333,8 +328,8 @@ function jpl_radar_str(radar::RadarJPL{T}) where {T <: AbstractFloat}
             @sprintf("%1.3f", radar.Δτ_σ),
             radar.Δτ_units,
             @sprintf("%.0f", radar.freq),
-            radar.rcvr, 
-            radar.xmit, 
+            radar.rcvr.code, 
+            radar.xmit.code, 
             radar.bouncepoint, 
             ""
         ], "\t", "\n")
@@ -350,8 +345,8 @@ function jpl_radar_str(radar::RadarJPL{T}) where {T <: AbstractFloat}
             @sprintf("%1.3f", radar.Δν_σ), 
             radar.Δν_units,
             @sprintf("%.0f", radar.freq),
-            radar.rcvr, 
-            radar.xmit, 
+            radar.rcvr.code, 
+            radar.xmit.code, 
             radar.bouncepoint, 
             ""
         ], "\t", "\n")
