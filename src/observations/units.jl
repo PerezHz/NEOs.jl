@@ -48,15 +48,17 @@ end
 
 @doc raw"""
     datetime2et(x::DateTime)
-    datetime2et(x::RadecMPC{T}) where {T <: AbstractFloat}
+    datetime2et(x::T) where {T <: AbstractObservation}
     
-Retuns the TDB seconds past the J2000 epoch.
+Retun the TDB seconds past the J2000 epoch.
 
 See also [`SPICE.str2et`](@ref).
 """
 function datetime2et(x::DateTime)
     return str2et(string(x))
 end
+
+datetime2et(x::T) where {T <: AbstractObservation} = datetime2et(x.date)
 
 @doc raw"""
     rad2arcsec(x)

@@ -8,21 +8,21 @@ export unknowncat, isunknown, read_catalogues_mpc, parse_catalogues_mpc, write_c
 # ObservatoryMPC 
 export hascoord, unknownobs, isunknown, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, 
        update_observatories_mpc, search_obs_code
+# RadecMPC
+export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc
+# RadarJPL
+export hasdelay, hasdoppler, ismonostatic, date, delay_doppler, delay, delay_sigma, delay_units, doppler, doppler_sigma, 
+       doppler_units, freq, rcvr, xmit, bouncepoint, read_radar_jpl, write_radar_jpl
 # Units 
 export kmsec2auday, auday2kmsec, julian2etsecs, etsecs2julian, datetime2et, rad2arcsec, arcsec2rad, mas2rad
 # JPL Ephemerides 
 export loadjpleph, sun_pv, earth_pv, moon_pv, apophis_pv_197, apophis_pv_199
 # Osculating 
-export OsculatingElements, pv2kep, yarkp2adot
-# RadecMPC
-export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc, date 
+export OsculatingElements, pv2kep, yarkp2adot 
 # Topocentric
 export obs_pos_ECEF, obs_pv_ECI, t2c_rotation_iau_76_80
 # Process radec 
 export compute_radec, w8sveres17, radec_astrometry
-# RadarJPL
-export delay_doppler, ismonostatic, delay, delay_sigma, delay_units, doppler, doppler_sigma, doppler_units, 
-       freq, rcvr, xmit, bouncepoint, read_radar_jpl, write_radar_jpl
 # Gauss method 
 export gauss_method
 # Asteroid dynamical models 

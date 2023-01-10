@@ -34,7 +34,7 @@ using NEOs: mpc_catalogue_regex, CatalogueMPC, CatalogueCodes_path, observations
 
     # Update catalogues file 
     update_catalogues_mpc()
-    @test isa(NEOs.mpc_catalogues[], Vector{NEOs.CatalogueMPC}) 
+    @test isa(NEOs.mpc_catalogues[], Vector{CatalogueMPC}) 
 
     # Search catalogue code 
     cat = search_cat_code("6")
@@ -93,7 +93,7 @@ using NEOs: mpc_observatory_regex, ObservatoryMPC, ObsCodes_path
 
     # Update observatories file
     update_observatories_mpc()
-    @test isa(NEOs.mpc_observatories[], Vector{NEOs.ObservatoryMPC{Float64}}) 
+    @test isa(NEOs.mpc_observatories[], Vector{ObservatoryMPC{Float64}}) 
 
     # Search observatory code 
     obs = search_obs_code("250")
@@ -102,20 +102,43 @@ using NEOs: mpc_observatory_regex, ObservatoryMPC, ObsCodes_path
     @test obs == arecibo
 end
 
-@testset "Read/write radec file" begin
+using NEOs: mpc_radec_regex, RadecMPC, src_path
+using Dates 
 
-    source_file = joinpath(dirname(NEOs.src_path), "data/99942.dat")
-    obs_1 = read_radec_mpc(source_file)
-    target_file = joinpath(dirname(NEOs.src_path), "data/99942_.dat")
-    write_radec_mpc(obs_1, target_file)
-    obs_2 = read_radec_mpc(target_file)
-    rm(target_file)
+@testset "RadecMPC" begin
+    # Parse RadecMPC
+    apophis_s = "99942K04M04N  C2004 03 15.10789 04 06 08.08 +16 55 04.6                om6394691"
+    apophis_m = match(mpc_radec_regex, apophis_s)
+    apophis = RadecMPC(apophis_m)
+    @test apophis.num == "99942"
+    @test apophis.tmpdesig == "K04M04N"
+    @test apophis.discovery == " "
+    @test apophis.publishnote == " "
+    @test apophis.obstech == "C"
+    @test apophis.date == DateTime("2004-03-15T02:35:21.696")
+    @test apophis.α == 1.0739650841580173
+    @test apophis.δ == 0.2952738332250385
+    @test apophis.info1 == "         "
+    @test apophis.mag == "     "
+    @test apophis.band == " "
+    @test apophis.catalogue == search_cat_code("o")
+    @test apophis.info2 == "m6394"
+    @test apophis.observatory == search_obs_code("691")
 
-    @test obs_1 == obs_2
-end
-
-@testset "Search MPC circulars" begin
+    # RadecMPC equality
+    @test apophis == apophis
     
+    # Read/write radec file
+    source_file = joinpath(dirname(src_path), "data/99942.dat")
+    source_radec = read_radec_mpc(source_file)
+    check_file = joinpath(dirname(src_path), "data/99942_.dat")
+    write_radec_mpc(source_radec, check_file)
+    check_radec = read_radec_mpc(check_file)
+    rm(check_file)
+
+    @test source_radec == check_radec
+
+    # Search MPC circulars
     function search_apophis(m::RegexMatch)
         if (m["num"] == "99942") || (m["tmpdesig"] == "N00hp15")
             return true
@@ -128,22 +151,48 @@ end
         search_apophis, 
         "https://minorplanetcenter.net/mpec/K20/K20YA9.html",
         "https://minorplanetcenter.net/mpec/K21/K21JL0.html"; 
-        max_iter = 100
+        max_iter = 10
     )
 
-    @test isa(obs, Vector{NEOs.RadecMPC{Float64}})
+    @test isa(obs, Vector{RadecMPC{Float64}})
     @test issorted(obs)
     @test allunique(obs)
+    @test all( (getfield.(obs, :num) .== "99942") .| (getfield.(obs, :tmpdesig) .== "N00hp15") )
 end
 
-@testset "Read/write radar file" begin
+using NEOs: jpl_radar_regex, RadarJPL, jpl_radar_dateformat
 
-    source_file = joinpath(dirname(NEOs.src_path), "data/99942_RADAR_2005_2013.dat")
-    radar_1 = read_radar_jpl(source_file)
-    target_file = joinpath(dirname(NEOs.src_path), "data/99942_RADAR_2005_2013_.dat")
-    write_radar_jpl(radar_1, target_file)
-    radar_2 = read_radar_jpl(target_file)
-    rm(target_file)
+@testset "RadarJPL" begin
+    # Parse RadarJPL
+    apophis_s = "99942 Apophis (2004 MN4)	2005-01-27 23:31:00	-100849.1434	0.250	Hz	2380	251	251	C"
+    apophis_m = match(jpl_radar_regex, apophis_s)
+    apophis = RadarJPL(Val(false), apophis_m)
+    @test apophis.id == "99942 Apophis (2004 MN4)"
+    @test apophis.date == DateTime("2005-01-27 23:31:00", jpl_radar_dateformat)
+    @test isnan(apophis.Δτ)
+    @test isnan(apophis.Δτ_σ)
+    @test apophis.Δτ_units == ""
+    @test apophis.Δν == -100849.1434
+    @test apophis.Δν_σ == 0.250
+    @test apophis.Δν_units == "Hz"
+    @test apophis.freq == 2380.0
+    @test apophis.rcvr == search_obs_code("251")
+    @test apophis.xmit == search_obs_code("251")
+    @test apophis.bouncepoint == "C"
+    @test ismonostatic(apophis)
+    @test !hasdelay(apophis)
+    @test hasdoppler(apophis)
 
-    @test radar_1 == radar_2
+    # RadarJPL equality
+    @test apophis == apophis
+
+    # Read/write radar file
+    source_file = joinpath(dirname(src_path), "data/99942_RADAR_2005_2013.dat")
+    source_radar = read_radar_jpl(source_file)
+    check_file = joinpath(dirname(src_path), "data/99942_RADAR_2005_2013_.dat")
+    write_radar_jpl(source_radar, check_file)
+    check_radar = read_radar_jpl(check_file)
+    rm(check_file)
+
+    @test source_radar == check_radar
 end

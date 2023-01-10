@@ -14,8 +14,8 @@ A radar measurement in JPL format.
 - `Δν_σ::T`: Doppler shift uncertainty.
 - `Δν_units::String`: units of Doppler shift.
 - `freq::T`: frequency of the measurement.
-- `rcvr::ObservatoryMPC{T}`: ID of reciever antenna.
-- `xmit::ObservatoryMPC{T}`: ID of emission antenna. 
+- `rcvr::ObservatoryMPC{T}`: reciever antenna.
+- `xmit::ObservatoryMPC{T}`: emission antenna. 
 - `bouncepoint::String`: bounce point. 
 
 ---
@@ -25,7 +25,7 @@ A radar measurement in JPL format.
     RadarJPL(delay::Val{false}, doppler::RegexMatch)
     RadarJPL(delay::Val{false}, doppler::Val{false})
 
-Converts a match of `NEOs.jpl_radar_regex` to `RadarJPL`. A `Val{false}` indicates that one or both of the measurements 
+Convert a match of `NEOs.jpl_radar_regex` to `RadarJPL`. A `Val{false}` indicates that one or both of the measurements 
 (time delay or Doppler shift) are missing. 
 """
 struct RadarJPL{T <: AbstractFloat} <: AbstractObservation
@@ -54,7 +54,6 @@ function RadarJPL(id::String, date::DateTime, Δτ::T, Δτ_σ::T, Δτ_units::S
     return RadarJPL{T}(id, date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, xmit, bouncepoint)
 end
 
-
 # Two RadarJPL are equal if ther date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, xmit and bouncepoint are equal
 function hash(a::RadarJPL{T}, h::UInt) where {T <: AbstractFloat}
     return hash((a.date, a.Δτ, a.Δτ_σ, a.Δτ_units, a.Δν, a.Δν_σ, a.Δν_units, a.freq, a.rcvr, a.xmit, a.bouncepoint), h)
@@ -64,8 +63,22 @@ function ==(a::RadarJPL{T}, b::RadarJPL{T}) where {T <: AbstractFloat}
     return hash(a) == hash(b)
 end
 
+@doc raw"""
+    hasdelay(r::RadarJPL{T}) where {T <: AbstractFloat}
+
+Check whether `r` has a non `NaN` time delay.
+"""
 hasdelay(r::RadarJPL{T}) where {T <: AbstractFloat} = !isnan(r.Δτ)
+
+@doc raw"""
+    hasdoppler(r::RadarJPL{T}) where {T <: AbstractFloat}
+
+Check whether `r` has a non `NaN` Doppler shift.
+"""
 hasdoppler(r::RadarJPL{T}) where {T <: AbstractFloat} = !isnan(r.Δν)
+
+# Order in RadecMPC and RadarJPL is given by date 
+isless(a::T, b::T) where {T <: AbstractObservation} = a.date < b.date
 
 # Print method for RadarJPL
 # Examples: 
@@ -91,11 +104,8 @@ function show(io::IO, r::RadarJPL{T}) where {T <: AbstractFloat}
 
 end
 
-# Convert DateTime to ephemerides seconds past J2000
-datetime2et(r::RadarJPL{T}) where {T <: AbstractFloat} = datetime2et(r.date)
-
 # Functions to get specific fields of a RadarJPL object 
-data(r::RadarJPL{T}) where {T <: AbstractFloat} = r.date
+date(r::T) where {T <: AbstractObservation} = r.date
 delay(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δτ
 delay_sigma(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δτ_σ
 delay_units(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δτ_units
@@ -110,14 +120,14 @@ bouncepoint(r::RadarJPL{T}) where {T <: AbstractFloat} = r.bouncepoint
 @doc raw"""
     ismonostatic(rdata::RadarJPL)
 
-Checks whether the setup is monostatic, i.e., receiver and transmitter are the same. 
+Check whether the setup is monostatic, i.e., receiver and transmitter are the same. 
 """
 ismonostatic(r::RadarJPL{T}) where {T <: AbstractFloat} = r.rcvr == r.xmit
 
 @doc raw"""
     issband(f_MHz::T) where {T<:Real}
 
-Checks whether the transmission frequency `f_MHz` (in MHz) belongs to the S band 
+Check whether the transmission frequency `f_MHz` (in MHz) belongs to the S band 
 (IEEE nomenclature). 
 """
 issband(f_MHz::T) where {T<:Real} = 2000.0 ≤ f_MHz ≤ 4000.0
@@ -125,12 +135,12 @@ issband(f_MHz::T) where {T<:Real} = 2000.0 ≤ f_MHz ≤ 4000.0
 @doc raw"""
     isxband(f_MHz::T) where {T<:Real}
 
-Checks whether the transmission frequency `f_MHz` (in MHz) belongs to the X band 
+Check whether the transmission frequency `f_MHz` (in MHz) belongs to the X band 
 (IEEE nomenclature). 
 """
 isxband(f_MHz::T) where {T<:Real} = 8000.0 ≤ f_MHz ≤ 12000.0
 
-# Regular expression to parse an optical measurement in MPC format
+# Regular expression to parse a radar measurement in JPL format
 const jpl_radar_regex = Regex(join(
     [
         # ID regex + tab 
@@ -153,6 +163,7 @@ const jpl_radar_regex = Regex(join(
         raw"(?P<bouncepoint>.*)"
     ]
 ))
+
 # Format of date in JPL radar data files 
 const jpl_radar_dateformat = "yyyy-mm-dd HH:MM:SS"
 
@@ -209,7 +220,7 @@ for (X, Y) in Iterators.product( (:(Val{false}), :(RegexMatch)), (:(Val{false}),
             elseif $Y == RegexMatch
                 rcvr = search_obs_code(string(doppler["rcvr"]))
             else 
-                rcvr = 0
+                rcvr = unknownobs()
             end
 
             if $X == RegexMatch
@@ -217,7 +228,7 @@ for (X, Y) in Iterators.product( (:(Val{false}), :(RegexMatch)), (:(Val{false}),
             elseif $Y == RegexMatch
                 xmit = search_obs_code(string(doppler["xmit"]))
             else 
-                xmit = 0
+                xmit = unknownobs()
             end
 
             if $X == RegexMatch
@@ -236,11 +247,11 @@ end
 @doc raw"""
     read_radar_jpl(filename::String)
 
-Returns the matches of `NEOs.jpl_radar_regex` in `filename` as `RadarJPL`.
+Return the matches of `NEOs.jpl_radar_regex` in `filename` as `RadarJPL`.
 """
 function read_radar_jpl(filename::String)
 
-    # Read lines of mpc formatted file 
+    # Read lines of jpl formatted file 
     lines = readlines(filename)
     # Apply regular expressions
     matches = match.(jpl_radar_regex, lines)
@@ -310,13 +321,16 @@ function read_radar_jpl(filename::String)
 
     end 
 
+    # Sort radar measurements by date 
+    sort!(radar)
+
     return radar 
 end 
 
 @doc raw"""
     jpl_radar_str(radar::RadarJPL{T}) where {T <: AbstractFloat}
 
-Returns an observation in JPL format. 
+Return an observation in JPL format. 
 """
 function jpl_radar_str(radar::RadarJPL{T}) where {T <: AbstractFloat}
 
@@ -363,7 +377,7 @@ end
 @doc raw"""
     write_radar_jpl(radar::Vector{RadarJPL{T}}, filename::String) where {T <: AbstractFloat}
 
-Writes `radar` to `filename` in JPL format. 
+Write `radar` to `filename` in JPL format. 
 """
 function write_radar_jpl(radar::Vector{RadarJPL{T}}, filename::String) where {T <: AbstractFloat}
     open(filename, "w") do file

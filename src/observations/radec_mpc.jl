@@ -76,14 +76,6 @@ function show(io::IO, m::RadecMPC{T}) where {T <: AbstractFloat}
               " obs: ", m.observatory.name)
 end
 
-# Order in RadecMPC is given by date 
-isless(a::RadecMPC{T}, b::RadecMPC{T}) where {T <: AbstractFloat} = a.date < b.date
-
-# Convert DateTime to ephemerides seconds past J2000
-datetime2et(x::RadecMPC{T}) where {T <: AbstractFloat} = datetime2et(x.date)
-
-date(x::RadecMPC{T}) where {T <: AbstractFloat} = getfield(x, :date)
-
 # Regular expression to parse an optical measurement in MPC format
 const mpc_radec_regex = Regex(join(
     [
@@ -147,7 +139,7 @@ end
     ra(hrs::Int, min::Int, sec::T) where {T <: Real}
     ra(obs::RadecMPC{T}) where {T <: AbstractFloat}
 
-Returns the right ascension in rad. 
+Return the right ascension in rad. 
 """
 function ra(hrs::Int, min::Int, sec::T) where {T <: Real}
     # Convert hours minutes seconds to deg
@@ -165,7 +157,7 @@ ra(obs::RadecMPC{T}) where {T <: AbstractFloat} = getfield(obs, :α)
     dec(sgn::String, deg::Int, min::Int, sec::T) where {T <: Real}
     dec(obs::RadecMPC{T}) where {T <: AbstractFloat}
 
-Returns the declination in rad. 
+Return the declination in rad. 
 """
 function dec(sgn::String, deg::Int, min::Int, sec::T) where {T <: Real}
     # Convert degrees minutes seconds to degrees
@@ -185,7 +177,7 @@ dec(obs::RadecMPC{T}) where {T <: AbstractFloat} = getfield(obs, :δ)
 @doc raw"""
     RadecMPC(m::RegexMatch)
 
-Converts a match of `NEOs.mpc_radec_regex` to `RadecMPC`.
+Convert a match of `NEOs.mpc_radec_regex` to `RadecMPC`.
 """
 function RadecMPC(m::RegexMatch)
     date = DateTime(
@@ -231,7 +223,7 @@ end
 @doc raw"""
     read_radec_mpc(filename::String)
 
-Returns the matches of `NEOs.mpc_radec_regex` in `filename` as `RadecMPC`.
+Return the matches of `NEOs.mpc_radec_regex` in `filename` as `RadecMPC`.
 """
 function read_radec_mpc(filename::String)
     # Read lines of mpc formatted file 
@@ -254,7 +246,7 @@ end
     parse_radec_mpc(text::String)
     parse_radec_mpc(f::Function, text::String)
 
-Returns the matches of `NEOs.mpc_radec_regex` in `text`. A function `f(m::RegexMatch) -> Bool` 
+Return the matches of `NEOs.mpc_radec_regex` in `text`. A function `f(m::RegexMatch) -> Bool` 
 can be passed to filter the matches. 
 """
 function parse_radec_mpc(f::Function, text::String)
@@ -290,7 +282,7 @@ const next_circular_regex = r"<a href=\"(?P<next>.*)\"><img src=\"/iau/figs/RArr
     search_circulars_mpc(url1::String, url2::String; max_iter::Int = 10_000)
     search_circulars_mpc(f::Function, url1::String, url2::String; max_iter::Int = 10_000)
 
-Iterates MPC circulars from `url1` to `url2` and returns the matches of `NEOs.mpc_radec_regex`. 
+Iterate MPC circulars from `url1` to `url2` and return the matches of `NEOs.mpc_radec_regex`. 
 A function `f(m::RegexMatch) -> Bool` can be passed to filter the observations. If `url2` is not
 reached before `max_iter` iterations, the function will print a warning and return the 
 matches found so far. 
@@ -341,7 +333,7 @@ search_circulars_mpc(url1::String, url2::String; max_iter::Int = 10_000) = searc
 @doc raw"""
     mpc_date_str(date::DateTime)
 
-Returns the date in MPC format. 
+Return the date in MPC format. 
 """
 function mpc_date_str(date::DateTime)
     
@@ -376,7 +368,7 @@ end
 @doc raw"""
     mpc_α_str(α::T) where {T <: Number}
 
-Returns the right ascension [rad] in MPC format. 
+Return the right ascension [rad] in MPC format. 
 """
 function mpc_α_str(α::T) where {T <: Number}
     # Convert rad to deg 
@@ -410,7 +402,7 @@ end
 @doc raw"""
     mpc_δ_str(δ::T) where {T <: Number}
 
-Returns the declination [rad] in MPC format. 
+Return the declination [rad] in MPC format. 
 """
 function mpc_δ_str(δ::T) where {T <: Number}
     # Sign string 
@@ -447,7 +439,7 @@ end
 @doc raw"""
     mpc_radec_str(obs::RadecMPC{T}) where {T <: AbstractFloat}
 
-Returns an observation in MPC format. 
+Return an observation in MPC format. 
 """
 function mpc_radec_str(obs::RadecMPC{T}) where {T <: AbstractFloat}
     # Date string 
@@ -485,7 +477,7 @@ end
 @doc raw"""
     write_radec_mpc(obs::Vector{RadecMPC{T}}, filename::String) where {T <: AbstractFloat}
 
-Writes `obs` to `filename` in MPC format. 
+Write `obs` to `filename` in MPC format. 
 """
 function write_radec_mpc(obs::Vector{RadecMPC{T}}, filename::String) where {T <: AbstractFloat}
     open(filename, "w") do file
