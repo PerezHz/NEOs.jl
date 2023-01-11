@@ -54,7 +54,7 @@ function show(io::IO, m::OsculatingElements{T}) where {T <: AbstractFloat}
     
     print(io, rpad("Semimajor axis (a): ", 36), m.a, " au\n")
     print(io, rpad("Eccentricity (e): ", 36), m.e, "\n")
-    print(io, rpad("Time of pericenter passage (tp): ", 36), m.tp, " JDTDB\n")
+    print(io, rpad("Time of pericenter passage (tp): ", 36), julian2datetime(m.tp), " JDTDB\n")
     print(io, rpad("Pericenter distance (q): ", 36), m.q, " au\n")
     print(io, rpad("Argument of pericenter (ω): ", 36), m.ω, " deg\n")
     print(io, rpad("Inclination (i): ", 36), m.i, " deg\n")
@@ -65,7 +65,7 @@ end
 @doc raw"""
     pv2kep(xas, μ_S = μ_S, jd = JD_J2000)
 
-Computes the orbital elements of the NEO with state vector `xas`. Returns a `OsculatingElements` object. 
+Compute the orbital elements of the NEO with state vector `xas`. Return a `OsculatingElements` object. 
 
 See also [`eccentricity`](@ref), [`semimajoraxis`](@ref), [`timeperipass`](@ref),
 [`longascnode`](@ref), [`argperi`](@ref) and [`inclination`](@ref).
@@ -111,22 +111,6 @@ function mean(osc::Vector{OsculatingElements{T}}) where {T <: AbstractFloat}
     return OsculatingElements(e/m, q/m, tp/m, Ω/m, ω/m, i/m, a/m)
 end
 
-function atan2(y, x)
-    if x > 0
-        return atan(y/x)
-    elseif (y ≥ 0) && (x < 0)
-        return atan(y/x) + π
-    elseif  (y < 0) && (x < 0)
-        return atan(y/x) - π
-    elseif (y > 0) && (x == 0)
-        return π/2
-    elseif (y < 0) && (x == 0)
-        return -π/2
-    elseif (y == 0) && (x == 0)
-        return NaN
-    end 
-end
-
 function (osc::OsculatingElements{T})(t::T) where {T <: AbstractFloat}
 
     # Mean motion 
@@ -166,14 +150,14 @@ end
 @doc raw"""
     yarkp2adot(A2, a, e, μ_S)
 
-Returns the average semimajor axis drift due to the Yarkovsky effect
+Return the average semimajor axis drift due to the Yarkovsky effect
 ```math
 \begin{align*}
     \left\langle\dot{a}\right\rangle & = \frac{2A_2(1-e^2)}{n}\left(\frac{1 \ \text{AU}}{p}\right)^2 \\
     & = \frac{2A_2}{(1-e^2)\sqrt{a\mu_\odot}}(1 \ \text{AU})^2,
 \end{align*}
 ```
-where ``A_2`` is the Yarkovsky parameter, ``\mu_\odot = GM_\odot`` is the Sun's mass parameter,
+where ``A_2`` is the Yarkovsky parameter, ``\mu_\odot = GM_\odot`` is the Sun's gravitational parameter,
 ``e`` is the eccentricity, ``n = \sqrt{\mu/a^3}`` is the mean motion, ``p = a(1-e^2)`` is the 
 semilatus rectum, and ``a`` is the semimajor axis. 
 

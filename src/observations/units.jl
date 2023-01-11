@@ -1,7 +1,7 @@
 @doc raw"""
     kmsec2auday(pv)
 
-Converts a `[x, y, z, v_x, v_y, v_z]` state vector from km, km/sec to au, au/day.
+Convert a `[x, y, z, v_x, v_y, v_z]` state vector from km, km/sec to au, au/day.
 
 See also [`auday2kmsec`](@ref).
 """
@@ -14,7 +14,7 @@ end
 @doc raw"""
     auday2kmsec(pv)
 
-Converts a `[x, y, z, v_x, v_y, v_z]` state vector from au, au/day to km, km/sec.
+Convert a `[x, y, z, v_x, v_y, v_z]` state vector from au, au/day to km, km/sec.
 
 See also [`kmsec2auday`](@ref).
 """
@@ -27,7 +27,7 @@ end
 @doc raw"""
     julian2etsecs(jd)
 
-Converts `jd` julian days to ephemeris seconds since J2000.
+Convert `jd` julian days to ephemeris seconds since J2000.
 
 See also [`etsecs2julian`](@ref).
 """
@@ -38,7 +38,7 @@ end
 @doc raw"""
     etsecs2julian(et)
 
-Converts `et` ephemeris seconds since J2000 to julian days.
+Convert `et` ephemeris seconds since J2000 to julian days.
 
 See also [`julian2etsecs`](@ref).
 """
@@ -63,7 +63,7 @@ datetime2et(x::T) where {T <: AbstractObservation} = datetime2et(x.date)
 @doc raw"""
     rad2arcsec(x)
 
-Converts radians to arcseconds. 
+Convert radians to arcseconds. 
 
 See also [`arcsec2rad`](@ref) and [`mas2rad`](@ref).
 """
@@ -72,7 +72,7 @@ rad2arcsec(x) = 3600 * rad2deg(x) # rad2deg(rad) -> deg; 3600 * deg -> arcsec
 @doc raw"""
     arcsec2rad(x)
 
-Converts arcseconds to radians. 
+Convert arcseconds to radians. 
 
 See also [`rad2arcsec`](@ref) and [`mas2rad`](@ref).
 """
@@ -81,7 +81,7 @@ arcsec2rad(x) = deg2rad(x / 3600) # arcsec/3600 -> deg; deg2rad(deg) -> rad
 @doc raw"""
     mas2rad(x)
 
-Converts milli-arcseconds to radians. 
+Convert milli-arcseconds to radians. 
 
 See also [`rad2arcsec`](@ref) and [`arcsec2rad`](@ref).
 """

@@ -53,18 +53,14 @@ const eop_IAU1980 = get_eop_iau1980()
 # Earth orientation parameters (eop) 2000
 const eop_IAU2000A = get_eop_iau2000a()
 
-_observatory(r::RadecMPC{T}) where {T <: AbstractFloat} = r.observatory
-_observatory(r::RadarJPL{T}) where {T <: AbstractFloat} = r.rcvr
-
 @doc raw"""
-    obs_pos_ECEF(obs::T) where {T <: AbstractObservation}
+    obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractObservation}
+    obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat}
+    obs_pos_ECEF(x::RadarJPL{T}) where {T <: AbstractFloat}
 
-Returns the observer's geocentric `[x, y, z]` position vector in Earth-Centered Earth-Fixed (ECEF) reference frame.
+Return the observer's geocentric `[x, y, z]` position vector in Earth-Centered Earth-Fixed (ECEF) reference frame.
 """
-function obs_pos_ECEF(obs::T) where {T <: AbstractObservation}
-
-    # Site of observation 
-    observatory = _observatory(obs)
+function obs_pos_ECEF(observatory::T) where {T <: AbstractObservation}
 
     # Make sure observatory has coordinates 
     @assert !isunknown(observatory) "Cannot compute position for unknown observatory."
@@ -73,7 +69,7 @@ function obs_pos_ECEF(obs::T) where {T <: AbstractObservation}
     # λ_deg: longitude [degrees east of Greenwich]
     # u: distance from spin axis [km], u = ρ*cos(ϕ')
     # v: height above equatorial plane [km], v = ρ*sin(ϕ'),
-    #  where ϕ' is the geocentric latitude and ρ is the geocentric distance in km
+    # where ϕ' is the geocentric latitude and ρ is the geocentric distance in km
 
     # Cilindrical components of Earth-Centered Earth-Fixed position of observer
     λ_deg = observatory.long     # deg 
@@ -92,15 +88,21 @@ function obs_pos_ECEF(obs::T) where {T <: AbstractObservation}
     return pos_ECEF
 end
 
+obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.observatory)
+obs_pos_ECEF(x::RadarJPL{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.rcvr)
+
 # isless overloads workaround to make rECEFtoECI work with TaylorSeries
 isless(a::Union{Taylor1,TaylorN}, b::Union{Taylor1,TaylorN}) = isless(constant_term(a), constant_term(b))
 isless(a::Real, b::Union{Taylor1,TaylorN}) = isless(a, constant_term(b))
 isless(a::Union{Taylor1,TaylorN}, b::Real) = isless(constant_term(a), b)
 
 @doc raw"""
-    obs_pv_ECI(obs::T; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractObservation}
+    obs_pv_ECI(observatory::ObservatoryMPC{T}, t::DateTime; eo::Bool=true, 
+               eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+    obs_pv_ECI(x::RadecMPC{T}) where {T <: AbstractFloat}
+    obs_pv_ECI(x::RadarJPL{T}) where {T <: AbstractFloat}
 
-Returns the observer's geocentric `[x, y, z, v_x, v_y, v_z]` "state" vector in Earth-Centered Inertial (ECI) reference frame.
+Return the observer's geocentric `[x, y, z, v_x, v_y, v_z]` "state" vector in Earth-Centered Inertial (ECI) reference frame.
 
 See also [`SatelliteToolbox.satsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@ref).
 
@@ -110,13 +112,14 @@ See also [`SatelliteToolbox.satsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@
 - `eo::Bool=true`: whether to use Earth Orientation Parameters (eop) or not. 
 - `eop::Union{EOPData_IAU1980, EOPData_IAU2000A}`: Earth Orientation Parameters (eop).
 """
-function obs_pv_ECI(obs::T; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractObservation}
+function obs_pv_ECI(observatory::ObservatoryMPC{T}, t::DateTime; eo::Bool=true, 
+                    eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
 
     # Earth-Centered Earth-Fixed position position of observer 
-    pos_ECEF = obs_pos_ECEF(obs)
+    pos_ECEF = obs_pos_ECEF(observatory)
 
     # ET seconds 
-    et = datetime2et(obs)
+    et = datetime2et(t)
     # UTC seconds 
     utc_secs = et - tdb_utc(et)
     # Julian days UTC 
@@ -145,6 +148,9 @@ function obs_pv_ECI(obs::T; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_I
     return vcat(p_ECI, v_ECI)
 end
 
+obs_pv_ECI(x::RadecMPC{T}) where {T <: AbstractFloat} = obs_pv_ECI(x.observatory)
+obs_pv_ECI(x::RadarJPL{T}) where {T <: AbstractFloat} = obs_pv_ECI(x.rcvr)
+
 # This method extends orthonormalize to handle Taylor1 and TaylorN
 # The ReferenceFrameRotations.jl package is licensed under the MIT "Expat" License
 # Copyright (c) 2014-2019: Ronan Arraes Jardim Chagas.
@@ -167,7 +173,7 @@ end
 @doc raw"""
     nupr7680mat(tt, Δϵ_1980, ΔΨ_1980, dde80, ddp80) 
 
-Returns IAU 1976/1980 nutation-precession matrix. 
+Return IAU 1976/1980 nutation-precession matrix. 
 
 # Arguments 
 
@@ -201,7 +207,7 @@ end
 @doc raw"""
     polarmotionmat(tt; eo::Bool=true)
 
-Returns the polar motion matrix in radians (TIRS->ITRS, IERS 1996).
+Return the polar motion matrix in radians (TIRS->ITRS, IERS 1996).
 
 See also [`EarthOrientation.polarmotion`](@ref). 
 
@@ -226,7 +232,7 @@ end
 @doc raw"""
     omega(lod)
 
-Returns the angular velocity of the earth in units of rad/sec
+Return the angular velocity of the earth in units of rad/sec
 ```math
 \omega = (72921151.467064 - 0.843994809\text{LOD})\times 10^{-12},
 ```
@@ -239,7 +245,7 @@ omega(lod) = (1e-12)*(72921151.467064 - 0.843994809lod)
 @doc raw"""
     t2c_rotation_iau_76_80(et::T; eo::Bool=true) where {T<:Number}
 
-Returns the terrestrial-to-celestial rotation matrix (including polar motion) 
+Return the terrestrial-to-celestial rotation matrix (including polar motion) 
 using 1976/1980 Earth orientation/rotation model.
 
 See also [`EarthOrientation.precession_nutation80`](@ref), [`SatelliteToolbox.nutation_fk5`](@ref),

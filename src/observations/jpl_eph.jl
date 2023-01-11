@@ -8,7 +8,7 @@ const ttmtdb = TaylorInterpolant(ttmtdb_t0, ttmtdb_t, Taylor1.(ttmtdb_x_coeffs))
 @doc raw"""
     loadjpleph()
 
-Loads JPL ephemerides (NAIF IDs, DE430 TT-TDB and ephemerides, #197 and #199 solutions for Apophis).
+Load JPL ephemerides (NAIF IDs, DE430 TT-TDB and ephemerides, #197 and #199 solutions for Apophis).
 
 See also [`SPICE.furnsh`](@ref).
 """
@@ -30,7 +30,7 @@ end
 @doc raw"""
     getpv(target::Int, observer::Int, et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec) at
+Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec) at
 TDB instant `et` from SPK-formatted ephemeris file with respect to J2000 frame.
 
 See also [`SPICE.spkgeo`](@ref).
@@ -56,7 +56,7 @@ end
 @doc raw"""
     sun_pv(et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
+Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Sun at TDB instant `et` with respect to J2000 frame.
 
 See also [`getpv`](@ref).
@@ -66,7 +66,7 @@ sun_pv(et) = getpv(10, 0, constant_term(et)) # units: km, km/second
 @doc raw"""
     earth_pv(et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
+Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Earth at TDB instant `et` with respect to J2000 frame.
 
 See also [`getpv`](@ref).
@@ -76,7 +76,7 @@ earth_pv(et) = getpv(399, 0, constant_term(et)) # units: km, km/second
 @doc raw"""
     moon_pv(et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
+Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Moon at TDB instant `et` with respect to J2000 frame.
 
 See also [`getpv`](@ref).
@@ -86,7 +86,7 @@ moon_pv(et) = getpv(301, 0, constant_term(et)) # units: km, km/second
 @doc raw"""
     apophis_pv_197(et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
+Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of Apophis at TDB instant `et` from JPL #197 solution with respect to J2000 frame.
 
 See also [`getpv`](@ref).
@@ -96,7 +96,7 @@ apophis_pv_197(et) = getpv(9904406, 0, constant_term(et)) # units: km, km/second
 @doc raw"""
     apophis_pv_199(et)
 
-Returns the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
+Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of Apophis at TDB instant `et` from JPL #199 solution with respect to J2000 frame.
 
 See also [`getpv`](@ref).
@@ -106,7 +106,7 @@ apophis_pv_199(et) = getpv(2099942, 0, constant_term(et)) # units: km, km/second
 @doc raw"""
     tt_tdb(et)
 
-Returns the difference TT-TDB (in units of sec) at TDB instant `et` with respect to J2000
+Return the difference TT-TDB (in units of sec) at TDB instant `et` with respect to J2000
 frame.
 
 See also [`getpv`](@ref).
@@ -116,7 +116,7 @@ tt_tdb(et) = getpv(1000000001, 1000000000, constant_term(et))[1] # units: second
 @doc raw"""
     dtt_tdb(et)
 
-Returns the rate of change of TT-TDB (in units of sec/sec) at TDB instant `et` with respect
+Return the rate of change of TT-TDB (in units of sec/sec) at TDB instant `et` with respect
 to J2000 frame.
 
 See also [`getpv`](@ref).
