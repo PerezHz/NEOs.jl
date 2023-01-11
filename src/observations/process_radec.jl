@@ -20,7 +20,7 @@ function compute_radec(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true, xve::Func
     # Transform receiving time from UTC to TDB seconds since J2000
     et_r_secs = datetime2et(obs)
     # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
-    RV_r = obs_pv_ECI(obs, eo=eo)
+    RV_r = obs_pv_ECI(obs, eo = eo)
     R_r = RV_r[1:3]
     V_r = RV_r[4:6]
     # Earth's barycentric position and velocity at receive time
@@ -182,6 +182,12 @@ const mpc_catalogue_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "
 const mpc_catalogue_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "n", "o", "p", "q", 
                                 "r", "t", "u", "v", "w", "L", "N", "Q", "R", "S", "U", "W"]
 
+@doc raw"""
+    select_debiasing_table(debias_table::String = "2018")
+
+Return the catalogue codes, truth catalogue, resolution and bias matrix of the corresponding debias table. The possible values 
+for `debias_table` are `2014`, `2018` and `hires2018`. 
+"""
 function select_debiasing_table(debias_table::String = "2018")
     # Select debiasing table: 
     # - 2014 corresponds to https://doi.org/10.1016/j.icarus.2014.07.033
@@ -191,14 +197,14 @@ function select_debiasing_table(debias_table::String = "2018")
         debias_path = artifact"debias_2018"
         mpc_catalogue_codes_201X = mpc_catalogue_codes_2018
         # The healpix tesselation resolution of the bias map from https://doi.org/10.1016/j.icarus.2019.113596
-        NSIDE= 64 
+        NSIDE = 64 
         # In 2018 debias table Gaia DR2 catalogue is regarded as the truth
         truth = "V" 
     elseif debias_table == "hires2018"
         debias_path = artifact"debias_hires2018"
         mpc_catalogue_codes_201X = mpc_catalogue_codes_2018
         # The healpix tesselation resolution of the high-resolution bias map from https://doi.org/10.1016/j.icarus.2019.113596
-        NSIDE= 256 
+        NSIDE = 256 
         # In 2018 debias table Gaia DR2 catalogue is regarded as the truth
         truth = "V" 
     elseif debias_table == "2014"
@@ -227,7 +233,7 @@ end
 @doc raw"""
     w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
 
-Returns the statistical weight from Veres et al. (2017) corresponding to `obs`. 
+Return the statistical weight from Veres et al. (2017) corresponding to `obs`. 
 """
 function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
     
@@ -301,7 +307,7 @@ end
     radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, debias_table::String="2018", xve::Function=earth_pv,
                      xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T <: AbstractFloat}
 
-Returns ra/dec astrometry (observed + computed + corrections + statistical weights) for a set of observations. 
+Return ra/dec astrometry (observed + computed + corrections + statistical weights) for a set of observations. 
 
 See also [`compute_radec`](@ref), [`w8sveres17`](@ref) and [`Healpix.ang2pixRing`](@ref). 
 
@@ -366,10 +372,9 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true
 
         # Computed ra/dec
         α_comp_as, δ_comp_as = compute_radec(obs[i], niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
-        δ_comp_rad = arcsec2rad(δ_comp_as)
         # Multiply by metric factor cos(dec)
-        α_comp[i] = α_comp_as * cos(obs.δ[i])  # arcsec 
-        δ_comp[i] = δ_comp_as                    # arcsec
+        α_comp[i] = α_comp_as * cos(obs[i].δ)  # arcsec 
+        δ_comp[i] = δ_comp_as                  # arcsec
 
         # Statistical weights from Veres et al. (2017)
         w8s[i] = w8sveres17(obs[i])
@@ -429,10 +434,10 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true
 end
 
 @doc raw"""
-    compute_optical_obs(outfilename::String, opticalobsfile::String, asteph, ss16asteph;
-                        debias_table::String="2018", niter::Int=5)
+    compute_optical_obs(outfilename::String, opticalobsfile::String, asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant;
+                        debias_table::String = "2018", niter::Int=5)
 
-Computes ra/dec astrometry and saves the result to a file.             
+Compute ra/dec astrometry and save the result to a file.             
 
 # Arguments 
 
@@ -443,7 +448,7 @@ Computes ra/dec astrometry and saves the result to a file.
 - `debias_table::String`: debias table. 
 - `niter::Int`: number of light-time solution iterations. 
 """
-function compute_optical_obs(outfilename::String, opticalobsfile::String, asteph, ss16asteph;
+function compute_optical_obs(outfilename::String, opticalobsfile::String, asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant;
                              debias_table::String="2018", niter::Int=5)
 
     # Check that opticalobsfile is a file 
@@ -453,10 +458,10 @@ function compute_optical_obs(outfilename::String, opticalobsfile::String, asteph
     radec = read_radec_mpc(opticalobsfile)
 
     # Check that first and last observation times are within interpolation interval
-    Δt_0 = radec[1].date - asteph.t0 
-    Δt_f = radec[end].date - asteph.t0
+    Δt_0 = datetime2julian(radec[1].date) - JD_J2000 - asteph.t0 
+    Δt_f = datetime2julian(radec[end].date) - JD_J2000 - asteph.t0
     t_min, t_max = minmax(asteph.t[1], asteph.t[end]) 
-    @assert t_min ≤ Δt_0 ≤ Δt_f ≤ t_max 
+    @assert t_min ≤ Δt_0 ≤ Δt_f ≤ t_max "First and/or last observation times are outside interpolation interval"
 
     # Number of massive bodies
     Nm1 = (size(ss16asteph.x)[2]-13) ÷ 6
@@ -484,10 +489,9 @@ function compute_optical_obs(outfilename::String, opticalobsfile::String, asteph
 
     # Save data to file
     println("Saving data to file: $outfilename")
-    jldopen(outfilename, "w") do file
-        addrequire(file, TaylorSeries)    # Require TaylorSeries 
+    JLD2.jldopen(outfilename, "w") do file
         # Write variables to jld file
-        JLD.write(file, 
+        JLD2.write(file, 
             "datetime_obs", datetime_obs,
             "α_obs", α_obs, 
             "δ_obs", δ_obs,

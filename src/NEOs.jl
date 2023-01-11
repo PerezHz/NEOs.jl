@@ -22,7 +22,7 @@ export OsculatingElements, pv2kep, yarkp2adot
 # Topocentric
 export obs_pos_ECEF, obs_pv_ECI, t2c_rotation_iau_76_80
 # Process radec 
-export compute_radec, w8sveres17, radec_astrometry
+export compute_radec, w8sveres17, radec_astrometry, compute_optical_obs
 # Gauss method 
 export gauss_method
 # Asteroid dynamical models 

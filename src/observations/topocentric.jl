@@ -54,13 +54,13 @@ const eop_IAU1980 = get_eop_iau1980()
 const eop_IAU2000A = get_eop_iau2000a()
 
 @doc raw"""
-    obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractObservation}
+    obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
     obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat}
     obs_pos_ECEF(x::RadarJPL{T}) where {T <: AbstractFloat}
 
 Return the observer's geocentric `[x, y, z]` position vector in Earth-Centered Earth-Fixed (ECEF) reference frame.
 """
-function obs_pos_ECEF(observatory::T) where {T <: AbstractObservation}
+function obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
 
     # Make sure observatory has coordinates 
     @assert !isunknown(observatory) "Cannot compute position for unknown observatory."
@@ -99,8 +99,8 @@ isless(a::Union{Taylor1,TaylorN}, b::Real) = isless(constant_term(a), b)
 @doc raw"""
     obs_pv_ECI(observatory::ObservatoryMPC{T}, t::DateTime; eo::Bool=true, 
                eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
-    obs_pv_ECI(x::RadecMPC{T}) where {T <: AbstractFloat}
-    obs_pv_ECI(x::RadarJPL{T}) where {T <: AbstractFloat}
+    obs_pv_ECI(x::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+    obs_pv_ECI(x::RadarJPL{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
 
 Return the observer's geocentric `[x, y, z, v_x, v_y, v_z]` "state" vector in Earth-Centered Inertial (ECI) reference frame.
 
@@ -148,8 +148,8 @@ function obs_pv_ECI(observatory::ObservatoryMPC{T}, t::DateTime; eo::Bool=true,
     return vcat(p_ECI, v_ECI)
 end
 
-obs_pv_ECI(x::RadecMPC{T}) where {T <: AbstractFloat} = obs_pv_ECI(x.observatory)
-obs_pv_ECI(x::RadarJPL{T}) where {T <: AbstractFloat} = obs_pv_ECI(x.rcvr)
+obs_pv_ECI(x::RadecMPC{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat} = obs_pv_ECI(x.observatory, x.date; eo = eo, eop = eop)
+obs_pv_ECI(x::RadarJPL{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat} = obs_pv_ECI(x.rcvr, x.date; eo = eo, eop = eop)
 
 # This method extends orthonormalize to handle Taylor1 and TaylorN
 # The ReferenceFrameRotations.jl package is licensed under the MIT "Expat" License
