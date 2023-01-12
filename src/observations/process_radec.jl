@@ -1,6 +1,8 @@
 @doc raw"""
-    compute_radec(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, 
-                  xva::Function=apophis_pv_197) where {T <: AbstractFloat}
+    compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter::Int = 10; eo::Bool = true, 
+                  xve::Function = earth_pv, xvs::Function = sun_pv, xva::Function = apophis_pv_197) where {T <: AbstractFloat}
+    compute_radec(obs::RadecMPC{T}, niter::Int = 10; eo::Bool = true, xve::Function = earth_pv, xvs::Function = sun_pv, 
+                  xva::Function = apophis_pv_197) where {T <: AbstractFloat}                  
     compute_radec(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, 
                   xva::Function=apophis_pv_197) where {T <: AbstractFloat}
 
@@ -8,19 +10,21 @@ Compute astrometric right ascension and declination (both in arcsec) for a set o
 
 # Arguments 
 
+- `observatory::ObservatoryMPC{T}`: observation site.
+- `t_r_utc::DateTime`: UTC time of astrometric observation.
 - `obs::RadecMPC{T}/Vector{RadecMPC{T}}`: observations.
 - `niter::Int`: number of light-time solution iterations.
 - `eo::Bool`: compute corrections due to Earth orientation, LOD, polar motion.
 - `xve::Function`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 - `xvs::Function`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xva::Function`: asteroid ephemeris wich takes [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `xva::Function`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
-function compute_radec(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, 
-                       xva::Function=apophis_pv_197) where {T <: AbstractFloat}
+function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter::Int = 10; eo::Bool = true, 
+                       xve::Function = earth_pv, xvs::Function = sun_pv, xva::Function = apophis_pv_197) where {T <: AbstractFloat}
     # Transform receiving time from UTC to TDB seconds since J2000
-    et_r_secs = datetime2et(obs)
+    et_r_secs = datetime2et(t_r_utc)
     # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
-    RV_r = obs_pv_ECI(obs, eo = eo)
+    RV_r = obs_pv_ECI(observatory, et_r_secs, eo = eo)
     R_r = RV_r[1:3]
     V_r = RV_r[4:6]
     # Earth's barycentric position and velocity at receive time
@@ -147,8 +151,13 @@ function compute_radec(obs::RadecMPC{T}, niter::Int=10; eo::Bool=true, xve::Func
     return α_as, δ_as # right ascension, declination both in arcsec
 end
 
-function compute_radec(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, xve::Function=earth_pv, xvs::Function=sun_pv, 
-                       xva::Function=apophis_pv_197) where {T <: AbstractFloat}
+function compute_radec(obs::RadecMPC{T}, niter::Int = 10; eo::Bool = true, xve::Function = earth_pv, xvs::Function = sun_pv, 
+                       xva::Function = apophis_pv_197) where {T <: AbstractFloat}
+    return compute_radec(obs.observatory, obs.date, niter; eo = eo, xve = xve, xvs = xvs, xva = xva)
+end 
+
+function compute_radec(obs::Vector{RadecMPC{T}}, niter::Int = 10; eo::Bool = true, xve::Function = earth_pv, xvs::Function = sun_pv, 
+                       xva::Function = apophis_pv_197) where {T <: AbstractFloat}
     
     # Number of observations
     n_optical_obs = length(obs)
@@ -168,7 +177,7 @@ function compute_radec(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, x
 
     # Iterate over the number of observations
     for i in 1:n_optical_obs
-        vra[i], vdec[i] = compute_radec(obs[i], niter, eo=eo, xve=xve, xvs=xvs, xva=xva)
+        vra[i], vdec[i] = compute_radec(obs[i], niter, eo = eo, xve = xve, xvs = xvs, xva = xva)
     end
 
     return vra, vdec # arcsec, arcsec
@@ -176,22 +185,22 @@ end
 
 # MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2014.07.033
 const mpc_catalogue_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "o", "p", "q", "r",
-                                "u", "v", "w", "L", "N"]
+                                  "u", "v", "w", "L", "N"]
 
 # MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2019.113596
 const mpc_catalogue_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "n", "o", "p", "q", 
-                                "r", "t", "u", "v", "w", "L", "N", "Q", "R", "S", "U", "W"]
+                                  "r", "t", "u", "v", "w", "L", "N", "Q", "R", "S", "U", "W"]
 
 @doc raw"""
     select_debiasing_table(debias_table::String = "2018")
 
 Return the catalogue codes, truth catalogue, resolution and bias matrix of the corresponding debias table. The possible values 
-for `debias_table` are `2014`, `2018` and `hires2018`. 
+for `debias_table` are: 
+- `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
+- `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
+- `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033. 
 """
 function select_debiasing_table(debias_table::String = "2018")
-    # Select debiasing table: 
-    # - 2014 corresponds to https://doi.org/10.1016/j.icarus.2014.07.033
-    # - 2018 corresponds to https://doi.org/10.1016/j.icarus.2019.113596
     # Debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
     if debias_table == "2018"
         debias_path = artifact"debias_2018"
@@ -304,10 +313,11 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
 end
 
 @doc raw"""
-    radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, debias_table::String="2018", xve::Function=earth_pv,
-                     xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T <: AbstractFloat}
+    radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int = 10; eo::Bool = true, debias_table::String = "2018", 
+                     xve::Function = earth_pv, xvs::Function = sun_pv, xva::Function = apophis_pv_197) where {T <: AbstractFloat}
 
-Return ra/dec astrometry (observed + computed + corrections + statistical weights) for a set of observations. 
+Return dates of observation and ra/dec astrometry (observed, computed, corrections and statistical weights all in arcsec) 
+for a set of observations. 
 
 See also [`compute_radec`](@ref), [`w8sveres17`](@ref) and [`Healpix.ang2pixRing`](@ref). 
 
@@ -319,10 +329,10 @@ See also [`compute_radec`](@ref), [`w8sveres17`](@ref) and [`Healpix.ang2pixRing
 - `debias_table::String`: debias table for optical observations. 
 - `xve::Function`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 - `xvs::Function`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xva::Function`: asteroid ephemeris wich takes [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `xva::Function`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
-function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int=10; eo::Bool=true, debias_table::String="2018", xve::Function=earth_pv,
-                          xvs::Function=sun_pv, xva::Function=apophis_pv_197) where {T <: AbstractFloat}
+function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int = 10; eo::Bool = true, debias_table::String = "2018", 
+                          xve::Function = earth_pv, xvs::Function = sun_pv, xva::Function = apophis_pv_197) where {T <: AbstractFloat}
 
     # Number of observations 
     n_optical_obs = length(obs)

@@ -97,7 +97,7 @@ isless(a::Real, b::Union{Taylor1,TaylorN}) = isless(a, constant_term(b))
 isless(a::Union{Taylor1,TaylorN}, b::Real) = isless(constant_term(a), b)
 
 @doc raw"""
-    obs_pv_ECI(observatory::ObservatoryMPC{T}, t::DateTime; eo::Bool=true, 
+    obs_pv_ECI(observatory::ObservatoryMPC{T}, et::T; eo::Bool=true, 
                eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
     obs_pv_ECI(x::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
     obs_pv_ECI(x::RadarJPL{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
@@ -108,18 +108,17 @@ See also [`SatelliteToolbox.satsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@
 
 # Arguments 
 
-- `obs::RadecMPC{T}`: observation instant.
-- `eo::Bool=true`: whether to use Earth Orientation Parameters (eop) or not. 
+- `observatory::ObservatoryMPC{T}`: observation site.
+- `et::T`: ephemeris time (TDB seconds since J2000.0 epoch).
+- `eo::Bool`: whether to use Earth Orientation Parameters (eop) or not. 
 - `eop::Union{EOPData_IAU1980, EOPData_IAU2000A}`: Earth Orientation Parameters (eop).
 """
-function obs_pv_ECI(observatory::ObservatoryMPC{T}, t::DateTime; eo::Bool=true, 
+function obs_pv_ECI(observatory::ObservatoryMPC{T}, et::T; eo::Bool=true, 
                     eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
 
     # Earth-Centered Earth-Fixed position position of observer 
     pos_ECEF = obs_pos_ECEF(observatory)
 
-    # ET seconds 
-    et = datetime2et(t)
     # UTC seconds 
     utc_secs = et - tdb_utc(et)
     # Julian days UTC 
@@ -148,8 +147,12 @@ function obs_pv_ECI(observatory::ObservatoryMPC{T}, t::DateTime; eo::Bool=true,
     return vcat(p_ECI, v_ECI)
 end
 
-obs_pv_ECI(x::RadecMPC{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat} = obs_pv_ECI(x.observatory, x.date; eo = eo, eop = eop)
-obs_pv_ECI(x::RadarJPL{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat} = obs_pv_ECI(x.rcvr, x.date; eo = eo, eop = eop)
+function obs_pv_ECI(x::RadecMPC{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+    return obs_pv_ECI(x.observatory, datetime2et(x.date); eo = eo, eop = eop)
+end 
+function obs_pv_ECI(x::RadarJPL{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat} 
+    return obs_pv_ECI(x.rcvr, datetime2et(x.date); eo = eo, eop = eop)
+end 
 
 # This method extends orthonormalize to handle Taylor1 and TaylorN
 # The ReferenceFrameRotations.jl package is licensed under the MIT "Expat" License
@@ -205,7 +208,7 @@ function nupr7680mat(tt, Δϵ_1980, ΔΨ_1980, dde80, ddp80)
 end
 
 @doc raw"""
-    polarmotionmat(tt; eo::Bool=true)
+    polarmotionmat(tt; eo::Bool = true)
 
 Return the polar motion matrix in radians (TIRS->ITRS, IERS 1996).
 
@@ -216,7 +219,7 @@ See also [`EarthOrientation.polarmotion`](@ref).
 - `tt`: days since J2000.0.
 - `eo::Bool`: wheter to use Earth orientation corrections from IERS or not.
 """
-function polarmotionmat(tt; eo::Bool=true)
+function polarmotionmat(tt; eo::Bool = true)
     # Polar motion (arcsec->radians)
     if eo
         xp_arcsec, yp_arcsec = EarthOrientation.polarmotion(JD_J2000+tt)
@@ -243,7 +246,7 @@ See https://www.iers.org/IERS/EN/Science/EarthRotation/UT1LOD.html.
 omega(lod) = (1e-12)*(72921151.467064 - 0.843994809lod)
 
 @doc raw"""
-    t2c_rotation_iau_76_80(et::T; eo::Bool=true) where {T<:Number}
+    t2c_rotation_iau_76_80(et::T; eo::Bool = true) where {T <: Number}
 
 Return the terrestrial-to-celestial rotation matrix (including polar motion) 
 using 1976/1980 Earth orientation/rotation model.
@@ -257,7 +260,7 @@ See also [`EarthOrientation.precession_nutation80`](@ref), [`SatelliteToolbox.nu
 - `et`: ephemeris time (TDB seconds since J2000.0 epoch).
 - `eo::Bool`: wheter to use Earth orientation corrections from IERS or not.
 """
-function t2c_rotation_iau_76_80(et::T; eo::Bool=true) where {T<:Number}
+function t2c_rotation_iau_76_80(et::T; eo::Bool = true) where {T <: Number}
     # UTC (JD)
     utc_secs = et - tdb_utc(et)                        # seconds
     t_utc = JD_J2000 + utc_secs/daysec                 # days 
