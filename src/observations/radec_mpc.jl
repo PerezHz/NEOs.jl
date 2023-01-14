@@ -76,6 +76,21 @@ function show(io::IO, m::RadecMPC{T}) where {T <: AbstractFloat}
               " obs: ", m.observatory.name)
 end
 
+# Functions to get specific fields of a RadecMPC object 
+num(r::RadecMPC{T}) where {T <: AbstractFloat} = r.num
+tmpdesig(r::RadecMPC{T}) where {T <: AbstractFloat} = r.tmpdesig
+discovery(r::RadecMPC{T}) where {T <: AbstractFloat} = r.discovery
+publishnote(r::RadecMPC{T}) where {T <: AbstractFloat} = r.publishnote
+obstech(r::RadecMPC{T}) where {T <: AbstractFloat} = r.obstech
+ra(r::RadecMPC{T}) where {T <: AbstractFloat} = r.α
+dec(r::RadecMPC{T}) where {T <: AbstractFloat} = r.δ
+info1(r::RadecMPC{T}) where {T <: AbstractFloat} = r.info1
+mag(r::RadecMPC{T}) where {T <: AbstractFloat} = r.mag
+band(r::RadecMPC{T}) where {T <: AbstractFloat} = r.band
+catalogue(r::RadecMPC{T}) where {T <: AbstractFloat} = r.catalogue
+info2(r::RadecMPC{T}) where {T <: AbstractFloat} = r.info2
+observatory(r::RadecMPC{T}) where {T <: AbstractFloat} = r.observatory
+
 # Regular expression to parse an optical measurement in MPC format
 const mpc_radec_regex = Regex(join(
     [
@@ -151,8 +166,6 @@ function ra(hrs::Int, min::Int, sec::T) where {T <: Real}
 
 end
 
-ra(obs::RadecMPC{T}) where {T <: AbstractFloat} = getfield(obs, :α)
-
 @doc raw"""
     dec(sgn::String, deg::Int, min::Int, sec::T) where {T <: Real}
     dec(obs::RadecMPC{T}) where {T <: AbstractFloat}
@@ -171,8 +184,6 @@ function dec(sgn::String, deg::Int, min::Int, sec::T) where {T <: Real}
 
     return δ_rad
 end
-
-dec(obs::RadecMPC{T}) where {T <: AbstractFloat} = getfield(obs, :δ)
 
 @doc raw"""
     RadecMPC(m::RegexMatch)
@@ -226,6 +237,8 @@ end
 Return the matches of `NEOs.mpc_radec_regex` in `filename` as `RadecMPC`.
 """
 function read_radec_mpc(filename::String)
+    # Check that filename is a file 
+    @assert isfile(filename) "Cannot open file: $filename"
     # Read lines of mpc formatted file 
     lines = readlines(filename)
     # Apply regular expressions

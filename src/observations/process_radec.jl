@@ -198,7 +198,7 @@ Return the catalogue codes, truth catalogue, resolution and bias matrix of the c
 for `debias_table` are: 
 - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
 - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
-- `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033. 
+- `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596. 
 """
 function select_debiasing_table(debias_table::String = "2018")
     # Debiasing tables are loaded "lazily" via Julia artifacts, according to rules in Artifacts.toml
@@ -238,6 +238,79 @@ function select_debiasing_table(debias_table::String = "2018")
 
     return mpc_catalogue_codes_201X, truth, resol, bias_matrix
 end
+
+@doc raw"""
+    debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, truth::String, resol::Resolution, 
+              bias_matrix::Matrix{T}) where {T <: AbstractFloat}
+
+Return total debiasing correction in right ascension and declination (both in arcsec).
+
+# Arguments
+
+- `obs::RadecMPC{T}`: optical observation.
+- `mpc_catalogue_codes_201X::Vector{String}`: catalogues present in debiasing table.
+- `truth::String`: truth catalogue of debiasing table. 
+- `resol::Resolution`: resolution.
+- `bias_matrix::Matrix{T}`: debiasing table. 
+"""
+function debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, truth::String, resol::Resolution, 
+                   bias_matrix::Matrix{T}) where {T <: AbstractFloat}
+    
+    # Catalogue code
+    catcode = obs.catalogue.code
+
+    # If star catalogue is not present in debiasing table, then set corrections equal to zero
+    if (catcode ∉ mpc_catalogue_codes_201X) && catcode != "Y"
+        # Catalogue exists in mpc_catalogues[]  
+        if !isunknown(obs.catalogue)
+            # Truth catalogue is not present in debiasing table but it does not send a warning
+            if catcode != truth
+                @warn "Catalogue $(obs.catalogue.name) not found in debiasing table. Setting debiasing corrections equal to zero."
+            end
+        # Unknown catalogue 
+        elseif catcode == ""
+            @warn "Catalog information not available in observation record. Setting debiasing corrections equal to zero."
+        # Catalogue code is not empty but it does not match an MPC catalogue code either  
+        else
+            @warn "Catalog code $catcode does not correspond to MPC catalogue code. Setting debiasing corrections equal to zero."
+        end
+        α_corr = zero(T)
+        δ_corr = zero(T)
+    # If star catalogue is present in debiasing table, then compute corrections
+    else
+        # Get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in `tiles.dat`.
+        # Substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in `tiles.dat`;
+        # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia.
+        # Since we use pix_ind to get the corresponding row number in `bias.dat`, it's not necessary to substract 1.
+        pix_ind = ang2pixRing(resol, π/2 - obs.δ, obs.α)
+        
+        # Handle edge case: in new MPC catalogue nomenclature, "UCAC-5"->"Y"; but in debias tables "UCAC-5"->"W"
+        if catcode == "Y"
+            cat_ind = findfirst(x -> x == "W", mpc_catalogue_codes_201X)
+        else
+            cat_ind = findfirst(x -> x == catcode, mpc_catalogue_codes_201X)
+        end
+        
+        # Read dRA, pmRA, dDEC, pmDEC data from bias.dat
+        # dRA: position correction in RA * cos(DEC) at epoch J2000.0 [arcsec]
+        # dDEC: position correction in DEC at epoch J2000.0 [arcsec]
+        # pmRA: proper motion correction in RA*cos(DEC) [mas/yr]
+        # pmDEC: proper motion correction in DEC [mas/yr]
+        dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
+        # Seconds since J2000 (TDB)
+        et_secs_i = datetime2et(obs.date)
+        # Seconds sinde J2000 (TT)
+        tt_secs_i = et_secs_i - ttmtdb(et_secs_i)
+        # Years since J2000
+        yrs_J2000_tt = tt_secs_i/(daysec*yr)
+        # Total debiasing correction in right ascension (arcsec)
+        α_corr = dRA + yrs_J2000_tt*pmRA/1_000 
+        # Total debiasing correction in declination (arcsec)
+        δ_corr = dDEC + yrs_J2000_tt*pmDEC/1_000 
+    end
+
+    return α_corr, δ_corr
+end 
 
 @doc raw"""
     w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
@@ -315,18 +388,27 @@ end
 @doc raw"""
     radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int = 10; eo::Bool = true, debias_table::String = "2018", 
                      xve::Function = earth_pv, xvs::Function = sun_pv, xva::Function = apophis_pv_197) where {T <: AbstractFloat}
+    radec_astrometry(outfilename::String, opticalobsfile::String, asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant,
+                     niter::Int = 5; eo::Bool = true, debias_table::String = "2018")
 
-Return dates of observation and ra/dec astrometry (observed, computed, corrections and statistical weights all in arcsec) 
-for a set of observations. 
+Compute optical astrometry, i.e. dates of observation plus observed, computed, debiasing corrections and statistical weights for 
+right ascension and declination (in arcsec).
 
-See also [`compute_radec`](@ref), [`w8sveres17`](@ref) and [`Healpix.ang2pixRing`](@ref). 
+See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and [`Healpix.ang2pixRing`](@ref). 
 
 # Arguments
 
-- `obs::Vector{RadecMPC{T}}`: vector of observations. 
+- `obs::Vector{RadecMPC{T}}`: vector of observations.
+- `outfilename::String`: file where to save the results (.jld2). 
+- `opticalobsfile::String`: file where to retrieve optical observations. 
+- `asteph::TaylorInterpolant`: NEO's ephemeris. 
+- `ss16asteph::TaylorInterpolant`: solar system ephemeris. 
 - `niter::Int`: number of light-time solution iterations.
 - `eo::Bool`: compute corrections due to Earth orientation, LOD, polar motion.
-- `debias_table::String`: debias table for optical observations. 
+- `debias_table::String`: possible values are:
+    - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
+    - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
+    - `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596. 
 - `xve::Function`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 - `xvs::Function`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 - `xva::Function`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
@@ -386,83 +468,20 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int = 10; eo::Bool = 
         α_comp[i] = α_comp_as * cos(obs[i].δ)  # arcsec 
         δ_comp[i] = δ_comp_as                  # arcsec
 
+        # Debiasing corrections
+        α_corr[i], δ_corr[i] = debiasing(obs[i], mpc_catalogue_codes_201X, truth, resol, bias_matrix)
+
         # Statistical weights from Veres et al. (2017)
         w8s[i] = w8sveres17(obs[i])
-
-        # Catalogue code of i-th observation 
-        catcode_i = obs[i].catalogue.code
-
-        if (catcode_i ∉ mpc_catalogue_codes_201X) && catcode_i != "Y"
-            # Handle case: if star catalogue not present in debiasing table, then set corrections equal to zero
-            catalog_i = search_cat_code(catcode_i)
-            if !isunknown(catalog_i)
-                if catcode_i != truth
-                    @warn "Catalogue not found in $(debias_table) table: $(catalog_i.name). Setting debiasing corrections equal to zero."
-                end
-            elseif catcode_i == ""
-                @warn "Catalog information not available in observation record. Setting debiasing corrections equal to zero."
-            else
-                @warn "Catalog code $catcode_i does not correspond to MPC catalogue code. Setting debiasing corrections equal to zero."
-            end
-            α_corr[i] = 0.0
-            δ_corr[i] = 0.0
-            continue
-        else
-            # Otherwise, if star catalogue is present in debias table, compute corrections
-            # get pixel tile index, assuming iso-latitude rings indexing, which is the formatting in tiles.dat
-            # substracting 1 from the returned value of `ang2pixRing` corresponds to 0-based indexing, as in tiles.dat
-            # not substracting 1 from the returned value of `ang2pixRing` corresponds to 1-based indexing, as in Julia
-            # since we use pix_ind to get the corresponding row number in bias.dat, it's not necessary to substract 1
-            pix_ind = ang2pixRing(resol, π/2 - obs[i].δ, obs[i].α)
-            
-            # Handle edge case: in new MPC catalogue nomenclature, "UCAC-5"->"Y"; but in debias tables "UCAC-5"->"W"
-            if catcode_i == "Y"
-                cat_ind = findfirst(x -> x == "W", mpc_catalogue_codes_201X)
-            else
-                cat_ind = findfirst(x -> x == catcode_i, mpc_catalogue_codes_201X)
-            end
-            
-            # Read dRA, pmRA, dDEC, pmDEC data from bias.dat
-            # dRA: position correction in RA * cos(DEC) at epoch J2000.0 [arcsec]
-            # dDEC: position correction in DEC at epoch J2000.0 [arcsec]
-            # pmRA: proper motion correction in RA*cos(DEC) [mas/yr]
-            # pmDEC: proper motion correction in DEC [mas/yr]
-            dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
-
-            et_secs_i = datetime2et(obs[i].date)
-            tt_secs_i = et_secs_i - ttmtdb(et_secs_i)
-            yrs_J2000_tt = tt_secs_i/(daysec*yr)
-            # Total debiasing correction in right ascension (arcsec)
-            α_corr[i] = dRA + yrs_J2000_tt*pmRA/1_000 
-            # Total debiasing correction in declination (arcsec)
-            δ_corr[i] = dDEC + yrs_J2000_tt*pmDEC/1_000 
-        end
+        
     end
 
     # Return time of observation, observed ra/dec, computed ra/dec, total debiasing correction in ra/dec and statistical weights
     return datetime_obs, α_obs, δ_obs, α_comp, δ_comp, α_corr, δ_corr, w8s
 end
 
-@doc raw"""
-    compute_optical_obs(outfilename::String, opticalobsfile::String, asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant;
-                        debias_table::String = "2018", niter::Int=5)
-
-Compute ra/dec astrometry and save the result to a file.             
-
-# Arguments 
-
-- `outfilename::String`: file where to save optical observations. 
-- `opticalobsfile::String`: file where to retrieve optical observations. 
-- `asteph::TaylorInterpolant`: asteroid's ephemeris. 
-- `ss16asteph::TaylorInterpolant`: solar system ephemeris. 
-- `debias_table::String`: debias table. 
-- `niter::Int`: number of light-time solution iterations. 
-"""
-function compute_optical_obs(outfilename::String, opticalobsfile::String, asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant;
-                             debias_table::String="2018", niter::Int=5)
-
-    # Check that opticalobsfile is a file 
-    @assert isfile(opticalobsfile) "Cannot open file: $opticalobsfile"
+function radec_astrometry(outfilename::String, opticalobsfile::String, asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant,
+                          niter::Int = 5; eo::Bool = true, debias_table::String = "2018")
 
     # Read optical observations 
     radec = read_radec_mpc(opticalobsfile)
@@ -475,13 +494,12 @@ function compute_optical_obs(outfilename::String, opticalobsfile::String, asteph
 
     # Number of massive bodies
     Nm1 = (size(ss16asteph.x)[2]-13) ÷ 6
-
     # Number of bodies, including NEA
     N = Nm1 + 1 
 
     # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
 
-    # Asteroid 
+    # NEO 
     function asteph_et(et)
         return auday2kmsec(asteph(et/daysec)[1:6])
     end
@@ -495,7 +513,8 @@ function compute_optical_obs(outfilename::String, opticalobsfile::String, asteph
     end
 
     # Compute ra/dec astrometry
-    datetime_obs, α_obs, δ_obs, α_comp, δ_comp, α_corr, δ_corr, w8s = radec_astrometry(radec, niter, xve=earth_et, xvs=sun_et, xva=asteph_et, debias_table=debias_table)
+    datetime_obs, α_obs, δ_obs, α_comp, δ_comp, α_corr, δ_corr, w8s = radec_astrometry(radec, niter; eo = eo, debias_table = debias_table,
+                                                                                       xve = earth_et, xvs = sun_et, xva = asteph_et)
 
     # Save data to file
     println("Saving data to file: $outfilename")

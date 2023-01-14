@@ -17,8 +17,7 @@ Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
 
 The current development version of this package may be installed in Julia via:
 ```
-import Pkg
-Pkg.add(Pkg.PackageSpec(url="https://github.com/PerezHz/NEOs.jl.git", rev="main"))
+] add NEOs
 ```
 
 ## Usage
@@ -26,11 +25,11 @@ Pkg.add(Pkg.PackageSpec(url="https://github.com/PerezHz/NEOs.jl.git", rev="main"
 The `apophis.jl` file in the `pha` directory contains an example script. This
 script may be called as:
 
-`julia --project=@. apophis.jl`
+`julia --project=@. apophis.jl --help`
 
 `NEOs.propagate` also supports multi-threading:
 
-`JULIA_NUM_THREADS=<number-of-threads> julia --project=@. apophis.jl`
+`julia -t <number-of-threads> --project=@. apophis.jl --help`
 
 ## Acknowledgments
 

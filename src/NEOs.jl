@@ -9,7 +9,8 @@ export unknowncat, isunknown, read_catalogues_mpc, parse_catalogues_mpc, write_c
 export hascoord, unknownobs, isunknown, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, 
        update_observatories_mpc, search_obs_code
 # RadecMPC
-export ra, dec, read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc
+export num, tmpdesig, discovery, publishnote, obstech, ra, dec, info1, mag, band, catalogue, info2, observatory, 
+       read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc
 # RadarJPL
 export hasdelay, hasdoppler, ismonostatic, date, delay_doppler, delay, delay_sigma, delay_units, doppler, doppler_sigma, 
        doppler_units, freq, rcvr, xmit, bouncepoint, read_radar_jpl, write_radar_jpl
@@ -22,7 +23,7 @@ export OsculatingElements, pv2kep, yarkp2adot
 # Topocentric
 export obs_pos_ECEF, obs_pv_ECI, t2c_rotation_iau_76_80
 # Process radec 
-export compute_radec, w8sveres17, radec_astrometry, compute_optical_obs
+export compute_radec, debiasing, w8sveres17, radec_astrometry
 # Process radar 
 export delay_doppler
 # Gauss method 
