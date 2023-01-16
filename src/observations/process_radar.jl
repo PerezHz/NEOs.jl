@@ -783,13 +783,13 @@ function radar_astrometry(astradarfile::String, niter::Int=10; eo::Bool=true, tc
     # Iterate over the measurements
     for i in eachindex(astradardata)
         # Compute time delay and doppler shift
-        vdelay[i], vdoppler[i] = delay_doppler(astradardata[i], niter; eo = eo, tc = tc, xve = xve, xvs = xvs, xva = xva,
+        vdelay[i], vdoppler[i] = radar_astrometry(astradardata[i], niter; eo = eo, tc = tc, xve = xve, xvs = xvs, xva = xva,
                                                autodiff = autodiff, tord = tord)
     end
     # Rows with time delays
-    delay_index = map(x-> x.delay_units == "us", astradardata)
+    delay_index = map(x-> x.Δτ_units == "us", astradardata)
     # Rows with Doppler shifts
-    doppler_index = map(x -> x.doppler_units == "Hz", astradardata)
+    doppler_index = map(x -> x.Δν_units == "Hz", astradardata)
     
     dt_utc_obs = date.(astradardata)           # UTC time
     Δτ_obs = delay.(astradardata)              # Observed time delay
@@ -798,15 +798,13 @@ function radar_astrometry(astradarfile::String, niter::Int=10; eo::Bool=true, tc
     Δν_σ = doppler_sigma.(astradardata)        # Observed Doppler shift uncertainty
     τ_units = delay_units.(astradardata)       # Time delay units
     ν_units = doppler_units.(astradardata)     # Doppler shift units
-    freq = freq.(astradardata)                 # Frequency
-    rcvr = rcvr.(astradardata)                 # Reciever antenna
-    xmit = xmit.(astradardata)                 # Emission antenna     
-    bouncepoint = bouncepoint.(astradardata)   # Bounce point
-    delay_index = delay_index                  # Rows with time delays
-    doppler_index = doppler_index               # Rows with Doppler shifts        
+    freq_ = freq.(astradardata)                # Frequency
+    rcvr_ = rcvr.(astradardata)                # Reciever antenna
+    xmit_ = xmit.(astradardata)                # Emission antenna     
+    bouncepoint_ = bouncepoint.(astradardata)   # Bounce point
 
     # Return time delays / Doppler shifts table
-    return dt_utc_obs, Δτ_obs, Δν_obs, vdelay, vdoppler, Δτ_σ, Δν_σ, τ_units, ν_units, freq, rcvr, xmit, bouncepoint, delay_index,
+    return dt_utc_obs, Δτ_obs, Δν_obs, vdelay, vdoppler, Δτ_σ, Δν_σ, τ_units, ν_units, freq_, rcvr_, xmit_, bouncepoint_, delay_index,
            doppler_index 
 end
 
@@ -1126,7 +1124,7 @@ function radar_astrometry(outfilename::String, radarobsfile::String, asteph::Tay
 
     # Compute ra/dec astrometry
     dt_utc_obs, Δτ_obs, Δν_obs, vdelay, vdoppler, Δτ_σ, Δν_σ, τ_units, ν_units, freq, rcvr, xmit, bouncepoint, delay_index,
-           doppler_index = delay_doppler(radarobsfile, niter, xve = earth_et, xvs = sun_et, xva = asteph_et, tc = tc, tord = tord, autodiff = autodiff)
+           doppler_index = radar_astrometry(radarobsfile, niter, xve = earth_et, xvs = sun_et, xva = asteph_et, tc = tc, tord = tord, autodiff = autodiff)
     # Save data to file
     println("Saving data to file: $outfilename")
     JLD2.jldopen(outfilename, "w") do file
