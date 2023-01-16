@@ -25,7 +25,7 @@ export obs_pos_ECEF, obs_pv_ECI, t2c_rotation_iau_76_80
 # Process radec 
 export compute_radec, debiasing, w8sveres17, radec_astrometry
 # Process radar 
-export delay_doppler
+export compute_delay, radar_astrometry
 # Gauss method 
 export gauss_method
 # Asteroid dynamical models 
@@ -47,7 +47,7 @@ using Distributed, JLD, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, L
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pole_rotation, 
       au, c_au_per_day, R_sun, c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx, 
       Ry, Rz, semimajoraxis, eccentricity, inclination, longascnode, argperi, timeperipass, 
-      nbodyind
+      nbodyind, PE
 using Healpix: ang2pixRing, Resolution
 using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_ΔAT, JD_J2000, EOPData_IAU1980, 
       rECItoECI, DCM, TOD, GCRF, ITRF, rECItoECI, PEF, satsv, EOPData_IAU2000A
