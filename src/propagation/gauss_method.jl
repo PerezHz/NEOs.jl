@@ -1,7 +1,7 @@
 @doc raw"""
     neo_pos_topo(obs::RadecMPC{T}) where {T <: AbstractFloat}
 
-Returns the NEO's topocentric position unit vector.
+Return the NEO's topocentric position unit vector.
 """
 function neo_pos_topo(obs::RadecMPC{T}) where {T <: AbstractFloat}
     
@@ -16,7 +16,7 @@ end
 @doc raw"""
     obs_pv_hel(obs::RadecMPC{T}) where {T <: AbstractFloat}
 
-Returns the observer's  heliocentric `[x, y, z, v_x, v_y, v_z]` state vector in units of au, au/day. 
+Return the observer's  heliocentric `[x, y, z, v_x, v_y, v_z]` state vector in units of au, au/day. 
 """
 function obs_pv_hel(obs::RadecMPC{T}) where {T <: AbstractFloat}
 
@@ -40,7 +40,7 @@ end
 @doc raw"""
     f_Lagrange(r, τ)
 
-Returns the 1st order approximation to Lagrange's f function. 
+Return the 1st order approximation to Lagrange's f function. 
 """
 function f_Lagrange(r, τ)
     return 1 - μ_S * (τ^2) / 2 / (r^3)
@@ -49,7 +49,7 @@ end
 @doc raw"""
     g_Lagrange(r, τ)  
     
-Returns the 1st order approximation to Lagrange's g function.
+Return the 1st order approximation to Lagrange's g function.
 """
 function g_Lagrange(r, τ)
     return τ - μ_S * (τ^3) / 6 / (r^3)
@@ -58,6 +58,24 @@ end
 function vectors2matrix(x::T) where {T <: AbstractVector}
     return permutedims(reduce(hcat, x))
 end
+
+function _format_Lagrange_equation(a, b, c)
+    a_sgn = a ≥ 0 ? "+" : "-"
+    b_sgn = b ≥ 0 ? "+" : "-"
+    c_sgn = c ≥ 0 ? "+" : "-"
+
+    return join(["r⁸ ", a_sgn, " ", abs(a), " r⁶ ", b_sgn, " ", abs(b), " r³ ", c_sgn, " ", abs(c), " = 0"])
+end 
+
+function _format_solutions(sol)
+    
+    s = Vector{String}(undef, length(sol))
+    for i in eachindex(sol)
+        s[i] = join([string(sol[i].status), " root at ", string(sol[i].interval), ", "])
+    end 
+
+    return join(["{ ", s..., " }"])
+end 
 
 @doc raw"""
     gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T <: AbstractFloat}
@@ -126,27 +144,28 @@ function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T
     c = -(μ_S^2)*(B^2)
 
     # Find roots of Lagrange equation 
-    sol = find_zeros(x -> x^8 + a*x^6 + b*x^3 + c, 0, 1_000)
+    sol = roots(x -> x^8 + a*x^6 + b*x^3 + c, Interval(0.00465047, 40))
     n_sol = length(sol)
 
     if n_sol == 0
 
         success = false 
 
-        @warn("""No solutions found for Lagrange equation r^8 + $a r^6 + $b r^3 + $c = 0; 
+        @warn("""No solutions found for Lagrange equation $(_format_Lagrange_equation(a, b, c)); 
         Cannot procede""")
 
         return fill(NaN, 3, 3), fill(NaN, 3), D, R_vec, ρ_vec, τ_1, τ_3, NaN, NaN, NaN, NaN, fill(NaN, 3), t, success
 
     elseif n_sol == 1
         
-        r_2 = sol[1]
+        r_2 = mid(sol[1].interval)
 
     else 
 
-        r_2 = sol[root_idx]
+        sort!(sol, by = x -> mid(x.interval))
+        r_2 = mid(sol[root_idx].interval)
 
-        @warn("""More than one solution $sol found for Lagrange equation r^8 + $a r^6 + $b r^3 + $c = 0;
+        @warn("""More than one solution $(_format_solutions(sol)) found for Lagrange equation $(_format_Lagrange_equation(a, b, c));
         Selecting root with index $root_idx""")
 
     end 
@@ -183,7 +202,7 @@ end
 @doc raw"""
     stumpC(z::T) where {T <: Real}
 
-Evaluates Stumpff function C(z). 
+Evaluate Stumpff function C(z). 
 """
 function stumpC(z::T) where {T <: Real}
     if z > 0
@@ -200,7 +219,7 @@ end
 @doc raw"""
     stumpS(z::T) where {T <: Real}
 
-Evaluates Stumpff function S(z). 
+Evaluate Stumpff function S(z). 
 """
 function stumpS(z::T) where {T <: Real}
     if z > 0
@@ -217,7 +236,7 @@ end
 @doc raw"""
     _f_Lagrange(χ, z, r)
 
-Returns the current value of Lagrange's f function. 
+Return the current value of Lagrange's f function. 
 """
 function _f_Lagrange(χ, z, r)
     return 1 - (χ^2) * stumpC(z) / r
@@ -226,7 +245,7 @@ end
 @doc raw"""
     _g_Lagrange(τ, χ, z)
 
-Returns the current value of Lagrange's g function. 
+Return the current value of Lagrange's g function. 
 """
 function _g_Lagrange(τ, χ, z)
     return τ - (χ^3) * stumpS(z) / sqrt(μ_S)
@@ -235,7 +254,7 @@ end
 @doc raw"""
     univkepler(τ::T, r_2_vec::Vector{T}, v_2_vec::Vector{T}; kep_iters::Int = 10, atol::T = 3e-14) where {T <: AbstractFloat}
 
-Solves the universal Kepler equation for the universal anomaly.
+Solve the universal Kepler equation for the universal anomaly.
 
 # Arguments 
 
@@ -296,7 +315,22 @@ function univkepler(τ::T, r_2_vec::Vector{T}, v_2_vec::Vector{T}; kep_iters::In
 end
 
 @doc raw"""
+    gauss_method_refinement(τ_1::T, τ_3::T, r_2_vec::Vector{T}, v_2_vec::Vector{T}, D::Matrix{T}, R_vec::Matrix{T}, ρ_vec::Matrix{T}, 
+                            f_1::T, g_1::T, f_3::T, g_3::T; kep_iters::Int = 10, atol::T = 3e-14) where {T <: AbstractFloat}
 
+Iterative improvement of the orbit determined by core Gauss method. 
+
+# Arguments 
+
+- `τ_1/τ_3::T`: time intervals. 
+- `r_2_vec::Vector{T}`: heliocentric position vector.
+- `v_2_vec::Vector{T}`: heliocentric velocity vector.
+- `D::Matrix{T}`: matrix of Gauss scalars. 
+- `R_vec::Matrix{T}`: matrix of observer heliocentric position vectors. 
+- `ρ_vec::Matrix{T}`: matrix of NEO topocentric position unit vectors. 
+- `f_1/g_1/f_3/g_3::T`: initial values of Lagrange's f and g function. 
+- `kep_iters::Int`: number of iterations for Newton's method. 
+- `atol::T`: absolute tolerance. 
 """
 function gauss_method_refinement(τ_1::T, τ_3::T, r_2_vec::Vector{T}, v_2_vec::Vector{T}, D::Matrix{T}, R_vec::Matrix{T}, 
                                  ρ_vec::Matrix{T}, f_1::T, g_1::T, f_3::T, g_3::T; kep_iters::Int = 10, atol::T = 3e-14) where {T <: AbstractFloat}
@@ -361,7 +395,18 @@ function gauss_method_refinement(τ_1::T, τ_3::T, r_2_vec::Vector{T}, v_2_vec::
 end
 
 @doc raw"""
+    gauss_method_iterator(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, atol = 3e-14, ref_iters::Int = 10, 
+                          root_idx::Int = 1) where {T <: AbstractFloat}
 
+Iterate over consecutive triplets in `obs` and apply core Gauss method to each one. 
+
+# Arguments 
+
+- `obs::Vector{RadecMPC{T}}`: observations. 
+- `kep_iters::Int`: number of iterations for Newton's method. 
+- `atol::T`: absolute tolerance. 
+- `ref_iters::Int`:: number of refinement iterations.
+- `root_idx::Int`: index of Lagrange equation solution in case of multiple roots. 
 """
 function gauss_method_iterator(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, atol = 3e-14, ref_iters::Int = 10, 
                                root_idx::Int = 1) where {T <: AbstractFloat}
@@ -396,6 +441,20 @@ function gauss_method_iterator(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, at
     return r_vec, v_2_vec, ρ, t, success
 end 
 
+@doc raw"""
+    gauss_method(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, atol = 3e-14, ref_iters::Int = 10, 
+                 root_idx::Int = 1) where {T <: AbstractFloat}
+
+Gauss method of IOD. 
+
+# Arguments 
+
+- `obs::Vector{RadecMPC{T}}`: observations. 
+- `kep_iters::Int`: number of iterations for Newton's method. 
+- `atol::T`: absolute tolerance. 
+- `ref_iters::Int`:: number of refinement iterations.
+- `root_idx::Int`: index of Lagrange equation solution in case of multiple roots. 
+"""
 function gauss_method(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, atol = 3e-14, ref_iters::Int = 10, 
                       root_idx::Int = 1) where {T <: AbstractFloat}
     

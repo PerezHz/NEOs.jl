@@ -1,5 +1,6 @@
 include("gauss_method.jl")
 include("asteroid_dynamical_models.jl")
+#include("jetcoeffs.jl")
 include("integration_methods.jl")
 
 @doc raw"""
@@ -301,7 +302,7 @@ for V_quadmath in V_true_false
             # Propagate orbit
 
             # Dense output (save Taylor polynomials in each step)
-            @time interp = apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps)
+            @time interp = neosinteg(dynamics, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps)
 
             # Days since J2000 until initial integration time
             asteph_t0 = T(jd0 - JD_J2000)

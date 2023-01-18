@@ -100,14 +100,14 @@ function main()
     q0 = vcat(q00, 0.0, 0.0) .+ dq
 
     println("*** Integrator warmup")
-    NEOs.propagate_root(parsed_args["objname"], dynamics, 1, jd0, parsed_args["nyears_fwd"], ss16asteph_et, q0, 
+    NEOs.propagate_dense(parsed_args["objname"], dynamics, 1, jd0, parsed_args["nyears_fwd"], ss16asteph_et, q0, 
                         Val(parsed_args["quadmath"]), output = false, order = parsed_args["order"], abstol = parsed_args["abstol"])
     println("*** Finished warmup")
 
     println("*** Full jet transport integration")
-    NEOs.propagate_root(parsed_args["objname"]*"_bwd", dynamics, parsed_args["maxsteps"], jd0, parsed_args["nyears_bwd"], ss16asteph_et, 
+    NEOs.propagate_dense(parsed_args["objname"]*"_bwd", dynamics, parsed_args["maxsteps"], jd0, parsed_args["nyears_bwd"], ss16asteph_et, 
                         q0, Val(parsed_args["quadmath"]), order = parsed_args["order"], abstol = parsed_args["abstol"])
-    NEOs.propagate_root(parsed_args["objname"]*"_fwd", dynamics, parsed_args["maxsteps"], jd0, parsed_args["nyears_fwd"], ss16asteph_et, 
+    NEOs.propagate_dense(parsed_args["objname"]*"_fwd", dynamics, parsed_args["maxsteps"], jd0, parsed_args["nyears_fwd"], ss16asteph_et, 
                         q0, Val(parsed_args["quadmath"]), order = parsed_args["order"], abstol = parsed_args["abstol"])
     println("*** Finished asteroid ephemeris integration")
 

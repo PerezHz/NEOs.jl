@@ -53,7 +53,7 @@ using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_ΔAT, JD_J200
       rECItoECI, DCM, TOD, GCRF, ITRF, rECItoECI, PEF, satsv, EOPData_IAU2000A
 using StaticArrays: SVector, SArray, @SVector
 using HTTP: get
-using Roots: find_zeros
+using IntervalRootFinding: roots, Interval, mid 
 
 include("observations/process_radar.jl")
 include("propagation/propagation.jl")

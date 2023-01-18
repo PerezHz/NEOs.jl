@@ -43,18 +43,22 @@ end
 
 # Print method fot OsculatingElements
 # Example: 
-# Semimajor axis (a):                 1.022714645967277 au
-# Eccentricity (e):                   0.18919435448507194
-# Time of pericenter passage (tp):    2.4592910085352035e6 JDTDB
-# Pericenter distance (q):            0.8071905529640956 au
-# Argument of pericenter (ω):         251.59066974220704 deg
-# Inclination (i):                    22.56425964296357 deg
-# Longitude of Ascending Node (Ω):    233.31225377038814 deg
+# Semimajor axis (a):                 0.8717319220347314 au
+# Eccentricity (e):                   0.4231715487782969
+# Time of pericenter passage (tp):    2021-03-19T03:45:01.293 JDTDB
+# Pericenter distance (q):            0.5028397744678126 au
+# Argument of pericenter (ω):         194.74654283451 deg
+# Inclination (i):                    34.81327005431841 deg
+# Longitude of Ascending Node (Ω):    17.855086873010706 deg
 function show(io::IO, m::OsculatingElements{T}) where {T <: AbstractFloat} 
     
     print(io, rpad("Semimajor axis (a): ", 36), m.a, " au\n")
     print(io, rpad("Eccentricity (e): ", 36), m.e, "\n")
-    print(io, rpad("Time of pericenter passage (tp): ", 36), julian2datetime(m.tp), " JDTDB\n")
+    if isnan(m.tp)
+        print(io, rpad("Time of pericenter passage (tp): ", 36), "NaN JDTDB\n")
+    else 
+        print(io, rpad("Time of pericenter passage (tp): ", 36), julian2datetime(m.tp), " JDTDB\n")
+    end 
     print(io, rpad("Pericenter distance (q): ", 36), m.q, " au\n")
     print(io, rpad("Argument of pericenter (ω): ", 36), m.ω, " deg\n")
     print(io, rpad("Inclination (i): ", 36), m.i, " deg\n")
