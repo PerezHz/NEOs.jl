@@ -1,12 +1,12 @@
 include("gauss_method.jl")
 include("asteroid_dynamical_models.jl")
-#include("jetcoeffs.jl")
+include("jetcoeffs.jl")
 include("integration_methods.jl")
 
 @doc raw"""
     rvelea(dx, x, params, t)
 
-Returns `true` and the numerator of the asteroid's radial velocity with respect to the Earth.
+Return `true` and the numerator of the asteroid's radial velocity with respect to the Earth.
 
 # Arguments 
 
@@ -27,7 +27,7 @@ end
 @doc raw"""
     loadeph(ss16asteph_::TaylorInterpolant, μ::Vector)
 
-Returns the ephemeris in `ss16asteph_` with times converted from seconds to days, 
+Return the ephemeris in `ss16asteph_` with times converted from seconds to days, 
 the point-mass newtonian accelerations and the newtonian N body potential. 
 
 # Arguments 
@@ -85,7 +85,7 @@ end
 @doc raw"""
     save2jldandcheck(objname, sol)
 
-Saves `sol` in a file `objname_jt.jld2`. 
+Save `sol` in a file `objname_jt.jld2`. 
 
 See also [`__save2jldandcheck`](@ref). 
 """
@@ -99,7 +99,7 @@ end
 @doc raw"""
     __save2jldandcheck(outfilename, sol)
 
-Saves `sol` in `outfilename`. 
+Savs `sol` in `outfilename`. 
 """
 function __save2jldandcheck(outfilename, sol)
     println("Saving solution to file: $outfilename")
@@ -132,7 +132,7 @@ end
 @doc raw"""
     taylor_minimum(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
 
-Returns the minimum of the Taylor polynomial `pol` computed via Newton's method. `x0` is the
+Return the minimum of the Taylor polynomial `pol` computed via Newton's method. `x0` is the
 initial guess and `niters` is the number of iterations. 
 """
 function taylor_minimum(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
@@ -156,7 +156,7 @@ end
 @doc raw"""
     taylor_roots(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
 
-Returns the root of the Taylor polynomial `pol` computed via Newton's method. `x0` is the 
+Return the root of the Taylor polynomial `pol` computed via Newton's method. `x0` is the 
 initial guess and `niters` is the number of iterations. 
 """
 function taylor_roots(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
@@ -177,7 +177,7 @@ end
 @doc raw"""
     scaling(a::Taylor1{Taylor1{T}}, c::T) where {T<:Real}
 
-Scales `a` by a factor `c`. 
+Scale `a` by a factor `c`. 
 """
 function scaling(a::Taylor1{Taylor1{T}}, c::T) where {T<:Real}
     x = c*Taylor1( Taylor1(a.order).coeffs*one(a[0]) )
@@ -185,15 +185,11 @@ function scaling(a::Taylor1{Taylor1{T}}, c::T) where {T<:Real}
 end
 
 @doc raw"""
-    propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, 
-              ss16asteph_et::TaylorInterpolant, ::Val{true/false}, ::Val{true/false}, 
-              ::Val{true/false}; output::Bool = true, newtoniter::Int = 10, 
-              q0::Vector = initialcond(), μ_ast::Vector = μ_ast343_DE430[1:end], 
-              order::Int=order, abstol::T = abstol) where {T <: Real}
-    propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, 
-              ephfile::String; kwargs...) where {T<:Real}
+    propagate_dense(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
+                    q0::Vector{U}, Val(true/false); output::Bool = true, μ_ast::Vector = μ_ast343_DE430[1:end], 
+                    order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number}
 
-Integrates the orbit of an asteroid via the Taylor method. 
+Integrate the orbit of a NEO via the Taylor method. 
 
 # Arguments 
 
@@ -203,30 +199,66 @@ Integrates the orbit of an asteroid via the Taylor method.
 - `jd0::T`: initial Julian date.
 - `tspan::T`: time span of the integration [in Julian days]. 
 - `ss16asteph_et::TaylorInterpolant`: solar system ephemeris.
-- `ephfile::String`: file with solar system ephemeris. 
 - `q0::Vector{T}`: vector of initial conditions.
-
-# Val arguments (order is important)
-
-- Whether to use quadruple precision or not `Val(true/false)`.
-- Whether to output the Taylor polynomials generated at each timestep or not `Val(true/false)`.
-- Whether to compute Lyapunov exponents or not `Val(true/false)`.
-
-# Keyword arguments
-
+- `Val(true/false)`: Whether to use quadruple precision or not.
 - `output::Bool`: whether to write the output to a file (`true`) or not.
-- `newtoniter::Int`: number of iterations for root-finding integration. 
 - `μ_ast::Vector`: vector of gravitational parameters. 
 - `order::Int=order`: order of the Taylor expansions to be used in the integration. 
 - `abstol::T`: absolute tolerance.
-"""
-function propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T,
-        tspan::T, ephfile::String; kwargs...) where {T<:Real}
-    # Load ephemeris
-    ss16asteph_et = JLD2.load(ephfile, "ss16ast_eph")
-    # Propagate 
-    propagate(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et; kwargs...)
-end
+- `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` (`true`) or not. 
+""" propagate_dense
+
+@doc raw"""
+    propagate_lyap(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
+                   q0::Vector{U}, Val(true/false); output::Bool = true, μ_ast::Vector = μ_ast343_DE430[1:end],
+                   order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number}
+
+Compute the Lyapunov spectrum of a NEO. 
+
+# Arguments 
+
+- `objname::String`: name of the object. 
+- `dynamics::Function`: dynamical model function.
+- `maxsteps::Int`: maximum number of steps for the integration.
+- `jd0::T`: initial Julian date.
+- `tspan::T`: time span of the integration [in Julian days]. 
+- `ss16asteph_et::TaylorInterpolant`: solar system ephemeris.
+- `q0::Vector{T}`: vector of initial conditions.
+- `Val(true/false)`: Whether to use quadruple precision or not.
+- `output::Bool`: whether to write the output to a file (`true`) or not.
+- `μ_ast::Vector`: vector of gravitational parameters. 
+- `order::Int=order`: order of the Taylor expansions to be used in the integration. 
+- `abstol::T`: absolute tolerance.
+- `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` (`true`) or not. 
+""" propagate_lyap
+
+@doc raw"""
+    propagate_root(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
+                   q0::Vector{U}, Val(true/false); output::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, 
+                   nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol, 
+                   parse_eqs::Bool = true) where {T <: Real, U <: Number}
+
+Integrate the orbit of a NEO via the Taylor method while finding the zeros of `rvelea`.  
+
+# Arguments 
+
+- `objname::String`: name of the object. 
+- `dynamics::Function`: dynamical model function.
+- `maxsteps::Int`: maximum number of steps for the integration.
+- `jd0::T`: initial Julian date.
+- `tspan::T`: time span of the integration [in Julian days]. 
+- `ss16asteph_et::TaylorInterpolant`: solar system ephemeris.
+- `q0::Vector{T}`: vector of initial conditions.
+- `Val(true/false)`: Whether to use quadruple precision or not.
+- `output::Bool`: whether to write the output to a file (`true`) or not.
+- `eventorder::Int`: order of the derivative of `rvelea` whose roots are computed.
+- `newtoniter::Int`: maximum Newton-Raphson iterations per detected root.
+- `nrabstol::T`: allowed tolerance for the Newton-Raphson process.
+- `μ_ast::Vector`: vector of gravitational parameters. 
+- `order::Int=order`: order of the Taylor expansions to be used in the integration. 
+- `abstol::T`: absolute tolerance.
+- `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` (`true`) or not. 
+""" propagate_root 
 
 for V_quadmath in V_true_false
     @eval begin
@@ -285,7 +317,7 @@ for V_quadmath in V_true_false
 
         function propagate_dense(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
                                  q0::Vector{U}, ::$V_quadmath; output::Bool = true, μ_ast::Vector = μ_ast343_DE430[1:end], 
-                                 order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number}
+                                 order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number}
 
             # Parameters for apophisinteg 
             if $V_quadmath == Val{true}
@@ -302,8 +334,8 @@ for V_quadmath in V_true_false
             # Propagate orbit
 
             # Dense output (save Taylor polynomials in each step)
-            @time interp = neosinteg(dynamics, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps)
-
+            @time interp = neosinteg(dynamics, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps, parse_eqs = parse_eqs)
+            
             # Days since J2000 until initial integration time
             asteph_t0 = T(jd0 - JD_J2000)
             # Vector of times 
@@ -327,7 +359,7 @@ for V_quadmath in V_true_false
 
         function propagate_lyap(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
                                 q0::Vector{U}, ::$V_quadmath; output::Bool = true, μ_ast::Vector = μ_ast343_DE430[1:end],
-                                order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number}
+                                order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number}
 
             # Parameters for apophisinteg 
             if $V_quadmath == Val{true}
@@ -342,7 +374,7 @@ for V_quadmath in V_true_false
             println("Final time of integration: ", julian2datetime(jd0 + _tmax))
 
             # Propagate orbit
-            @time sol_objs = lyap_apophisinteg(dynamics, _q0, _t0, _tmax, order, _abstol, Val(false), _params; maxsteps = maxsteps)
+            @time sol_objs = lyap_neosinteg(dynamics, _q0, _t0, _tmax, order, _abstol, Val(false), _params; maxsteps = maxsteps, parse_eqs = parse_eqs)
 
             # Solution 
             sol = (
@@ -362,8 +394,9 @@ for V_quadmath in V_true_false
         end
 
         function propagate_root(objname::String, dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
-                                q0::Vector{U}, ::$V_quadmath; output::Bool = true, newtoniter::Int = 10,
-                                μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number}
+                                q0::Vector{U}, ::$V_quadmath; output::Bool = true, parse_eqs::Bool = true, eventorder::Int = 0, 
+                                newtoniter::Int = 10, nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, 
+                                abstol::T = abstol) where {T <: Real, U <: Number}
 
             # Parameters for apophisinteg 
             if $V_quadmath == Val{true}
@@ -378,8 +411,9 @@ for V_quadmath in V_true_false
             println("Final time of integration: ", julian2datetime(jd0 + _tmax))
 
             # Propagate orbit
-            @time sol_objs = apophisinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps, 
-                                          newtoniter = newtoniter)
+            @time sol_objs = neosinteg(dynamics, rvelea, _q0, _t0, _tmax, order, _abstol, Val(true), _params; maxsteps = maxsteps, 
+                                       parse_eqs = parse_eqs,  eventorder = eventorder, newtoniter = newtoniter, nrabstol = nrabstol)
+
             # Days since J2000 until initial integration time
             asteph_t0 = (_params[4] - JD_J2000) 
             # Vector of times 

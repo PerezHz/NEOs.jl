@@ -99,7 +99,7 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
 
 """ RNp1BP_pN_A_J23E_J2S_ng_eph!
 
-@taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph!(dq, q, params, t)
+function RNp1BP_pN_A_J23E_J2S_ng_eph!(dq, q, params, t)
     # Julian date of start time
     local jd0 = params[4] 
     # Days since J2000.0 = 2.451545e6
@@ -263,7 +263,7 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
     # See equations (176) and (177) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     P_2_sin_ϕ = Array{S}(undef, N)      # Second Legendre polynomial P_2(sin ϕ)
     ∂P_2_sin_ϕ = Array{S}(undef, N)     # dP_2(sin ϕ)/d(sin ϕ)
-    P_3_sin_ϕ = Array{S}(undef, N)      # Thrid Legendre polynomial P_3(sin ϕ)
+    P_3_sin_ϕ = Array{S}(undef, N)      # Third Legendre polynomial P_3(sin ϕ)
     ∂P_3_sin_ϕ = Array{S}(undef, N)     # dP_3(sin ϕ)/d(sin ϕ)
     # -cos ϕ P_n'
     m_c_ϕ_∂P_2 = Array{S}(undef, N)     # -cos ϕ P_2'
@@ -669,7 +669,7 @@ Threaded version of `RNp1BP_pN_A_J23E_J2S_ng_eph`.
 See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
 """ RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
 
-@taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
+function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     # Julian date of start time
     local jd0 = params[4] 
     # Days since J2000.0 = 2.451545e6
@@ -833,7 +833,7 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
     # See equations (176) and (177) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     P_2_sin_ϕ = Array{S}(undef, N)      # Second Legendre polynomial P_2(sin ϕ)
     ∂P_2_sin_ϕ = Array{S}(undef, N)     # dP_2(sin ϕ)/d(sin ϕ)
-    P_3_sin_ϕ = Array{S}(undef, N)      # Thrid Legendre polynomial P_3(sin ϕ)
+    P_3_sin_ϕ = Array{S}(undef, N)      # Third Legendre polynomial P_3(sin ϕ)
     ∂P_3_sin_ϕ = Array{S}(undef, N)     # dP_3(sin ϕ)/d(sin ϕ)
     # -cos ϕ P_n'
     m_c_ϕ_∂P_2 = Array{S}(undef, N)     # -cos ϕ P_2'
@@ -1002,7 +1002,7 @@ See also [`RNp1BP_pN_A_J23E_J2S_ng_eph`](@ref).
             # See equations (176) and (177) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
             P_2_sin_ϕ[i] = 1.5sin2_ϕ[i] - 0.5               # Second Legendre polynomial P_2(sin ϕ)
             ∂P_2_sin_ϕ[i] = 3sin_ϕ[i]                       # dP_2(sin ϕ)/d(sin ϕ)
-            P_3_sin_ϕ[i] = (-1.5sin_ϕ[i]) + (2.5sin3_ϕ[i])  # Thrid Legendre polynomial P_3(sin ϕ)
+            P_3_sin_ϕ[i] = (-1.5sin_ϕ[i]) + (2.5sin3_ϕ[i])  # Third Legendre polynomial P_3(sin ϕ)
             ∂P_3_sin_ϕ[i] = -1.5 + 7.5sin2_ϕ[i]             # dP_3(sin ϕ)/d(sin ϕ)
 
             # Compute cartesian coordinates of acceleration due to body figure in body frame
