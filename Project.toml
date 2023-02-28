@@ -50,8 +50,8 @@ SPICE = "0.2"
 SatelliteToolbox = "0.9"
 StaticArrays = "1.2"
 StatsBase = "0.33"
-TaylorIntegration = "0.8, 0.10"
-TaylorSeries = "0.12"
+TaylorIntegration = "0.11"
+TaylorSeries = "0.13"
 julia = "1.6"
 
 [extras]
