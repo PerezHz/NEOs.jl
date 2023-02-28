@@ -1,129 +1,24 @@
 @doc raw"""
-    neos_jetcoeffs!(eqsdiff!::Function, t::Taylor1{T}, x::AbstractArray{Taylor1{U}, N}, dx::AbstractArray{Taylor1{U}, N},
-                    xaux::AbstractArray{Taylor1{U}, N}, params) where {T <: Real, U <: Number, N}
+    update_params(t::Taylor1{T}, x::Vector{Taylor1{U}}, eph, params) where {T <: Real, U <: Number}
 
-Specialized method of `TaylorIntegration.jetcoeffs!` for the integration of a NEO. 
-
-See also [`TaylorIntegration.jetcoeffs!`](@ref). 
+Update time-dependent parameters for the dynamical function.
 """
-function neos_jetcoeffs!(eqsdiff!::Function, t::Taylor1{T}, x::AbstractArray{Taylor1{U}, N}, dx::AbstractArray{Taylor1{U}, N},
-                    xaux::AbstractArray{Taylor1{U}, N}, params) where {T <: Real, U <: Number, N}
-    order = x[1].order
-    for ord in 0:order-1
-        ordnext = ord+1
+function update_params(t::Taylor1{T}, x::Vector{Taylor1{U}}, eph, params) where {T <: Real, U <: Number}
 
-        # Set `taux`, auxiliary Taylor1 variable to order `ord`
-        @inbounds taux = Taylor1( t.coeffs )
-        # Set `xaux`, auxiliary vector of Taylor1 to order `ord`
-        for j in eachindex(x)
-            @inbounds xaux[j] = Taylor1( x[j].coeffs[1:ordnext] )
-        end
-        
-        # Equations of motion
-        eqsdiff!(dx, xaux, params, taux)
+    # Julian date of start time
+    jd0 = params[4] 
+    # Days since J2000.0 = 2.451545e6
+    dsj2k = t + (jd0 - JD_J2000) 
+    # Solar system ephemeris at dsj2k
+    ss16asteph_t = evaleph(eph[1], dsj2k, x[1]) 
+    # Accelerations at dsj2k
+    acceph_t = evaleph(eph[2], dsj2k, x[1]) 
+    # Newtonian potentials at dsj2k
+    newtonianNb_Potential_t = evaleph(eph[3], dsj2k, x[1]) 
 
-        # Recursion relations
-        for j in eachindex(x)
-            @inbounds x[j].coeffs[ordnext+1] = dx[j].coeffs[ordnext]/ordnext
-        end
-    end
-    nothing
-end
+    params = (ss16asteph_t, acceph_t, newtonianNb_Potential_t, jd0, params[5], params[6], params[7])
 
-@doc raw"""
-    neosstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}}, dx::Vector{Taylor1{U}}, 
-              xaux::Vector{Taylor1{U}}, abstol::T, params) where {T <: Real, U <: Number}
-    neosstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}}, dx::Vector{Taylor1{U}}, 
-              abstol::T, params, rv::RetAlloc{Taylor1{U}}) where {T <: Real, U <: Number}
-
-Specialized methods of `TaylorIntegration.taylorstep!` for the integration of a NEO. 
-
-See also [`TaylorIntegration.taylorstep!`](@ref).
-"""
-function neosstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}}, dx::Vector{Taylor1{U}}, 
-                   xaux::Vector{Taylor1{U}}, abstol::T, params) where {T <: Real, U <: Number}
-
-    # Compute the Taylor coefficients
-    neos_jetcoeffs!(f!, t, x, dx, xaux, params)
-
-    # Compute the step-size of the integration using `abstol`
-    δt = TaylorIntegration.stepsize(x, abstol)
-
-    return δt
-end
-
-function neosstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}}, dx::Vector{Taylor1{U}}, 
-                   abstol::T, params, rv::TaylorIntegration.RetAlloc{Taylor1{U}}) where {T <: Real, U <: Number}
-
-    # Compute the Taylor coefficients
-    TaylorIntegration.__jetcoeffs!(Val(true), f!, t, x, dx, params, rv)
-
-    # Compute the step-size of the integration using `abstol`
-    δt = TaylorIntegration.stepsize(x, abstol)
-
-    return δt
-end
-
-@doc raw"""
-    lyap_neosstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}}, dx::Vector{Taylor1{U}}, xaux::Vector{Taylor1{U}},
-                   δx::Array{TaylorN{Taylor1{U}}, 1}, dδx::Array{TaylorN{Taylor1{U}}, 1}, jac::Array{Taylor1{U}, 2}, 
-                   abstol::T, _δv::Vector{TaylorN{Taylor1{U}}}, varsaux::Array{Taylor1{U},3}, params, 
-                   jacobianfunc! = nothing) where {T <: Real, U <: Number}
-    lyap_neosstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}}, dx::Vector{Taylor1{U}}, δx::Array{TaylorN{Taylor1{U}}, 1}, 
-                   dδx::Array{TaylorN{Taylor1{U}}, 1}, jac::Array{Taylor1{U}, 2}, abstol::T, _δv::Vector{TaylorN{Taylor1{U}}},
-                   varsaux::Array{Taylor1{U}, 3}, params, rv::TaylorIntegration.RetAlloc{Taylor1{U}}, 
-                   jacobianfunc! = nothing) where {T <: Real, U <: Number}
-
-Specialized method of `TaylorIntegration.lyap_taylorstep!` for the calculation of the Lyapunov spectrum of a NEO. 
-
-See also [`TaylorIntegration.lyap_taylorstep`](@ref).
-"""
-function lyap_neosstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}}, dx::Vector{Taylor1{U}}, xaux::Vector{Taylor1{U}},
-                        δx::Array{TaylorN{Taylor1{U}}, 1}, dδx::Array{TaylorN{Taylor1{U}}, 1}, jac::Array{Taylor1{U}, 2}, 
-                        abstol::T, _δv::Vector{TaylorN{Taylor1{U}}}, varsaux::Array{Taylor1{U},3}, params, 
-                        jacobianfunc! = nothing) where {T <: Real, U <: Number}
-
-    # Dimensions of phase-space: dof
-    nx = length(x)
-    dof = length(δx)
-
-    # Compute the Taylor coefficients associated to trajectory
-    neos_jetcoeffs!(f!, t, view(x, 1:dof), view(dx, 1:dof), view(xaux, 1:dof), params)
-
-    # Compute stability matrix
-    TaylorIntegration.stabilitymatrix!(f!, t, x, δx, dδx, jac, _δv, params, jacobianfunc!)
-
-    # Compute the Taylor coefficients associated to variational equations
-    TaylorIntegration.lyap_jetcoeffs!(t, view(x, dof+1:nx), view(dx, dof+1:nx), jac, varsaux)
-    
-    # Compute the step-size of the integration using `abstol`
-    δt = TaylorIntegration.stepsize(view(x, 1:dof), abstol)
-
-    return δt
-end
-
-function lyap_neosstep!(f!, t::Taylor1{T}, x::Vector{Taylor1{U}}, dx::Vector{Taylor1{U}}, δx::Array{TaylorN{Taylor1{U}}, 1}, 
-                        dδx::Array{TaylorN{Taylor1{U}}, 1}, jac::Array{Taylor1{U}, 2}, abstol::T, _δv::Vector{TaylorN{Taylor1{U}}},
-                        varsaux::Array{Taylor1{U}, 3}, params, rv::TaylorIntegration.RetAlloc{Taylor1{U}}, 
-                        jacobianfunc! = nothing) where {T <: Real, U <: Number}
-
-    # Dimensions of phase-space: dof
-    nx = length(x)
-    dof = length(δx)
-
-    # Compute the Taylor coefficients associated to trajectory
-    TaylorIntegration.__jetcoeffs!(Val(true), f!, t, view(x, 1:dof), view(dx, 1:dof), params, rv)
-
-    # Compute stability matrix
-    TaylorIntegration.stabilitymatrix!(f!, t, x, δx, dδx, jac, _δv, params, jacobianfunc!)
-
-    # Compute the Taylor coefficients associated to variational equations
-    TaylorIntegration.lyap_jetcoeffs!(t, view(x, dof+1:nx), view(dx, dof+1:nx), jac, varsaux)
-    
-    # Compute the step-size of the integration using `abstol`
-    δt = TaylorIntegration.stepsize(view(x, 1:dof), abstol)
-
-    return δt
+    return params 
 end
 
 const V_true = :(Val{true})
@@ -131,9 +26,9 @@ const V_false = :(Val{false})
 const V_true_false = (V_true, V_false)
 
 @doc raw"""
-    neosinteg(f!, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, ::$V, params = nothing;
+    neosinteg(f!, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, Val(true/false), eph, params = nothing;
               maxsteps::Int = 500, parse_eqs::Bool = true) where {T <: Real, U <: Number}
-    neosinteg(f!, g, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, ::$V, params = nothing; 
+    neosinteg(f!, g, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, Val(true/false), eph, params = nothing; 
               maxsteps::Int = 500, parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, 
               nrabstol::T = eps(T)) where {T <: Real, U <: Number}
 
@@ -145,7 +40,7 @@ See also [`TaylorIntegration.taylorinteg`](@ref).
 for V in V_true_false
     @eval begin
 
-        function neosinteg(f!, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, ::$V, params = nothing;
+        function neosinteg(f!, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, ::$V, eph, params = nothing;
                            maxsteps::Int = 500, parse_eqs::Bool = true) where {T <: Real, U <: Number}
 
             # Initialize the vector of Taylor1 expansions
@@ -158,6 +53,8 @@ for V in V_true_false
             @inbounds dx[i] = Taylor1( zero(q0[i]), order )
             end
 
+            params = update_params(t, x, eph, params)
+
             # Determine if specialized jetcoeffs! method exists
             parse_eqs, rv = TaylorIntegration._determine_parsing!(parse_eqs, f!, t, x, dx, params)
 
@@ -165,15 +62,15 @@ for V in V_true_false
                 # Re-initialize the Taylor1 expansions
                 t = t0 + Taylor1( T, order )
                 x .= Taylor1.( q0, order )
-                return _neosinteg!(f!, t, x, dx, q0, t0, tmax, abstol, rv, $V(), params, maxsteps = maxsteps)
+                return _neosinteg!(f!, t, x, dx, q0, t0, tmax, abstol, rv, $V(), eph, params, maxsteps = maxsteps)
             else
-                return _neosinteg!(f!, t, x, dx, q0, t0, tmax, abstol, $V(), params, maxsteps=maxsteps)
+                return _neosinteg!(f!, t, x, dx, q0, t0, tmax, abstol, $V(), eph, params, maxsteps=maxsteps)
             end
 
         end
 
         function _neosinteg!(f!, t::Taylor1{T}, x::Array{Taylor1{U}, 1}, dx::Array{Taylor1{U}, 1}, q0::Array{U, 1}, t0::T, 
-                             tmax::T, abstol::T, ::$V, params; maxsteps::Int = 500) where {T<:Real, U<:Number}
+                             tmax::T, abstol::T, ::$V, eph, params; maxsteps::Int = 500) where {T<:Real, U<:Number}
 
             # Initialize the vector of Taylor1 expansions
             dof = length(q0)
@@ -200,7 +97,8 @@ for V in V_true_false
             # Integration
             nsteps = 1
             while sign_tstep*t0 < sign_tstep*tmax
-                δt = neosstep!(f!, t, x, dx, xaux, abstol, params) # δt is positive!
+                params = update_params(t, x, eph, params)
+                δt = TaylorIntegration.taylorstep!(f!, t, x, dx, xaux, abstol, params) # δt is positive!
                 # Below, δt has the proper sign according to the direction of the integration
                 δt = sign_tstep * min(δt, sign_tstep*(tmax-t0))
                 evaluate!(x, δt, x0) # new initial condition
@@ -226,14 +124,15 @@ for V in V_true_false
             end
 
             if $V == Val{true}
-                return TaylorInterpolant(tv[1], view(tv.-tv[1],1:nsteps), view(transpose(view(polynV,:,2:nsteps)),1:nsteps-1,:))
+                jd0 = params[4]
+                return TaylorInterpolant(jd0-JD_J2000, view(tv.-tv[1],1:nsteps), view(transpose(view(polynV,:,2:nsteps)),1:nsteps-1,:))
             elseif $V == Val{false}
                 return view(tv,1:nsteps), view(transpose(view(xv,:,1:nsteps)),1:nsteps,:)
             end
         end
 
         function _neosinteg!(f!, t::Taylor1{T}, x::Array{Taylor1{U},1}, dx::Array{Taylor1{U},1}, q0::Array{U,1}, t0::T, 
-            tmax::T, abstol::T, rv::TaylorIntegration.RetAlloc{Taylor1{U}}, ::$V, params; maxsteps::Int=500) where {T<:Real, U<:Number}
+            tmax::T, abstol::T, rv::TaylorIntegration.RetAlloc{Taylor1{U}}, ::$V, eph, params; maxsteps::Int=500) where {T<:Real, U<:Number}
 
             # Initialize the vector of Taylor1 expansions
             dof = length(q0)
@@ -258,7 +157,8 @@ for V in V_true_false
             # Integration
             nsteps = 1
             while sign_tstep*t0 < sign_tstep*tmax
-                δt = neosstep!(f!, t, x, dx, abstol, params, rv) # δt is positive!
+                params = update_params(t, x, eph, params)
+                δt = TaylorIntegration.taylorstep!(f!, t, x, dx, abstol, params, rv) # δt is positive!
                 # Below, δt has the proper sign according to the direction of the integration
                 δt = sign_tstep * min(δt, sign_tstep*(tmax-t0))
                 evaluate!(x, δt, x0) # new initial condition
@@ -283,16 +183,17 @@ for V in V_true_false
                     break
                 end
             end
-
+            
             if $V == Val{true}
-                return TaylorInterpolant(tv[1], view(tv.-tv[1],1:nsteps), view(transpose(view(polynV,:,2:nsteps)),1:nsteps-1,:))
+                jd0 = params[4]
+                return TaylorInterpolant(jd0-JD_J2000, view(tv.-tv[1],1:nsteps), view(transpose(view(polynV,:,2:nsteps)),1:nsteps-1,:))
             elseif $V == Val{false}
                 return view(tv,1:nsteps), view(transpose(view(xv,:,1:nsteps)),1:nsteps,:)
             end
         end
 
         # TODO: allow backwards integration
-        function neosinteg(f!, g, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, ::$V, params = nothing; 
+        function neosinteg(f!, g, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, ::$V, eph, params = nothing; 
                            maxsteps::Int = 500, parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, 
                            nrabstol::T = eps(T)) where {T <: Real, U <: Number}
     
@@ -308,6 +209,8 @@ for V in V_true_false
                 dx[i] = Taylor1( zero(q0[i]), order )
             end
 
+            params = update_params(t, x, eph, params)
+
             # Determine if specialized jetcoeffs! method exists
             parse_eqs, rv = TaylorIntegration._determine_parsing!(parse_eqs, f!, t, x, dx, params)
 
@@ -315,17 +218,17 @@ for V in V_true_false
                 # Re-initialize the Taylor1 expansions
                 t = t0 + Taylor1( T, order )
                 x .= Taylor1.( q0, order )
-                return _neosinteg!(f!, g, t, x, dx, q0, t0, tmax, abstol, rv, $V(), params, maxsteps = maxsteps, 
+                return _neosinteg!(f!, g, t, x, dx, q0, t0, tmax, abstol, rv, $V(), eph, params, maxsteps = maxsteps, 
                                    eventorder = eventorder, newtoniter = newtoniter, nrabstol = nrabstol)
             else
-                return _neosinteg!(f!, g, t, x, dx, q0, t0, tmax, abstol, $V(), params, maxsteps = maxsteps, 
+                return _neosinteg!(f!, g, t, x, dx, q0, t0, tmax, abstol, $V(), eph, params, maxsteps = maxsteps, 
                                    eventorder = eventorder, newtoniter = newtoniter, nrabstol = nrabstol)
             end
 
         end 
 
         function _neosinteg!(f!, g, t::Taylor1{T}, x::Array{Taylor1{U}, 1}, dx::Array{Taylor1{U}, 1}, q0::Array{U, 1}, t0::T, 
-                             tmax::T, abstol::T, ::$V, params; maxsteps::Int = 500, eventorder::Int = 0, newtoniter::Int = 10, 
+                             tmax::T, abstol::T, ::$V, eph, params; maxsteps::Int = 500, eventorder::Int = 0, newtoniter::Int = 10, 
                              nrabstol::T = eps(T)) where {T <: Real, U <: Number}
     
             # Initialize the vector of Taylor1 expansions
@@ -351,8 +254,8 @@ for V in V_true_false
             sign_tstep = copysign(1, tmax-t0)
 
             # Some auxiliary arrays for root-finding/event detection/Poincaré surface of section evaluation
-            g_tupl = g(dx, x, params, t)
-            g_tupl_old = g(dx, x, params, t)
+            g_tupl = g(dx, x, eph, params, t)
+            g_tupl_old = g(dx, x, eph, params, t)
             δt = zero(x[1])
             δt_old = zero(x[1])
 
@@ -369,12 +272,13 @@ for V in V_true_false
             nsteps = 1
             nevents = 1 #number of detected events
             while sign_tstep*t0 < sign_tstep*tmax
+                params = update_params(t, x, eph, params)
                 δt_old = δt
-                δt = neosstep!(f!, t, x, dx, xaux, abstol, params) # δt is positive!
+                δt = TaylorIntegration.taylorstep!(f!, t, x, dx, xaux, abstol, params) # δt is positive!
                 # Below, δt has the proper sign according to the direction of the integration
                 δt = sign_tstep * min(δt, sign_tstep*(tmax-t0))
                 evaluate!(x, δt, x0) # new initial condition
-                g_tupl = g(dx, x, params, t)
+                g_tupl = g(dx, x, eph, params, t)
                 nevents = TaylorIntegration.findroot!(t, x, dx, g_tupl_old, g_tupl, eventorder, tvS, xvS, gvS, t0, 
                                                       δt_old, x_dx, x_dx_val, g_dg, g_dg_val, nrabstol, newtoniter, nevents)
                 if $V == Val{true}
@@ -399,7 +303,8 @@ for V in V_true_false
             end 
 
             if $V == Val{true}
-                return TaylorInterpolant(tv[1], view(tv .- tv[1], 1:nsteps), view(transpose(view(polynV, :, 2:nsteps)), 1:nsteps-1, :)),
+                jd0 = params[4]
+                return TaylorInterpolant(jd0 - JD_J2000, view(tv .- tv[1], 1:nsteps), view(transpose(view(polynV, :, 2:nsteps)), 1:nsteps-1, :)),
                        view(tvS, 1:nevents-1), view(transpose(view(xvS, :, 1:nevents-1)), 1:nevents-1, :), view(gvS, 1:nevents-1)
             elseif $V == Val{false}
                 return view(tv, 1:nsteps), view(transpose(view(xv, :, 1:nsteps)), 1:nsteps, :), view(tvS, 1:nevents-1), 
@@ -409,7 +314,7 @@ for V in V_true_false
         end 
 
         function _neosinteg!(f!, g, t::Taylor1{T}, x::Array{Taylor1{U}, 1}, dx::Array{Taylor1{U}, 1}, q0::Array{U, 1}, t0::T, 
-                             tmax::T, abstol::T, rv::TaylorIntegration.RetAlloc{Taylor1{U}}, ::$V, params; maxsteps::Int = 500, 
+                             tmax::T, abstol::T, rv::TaylorIntegration.RetAlloc{Taylor1{U}}, ::$V, eph, params; maxsteps::Int = 500, 
                              eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T)) where {T <: Real, U <: Number}
 
             # Initialize the vector of Taylor1 expansions
@@ -434,8 +339,8 @@ for V in V_true_false
             sign_tstep = copysign(1, tmax-t0)
 
             # Some auxiliary arrays for root-finding/event detection/Poincaré surface of section evaluation
-            g_tupl = g(dx, x, params, t)
-            g_tupl_old = g(dx, x, params, t)
+            g_tupl = g(dx, x, eph, params, t)
+            g_tupl_old = g(dx, x, eph, params, t)
             δt = zero(x[1])
             δt_old = zero(x[1])
 
@@ -452,12 +357,13 @@ for V in V_true_false
             nsteps = 1
             nevents = 1 #number of detected events
             while sign_tstep*t0 < sign_tstep*tmax
+                params = update_params(t, x, eph, params)
                 δt_old = δt
-                δt = neosstep!(f!, t, x, dx, abstol, params, rv) # δt is positive!
+                δt = TaylorIntegration.taylorstep!(f!, t, x, dx, abstol, params, rv) # δt is positive!
                 # Below, δt has the proper sign according to the direction of the integration
                 δt = sign_tstep * min(δt, sign_tstep*(tmax-t0))
                 evaluate!(x, δt, x0) # new initial condition
-                g_tupl = g(dx, x, params, t)
+                g_tupl = g(dx, x, eph, params, t)
                 nevents = TaylorIntegration.findroot!(t, x, dx, g_tupl_old, g_tupl, eventorder, tvS, xvS, gvS, t0, 
                                                       δt_old, x_dx, x_dx_val, g_dg, g_dg_val, nrabstol, newtoniter, nevents)
                 if $V == Val{true}
@@ -482,7 +388,8 @@ for V in V_true_false
             end 
     
             if $V == Val{true}
-                return TaylorInterpolant(tv[1], view(tv .- tv[1], 1:nsteps), view(transpose(view(polynV, :, 2:nsteps)), 1:nsteps-1, :)),
+                jd0 = params[4]
+                return TaylorInterpolant(jd0-JD_J2000, view(tv .- tv[1], 1:nsteps), view(transpose(view(polynV, :, 2:nsteps)), 1:nsteps-1, :)),
                        view(tvS, 1:nevents-1), view(transpose(view(xvS, :, 1:nevents-1)), 1:nevents-1, :), view(gvS, 1:nevents-1)
             elseif $V == Val{false}
                 return view(tv, 1:nsteps), view(transpose(view(xv, :, 1:nsteps)), 1:nsteps, :), view(tvS, 1:nevents-1), 
@@ -495,14 +402,14 @@ for V in V_true_false
 end 
 
 @doc raw"""
-    lyap_neosinteg(f!, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, params = nothing, jacobianfunc! = nothing;
+    lyap_neosinteg(f!, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, eph, params = nothing, jacobianfunc! = nothing;
                    maxsteps::Int = 500, parse_eqs::Bool = true) where {T <: Real, U <: Number}
 
 Specialized method of `TaylorIntegration.lyap_taylorinteg` for the calculation of the Lyapunov spectrum of a NEO.
 
 See also [`TaylorIntegration.lyap_taylorinteg`](@ref). 
 """
-function lyap_neosinteg(f!, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, params = nothing, jacobianfunc! = nothing;
+function lyap_neosinteg(f!, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol::T, eph, params = nothing, jacobianfunc! = nothing;
                           maxsteps::Int = 500, parse_eqs::Bool = true) where {T <: Real, U <: Number}
 
     # Initialize the vector of Taylor1 expansions
@@ -525,6 +432,8 @@ function lyap_neosinteg(f!, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol:
         end
     end
 
+    params = update_params(t, x, eph, params)
+
     # Determine if specialized jetcoeffs! method exists
     parse_eqs, rv = TaylorIntegration._determine_parsing!(parse_eqs, f!, t, view(x, 1:dof), view(dx, 1:dof), params)
 
@@ -532,14 +441,14 @@ function lyap_neosinteg(f!, q0::Array{U, 1}, t0::T, tmax::T, order::Int, abstol:
         # Re-initialize the Taylor1 expansions
         t = t0 + Taylor1( T, order )
         x .= Taylor1.( x0, order )
-        return _lyap_taylorinteg!(f!, t, x, dx, q0, t0, tmax, abstol, jt, _dv, rv, params, jacobianfunc!, maxsteps = maxsteps)
+        return _lyap_neosinteg!(f!, t, x, dx, q0, t0, tmax, abstol, jt, _dv, rv, eph, params, jacobianfunc!, maxsteps = maxsteps)
     else
-        return _lyap_taylorinteg!(f!, t, x, dx, q0, t0, tmax, abstol, jt, _dv, params, jacobianfunc!, maxsteps = maxsteps)
+        return _lyap_neosinteg!(f!, t, x, dx, q0, t0, tmax, abstol, jt, _dv, eph, params, jacobianfunc!, maxsteps = maxsteps)
     end
 end
 
-function _lyap_taylorinteg!(f!, t::Taylor1{T}, x::Array{Taylor1{U},1}, dx::Array{Taylor1{U},1}, q0::Array{U,1}, t0::T, tmax::T, 
-                            abstol::T, jt::Matrix{U}, _δv::Array{TaylorN{Taylor1{U}},1}, params, jacobianfunc!; maxsteps::Int = 500) where {T <: Real, U <: Number}
+function _lyap_neosinteg!(f!, t::Taylor1{T}, x::Array{Taylor1{U},1}, dx::Array{Taylor1{U},1}, q0::Array{U,1}, t0::T, tmax::T, 
+                            abstol::T, jt::Matrix{U}, _δv::Array{TaylorN{Taylor1{U}},1}, eph, params, jacobianfunc!; maxsteps::Int = 500) where {T <: Real, U <: Number}
 
     # Allocation
     order = get_order(t)
@@ -580,7 +489,8 @@ function _lyap_taylorinteg!(f!, t::Taylor1{T}, x::Array{Taylor1{U},1}, dx::Array
     # Integration
     nsteps = 1
     while sign_tstep*t0 < sign_tstep*tmax
-        δt = lyap_neosstep!(f!, t, x, dx, xaux, δx, dδx, jac, abstol, _δv, varsaux, params, jacobianfunc!) # δt is positive!
+        params = update_params(t, x, eph, params)
+        δt = TaylorIntegration._lyap_taylorstep!(f!, t, x, dx, xaux, δx, dδx, jac, abstol, _δv, varsaux, params, jacobianfunc!) # δt is positive!
         # Below, δt has the proper sign according to the direction of the integration
         δt = sign_tstep * min(δt, sign_tstep*(tmax-t0))
         evaluate!(x, δt, x0) # Update x0
@@ -613,9 +523,9 @@ function _lyap_taylorinteg!(f!, t::Taylor1{T}, x::Array{Taylor1{U},1}, dx::Array
     return view(tv, 1:nsteps),  view(transpose(xv), 1:nsteps, :),  view(transpose(λ), 1:nsteps, :)
 end
 
-function _lyap_taylorinteg!(f!, t::Taylor1{T}, x::Array{Taylor1{U},1}, dx::Array{Taylor1{U},1},
+function _lyap_neosinteg!(f!, t::Taylor1{T}, x::Array{Taylor1{U},1}, dx::Array{Taylor1{U},1},
     q0::Array{U,1}, t0::T, tmax::T, abstol::T, jt::Matrix{U}, _δv::Array{TaylorN{Taylor1{U}},1},
-    rv::TaylorIntegration.RetAlloc{Taylor1{U}}, params, jacobianfunc!; maxsteps::Int=500) where {T<:Real, U<:Number}
+    rv::TaylorIntegration.RetAlloc{Taylor1{U}}, eph, params, jacobianfunc!; maxsteps::Int=500) where {T<:Real, U<:Number}
 
     # Allocation
     order = get_order(t)
@@ -653,6 +563,7 @@ function _lyap_taylorinteg!(f!, t::Taylor1{T}, x::Array{Taylor1{U},1}, dx::Array
     # Integration
     nsteps = 1
     while sign_tstep*t0 < sign_tstep*tmax
+        params = update_params(t, x, eph, params)
         δt = lyap_neosstep!(f!, t, x, dx, δx, dδx, jac, abstol, _δv, varsaux, params, rv, jacobianfunc!) # δt is positive!
         # Below, δt has the proper sign according to the direction of the integration
         δt = sign_tstep * min(δt, sign_tstep*(tmax-t0))

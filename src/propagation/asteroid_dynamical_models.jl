@@ -37,7 +37,7 @@ end
 @doc raw"""
     auxzero(a::AbstractSeries)
     
-Returns a zero of the same type as `a`.
+Return a zero of the same type as `a`.
 """
 function auxzero(a::AbstractSeries)
     return zero(a)
@@ -46,7 +46,7 @@ end
 @doc raw"""
     auxzero(a::TaylorN{Taylor1{T}}) where {T<:Number}
     
-Returns a `TaylorN` with zero coefficients of the same type as `a.coeffs`.
+Return a `TaylorN` with zero coefficients of the same type as `a.coeffs`.
 """
 function auxzero(a::TaylorN{Taylor1{T}}) where {T<:Number}
     return TaylorN(zero.(a.coeffs))
@@ -103,13 +103,13 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph!(dq, q, params, t)
     # Julian date of start time
     local jd0 = params[4] 
     # Days since J2000.0 = 2.451545e6
-    local dsj2k = t+(jd0-JD_J2000) 
-    # params[1](t)*one(q[1]) # ss16asteph(t)
-    local ss16asteph_t = evaleph(params[1], dsj2k, q[1]) 
-    # params[2](t)*one(q[1]) # acc_eph(t)
-    local acceph_t = evaleph(params[2], dsj2k, q[1]) 
-    # params[3](t)*one(q[1]) # newtonianNb_Potential(t), massive bodies
-    local newtonianNb_Potential_t = evaleph(params[3], dsj2k, q[1]) 
+    local dsj2k = t + (jd0 - JD_J2000) 
+    # Solar system ephemeris at dsj2k
+    local ss16asteph_t = params[1]
+    # Accelerations at dsj2k
+    local acceph_t = params[2]
+    # Newtonian potentials at dsj2k
+    local newtonianNb_Potential_t = params[3]
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
@@ -673,13 +673,13 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     # Julian date of start time
     local jd0 = params[4] 
     # Days since J2000.0 = 2.451545e6
-    local dsj2k = t+(jd0-JD_J2000) 
-    # params[1](t)*one(q[1]) # ss16asteph(t)
-    local ss16asteph_t = evaleph(params[1], dsj2k, q[1]) 
-    # params[2](t)*one(q[1]) # acc_eph(t)
-    local acceph_t = evaleph(params[2], dsj2k, q[1]) 
-    # params[3](t)*one(q[1]) # newtonianNb_Potential(t), massive bodies
-    local newtonianNb_Potential_t = evaleph(params[3], dsj2k, q[1]) 
+    local dsj2k = t + (jd0 - JD_J2000) 
+    # Solar system ephemeris at dsj2k
+    local ss16asteph_t = params[1]
+    # Accelerations at dsj2k
+    local acceph_t = params[2]
+    # Newtonian potentials at dsj2k
+    local newtonianNb_Potential_t = params[3]
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
