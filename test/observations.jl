@@ -7,6 +7,8 @@ using NEOs: mpc_catalogue_regex, CatalogueMPC, CatalogueCodes_path, observations
 
 @testset "CatalogueMPC" begin  
 
+    @test isfile(joinpath(observations_path, "CatalogueCodes.txt"))
+
     # Parse CatalogueMPC
     gaia_s = "  6    Gaia2016"
     gaia_m = match(mpc_catalogue_regex, gaia_s)
@@ -44,6 +46,8 @@ end
 using NEOs: mpc_observatory_regex, ObservatoryMPC, ObsCodes_path
 
 @testset "ObservatoryMPC" begin
+
+    @test isfile(joinpath(observations_path, "ObsCodes.txt"))
     
     # Parse ObservatoryMPC
     arecibo_s = "251 293.246920.949577+0.312734Arecibo"

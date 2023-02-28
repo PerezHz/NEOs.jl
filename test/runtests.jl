@@ -2,6 +2,7 @@
 
 testfiles = (
     "observations.jl",
+    "propagation.jl"
     )
 
 for file in testfiles
