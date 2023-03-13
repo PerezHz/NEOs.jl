@@ -6,6 +6,8 @@ const src_path = dirname(pathof(NEOs))
 const observations_path = joinpath(src_path, "observations")
 # Path to MPC catalogues file 
 const CatalogueCodes_path = joinpath(observations_path, "CatalogueCodes.txt")
+# Path to mpc observatories file 
+const ObsCodes_path = joinpath(observations_path, "ObsCodes.txt")
 
 # URLs
 

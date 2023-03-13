@@ -11,7 +11,7 @@ An observatory in MPC format. The format is described in https://minorplanetcent
 - `sin::T`: `ρ*sin(ϕ')`, where `ϕ'` is the geocentric latitude and `ρ` is the geocentric distance in earth radii.
 - `name::String`: observatory's name.
 """
-struct ObservatoryMPC{T <: AbstractFloat}
+@auto_hash_equals struct ObservatoryMPC{T <: AbstractFloat}
     code::String
     long::T
     cos::T
@@ -28,13 +28,29 @@ function ObservatoryMPC(code::String, long::T, cos::T, sin::T, name::String) whe
     return ObservatoryMPC{T}(code, long, cos, sin, name)
 end
 
-# Two ObservatoryMPC are equal if ther code, long, cos, sin and name are equal
-function hash(a::ObservatoryMPC{T}, h::UInt) where {T <: AbstractFloat}
-    return hash((a.code, a.long, a.cos, a.sin, a.name), h)
-end
+@doc raw"""
+    unknownobs()
 
-function ==(a::ObservatoryMPC{T}, b::ObservatoryMPC{T}) where {T <: AbstractFloat}
-    return hash(a) == hash(b)
+Return a `ObservatoryMPC` with no code, coordinates or name. 
+"""
+unknownobs() = ObservatoryMPC("", NaN, NaN, NaN, "")
+
+@doc raw"""
+    isunknown(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
+
+Check whether `m` equals `unknownobs()`.
+"""
+function isunknown(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
+    return m == unknownobs()
+end 
+
+@doc raw"""
+    hascoord(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
+
+Check whether `m` has non `NaN` coordinates. 
+"""
+function hascoord(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
+    return !isnan(m.long) && !isnan(m.cos) && !isnan(m.sin)
 end
 
 # Print method for ObservatoryMPC
@@ -51,9 +67,6 @@ function show(io::IO, m::ObservatoryMPC{T}) where {T <: AbstractFloat}
         print(io, m.name, " [", m.code, "]")
     end
 end
-
-# MPC observatories file url 
-const mpc_observatories_url = "https://minorplanetcenter.net/iau/lists/ObsCodes.html"
 
 # Regular expression to parse an observatory in MPC format
 const mpc_observatory_regex = Regex(join(
@@ -89,34 +102,13 @@ function parse_observatory_float(x::String)
 end
 
 @doc raw"""
-    hascoord(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
-
-Check whether `m` has non `NaN` coordinates. 
-"""
-function hascoord(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
-    return !isnan(m.long) && !isnan(m.cos) && !isnan(m.sin)
-end
-
-@doc raw"""
-    unknownobs()
-
-Return a `ObservatoryMPC` with no code, coordinates or name. 
-"""
-unknownobs() = ObservatoryMPC("", NaN, NaN, NaN, "")
-
-@doc raw"""
-    isunknown(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
-
-Check whether `m` equals `unknownobs()`.
-"""
-isunknown(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m == unknownobs()
-
-@doc raw"""
     ObservatoryMPC(m::RegexMatch)
 
 Convert a match of `NEOs.mpc_observatory_regex` to `ObservatoryMPC`.
 """
 function ObservatoryMPC(m::RegexMatch)
+
+    @assert m.regex == mpc_observatory_regex "Only matches of `NEOs.mpc_observatory_regex` can be converted to `ObservatoryMPC`."
     
     long_ = parse_observatory_float(string(m["long"]))
     cos_ = parse_observatory_float(string(m["cos"]))
@@ -138,6 +130,8 @@ end
 Return the matches of `NEOs.mpc_observatory_regex` in `filename` as `ObservatoryMPC`.
 """
 function read_observatories_mpc(filename::String)
+    # Check that file exists 
+    @assert isfile(filename) "Invalid filename"
     # Read lines of mpc formatted file (except header)
     lines = readlines(filename)[2:end]
     # Apply regular expressions
@@ -146,6 +140,8 @@ function read_observatories_mpc(filename::String)
     filter!(!isnothing, matches)
     # Convert matches to ObservatoryMPC
     obs = ObservatoryMPC.(matches)
+    # Eliminate repeated entries 
+    unique!(obs)
     
     return obs
 end
@@ -167,12 +163,13 @@ function parse_observatories_mpc(text::String)
     for m in eachmatch(mpc_observatory_regex, text)
         push!(obs, ObservatoryMPC(m))
     end
+
+    # Eliminate repeated entries 
+    unique!(obs)
     
     return obs
 end
 
-# Path to mpc observatories file 
-const ObsCodes_path = joinpath(observations_path, "ObsCodes.txt")
 # List of mpc observatories
 const mpc_observatories = Ref{Vector{ObservatoryMPC{Float64}}}(read_observatories_mpc(ObsCodes_path))
 
@@ -234,22 +231,25 @@ end
 Convert `obs` to a string acoording to MPC format.
 """
 function mpc_observatory_str(obs::ObservatoryMPC{T}) where {T <: AbstractFloat}
-    # Longitude string 
-    long_s = mpc_long_str(obs.long)
-    # Cosine string 
-    cos_s = mpc_cos_str(obs.cos)
-    # Sine string  string 
-    sin_s = mpc_sin_str(obs.sin)
-    # Join everything
-    obs_s = join([
-        obs.code,
-        " ",
-        long_s,
-        cos_s,
-        sin_s,
-        obs.name,
-        "\n"
-    ])
+    if isunknown(obs)
+        return ""
+    else
+        # Longitude string 
+        long_s = mpc_long_str(obs.long)
+        # Cosine string 
+        cos_s = mpc_cos_str(obs.cos)
+        # Sine string  string 
+        sin_s = mpc_sin_str(obs.sin)
+        # Join everything
+        obs_s = join([
+            obs.code,
+            " ",
+            long_s,
+            cos_s,
+            sin_s,
+            obs.name
+        ])
+    end 
 
     return obs_s
 end
@@ -266,7 +266,7 @@ function write_observatories_mpc(obs::Vector{ObservatoryMPC{T}}, filename::Strin
         # Write observatories 
         for i in eachindex(obs)
             line = mpc_observatory_str(obs[i])
-            write(file, line)
+            write(file, line, "\n")
         end 
     end
 end

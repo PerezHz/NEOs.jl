@@ -53,7 +53,12 @@ using NEOs: mpc_observatory_regex, ObservatoryMPC, ObsCodes_path
 
 @testset "ObservatoryMPC" begin
 
+    # Check that local observatories file exists 
     @test isfile(joinpath(observations_path, "ObsCodes.txt"))
+
+    # Check global variable NEOs.mpc_observatories[]
+    @test allunique(NEOs.mpc_observatories[])
+    @test isa(NEOs.mpc_observatories[], Vector{ObservatoryMPC{Float64}})
     
     # Parse ObservatoryMPC
     arecibo_s = "251 293.246920.949577+0.312734Arecibo"
@@ -103,6 +108,7 @@ using NEOs: mpc_observatory_regex, ObservatoryMPC, ObsCodes_path
 
     # Update observatories file
     update_observatories_mpc()
+    @test allunique(NEOs.mpc_observatories[])
     @test isa(NEOs.mpc_observatories[], Vector{ObservatoryMPC{Float64}}) 
 
     # Search observatory code 
