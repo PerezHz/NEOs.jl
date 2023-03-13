@@ -7,7 +7,12 @@ using NEOs: mpc_catalogue_regex, CatalogueMPC, CatalogueCodes_path, observations
 
 @testset "CatalogueMPC" begin  
 
+    # Check that local catalogues file exists 
     @test isfile(joinpath(observations_path, "CatalogueCodes.txt"))
+
+    # Check global variable NEOs.mpc_catalogues[]
+    @test allunique(NEOs.mpc_catalogues[])
+    @test isa(NEOs.mpc_catalogues[], Vector{CatalogueMPC})
 
     # Parse CatalogueMPC
     gaia_s = "  6    Gaia2016"
@@ -36,6 +41,7 @@ using NEOs: mpc_catalogue_regex, CatalogueMPC, CatalogueCodes_path, observations
 
     # Update catalogues file 
     update_catalogues_mpc()
+    @test allunique(NEOs.mpc_catalogues[])
     @test isa(NEOs.mpc_catalogues[], Vector{CatalogueMPC}) 
 
     # Search catalogue code 

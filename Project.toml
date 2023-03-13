@@ -5,6 +5,7 @@ version = "0.2.1"
 
 [deps]
 Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
+AutoHashEquals = "15f4f7f2-30c1-5605-9d31-71845cf9641f"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
@@ -36,12 +37,15 @@ TaylorSeries = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
+AutoHashEquals = "0.2"
 DataFrames = "1.2"
 EarthOrientation = "0.7"
 HORIZONS = "0.3"
 Healpix = "3"
 IntervalArithmetic = "0.19"
-PlanetaryEphemeris = "0.2"
+JLD = "0.13"
+JLD2 = "0.4"
+PlanetaryEphemeris = "0.3"
 Quadmath = "0.5"
 Query = "1.0"
 ReferenceFrameRotations = "1.0"
@@ -51,7 +55,7 @@ SatelliteToolbox = "0.9"
 StaticArrays = "1.2"
 StatsBase = "0.33"
 TaylorIntegration = "0.11"
-TaylorSeries = "0.13"
+TaylorSeries = "0.14"
 julia = "1.6"
 
 [extras]

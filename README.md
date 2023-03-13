@@ -15,7 +15,7 @@ Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
 
 ## Installation
 
-The current development version of this package may be installed in Julia via:
+The current version of this package may be installed in Julia pkg manager via:
 ```
 ] add NEOs
 ```
@@ -27,7 +27,7 @@ script may be called as:
 
 `julia-1.6 --project apophis.jl --help`
 
-`NEOs.propagate_dense` also supports multi-threading:
+`NEOs.propagate` also supports multi-threading:
 
 `julia-1.6 -t <number-of-threads> --project apophis.jl --help`
 

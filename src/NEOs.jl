@@ -6,7 +6,7 @@ module NEOs
 export unknowncat, isunknown, read_catalogues_mpc, parse_catalogues_mpc, write_catalogues_mpc, update_catalogues_mpc, 
        search_cat_code
 # ObservatoryMPC 
-export hascoord, unknownobs, isunknown, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, 
+export unknownobs, hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc, 
        update_observatories_mpc, search_obs_code
 # RadecMPC
 export num, tmpdesig, discovery, publishnote, obstech, ra, dec, info1, mag, band, catalogue, info2, observatory, 
@@ -43,7 +43,7 @@ import PlanetaryEphemeris, SatelliteToolbox, RemoteFiles
 
 using Distributed, JLD, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
       Dates, EarthOrientation, SPICE, Quadmath, LazyArtifacts, DataFrames, TaylorSeries,
-      InteractiveUtils
+      InteractiveUtils, AutoHashEquals
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pole_rotation, 
       au, c_au_per_day, R_sun, c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx, 
       Ry, Rz, semimajoraxis, eccentricity, inclination, longascnode, argperi, timeperipass, 

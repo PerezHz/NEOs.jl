@@ -1,30 +1,4 @@
 @doc raw"""
-    kmsec2auday(pv)
-
-Convert a `[x, y, z, v_x, v_y, v_z]` state vector from km, km/sec to au, au/day.
-
-See also [`auday2kmsec`](@ref).
-"""
-function kmsec2auday(pv)
-    pv /= au          # (km, km/sec) -> (au, au/sec)
-    pv[4:6] *= daysec # (au, au/sec) -> (au, au/day)
-    return pv
-end
-
-@doc raw"""
-    auday2kmsec(pv)
-
-Convert a `[x, y, z, v_x, v_y, v_z]` state vector from au, au/day to km, km/sec.
-
-See also [`kmsec2auday`](@ref).
-"""
-function auday2kmsec(pv)
-    pv *= au          # (au, au/day) -> (km, km/day)
-    pv[4:6] /= daysec # (km, km/day) -> (km, km/sec)
-    return pv
-end
-
-@doc raw"""
     julian2etsecs(jd)
 
 Convert `jd` julian days to ephemeris seconds since J2000.

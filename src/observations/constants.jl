@@ -1,7 +1,18 @@
+# Internal paths 
+
 # Path to NEOs src directory 
 const src_path = dirname(pathof(NEOs))
 # Path to NEOs observations directory
 const observations_path = joinpath(src_path, "observations")
+# Path to MPC catalogues file 
+const CatalogueCodes_path = joinpath(observations_path, "CatalogueCodes.txt")
+
+# URLs
+
+# MPC catalogues file url 
+const mpc_catalogues_url = "https://minorplanetcenter.net/iau/info/CatalogueCodes.html"
+# MPC observatories file url 
+const mpc_observatories_url = "https://minorplanetcenter.net/iau/lists/ObsCodes.html"
 
 # Integration parameters
 const order = 30

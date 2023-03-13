@@ -8,22 +8,13 @@ An astrometric reference catalogue in MPC format. The format is described in htt
 - `code::String`: catalogue's identifier. 
 - `name::String`: catalogue's name.
 """
-struct CatalogueMPC
+@auto_hash_equals struct CatalogueMPC
     code::String
     name::String
     # Inner constructor
     function CatalogueMPC(code::String, name::String)
         return new(code, name)
     end
-end
-
-# Two CatalogueMPC are equal if ther code and name are equal
-function hash(a::CatalogueMPC, h::UInt)
-    return hash((a.code, a.name), h)
-end
-
-function ==(a::CatalogueMPC, b::CatalogueMPC)
-    return hash(a) == hash(b)
 end
 
 @doc raw"""
@@ -44,7 +35,6 @@ function isunknown(m::CatalogueMPC)
     return m == unknowncat()
 end 
 
-
 # Print method for CatalogueMPC 
 # Examples: 
 # Unknown catalogue
@@ -57,9 +47,6 @@ function show(io::IO, m::CatalogueMPC)
     end
 end
 
-# MPC catalogues file url 
-const mpc_catalogues_url = "https://minorplanetcenter.net/iau/info/CatalogueCodes.html"
-
 # Regular expression to parse a catalogue in MPC format
 const mpc_catalogue_regex = r"\s{2}(?P<code>\w{1})\s{4}(?P<name>.*)"
 
@@ -68,7 +55,10 @@ const mpc_catalogue_regex = r"\s{2}(?P<code>\w{1})\s{4}(?P<name>.*)"
 
 Convert a match of `NEOs.mpc_catalogue_regex` to `CatalogueMPC`.
 """
-CatalogueMPC(m::RegexMatch) = CatalogueMPC(string(m["code"]), string(m["name"]))
+function CatalogueMPC(m::RegexMatch) 
+    @assert m.regex == mpc_catalogue_regex "Only matches of `NEOs.mpc_catalogue_regex` can be converted to `CatalogueMPC`."
+    return CatalogueMPC(string(m["code"]), string(m["name"]))
+end 
 
 @doc raw"""
     read_catalogues_mpc(filename::String)
@@ -76,6 +66,8 @@ CatalogueMPC(m::RegexMatch) = CatalogueMPC(string(m["code"]), string(m["name"]))
 Return the matches of `NEOs.mpc_catalogue_regex` in `filename` as `CatalogueMPC`.
 """
 function read_catalogues_mpc(filename::String)
+    # Check that file exists 
+    @assert isfile(filename) "Invalid filename"
     # Read lines of mpc formatted file (except header)
     lines = readlines(filename)[2:end]
     # Apply regular expressions
@@ -84,6 +76,8 @@ function read_catalogues_mpc(filename::String)
     filter!(!isnothing, matches)
     # Convert matches to CatalogueMPC
     cats = CatalogueMPC.(matches)
+    # Eliminate repeated entries 
+    unique!(cats)
     
     return cats
 end
@@ -119,12 +113,13 @@ function parse_catalogues_mpc(text::String)
     for m in eachmatch(mpc_catalogue_regex, text)
         push!(cats, CatalogueMPC(m))
     end
+
+    # Eliminate repeated entries 
+    unique!(cats)
     
     return cats 
 end
 
-# Path to MPC catalogues file 
-const CatalogueCodes_path = joinpath(observations_path, "CatalogueCodes.txt")
 # List of MPC catalogues 
 const mpc_catalogues = Ref{Vector{CatalogueMPC}}(read_catalogues_mpc(CatalogueCodes_path))
 
@@ -134,16 +129,16 @@ const mpc_catalogues = Ref{Vector{CatalogueMPC}}(read_catalogues_mpc(CatalogueCo
 Convert `cat` to a string according to MPC format.
 """
 function mpc_catalogue_str(cat::CatalogueMPC)
-    # Code string 
-    code_s = join(["  ", cat.code, "    "])
-    # Join everything
-    cat_s = join([
-        code_s,
-        cat.name,
-        "\n"
-    ])
+    if isunknown(cat)
+        return ""
+    else 
+        # Code string 
+        code_s = join(["  ", cat.code, "    "])
+        # Join everything
+        cat_s = join([code_s, cat.name])
 
-    return cat_s
+        return cat_s
+    end
 end
 
 @doc raw"""
@@ -158,7 +153,7 @@ function write_catalogues_mpc(cats::Vector{CatalogueMPC}, filename::String)
         # Write observatories 
         for i in eachindex(cats)
             line = mpc_catalogue_str(cats[i])
-            write(file, line)
+            write(file, line, "\n")
         end 
     end
 end
@@ -190,7 +185,7 @@ end
 @doc raw"""
     search_cat_code(catcode::String)
 
-Return the catalogue in `NEOs.mpc_cataloges` that matches `catcode`.
+Return the catalogue in `NEOs.mpc_catalogues` that matches `catcode`.
 """
 function search_cat_code(catcode::String)
     
@@ -201,7 +196,7 @@ function search_cat_code(catcode::String)
     # No catalog matches catcode
     if L_i == 0
         catalogue = unknowncat()
-    # At least one catalogue matches catcode
+    # Exactly one catalogue matches catcode
     else
         catalogue = mpc_catalogues[][idxs[1]]
         # More than one catalogue matches catcode
