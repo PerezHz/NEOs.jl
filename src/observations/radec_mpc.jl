@@ -55,6 +55,10 @@ function RadecMPC(num::String, tmpdesig::String, discovery::String, publishnote:
                 catalogue, info2, observatory)
 end
 
+function RadecMPC(date::DateTime, α::T, δ::T, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
+    RadecMPC{T}("", "", "", "", "", date, α, δ, "", "", "", unknowncat(), "", observatory)
+end 
+
 # Two RadecMPC are equal if ther date, α, δ and observatory are equal
 function hash(a::RadecMPC{T}, h::UInt) where {T <: AbstractFloat}
     return hash((a.date, a.α, a.δ, a.observatory), h)

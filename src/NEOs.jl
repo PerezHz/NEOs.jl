@@ -29,7 +29,7 @@ export compute_delay, radar_astrometry
 # Gauss method 
 export gauss_method
 # Asteroid dynamical models 
-export RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
+export RNp1BP_pN_A_J23E_J2S_ng_eph!, RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!
 # Propagate 
 export propagate, propagate_lyap, propagate_root, save2jldandcheck
 
@@ -47,7 +47,7 @@ using Distributed, JLD, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, L
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pole_rotation, 
       au, c_au_per_day, R_sun, c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx, 
       Ry, Rz, semimajoraxis, eccentricity, inclination, longascnode, argperi, timeperipass, 
-      nbodyind, PE, ordpres_differentiate, numberofbodies
+      nbodyind, PE, ordpres_differentiate, numberofbodies, kmsec2auday
 using Healpix: ang2pixRing, Resolution
 using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_ΔAT, JD_J2000, EOPData_IAU1980, 
       rECItoECI, DCM, TOD, GCRF, ITRF, rECItoECI, PEF, satsv, EOPData_IAU2000A
