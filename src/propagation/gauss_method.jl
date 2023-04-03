@@ -13,6 +13,16 @@ function neo_pos_topo(obs::RadecMPC{T}) where {T <: AbstractFloat}
     return pos
 end
 
+function neo_pos_topo(α::T, δ::T) where {T <: Number}
+    
+    sin_α, cos_α = sincos(α)
+    sin_δ, cos_δ = sincos(δ)
+
+    pos = [cos_δ * cos_α, cos_δ * sin_α, sin_δ]
+
+    return pos
+end
+
 @doc raw"""
     obs_pv_hel(obs::RadecMPC{T}) where {T <: AbstractFloat}
 

@@ -16,11 +16,10 @@ Return `true` and the numerator of the asteroid's radial velocity with respect t
 - `t`: time. 
 """
 function rvelea(dx, x, eph, params, t)
-    jd0 = params[4]                                # Julian date of start time
-    dsj2k = t+(jd0-JD_J2000)                       # Days since J2000.0 = 2.451545e6
-    ss16asteph_t = evaleph(eph[1], dsj2k, x[1]) # params[2](t)*one(q[1]) # ss16asteph(t)
+
     N = params[6]                                  # Number of bodies in the ephemeris
-    xe = ss16asteph_t[nbodyind(N-1,ea)]            # Earth's ephemeris 
+    xe = params[1][nbodyind(N-1,ea)]               # Earth's ephemeris 
+    
     return true, (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
 end
 
@@ -168,7 +167,7 @@ function taylor_roots(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
     # Initial guess
     xnewton::T = x0
     #@show xnewton
-    # Newton iteration 
+    # Newton iteration  
     for i in 1:niters
         # Newton update rule 
         xnewton -= pol(xnewton)/dpol(xnewton)

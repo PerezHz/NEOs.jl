@@ -35,6 +35,13 @@ end
 datetime2et(x::T) where {T <: AbstractObservation} = datetime2et(x.date)
 
 @doc raw"""
+    et_to_200X(et::T) where {T <: Number}
+
+Convert `et` ephemeris seconds since J2000 to years `200X`. 
+"""
+et_to_200X(et::T) where {T <: Number} = 2000 + et/daysec/yr
+
+@doc raw"""
     tdb_utc(et::T) where {T<:Number}
 
 Auxiliary function to compute (TDB-UTC)
