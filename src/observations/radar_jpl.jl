@@ -28,7 +28,7 @@ A radar measurement in JPL format.
 Convert a match of `NEOs.jpl_radar_regex` to `RadarJPL`. A `Val{false}` indicates that one or both of the measurements 
 (time delay or Doppler shift) are missing. 
 """
-struct RadarJPL{T <: AbstractFloat} <: AbstractObservation
+@auto_hash_equals struct RadarJPL{T <: AbstractFloat} <: AbstractObservation
     id::String
     date::DateTime
     Δτ::T
@@ -52,15 +52,6 @@ end
 function RadarJPL(id::String, date::DateTime, Δτ::T, Δτ_σ::T, Δτ_units::String, Δν::T, Δν_σ::T, Δν_units::String, freq::T, 
                       rcvr::ObservatoryMPC{T}, xmit::ObservatoryMPC{T}, bouncepoint::String) where {T <: AbstractFloat}
     return RadarJPL{T}(id, date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, xmit, bouncepoint)
-end
-
-# Two RadarJPL are equal if ther date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, xmit and bouncepoint are equal
-function hash(a::RadarJPL{T}, h::UInt) where {T <: AbstractFloat}
-    return hash((a.date, a.Δτ, a.Δτ_σ, a.Δτ_units, a.Δν, a.Δν_σ, a.Δν_units, a.freq, a.rcvr, a.xmit, a.bouncepoint), h)
-end
-
-function ==(a::RadarJPL{T}, b::RadarJPL{T}) where {T <: AbstractFloat}
-    return hash(a) == hash(b)
 end
 
 @doc raw"""

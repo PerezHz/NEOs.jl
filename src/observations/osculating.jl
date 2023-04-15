@@ -13,7 +13,7 @@ Osculating orbital elements of a NEO.
 - `i::T`: inclination [deg]. 
 - `a::T`: semimajor axis [au].
 """
-struct OsculatingElements{T <: AbstractFloat}
+@auto_hash_equals struct OsculatingElements{T <: AbstractFloat}
     e::T
     q::T
     tp::T

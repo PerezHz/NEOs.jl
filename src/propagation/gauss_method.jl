@@ -210,11 +210,11 @@ function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T
 end
 
 @doc raw"""
-    stumpC(z::T) where {T <: Real}
+    stumpC(z::T) where {T <: Number}
 
 Evaluate Stumpff function C(z). 
 """
-function stumpC(z::T) where {T <: Real}
+function stumpC(z::T) where {T <: Number}
     if z > 0
         c = (1 - cos(sqrt(z))) / z
     elseif z < 0
@@ -227,11 +227,11 @@ function stumpC(z::T) where {T <: Real}
 end
 
 @doc raw"""
-    stumpS(z::T) where {T <: Real}
+    stumpS(z::T) where {T <: Number}
 
 Evaluate Stumpff function S(z). 
 """
-function stumpS(z::T) where {T <: Real}
+function stumpS(z::T) where {T <: Number}
     if z > 0
         s = (sqrt(z) - sin(sqrt(z))) / sqrt(z)^3
     elseif z < 0

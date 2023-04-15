@@ -23,7 +23,7 @@ and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.20
 - `info2::String`: additional information. 
 - `observatory::ObservatoryMPC{T}`: observatory. 
 """
-struct RadecMPC{T <: AbstractFloat} <: AbstractObservation
+@auto_hash_equals struct RadecMPC{T <: AbstractFloat} <: AbstractObservation
     num::String 
     tmpdesig::String
     discovery::String
@@ -58,15 +58,6 @@ end
 function RadecMPC(date::DateTime, α::T, δ::T, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
     RadecMPC{T}("", "", "", "", "", date, α, δ, "", "", "", unknowncat(), "", observatory)
 end 
-
-# Two RadecMPC are equal if ther date, α, δ and observatory are equal
-function hash(a::RadecMPC{T}, h::UInt) where {T <: AbstractFloat}
-    return hash((a.date, a.α, a.δ, a.observatory), h)
-end
-
-function ==(a::RadecMPC{T}, b::RadecMPC{T}) where {T <: AbstractFloat}
-    return hash(a) == hash(b)
-end
 
 # Print method for RadecMPC
 # Examples: 
