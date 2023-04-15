@@ -41,7 +41,7 @@ function isnan(osc::OsculatingElements{T}) where {T <: AbstractFloat}
     return isnan(osc.e) && isnan(osc.q) && isnan(osc.tp) && isnan(osc.Ω) && isnan(osc.ω) && isnan(osc.i) && isnan(osc.a)
 end
 
-# Print method fot OsculatingElements
+# Print method for OsculatingElements
 # Example: 
 # Semimajor axis (a):                 0.8717319220347314 au
 # Eccentricity (e):                   0.4231715487782969
