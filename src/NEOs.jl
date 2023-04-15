@@ -2,6 +2,8 @@ module NEOs
 
 # __precompile__(false)
 
+# Constants
+export d_EM_km, d_EM_au
 # CatalogueMPC
 export unknowncat, isunknown, read_catalogues_mpc, parse_catalogues_mpc, write_catalogues_mpc, update_catalogues_mpc, 
        search_cat_code
@@ -15,7 +17,8 @@ export num, tmpdesig, discovery, publishnote, obstech, ra, dec, info1, mag, band
 export hasdelay, hasdoppler, ismonostatic, date, delay_doppler, delay, delay_sigma, delay_units, doppler, doppler_sigma, 
        doppler_units, freq, rcvr, xmit, bouncepoint, read_radar_jpl, write_radar_jpl
 # Units 
-export kmsec2auday, auday2kmsec, julian2etsecs, etsecs2julian, datetime2et, et_to_200X, rad2arcsec, arcsec2rad, mas2rad
+export kmsec2auday, auday2kmsec, julian2etsecs, etsecs2julian, datetime2et, et_to_200X, days_to_200X, datetime_to_200X,
+       datetime2days, days2datetime, rad2arcsec, arcsec2rad, mas2rad
 # JPL Ephemerides 
 export loadjpleph, sun_pv, earth_pv, moon_pv, apophis_pv_197, apophis_pv_199
 # Osculating 

@@ -59,3 +59,7 @@ const clightkms = 2.99792458E5   # km/sec
 const c_p2 = 29979.063823897606      # c^2 = 29979.063823897606 au^2/d^2
 const c_m2 = 3.3356611996764786e-5   # c^-2 = 3.3356611996764786e-5 d^2/au^2
 
+# Earth-Moon distance in [km]
+const d_EM_km = 384_400
+# Earth-Moon distance in [au]
+const d_EM_au = 384_400 / au

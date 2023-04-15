@@ -42,6 +42,34 @@ Convert `et` ephemeris seconds since J2000 to years `200X`.
 et_to_200X(et::T) where {T <: Number} = 2000 + et/daysec/yr
 
 @doc raw"""
+    days_to_200X(jd::T) where {T <: Number}
+
+Convert `jd` julian days since J2000 to years `200X`. 
+"""
+days_to_200X(jd::T) where {T <: Number} = 2000 + jd/yr
+
+@doc raw"""
+    datetime_to_200X(x::DateTime)
+
+Convert `x` to years `200X`. 
+"""
+datetime_to_200X(x::DateTime) = et_to_200X(datetime2et(x))
+
+@doc raw"""
+    datetime2days(x::DateTime)
+
+Convert `x` to julian days since 2000. 
+"""
+datetime2days(x::DateTime) = datetime2julian(x) - JD_J2000
+
+@doc raw"""
+    days2datetime(x::DateTime)
+
+Convert `jd` julian days since 2000 to `DateTime`. 
+"""
+days2datetime(jd::T) where {T <: Number} = julian2datetime(jd + JD_J2000)
+
+@doc raw"""
     tdb_utc(et::T) where {T<:Number}
 
 Auxiliary function to compute (TDB-UTC)
