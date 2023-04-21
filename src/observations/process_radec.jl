@@ -534,3 +534,41 @@ function radec_astrometry(outfilename::String, opticalobsfile::String, asteph::T
 
     return nothing
 end
+
+@doc raw"""
+    residuals(obs::Vector{RadecMPC{T}}, niter::Int = 10; eo::Bool = true, debias_table::String = "2018",
+              xvs::Function = sun_pv, xve::Function = earth_pv, xva::Function = apophis_pv_197) where {T <: AbstractFloat}
+
+Compute optical O-C residuals.
+
+See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and [`radec_astrometry`](@ref). 
+
+# Arguments
+
+- `obs::Vector{RadecMPC{T}}`: vector of observations.
+- `niter::Int`: number of light-time solution iterations.
+- `eo::Bool`: compute corrections due to Earth orientation, LOD, polar motion.
+- `debias_table::String`: possible values are:
+    - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
+    - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
+    - `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596. 
+- `xvs::Function`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `xve::Function`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `xva::Function`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+"""
+function residuals(obs::Vector{RadecMPC{T}}, niter::Int = 10; eo::Bool = true, debias_table::String = "2018",
+                   xvs::Function = sun_pv, xve::Function = earth_pv, xva::Function = apophis_pv_197) where {T <: AbstractFloat}
+
+    # Optical astrometry (dates + observed + computed + debiasing + weights)
+    x_jt = radec_astrometry(obs, niter; eo = eo, debias_table = debias_table, xvs = xvs, xve = xve, xva = xva)
+    # Right ascension residuals 
+    res_α = x_jt[2] .- x_jt[6] .- x_jt[4]
+    # Declination residuals 
+    res_δ = x_jt[3] .- x_jt[7] .- x_jt[5]
+    # Total residuals 
+    res = vcat(res_α, res_δ)
+    # Weights 
+    w = repeat(1 ./ x_jt[end].^2, 2)
+
+    return res, w 
+end 

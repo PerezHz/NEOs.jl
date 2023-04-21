@@ -26,7 +26,7 @@ export OsculatingElements, pv2kep, yarkp2adot
 # Topocentric
 export obs_pos_ECEF, obs_pv_ECI, t2c_rotation_iau_76_80
 # Process radec 
-export compute_radec, debiasing, w8sveres17, radec_astrometry
+export compute_radec, debiasing, w8sveres17, radec_astrometry, residuals
 # Process radar 
 export compute_delay, radar_astrometry
 # Gauss method 
