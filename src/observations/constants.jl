@@ -16,6 +16,9 @@ const mpc_catalogues_url = "https://minorplanetcenter.net/iau/info/CatalogueCode
 # MPC observatories file url 
 const mpc_observatories_url = "https://minorplanetcenter.net/iau/lists/ObsCodes.html"
 
+# Abbreviations
+const cte = constant_term
+
 # Integration parameters
 const order = 30
 const abstol = 1.0E-30

@@ -57,7 +57,7 @@ using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_ΔAT, JD_J200
 using StaticArrays: SVector, SArray, @SVector
 using Dates: format 
 using HTTP: get
-using IntervalRootFinding: roots, Interval, mid 
+using IntervalRootFinding: roots, interval, Interval, mid 
 
 include("observations/process_radar.jl")
 include("propagation/propagation.jl")

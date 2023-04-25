@@ -1,19 +1,46 @@
-@doc raw"""
-    neo_pos_topo(obs::RadecMPC{T}) where {T <: AbstractFloat}
+@auto_hash_equals struct GaussSolution{T <: Real, U <: Number}
+    r_2_vec::Vector{U}
+    v_2_vec::Vector{U}
+    D::Matrix{U}
+    R_vec::Matrix{T}
+    ρ_vec::Matrix{U}
+    τ_1::T 
+    τ_3::T
+    f_1::U
+    g_1::U
+    f_3::U 
+    g_3::U 
+    success::Bool
+    # Internal constructor 
+    function GaussSolution{T, U}(r_2_vec::Vector{U}, v_2_vec::Vector{U}, D::Matrix{U}, R_vec::Matrix{T}, ρ_vec::Matrix{U},
+                                 τ_1::T, τ_3::T, f_1::U, g_1::U, f_3::U, g_3::U, success::Bool) where {T <: Real, U <: Number}
+        return new{T, U}(r_2_vec, v_2_vec, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, success)
+    end 
+end 
+# Outer constructor 
+function GaussSolution(r_2_vec::Matrix{U}, v_2_vec::Vector{U}, D::Matrix{U}, R_vec::Matrix{T}, ρ_vec::Matrix{U}, 
+                       τ_1::T, τ_3::T, f_1::U, g_1::U, f_3::U, g_3::U, success::Bool) where {T <: Real, U <: Number}
+    return GaussSolution(r_2_vec, v_2_vec, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, success)
+end 
 
-Return the NEO's topocentric position unit vector.
-"""
-function neo_pos_topo(obs::RadecMPC{T}) where {T <: AbstractFloat}
-    
-    sin_α, cos_α = sincos(obs.α)
-    sin_δ, cos_δ = sincos(obs.δ)
+function isless(a::GaussSolution{T, U}, b::GaussSolution{T, U}) where {T <: Real, U <: Number} 
+    return norm(cte.(a.r_2_vec)) < norm(cte.(b.r_2_vec))
+end 
 
-    pos = [cos_δ * cos_α, cos_δ * sin_α, sin_δ]
-
-    return pos
+# Print method for GaussSolution
+# Examples: 
+# 
+function show(io::IO, g::GaussSolution{T, U}) where {T <: Real, U <: Number} 
+    print(io, "Gauss solution (r = ", norm(cte.(g.r_2_vec)), ")")
 end
 
-function neo_pos_topo(α::T, δ::T) where {T <: Number}
+@doc raw"""
+    topounit(α::T, δ::T) where {T <: Number}
+    topounit(obs::RadecMPC{T}) where {T <: AbstractFloat}
+
+Return the topocentric unit vector.
+"""
+function topounit(α::T, δ::T) where {T <: Number}
     
     sin_α, cos_α = sincos(α)
     sin_δ, cos_δ = sincos(δ)
@@ -23,36 +50,14 @@ function neo_pos_topo(α::T, δ::T) where {T <: Number}
     return pos
 end
 
-@doc raw"""
-    obs_pv_hel(obs::RadecMPC{T}) where {T <: AbstractFloat}
-
-Return the observer's  heliocentric `[x, y, z, v_x, v_y, v_z]` state vector in units of au, au/day. 
-"""
-function obs_pv_hel(obs::RadecMPC{T}) where {T <: AbstractFloat}
-
-    # Geocentric state vector of the observer [km, km/s] 
-    g_vec = obs_pv_ECI(obs)
-
-    # ET secs 
-    et = datetime2et(obs)
-    # Barycentric state vector of the Sun [km, km/s]
-    S_vec = sun_pv(et)
-    # Barycentric state vector of the Earth [km, km/s]
-    E_vec = earth_pv(et)
-
-    # Heliocentric state vector of the Earth [km, km/s]
-    G_vec = E_vec - S_vec
-
-    # Heliocentric state vector of the observer [au, au/day]
-    return kmsec2auday(G_vec + g_vec)
-end
+topounit(obs::RadecMPC{T}) where {T <: AbstractFloat} = topounit(obs.α, obs.δ)
 
 @doc raw"""
     f_Lagrange(r, τ)
 
 Return the 1st order approximation to Lagrange's f function. 
 """
-function f_Lagrange(r, τ)
+function f_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
     return 1 - μ_S * (τ^2) / 2 / (r^3)
 end
 
@@ -61,13 +66,16 @@ end
     
 Return the 1st order approximation to Lagrange's g function.
 """
-function g_Lagrange(r, τ)
+function g_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
     return τ - μ_S * (τ^3) / 6 / (r^3)
 end
 
-function vectors2matrix(x::T) where {T <: AbstractVector}
-    return permutedims(reduce(hcat, x))
-end
+@doc raw"""
+    vectors2matrix(x::T) where {T <: AbstractVector}
+
+Convert a vector of vectors `x` to a matrix.
+"""
+vectors2matrix(x::T) where {T <: AbstractVector} = permutedims(reduce(hcat, x))
 
 function _format_Lagrange_equation(a, b, c)
     a_sgn = a ≥ 0 ? "+" : "-"
@@ -87,8 +95,39 @@ function _format_solutions(sol)
     return join(["{ ", s..., " }"])
 end 
 
+lagrange(x, a, b, c) = x^8 + a*x^6 + b*x^3 + c
+lagrange_derivative(x, a, b) = 8*x^7 + 6*a*x^5 + 3*b*x^2
+
+function solve_lagrange(a::T, b::T, c::T) where {T <: Real}
+
+    sol = roots(x -> lagrange(x, a, b, c), Interval(0.00465047, 40))
+    return mid.(interval.(sol)) 
+
+end 
+
+function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T}) where {T <: Real}
+
+    sol_0_ = roots(x -> lagrange(x, cte(a), cte(b), cte(c)), Interval(0.00465047, 40))
+    sol_0 = mid.(interval.(sol_0_))
+
+    sol = Vector{TaylorN{T}}(undef, length(sol_0))
+
+    for i in eachindex(sol_0)
+        r_0 = sol_0[i] 
+        r_2 = sol_0[i] 
+        for i in 1:5
+            r_2 = r_0 - lagrange(r_0, a, b, c) / lagrange_derivative(r_0, a, b)
+            r_0 = r_2
+        end 
+        sol[i] = r_2
+    end
+
+    return sol 
+end 
+
 @doc raw"""
-    gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T <: AbstractFloat}
+    gauss_method(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T <: AbstractFloat}
+    gauss_method(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T <: AbstractFloat}
 
 Core Gauss method of Initial Orbit determination (IOD). See Algorithm 5.5 in page 274 https://doi.org/10.1016/C2016-0-02107-1.
 
@@ -97,34 +136,57 @@ Core Gauss method of Initial Orbit determination (IOD). See Algorithm 5.5 in pag
 - `obs::Vector{RadecMPC{T}}`: three observations.
 - `root_idx::Int = 1`: index of Lagrange equation solution in case of multiple roots. 
 """
-function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T <: AbstractFloat}
-
-    # Check we have exactly three observations 
-    m = length(obs)
-    @assert m == 3 "Core Gauss method requires exactly three observations, got $m"
-
-    # Sucess of gauss core method 
-    success = true 
-
+function gauss_method(obs::Vector{RadecMPC{T}}; xve::Function = et -> kmsec2auday(getpv(399, 10, et)), niter::Int = 10) where {T <: AbstractFloat}
+    
     # Make sure observations are in temporal order 
     sort!(obs)
 
-    # Julian dates of observation 
-    t = datetime2julian.(date.(obs))
+    # Sites of observation
+    observatories = observatory.(obs)
+
+    # Dates of observation 
+    dates = date.(obs)
+
+    # Right ascension
+    α = ra.(obs)
+
+    # Declination
+    δ = dec.(obs)
+
+    return gauss_method(observatories, dates, α, δ; xve = xve, niter = niter)
+end 
+
+function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime}, α::Vector{U}, δ::Vector{U};
+                      xve::Function = et -> kmsec2auday(getpv(399, 10, et)), niter::Int = 10) where {T <: Real, U <: Number}
+
+    # Check we have exactly three observations 
+    @assert length(observatories) == length(dates) == length(α) == length(δ) == 3 "Gauss method requires exactly three observations"
+
+    # Julian days of observation
+    t_julian = datetime2julian.(dates)
 
     # Time intervals 
-    τ_1 = t[1] - t[2]
-    τ_3 = t[3] - t[2]
+    τ_1 = t_julian[1] - t_julian[2]
+    τ_3 = t_julian[3] - t_julian[2]
     τ = τ_3 - τ_1
 
     # NEO's topocentric position unit vectors 
-    ρ_vec = vectors2matrix(neo_pos_topo.(obs))
+    ρ_vec = vectors2matrix(topounit.(α, δ))
 
-    # Observer's heliocentric positions 
-    R_vec = vectors2matrix(obs_pv_hel.(obs))[:, 1:3]
+    # Times of observation [et]
+    t_et = datetime2et.(dates)
+
+    # Geocentric state vector of the observer [au, au/day] 
+    g_vec = kmsec2auday.(obs_pv_ECI.(observatories, t_et))
+
+    # Heliocentric state vector of the Earth [au, au/day]
+    G_vec = xve.(t_et)
+
+    # Observer's heliocentric positions [au, au/day]
+    R_vec = vectors2matrix(G_vec .+  g_vec)[:, 1:3]
 
     # Cross products 
-    p_vec = zeros(3, 3)
+    p_vec = zeros(U, 3, 3)
     p_vec[1, :] = cross(ρ_vec[2, :], ρ_vec[3, :])
     p_vec[2, :] = cross(ρ_vec[1, :], ρ_vec[3, :])
     p_vec[3, :] = cross(ρ_vec[1, :], ρ_vec[2, :]) 
@@ -133,7 +195,7 @@ function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T
     D_0 = dot(ρ_vec[1, :], p_vec[1, :])
 
     # Matrix of triple products 
-    D = zeros(3, 3)
+    D = zeros(U, 3, 3)
     for i in 1:3
         for j in 1:3
             D[i, j] = dot(R_vec[i, :], p_vec[j, :]) 
@@ -153,60 +215,58 @@ function gauss_method_core(obs::Vector{RadecMPC{T}}; root_idx::Int = 1) where {T
     b = -2*μ_S*B*(A + E)
     c = -(μ_S^2)*(B^2)
 
-    # Find roots of Lagrange equation 
-    sol = roots(x -> x^8 + a*x^6 + b*x^3 + c, Interval(0.00465047, 40))
+    # Solve Lagrange equation 
+    sol = solve_lagrange(a, b, c)
+
+    # Number of solutions 
     n_sol = length(sol)
 
     if n_sol == 0
-
-        success = false 
-
-        @warn("""No solutions found for Lagrange equation $(_format_Lagrange_equation(a, b, c)); 
-        Cannot procede""")
-
-        return fill(NaN, 3, 3), fill(NaN, 3), D, R_vec, ρ_vec, τ_1, τ_3, NaN, NaN, NaN, NaN, fill(NaN, 3), t, success
-
-    elseif n_sol == 1
         
-        r_2 = mid(sol[1].interval)
+        @warn("""No solutions found for Lagrange equation $(_format_Lagrange_equation(cte(a), cte(b), cte(c)))""")
+
+        return Vector{GaussSolution{T, U}}(undef, 0)
 
     else 
 
-        sort!(sol, by = x -> mid(x.interval))
-        r_2 = mid(sol[root_idx].interval)
+        sol_gauss = Vector{GaussSolution{T, U}}(undef, n_sol)
 
-        @warn("""More than one solution $(_format_solutions(sol)) found for Lagrange equation $(_format_Lagrange_equation(a, b, c));
-        Selecting root with index $root_idx""")
+        for i in eachindex(sol_gauss)
+            # Heliocentric range 
+            r_2 = sol[i]
+            # Slant ranges 
+            ρ = zeros(U, 3)
+
+            num_1 = 6*(D[3, 1]*τ_1/τ_3 + D[2, 1]*τ/τ_3)*(r_2^3) + μ_S*D[3, 1]*(τ^2 - τ_1^2)*τ_1/τ_3
+            den_1 = 6*(r_2^3) + μ_S*(τ^2 - τ_3^2)
+            ρ[1] = (num_1 / den_1 - D[1, 1]) / D_0
+
+            ρ[2] = A + μ_S*B/(r_2^3)
+
+            num_3 = 6*(D[1, 3]*τ_3/τ_1 - D[2, 3]*τ/τ_1)*(r_2^3) + μ_S*D[1, 3]*(τ^2 - τ_3^2)*τ_3/τ_1
+            den_3 = 6*(r_2^3) + μ_S*(τ^2 - τ_1^2)
+            ρ[3] = (num_3 / den_3 - D[3, 3]) / D_0
+
+            # Heliocentric position of the NEO 
+            r_vec = R_vec .+ ρ.*ρ_vec
+
+            # f, g Lagrange coefficients
+            f_1 = f_Lagrange(τ_1, r_2)
+            f_3 = f_Lagrange(τ_3, r_2)
+
+            g_1 = g_Lagrange(τ_1, r_2)
+            g_3 = g_Lagrange(τ_3, r_2)
+
+            # Heliocentric velocity of the NEO 
+            v_2_vec = (- f_3 * r_vec[1, :] + f_1 * r_vec[3, :]) / (f_1*g_3 - f_3*g_1)
+
+            sol_gauss[i] = GaussSolution{T, U}(r_vec[2, :], v_2_vec, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, true)
+        end 
+
+        return sort!(sol_gauss)
 
     end 
-
-    # Slant ranges 
-    ρ = zeros(3)
-
-    num_1 = 6*(D[3, 1]*τ_1/τ_3 + D[2, 1]*τ/τ_3)*(r_2^3) + μ_S*D[3, 1]*(τ^2 - τ_1^2)*τ_1/τ_3
-    den_1 = 6*(r_2^3) + μ_S*(τ^2 - τ_3^2)
-    ρ[1] = (num_1 / den_1 - D[1, 1]) / D_0
-
-    ρ[2] = A + μ_S*B/(r_2^3)
-
-    num_3 = 6*(D[1, 3]*τ_3/τ_1 - D[2, 3]*τ/τ_1)*(r_2^3) + μ_S*D[1, 3]*(τ^2 - τ_3^2)*τ_3/τ_1
-    den_3 = 6*(r_2^3) + μ_S*(τ^2 - τ_1^2)
-    ρ[3] = (num_3 / den_3 - D[3, 3]) / D_0
-
-    # Heliocentric position of the NEO 
-    r_vec = R_vec .+ ρ.*ρ_vec
-
-    # f, g Lagrange coefficients
-    f_1 = f_Lagrange(r_2, τ_1)
-    f_3 = f_Lagrange(r_2, τ_3)
-
-    g_1 = g_Lagrange(r_2, τ_1)
-    g_3 = g_Lagrange(r_2, τ_3)
-
-    # Heliocentric velocity of the NEO 
-    v_2_vec = (- f_3 * r_vec[1, :] + f_1 * r_vec[3, :]) / (f_1*g_3 - f_3*g_1)
-
-    return r_vec, v_2_vec, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, ρ, t, success
+    
 end
 
 @doc raw"""
@@ -450,65 +510,3 @@ function gauss_method_iterator(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, at
 
     return r_vec, v_2_vec, ρ, t, success
 end 
-
-@doc raw"""
-    gauss_method(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, atol = 3e-14, ref_iters::Int = 10, 
-                 root_idx::Int = 1) where {T <: AbstractFloat}
-
-Gauss method of IOD. 
-
-# Arguments 
-
-- `obs::Vector{RadecMPC{T}}`: observations. 
-- `kep_iters::Int`: number of iterations for Newton's method. 
-- `atol::T`: absolute tolerance. 
-- `ref_iters::Int`:: number of refinement iterations.
-- `root_idx::Int`: index of Lagrange equation solution in case of multiple roots. 
-"""
-function gauss_method(obs::Vector{RadecMPC{T}}; kep_iters::Int = 10, atol = 3e-14, ref_iters::Int = 10, 
-                      root_idx::Int = 1) where {T <: AbstractFloat}
-    
-    # Number of observations 
-    m = length(obs)
-
-    # Vector of osculating orbita elements 
-    osc = Vector{OsculatingElements{T}}(undef, m-2)
-    
-    # Iterate over consecutive triplets 
-    for j in 1:m-2
-        # Current triplet
-        obs_ = obs[[j, j+1, j+2]]
-        # Gauss method 
-        r_vec, v_2_vec, ρ, t, success = gauss_method_iterator(obs_; kep_iters = kep_iters, atol = atol, ref_iters = ref_iters,
-                                                              root_idx = root_idx)
-
-        if !success
-            osc[j] = OsculatingElements()
-        end
-
-        # Correct times for light propagation                                                              
-        for k in eachindex(t)
-            t[k] = t[k] - ρ[k] / c_au_per_day
-        end
-        # Try computing orbital elements 
-        try
-            osc[j] = pv2kep(vcat(r_vec[2, :], v_2_vec), μ_S, t[2])
-        catch
-            @warn "Cannot compute orbital elements for state vector $(vcat(r_vec[2, :], v_2_vec)) at epoch $(t[2])"
-            osc[j] = OsculatingElements()
-        end
-
-    end
-
-    # Eliminate NaN orbital elements 
-    filter!(!isnan, osc)
-
-    if length(osc) == 0
-        @warn("Cannot compute orbital elements for any triplet.")
-        return OsculatingElements()
-    end 
-
-    # Average orbital elements 
-    return mean(osc)
-
-end

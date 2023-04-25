@@ -4,7 +4,7 @@ include("jetcoeffs.jl")
 include("integration_methods.jl")
 
 @doc raw"""
-    rvelea(dx, x, params, t)
+    rvelea(dx, x, eph, params, t)
 
 Return `true` and the numerator of the asteroid's radial velocity with respect to the Earth.
 
@@ -12,6 +12,7 @@ Return `true` and the numerator of the asteroid's radial velocity with respect t
 
 - `dx`: asteroid's velocities. 
 - `x`: asteroid's degrees of freedom. 
+- `eph`: ephemeris. 
 - `params`: parameters (ephemeris + accelerations + newtonian N body potential + julian date of start time + matrix of extended body interactions + number of bodies + mass parameters). 
 - `t`: time. 
 """
@@ -187,6 +188,21 @@ function scaling(a::Taylor1{Taylor1{T}}, c::T) where {T<:Real}
 end
 
 @doc raw"""
+    scaled_variables(c::Vector{T} = fill(1e-6, 6), names::String = "δx"; order::Int = 5) where {T <: Real}
+
+Equivalent to `TaylorSeries.set_variables` times a scaling given by `c`. 
+"""
+function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6); order::Int = 5) where {T <: Real}
+    # Set TaylorN variables
+    dq = set_variables(T, names, order = order, numvars = length(c))
+    # Scale jet transport perturbation
+    for i in eachindex(dq)
+        dq[i][1][i] = c[i]
+    end
+    return dq 
+end 
+
+@doc raw"""
     propagate_params(jd0::T, ss16asteph_et::TaylorInterpolant, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], 
                      order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number}
 
@@ -312,12 +328,12 @@ for V_dense in V_true_false
 
     @eval begin
 
-        function propagate(dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
-                           q0::Vector{U}, ::$V_dense; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, 
-                           abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number}
+        function propagate(dynamics::Function, maxsteps::Int, jd0::T, tspan::T, sseph::TaylorInterpolant, q0::Vector{U}, 
+                           ::$V_dense; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol, 
+                           parse_eqs::Bool = true) where {T <: Real, U <: Number}
 
             # Parameters for apophisinteg 
-            _q0, _t0, _eph, _params = propagate_params(jd0, ss16asteph_et, q0; μ_ast = μ_ast, order = order, abstol = abstol)
+            _q0, _t0, _eph, _params = propagate_params(jd0, sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
 
             # Final time of integration (days)
             _tmax = _t0 + tspan*yr 
@@ -332,21 +348,37 @@ for V_dense in V_true_false
 
         end
 
-        function propagate(dynamics::Function, maxsteps::Int, jd0::T1, tspan::T2, ss16asteph_et::TaylorInterpolant,
-                           q0::Vector{U}, ::$V_dense; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, 
-                           abstol::T3 = abstol, parse_eqs::Bool = true) where {T1, T2, T3 <: Real, U <: Number}
+        function propagate(dynamics::Function, maxsteps::Int, jd0::T1, tspan::T2, sseph::TaylorInterpolant, q0::Vector{U}, 
+                           ::$V_dense; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T3 = abstol, 
+                           parse_eqs::Bool = true) where {T1, T2, T3 <: Real, U <: Number}
+
             _jd0, _tspan, _abstol = promote(jd0, tspan, abstol)
-            return propagate(dynamics, maxsteps, _jd0, _tspan, ss16asteph_et, q0, $V_dense(); μ_ast = μ_ast, order = order,
+
+            return propagate(dynamics, maxsteps, _jd0, _tspan, sseph, q0, $V_dense(); μ_ast = μ_ast, order = order,
                              abstol = _abstol, parse_eqs = parse_eqs)
         end 
 
-        function propagate_root(dynamics::Function, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
-                                q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, 
-                                nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, 
-                                abstol::T = abstol) where {T <: Real, U <: Number}
+        function propagate(dynamics::Function, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, sseph::TaylorInterpolant, 
+                           q0::Vector{U}, ::$V_dense; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
+                           parse_eqs::Bool = true) where {T <: Real, U <: Number}
+
+            # Backward integration
+            bwd = propagate(dynamics, maxsteps, jd0, nyears_bwd, sseph, q0, $V_dense(); μ_ast = μ_ast, order = order, 
+                            abstol = abstol, parse_eqs = parse_eqs)
+            # Forward integration 
+            fwd = propagate(dynamics, maxsteps, jd0, nyears_fwd, sseph, q0, $V_dense(); μ_ast = μ_ast, order = order, 
+                            abstol = abstol, parse_eqs = parse_eqs)
+
+            return bwd, fwd 
+
+        end 
+
+        function propagate_root(dynamics::Function, maxsteps::Int, jd0::T, tspan::T, sseph::TaylorInterpolant, q0::Vector{U},
+                                ::$V_dense; parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T), 
+                                μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number}
 
             # Parameters for apophisinteg 
-            _q0, _t0, _eph, _params = propagate_params(jd0, ss16asteph_et, q0; μ_ast = μ_ast, order = order, abstol = abstol)
+            _q0, _t0, _eph, _params = propagate_params(jd0, sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
             
             # Final time of integration (days)
             _tmax = _t0 + tspan*yr 
@@ -360,15 +392,31 @@ for V_dense in V_true_false
 
         end
 
-        function propagate_root(dynamics::Function, maxsteps::Int, jd0::T1, tspan::T2, ss16asteph_et::TaylorInterpolant,
-            q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, 
-            nrabstol::T3 = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, 
-            abstol::T4 = abstol) where {T1, T2, T3, T4 <: Real, U <: Number}
+        function propagate_root(dynamics::Function, maxsteps::Int, jd0::T1, tspan::T2, sseph::TaylorInterpolant, q0::Vector{U}, 
+                                ::$V_dense; parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T3 = eps(T), 
+                                μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T4 = abstol) where {T1, T2, T3, T4 <: Real, U <: Number}
 
             _jd0, _tspan, _nrabstol, _abstol = promote(jd0, tspan, nrabstol, abstol)
-            return propagate_root(dynamics, maxsteps, _jd0, _tspan, ss16asteph_et, q0, $V_dense(); parse_eqs = parse_eqs,
+
+            return propagate_root(dynamics, maxsteps, _jd0, _tspan, sseph, q0, $V_dense(); parse_eqs = parse_eqs,
                                   eventorder = eventorder, newtoniter = newtoniter, nrabstol = _nrabstol, μ_ast = μ_ast,
                                   order = order, abstol = _abstol)
+        end
+
+        function propagate_root(dynamics::Function, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, sseph::TaylorInterpolant, 
+                                q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, 
+                                nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number}
+
+            # Backward integration
+            bwd, tvS_bwd, xvS_bwd, gvS_bwd = propagate_root(dynamics, maxsteps, jd0, nyears_bwd, sseph, q0, $V_dense(); parse_eqs = parse_eqs,
+                                                            eventorder = eventorder, newtoniter = newtoniter, nrabstol = nrabstol,
+                                                            μ_ast = μ_ast, order = order, abstol = abstol)
+            # Forward integration 
+            fwd, tvS_fwd, xvS_fwd, gvS_fwd = propagate_root(dynamics, maxsteps, jd0, nyears_fwd, sseph, q0, $V_dense(); parse_eqs = parse_eqs,
+                                                            eventorder = eventorder, newtoniter = newtoniter, nrabstol = nrabstol,
+                                                            μ_ast = μ_ast, order = order, abstol = abstol)
+
+            return bwd, tvS_bwd, xvS_bwd, gvS_bwd, fwd, tvS_fwd, xvS_fwd, gvS_fwd 
 
         end
 

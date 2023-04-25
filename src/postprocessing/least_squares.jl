@@ -158,11 +158,9 @@ See also [`BHC`](@ref).
 - `x_0`: First guess for the initial conditions.
 - `niters`: Number of iterations.
 """
-function diffcorr(res, w, x0, niters=5)
+function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
     # Have as many residuals as weights
     @assert length(res) == length(w)
-    # Number of observations
-    nobs = length(res)
     # Degrees of freedom
     npar = length(x0)
     # Design matrix B, H array and normal matrix C
@@ -170,25 +168,43 @@ function diffcorr(res, w, x0, niters=5)
     # D matrix: transpose(B) * W * ξ
     D_mat = B_mat' * (w .* res)
     # ξTH_mat = ξTH(w, res, H_mat, npar)
+    # Vector of x 
+    x = Matrix{T}(undef, niters + 1, npar) 
     # First guess
-    x_new = x0
+    x[1, :] = x0
+    # Vector of errors 
+    error = Vector{T}(undef, niters + 1)
+    # Error of first guess 
+    error[1] = T(Inf)
     # Iteration
     for i in 1:niters
         # D matrix evaluated in x_new
-        D = D_mat(x_new)
+        D = D_mat(x[i, :])
         # C matrix evaluated in x_new
-        C = C_mat(x_new) #.+ ξTH_mat(x_new)
+        C = C_mat(x[i, :]) #.+ ξTH_mat(x_new)
         # Update rule
         Δx = - inv(C)*D
-        x_new = x_new .+ Δx
-        @show sqrt(((Δx')*(C*Δx))/npar)
+        # New x 
+        x[i+1, :] = x[i, :] + Δx 
+        # Error 
+        error2 = ( (Δx') * (C*Δx) ) / npar
+        if error2 ≥ 0
+            error[i+1] = sqrt(error2)
+        # The method do not converge
+        else 
+            return false, x[i+1, :], inv(C)
+        end 
     end
+    # Index with the lowest error 
+    i = argmin(error)
+    # x with the lowest error 
+    x_new = x[i, :]
     # Normal C matrix evaluated in x_new
     C = C_mat(x_new)
     # Covariance matrix
     Γ = inv(C)
-
-    return x_new, Γ
+    
+    return true, x_new, Γ
 end
 
 @doc raw"""
@@ -219,7 +235,7 @@ See also [`chi2`](@ref).
 - `x_0`: First guess for the initial conditions.
 - `niters`: Number of iterations.
 """
-function newtonls(res, w, x0, niters=5)
+function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
     # Have as many residuals as weights
     @assert length(res) == length(w)
     # Number of observations
@@ -228,27 +244,45 @@ function newtonls(res, w, x0, niters=5)
     npar = length(x0)
     # Mean square residual
     Q = chi2(res, w)/nobs
+    # Vector of x 
+    x = Matrix{T}(undef, niters + 1, npar) 
     # First guess
-    x_new = x0
+    x[1, :] = x0
+    # Vector of errors 
+    error = Vector{T}(undef, niters + 1)
+    # Error of first guess 
+    error[1] = T(Inf)
     # Iteration
     for i in 1:niters
-        # Gradient of Q with respect to x_0
-        dQ = TaylorSeries.gradient(Q)(x_new)
-        # Hessian of Q with respect to x_0
-        d2Q = TaylorSeries.hessian(Q, x_new)
+        # Gradient of Q with respect to x
+        dQ = TaylorSeries.gradient(Q)(x[i, :])
+        # Hessian of Q with respect to x
+        d2Q = TaylorSeries.hessian(Q, x[i, :])
         # Newton update rule
         Δx = - inv(d2Q)*dQ
-        x_new = x_new + Δx
+        # New x 
+        x[i+1, :] = x[i, :] + Δx
         # Normal matrix
         C = d2Q/(2/nobs) # C = d2Q/(2/m)
-        @show sqrt(((Δx')*(C*Δx))/npar)
+        # Error 
+        error2 = ( (Δx') * (C*Δx) ) / npar
+        if error2 ≥ 0
+            error[i+1] = sqrt(error2)
+        # The method do not converge
+        else 
+            return false, x[i+1, :], inv(C)
+        end 
     end
+    # Index with the lowest error 
+    i = argmin(error)
+    # x with the lowest error 
+    x_new = x[i, :]
     # Normal matrix
     C = TaylorSeries.hessian(Q, x_new)/(2/nobs) # C = d2Q/(2/m)
     # Covariance matrix
     Γ = inv(C)
 
-    return x_new, Γ
+    return true, x_new, Γ
 end
 
 @doc raw"""
