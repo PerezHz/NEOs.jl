@@ -62,6 +62,14 @@ lazy = true
     sha256 = "d9b1c3d944f671eca8177e29384accbdb5f4b3fbe4603a4bb2e0bdbf7a900fb4"
     url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/naif0012.tar.gz"
 
+[sseph_p100]
+git-tree-sha1 = "7d5e74f46f84db8bce330e84c3c0d11c9e2157c1"
+lazy = true
+
+    [[sseph_p100.download]]
+    sha256 = "7d5e74f46f84db8bce330e84c3c0d11c9e2157c1"
+    url = "https://github.com/LuEdRaMo/sseph/raw/main/sseph343ast016_p100y_et.jld2"
+
 [ttmtdb_DE430_1995_2030]
 git-tree-sha1 = "9e0c56a8987df7426aad09829332f04b014e6264"
 lazy = true

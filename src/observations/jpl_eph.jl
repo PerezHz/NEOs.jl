@@ -123,3 +123,9 @@ See also [`getpv`](@ref).
 """
 dtt_tdb(et) = getpv(1000000001, 1000000000, constant_term(et))[4] # units: seconds/seconds
 
+# TO DO: Add documentation 
+# To DO: Allow to load ephemeris only up to certain time 
+function loadeph()
+    eph = JLD2.load(joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2"), "ss16ast_eph")
+    return eph 
+end 

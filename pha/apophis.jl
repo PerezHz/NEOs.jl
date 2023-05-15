@@ -64,17 +64,22 @@ function parse_commandline()
     return parse_args(s)
 end
 
-function main(objname::String, dynamics::Function, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T, 
-              nyears_fwd::T, ss16asteph_et::TaylorInterpolant, order::Int, varorder::Int, abstol::T, 
-              parse_eqs::Bool) where {T <: Real}
+function print_header(header::String)
+    L = length(header)
+    println(repeat("-", L))
+    println(header)
+    println(repeat("-", L))
+end 
+
+function main(dynamics::Function, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T, nyears_fwd::T, 
+              ss16asteph_et::TaylorInterpolant, order::Int, varorder::Int, abstol::T, parse_eqs::Bool) where {T <: Real}
     
     # Perturbation to nominal initial condition (Taylor1 jet transport)
-    dq = set_variables("δx", order = varorder, numvars = 8)
-    for i in 1:6
-        dq[i][1][i] = 1e-8
-    end
-    dq[7][1][7] = 1e-14
-    dq[8][1][8] = 1e-13
+    # vcat(fill(1e-8, 6), 1e-14, 1e-13) are the scaling factors for jet transport perturbation, 
+    # these are needed to ensure expansion coefficients remain small. 
+    # The magnitudes correspond to the typical order of magnitude of errors in 
+    # position/velocity (1e-8), Yarkovsky (1e-13) and radiation pressure (1e-14)
+    dq = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14, 1e-13), order = varorder)
 
     # Initial conditions from Apophis JPL solution #197
     q00 = kmsec2auday(apophis_pv_197(datetime2et(jd0_datetime)))
@@ -83,28 +88,26 @@ function main(objname::String, dynamics::Function, maxsteps::Int, jd0_datetime::
     # Initial date (in julian days)
     jd0 = datetime2julian(jd0_datetime)
 
-    println("*** Integrator warmup")
+    print_header("Integrator warmup")
     sol = NEOs.propagate(dynamics, 1, jd0, nyears_fwd, ss16asteph_et, q0, Val(true); 
                          order = order, abstol = abstol, parse_eqs = parse_eqs)
-    println("*** Finished warmup")
     
-    println("*** Full jet transport integration")
+    print_header("Main integration")
     tmax = nyears_bwd*yr 
-    println("Initial time of integration: ", string(jd0_datetime))
-    println("Final time of integration: ", julian2datetime(jd0 + tmax))
+    println("• Initial time of integration: ", string(jd0_datetime))
+    println("• Final time of integration: ", julian2datetime(jd0 + tmax))
 
     sol = NEOs.propagate(dynamics, maxsteps, jd0, nyears_bwd, ss16asteph_et, q0, Val(true); 
                          order = order, abstol = abstol, parse_eqs = parse_eqs)
-    save2jldandcheck(objname*"_bwd", (asteph = sol,))
+    save2jldandcheck("Apophis_bwd", (asteph = sol,))
 
     tmax = nyears_fwd*yr 
-    println("Initial time of integration: ", string(jd0_datetime))
-    println("Final time of integration: ", julian2datetime(jd0 + tmax))
+    println("• Initial time of integration: ", string(jd0_datetime))
+    println("• Final time of integration: ", julian2datetime(jd0 + tmax))
 
     sol = NEOs.propagate(dynamics, maxsteps, jd0, nyears_fwd, ss16asteph_et, q0, Val(true), 
                          order = order, abstol = abstol, parse_eqs = parse_eqs)
-    save2jldandcheck(objname*"_fwd", (asteph = sol,))
-    println("*** Finished asteroid ephemeris integration")
+    save2jldandcheck("Apophis_fwd", (asteph = sol,))
     
     nothing 
     
@@ -112,11 +115,15 @@ end
 
 function main()
 
+    # Parse arguments from commandline 
     parsed_args = parse_commandline()
     
+    print_header("Asteroid Apophis")
+    print_header("General parameters")
+
     # Number of threads 
     N_threads = Threads.nthreads()
-    println("Number of threads: ", N_threads)
+    println("• Number of threads: ", N_threads)
 
     # Dynamical function 
     if N_threads == 1
@@ -124,33 +131,43 @@ function main()
     else 
         dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
     end 
-    println("Dynamical function: ", dynamics)
+    println("• Dynamical function: ", dynamics)
 
-    objname = "Apophis"
     # Maximum number of steps 
     maxsteps = parsed_args["maxsteps"]
+    println("• Maximum number of steps: ", maxsteps)
+
     # Initial date 
     jd0_datetime = parsed_args["jd0"]
+
     # Number of years in backward integration
     nyears_bwd = parsed_args["nyears_bwd"]
+
     # Number of years in forward integration
     nyears_fwd = parsed_args["nyears_fwd"]
 
     # Solar system ephemeris 
-    println("Loading Solar System ephemeris...")
+    print("• Loading Solar System ephemeris... ")
     ss16asteph_et = JLD2.load(parsed_args["ss_eph_file"], "ss16ast_eph")
-    println("Solar System ephemeris loaded")
+    println("Done")
 
     # Order of Taylor polynomials
     order = parsed_args["order"]
+    println("• Order of Taylor polynomials: ", order)
+
     # Order of jet transport perturbation
     varorder = parsed_args["varorder"]
+    println("• Order of jet transport perturbation: ", varorder)
+
     # Absolute tolerance
     abstol = parsed_args["abstol"]
+    println("• Absolute tolerance: ", abstol)
+
     # Wheter to use @taylorize or not 
     parse_eqs = parsed_args["parse_eqs"]
+    println("• Use @taylorize: ", parse_eqs)
 
-    main(objname, dynamics, maxsteps, jd0_datetime,  nyears_bwd, nyears_fwd, ss16asteph_et, 
+    main(dynamics, maxsteps, jd0_datetime,  nyears_bwd, nyears_fwd, ss16asteph_et, 
          order, varorder, abstol, parse_eqs)
 end 
 

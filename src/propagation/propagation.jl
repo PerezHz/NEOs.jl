@@ -1,4 +1,3 @@
-include("gauss_method.jl")
 include("asteroid_dynamical_models.jl")
 include("jetcoeffs.jl")
 include("integration_methods.jl")

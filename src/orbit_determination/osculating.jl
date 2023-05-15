@@ -1,5 +1,5 @@
 @doc raw"""
-    OsculatingElements{T <: AbstractFloat}
+    OsculatingElements{T <: Number}
 
 Osculating orbital elements of a NEO. 
 
@@ -13,7 +13,7 @@ Osculating orbital elements of a NEO.
 - `i::T`: inclination [deg]. 
 - `a::T`: semimajor axis [au].
 """
-@auto_hash_equals struct OsculatingElements{T <: AbstractFloat}
+@auto_hash_equals struct OsculatingElements{T <: Number}
     e::T
     q::T
     tp::T
@@ -22,13 +22,13 @@ Osculating orbital elements of a NEO.
     i::T
     a::T
     # Inner constructor 
-    function OsculatingElements{T}(e::T, q::T, tp::T, Ω::T, ω::T, i::T, a::T) where {T <: AbstractFloat}
+    function OsculatingElements{T}(e::T, q::T, tp::T, Ω::T, ω::T, i::T, a::T) where {T <: Number}
         return new{T}(e, q, tp, Ω, ω, i, a)
     end
 end
 
 # Outer constructors
-function OsculatingElements(e::T, q::T, tp::T, Ω::T, ω::T, i::T, a::T) where {T <: AbstractFloat}
+function OsculatingElements(e::T, q::T, tp::T, Ω::T, ω::T, i::T, a::T) where {T <: Number}
     return OsculatingElements{T}(e, q, tp, Ω, ω, i, a)
 end
 
@@ -37,7 +37,7 @@ function OsculatingElements()
 end
 
 # A OsculatingElements is NaN if all its fields are NaN 
-function isnan(osc::OsculatingElements{T}) where {T <: AbstractFloat} 
+function isnan(osc::OsculatingElements{T}) where {T <: Number} 
     return isnan(osc.e) && isnan(osc.q) && isnan(osc.tp) && isnan(osc.Ω) && isnan(osc.ω) && isnan(osc.i) && isnan(osc.a)
 end
 
@@ -50,24 +50,24 @@ end
 # Argument of pericenter (ω):         194.74654283451 deg
 # Inclination (i):                    34.81327005431841 deg
 # Longitude of Ascending Node (Ω):    17.855086873010706 deg
-function show(io::IO, m::OsculatingElements{T}) where {T <: AbstractFloat} 
+function show(io::IO, m::OsculatingElements{T}) where {T <: Number} 
     
-    print(io, rpad("Semimajor axis (a): ", 36), m.a, " au\n")
-    print(io, rpad("Eccentricity (e): ", 36), m.e, "\n")
+    print(io, rpad("Semimajor axis (a): ", 36), cte(m.a), " au\n")
+    print(io, rpad("Eccentricity (e): ", 36), cte(m.e), "\n")
     if isnan(m.tp)
         print(io, rpad("Time of pericenter passage (tp): ", 36), "NaN JDTDB\n")
     else 
-        print(io, rpad("Time of pericenter passage (tp): ", 36), julian2datetime(m.tp), " JDTDB\n")
+        print(io, rpad("Time of pericenter passage (tp): ", 36), julian2datetime(cte(m.tp)), " JDTDB\n")
     end 
-    print(io, rpad("Pericenter distance (q): ", 36), m.q, " au\n")
-    print(io, rpad("Argument of pericenter (ω): ", 36), m.ω, " deg\n")
-    print(io, rpad("Inclination (i): ", 36), m.i, " deg\n")
-    print(io, rpad("Longitude of Ascending Node (Ω): ", 36), m.Ω, " deg\n")
+    print(io, rpad("Pericenter distance (q): ", 36), cte(m.q), " au\n")
+    print(io, rpad("Argument of pericenter (ω): ", 36), cte(m.ω), " deg\n")
+    print(io, rpad("Inclination (i): ", 36), cte(m.i), " deg\n")
+    print(io, rpad("Longitude of Ascending Node (Ω): ", 36), cte(m.Ω), " deg\n")
 
 end
 
 @doc raw"""
-    pv2kep(xas, μ_S = μ_S, jd = JD_J2000)
+    pv2kep(xas, μ = μ_S, jd = JD_J2000)
 
 Compute the orbital elements of the NEO with state vector `xas`. Return a `OsculatingElements` object. 
 
@@ -77,54 +77,35 @@ See also [`eccentricity`](@ref), [`semimajoraxis`](@ref), [`timeperipass`](@ref)
 # Arguments 
 
 - `xas`: State vector of the asteroid `[x, y, z, v_x, v_y, v_z]`. 
-- `μ_S`: Mass parameter of the Sun.
-- `jd`: Julian days since J2000. 
+- `μ_S`: Mass parameter of the central body (Sun).
+- `jd`: Orbit epoch of reference in julian days. 
 """
-function pv2kep(xas, μ_S = μ_S, jd = JD_J2000)
-    e = eccentricity(xas..., μ_S, 0.0)
-    a = semimajoraxis(xas..., μ_S, 0.0)
+function pv2kep(xas, μ = μ_S, jd = JD_J2000)
+    e = eccentricity(xas..., μ, 0.0)
+    a = semimajoraxis(xas..., μ, 0.0)
     q = a * (1 - e)
-    tp = timeperipass(jd, xas..., μ_S, 0.0)
+    tp = timeperipass(jd, xas..., μ, 0.0)
     Ω = rad2deg(longascnode(xas...))
-    ω = rad2deg(argperi(xas..., μ_S, 0.0))
+    ω = rad2deg(argperi(xas..., μ, 0.0))
     i = rad2deg(inclination(xas...))
     return OsculatingElements(e, q, tp, Ω, ω, i, a)
 end
 
-function mean(osc::Vector{OsculatingElements{T}}) where {T <: AbstractFloat}
-    m = length(osc)
+@doc raw"""
+    (osc::OsculatingElements{T})(t::T) where {T <: Number}
 
-    e = zero(T)
-    q = zero(T)
-    tp = zero(T)
-    Ω = zero(T)
-    ω = zero(T)
-    i = zero(T)
-    a = zero(T)
-
-    for j in 1:m
-        e += osc[j].e
-        q += osc[j].q
-        tp += osc[j].tp
-        Ω += osc[j].Ω
-        ω += osc[j].ω
-        i += osc[j].i
-        a += osc[j].a
-    end
-
-    return OsculatingElements(e/m, q/m, tp/m, Ω/m, ω/m, i/m, a/m)
-end
-
-function (osc::OsculatingElements{T})(t::T) where {T <: AbstractFloat}
+Return cartesian state vector of orbit `osc` at time `t`.
+"""
+function (osc::OsculatingElements{T})(t::T) where {T <: Number}
 
     # Mean motion 
-    n = PlanetaryEphemeris.meanmotion(μ_S, osc.a)
+    n = PE.meanmotion(μ_S, osc.a)
     # Mean anomaly 
-    M = PlanetaryEphemeris.meananomaly(n, t, osc.tp)
+    M = PE.meananomaly(n, t, osc.tp)
     # Eccentric anomaly
-    E = PlanetaryEphemeris.eccentricanomaly(osc.e, M)
+    E = PE.eccentricanomaly(osc.e, M)
     # True anomaly
-    f = PlanetaryEphemeris.trueanomaly(osc.e, E)
+    f = PE.trueanomaly(osc.e, E)
     
     # Distance to the central body 
     r = osc.a * (1 - osc.e^2) / (1 + osc.e * cos(f))
@@ -137,18 +118,15 @@ function (osc::OsculatingElements{T})(t::T) where {T <: AbstractFloat}
     ω = deg2rad(osc.ω)
     i = deg2rad(osc.i)
     Ω = deg2rad(osc.Ω)
-
+    # Rotation from orbital to inertial frame 
     A = Rz(-Ω) * Rx(-i) * Rz(-ω)
     r_i = A * r_o
     v_i = A * v_o
 
+    # State vector 
     pv_i = vcat(r_i, v_i)
 
-    # Barycentric state vector of the sun 
-    et = julian2etsecs(t)
-    sun_bar = kmsec2auday(sun_pv(et))
-
-    return  pv_i .+ sun_bar
+    return  pv_i
 end 
 
 @doc raw"""
@@ -177,3 +155,17 @@ See https://doi.org/10.1016/j.icarus.2013.02.004.
 function yarkp2adot(A2, a, e, μ_S)
     return 2A2/(sqrt(a)*(1-e^2)*sqrt(μ_S))
 end
+
+@doc raw"""
+    equatorial2ecliptic(xas::Vector{T}) where {T <: Number}
+
+Rotate state vector `xas` from equatorial plane to the ecliptic. 
+"""
+function equatorial2ecliptic(xas::Vector{T}) where {T <: Number}
+    # Rotation matrix (only positions)
+    m_eq2ecl = Rx(deg2rad(ϵ0_deg))
+    # Rotational matrix (positions + velocities)
+    m_xv_eq2ecl = hcat(vcat(m_eq2ecl, zeros(3,3)), vcat(zeros(3,3), m_eq2ecl))
+    # Rotated state vector 
+    return m_xv_eq2ecl*xas
+end 

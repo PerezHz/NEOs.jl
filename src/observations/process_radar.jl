@@ -1,11 +1,9 @@
-include("constants.jl")
 include("catalogue_mpc.jl")
 include("observatory_mpc.jl")
 include("radec_mpc.jl")
 include("radar_jpl.jl")
 include("units.jl")
 include("jpl_eph.jl")
-include("osculating.jl")
 include("topocentric.jl")
 include("process_radec.jl")
 

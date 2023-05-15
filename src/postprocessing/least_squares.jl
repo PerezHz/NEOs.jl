@@ -273,6 +273,10 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
             return false, x[i+1, :], inv(C)
         end 
     end
+    # TO DO: study Gauss method solution dependence on jt order 
+    # TO DO: try even varorder 
+    # TO DO: study optimal number of iterations 
+
     # Index with the lowest error 
     i = argmin(error)
     # x with the lowest error 

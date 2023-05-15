@@ -66,3 +66,7 @@ const c_m2 = 3.3356611996764786e-5   # c^-2 = 3.3356611996764786e-5 d^2/au^2
 const d_EM_km = 384_400
 # Earth-Moon distance in [au]
 const d_EM_au = 384_400 / au
+
+# Zeroth order obliquity of the ecliptic in degrees 
+# See equation (5-153) in page 5-61 of https://doi.org/10.1002/0471728470.
+const ϵ0_deg = 84381.448/3_600

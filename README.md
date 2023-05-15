@@ -25,11 +25,11 @@ The current version of this package may be installed in Julia pkg manager via:
 The `apophis.jl` file in the `pha` directory contains an example script. This
 script may be called as:
 
-`julia-1.6 --project apophis.jl --help`
+`julia --project apophis.jl --help`
 
 `NEOs.propagate` also supports multi-threading:
 
-`julia-1.6 -t <number-of-threads> --project apophis.jl --help`
+`julia -t <number-of-threads> --project apophis.jl --help`
 
 ## Acknowledgments
 

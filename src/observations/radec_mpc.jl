@@ -67,7 +67,7 @@ function show(io::IO, m::RadecMPC{T}) where {T <: AbstractFloat}
     # If there is no number, use temporary designation
     id_str = filter(!isspace, m.num) == "" ? m.tmpdesig : m.num
 
-    print(io, id_str, " α: ", m.α, " δ: ", m.δ, " t: ", m.date,
+    print(io, id_str, " α: ", @sprintf("%.5f", rad2deg(m.α)), "° δ: ", @sprintf("%.5f", rad2deg(m.δ)), "° t: ", m.date,
               " obs: ", m.observatory.name)
 end
 
