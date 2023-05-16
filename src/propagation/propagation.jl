@@ -5,7 +5,7 @@ include("integration_methods.jl")
 @doc raw"""
     rvelea(dx, x, eph, params, t)
 
-Return `true` and the numerator of the asteroid's radial velocity with respect to the Earth.
+Return `true` and the asteroid's radial velocity with respect to the Earth.
 
 # Arguments 
 
@@ -13,7 +13,7 @@ Return `true` and the numerator of the asteroid's radial velocity with respect t
 - `x`: asteroid's degrees of freedom. 
 - `eph`: ephemeris. 
 - `params`: parameters (ephemeris + accelerations + newtonian N body potential + julian date of start time + matrix of extended body interactions + number of bodies + mass parameters). 
-- `t`: time. 
+- `t`: time.
 """
 function rvelea(dx, x, eph, params, t)
 
@@ -139,9 +139,9 @@ initial guess and `niters` is the number of iterations.
 """
 function taylor_minimum(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
     # First derivative 
-    dpol = PlanetaryEphemeris.ordpres_differentiate(pol)
+    dpol = PE.ordpres_differentiate(pol)
     # Second derivative
-    dpol2 = PlanetaryEphemeris.ordpres_differentiate(dpol)
+    dpol2 = PE.ordpres_differentiate(dpol)
     # Initial guess
     xnewton::T = x0
     #@show xnewton
@@ -163,7 +163,7 @@ initial guess and `niters` is the number of iterations.
 """
 function taylor_roots(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
     # First derivative
-    dpol = PlanetaryEphemeris.ordpres_differentiate(pol)
+    dpol = PE.ordpres_differentiate(pol)
     # Initial guess
     xnewton::T = x0
     #@show xnewton
@@ -174,16 +174,6 @@ function taylor_roots(pol::Taylor1{T}, x0::T; niters::Int=10) where {T<:Real}
         #@show xnewton, pol(xnewton)
     end
     return xnewton
-end
-
-@doc raw"""
-    scaling(a::Taylor1{Taylor1{T}}, c::T) where {T<:Real}
-
-Scale `a` by a factor `c`. 
-"""
-function scaling(a::Taylor1{Taylor1{T}}, c::T) where {T<:Real}
-    x = c*Taylor1( Taylor1(a.order).coeffs*one(a[0]) )
-    return a(x)
 end
 
 @doc raw"""

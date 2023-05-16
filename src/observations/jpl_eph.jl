@@ -61,7 +61,7 @@ of the Sun at TDB instant `et` with respect to J2000 frame.
 
 See also [`getpv`](@ref).
 """
-sun_pv(et) = getpv(10, 0, constant_term(et)) # units: km, km/second
+sun_pv(et) = getpv(10, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     earth_pv(et)
@@ -71,7 +71,7 @@ of the Earth at TDB instant `et` with respect to J2000 frame.
 
 See also [`getpv`](@ref).
 """
-earth_pv(et) = getpv(399, 0, constant_term(et)) # units: km, km/second
+earth_pv(et) = getpv(399, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     moon_pv(et)
@@ -81,7 +81,7 @@ of the Moon at TDB instant `et` with respect to J2000 frame.
 
 See also [`getpv`](@ref).
 """
-moon_pv(et) = getpv(301, 0, constant_term(et)) # units: km, km/second
+moon_pv(et) = getpv(301, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     apophis_pv_197(et)
@@ -91,7 +91,7 @@ of Apophis at TDB instant `et` from JPL #197 solution with respect to J2000 fram
 
 See also [`getpv`](@ref).
 """
-apophis_pv_197(et) = getpv(9904406, 0, constant_term(et)) # units: km, km/second
+apophis_pv_197(et) = getpv(9904406, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     apophis_pv_199(et)
@@ -101,7 +101,7 @@ of Apophis at TDB instant `et` from JPL #199 solution with respect to J2000 fram
 
 See also [`getpv`](@ref).
 """
-apophis_pv_199(et) = getpv(2099942, 0, constant_term(et)) # units: km, km/second
+apophis_pv_199(et) = getpv(2099942, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     tt_tdb(et)
@@ -111,7 +111,7 @@ frame.
 
 See also [`getpv`](@ref).
 """
-tt_tdb(et) = getpv(1000000001, 1000000000, constant_term(et))[1] # units: seconds
+tt_tdb(et) = getpv(1000000001, 1000000000, cte(et))[1] # units: seconds
 
 @doc raw"""
     dtt_tdb(et)
@@ -121,11 +121,22 @@ to J2000 frame.
 
 See also [`getpv`](@ref).
 """
-dtt_tdb(et) = getpv(1000000001, 1000000000, constant_term(et))[4] # units: seconds/seconds
+dtt_tdb(et) = getpv(1000000001, 1000000000, cte(et))[4] # units: seconds/seconds
 
-# TO DO: Add documentation 
-# To DO: Allow to load ephemeris only up to certain time 
-function loadeph()
+@doc raw"""
+    loadpeeph(et::Union{Nothing, T} = nothing) where {T <: Real}
+
+Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` from Jan 1st 2000 up to `et > 0` [ephemeris seconds since J2000].
+
+Caution: running this function for the first time will download the `sseph_p100` artifact which can take several minutes.  
+"""
+function loadpeeph(et::Union{Nothing, T} = nothing) where {T <: Real}
+    # Load Solar System 2000-2100 ephemeris 
     eph = JLD2.load(joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2"), "ss16ast_eph")
-    return eph 
+    if isnothing(et)
+        return eph 
+    else 
+        idxs = findall(x -> x <= et, eph.t)
+        return TaylorInterpolant(eph.t0, eph.t[idxs], eph.x[idxs[1:end-1], :])
+    end 
 end 

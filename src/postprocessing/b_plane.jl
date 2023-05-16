@@ -47,7 +47,7 @@ function bopik(xae, xes)
     # See equations (37)-(38) in page 14 of https://doi.org/10.1007/s10569-019-9914-4
 
     # Earth's gravitational parameter
-    μ_E = PlanetaryEphemeris.μ[ea]
+    μ_E = PE.μ[ea]
     # Asteroid geocentric range at 2029 closest approach (au)
     rae = sqrt(xae[1]^2 + xae[2]^2 + xae[3]^2)
     # Osculating semimajor axis at closest approach (negative since hyperbolic)

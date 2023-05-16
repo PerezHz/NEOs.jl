@@ -186,7 +186,7 @@ Return IAU 1976/1980 nutation-precession matrix.
 """
 function nupr7680mat(tt, Δϵ_1980, ΔΨ_1980, dde80, ddp80)
     # IAU 1976 precession matrix, J2000.0 to date
-    rp = Rz(-PlanetaryEphemeris.zeta(tt))*Ry(PlanetaryEphemeris.Theta(tt))*Rz(-PlanetaryEphemeris.Zeta(tt))
+    rp = Rz(-PE.zeta(tt))*Ry(PE.Theta(tt))*Rz(-PE.Zeta(tt))
     # Add nutation corrections
     dpsi = ΔΨ_1980 + ddp80   # rad
     deps = Δϵ_1980 + dde80   # rad
@@ -194,7 +194,7 @@ function nupr7680mat(tt, Δϵ_1980, ΔΨ_1980, dde80, ddp80)
     # See Explanatory Supplement to the Astronomical Almanac 1992
     # See equation (5-152) in page (5-60) of https://doi.org/10.1002/0471728470
     # ϵ0 (rad): mean obliquity of the ecliptic
-    ϵ0 = PlanetaryEphemeris.ϵ̄(tt)
+    ϵ0 = PE.ϵ̄(tt)
     # Δϵ (rad): nutation in obliquity
     Δϵ = deps
     # Δψ (rad): nutation in longitude
@@ -286,9 +286,9 @@ function t2c_rotation_iau_76_80(et::T; eo::Bool = true) where {T <: Number}
     # TDB days since J2000.0
     et_days = et/daysec 
     # Mean obliquity (output in radians)
-    epsa = PlanetaryEphemeris.ϵ̄(et_days) # rad
+    epsa = PE.ϵ̄(et_days) # rad
     # Lunar longitude of ascending node (measured from ecliptic)
-    Ω_M = PlanetaryEphemeris.Ω(et_days)  # rad
+    Ω_M = PE.Ω(et_days)  # rad
     # IAU 1980 nutation angles
     _, Δϵ_1980, ΔΨ_1980 = nutation_fk5(JD_J2000 + et_days)
     # Equation of the equinoxes `ee = GAST - GMST`, including nutation correction

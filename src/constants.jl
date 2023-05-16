@@ -24,11 +24,11 @@ const order = 30
 const abstol = 1.0E-30
 
 # Vector of GM's (DE430 values) [au^2 / day^3]
-const μ_DE430 = PlanetaryEphemeris.μ
+const μ_DE430 = PE.μ
 const μ_B16_DE430 = μ_DE430[12:27]     # DE430 GM's of 16 most massive asteroids
 const μ_ast343_DE430 = μ_DE430[12:end] # DE430 GM's of 343 main belt asteroids included in DE430 integration
 # Gravitational parameter of the Sun [au^2 / day^3]
-const μ_S = PlanetaryEphemeris.GMS  
+const μ_S = PE.GMS  
 
 # Standard value of nominal mean angular velocity of Earth (rad/sec)
 # See Explanatory Supplement to the Astronomical Almanac 2014 Sec 7.4.3.3 p. 296

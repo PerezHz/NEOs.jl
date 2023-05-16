@@ -134,7 +134,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter:
     E_H = sqrt(E_H_vec[1]^2 + E_H_vec[2]^2 + E_H_vec[3]^2)
     e_vec = E_H_vec/E_H
     # See ESAA 2014, equation (7.115)
-    g1 = (2PlanetaryEphemeris.μ[su]/(c_au_per_day^2))/(E_H/au) 
+    g1 = (2PE.μ[su]/(c_au_per_day^2))/(E_H/au) 
     g2 = 1 + dot(q_vec, e_vec)
     # See ESAA 2014, equation (7.116)
     u1_vec = U_norm*(  u_vec + (g1/g2)*( dot(u_vec,q_vec)*e_vec - dot(e_vec,u_vec)*q_vec )  ) 

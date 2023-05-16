@@ -28,7 +28,7 @@ See https://doi.org/10.1103/PhysRevLett.13.789.
 """
 function shapiro_delay(e, p, q)
     shap = 0.0 # 2μ[1]/(c_au_per_day^2)
-    shap_del_days = (2PlanetaryEphemeris.μ[su]/(c_au_per_day^3))*log( (e+p+q+shap)/(e+p-q+shap) ) # days
+    shap_del_days = (2PE.μ[su]/(c_au_per_day^3))*log( (e+p+q+shap)/(e+p-q+shap) ) # days
     return shap_del_days*daysec # seconds
 end
 
@@ -56,7 +56,7 @@ See https://doi.org/10.1103/PhysRevLett.17.933.
 """
 function shapiro_doppler(e, de, p, dp, q, dq, F_tx)
     # shap_del_diff = 2μ[1]*( (de+dp+dq)/(e+p+q) - (de+dp-dq)/(e+p-q) )/(c_au_per_day^3) # (adim.)
-    shap_del_diff = (4PlanetaryEphemeris.μ[su]/(c_au_per_day^3))*(  ( dq*(e+p) - q*(de+dp) )/( (e+p)^2 - q^2 )  ) # differential of Shapiro delay (adim.)
+    shap_del_diff = (4PE.μ[su]/(c_au_per_day^3))*(  ( dq*(e+p) - q*(de+dp) )/( (e+p)^2 - q^2 )  ) # differential of Shapiro delay (adim.)
     # ν = -F_tx*dτ/dt (units of F_tx)
     # See footnote 10 of https://doi.org/10.1103/PhysRevLett.17.933
     shap_dop = -F_tx*shap_del_diff
@@ -1059,7 +1059,7 @@ function radar_astrometry_yeomansetal92(observatory::ObservatoryMPC{T}, t_r_utc:
     r_ts = sqrt(r_ts_vec[1]^2+r_ts_vec[2]^2+r_ts_vec[3]^2)
     r_rs_vec = r_r_t_r - r_s_t_r
     r_rs = sqrt(r_rs_vec[1]^2+r_rs_vec[2]^2+r_rs_vec[3]^2)
-    doppler_c2_t2 = (PlanetaryEphemeris.μ[su]*((au^3)/(daysec^2)))*( (1/r_ts) - (1/r_rs) )
+    doppler_c2_t2 = (PE.μ[su]*((au^3)/(daysec^2)))*( (1/r_ts) - (1/r_rs) )
     # Order 1/c^2, last term
     doppler_c2_t3 = (  dot(v_t_t_t, v_t_t_t) - dot(v_r_t_r, v_r_t_r)  )/2
 
