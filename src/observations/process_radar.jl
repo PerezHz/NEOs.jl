@@ -770,7 +770,7 @@ function radar_astrometry(astradarfile::String, niter::Int=10; eo::Bool=true, tc
     et1 = datetime2et(utc1)
     # Asteroid ephemeris at et1
     a1_et1 = xva(et1)[1]
-    # Tipe of asteroid ephemeris 
+    # Type of asteroid ephemeris 
     S = typeof(a1_et1)
 
     # Time delays

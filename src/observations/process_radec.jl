@@ -167,7 +167,7 @@ function compute_radec(obs::Vector{RadecMPC{T}}, niter::Int = 10; eo::Bool = tru
     et1 = datetime2et(utc1)
     # Asteroid ephemeris at et1
     a1_et1 = xva(et1)[1]
-    # Tipe of asteroid ephemeris 
+    # Type of asteroid ephemeris 
     S = typeof(a1_et1)
 
     # Right ascension
@@ -425,7 +425,7 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}, niter::Int = 10; eo::Bool = 
     et1 = datetime2et(utc1)
     # Asteroid ephemeris at et1
     a1_et1 = xva(et1)[1]
-    # Tipe of asteroid ephemeris 
+    # Type of asteroid ephemeris 
     S = typeof(a1_et1)
     
     # Observed right ascension
