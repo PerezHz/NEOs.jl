@@ -91,11 +91,6 @@ end
 obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.observatory)
 obs_pos_ECEF(x::RadarJPL{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.rcvr)
 
-# isless overloads workaround to make rECEFtoECI work with TaylorSeries
-isless(a::Union{Taylor1,TaylorN}, b::Union{Taylor1,TaylorN}) = isless(constant_term(a), constant_term(b))
-isless(a::Real, b::Union{Taylor1,TaylorN}) = isless(a, constant_term(b))
-isless(a::Union{Taylor1,TaylorN}, b::Real) = isless(constant_term(a), b)
-
 @doc raw"""
     obs_pv_ECI(observatory::ObservatoryMPC{T}, et::T; eo::Bool=true, 
                eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
