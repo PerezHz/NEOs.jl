@@ -1,7 +1,7 @@
 @doc raw"""
     julian2etsecs(jd)
 
-Convert `jd` julian days to ephemeris seconds since J2000.
+Convert the Julian date `jd` to ephemeris seconds since J2000.
 
 See also [`etsecs2julian`](@ref).
 """
@@ -12,7 +12,7 @@ end
 @doc raw"""
     etsecs2julian(et)
 
-Convert `et` ephemeris seconds since J2000 to julian days.
+Convert `et` ephemeris seconds since J2000 to Julian date.
 
 See also [`julian2etsecs`](@ref).
 """
@@ -42,32 +42,32 @@ Convert `et` ephemeris seconds since J2000 to years `200X`.
 et_to_200X(et::T) where {T <: Number} = 2000 + et/daysec/yr
 
 @doc raw"""
-    days_to_200X(jd::T) where {T <: Number}
+    days_to_200X(d::T) where {T <: Number}
 
-Convert `jd` julian days since J2000 to years `200X`. 
+Convert `d` days since J2000 to years `200X`. 
 """
-days_to_200X(jd::T) where {T <: Number} = 2000 + jd/yr
+days_to_200X(d::T) where {T <: Number} = 2000 + d/yr
 
 @doc raw"""
     datetime_to_200X(x::DateTime)
 
-Convert `x` to years `200X`. 
+Convert `DateTime` `x` to years `200X`. 
 """
 datetime_to_200X(x::DateTime) = et_to_200X(datetime2et(x))
 
 @doc raw"""
     datetime2days(x::DateTime)
 
-Convert `x` to julian days since 2000. 
+Convert `DateTime` `x` to days since J2000. 
 """
 datetime2days(x::DateTime) = datetime2julian(x) - JD_J2000
 
 @doc raw"""
-    days2datetime(x::DateTime)
+    days2datetime(d::T) where {T <: Number}
 
-Convert `jd` julian days since 2000 to `DateTime`. 
+Convert `d` days since J2000 to `DateTime`. 
 """
-days2datetime(jd::T) where {T <: Number} = julian2datetime(jd + JD_J2000)
+days2datetime(d::T) where {T <: Number} = julian2datetime(d + JD_J2000)
 
 @doc raw"""
     tdb_utc(et::T) where {T<:Number}
@@ -83,8 +83,8 @@ TDB-UTC & = (TDB-TAI) + (TAI-UTC) \\
 where TDB is the Solar System barycentric ephemeris time, TT is the Terrestrial time,
 TAI is the International Atomic Time, and UTC is the Coordinated Universal Time.
 
-This function is useful to convert TDB to UTC via UTC + (TDB-UTC) and viceversa. This function
-does not include correction due to position of measurement station ``v_E(r_S.r_E)/c^2``
+This function is useful to convert TDB to UTC via UTC + (TDB-UTC) and viceversa. It does 
+not include the correction due to the position of the measurement station ``v_E.(r_S-r_E)/c^2``
 (Folkner et al. 2014; Moyer, 2003).
 
 # Arguments

@@ -48,7 +48,7 @@ function bopik(xae, xes)
 
     # Earth's gravitational parameter
     μ_E = PE.μ[ea]
-    # Asteroid geocentric range at 2029 closest approach (au)
+    # Asteroid geocentric range at closest approach [au]
     rae = sqrt(xae[1]^2 + xae[2]^2 + xae[3]^2)
     # Osculating semimajor axis at closest approach (negative since hyperbolic)
     a = semimajoraxis(xae..., μ_E, 0.0)

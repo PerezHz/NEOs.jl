@@ -54,10 +54,10 @@ function parse_commandline()
         examples:\n
         \n
         # Multi-threaded\n
-        julia-1.6 -t 4 --project apophis.jl --maxsteps 100 --nyears_bwd -0.02 --nyears_fwd 0.02 --parse_eqs true\n
+        julia -t 4 --project apophis.jl --maxsteps 100 --nyears_bwd -0.02 --nyears_fwd 0.02 --parse_eqs true\n
         \n
         # Single-threaded\n
-        julia-1.6 --project apophis.jl --maxsteps 100 --nyears_bwd -0.02 --nyears_fwd 0.02 --parse_eqs true\n
+        julia --project apophis.jl --maxsteps 100 --nyears_bwd -0.02 --nyears_fwd 0.02 --parse_eqs true\n
         \n
     """
 
