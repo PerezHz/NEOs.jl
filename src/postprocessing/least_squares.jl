@@ -169,36 +169,38 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
     D_mat = B_mat' * (w .* res)
     # ξTH_mat = ξTH(w, res, H_mat, npar)
     # Vector of x 
-    x = Matrix{T}(undef, niters + 1, npar) 
+    x = Matrix{T}(undef, npar, niters + 1) 
     # First guess
-    x[1, :] = x0
+    x[:, 1] = x0
     # Vector of errors 
     error = Vector{T}(undef, niters + 1)
     # Error of first guess 
     error[1] = T(Inf)
     # Iteration
     for i in 1:niters
-        # D matrix evaluated in x_new
-        D = D_mat(x[i, :])
-        # C matrix evaluated in x_new
-        C = C_mat(x[i, :]) #.+ ξTH_mat(x_new)
+        # Current x
+        xi = x[:, i]
+        # D matrix evaluated in xi
+        D = D_mat(xi)
+        # C matrix evaluated in xi
+        C = C_mat(xi) #.+ ξTH_mat(xi)
         # Update rule
         Δx = - inv(C)*D
         # New x 
-        x[i+1, :] = x[i, :] + Δx 
+        x[:, i+1] = xi + Δx 
         # Error 
         error2 = ( (Δx') * (C*Δx) ) / npar
         if error2 ≥ 0
             error[i+1] = sqrt(error2)
         # The method do not converge
         else 
-            return false, x[i+1, :], inv(C)
+            return false, x[:, i+1], inv(C)
         end 
     end
     # Index with the lowest error 
     i = argmin(error)
     # x with the lowest error 
-    x_new = x[i, :]
+    x_new = x[:, i]
     # Normal C matrix evaluated in x_new
     C = C_mat(x_new)
     # Covariance matrix
@@ -245,23 +247,25 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
     # Mean square residual
     Q = chi2(res, w)/nobs
     # Vector of x 
-    x = Matrix{T}(undef, niters + 1, npar) 
+    x = Matrix{T}(undef, npar, niters + 1) 
     # First guess
-    x[1, :] = x0
+    x[:, 1] = x0
     # Vector of errors 
     error = Vector{T}(undef, niters + 1)
     # Error of first guess 
     error[1] = T(Inf)
     # Iteration
     for i in 1:niters
+        # Current x
+        xi = x[:, i]
         # Gradient of Q with respect to x
-        dQ = TaylorSeries.gradient(Q)(x[i, :])
+        dQ = TaylorSeries.gradient(Q)(xi)
         # Hessian of Q with respect to x
-        d2Q = TaylorSeries.hessian(Q, x[i, :])
+        d2Q = TaylorSeries.hessian(Q, xi)
         # Newton update rule
         Δx = - inv(d2Q)*dQ
         # New x 
-        x[i+1, :] = x[i, :] + Δx
+        x[:, i+1] = xi + Δx
         # Normal matrix
         C = d2Q/(2/nobs) # C = d2Q/(2/m)
         # Error 
@@ -270,7 +274,7 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
             error[i+1] = sqrt(error2)
         # The method do not converge
         else 
-            return false, x[i+1, :], inv(C)
+            return false, x[:, i+1], inv(C)
         end 
     end
     # TO DO: study Gauss method solution dependence on jt order 
@@ -280,7 +284,7 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
     # Index with the lowest error 
     i = argmin(error)
     # x with the lowest error 
-    x_new = x[i, :]
+    x_new = x[:, i]
     # Normal matrix
     C = TaylorSeries.hessian(Q, x_new)/(2/nobs) # C = d2Q/(2/m)
     # Covariance matrix

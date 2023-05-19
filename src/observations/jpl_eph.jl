@@ -28,14 +28,14 @@ function loadjpleph()
 end
 
 @doc raw"""
-    getpv(target::Int, observer::Int, et)
+    getposvel(target::Int, observer::Int, et)
 
 Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec) at
 TDB instant `et` from SPK-formatted ephemeris file with respect to J2000 frame.
 
 See also [`SPICE.spkgeo`](@ref).
 """
-function getpv(target::Int, observer::Int, et)
+function getposvel(target::Int, observer::Int, et)
     return spkgeo(target, et, "J2000", observer)[1] # units: km,km/sec
 end
 
@@ -59,9 +59,9 @@ end
 Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Sun at TDB instant `et` with respect to J2000 frame.
 
-See also [`getpv`](@ref).
+See also [`getposvel`](@ref).
 """
-sun_pv(et) = getpv(10, 0, cte(et)) # units: km, km/second
+sun_pv(et) = getposvel(10, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     earth_pv(et)
@@ -69,9 +69,9 @@ sun_pv(et) = getpv(10, 0, cte(et)) # units: km, km/second
 Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Earth at TDB instant `et` with respect to J2000 frame.
 
-See also [`getpv`](@ref).
+See also [`getposvel`](@ref).
 """
-earth_pv(et) = getpv(399, 0, cte(et)) # units: km, km/second
+earth_pv(et) = getposvel(399, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     moon_pv(et)
@@ -79,9 +79,9 @@ earth_pv(et) = getpv(399, 0, cte(et)) # units: km, km/second
 Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Moon at TDB instant `et` with respect to J2000 frame.
 
-See also [`getpv`](@ref).
+See also [`getposvel`](@ref).
 """
-moon_pv(et) = getpv(301, 0, cte(et)) # units: km, km/second
+moon_pv(et) = getposvel(301, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     apophis_pv_197(et)
@@ -89,9 +89,9 @@ moon_pv(et) = getpv(301, 0, cte(et)) # units: km, km/second
 Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of Apophis at TDB instant `et` from JPL #197 solution with respect to J2000 frame.
 
-See also [`getpv`](@ref).
+See also [`getposvel`](@ref).
 """
-apophis_pv_197(et) = getpv(9904406, 0, cte(et)) # units: km, km/second
+apophis_pv_197(et) = getposvel(9904406, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     apophis_pv_199(et)
@@ -99,9 +99,9 @@ apophis_pv_197(et) = getpv(9904406, 0, cte(et)) # units: km, km/second
 Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of Apophis at TDB instant `et` from JPL #199 solution with respect to J2000 frame.
 
-See also [`getpv`](@ref).
+See also [`getposvel`](@ref).
 """
-apophis_pv_199(et) = getpv(2099942, 0, cte(et)) # units: km, km/second
+apophis_pv_199(et) = getposvel(2099942, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     tt_tdb(et)
@@ -109,9 +109,9 @@ apophis_pv_199(et) = getpv(2099942, 0, cte(et)) # units: km, km/second
 Return the difference TT-TDB (in units of sec) at TDB instant `et` with respect to J2000
 frame.
 
-See also [`getpv`](@ref).
+See also [`getposvel`](@ref).
 """
-tt_tdb(et) = getpv(1000000001, 1000000000, cte(et))[1] # units: seconds
+tt_tdb(et) = getposvel(1000000001, 1000000000, cte(et))[1] # units: seconds
 
 @doc raw"""
     dtt_tdb(et)
@@ -119,9 +119,9 @@ tt_tdb(et) = getpv(1000000001, 1000000000, cte(et))[1] # units: seconds
 Return the rate of change of TT-TDB (in units of sec/sec) at TDB instant `et` with respect
 to J2000 frame.
 
-See also [`getpv`](@ref).
+See also [`getposvel`](@ref).
 """
-dtt_tdb(et) = getpv(1000000001, 1000000000, cte(et))[4] # units: seconds/seconds
+dtt_tdb(et) = getposvel(1000000001, 1000000000, cte(et))[4] # units: seconds/seconds
 
 @doc raw"""
     loadpeeph(et::Union{Nothing, T} = nothing) where {T <: Real}

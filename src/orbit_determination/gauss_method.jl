@@ -162,10 +162,10 @@ function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T}; niter::Int 
 end 
 
 @doc raw"""
-    gauss_method(obs::Vector{RadecMPC{T}}; xve::Function = et -> kmsec2auday(getpv(399, 10, et)), 
+    gauss_method(obs::Vector{RadecMPC{T}}; xve::Function = et -> kmsec2auday(getposvel(399, 10, et)), 
                  niter::Int = 10) where {T <: AbstractFloat}
     gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime}, α::Vector{U}, δ::Vector{U};
-                 xve::Function = et -> kmsec2auday(getpv(399, 10, et)), niter::Int = 5) where {T <: Real, U <: Number}
+                 xve::Function = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: Real, U <: Number}
 
 Core Gauss method of Initial Orbit determination (IOD). See Algorithm 5.5 in page 274 https://doi.org/10.1016/C2016-0-02107-1.
 
@@ -179,7 +179,7 @@ Core Gauss method of Initial Orbit determination (IOD). See Algorithm 5.5 in pag
 - `xve::Function`: Earth's ephemeris [et -> au, au/day]. 
 - `niter::Int`: Number of iterations for Newton's method. 
 """
-function gauss_method(obs::Vector{RadecMPC{T}}; xve::Function = et -> kmsec2auday(getpv(399, 10, et)), niter::Int = 5) where {T <: AbstractFloat}
+function gauss_method(obs::Vector{RadecMPC{T}}; xve::Function = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: AbstractFloat}
     
     # Make sure observations are in temporal order 
     sort!(obs)
@@ -200,7 +200,7 @@ function gauss_method(obs::Vector{RadecMPC{T}}; xve::Function = et -> kmsec2auda
 end 
 
 function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime}, α::Vector{U}, δ::Vector{U};
-                      xve::Function = et -> kmsec2auday(getpv(399, 10, et)), niter::Int = 5) where {T <: Real, U <: Number}
+                      xve::Function = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: Real, U <: Number}
 
     # Check we have exactly three observations 
     @assert length(observatories) == length(dates) == length(α) == length(δ) == 3 "Gauss method requires exactly three observations"
