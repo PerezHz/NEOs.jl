@@ -128,7 +128,7 @@ dtt_tdb(et) = getposvel(1000000001, 1000000000, cte(et))[4] # units: seconds/sec
 
 Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` from Jan 1st 2000 up to `et > 0` [ephemeris seconds since J2000].
 
-Caution: running this function for the first time will download the `sseph_p100` artifact which can take several minutes.  
+**Caution**: running this function for the first time will download the `sseph_p100` artifact (∼554 MB) which can take several minutes.  
 """
 function loadpeeph(et::Union{Nothing, T} = nothing) where {T <: Real}
     # Load Solar System 2000-2100 ephemeris 

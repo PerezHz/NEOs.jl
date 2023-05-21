@@ -1,7 +1,10 @@
-# this script generates Julia artifacts for debiasing tables from
-# Chesley et al. (2010), Farnocchia et al. (2015) and Eggl et al. (2020)
-# TODO: adapt script for julia1.6+
-# TODO: adapt script for 2010 debiasing tables (requires extra unpacking)
+# This script generates Julia artifacts for NEOs.jl, including
+# - debiasing tables from Chesley et al. (2010), Farnocchia et al. (2015) and Eggl et al. (2020)
+# - JPL lsk and spk  
+# - PlanetaryEphemeris.jl Solar System ephemeris 
+
+# TO DO: adapt script for julia1.6+
+# TO DO: adapt script for 2010 debiasing tables (requires extra unpacking)
 
 using Pkg.Artifacts
 using Pkg.PlatformEngines
@@ -11,15 +14,18 @@ using Pkg
 Pkg.PlatformEngines.probe_platform_engines!()
 
 # This is the path to the Artifacts.toml we will manipulate
-artifact_toml = joinpath(dirname(@__DIR__), "Artifacts.toml")
+const artifact_toml = joinpath(dirname(@__DIR__), "Artifacts.toml")
 
-ftp_jpl = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/"
+# JPL FTP URL 
+const ftp_jpl = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/"
 
-names_debias = ["debias", "debias_2014", "debias_2018", "debias_hires2018"]
-urls_debias = ftp_jpl .* names_debias .* ".tgz"
+# Debiasing tables names and URLs  
+const names_debias = ["debias", "debias_2014", "debias_2018", "debias_hires2018"]
+const urls_debias = ftp_jpl .* names_debias .* ".tgz"
 
-names_lsk_spk = ["naif0012", "de430", "TTmTDBde430", "a99942", "ttmtdb_DE430_1995_2030"]
-urls_lsk_spk = [
+# JPL lsk and spk names and URLs 
+const names_lsk_spk = ["naif0012", "de430", "TTmTDBde430", "a99942", "ttmtdb_DE430_1995_2030"]
+const urls_lsk_spk = [
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/naif0012.tar.gz",
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/de430.tar.gz",
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/TTmTDBde430.tar.gz",
@@ -27,8 +33,13 @@ urls_lsk_spk = [
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/ttmtdb_DE430_1995_2030_20221103.tar.gz"
 ]
 
-urls_ = vcat(urls_lsk_spk, urls_debias)
-names_ = vcat(names_lsk_spk, names_debias)
+# PlanetaryEphemeris.jl Solar System ephemeris name and URL 
+const name_sseph = "sseph_p100"
+const url_sseph = "https://github.com/LuEdRaMo/sseph/raw/main/sseph343ast016_p100y_et.tar.gz"
+
+# Collect names and URLs 
+const urls_ = vcat(urls_lsk_spk, urls_debias, url_sseph)
+const names_ = vcat(names_lsk_spk, names_debias, name_sseph)
 
 for (url, name) in map((x,y)->(x,y), urls_, names_)
     # Query the `Artifacts.toml` file for the hash bound to the name
@@ -36,7 +47,7 @@ for (url, name) in map((x,y)->(x,y), urls_, names_)
     artfct_hash = artifact_hash(name, artifact_toml)
 
     # If the name was not bound, or the hash it was bound to does not exist, create it!
-    if artfct_hash == nothing || !artifact_exists(artfct_hash)
+    if isnothing(artfct_hash) || !artifact_exists(artfct_hash)
         tb = Tuple[]
         # create_artifact() returns the content-hash of the artifact directory once we're finished creating it
         artfct_hash = create_artifact() do artifact_dir
@@ -66,5 +77,5 @@ for (url, name) in map((x,y)->(x,y), urls_, names_)
     # Get the path of the artifact, either newly created or previously generated.
     # this should be something like `~/.julia/artifacts/dbd04e28be047a54fbe9bf67e934be5b5e0d357a`
     artfct_path = artifact_path(artfct_hash)
-    @show artfct_path
+    println(name, " artifact saved to ", artfct_path)
 end
