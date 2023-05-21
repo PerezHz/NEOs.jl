@@ -22,7 +22,7 @@ end
 
 @doc raw"""
     datetime2et(x::DateTime)
-    datetime2et(x::T) where {T <: AbstractObservation}
+    datetime2et(x::T) where {T <: AbstractAstrometry}
     
 Retun the TDB seconds past the J2000 epoch.
 
@@ -32,7 +32,7 @@ function datetime2et(x::DateTime)
     return str2et(string(x))
 end
 
-datetime2et(x::T) where {T <: AbstractObservation} = datetime2et(x.date)
+datetime2et(x::T) where {T <: AbstractAstrometry} = datetime2et(x.date)
 
 @doc raw"""
     et_to_200X(et::T) where {T <: Number}

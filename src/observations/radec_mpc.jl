@@ -1,7 +1,7 @@
-abstract type AbstractObservation end
+abstract type AbstractAstrometry end
 
 @doc raw"""
-    RadecMPC{T <: AbstractFloat} <: AbstractObservation
+    RadecMPC{T <: AbstractFloat} <: AbstractAstrometry
 
 An optical (α, δ) measurement in MPC format. The format is described in https://minorplanetcenter.net/iau/info/OpticalObs.html
 and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.2010.06.003.
@@ -23,7 +23,7 @@ and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.20
 - `info2::String`: additional information. 
 - `observatory::ObservatoryMPC{T}`: observatory. 
 """
-@auto_hash_equals struct RadecMPC{T <: AbstractFloat} <: AbstractObservation
+@auto_hash_equals struct RadecMPC{T <: AbstractFloat} <: AbstractAstrometry
     num::String 
     tmpdesig::String
     discovery::String

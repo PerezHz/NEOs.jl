@@ -1,5 +1,5 @@
 @doc raw"""
-    RadarJPL{T <: AbstractFloat} <: AbstractObservation
+    RadarJPL{T <: AbstractFloat} <: AbstractAstrometry
 
 A radar measurement in JPL format.
 
@@ -28,7 +28,7 @@ A radar measurement in JPL format.
 Convert a match of `NEOs.jpl_radar_regex` to `RadarJPL`. A `Val{false}` indicates that one or both of the measurements 
 (time delay or Doppler shift) are missing. 
 """
-@auto_hash_equals struct RadarJPL{T <: AbstractFloat} <: AbstractObservation
+@auto_hash_equals struct RadarJPL{T <: AbstractFloat} <: AbstractAstrometry
     id::String
     date::DateTime
     Δτ::T
@@ -69,7 +69,7 @@ Check whether `r` has a non `NaN` Doppler shift.
 hasdoppler(r::RadarJPL{T}) where {T <: AbstractFloat} = !isnan(r.Δν)
 
 # Order in RadecMPC and RadarJPL is given by date 
-isless(a::T, b::T) where {T <: AbstractObservation} = a.date < b.date
+isless(a::T, b::T) where {T <: AbstractAstrometry} = a.date < b.date
 
 # Print method for RadarJPL
 # Examples: 
@@ -96,7 +96,7 @@ function show(io::IO, r::RadarJPL{T}) where {T <: AbstractFloat}
 end
 
 # Functions to get specific fields of a RadarJPL object 
-date(r::T) where {T <: AbstractObservation} = r.date
+date(r::T) where {T <: AbstractAstrometry} = r.date
 delay(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δτ
 delay_sigma(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δτ_σ
 delay_units(r::RadarJPL{T}) where {T <: AbstractFloat} = r.Δτ_units
