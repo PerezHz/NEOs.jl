@@ -82,7 +82,7 @@ function main(dynamics::Function, maxsteps::Int, jd0_datetime::DateTime, nyears_
     dq = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14, 1e-13), order = varorder)
 
     # Initial conditions from Apophis JPL solution #197
-    q00 = kmsec2auday(apophis_pv_197(datetime2et(jd0_datetime)))
+    q00 = kmsec2auday(apophisposvel197(datetime2et(jd0_datetime)))
     q0 = vcat(q00, 0.0, 0.0) .+ dq
 
     # Initial date (in julian days)

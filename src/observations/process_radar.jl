@@ -241,9 +241,9 @@ end
 
 @doc raw"""
     compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, t_offset::Real, niter::Int = 10; eo::Bool = true, 
-          xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197) where {T <: AbstractFloat}
+          xve = earthposvel, xvs = sunposvel, xva = apophisposvel197) where {T <: AbstractFloat}
     compute_delay(radar::RadarJPL{T}, t_offset::Real, niter::Int = 10; eo::Bool = true, xve = earthposvel, xvs = sunposvel, 
-          xva = apophis_pv_197) where {T <: AbstractFloat}
+          xva = apophisposvel197) where {T <: AbstractFloat}
 
 Compute radar-astrometric round-trip time (``\mu``s).
 
@@ -262,11 +262,11 @@ See https://doi.org/10.1086/116062.
 - `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
 function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, t_offset::Real, niter::Int = 10; eo::Bool = true, 
-               xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197) where {T <: AbstractFloat}
+               xve = earthposvel, xvs = sunposvel, xva = apophisposvel197) where {T <: AbstractFloat}
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = datetime2et(t_r_utc) + t_offset
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    RV_r = obs_pv_ECI(observatory, et_r_secs, eo = eo)
+    RV_r = obsposvelECI(observatory, et_r_secs, eo = eo)
     R_r = RV_r[1:3]
     V_r = RV_r[4:6]
     # Earth's barycentric position and velocity at receive time
@@ -361,7 +361,7 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, t_offs
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_b_secs - τ_U
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    RV_t = obs_pv_ECI(observatory, et_t_secs, eo = eo)
+    RV_t = obsposvelECI(observatory, et_t_secs, eo = eo)
     R_t = RV_t[1:3]
     V_t = RV_t[4:6]
     # Barycentric position and velocity of the Earth at transmit time
@@ -386,7 +386,7 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, t_offs
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
         # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial
         # conditions variations via et_t_secs
-        RV_t = obs_pv_ECI(observatory, et_t_secs, eo = eo)
+        RV_t = obsposvelECI(observatory, et_t_secs, eo = eo)
         R_t = RV_t[1:3]
         V_t = RV_t[4:6]
         # Earth's barycentric position and velocity at the transmit time
@@ -461,15 +461,15 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, t_offs
     return 1e6τ
 end
 function compute_delay(radar::RadarJPL{T}, t_offset::Real, niter::Int = 10; eo::Bool = true, xve = earthposvel, xvs = sunposvel, 
-               xva = apophis_pv_197) where {T <: AbstractFloat}
+               xva = apophisposvel197) where {T <: AbstractFloat}
     return compute_delay(radar.rcvr, radar.date, t_offset, niter; eo = eo, xve = xve, xvs = xvs, xva = xva)
 end 
 
 @doc raw"""
     compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earthposvel, 
-          xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
+          xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophisposvel197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
     compute_delay(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earthposvel, 
-          xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
+          xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophisposvel197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
 
 Compute Taylor series expansion of time-delay observable around echo reception time. This
 allows to compute dopplers via automatic differentiation using
@@ -496,7 +496,7 @@ See https://doi.org/10.1086/116062.
 - `tord::Int`: order of Taylor expansions.
 """
 function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earthposvel, 
-               xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
+               xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophisposvel197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
 
     # Auxiliary to evaluate JT ephemeris
     q1 = xva.x[1]
@@ -505,7 +505,7 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter:
     # et_r_secs_0 a a Taylor polynomial
     et_r_secs = Taylor1([et_r_secs_0,1.0].*one(q1[0]), tord)
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    RV_r = obs_pv_ECI(observatory, et_r_secs, eo = eo)
+    RV_r = obsposvelECI(observatory, et_r_secs, eo = eo)
     R_r = RV_r[1:3]
     # Earth's barycentric position and velocity at receive time
     r_e_t_r = xve(et_r_secs)[1:3]
@@ -596,7 +596,7 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter:
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_b_secs - τ_U
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    RV_t = obs_pv_ECI(observatory, et_t_secs, eo = eo)
+    RV_t = obsposvelECI(observatory, et_t_secs, eo = eo)
     R_t = RV_t[1:3]
     V_t = RV_t[4:6]
     # Barycentric position and velocity of the Earth at transmit time
@@ -621,7 +621,7 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter:
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
         # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial
         # conditions variations via et_t_secs
-        RV_t = obs_pv_ECI(observatory, et_t_secs, eo = eo)
+        RV_t = obsposvelECI(observatory, et_t_secs, eo = eo)
         R_t = RV_t[1:3]
         V_t = RV_t[4:6]
         # Earth's barycentric position and velocity at transmit time
@@ -696,17 +696,17 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter:
 end
 
 function compute_delay(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earthposvel, 
-               xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
+               xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophisposvel197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
     return compute_delay(radar.rcvr, radar.date, niter; eo = eo, xve = xve, xvs = xvs, xva = xva, tord = tord)
 end 
 
 @doc raw"""
     radar_astrometry(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_tx::Real, niter::Int = 10; eo::Bool = true, tc::Real = 1.0,
-                  xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
+                  xve = earthposvel, xvs = sunposvel, xva = apophisposvel197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
     radar_astrometry(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, tc::Real = 1.0, xve = earthposvel, 
-                  xvs = sunposvel, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
+                  xvs = sunposvel, xva = apophisposvel197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
     radar_astrometry(astradarfile::String, niter::Int = 10; eo::Bool = true, tc::Real = 1.0, xve = earthposvel, xvs = sunposvel, 
-                  xva = apophis_pv_197, autodiff::Bool = true, tord::Int=10)
+                  xva = apophisposvel197, autodiff::Bool = true, tord::Int=10)
     radar_astrometry(outfilename::String, radarobsfile::String, asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant; tc::Real=1.0, autodiff::Bool=true, 
                   tord::Int=10, niter::Int=5)
 
@@ -732,7 +732,7 @@ Return time-delay and Doppler shift.
 - `tord::Int`: order of Taylor expansions.
 """
 function radar_astrometry(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_tx::Real, niter::Int = 10; eo::Bool = true, tc::Real = 1.0,
-                       xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
+                       xve = earthposvel, xvs = sunposvel, xva = apophisposvel197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
 
     # Automatic differentiation method of delay
     if autodiff
@@ -752,12 +752,12 @@ function radar_astrometry(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_t
 end
 
 function radar_astrometry(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, tc::Real = 1.0, xve = earthposvel, 
-                       xvs = sunposvel, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
+                       xvs = sunposvel, xva = apophisposvel197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
     return radar_astrometry(radar.rcvr, radar.date, radar.freq, niter; eo = eo, tc = tc, xve = xve, xvs = xvs, xva = xva, autodiff = autodiff, tord = tord)
 end 
 
 function radar_astrometry(astradarfile::String, niter::Int=10; eo::Bool=true, tc::Real=1.0, xve=earthposvel, xvs=sunposvel,
-                       xva=apophis_pv_197, autodiff::Bool=true, tord::Int=10)
+                       xva=apophisposvel197, autodiff::Bool=true, tord::Int=10)
 
     # Check that astradarfile is a file 
     @assert isfile(astradarfile) "Cannot open file: $astradarfile"
@@ -808,9 +808,9 @@ end
 
 @doc raw"""
     radar_astrometry_yeomansetal92(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_tx::Real, niter::Int = 10; eo::Bool = true, 
-                                xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197) where {T <: AbstractFloat}
+                                xve = earthposvel, xvs = sunposvel, xva = apophisposvel197) where {T <: AbstractFloat}
     radar_astrometry_yeomansetal92(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve = earthposvel, xvs = sunposvel, 
-                                xva = apophis_pv_197) where {T <: AbstractFloat}
+                                xva = apophisposvel197) where {T <: AbstractFloat}
 
 Compute round-trip time (in ``\mu``s) and Doppler shift (Hz) radar astrometry. Dopplers are computed following https://doi.org/10.1086/116062.
 
@@ -827,11 +827,11 @@ Compute round-trip time (in ``\mu``s) and Doppler shift (Hz) radar astrometry. D
 - `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
 function radar_astrometry_yeomansetal92(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_tx::Real, niter::Int = 10; eo::Bool = true, 
-                                     xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197) where {T <: AbstractFloat}
+                                     xve = earthposvel, xvs = sunposvel, xva = apophisposvel197) where {T <: AbstractFloat}
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = datetime2et(t_r_utc)
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
-    RV_r = obs_pv_ECI(observatory, et_r_secs, eo = eo)
+    RV_r = obsposvelECI(observatory, et_r_secs, eo = eo)
     R_r = RV_r[1:3]
     V_r = RV_r[4:6]
     # Earth's barycentric position and velocity at receive time
@@ -939,7 +939,7 @@ function radar_astrometry_yeomansetal92(observatory::ObservatoryMPC{T}, t_r_utc:
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_r_secs - (τ_U+τ_D)
     # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    RV_t = obs_pv_ECI(observatory, constant_term(et_t_secs), eo = eo)
+    RV_t = obsposvelECI(observatory, constant_term(et_t_secs), eo = eo)
     R_t = RV_t[1:3]
     V_t = RV_t[4:6]
     # Barycentric position and velocity of the Earth at transmit time
@@ -968,7 +968,7 @@ function radar_astrometry_yeomansetal92(observatory::ObservatoryMPC{T}, t_r_utc:
         # See equation (6) of https://doi.org/10.1086/116062
         et_t_secs = et_r_secs-(τ_U+τ_D)
         # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-        RV_t = obs_pv_ECI(observatory, constant_term(et_t_secs), eo = eo)
+        RV_t = obsposvelECI(observatory, constant_term(et_t_secs), eo = eo)
         R_t = RV_t[1:3]
         V_t = RV_t[4:6]
         # Earth's barycentric position and velocity at the transmit time
@@ -1072,7 +1072,7 @@ function radar_astrometry_yeomansetal92(observatory::ObservatoryMPC{T}, t_r_utc:
 end
 
 function radar_astrometry_yeomansetal92(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve = earthposvel, xvs = sunposvel, 
-                                     xva = apophis_pv_197) where {T <: AbstractFloat}
+                                     xva = apophisposvel197) where {T <: AbstractFloat}
     return radar_astrometry_yeomansetal92(radar.observatory, radar.date, radar.freq, niter, eo = eo, xve = xve, xvs = xvs, xva = xva)
 end 
 

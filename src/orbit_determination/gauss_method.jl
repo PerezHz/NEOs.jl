@@ -220,7 +220,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     t_et = datetime2et.(dates)
 
     # Geocentric state vector of the observer [au, au/day] 
-    g_vec = kmsec2auday.(obs_pv_ECI.(observatories, t_et))
+    g_vec = kmsec2auday.(obsposvelECI.(observatories, t_et))
 
     # Heliocentric state vector of the Earth [au, au/day]
     G_vec = xve.(t_et)

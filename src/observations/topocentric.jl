@@ -92,10 +92,10 @@ obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.observa
 obs_pos_ECEF(x::RadarJPL{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.rcvr)
 
 @doc raw"""
-    obs_pv_ECI(observatory::ObservatoryMPC{T}, et::T; eo::Bool=true, 
+    obsposvelECI(observatory::ObservatoryMPC{T}, et::T; eo::Bool=true, 
                eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
-    obs_pv_ECI(x::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
-    obs_pv_ECI(x::RadarJPL{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+    obsposvelECI(x::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+    obsposvelECI(x::RadarJPL{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
 
 Return the observer's geocentric `[x, y, z, v_x, v_y, v_z]` "state" vector in Earth-Centered Inertial (ECI) reference frame.
 
@@ -108,7 +108,7 @@ See also [`SatelliteToolbox.satsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@
 - `eo::Bool`: whether to use Earth Orientation Parameters (eop) or not. 
 - `eop::Union{EOPData_IAU1980, EOPData_IAU2000A}`: Earth Orientation Parameters (eop).
 """
-function obs_pv_ECI(observatory::ObservatoryMPC{T}, et::T; eo::Bool=true, 
+function obsposvelECI(observatory::ObservatoryMPC{T}, et::T; eo::Bool=true, 
                     eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
 
     # Earth-Centered Earth-Fixed position position of observer 
@@ -142,11 +142,11 @@ function obs_pv_ECI(observatory::ObservatoryMPC{T}, et::T; eo::Bool=true,
     return vcat(p_ECI, v_ECI)
 end
 
-function obs_pv_ECI(x::RadecMPC{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
-    return obs_pv_ECI(x.observatory, datetime2et(x.date); eo = eo, eop = eop)
+function obsposvelECI(x::RadecMPC{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+    return obsposvelECI(x.observatory, datetime2et(x.date); eo = eo, eop = eop)
 end 
-function obs_pv_ECI(x::RadarJPL{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat} 
-    return obs_pv_ECI(x.rcvr, datetime2et(x.date); eo = eo, eop = eop)
+function obsposvelECI(x::RadarJPL{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat} 
+    return obsposvelECI(x.rcvr, datetime2et(x.date); eo = eo, eop = eop)
 end 
 
 # This method extends orthonormalize to handle Taylor1 and TaylorN

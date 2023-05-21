@@ -84,24 +84,24 @@ See also [`getposvel`](@ref).
 moonposvel(et) = getposvel(301, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
-    apophis_pv_197(et)
+    apophisposvel197(et)
 
 Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of Apophis at TDB instant `et` from JPL #197 solution with respect to J2000 frame.
 
 See also [`getposvel`](@ref).
 """
-apophis_pv_197(et) = getposvel(9904406, 0, cte(et)) # units: km, km/second
+apophisposvel197(et) = getposvel(9904406, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
-    apophis_pv_199(et)
+    apophisposvel199(et)
 
 Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of Apophis at TDB instant `et` from JPL #199 solution with respect to J2000 frame.
 
 See also [`getposvel`](@ref).
 """
-apophis_pv_199(et) = getposvel(2099942, 0, cte(et)) # units: km, km/second
+apophisposvel199(et) = getposvel(2099942, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     tt_tdb(et)
