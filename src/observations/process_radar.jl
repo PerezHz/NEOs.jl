@@ -241,8 +241,8 @@ end
 
 @doc raw"""
     compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, t_offset::Real, niter::Int = 10; eo::Bool = true, 
-          xve = earth_pv, xvs = sun_pv, xva = apophis_pv_197) where {T <: AbstractFloat}
-    compute_delay(radar::RadarJPL{T}, t_offset::Real, niter::Int = 10; eo::Bool = true, xve = earth_pv, xvs = sun_pv, 
+          xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197) where {T <: AbstractFloat}
+    compute_delay(radar::RadarJPL{T}, t_offset::Real, niter::Int = 10; eo::Bool = true, xve = earthposvel, xvs = sunposvel, 
           xva = apophis_pv_197) where {T <: AbstractFloat}
 
 Compute radar-astrometric round-trip time (``\mu``s).
@@ -262,7 +262,7 @@ See https://doi.org/10.1086/116062.
 - `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
 function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, t_offset::Real, niter::Int = 10; eo::Bool = true, 
-               xve = earth_pv, xvs = sun_pv, xva = apophis_pv_197) where {T <: AbstractFloat}
+               xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197) where {T <: AbstractFloat}
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = datetime2et(t_r_utc) + t_offset
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
@@ -460,16 +460,16 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, t_offs
     # Total signal delay (μs)
     return 1e6τ
 end
-function compute_delay(radar::RadarJPL{T}, t_offset::Real, niter::Int = 10; eo::Bool = true, xve = earth_pv, xvs = sun_pv, 
+function compute_delay(radar::RadarJPL{T}, t_offset::Real, niter::Int = 10; eo::Bool = true, xve = earthposvel, xvs = sunposvel, 
                xva = apophis_pv_197) where {T <: AbstractFloat}
     return compute_delay(radar.rcvr, radar.date, t_offset, niter; eo = eo, xve = xve, xvs = xvs, xva = xva)
 end 
 
 @doc raw"""
-    compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earth_pv, 
-          xvs::TaylorInterpolant = sun_pv, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
-    compute_delay(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earth_pv, 
-          xvs::TaylorInterpolant = sun_pv, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
+    compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earthposvel, 
+          xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
+    compute_delay(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earthposvel, 
+          xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
 
 Compute Taylor series expansion of time-delay observable around echo reception time. This
 allows to compute dopplers via automatic differentiation using
@@ -495,8 +495,8 @@ See https://doi.org/10.1086/116062.
 - `xva::TaylorInterpolant`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 - `tord::Int`: order of Taylor expansions.
 """
-function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earth_pv, 
-               xvs::TaylorInterpolant = sun_pv, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
+function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earthposvel, 
+               xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
 
     # Auxiliary to evaluate JT ephemeris
     q1 = xva.x[1]
@@ -695,17 +695,17 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter:
     return 1e6τ
 end
 
-function compute_delay(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earth_pv, 
-               xvs::TaylorInterpolant = sun_pv, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
+function compute_delay(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve::TaylorInterpolant = earthposvel, 
+               xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophis_pv_197, tord::Int = xva.x[1].order) where {T <: AbstractFloat}
     return compute_delay(radar.rcvr, radar.date, niter; eo = eo, xve = xve, xvs = xvs, xva = xva, tord = tord)
 end 
 
 @doc raw"""
     radar_astrometry(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_tx::Real, niter::Int = 10; eo::Bool = true, tc::Real = 1.0,
-                  xve = earth_pv, xvs = sun_pv, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
-    radar_astrometry(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, tc::Real = 1.0, xve = earth_pv, 
-                  xvs = sun_pv, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
-    radar_astrometry(astradarfile::String, niter::Int = 10; eo::Bool = true, tc::Real = 1.0, xve = earth_pv, xvs = sun_pv, 
+                  xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
+    radar_astrometry(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, tc::Real = 1.0, xve = earthposvel, 
+                  xvs = sunposvel, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
+    radar_astrometry(astradarfile::String, niter::Int = 10; eo::Bool = true, tc::Real = 1.0, xve = earthposvel, xvs = sunposvel, 
                   xva = apophis_pv_197, autodiff::Bool = true, tord::Int=10)
     radar_astrometry(outfilename::String, radarobsfile::String, asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant; tc::Real=1.0, autodiff::Bool=true, 
                   tord::Int=10, niter::Int=5)
@@ -732,7 +732,7 @@ Return time-delay and Doppler shift.
 - `tord::Int`: order of Taylor expansions.
 """
 function radar_astrometry(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_tx::Real, niter::Int = 10; eo::Bool = true, tc::Real = 1.0,
-                       xve = earth_pv, xvs = sun_pv, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
+                       xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
 
     # Automatic differentiation method of delay
     if autodiff
@@ -751,12 +751,12 @@ function radar_astrometry(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_t
 
 end
 
-function radar_astrometry(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, tc::Real = 1.0, xve = earth_pv, 
-                       xvs = sun_pv, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
+function radar_astrometry(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, tc::Real = 1.0, xve = earthposvel, 
+                       xvs = sunposvel, xva = apophis_pv_197, autodiff::Bool = true, tord::Int = 10) where {T <: AbstractFloat}
     return radar_astrometry(radar.rcvr, radar.date, radar.freq, niter; eo = eo, tc = tc, xve = xve, xvs = xvs, xva = xva, autodiff = autodiff, tord = tord)
 end 
 
-function radar_astrometry(astradarfile::String, niter::Int=10; eo::Bool=true, tc::Real=1.0, xve=earth_pv, xvs=sun_pv,
+function radar_astrometry(astradarfile::String, niter::Int=10; eo::Bool=true, tc::Real=1.0, xve=earthposvel, xvs=sunposvel,
                        xva=apophis_pv_197, autodiff::Bool=true, tord::Int=10)
 
     # Check that astradarfile is a file 
@@ -808,8 +808,8 @@ end
 
 @doc raw"""
     radar_astrometry_yeomansetal92(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_tx::Real, niter::Int = 10; eo::Bool = true, 
-                                xve = earth_pv, xvs = sun_pv, xva = apophis_pv_197) where {T <: AbstractFloat}
-    radar_astrometry_yeomansetal92(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve = earth_pv, xvs = sun_pv, 
+                                xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197) where {T <: AbstractFloat}
+    radar_astrometry_yeomansetal92(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve = earthposvel, xvs = sunposvel, 
                                 xva = apophis_pv_197) where {T <: AbstractFloat}
 
 Compute round-trip time (in ``\mu``s) and Doppler shift (Hz) radar astrometry. Dopplers are computed following https://doi.org/10.1086/116062.
@@ -827,7 +827,7 @@ Compute round-trip time (in ``\mu``s) and Doppler shift (Hz) radar astrometry. D
 - `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
 function radar_astrometry_yeomansetal92(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_tx::Real, niter::Int = 10; eo::Bool = true, 
-                                     xve = earth_pv, xvs = sun_pv, xva = apophis_pv_197) where {T <: AbstractFloat}
+                                     xve = earthposvel, xvs = sunposvel, xva = apophis_pv_197) where {T <: AbstractFloat}
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs = datetime2et(t_r_utc)
     # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
@@ -1071,7 +1071,7 @@ function radar_astrometry_yeomansetal92(observatory::ObservatoryMPC{T}, t_r_utc:
     return 1e6τ, 1e6ν
 end
 
-function radar_astrometry_yeomansetal92(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve = earth_pv, xvs = sun_pv, 
+function radar_astrometry_yeomansetal92(radar::RadarJPL{T}, niter::Int = 10; eo::Bool = true, xve = earthposvel, xvs = sunposvel, 
                                      xva = apophis_pv_197) where {T <: AbstractFloat}
     return radar_astrometry_yeomansetal92(radar.observatory, radar.date, radar.freq, niter, eo = eo, xve = xve, xvs = xvs, xva = xva)
 end 

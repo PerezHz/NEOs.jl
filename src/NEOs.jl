@@ -40,7 +40,7 @@ export hasdelay, hasdoppler, ismonostatic, date, delay_doppler, delay, delay_sig
 export kmsec2auday, auday2kmsec, julian2etsecs, etsecs2julian, datetime2et, et_to_200X, days_to_200X, datetime_to_200X,
        datetime2days, days2datetime, rad2arcsec, arcsec2rad, mas2rad
 # JPL Ephemerides 
-export loadjpleph, sun_pv, earth_pv, moon_pv, apophis_pv_197, apophis_pv_199, loadpeeph
+export loadjpleph, sunposvel, earthposvel, moonposvel, apophis_pv_197, apophis_pv_199, loadpeeph
 # Osculating 
 export pv2kep, yarkp2adot
 # Topocentric

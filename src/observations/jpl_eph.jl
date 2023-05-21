@@ -54,34 +54,34 @@ end
 # https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/spkgeo_c.html (see: Detailed ouput section)
 
 @doc raw"""
-    sun_pv(et)
+    sunposvel(et)
 
 Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Sun at TDB instant `et` with respect to J2000 frame.
 
 See also [`getposvel`](@ref).
 """
-sun_pv(et) = getposvel(10, 0, cte(et)) # units: km, km/second
+sunposvel(et) = getposvel(10, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
-    earth_pv(et)
+    earthposvel(et)
 
 Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Earth at TDB instant `et` with respect to J2000 frame.
 
 See also [`getposvel`](@ref).
 """
-earth_pv(et) = getposvel(399, 0, cte(et)) # units: km, km/second
+earthposvel(et) = getposvel(399, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
-    moon_pv(et)
+    moonposvel(et)
 
 Return the `[x, y, z, v_x, v_y, v_z]` state vector (in units of km, km/sec)
 of the Moon at TDB instant `et` with respect to J2000 frame.
 
 See also [`getposvel`](@ref).
 """
-moon_pv(et) = getposvel(301, 0, cte(et)) # units: km, km/second
+moonposvel(et) = getposvel(301, 0, cte(et)) # units: km, km/second
 
 @doc raw"""
     apophis_pv_197(et)
