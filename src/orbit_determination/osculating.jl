@@ -67,11 +67,25 @@ function show(io::IO, m::OsculatingElements{T}) where {T <: Number}
 end
 
 @doc raw"""
-    pv2kep(xas, μ = μ_S, jd = JD_J2000)
+    equatorial2ecliptic(xas::Vector{T}) where {T <: Number}
+
+Rotate state vector `xas` from equatorial plane to the ecliptic. 
+"""
+function equatorial2ecliptic(xas::Vector{T}) where {T <: Number}
+    # Rotation matrix (only positions)
+    m_eq2ecl = Rx(deg2rad(ϵ0_deg))
+    # Rotational matrix (positions + velocities)
+    m_xv_eq2ecl = hcat(vcat(m_eq2ecl, zeros(3,3)), vcat(zeros(3,3), m_eq2ecl))
+    # Rotated state vector 
+    return m_xv_eq2ecl*xas
+end 
+
+@doc raw"""
+    pv2kep(xas, μ = μ_S, jd = JD_J2000, frame::Symbol = :equatorial)
 
 Compute the orbital elements of the NEO with state vector `xas`. Return a `OsculatingElements` object. 
 
-See also [`eccentricity`](@ref), [`semimajoraxis`](@ref), [`timeperipass`](@ref),
+See also [`equatorial2ecliptic`](@ref), [`eccentricity`](@ref), [`semimajoraxis`](@ref), [`timeperipass`](@ref),
 [`longascnode`](@ref), [`argperi`](@ref) and [`inclination`](@ref).
 
 # Arguments 
@@ -79,8 +93,12 @@ See also [`eccentricity`](@ref), [`semimajoraxis`](@ref), [`timeperipass`](@ref)
 - `xas`: State vector of the asteroid `[x, y, z, v_x, v_y, v_z]`. 
 - `μ_S`: Mass parameter of the central body (Sun).
 - `jd`: Orbit epoch of reference in julian days. 
+- `frame::Symbol`: plane of reference (`:equatorial` or `:ecliptic`).
 """
-function pv2kep(xas, μ = μ_S, jd = JD_J2000)
+function pv2kep(xas, μ = μ_S, jd = JD_J2000, frame::Symbol = :equatorial)
+    if frame == :ecliptic
+        xas = equatorial2ecliptic(xas)
+    end 
     e = eccentricity(xas..., μ, 0.0)
     a = semimajoraxis(xas..., μ, 0.0)
     q = a * (1 - e)
@@ -155,17 +173,3 @@ See https://doi.org/10.1016/j.icarus.2013.02.004.
 function yarkp2adot(A2, a, e, μ_S)
     return 2A2/(sqrt(a)*(1-e^2)*sqrt(μ_S))
 end
-
-@doc raw"""
-    equatorial2ecliptic(xas::Vector{T}) where {T <: Number}
-
-Rotate state vector `xas` from equatorial plane to the ecliptic. 
-"""
-function equatorial2ecliptic(xas::Vector{T}) where {T <: Number}
-    # Rotation matrix (only positions)
-    m_eq2ecl = Rx(deg2rad(ϵ0_deg))
-    # Rotational matrix (positions + velocities)
-    m_xv_eq2ecl = hcat(vcat(m_eq2ecl, zeros(3,3)), vcat(zeros(3,3), m_eq2ecl))
-    # Rotated state vector 
-    return m_xv_eq2ecl*xas
-end 

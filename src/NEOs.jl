@@ -42,7 +42,7 @@ export kmsec2auday, auday2kmsec, julian2etsecs, etsecs2julian, datetime2et, et_t
 # JPL Ephemerides 
 export loadjpleph, sun_pv, earth_pv, moon_pv, apophis_pv_197, apophis_pv_199, loadpeeph
 # Osculating 
-export pv2kep, yarkp2adot, equatorial2ecliptic
+export pv2kep, yarkp2adot
 # Topocentric
 export obs_pos_ECEF, obs_pv_ECI, t2c_rotation_iau_76_80
 # Process radec 
