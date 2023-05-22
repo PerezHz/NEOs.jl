@@ -1,57 +1,7 @@
-# Functions get_eop_iau1980, get_eop_iau2000a were adapted from SatelliteToolbox.jl; MIT-licensed
-# these functions avoid the use of @eval
-# https://github.com/JuliaSpace/SatelliteToolbox.jl/blob/b95e7f54f85c26744c64270841c874631f5addf1/src/transformations/eop.jl#L87
-
-@doc raw"""
-    get_eop_iau1980(; force=false)
-
-Adaptation of [`SatelliteToolbox.get_iers_eop_iau_1980`](@ref) that avoids the use of `@eval`.
-See https://github.com/JuliaSpace/SatelliteToolbox.jl/blob/master/src/transformations/eop.jl.
-"""
-function get_eop_iau1980(; force = false)
-    # Remote file 
-    eop_iau1980_rf = RemoteFiles.@RemoteFile(
-        EOP_IAU1980_RF, 
-        "https://datacenter.iers.org/data/csv/finals.all.csv", 
-        file = "EOP_IAU1980.TXT",
-        dir = observations_path, 
-        updates = :weekly
-    )
-    # Download remote file 
-    RemoteFiles.download(EOP_IAU1980_RF, force = force)
-    # Read delimited file 
-    eop, ~ = readdlm(RemoteFiles.path(eop_iau1980_rf), ';'; header = true)
-    # Parse eop 
-    SatelliteToolbox._parse_iers_eop_iau_1980(eop)
-end
-
-@doc raw"""
-    get_eop_iau2000a(; force=false)
-
-Adaptation of [`SatelliteToolbox.get_iers_eop_iau_2000A`](@ref) that avoids the use of `@eval`.
-See https://github.com/JuliaSpace/SatelliteToolbox.jl/blob/master/src/transformations/eop.jl.
-"""
-function get_eop_iau2000a(; force = false)
-    # Remote file 
-    eop_iau2000a_rf = RemoteFiles.@RemoteFile(
-        EOP_IAU2000A_RF, 
-        "https://datacenter.iers.org/data/csv/finals2000A.all.csv", 
-        file = "EOP_IAU2000A.TXT", 
-        dir = observations_path, 
-        updates = :weekly
-    )
-    # Download remote file 
-    RemoteFiles.download(EOP_IAU2000A_RF, force = force)
-    # Read delimited file 
-    eop, ~ = readdlm(RemoteFiles.path(eop_iau2000a_rf), ';'; header = true)
-    # Parse eop 
-    SatelliteToolbox._parse_iers_eop_iau_2000A(eop)
-end
-
 # Earth orientation parameters (eop) 1980
-const eop_IAU1980 = get_eop_iau1980()
+const eop_IAU1980 = get_iers_eop_iau_1980() # get_eop_iau1980()
 # Earth orientation parameters (eop) 2000
-const eop_IAU2000A = get_eop_iau2000a()
+const eop_IAU2000A = get_iers_eop_iau_2000A() # get_eop_iau2000a()
 
 @doc raw"""
     obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}

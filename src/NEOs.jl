@@ -3,9 +3,8 @@ module NEOs
 # __precompile__(false)
 
 import Base: hash, ==, show, isless, isnan, convert
-import Dates: DateTime
 import ReferenceFrameRotations: orthonormalize
-import PlanetaryEphemeris, SatelliteToolbox, RemoteFiles
+import PlanetaryEphemeris, SatelliteToolbox
 
 using Distributed, JLD, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
       Dates, EarthOrientation, SPICE, Quadmath, LazyArtifacts, DataFrames, TaylorSeries,
@@ -16,7 +15,8 @@ using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pol
       nbodyind, PE, ordpres_differentiate, numberofbodies, kmsec2auday
 using Healpix: ang2pixRing, Resolution
 using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_ΔAT, JD_J2000, EOPData_IAU1980, 
-      rECItoECI, DCM, TOD, GCRF, ITRF, rECItoECI, PEF, satsv, EOPData_IAU2000A
+      rECItoECI, DCM, TOD, GCRF, ITRF, rECItoECI, PEF, satsv, EOPData_IAU2000A, get_iers_eop_iau_1980,
+      get_iers_eop_iau_2000A
 using StaticArrays: SVector, SArray, @SVector
 using Dates: format 
 using HTTP: get
@@ -34,10 +34,10 @@ export unknownobs, hascoord, read_observatories_mpc, parse_observatories_mpc, wr
 export num, tmpdesig, discovery, publishnote, obstech, ra, dec, info1, mag, band, catalogue, info2, observatory, 
        read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc
 # RadarJPL
-export hasdelay, hasdoppler, ismonostatic, date, delay_doppler, delay, delay_sigma, delay_units, doppler, doppler_sigma, 
+export hasdelay, hasdoppler, ismonostatic, date, delay, delay_sigma, delay_units, doppler, doppler_sigma, 
        doppler_units, freq, rcvr, xmit, bouncepoint, read_radar_jpl, write_radar_jpl
 # Units 
-export kmsec2auday, auday2kmsec, julian2etsecs, etsecs2julian, datetime2et, et_to_200X, days_to_200X, datetime_to_200X,
+export julian2etsecs, etsecs2julian, datetime2et, et_to_200X, days_to_200X, datetime_to_200X,
        datetime2days, days2datetime, rad2arcsec, arcsec2rad, mas2rad
 # JPL Ephemerides 
 export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199, loadpeeph

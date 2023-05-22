@@ -137,11 +137,11 @@ const mpc_radec_regex = Regex(join(
 ))
 
 @doc raw"""
-    DateTime(year::Int, month::Int, day::Int, utc::T) where {T <: Real}
+    datetime(year::Int, month::Int, day::Int, utc::T) where {T <: Real}
 
 Construct a `DateTime` type by parts. `utc` is the fraction of day. 
 """
-function DateTime(year::Int, month::Int, day::Int, utc::T) where {T <: Real}
+function datetime(year::Int, month::Int, day::Int, utc::T) where {T <: Real}
     return DateTime(year, month, day) + Microsecond( round(1e6*86_400*utc) )
 end
 
@@ -186,7 +186,7 @@ end
 Convert a match of `NEOs.mpc_radec_regex` to `RadecMPC`.
 """
 function RadecMPC(m::RegexMatch)
-    date = DateTime(
+    date = datetime(
         Meta.parse(m["year"]), 
         Meta.parse(m["month"]), 
         Meta.parse(m["day"]),

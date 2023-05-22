@@ -124,13 +124,13 @@ See also [`getposvel`](@ref).
 dtt_tdb(et) = getposvel(1000000001, 1000000000, cte(et))[4] # units: seconds/seconds
 
 @doc raw"""
-    loadpeeph(et::Union{Nothing, T} = nothing) where {T <: Real}
+    loadpeeph(et::Union{Nothing, Real} = nothing)
 
 Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` from Jan 1st 2000 up to `et > 0` [ephemeris seconds since J2000].
 
 **Caution**: running this function for the first time will download the `sseph_p100` artifact (∼554 MB) which can take several minutes.  
 """
-function loadpeeph(et::Union{Nothing, T} = nothing) where {T <: Real}
+function loadpeeph(et::Union{Nothing, Real} = nothing)
     # Load Solar System 2000-2100 ephemeris 
     eph = JLD2.load(joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2"), "ss16ast_eph")
     if isnothing(et)
