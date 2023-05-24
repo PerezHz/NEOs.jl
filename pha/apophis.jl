@@ -1,73 +1,174 @@
-#Multi-threaded:
-#julia -t <number-of-threads> --project=@. main.jl
-#Single thread:
-#julia --project=@. main.jl
-using NEOs
-using Dates
-using TaylorIntegration
-using JLD
-using PlanetaryEphemeris
-@show Threads.nthreads()
+using ArgParse, NEOs, PlanetaryEphemeris, Dates, TaylorIntegration, JLD2
 
-#script parameters (TODO: use ArgParse.jl instead)
-varorder = 5 # varorder is the order corresponding to the jet transport perturbation
-nv = 8 #number of TaylorN variables
-objname = "Apophis"
-maxsteps = 10000
-nyears_bwd = -18.0 # years in backward integration
-nyears_fwd = 9.0 # years in forward integration
-dense = false #true
-quadmath = false # use quadruple precision
-lyap = false #true # compute Lyapunov exponents
-neosjlpath = pkgdir(NEOs)
-dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
+# Load JPL ephemeris 
+loadjpleph()
 
-# integration parameters
-order = 25
-abstol = 1.0E-20
+function parse_commandline()
+    s = ArgParseSettings()
 
-### observation data files (ra/dec, del/dop)
-optfile_bwd = joinpath(neosjlpath, "data", "99942_2004_2020.dat")
-optfile_fwd = joinpath(neosjlpath, "data", "99942_2020_2021.dat")
-radarfile_bwd = joinpath(neosjlpath, "data", "99942_RADAR_2005_2013.dat")
-radarfile_fwd = joinpath(neosjlpath, "data", "99942_RADAR_2021.dat")
+    # Program name (for usage & help screen)
+    s.prog = "apophis.jl"  
+    # Desciption (for help screen)
+    s.description = "Propagates Apophis orbit via jet transport" 
 
-### path to local Solar System ephemeris file
-ss_eph_file = "./sseph343ast016_p31y_et.jld"
-ss16asteph_et = JLD.load(ss_eph_file, "ss16ast_eph")
-
-### TaylorN variables setup
-if lyap
-    ### setup TaylorN variables with order=1, numvars=nv
-    TNvars = set_variables("δx", order=1, numvars=nv)
-    # dq corresponding to solution OR7 for Apophis
-    dq_OR7 = [-8.053250543083672e-7, -6.4934453239292154e-9, -3.552581604396334e-8, 2.382431039885935e-9, -1.3384789262277344e-8, -4.6746457798167725e-9, -2.892614243659006e-14, 0.0]
-    dq = dq_OR7
-else
-    #### dq: perturbation to nominal initial condition (Taylor1 jet transport)
-    #dq = Taylor1.(zeros(7), varorder)
-    #dq[end][1] = 1e-14
-    # dq: perturbation to nominal initial condition (TaylorN jet transport)
-    dq = set_variables("δx", order=varorder, numvars=nv)
-    for i in 1:6
-        dq[i][1][i] = 1e-8
+    @add_arg_table! s begin
+        "--jd0"
+            help = "Initial date"
+            arg_type = DateTime
+            default = DateTime(2020, 12, 17)
+        "--varorder"
+            help = "Order of the jet transport perturbation" 
+            arg_type = Int
+            default = 5
+        "--maxsteps"
+            help = "Maximum number of steps during integration"
+            arg_type = Int
+            default = 10_000 
+        "--nyears_bwd"
+            help = "Years in backward integration"
+            arg_type = Float64
+            default = -18.0
+        "--nyears_fwd"
+            help = "Years in forward integration"
+            arg_type = Float64
+            default = 9.0 
+        "--order"
+            help = "Order of Taylor polynomials expansions during integration"
+            arg_type = Int
+            default = 25
+        "--abstol"
+            help = "Absolute tolerance"
+            arg_type = Float64
+            default = 1.0E-20
+        "--parse_eqs"
+            help = "Whether to use the taylorized method of jetcoeffs or not"
+            arg_type = Bool
+            default = true 
+        "--ss_eph_file"
+            help = "Path to local Solar System ephemeris file"
+            arg_type = String 
+            default = "./sseph343ast016_p31y_et.jld2"
     end
-    if get_numvars() == 8
-        dq[7][1][7] = 1e-14
-        dq[8][1][8] = 1e-13
-    end
+
+    s.epilog = """
+        examples:\n
+        \n
+        # Multi-threaded\n
+        julia -t 4 --project apophis.jl --maxsteps 100 --nyears_bwd -0.02 --nyears_fwd 0.02 --parse_eqs true\n
+        \n
+        # Single-threaded\n
+        julia --project apophis.jl --maxsteps 100 --nyears_bwd -0.02 --nyears_fwd 0.02 --parse_eqs true\n
+        \n
+    """
+
+    return parse_args(s)
 end
 
-### initial conditions from Apophis JPL solution #197 at the Dec-17-2020.0 (TDB) epoch
-jd0 = datetime2julian(DateTime(2020,12,17)) # JDTDB = 2459200.5
-q00 = [-0.18034747703273316, 0.9406910666200128, 0.3457360259054398, -0.016265942170279046, 4.392889725556651e-5, -0.00039519931615139716] ### JPL solution #197 at 2020Dec17.0 (TDB)
-q0 = vcat(q00, 0.0, 0.0) .+ dq
+function print_header(header::String)
+    L = length(header)
+    println(repeat("-", L))
+    println(header)
+    println(repeat("-", L))
+end 
 
-####integrator warmup
-propagate(objname, dynamics, 1, jd0, nyears_fwd, ss16asteph_et, output=false, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol)
-println("*** Finished warmup")
+function main(dynamics::Function, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T, nyears_fwd::T, 
+              ss16asteph_et::TaylorInterpolant, order::Int, varorder::Int, abstol::T, parse_eqs::Bool) where {T <: Real}
+    
+    # Perturbation to nominal initial condition (Taylor1 jet transport)
+    # vcat(fill(1e-8, 6), 1e-14, 1e-13) are the scaling factors for jet transport perturbation, 
+    # these are needed to ensure expansion coefficients remain small. 
+    # The magnitudes correspond to the typical order of magnitude of errors in 
+    # position/velocity (1e-8), Yarkovsky (1e-13) and radiation pressure (1e-14)
+    dq = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14, 1e-13), order = varorder)
 
-######Full jet transport integration
-propagate(objname*"_bwd", dynamics, maxsteps, jd0, nyears_bwd, ss16asteph_et, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol, radarobsfile=radarfile_bwd, opticalobsfile=optfile_bwd, tord=10, niter=5)
-propagate(objname*"_fwd", dynamics, maxsteps, jd0, nyears_fwd, ss16asteph_et, dense=dense, q0=q0, quadmath=quadmath, lyap=lyap, order=order, abstol=abstol, radarobsfile=radarfile_fwd, opticalobsfile=optfile_fwd, tord=10, niter=5)
-println("*** Finished asteroid ephemeris integration")
+    # Initial conditions from Apophis JPL solution #197
+    q00 = kmsec2auday(apophisposvel197(datetime2et(jd0_datetime)))
+    q0 = vcat(q00, 0.0, 0.0) .+ dq
+
+    # Initial date (in julian days)
+    jd0 = datetime2julian(jd0_datetime)
+
+    print_header("Integrator warmup")
+    sol = NEOs.propagate(dynamics, 1, jd0, nyears_fwd, ss16asteph_et, q0, Val(true); 
+                         order = order, abstol = abstol, parse_eqs = parse_eqs)
+    
+    print_header("Main integration")
+    tmax = nyears_bwd*yr 
+    println("• Initial time of integration: ", string(jd0_datetime))
+    println("• Final time of integration: ", julian2datetime(jd0 + tmax))
+
+    sol = NEOs.propagate(dynamics, maxsteps, jd0, nyears_bwd, ss16asteph_et, q0, Val(true); 
+                         order = order, abstol = abstol, parse_eqs = parse_eqs)
+    save2jldandcheck("Apophis_bwd", (asteph = sol,))
+
+    tmax = nyears_fwd*yr 
+    println("• Initial time of integration: ", string(jd0_datetime))
+    println("• Final time of integration: ", julian2datetime(jd0 + tmax))
+
+    sol = NEOs.propagate(dynamics, maxsteps, jd0, nyears_fwd, ss16asteph_et, q0, Val(true), 
+                         order = order, abstol = abstol, parse_eqs = parse_eqs)
+    save2jldandcheck("Apophis_fwd", (asteph = sol,))
+    
+    nothing 
+    
+end 
+
+function main()
+
+    # Parse arguments from commandline 
+    parsed_args = parse_commandline()
+    
+    print_header("Asteroid Apophis")
+    print_header("General parameters")
+
+    # Number of threads 
+    N_threads = Threads.nthreads()
+    println("• Number of threads: ", N_threads)
+
+    # Dynamical function 
+    if N_threads == 1
+        dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph!
+    else 
+        dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
+    end 
+    println("• Dynamical function: ", dynamics)
+
+    # Maximum number of steps 
+    maxsteps = parsed_args["maxsteps"]
+    println("• Maximum number of steps: ", maxsteps)
+
+    # Initial date 
+    jd0_datetime = parsed_args["jd0"]
+
+    # Number of years in backward integration
+    nyears_bwd = parsed_args["nyears_bwd"]
+
+    # Number of years in forward integration
+    nyears_fwd = parsed_args["nyears_fwd"]
+
+    # Solar system ephemeris 
+    print("• Loading Solar System ephemeris... ")
+    ss16asteph_et = JLD2.load(parsed_args["ss_eph_file"], "ss16ast_eph")
+    println("Done")
+
+    # Order of Taylor polynomials
+    order = parsed_args["order"]
+    println("• Order of Taylor polynomials: ", order)
+
+    # Order of jet transport perturbation
+    varorder = parsed_args["varorder"]
+    println("• Order of jet transport perturbation: ", varorder)
+
+    # Absolute tolerance
+    abstol = parsed_args["abstol"]
+    println("• Absolute tolerance: ", abstol)
+
+    # Wheter to use @taylorize or not 
+    parse_eqs = parsed_args["parse_eqs"]
+    println("• Use @taylorize: ", parse_eqs)
+
+    main(dynamics, maxsteps, jd0_datetime,  nyears_bwd, nyears_fwd, ss16asteph_et, 
+         order, varorder, abstol, parse_eqs)
+end 
+
+main()

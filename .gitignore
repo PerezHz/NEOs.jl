@@ -1,6 +1,10 @@
 *.jld
+*.jld2
+*.bsp
 *.out
 *.err
 notebooks/.ipynb_checkpoints
 jldeph/
 notebooks/figs
+EOP_IAU*.TXT
+Manifest.toml
