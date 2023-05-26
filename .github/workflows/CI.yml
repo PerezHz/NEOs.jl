@@ -40,4 +40,4 @@ jobs:
           files: lcov.info
       - uses: julia-actions/julia-uploadcoveralls@v1
         env:
-          COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+          COVERALLS_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
