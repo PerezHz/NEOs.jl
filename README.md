@@ -4,7 +4,7 @@
 
 `NEOs.jl` is a Near-Earth Object orbital propagator and
 fitter in Julia. `NEOs.jl` exploits jet transport techniques via
-[TaylorIntegration.jl](https://github.com/PerezHzTaylorIntegration.jl).
+[TaylorIntegration.jl](https://github.com/PerezHz/TaylorIntegration.jl).
 
 ## Authors
 
@@ -12,6 +12,8 @@ fitter in Julia. `NEOs.jl` exploits jet transport techniques via
 Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
 - [Luis Benet](http://www.cicc.unam.mx/~benet/),
 Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
+- [Luis Eduardo Ramírez Montoya](https://github.com/LuEdRaMo),
+Facultad de Ciencias, Universidad Nacional Autónoma de México (UNAM)
 
 ## Installation
 
@@ -38,6 +40,6 @@ resources provided by LANCAD-UNAM-DGTIC-284.
 
 ## References
 
-- Pérez-Hernández, Jorge A., & Benet, Luis. (2020, October 13).
+- Pérez-Hernández, Jorge A., & Benet, Luis. (2023).
     [PerezHz/TaylorIntegration.jl](https://github.com/PerezHzTaylorIntegration.jl):
-    v0.8.4 (Version v0.8.4). Zenodo. http://doi.org/10.5281/zenodo.4086166
+    v0.13.0 (Version v0.13.0). Zenodo. http://doi.org/10.5281/zenodo.7953772
