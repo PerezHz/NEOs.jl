@@ -1,7 +1,7 @@
 name = "NEOs"
 uuid = "b41c07a2-2abb-11e9-070a-c3c1b239e7df"
 authors = ["Jorge A. Pérez Hernández", "Luis Benet"]
-version = "0.3.1"
+version = "0.3"
 
 [deps]
 Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -46,7 +46,7 @@ IntervalArithmetic = "0.20"
 IntervalRootFinding = "0.5.11"
 JLD = "0.13"
 JLD2 = "0.4"
-PlanetaryEphemeris = "0.5"
+PlanetaryEphemeris = "0.6"
 Quadmath = "0.5"
 Query = "1.0"
 ReferenceFrameRotations = "3"
