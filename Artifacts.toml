@@ -1,11 +1,3 @@
-[TTmTDBde430]
-git-tree-sha1 = "de3fba2237359dc941a057d492c305afeccba133"
-lazy = true
-
-    [[TTmTDBde430.download]]
-    sha256 = "c599efe597200055c27cec38ddc769f5d3b3e301a481b9dcd8b9640d745508a1"
-    url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/TTmTDBde430.tar.gz"
-
 [a99942]
 git-tree-sha1 = "7cdf1265a22c52329651c4a71a9835d1b90f568e"
 lazy = true
@@ -69,11 +61,3 @@ lazy = true
     [[sseph_p100.download]]
     sha256 = "7a5886729bbd85d68417f8d69fb2d7e8f4390376a49c9bcda1b580116f8ed11b"
     url = "https://github.com/LuEdRaMo/sseph/raw/main/sseph343ast016_p100y_et.tar.gz"
-
-[ttmtdb_DE430_1995_2030]
-git-tree-sha1 = "9e0c56a8987df7426aad09829332f04b014e6264"
-lazy = true
-
-    [[ttmtdb_DE430_1995_2030.download]]
-    sha256 = "19f2a3136a81755746795466b4d4d01bfd962b5b1f6f877af0377a21126d99e1"
-    url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/ttmtdb_DE430_1995_2030_20221103.tar.gz"

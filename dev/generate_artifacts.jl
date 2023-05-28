@@ -1,7 +1,7 @@
 # This script generates Julia artifacts for NEOs.jl, including
 # - debiasing tables from Chesley et al. (2010), Farnocchia et al. (2015) and Eggl et al. (2020)
-# - JPL lsk and spk  
-# - PlanetaryEphemeris.jl Solar System ephemeris 
+# - JPL lsk and spk
+# - PlanetaryEphemeris.jl Solar System ephemeris
 
 # TO DO: adapt script for julia1.6+
 # TO DO: adapt script for 2010 debiasing tables (requires extra unpacking)
@@ -16,28 +16,26 @@ Pkg.PlatformEngines.probe_platform_engines!()
 # This is the path to the Artifacts.toml we will manipulate
 const artifact_toml = joinpath(dirname(@__DIR__), "Artifacts.toml")
 
-# JPL FTP URL 
+# JPL FTP URL
 const ftp_jpl = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/"
 
-# Debiasing tables names and URLs  
+# Debiasing tables names and URLs
 const names_debias = ["debias", "debias_2014", "debias_2018", "debias_hires2018"]
 const urls_debias = ftp_jpl .* names_debias .* ".tgz"
 
-# JPL lsk and spk names and URLs 
-const names_lsk_spk = ["naif0012", "de430", "TTmTDBde430", "a99942", "ttmtdb_DE430_1995_2030"]
+# JPL lsk and spk names and URLs
+const names_lsk_spk = ["naif0012", "de430", "a99942"]
 const urls_lsk_spk = [
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/naif0012.tar.gz",
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/de430.tar.gz",
-    "https://raw.githubusercontent.com/PerezHz/jpleph/main/TTmTDBde430.tar.gz",
     "https://raw.githubusercontent.com/PerezHz/jpleph/main/a99942.tar.gz",
-    "https://raw.githubusercontent.com/PerezHz/jpleph/main/ttmtdb_DE430_1995_2030_20221103.tar.gz"
 ]
 
-# PlanetaryEphemeris.jl Solar System ephemeris name and URL 
+# PlanetaryEphemeris.jl Solar System ephemeris name and URL
 const name_sseph = "sseph_p100"
 const url_sseph = "https://github.com/LuEdRaMo/sseph/raw/main/sseph343ast016_p100y_et.tar.gz"
 
-# Collect names and URLs 
+# Collect names and URLs
 const urls_ = vcat(urls_lsk_spk, urls_debias, url_sseph)
 const names_ = vcat(names_lsk_spk, names_debias, name_sseph)
 
