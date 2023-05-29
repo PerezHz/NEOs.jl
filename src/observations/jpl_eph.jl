@@ -130,7 +130,6 @@ Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` from Jan 1st 200
 **Caution**: running this function for the first time will download the `sseph_p100` artifact (∼554 MB) which can take several minutes.
 """
 function loadpeeph(et::Union{Nothing, Real} = nothing)
-    1 + 1
     if isnothing(et)
         return sseph
     else
