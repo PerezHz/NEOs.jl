@@ -53,8 +53,21 @@ for (url, name) in zip(urls, names)
             @show basename_url
             dot_idx = findlast(isequal('.'), basename_url)
             ext = basename_url[dot_idx+1:end]
-            if ext in ["gz", "tgz"]  # If artifact is a tarball with many files
-                tarball = Downloads.download(url, joinpath(tmp_dir, basename(url)))
+            if ext in ["gz", "tgz"] # If artifact is a tarball with many files
+                # the following code block was adapted from PlatformEngines.jl, MIT licensed
+                # https://github.com/JuliaLang/Pkg.jl/blob/048b0e86deba0c5f491eb1a3af2f3c97cac675b3/src/PlatformEngines.jl#L348
+                dest = joinpath(tmp_dir, basename(url))
+                tarball = ""
+                f = retry(delays = fill(1.0, 3)) do
+                    try
+                        tarball = Downloads.download(url, dest)
+                    catch err
+                        @debug "download and verify failed" url dest err
+                        rethrow()
+                    end
+                end
+                f()
+                # tarball = Downloads.download(url, joinpath(tmp_dir, basename(url)))
                 try
                     tarball_hash = open(tarball) do file
                         bytes2hex(sha256(file))
