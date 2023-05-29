@@ -17,7 +17,7 @@ using Healpix: ang2pixRing, Resolution
 using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_ΔAT, JD_J2000, EOPData_IAU1980,
       rECItoECI, DCM, TOD, GCRF, ITRF, rECItoECI, PEF, satsv, EOPData_IAU2000A, get_iers_eop_iau_1980,
       get_iers_eop_iau_2000A
-using StaticArrays: SVector, SArray, @SVector
+using StaticArraysCore: SArray
 using Dates: format
 using HTTP: get
 using IntervalRootFinding: roots, interval, Interval, mid
