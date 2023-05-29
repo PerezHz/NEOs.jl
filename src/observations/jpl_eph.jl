@@ -1,8 +1,4 @@
 # Load TT-TDB (ttmtdb) from jld2 file
-const peeph_artifact_path = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
-const peeph = JLD2.load(peeph_artifact_path, "ss16ast_eph")
-const ttmtdb = TaylorInterpolant(peeph.t0, peeph.t, peeph.x[:,end])
-
 @doc raw"""
     loadjpleph()
 
@@ -14,6 +10,8 @@ function loadjpleph()
     furnsh(
         # NAIF IDs
         joinpath(artifact"naif0012", "naif0012.tls"),
+        # JPL DE430 TT-TDB
+        joinpath(artifact"TTmTDBde430", "TTmTDB.de430.19feb2015.bsp"),
         # JPL DE430 ephemerides
         joinpath(artifact"de430", "de430_1850-2150.bsp"),
         # JPL #197 solution for Apophis
@@ -119,6 +117,11 @@ See also [`getposvel`](@ref).
 """
 dtt_tdb(et) = getposvel(1000000001, 1000000000, cte(et))[4] # units: seconds/seconds
 
+# Load Solar System 2000-2100 ephemeris
+const sseph_artifact_path = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
+const sseph = JLD2.load(sseph_artifact_path, "ss16ast_eph")
+const ttmtdb = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
+
 @doc raw"""
     loadpeeph(et::Union{Nothing, Real} = nothing)
 
@@ -127,12 +130,11 @@ Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` from Jan 1st 200
 **Caution**: running this function for the first time will download the `sseph_p100` artifact (∼554 MB) which can take several minutes.
 """
 function loadpeeph(et::Union{Nothing, Real} = nothing)
-    # Load Solar System 2000-2100 ephemeris
-    eph = JLD2.load(joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2"), "ss16ast_eph")
+    1 + 1
     if isnothing(et)
-        return eph
+        return sseph
     else
-        idxs = findall(x -> x <= et, eph.t)
-        return TaylorInterpolant(eph.t0, eph.t[idxs], eph.x[idxs[1:end-1], :])
+        idxs = findall(x -> x <= et, sseph.t)
+        return TaylorInterpolant(sseph.t0, sseph.t[idxs], sseph.x[idxs[1:end-1], :])
     end
 end
