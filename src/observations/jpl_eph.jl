@@ -137,3 +137,17 @@ function loadpeeph(et::Union{Nothing, Real} = nothing)
         return TaylorInterpolant(sseph.t0, sseph.t[idxs], sseph.x[idxs[1:end-1], :])
     end
 end
+
+function bwdfwdeph(et::T,
+        bwd::TaylorInterpolant{T,U,2},
+        fwd::TaylorInterpolant{T,U,2}
+        ) where {T<:AbstractFloat, U<:Union{T,TaylorN{T}}}
+    @assert bwd.t0 == fwd.t0 "Backward and forward TaylorInterpolant initial times must match"
+    t = et/daysec
+    t0 = bwd.t0
+    if t <= t0
+        return auday2kmsec(bwd(t))
+    else
+        return auday2kmsec(fwd(t))
+    end
+end
