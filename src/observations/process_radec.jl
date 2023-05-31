@@ -482,7 +482,8 @@ end
 
 function radec_astrometry(outfilename::String, opticalobsfile::String, asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant,
                           niter::Int = 5; eo::Bool = true, debias_table::String = "2018")
-
+    # Check that opticalobsfile is a file
+    @assert isfile(opticalobsfile) "Cannot open file: $opticalobsfile"
     # Read optical observations
     radec = read_radec_mpc(opticalobsfile)
 
@@ -497,20 +498,17 @@ function radec_astrometry(outfilename::String, opticalobsfile::String, asteph::T
     # Number of bodies, including NEA
     N = Nm1 + 1
 
-    # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
-
     # NEO
-    function asteph_et(et)
-        return auday2kmsec(asteph(et/daysec)[1:6])
-    end
+    # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
+    asteph_et(et) = auday2kmsec(asteph(et/daysec)[1:6])
     # Earth
-    function earth_et(et)
-        return auday2kmsec(ss16asteph(et)[union(3*4-2:3*4,3*(N-1+4)-2:3*(N-1+4))])
-    end
+    # Change x, v units, resp., from au, au/day to km, km/sec
+    eph_ea = selecteph(ss16asteph, ea)
+    xve(et) = auday2kmsec(eph_ea(et))
     # Sun
-    function sun_et(et)
-        return auday2kmsec(ss16asteph(et)[union(3*1-2:3*1,3*(N-1+1)-2:3*(N-1+1))])
-    end
+    # Change x, v units, resp., from au, au/day to km, km/sec
+    eph_su = selecteph(ss16asteph, su)
+    xvs(et) = auday2kmsec(eph_su(et))
 
     # Compute ra/dec astrometry
     datetime_obs, α_obs, δ_obs, α_comp, δ_comp, α_corr, δ_corr, w8s = radec_astrometry(radec, niter; eo = eo, debias_table = debias_table,
@@ -539,7 +537,7 @@ end
     residuals(obs::Vector{RadecMPC{T}}, niter::Int = 10; eo::Bool = true, debias_table::String = "2018",
               xvs::Function = sunposvel, xve::Function = earthposvel, xva::Function = apophisposvel197) where {T <: AbstractFloat}
 
-Compute optical O-C residuals.
+Compute O-C residuals for optical astrometry.
 
 See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and [`radec_astrometry`](@ref).
 
