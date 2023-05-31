@@ -3,7 +3,7 @@ module NEOs
 # __precompile__(false)
 
 import Base: hash, ==, show, isless, isnan, convert
-import ReferenceFrameRotations: orthonormalize
+import ReferenceFrameRotations: orthonormalize, smallangle_to_dcm, smallangle_to_rot
 import PlanetaryEphemeris, SatelliteToolbox
 
 using Distributed, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
@@ -12,12 +12,12 @@ using Distributed, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, Linear
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pole_rotation,
       au, c_au_per_day, R_sun, c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx,
       Ry, Rz, semimajoraxis, eccentricity, inclination, longascnode, argperi, timeperipass,
-      nbodyind, PE, ordpres_differentiate, numberofbodies, kmsec2auday
+      nbodyind, PE, ordpres_differentiate, numberofbodies, kmsec2auday, auday2kmsec
 using Healpix: ang2pixRing, Resolution
 using SatelliteToolbox: nutation_fk5, J2000toGMST, rECEFtoECI, get_ΔAT, JD_J2000, EOPData_IAU1980,
-      rECItoECI, DCM, TOD, GCRF, ITRF, rECItoECI, PEF, satsv, EOPData_IAU2000A, get_iers_eop_iau_1980,
+      rECItoECI, DCM, TOD, GCRF, ITRF, rECItoECI, PEF, orbsv, EOPData_IAU2000A, get_iers_eop_iau_1980,
       get_iers_eop_iau_2000A
-using StaticArraysCore: SArray
+import SatelliteToolbox.r_itrf_to_pef_fk5
 using Dates: format
 using HTTP: get
 using IntervalRootFinding: roots, interval, Interval, mid
@@ -40,7 +40,8 @@ export hasdelay, hasdoppler, ismonostatic, date, delay, delay_sigma, delay_units
 export julian2etsecs, etsecs2julian, datetime2et, et_to_200X, days_to_200X, datetime_to_200X,
        datetime2days, days2datetime, rad2arcsec, arcsec2rad, mas2rad
 # JPL Ephemerides
-export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199, loadpeeph
+export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199,
+       loadpeeph, bwdfwdeph
 # Osculating
 export pv2kep, yarkp2adot
 # Topocentric
