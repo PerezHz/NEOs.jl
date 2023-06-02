@@ -1,8 +1,10 @@
 # This file is part of the NEOs.jl package; MIT licensed
 
 using NEOs
+using PlanetaryEphemeris
 using Dates
 using TaylorIntegration
+using JLD2
 using Test
 
 using InteractiveUtils: methodswith
@@ -223,6 +225,54 @@ using InteractiveUtils: methodswith
 
         # Total normalized RMS
         @test nrms(res, w) ≈ 0.375 atol=1e-2
+    end
+
+    @testset "Propagation: root-finding and TaylorN serialization" begin
+        # Test integration (Apophis)
+
+        # Dynamical function
+        local dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
+        # Order of Taylor polynomials
+        local order = 25
+        # Absolute tolerance
+        local abstol = 1e-20
+        # Whether to use @taylorize
+        local parse_eqs = true
+        # Solar System ephemeris
+        local sseph = NEOs.loadpeeph()
+        # Perturbation to nominal initial condition (Taylor1 jet transport)
+        local dq = NEOs.scaled_variables()
+        # Initial date of integration (julian days)
+        local jd0 = datetime2julian(DateTime(2020,12,17))
+        # Initial conditions
+        local q0 = [-0.18034747703273316, 0.9406910666200128, 0.3457360259054398,
+                    -0.016265942170279046, 4.392889725556651e-5, -0.00039519931615139716] .+ dq
+
+        sol = NEOs.propagate(dynamics, 1, jd0, 1/yr, sseph, q0, Val(true), order = order, abstol = abstol, parse_eqs = parse_eqs)
+        jldsave("test.jld2"; sol = sol)
+        recovered_sol = JLD2.load("test.jld2", "sol")
+        @test sol == recovered_sol
+
+        sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, 1, jd0, 1/yr, sseph, q0, Val(true), order = order, abstol = abstol,
+                                                 parse_eqs = parse_eqs)
+        jldsave("test.jld2"; sol = sol, tvS = tvS, xvS = xvS, gvS = gvS)
+        recovered_sol = JLD2.load("test.jld2", "sol")
+        recovered_tvS = JLD2.load("test.jld2", "tvS")
+        recovered_xvS = JLD2.load("test.jld2", "xvS")
+        recovered_gvS = JLD2.load("test.jld2", "gvS")
+        @test sol == recovered_sol
+        @test tvS == recovered_tvS
+        @test xvS == recovered_xvS
+        @test gvS == recovered_gvS
+
+        # It is unlikely that such a short integration generates a non-trivial tvS, xvS and gvS. Therefore, to test
+        # VectorTaylorNSerialization I suggest to generate random TaylorN and check it saves correctly...
+        local random_TaylorN = [cos(sum(dq .* rand(6)))]
+        jldsave("test.jld2"; random_TaylorN = random_TaylorN)
+        recovered_taylorN = JLD2.load("test.jld2", "random_TaylorN")
+        @test recovered_taylorN == random_TaylorN
+
+        rm("test.jld2")
     end
 
 end

@@ -4,6 +4,7 @@ module NEOs
 
 import Base: hash, ==, show, isless, isnan, convert
 import PlanetaryEphemeris
+import JLD2: writeas
 
 using Distributed, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
       Dates, EarthOrientation, SPICE, Quadmath, LazyArtifacts, DataFrames, TaylorSeries,
