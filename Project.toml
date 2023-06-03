@@ -38,6 +38,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 [compat]
 AutoHashEquals = "0.2"
 DataFrames = "1.2"
+DelimitedFiles = "1"
 EarthOrientation = "0.7"
 HORIZONS = "0.3"
 HTTP = "1.9.5"
