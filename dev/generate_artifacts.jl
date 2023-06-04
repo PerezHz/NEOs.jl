@@ -67,7 +67,6 @@ for (url, name) in zip(urls, names)
                     end
                 end
                 f()
-                # tarball = Downloads.download(url, joinpath(tmp_dir, basename(url)))
                 try
                     tarball_hash = open(tarball) do file
                         bytes2hex(sha256(file))
