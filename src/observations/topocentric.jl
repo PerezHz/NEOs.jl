@@ -1,7 +1,7 @@
 # Earth orientation parameters (eop) 1980
-const eop_IAU1980 = get_iers_eop_iau_1980() # get_eop_iau1980()
+# const eop_IAU1980 = ST.get_iers_eop_iau_1980()
 # Earth orientation parameters (eop) 2000
-const eop_IAU2000A = get_iers_eop_iau_2000A() # get_eop_iau2000a()
+const eop_IAU2000A = get_iers_eop_iau_2000A()
 
 @doc raw"""
     obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
@@ -42,49 +42,43 @@ obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.observa
 obs_pos_ECEF(x::RadarJPL{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.rcvr)
 
 @doc raw"""
-    obsposvelECI(observatory::ObservatoryMPC{T}, et::T; eo::Bool=true,
-               eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
-    obsposvelECI(x::RadecMPC{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
-    obsposvelECI(x::RadarJPL{T}; eo::Bool=true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
+    obsposvelECI(observatory::ObservatoryMPC{T}, et::T;
+               eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat}
+    obsposvelECI(x::RadecMPC{T}; eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat}
+    obsposvelECI(x::RadarJPL{T}; eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat}
 
-Return the observer's geocentric `[x, y, z, v_x, v_y, v_z]` "state" vector in Earth-Centered Inertial (ECI) reference frame.
+Return the observer's geocentric `[x, y, z, v_x, v_y, v_z]` "state" vector in Earth-Centered
+Inertial (ECI) reference frame. By default, the IAU200A Earth orientation model is used to
+transform from Earth-centered, Earth-fixed (ECEF) frame to ECI frame. Other Earth orientation
+models, such as the IAU1976/80 model can be used by importing the `SatelliteToolbox.EOPData_IAU1980`
+type and passing it to the `eop` keyword argument in the function call.
 
-See also [`SatelliteToolbox.orbsv`](@ref) and [`SatelliteToolbox.svECEFtoECI`](@ref).
+See also [`SatelliteToolbox.orbsv`](@ref) and [`SatelliteToolbox.sv_ecef_to_eci`](@ref).
 
 # Arguments
 
 - `observatory::ObservatoryMPC{T}`: observation site.
 - `et::T`: ephemeris time (TDB seconds since J2000.0 epoch).
-- `eo::Bool`: whether to use Earth Orientation Parameters (eop) or not.
 - `eop::Union{EOPData_IAU1980, EOPData_IAU2000A}`: Earth Orientation Parameters (eop).
 """
-function obsposvelECI(observatory::ObservatoryMPC{T}, et::Union{T,Taylor1{T}}; eo::Bool=true,
-                    eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
-
-    # auxiliary to compute time-derivatives via autodiff
-    one_et = one(et)
-
+function obsposvelECI(observatory::ObservatoryMPC{T}, et::ET;
+        eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat, ET<:Union{T,Taylor1{T},Taylor1{TaylorN{T}}}}
     # Earth-Centered Earth-Fixed position position of observer
-    pos_ECEF = obs_pos_ECEF(observatory)*one_et
+    pos_ECEF = obs_pos_ECEF(observatory)
 
     # UTC seconds
     utc_secs = et - tdb_utc(et)
     # Julian days UTC
     jd_utc = JD_J2000 + utc_secs/daysec
     # State vector
-    pv_ECEF = SatelliteToolbox.orbsv(jd_utc, pos_ECEF, one_et*zeros(3), one_et*zeros(3))
+    pv_ECEF = orbsv(jd_utc, pos_ECEF, zeros(3), zeros(3))
 
     # Transform position/velocity from Earth-Centered Earth-fixed (ECEF) frame to Earth-Centered Inertial (ECI) frame
     # ITRF: International Terrestrial Reference Frame
     # GCRF: Geocentric Celestial Reference Frame
 
     # Use earth orientation parameters
-    if eo
-        pv_ECI = SatelliteToolbox.sv_ecef_to_eci(pv_ECEF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
-    # Not use earth orientation parameters
-    else
-        pv_ECI = SatelliteToolbox.sv_ecef_to_eci(pv_ECEF, Val(:ITRF), Val(:GCRF), jd_utc)
-    end
+    pv_ECI = sv_ecef_to_eci(pv_ECEF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
 
     # Inertial position
     p_ECI = convert(Vector{eltype(pv_ECI.r)}, pv_ECI.r)
@@ -95,55 +89,11 @@ function obsposvelECI(observatory::ObservatoryMPC{T}, et::Union{T,Taylor1{T}}; e
     return vcat(p_ECI, v_ECI)
 end
 
-function obsposvelECI(x::RadecMPC{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
-    return obsposvelECI(x.observatory, datetime2et(x.date); eo = eo, eop = eop)
+function obsposvelECI(x::RadecMPC{T}; eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat}
+    return obsposvelECI(x.observatory, datetime2et(x.date); eop = eop)
 end
-function obsposvelECI(x::RadarJPL{T}; eo::Bool = true, eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU1980) where {T <: AbstractFloat}
-    return obsposvelECI(x.rcvr, datetime2et(x.date); eo = eo, eop = eop)
-end
-
-function smallangle_to_rot(
-    ::Type{DCM},
-    θx::Taylor1,
-    θy::Taylor1,
-    θz::Taylor1;
-    normalize = true
-)
-    return smallangle_to_dcm(θx, θy, θz; normalize = normalize)
-end
-
-function smallangle_to_dcm(
-    θx::Taylor1{T},
-    θy::Taylor1{T},
-    θz::Taylor1{T};
-    normalize = true
-) where {T<:Number}
-    # # Since we might orthonormalize `D`, we need to get the float to avoid type
-    # # instabilities.
-    # T = float(promote_type(T1, T2, T3))
-
-    D = DCM{Taylor1{T}}(
-          1, +θz, -θy,
-        -θz,   1, +θx,
-        +θy, -θx,   1
-    )'
-
-    if normalize
-        return orthonormalize(D)
-    else
-        return D
-    end
-end
-
-function r_itrf_to_pef_fk5(
-    T::Type,
-    x_p::Taylor1,
-    y_p::Taylor1
-)
-    # Notice that `x_p` and `y_p` are displacements in X and Y directions and
-    # **not** rotation angles. Hence, a displacement in X is a rotation in Y and
-    # a displacement in Y is a rotation in X.
-    return smallangle_to_rot(T, +y_p, +x_p, zero(x_p))
+function obsposvelECI(x::RadarJPL{T}; eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat}
+    return obsposvelECI(x.rcvr, datetime2et(x.date); eop = eop)
 end
 
 @doc raw"""
@@ -263,7 +213,7 @@ function t2c_rotation_iau_76_80(et::T; eo::Bool = true) where {T <: Number}
     # Lunar longitude of ascending node (measured from ecliptic)
     Ω_M = PE.Ω(et_days)  # rad
     # IAU 1980 nutation angles
-    _, Δϵ_1980, ΔΨ_1980 = nutation_fk5(JD_J2000 + et_days)
+    _, Δϵ_1980, ΔΨ_1980 = ST.nutation_fk5(JD_J2000 + et_days)
     # Equation of the equinoxes `ee = GAST - GMST`, including nutation correction
     # See equation (5-184) in page (5-70) of https://doi.org/10.1002/0471728470:
     # Δθ = ∆ψ cosϵ̄ + 0''.00264 sinΩ + 0''.000063 sin2Ω
