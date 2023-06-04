@@ -138,7 +138,7 @@ function loadpeeph(et::Union{Nothing, Real} = nothing)
     end
 end
 
-function bwdfwdeph(et::T,
+function bwdfwdeph(et::Union{T,TaylorN{T}},
         bwd::TaylorInterpolant{T,U,2},
         fwd::TaylorInterpolant{T,U,2}
         ) where {T<:AbstractFloat, U<:Union{T,TaylorN{T}}}
