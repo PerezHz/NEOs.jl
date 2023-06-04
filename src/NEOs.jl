@@ -12,7 +12,8 @@ import PlanetaryEphemeris as PE
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pole_rotation,
       au, c_au_per_day, R_sun, c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx,
       Ry, Rz, semimajoraxis, eccentricity, inclination, longascnode, argperi, timeperipass,
-      nbodyind, ordpres_differentiate, numberofbodies, kmsec2auday, auday2kmsec
+      nbodyind, ordpres_differentiate, numberofbodies, kmsec2auday, auday2kmsec, meanmotion,
+      meananomaly
 using Healpix: ang2pixRing, Resolution
 using SatelliteToolbox: get_iers_eop_iau_2000A, EOPData_IAU1980, EOPData_IAU2000A, JD_J2000,
       orbsv, sv_ecef_to_eci, get_Δat, nutation_fk5
