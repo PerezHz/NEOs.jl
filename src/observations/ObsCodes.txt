@@ -2023,6 +2023,7 @@ M51   9.226970.655500+0.752709Robert Mayer Sternwarte, Heilbronn
 M52   8.578500.758941+0.649052Sassari
 M53  10.282190.585977+0.807623CAS Observatory, Preetz
 M54   7.077810.725140+0.686335Observatoire Albireo de Biot
+M55  19.987000.656685+0.751814Luckystar Observatory, Vazec
 M90  65.428600.546720+0.834520Chervishevo
 N27  73.725300.578470+0.812980Omsk-Yogik Observatory
 N30  74.369400.853690+0.519090Zeds Astronomical Observatory, Lahore

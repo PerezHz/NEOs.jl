@@ -15,7 +15,7 @@ using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pol
       nbodyind, ordpres_differentiate, numberofbodies, kmsec2auday, auday2kmsec
 using Healpix: ang2pixRing, Resolution
 using SatelliteToolbox: get_iers_eop_iau_2000A, EOPData_IAU1980, EOPData_IAU2000A, JD_J2000,
-      orbsv, sv_ecef_to_eci, get_ΔAT, nutation_fk5
+      orbsv, sv_ecef_to_eci, get_Δat, nutation_fk5
 using Dates: format
 using HTTP: get
 using IntervalRootFinding: roots, interval, Interval, mid

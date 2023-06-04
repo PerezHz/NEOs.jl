@@ -102,7 +102,7 @@ function tdb_utc(et::T) where {T<:Number}
     utc_secs = et_00 - deltet(et_00, "ET")
     # ΔAT
     jd_utc = JD_J2000 + utc_secs/daysec
-    tai_utc = get_ΔAT(jd_utc)
+    tai_utc = get_Δat(jd_utc)
     # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
     return (tt_tai + tai_utc) - tt_tdb_et
 end
