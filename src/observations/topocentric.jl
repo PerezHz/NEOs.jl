@@ -233,7 +233,7 @@ function t2c_rotation_iau_76_80(et::T; eo::Bool = true) where {T <: Number}
     ut1_days = ut1/daysec # elapsed UT1 days since J2000.0
     # Greenwich apparent sidereal time (IAU 1982/1994)
     # See equation (5-173) in page (5-67) of https://doi.org/10.1002/0471728470:
-    gmst82 = J2000toGMST(ut1_days)
+    gmst82 = ST.J2000toGMST(ut1_days)
     gast = mod2pi( gmst82 + ee )
     β_dot = eo ? omega(EarthOrientation.getlod(t_utc_00)) : ω
 
