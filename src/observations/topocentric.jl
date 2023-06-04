@@ -76,8 +76,6 @@ function obsposvelECI(observatory::ObservatoryMPC{T}, et::ET;
     # Transform position/velocity from Earth-Centered Earth-fixed (ECEF) frame to Earth-Centered Inertial (ECI) frame
     # ITRF: International Terrestrial Reference Frame
     # GCRF: Geocentric Celestial Reference Frame
-
-    # Use earth orientation parameters
     pv_ECI = sv_ecef_to_eci(pv_ECEF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
 
     # Inertial position
