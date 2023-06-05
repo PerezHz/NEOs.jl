@@ -172,8 +172,6 @@ using InteractiveUtils: methodswith
         std_dec = std(res_dec)
         rms_ra = nrms(res_ra,ones(length(res_ra)))
         rms_dec = nrms(res_dec,ones(length(res_dec)))
-        @show mean_ra, std_ra,rms_ra
-        @show mean_dec, std_dec,rms_dec
         @test mean_ra ≈ 0.0224 atol=1e-2
         @test std_ra ≈ 0.136 atol=1e-2
         @test rms_ra ≈ std_ra atol=1e-2
@@ -209,7 +207,7 @@ using InteractiveUtils: methodswith
         w = vcat(w_radec, w_del, w_dop)
 
         # Total normalized RMS
-        @show nrms(res, w)
+        @test nrms(res, w) ≈ 0.375 atol=1e-2
     end
 
 end
