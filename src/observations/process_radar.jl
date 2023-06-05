@@ -548,7 +548,6 @@ function radar_astrometry(astradardata::Vector{RadarJPL{T}}; tord::Int = 5, nite
 
     # Iterate over the measurements
     for i in eachindex(astradardata)
-        @show astradardata[i]
         # Compute time delay and doppler shift
         vdelay[i], vdoppler[i] = radar_astrometry(astradardata[i], tord = tord, niter = niter, tc = tc, xve = xve, xvs = xvs, xva = xva,
                                                autodiff = autodiff)
@@ -603,12 +602,9 @@ function residuals(obs::Vector{RadarJPL{T}}; tord::Int = 5, niter::Int = 10, tc:
     res_τ = x_jt[2][x_jt[14]] .- x_jt[4][x_jt[14]]
     # Doppler-shift residuals
     res_ν = x_jt[3][x_jt[15]] .- x_jt[5][x_jt[15]]
-    # Total residuals
-    res = vcat(res_τ, res_ν)
     # Weights
-    w_τ = 1 ./ x_jt[6][x_jt[14]].^2
-    w_ν = 1 ./ x_jt[7][x_jt[15]].^2
-    w = vcat(w_τ, w_ν)
+    w_τ = 1 ./ (x_jt[6][x_jt[14]].^2)
+    w_ν = 1 ./ (x_jt[7][x_jt[15]].^2)
 
     return res_τ, w_τ, res_ν, w_ν
 end

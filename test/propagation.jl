@@ -155,17 +155,17 @@ using InteractiveUtils: methodswith
         obs_radec_mpc_apophis = NEOs.read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
 
         # Compute optical astrometry residuals
-        res, _ = NEOs.residuals(
+        res_radec, w_radec = NEOs.residuals(
             obs_radec_mpc_apophis,
             xve=t->auday2kmsec(eph_ea(t)),
             xvs=t->auday2kmsec(eph_su(t)),
             xva=t->auday2kmsec(sol(t/daysec))
         )
-        nobsopt = round(Int, length(res))
+        nobsopt = round(Int, length(res_radec))
 
         # Compute mean optical astrometric residual (right ascension and declination)
-        res_ra = res[1:round(Int,nobsopt/2)]
-        res_dec = res[round(Int,nobsopt/2)+1:end]
+        res_ra = res_radec[1:round(Int,nobsopt/2)]
+        res_dec = res_radec[round(Int,nobsopt/2)+1:end]
         mean_ra = mean(res_ra)
         mean_dec = mean(res_dec)
         std_ra = std(res_ra)
@@ -174,9 +174,12 @@ using InteractiveUtils: methodswith
         rms_dec = nrms(res_dec,ones(length(res_dec)))
         @show mean_ra, std_ra,rms_ra
         @show mean_dec, std_dec,rms_dec
-        # @test mean_radec ≈ 0.005 atol=1e-2
-        # @test std_radec ≈ 0.110 atol=1e-2
-        # @test rms_radec ≈ std_radec atol=1e-2
+        @test mean_ra ≈ 0.0224 atol=1e-2
+        @test std_ra ≈ 0.136 atol=1e-2
+        @test rms_ra ≈ std_ra atol=1e-2
+        @test mean_dec ≈ -0.0124 atol=1e-2
+        @test std_dec ≈ 0.0714 atol=1e-2
+        @test rms_dec ≈ std_dec atol=1e-2
 
         # Read radar astrometry file
         deldop_2005_2013 = NEOs.read_radar_jpl(joinpath("data", "99942_RADAR_2005_2013.dat"))
@@ -196,12 +199,17 @@ using InteractiveUtils: methodswith
         mean_dop = mean(res_dop)
         std_del = std(res_del)
         std_dop = std(res_dop)
-        rms_del = nrms(res_del,w_del)
-        rms_dop = nrms(res_dop,w_dop)
 
-        @show res_del, w_del, res_dop, w_dop
-        @show mean_del, mean_dop, std_del, std_dop, rms_del, rms_dop
+        @test mean_del ≈ 0.281 atol=1e-2
+        @test mean_dop ≈ -0.084 atol=1e-2
+        @test std_del ≈ 1.246 atol=1e-2
+        @test std_dop ≈ 0.286 atol=1e-2
 
+        res = vcat(res_radec, res_del, res_dop)
+        w = vcat(w_radec, w_del, w_dop)
+
+        # Total normalized RMS
+        @show nrms(res, w)
     end
 
 end
