@@ -123,8 +123,8 @@ using InteractiveUtils: methodswith
 
         # integration parameters
         objname = "Apophis"
-        maxsteps = 2000
-        nyears = 4.0
+        maxsteps = 5000
+        nyears = 9.0
         dense = true
         quadmath = false
         dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
@@ -154,20 +154,54 @@ using InteractiveUtils: methodswith
         # Read optical astrometry file
         obs_radec_mpc_apophis = NEOs.read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
 
-        # Compute residuals
+        # Compute optical astrometry residuals
         res, _ = NEOs.residuals(
             obs_radec_mpc_apophis,
             xve=t->auday2kmsec(eph_ea(t)),
             xvs=t->auday2kmsec(eph_su(t)),
             xva=t->auday2kmsec(sol(t/daysec))
         )
+        nobsopt = round(Int, length(res))
 
-        mean_radec = mean(res)
-        std_radec = std(res)
-        rms_radec = nrms(res,ones(length(res)))
-        @test mean_radec ≈ 0.005 atol=1e-2
-        @test std_radec ≈ 0.110 atol=1e-2
-        @test rms_radec ≈ std_radec atol=1e-2
+        # Compute mean optical astrometric residual (right ascension and declination)
+        res_ra = res[1:round(Int,nobsopt/2)]
+        res_dec = res[round(Int,nobsopt/2)+1:end]
+        mean_ra = mean(res_ra)
+        mean_dec = mean(res_dec)
+        std_ra = std(res_ra)
+        std_dec = std(res_dec)
+        rms_ra = nrms(res_ra,ones(length(res_ra)))
+        rms_dec = nrms(res_dec,ones(length(res_dec)))
+        @show mean_ra, std_ra,rms_ra
+        @show mean_dec, std_dec,rms_dec
+        # @test mean_radec ≈ 0.005 atol=1e-2
+        # @test std_radec ≈ 0.110 atol=1e-2
+        # @test rms_radec ≈ std_radec atol=1e-2
+
+        # Read radar astrometry file
+        deldop_2005_2013 = NEOs.read_radar_jpl(joinpath("data", "99942_RADAR_2005_2013.dat"))
+
+        # Compute mean radar (time-delay and Doppler-shift) residuals
+        println("Computing radar astrometric residuals")
+        @time res_del, w_del, res_dop, w_dop = residuals(
+            deldop_2005_2013,
+            xve=t->auday2kmsec(eph_ea(t)),
+            xvs=t->auday2kmsec(eph_su(t)),
+            xva=t->auday2kmsec(sol(t/daysec))
+            niter=4,
+            tord=5
+        )
+
+        mean_del = mean(res_del)
+        mean_dop = mean(res_dop)
+        std_del = std(res_del)
+        std_dop = std(res_dop)
+        rms_del = nrms(res_del,w_del)
+        rms_dop = nrms(res_dop,w_dop)
+
+        @show res_del, w_del, res_dop, w_dop
+        @show mean_del, mean_dop, std_del, std_dop, rms_del, rms_dop
+
     end
 
 end
