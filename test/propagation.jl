@@ -187,7 +187,7 @@ using InteractiveUtils: methodswith
             deldop_2005_2013,
             xve=t->auday2kmsec(eph_ea(t)),
             xvs=t->auday2kmsec(eph_su(t)),
-            xva=t->auday2kmsec(sol(t/daysec))
+            xva=t->auday2kmsec(sol(t/daysec)),
             niter=4,
             tord=5
         )
