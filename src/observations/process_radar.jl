@@ -606,8 +606,8 @@ function residuals(obs::Vector{RadarJPL{T}}; tord::Int = 5, niter::Int = 10, tc:
     # Total residuals
     res = vcat(res_τ, res_ν)
     # Weights
-    w_τ = repeat(1 ./ x_jt[6][x_jt[14]].^2, 2)
-    w_ν = repeat(1 ./ x_jt[7][x_jt[15]].^2, 2)
+    w_τ = 1 ./ x_jt[6][x_jt[14]].^2
+    w_ν = 1 ./ x_jt[7][x_jt[15]].^2
     w = vcat(w_τ, w_ν)
 
     return res_τ, w_τ, res_ν, w_ν
