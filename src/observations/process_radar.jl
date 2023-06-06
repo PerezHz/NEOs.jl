@@ -240,10 +240,8 @@ function tropo_delay(r_antenna::Vector{T}, ρ_vec_ae::Vector{S}) where {T<:Numbe
 end
 
 @doc raw"""
-    compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::Int = 5, niter::Int = 10, xve::TaylorInterpolant = earthposvel,
-          xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophisposvel197) where {T <: AbstractFloat}
-    compute_delay(radar::RadarJPL{T}; tord::Int = 5, niter::Int = 10, xve::TaylorInterpolant = earthposvel,
-          xvs::TaylorInterpolant = sunposvel, xva::TaylorInterpolant = apophisposvel197) where {T <: AbstractFloat}
+    compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::Int = 5, niter::Int = 10,
+        xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
 
 Compute Taylor series expansion of time-delay observable around echo reception time. This
 allows to compute dopplers via automatic differentiation using
@@ -269,7 +267,7 @@ See https://doi.org/10.1086/116062.
 - `xva::TaylorInterpolant`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
 function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::Int = 5, niter::Int = 10,
-                xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph = apophisposvel197) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
+                xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
 
     # Transform receiving time from UTC to TDB seconds since j2000
     et_r_secs_0 = datetime2et(t_r_utc)
@@ -470,13 +468,13 @@ end
 
 @doc raw"""
     radar_astrometry(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_tx::Real; tord::Int = 5, niter::Int = 10, tc::Real = 1.0,
-                  xve = earthposvel, xvs = sunposvel, xva = apophisposvel197, autodiff::Bool = true) where {T <: AbstractFloat}
-    radar_astrometry(radar::RadarJPL{T}; tord::Int = 5, niter::Int = 10, tc::Real = 1.0, xve = earthposvel,
-                  xvs = sunposvel, xva = apophisposvel197, autodiff::Bool = true) where {T <: AbstractFloat}
-    radar_astrometry(astradarfile::String; tord::Int = 5, niter::Int = 10, tc::Real = 1.0, xve = earthposvel, xvs = sunposvel,
-                  xva = apophisposvel197, autodiff::Bool = true)
-    radar_astrometry(outfilename::String, radarobsfile::String, asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant; tc::Real=1.0, autodiff::Bool=true,
-                  tord::Int = 5, niter::Int = 10)
+                  xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph, autodiff::Bool = true) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
+    radar_astrometry(radar::RadarJPL{T}; tord::Int = 5, niter::Int = 10, tc::Real = 1.0, xve::EarthEph = earthposvel,
+                  xvs::SunEph = sunposvel, xva::AstEph, autodiff::Bool = true) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
+    radar_astrometry(astradarfile::String; tord::Int = 5, niter::Int = 10, tc::Real = 1.0, xve::EarthEph = earthposvel, xvs::SunEph = sunposvel,
+                  xva::AstEph, autodiff::Bool = true) where {EarthEph, SunEph, AstEph}
+    radar_astrometry(astradardata::Vector{RadarJPL}; tord::Int = 5, niter::Int = 10, tc::Real = 1.0,
+                xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph, autodiff::Bool = true) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
 
 Return time-delay and Doppler shift.
 
@@ -529,8 +527,7 @@ function radar_astrometry(astradarfile::String; kwargs...)
     return radar_astrometry(astradardata; kwargs...)
 end
 
-function radar_astrometry(astradardata::Vector{RadarJPL{T}}; tord::Int = 5, niter::Int = 10, tc::Real = 1.0, xve = earthposvel, xvs = sunposvel,
-                       xva=apophisposvel197, autodiff::Bool=true) where {T <: AbstractFloat}
+function radar_astrometry(astradardata::Vector{RadarJPL{T}}; xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
 
     # UTC time of first radar observation
     utc1 = astradardata[1].date
@@ -549,8 +546,7 @@ function radar_astrometry(astradardata::Vector{RadarJPL{T}}; tord::Int = 5, nite
     # Iterate over the measurements
     for i in eachindex(astradardata)
         # Compute time delay and doppler shift
-        vdelay[i], vdoppler[i] = radar_astrometry(astradardata[i], tord = tord, niter = niter, tc = tc, xve = xve, xvs = xvs, xva = xva,
-                                               autodiff = autodiff)
+        vdelay[i], vdoppler[i] = radar_astrometry(astradardata[i]; xva, kwargs...)
     end
     # Rows with time delays
     delay_index = map(x-> x.Δτ_units == "us", astradardata)
@@ -576,7 +572,7 @@ end
 
 @doc raw"""
     residuals(obs::Vector{RadarJPL{T}}, niter::Int = 10; debias_table::String = "2018",
-              xvs::SunEph = sunposvel, xve::EarthEph = earthposvel, xva::AstEph = apophisposvel197) where {T <: AbstractFloat}
+              xvs = sunposvel, xve = earthposvel, xva) where {T <: AbstractFloat}
 
 Compute O-C residuals for radar astrometry, including corrections due to Earth orientation,
 LOD and polar motion.
@@ -590,14 +586,13 @@ See also [`compute_delay`](@ref) and [`radar_astrometry`](@ref).
 - `tc::Real`: time offset wrt echo reception time, to compute Doppler shifts by range differences (seconds).
 - `autodiff::Bool`: whether to use the automatic differentiation method of [`compute_delay`](@ref) or not.
 - `tord::Int`: order of Taylor expansions.
-- `xvs::SunEph`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xve::EarthEph`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xva::AstEph`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `xvs::`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `xve::`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `xva::`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
-function residuals(obs::Vector{RadarJPL{T}}; tord::Int = 5, niter::Int = 10, tc::Real = 1.0, autodiff::Bool = true,
-                   xvs::SunEph = sunposvel, xve::EarthEph = earthposvel, xva::AstEph = apophisposvel197) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
+function residuals(obs::Vector{RadarJPL{T}}; kwargs...) where {T <: AbstractFloat}
     # Radar delay/Doppler astrometric data
-    x_jt = radar_astrometry(obs; tord = tord, niter=niter, tc=tc, autodiff = autodiff, xvs = xvs, xve = xve, xva = xva)
+    x_jt = radar_astrometry(obs; kwargs...)
     # Time-delay residuals
     res_τ = x_jt[2][x_jt[14]] .- x_jt[4][x_jt[14]]
     # Doppler-shift residuals

@@ -1,10 +1,10 @@
 @doc raw"""
-    compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, niter::Int = 5;
-    xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph = apophisposvel197) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
-    compute_radec(obs::RadecMPC{T}, niter::Int = 5; xve::EarthEph = earthposvel, xvs::SunEph = sunposvel,
-                  xva::AstEph = apophisposvel197) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
-    compute_radec(obs::Vector{RadecMPC{T}}, niter::Int=5; xve::EarthEph=earthposvel, xvs::SunEph=sunposvel,
-                  xva::AstEph=apophisposvel197) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
+    compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
+    xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
+    compute_radec(obs::RadecMPC{T}; niter::Int = 5, xve::EarthEph = earthposvel, xvs::SunEph = sunposvel,
+                  xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
+    compute_radec(obs::Vector{RadecMPC{T}}; niter::Int=5, xve::EarthEph=earthposvel, xvs::SunEph=sunposvel,
+                  xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
 
 Compute astrometric right ascension and declination (both in arcsec) for a set of MPC-formatted observations.
 Corrections due to Earth orientation, LOD, polar motion are considered in computations.
@@ -19,7 +19,7 @@ Corrections due to Earth orientation, LOD, polar motion are considered in comput
 - `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
 function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
-                       xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph = apophisposvel197) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
+                       xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
     # Transform receiving time from UTC to TDB seconds since J2000
     et_r_secs = datetime2et(t_r_utc)
     # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
@@ -151,7 +151,7 @@ function compute_radec(obs::RadecMPC{T}; kwargs...) where {T <: AbstractFloat}
     return compute_radec(obs.observatory, obs.date; kwargs...)
 end
 
-function compute_radec(obs::Vector{RadecMPC{T}}; xva::AstEph=apophisposvel197, kwargs...) where {T <: AbstractFloat, AstEph}
+function compute_radec(obs::Vector{RadecMPC{T}}; xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
 
     # Number of observations
     n_optical_obs = length(obs)
@@ -381,7 +381,7 @@ end
 
 @doc raw"""
     radec_astrometry(obs::Vector{RadecMPC{T}}; niter::Int = 5, debias_table::String = "2018",
-                     xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph = apophisposvel197) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
+                     xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
 
 Compute optical astrometry, i.e. dates of observation plus observed, computed, debiasing corrections and statistical weights for
 right ascension and declination (in arcsec). Corrections to Earth orientation parameters provided by IERS are computed by default.
@@ -403,7 +403,7 @@ See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and 
 - `xvs`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 - `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
-function radec_astrometry(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph=apophisposvel197, kwargs...) where {T <: AbstractFloat, AstEph}
+function radec_astrometry(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
 
     # Number of observations
     n_optical_obs = length(obs)
@@ -452,7 +452,7 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}; debias_table::String = "2018
         α_obs[i] = rad2arcsec(obs[i].α) * cos(obs[i].δ) # arcsec
 
         # Computed ra/dec
-        α_comp_as, δ_comp_as = compute_radec(obs[i]; kwargs...)
+        α_comp_as, δ_comp_as = compute_radec(obs[i]; xva, kwargs...)
         # Multiply by metric factor cos(dec)
         α_comp[i] = α_comp_as * cos(obs[i].δ)  # arcsec
         δ_comp[i] = δ_comp_as                  # arcsec
@@ -471,7 +471,7 @@ end
 
 @doc raw"""
     residuals(obs::Vector{RadecMPC{T}}; niter::Int = 5, debias_table::String = "2018",
-    xvs::SunEph = sunposvel, xve::EarthEph = earthposvel, xva::AstEph = apophisposvel197) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
+    xvs::SunEph = sunposvel, xve::EarthEph = earthposvel, xva::AstEph) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
 
 Compute O-C residuals for optical astrometry. Corrections due to Earth orientation, LOD, polar motion are computed by default.
 
