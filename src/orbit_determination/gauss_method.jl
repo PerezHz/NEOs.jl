@@ -8,14 +8,14 @@ https://doi.org/10.1016/C2016-0-02107-1.
 
 See also [`gauss_method`](@ref).
 
-# Fields 
+# Fields
 
-- `statevect::Vector{U}`: state vector at middle observation. 
-- `D::Matrix{U}`: D matrix. 
-- `R_vec::Matrix{T}`: observer's heliocentric positions. 
-- `ρ_vec::Matrix{U}`: slant ranges. 
-- `τ_1::T`: time between first and second observations. 
-- `τ_3::T`: time between third and second observations. 
+- `statevect::Vector{U}`: state vector at middle observation.
+- `D::Matrix{U}`: D matrix.
+- `R_vec::Matrix{T}`: observer's heliocentric positions.
+- `ρ_vec::Matrix{U}`: slant ranges.
+- `τ_1::T`: time between first and second observations.
+- `τ_3::T`: time between third and second observations.
 - `f_1, g_1, f_3, g_3::U`: Lagrange coefficients.
 - `status::Symbol`: the status of the solution (`:empty`, `:unkown` or `:unique`)
 """
@@ -24,30 +24,30 @@ See also [`gauss_method`](@ref).
     D::Matrix{U}
     R_vec::Matrix{T}
     ρ_vec::Matrix{U}
-    τ_1::T 
+    τ_1::T
     τ_3::T
     f_1::U
     g_1::U
-    f_3::U 
-    g_3::U 
+    f_3::U
+    g_3::U
     status::Symbol
-    # Internal constructor 
-    function GaussSolution{T, U}(statevect::Vector{U}, D::Matrix{U}, R_vec::Matrix{T}, ρ_vec::Matrix{U}, τ_1::T, τ_3::T, 
+    # Internal constructor
+    function GaussSolution{T, U}(statevect::Vector{U}, D::Matrix{U}, R_vec::Matrix{T}, ρ_vec::Matrix{U}, τ_1::T, τ_3::T,
                                  f_1::U, g_1::U, f_3::U, g_3::U, status::Symbol) where {T <: Real, U <: Number}
         return new{T, U}(statevect, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, status)
-    end 
-end 
+    end
+end
 
-# Outer constructor 
-function GaussSolution(statevect::Vector{U}, D::Matrix{U}, R_vec::Matrix{T}, ρ_vec::Matrix{U}, τ_1::T, τ_3::T, 
+# Outer constructor
+function GaussSolution(statevect::Vector{U}, D::Matrix{U}, R_vec::Matrix{T}, ρ_vec::Matrix{U}, τ_1::T, τ_3::T,
                        f_1::U, g_1::U, f_3::U, g_3::U, status::Symbol) where {T <: Real, U <: Number}
     return GaussSolution{T, U}(statevect, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, status)
-end 
+end
 
 # Print method for GaussSolution
-# Examples: 
+# Examples:
 # unique Gauss solution (r = 1.0800950907383229)
-function show(io::IO, g::GaussSolution{T, U}) where {T <: Real, U <: Number} 
+function show(io::IO, g::GaussSolution{T, U}) where {T <: Real, U <: Number}
     print(io, g.status, " Gauss solution (r = ", norm(cte.(g.statevect[1:3])), ")")
 end
 
@@ -58,7 +58,7 @@ end
 Return the topocentric unit vector.
 """
 function topounit(α::T, δ::T) where {T <: Number}
-    
+
     sin_α, cos_α = sincos(α)
     sin_δ, cos_δ = sincos(δ)
 
@@ -74,7 +74,7 @@ topounit(obs::RadecMPC{T}) where {T <: AbstractFloat} = topounit(obs.α, obs.δ)
 @doc raw"""
     f_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
 
-Return the 1st order approximation to Lagrange's f function. 
+Return the 1st order approximation to Lagrange's f function.
 """
 function f_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
     return 1 - μ_S * (τ^2) / 2 / (r^3)
@@ -82,7 +82,7 @@ end
 
 @doc raw"""
     g_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
-    
+
 Return the 1st order approximation to Lagrange's g function.
 """
 function g_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
@@ -107,87 +107,87 @@ function _format_Lagrange_equation(a::T, b::T, c::T) where {T <: AbstractFloat}
     c_sgn = c ≥ 0 ? "+" : "-"
 
     return join(["r⁸ ", a_sgn, " ", abs(a), " r⁶ ", b_sgn, " ", abs(b), " r³ ", c_sgn, " ", abs(c), " = 0"])
-end 
+end
 
 @doc raw"""
     lagrange(x::T, a::U, b::U, c::U) where {T, U <: Number}
 
-Lagrange polynomial to be solved during Gauss method. 
+Lagrange polynomial to be solved during Gauss method.
 """
 lagrange(x::T, a::U, b::U, c::U) where {T, U <: Number} = x^8 + a*x^6 + b*x^3 + c
 
 @doc raw"""
     lagrange_derivative(x::T, a::T, b::T) where {T <: Number}
 
-Derivative of Lagrange polynomial to be solved during Gauss method. 
+Derivative of Lagrange polynomial to be solved during Gauss method.
 """
 lagrange_derivative(x::T, a::U, b::U) where {T, U <: Number} = 8*x^7 + 6*a*x^5 + 3*b*x^2
 
-# TO DO: Allow to control interval over which to look for solutions 
+# TO DO: Allow to control interval over which to look for solutions
 # Currently we look between the radius of the Sun ((0.00465047 au) and the radius of the Solar System (40 au)
 
 @doc raw"""
     solve_lagrange(a::T, b::T, c::T; niter::Int = niter) where {T <: Real}
     solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T}; niter::Int = niter) where {T <: Real}
 
-Solve Lagrange polynomial. 
+Solve Lagrange polynomial.
 
 See also [`lagrange`](@ref).
 """
-function solve_lagrange(a::T, b::T, c::T; niter::Int = 5) where {T <: Real} 
+function solve_lagrange(a::T, b::T, c::T; niter::Int = 5) where {T <: Real}
     sol = roots(x -> lagrange(x, a, b, c), Interval(0.00465047, 40))
     return mid.(interval.(sol)), getfield.(sol, :status)
-end 
+end
 
 function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T}; niter::Int = 5) where {T <: Real}
-    # 0-th order solution 
+    # 0-th order solution
     sol_0, status = solve_lagrange(cte(a), cte(b), cte(c))
-    # Discard empty solutions 
+    # Discard empty solutions
     idxs = findall(x -> x != :empty, status)
-    # Vector of solutions 
+    # Vector of solutions
     sol = Vector{TaylorN{T}}(undef, length(idxs))
     # Iterate non-empty solutions
     for i in eachindex(sol)
-        # Newton's method 
-        r_0 = sol_0[idxs[i]] 
-        r_2 = sol_0[idxs[i]] 
+        # Newton's method
+        r_0 = sol_0[idxs[i]]
+        r_2 = sol_0[idxs[i]]
         for j in 1:niter
             r_2 = r_0 - lagrange(r_0, a, b, c) / lagrange_derivative(r_0, a, b)
             r_0 = r_2
-        end 
+        end
         sol[i] = r_2
     end
 
     return sol, status[idxs]
-end 
+end
 
 @doc raw"""
-    gauss_method(obs::Vector{RadecMPC{T}}; xve::Function = et -> kmsec2auday(getposvel(399, 10, et)), 
-                 niter::Int = 10) where {T <: AbstractFloat}
+    gauss_method(obs::Vector{RadecMPC{T}}; xve::EarthEph = et -> kmsec2auday(getposvel(399, 10, et)),
+                 niter::Int = 10) where {T <: AbstractFloat, EarthEph}
     gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime}, α::Vector{U}, δ::Vector{U};
-                 xve::Function = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: Real, U <: Number}
+                 xve::EarthEph = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: Real, U <: Number, EarthEph}
 
 Core Gauss method of Initial Orbit determination (IOD). See Algorithm 5.5 in page 274 https://doi.org/10.1016/C2016-0-02107-1.
 
-# Arguments 
+# Arguments
 
 - `obs::Vector{RadecMPC{T}}`: three observations.
 - `observatories::Vector{ObservatoryMPC{T}}`: sites of observation.
 - `dates::Vector{DateTime}`: times of observation.
 - `α::Vector{U}`: right ascension.
-- `δ::Vector{U}`: declination. 
-- `xve::Function`: Earth's ephemeris [et -> au, au/day]. 
-- `niter::Int`: Number of iterations for Newton's method. 
+- `δ::Vector{U}`: declination.
+- `xve::EarthEph`: Earth's ephemeris [et -> au, au/day].
+- `niter::Int`: Number of iterations for Newton's method.
 """
-function gauss_method(obs::Vector{RadecMPC{T}}; xve::Function = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: AbstractFloat}
-    
-    # Make sure observations are in temporal order 
+function gauss_method(obs::Vector{RadecMPC{T}}; xve::EarthEph = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: AbstractFloat, EarthEph}
+
+    # Make sure observations are in temporal order
     sort!(obs)
 
     # Sites of observation
     observatories = observatory.(obs)
 
-    # Dates of observation 
+    # Dates of observation
     dates = date.(obs)
 
     # Right ascension
@@ -197,29 +197,29 @@ function gauss_method(obs::Vector{RadecMPC{T}}; xve::Function = et -> kmsec2auda
     δ = dec.(obs)
 
     return gauss_method(observatories, dates, α, δ; xve = xve, niter = niter)
-end 
+end
 
 function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime}, α::Vector{U}, δ::Vector{U};
-                      xve::Function = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: Real, U <: Number}
+                      xve::EarthEph = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: Real, U <: Number, EarthEph}
 
-    # Check we have exactly three observations 
+    # Check we have exactly three observations
     @assert length(observatories) == length(dates) == length(α) == length(δ) == 3 "Gauss method requires exactly three observations"
 
     # Julian days of observation
     t_julian = datetime2julian.(dates)
 
-    # Time intervals 
+    # Time intervals
     τ_1 = t_julian[1] - t_julian[2]
     τ_3 = t_julian[3] - t_julian[2]
     τ = τ_3 - τ_1
 
-    # NEO's topocentric position unit vectors 
+    # NEO's topocentric position unit vectors
     ρ_vec = vectors2matrix(topounit.(α, δ))
 
     # Times of observation [et]
     t_et = datetime2et.(dates)
 
-    # Geocentric state vector of the observer [au, au/day] 
+    # Geocentric state vector of the observer [au, au/day]
     g_vec = kmsec2auday.(obsposvelECI.(observatories, t_et))
 
     # Heliocentric state vector of the Earth [au, au/day]
@@ -228,28 +228,28 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     # Observer's heliocentric positions [au, au/day]
     R_vec = vectors2matrix(G_vec .+  g_vec)[:, 1:3]
 
-    # Cross products 
+    # Cross products
     p_vec = zeros(U, 3, 3)
     p_vec[1, :] = cross(ρ_vec[2, :], ρ_vec[3, :])
     p_vec[2, :] = cross(ρ_vec[1, :], ρ_vec[3, :])
-    p_vec[3, :] = cross(ρ_vec[1, :], ρ_vec[2, :]) 
+    p_vec[3, :] = cross(ρ_vec[1, :], ρ_vec[2, :])
 
-    # Gauss scalar 
+    # Gauss scalar
     D_0 = dot(ρ_vec[1, :], p_vec[1, :])
 
-    # Matrix of triple products 
+    # Matrix of triple products
     D = zeros(U, 3, 3)
     for i in 1:3
         for j in 1:3
-            D[i, j] = dot(R_vec[i, :], p_vec[j, :]) 
+            D[i, j] = dot(R_vec[i, :], p_vec[j, :])
         end
-    end 
+    end
 
-    # A and B scalars 
+    # A and B scalars
     A = (-D[1, 2]*τ_3/τ + D[2, 2] + D[3, 2]*τ_1/τ) / D_0
     B = (D[1, 2]*(τ_3^2 - τ^2)*τ_3/τ + D[3, 2]*(τ^2 - τ_1^2)*τ_1/τ) / 6 / D_0
 
-    # E and F scalars 
+    # E and F scalars
     E = dot(R_vec[2, :], ρ_vec[2, :])
     F = dot(R_vec[2, :], R_vec[2, :])
 
@@ -258,26 +258,26 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     b = -2*μ_S*B*(A + E)
     c = -(μ_S^2)*(B^2)
 
-    # Solve Lagrange equation 
+    # Solve Lagrange equation
     sol, status = solve_lagrange(a, b, c; niter = niter)
 
-    # Number of solutions 
+    # Number of solutions
     n_sol = length(sol)
 
     if n_sol == 0
-        
+
         @warn("""No solutions found for Lagrange equation $(_format_Lagrange_equation(cte(a), cte(b), cte(c)))""")
 
         return Vector{GaussSolution{T, U}}(undef, 0)
 
-    else 
+    else
 
         sol_gauss = Vector{GaussSolution{T, U}}(undef, n_sol)
 
         for i in eachindex(sol_gauss)
-            # Heliocentric range 
+            # Heliocentric range
             r_2 = sol[i]
-            # Slant ranges 
+            # Slant ranges
             ρ = zeros(U, 3)
 
             num_1 = 6*(D[3, 1]*τ_1/τ_3 + D[2, 1]*τ/τ_3)*(r_2^3) + μ_S*D[3, 1]*(τ^2 - τ_1^2)*τ_1/τ_3
@@ -290,7 +290,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
             den_3 = 6*(r_2^3) + μ_S*(τ^2 - τ_1^2)
             ρ[3] = (num_3 / den_3 - D[3, 3]) / D_0
 
-            # Heliocentric position of the NEO 
+            # Heliocentric position of the NEO
             r_vec = R_vec .+ ρ.*ρ_vec
 
             # f, g Lagrange coefficients
@@ -300,14 +300,14 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
             g_1 = g_Lagrange(τ_1, r_2)
             g_3 = g_Lagrange(τ_3, r_2)
 
-            # Heliocentric velocity of the NEO 
+            # Heliocentric velocity of the NEO
             v_2_vec = (- f_3 * r_vec[1, :] + f_1 * r_vec[3, :]) / (f_1*g_3 - f_3*g_1)
 
             sol_gauss[i] = GaussSolution{T, U}(vcat(r_vec[2, :], v_2_vec), D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, status[i])
-        end 
+        end
 
         return sort!(sol_gauss, by = x -> norm(x.statevect[1:3]))
 
-    end 
-    
+    end
+
 end

@@ -476,7 +476,7 @@ end
     radar_astrometry(astradarfile::String; tord::Int = 5, niter::Int = 10, tc::Real = 1.0, xve = earthposvel, xvs = sunposvel,
                   xva = apophisposvel197, autodiff::Bool = true)
     radar_astrometry(outfilename::String, radarobsfile::String, asteph::TaylorInterpolant, ss16asteph::TaylorInterpolant; tc::Real=1.0, autodiff::Bool=true,
-                  tord::Int = 5, niter::Int = 5)
+                  tord::Int = 5, niter::Int = 10)
 
 Return time-delay and Doppler shift.
 

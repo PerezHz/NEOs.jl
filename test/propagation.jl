@@ -56,6 +56,7 @@ using InteractiveUtils: methodswith
             parse_eqs = true
         )
 
+        # propagate orbit
         sol = NEOs.propagate(
             dynamics,
             maxsteps,
@@ -136,6 +137,20 @@ using InteractiveUtils: methodswith
         eph_su = selecteph(sseph, su)
         # Earth's ephemeris
         eph_ea = selecteph(sseph, ea)
+
+        # warmup propagation
+        sol = NEOs.propagate(
+            dynamics,
+            1,
+            jd0,
+            nyears,
+            sseph,
+            q0,
+            Val(true),
+            order = 25,
+            abstol = 1e-20,
+            parse_eqs = true
+        )
 
         # propagate orbit
         sol = NEOs.propagate(

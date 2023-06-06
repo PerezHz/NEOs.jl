@@ -72,8 +72,8 @@ function print_header(header::String)
     println(repeat("-", L))
 end
 
-function main(dynamics::Function, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T, nyears_fwd::T,
-              ss16asteph_et::TaylorInterpolant, order::Int, varorder::Int, abstol::T, parse_eqs::Bool) where {T <: Real}
+function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T, nyears_fwd::T,
+              ss16asteph_et::TaylorInterpolant, order::Int, varorder::Int, abstol::T, parse_eqs::Bool) where {T <: Real, D}
 
     # Initial conditions from Apophis JPL solution #197
     q00 = kmsec2auday(apophisposvel197(datetime2et(jd0_datetime)))
