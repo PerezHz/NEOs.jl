@@ -93,7 +93,9 @@ function convert(::Type{TaylorInterpolant{T, TaylorN{T}, 2}}, eph::TaylorInterpo
     # M = sum(binomial(n + i_3 - 1, i_3) for i_3 in 0:varorder)
 
     # Set variables
-    TS.set_variables(T, vars, order = varorder)
+    if TS.get_variable_names() != vars
+        TS.set_variables(T, vars, order = varorder)
+    end 
     
     # Matrix of Taylor polynomials 
     x = Matrix{Taylor1{TaylorN{T}}}(undef, dims[1], dims[2])
@@ -121,36 +123,32 @@ function convert(::Type{TaylorInterpolant{T, TaylorN{T}, 2}}, eph::TaylorInterpo
 end 
 
 @doc raw"""
-    VectorTaylorNSerialization{T}
+    TaylorNSerialization{T}
 
-Custom serialization struct to save a `Vector{TaylorN{T}}` to a `.jld2` file. 
+Custom serialization struct to save a `TaylorN{T}` to a `.jld2` file. 
 
 # Fields
 - `vars::Vector{String}`: jet transport variables. 
 - `varorder::Int`: order of jet transport perturbations. 
-- `length::Int`: vector length. 
 - `x::Vector{T}`: vector of coefficients. 
 """
-struct VectorTaylorNSerialization{T}
+struct TaylorNSerialization{T}
     vars::Vector{String}
     varorder::Int
-    length::Int
     x::Vector{T}
 end 
 
-# Tell JLD2 to save Vector{TaylorN{T}} as VectorTaylorNSerialization{T}
-writeas(::Type{AbstractVector{TaylorN{T}}}) where {T} = VectorTaylorNSerialization{T}
+# Tell JLD2 to save TaylorN{T} as TaylorNSerialization{T}
+writeas(::Type{TaylorN{T}}) where {T} = TaylorNSerialization{T}
 
 # Convert method to write .jld2 files
-function convert(::Type{VectorTaylorNSerialization{T}}, eph::AbstractVector{TaylorN{T}}) where {T}
+function convert(::Type{TaylorNSerialization{T}}, eph::TaylorN{T}) where {T}
     # Variables 
     vars = TS.get_variable_names()
     # Number of variables 
     n = length(vars)
-    # Vector length
-    N = length(eph)
     # TaylorN order 
-    varorder = eph[1].order
+    varorder = eph.order
     # Number of coefficients in each TaylorN
     L = varorder + 1
     # Number of coefficients in each HomogeneousPolynomial
@@ -158,59 +156,49 @@ function convert(::Type{VectorTaylorNSerialization{T}}, eph::AbstractVector{Tayl
     # M = sum(binomial(n + i_3 - 1, i_3) for i_3 in 0:varorder)
     
     # Vector of coefficients 
-    x = Vector{T}(undef, N * M)
+    x = Vector{T}(undef, M)
 
     # Save coefficients 
     i = 1
-    # Iterate over vector elements
-    for i_1 in 1:N
-        # Iterate over TaylorN coefficients
-        for i_2 in 0:varorder
-            # Iterate over i_2 order HomogeneousPolynomial
-            for i_3 in 1:binomial(n + i_2 - 1, i_2)
-                x[i] = eph[i_1].coeffs[i_2+1].coeffs[i_3]
-                i += 1
-            end 
+    for i_1 in 0:varorder
+        # Iterate over i_1 order HomogeneousPolynomial
+        for i_2 in 1:binomial(n + i_1 - 1, i_1)
+            x[i] = eph.coeffs[i_1+1].coeffs[i_2]
+            i += 1
         end 
     end 
-
-    return VectorTaylorNSerialization{T}(vars, varorder, length, x)
+    
+    return TaylorNSerialization{T}(vars, varorder, x)
 end 
 
 # Convert method to read .jld2 files
-function convert(::Type{Vector{TaylorN{T}}}, eph::VectorTaylorNSerialization{T}) where {T} 
+function convert(::Type{TaylorN{T}}, eph::TaylorNSerialization{T}) where {T} 
     # Variables 
     vars = eph.vars
     # Number of variables 
     n = length(vars)
-    # Vector length
-    N = eph.length
     # TaylorN order 
     varorder = eph.varorder
     # Number of coefficients in each TaylorN
     L = varorder + 1
     # Number of coefficients in each HomogeneousPolynomial
     M = binomial(n + varorder, varorder)
-    # M = sum(binomial(n + i_3 - 1, i_3) for i_3 in 0:varorder)
-
-    # Set variables
-    TS.set_variables(T, vars, order = varorder)
+    # M = sum(binomial(n + i_1 - 1, i_1) for i_1 in 0:varorder)
     
-    # Vector of TaylorN
-    x = Vector{TaylorN{T}}(undef, N)
-
-    # Reconstruct TaylorN polynomials 
-    i = 1
-    for i_1 in 1:N
-        # Reconstruct TaylorNs
-        TaylorN_coeffs = Vector{HomogeneousPolynomial{T}}(undef, L)
-        for i_2 in 0:varorder
-            # Reconstruct HomogeneousPolynomials
-            TaylorN_coeffs[i_2 + 1] = HomogeneousPolynomial(eph.x[i : i + binomial(n + i_2 - 1, i_2)-1], i_2)
-            i += binomial(n + i_2 - 1, i_2)
-        end 
-        x[i_1] = TaylorN{T}(TaylorN_coeffs, varorder)
+    # Set variables
+    if TS.get_variable_names() != vars
+        TS.set_variables(T, vars, order = varorder)
     end 
     
-    return Vector{TaylorN{T}}(x)
+    # Reconstruct TaylorN
+    i = 1
+    TaylorN_coeffs = Vector{HomogeneousPolynomial{T}}(undef, L)
+    for i_1 in 0:varorder
+        # Reconstruct HomogeneousPolynomials
+        TaylorN_coeffs[i_1 + 1] = HomogeneousPolynomial(eph.x[i : i + binomial(n + i_1 - 1, i_1)-1], i_1)
+        i += binomial(n + i_1 - 1, i_1)
+    end 
+    x = TaylorN{T}(TaylorN_coeffs, varorder)
+    
+    return x
 end 

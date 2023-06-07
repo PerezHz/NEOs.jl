@@ -246,7 +246,7 @@ using InteractiveUtils: methodswith
         @test nrms(res, w) ≈ 0.375 atol=1e-2
     end
 
-    @testset "Propagation: root-finding and TaylorN serialization" begin
+    @testset "Jet transport propagation and TaylorN serialization" begin
         # Test integration (Apophis)
 
         # Dynamical function
@@ -258,7 +258,7 @@ using InteractiveUtils: methodswith
         # Whether to use @taylorize
         local parse_eqs = true
         # Solar System ephemeris
-        local sseph = NEOs.loadpeeph()
+        local sseph = NEOs.sseph
         # Perturbation to nominal initial condition (Taylor1 jet transport)
         local dq = NEOs.scaled_variables()
         # Initial date of integration (julian days)
@@ -288,12 +288,12 @@ using InteractiveUtils: methodswith
 
         # It is unlikely that such a short integration generates a non-trivial tvS, xvS and gvS. Therefore, to test
         # VectorTaylorNSerialization I suggest to generate random TaylorN and check it saves correctly...
-        local random_TaylorN = [cos(sum(dq .* rand(6)))]
+        local random_TaylorN = [cos(sum(dq .* rand(6))), sin(sum(dq .* rand(6))), tan(sum(dq .* rand(6)))]
         jldsave("test.jld2"; random_TaylorN = random_TaylorN)
         recovered_taylorN = JLD2.load("test.jld2", "random_TaylorN")
         @test recovered_taylorN == random_TaylorN
         rm("test.jld2")
-        
+
     end
 
 end
