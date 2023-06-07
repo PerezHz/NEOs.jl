@@ -72,6 +72,12 @@ using InteractiveUtils: methodswith
             parse_eqs = true
         )
 
+        # check that solution saves correctly
+        jldsave("test.jld2"; sol = sol)
+        recovered_sol = JLD2.load("test.jld2", "sol")
+        @test sol == recovered_sol
+        rm("test.jld2")
+
         # Read optical astrometry file
 
         obs_radec_mpc_2023DW = NEOs.read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
@@ -106,6 +112,13 @@ using InteractiveUtils: methodswith
             abstol = 1e-20,
             parse_eqs = true
         )
+
+        # check that solution saves correctly
+        jldsave("test.jld2"; sol1 = sol1)
+        recovered_sol1 = JLD2.load("test.jld2", "sol1")
+        @test sol1 == recovered_sol1
+        rm("test.jld2")
+
         # compute residuals for orbit with perturbed initial conditions
         res1, _ = NEOs.residuals(
             obs_radec_mpc_2023DW,
@@ -167,6 +180,12 @@ using InteractiveUtils: methodswith
             abstol = 1e-20,
             parse_eqs = true
         )
+
+        # check that solution saves correctly
+        jldsave("test.jld2"; sol = sol)
+        recovered_sol = JLD2.load("test.jld2", "sol")
+        @test sol == recovered_sol
+        rm("test.jld2")
 
         # Read optical astrometry file
         obs_radec_mpc_apophis = NEOs.read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
@@ -248,12 +267,13 @@ using InteractiveUtils: methodswith
         local q0 = [-0.18034747703273316, 0.9406910666200128, 0.3457360259054398,
                     -0.016265942170279046, 4.392889725556651e-5, -0.00039519931615139716] .+ dq
 
-        sol = NEOs.propagate(dynamics, 1, jd0, 1/yr, sseph, q0, Val(true), order = order, abstol = abstol, parse_eqs = parse_eqs)
+        sol = NEOs.propagate(dynamics, 1, jd0, 0.02, sseph, q0, Val(true), order = order, abstol = abstol, parse_eqs = parse_eqs)
         jldsave("test.jld2"; sol = sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol
+        rm("test.jld2")
 
-        sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, 1, jd0, 1/yr, sseph, q0, Val(true), order = order, abstol = abstol,
+        sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, 1, jd0, 0.02, sseph, q0, Val(true), order = order, abstol = abstol,
                                                  parse_eqs = parse_eqs)
         jldsave("test.jld2"; sol = sol, tvS = tvS, xvS = xvS, gvS = gvS)
         recovered_sol = JLD2.load("test.jld2", "sol")
@@ -264,6 +284,7 @@ using InteractiveUtils: methodswith
         @test tvS == recovered_tvS
         @test xvS == recovered_xvS
         @test gvS == recovered_gvS
+        rm("test.jld2")
 
         # It is unlikely that such a short integration generates a non-trivial tvS, xvS and gvS. Therefore, to test
         # VectorTaylorNSerialization I suggest to generate random TaylorN and check it saves correctly...
@@ -271,8 +292,8 @@ using InteractiveUtils: methodswith
         jldsave("test.jld2"; random_TaylorN = random_TaylorN)
         recovered_taylorN = JLD2.load("test.jld2", "random_TaylorN")
         @test recovered_taylorN == random_TaylorN
-
         rm("test.jld2")
+        
     end
 
 end
