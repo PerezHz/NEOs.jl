@@ -3,8 +3,8 @@ git-tree-sha1 = "de3fba2237359dc941a057d492c305afeccba133"
 lazy = true
 
     [[TTmTDBde430.download]]
-    sha256 = "c599efe597200055c27cec38ddc769f5d3b3e301a481b9dcd8b9640d745508a1"
-    url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/TTmTDBde430.tar.gz"
+    sha256 = "a8e09c3d2f68f77c641eed0b41d2441b11a7b4f12daed8144638fdca02eb4d5d"
+    url = "https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/TTmTDB.de430.19feb2015.bsp"
 
 [a99942]
 git-tree-sha1 = "7cdf1265a22c52329651c4a71a9835d1b90f568e"
@@ -19,8 +19,8 @@ git-tree-sha1 = "db3e3a765712a792a7f4a73634213d53fc0561ec"
 lazy = true
 
     [[de430.download]]
-    sha256 = "25458f6fc0219be7ff9fbd893a4cd6ed9927316824cb5c4062b642414884790d"
-    url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/de430.tar.gz"
+    sha256 = "b70b72fde86923475fac6cec1e0887040bb80ffe159f153aab647cdfdf897351"
+    url = "https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de430_1850-2150.bsp"
 
 [debias]
 git-tree-sha1 = "cfd0d2615770087d3c564b7f6143f01930ccb45e"
@@ -28,7 +28,7 @@ lazy = true
 
     [[debias.download]]
     sha256 = "8b107db9506ec45c8cad78d0981c48693c6e5957912df95f4a3df826c7736227"
-    url = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/debias.tgz"
+    url = "https://ssd.jpl.nasa.gov/ftp/ssd/debias/debias.tgz"
 
 [debias_2014]
 git-tree-sha1 = "1b6a82575ac74386b893f8c51361d19d350bd234"
@@ -36,7 +36,7 @@ lazy = true
 
     [[debias_2014.download]]
     sha256 = "1d44c6443d08f83c79017afd218c3b4e326c573d84842c88713e4b6c8d6d5b03"
-    url = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/debias_2014.tgz"
+    url = "https://ssd.jpl.nasa.gov/ftp/ssd/debias/debias_2014.tgz"
 
 [debias_2018]
 git-tree-sha1 = "ea7915a243ea4c8e0960817f50677598076beeaa"
@@ -44,7 +44,7 @@ lazy = true
 
     [[debias_2018.download]]
     sha256 = "288132cefea7f1bdf0989782db1173948dd7dfef7da31910be90b16b73cfea6c"
-    url = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/debias_2018.tgz"
+    url = "https://ssd.jpl.nasa.gov/ftp/ssd/debias/debias_2018.tgz"
 
 [debias_hires2018]
 git-tree-sha1 = "cebf83360f68870a628805aea9b4261d0d6b4545"
@@ -52,28 +52,20 @@ lazy = true
 
     [[debias_hires2018.download]]
     sha256 = "2b292fc79c202d38dfab386783fee10d422f6919afc58348c72059710dd6cd92"
-    url = "ftp://ssd.jpl.nasa.gov/pub/ssd/debias/debias_hires2018.tgz"
+    url = "https://ssd.jpl.nasa.gov/ftp/ssd/debias/debias_hires2018.tgz"
 
 [naif0012]
 git-tree-sha1 = "8fa307fe9da2a63ed0cf9d681540d94a619a0995"
 lazy = true
 
     [[naif0012.download]]
-    sha256 = "d9b1c3d944f671eca8177e29384accbdb5f4b3fbe4603a4bb2e0bdbf7a900fb4"
-    url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/naif0012.tar.gz"
+    sha256 = "678e32bdb5a744117a467cd9601cd6b373f0e9bc9bbde1371d5eee39600a039b"
+    url = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls"
 
 [sseph_p100]
-git-tree-sha1 = "63a7429f64436a92016962f1fab2d70262120f6c"
+git-tree-sha1 = "6fb49d939d8cc8675acbb8d64d9014e918c1569c"
 lazy = true
 
     [[sseph_p100.download]]
-    sha256 = "7a5886729bbd85d68417f8d69fb2d7e8f4390376a49c9bcda1b580116f8ed11b"
+    sha256 = "5051b43a30e33b3bde2388d7bf48dcdfefffd1dc3c139b37042b94b2f877baee"
     url = "https://github.com/LuEdRaMo/sseph/raw/main/sseph343ast016_p100y_et.tar.gz"
-
-[ttmtdb_DE430_1995_2030]
-git-tree-sha1 = "9e0c56a8987df7426aad09829332f04b014e6264"
-lazy = true
-
-    [[ttmtdb_DE430_1995_2030.download]]
-    sha256 = "19f2a3136a81755746795466b4d4d01bfd962b5b1f6f877af0377a21126d99e1"
-    url = "https://raw.githubusercontent.com/PerezHz/jpleph/main/ttmtdb_DE430_1995_2030_20221103.tar.gz"

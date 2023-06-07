@@ -1,10 +1,4 @@
-# Load TT-TDB (ttmtdb) as a TaylorInterpolant saved in .jld file
-const ttmtdb_artifact_path = joinpath(artifact"ttmtdb_DE430_1995_2030", "ttmtdb_DE430_1995_2030_20221103.jld")
-const ttmtdb_t0 = JLD.load(ttmtdb_artifact_path, "t0")
-const ttmtdb_t = JLD.load(ttmtdb_artifact_path, "t")
-const ttmtdb_x_coeffs = JLD.load(ttmtdb_artifact_path, "x_coeffs")
-const ttmtdb = TaylorInterpolant(ttmtdb_t0, ttmtdb_t, Taylor1.(ttmtdb_x_coeffs))
-
+# Load TT-TDB (ttmtdb) from jld2 file
 @doc raw"""
     loadjpleph()
 
@@ -123,20 +117,37 @@ See also [`getposvel`](@ref).
 """
 dtt_tdb(et) = getposvel(1000000001, 1000000000, cte(et))[4] # units: seconds/seconds
 
+# Load Solar System 2000-2100 ephemeris
+const sseph_artifact_path = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
+const sseph = JLD2.load(sseph_artifact_path, "ss16ast_eph")
+const ttmtdb = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
+
 @doc raw"""
     loadpeeph(et::Union{Nothing, Real} = nothing)
 
 Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` from Jan 1st 2000 up to `et > 0` [ephemeris seconds since J2000].
 
-**Caution**: running this function for the first time will download the `sseph_p100` artifact (∼554 MB) which can take several minutes.  
+**Caution**: running this function for the first time will download the `sseph_p100` artifact (∼554 MB) which can take several minutes.
 """
 function loadpeeph(et::Union{Nothing, Real} = nothing)
-    # Load Solar System 2000-2100 ephemeris 
-    eph = JLD2.load(joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2"), "ss16ast_eph")
     if isnothing(et)
-        return eph 
-    else 
-        idxs = findall(x -> x <= et, eph.t)
-        return TaylorInterpolant(eph.t0, eph.t[idxs], eph.x[idxs[1:end-1], :])
-    end 
-end 
+        return sseph
+    else
+        idxs = findall(x -> x <= et, sseph.t)
+        return TaylorInterpolant(sseph.t0, sseph.t[idxs], sseph.x[idxs[1:end-1], :])
+    end
+end
+
+function bwdfwdeph(et::Union{T,TaylorN{T}},
+        bwd::TaylorInterpolant{T,U,2},
+        fwd::TaylorInterpolant{T,U,2}
+        ) where {T<:AbstractFloat, U<:Union{T,TaylorN{T}}}
+    @assert bwd.t0 == fwd.t0 "Backward and forward TaylorInterpolant initial times must match"
+    t = et/daysec
+    t0 = bwd.t0
+    if t <= t0
+        return auday2kmsec(bwd(t))
+    else
+        return auday2kmsec(fwd(t))
+    end
+end
