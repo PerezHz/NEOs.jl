@@ -247,6 +247,7 @@ using InteractiveUtils: methodswith
     end
 
     @testset "Jet transport propagation and TaylorN serialization" begin
+
         # Test integration (Apophis)
 
         # Dynamical function
@@ -262,12 +263,12 @@ using InteractiveUtils: methodswith
         # Perturbation to nominal initial condition (Taylor1 jet transport)
         local dq = NEOs.scaled_variables()
         # Initial date of integration (julian days)
-        local jd0 = datetime2julian(DateTime(2020,12,17))
+        local jd0 = datetime2julian(DateTime(2029, 4, 13, 20))
         # Initial conditions
-        local q0 = [-0.18034747703273316, 0.9406910666200128, 0.3457360259054398,
-                    -0.016265942170279046, 4.392889725556651e-5, -0.00039519931615139716] .+ dq
-
-        sol = NEOs.propagate(dynamics, 1, jd0, 0.02, sseph, q0, Val(true), order = order, abstol = abstol, parse_eqs = parse_eqs)
+        local q0 = [-0.9170913888342959, -0.37154308794738056, -0.1610606989484252,
+                    0.009701519087787077, -0.012766026792868212, -0.0043488589639194275] .+ dq
+        
+        sol = NEOs.propagate(dynamics, 10, jd0, 0.02, sseph, q0, Val(true), order = order, abstol = abstol, parse_eqs = parse_eqs)
         jldsave("test.jld2"; sol = sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol

@@ -5,7 +5,7 @@ Custom serialization struct to save a `TaylorInterpolant{T, TaylorN{T}, 2}` to a
 
 # Fields
 - `vars::Vector{String}`: jet transport variables. 
-- `order::Int`: order of Taylor polynomials.
+- `order::Int`: order of Taylor polynomials w.r.t time.
 - `varorder::Int`: order of jet transport perturbations. 
 - `dims::Tuple{Int, Int}`: matrix dimensions. 
 - `t0::T`: initial time.
@@ -34,7 +34,7 @@ function convert(::Type{TaylorInterpolantNSerialization{T}}, eph::TaylorInterpol
     # Matrix dimensions
     dims = size(eph.x)
     # Number of elements in matrix
-    N = dims[1] * dims[2]
+    N = length(eph.x)
     # Taylor1 order
     order = eph.x[1, 1].order
     # Number of coefficients in each Taylor1
