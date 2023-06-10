@@ -3,7 +3,8 @@
 testfiles = (
     "osculating.jl",
     "observations.jl",
-    "propagation.jl"
+    "propagation.jl",
+    "extensions.jl"
     )
 
 for file in testfiles

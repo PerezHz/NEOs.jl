@@ -7,7 +7,7 @@ import PlanetaryEphemeris as PE
 import JLD2: writeas
 
 using Distributed, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
-      Dates, EarthOrientation, SPICE, Quadmath, LazyArtifacts, DataFrames, TaylorSeries,
+      Dates, EarthOrientation, SPICE, Quadmath, LazyArtifacts, TaylorSeries,
       InteractiveUtils, AutoHashEquals
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pole_rotation,
       au, c_au_per_day, R_sun, c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx,
