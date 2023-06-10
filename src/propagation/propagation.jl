@@ -1,6 +1,7 @@
 include("asteroid_dynamical_models.jl")
 include("jetcoeffs.jl")
 include("integration_methods.jl")
+include("serialization.jl")
 
 @doc raw"""
     rvelea(dx, x, eph, params, t)

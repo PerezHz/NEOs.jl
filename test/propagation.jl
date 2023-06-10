@@ -1,8 +1,10 @@
 # This file is part of the NEOs.jl package; MIT licensed
 
 using NEOs
+using PlanetaryEphemeris
 using Dates
 using TaylorIntegration
+using JLD2
 using Test
 
 using InteractiveUtils: methodswith
@@ -70,6 +72,12 @@ using InteractiveUtils: methodswith
             parse_eqs = true
         )
 
+        # check that solution saves correctly
+        jldsave("test.jld2"; sol = sol)
+        recovered_sol = JLD2.load("test.jld2", "sol")
+        @test sol == recovered_sol
+        rm("test.jld2")
+
         # Read optical astrometry file
 
         obs_radec_mpc_2023DW = NEOs.read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
@@ -104,6 +112,13 @@ using InteractiveUtils: methodswith
             abstol = 1e-20,
             parse_eqs = true
         )
+
+        # check that solution saves correctly
+        jldsave("test.jld2"; sol1 = sol1)
+        recovered_sol1 = JLD2.load("test.jld2", "sol1")
+        @test sol1 == recovered_sol1
+        rm("test.jld2")
+
         # compute residuals for orbit with perturbed initial conditions
         res1, _ = NEOs.residuals(
             obs_radec_mpc_2023DW,
@@ -166,6 +181,12 @@ using InteractiveUtils: methodswith
             parse_eqs = true
         )
 
+        # check that solution saves correctly
+        jldsave("test.jld2"; sol = sol)
+        recovered_sol = JLD2.load("test.jld2", "sol")
+        @test sol == recovered_sol
+        rm("test.jld2")
+
         # Read optical astrometry file
         obs_radec_mpc_apophis = NEOs.read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
 
@@ -223,6 +244,57 @@ using InteractiveUtils: methodswith
 
         # Total normalized RMS
         @test nrms(res, w) ≈ 0.375 atol=1e-2
+    end
+
+    @testset "Jet transport propagation and TaylorN serialization" begin
+
+        # Test integration (Apophis)
+
+        # Dynamical function
+        local dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
+        # Order of Taylor polynomials
+        local order = 25
+        # Absolute tolerance
+        local abstol = 1e-20
+        # Whether to use @taylorize
+        local parse_eqs = true
+        # Solar System ephemeris
+        local sseph = NEOs.sseph
+        # Perturbation to nominal initial condition (Taylor1 jet transport)
+        local dq = NEOs.scaled_variables()
+        # Initial date of integration (julian days)
+        local jd0 = datetime2julian(DateTime(2029, 4, 13, 20))
+        # Initial conditions
+        local q0 = [-0.9170913888342959, -0.37154308794738056, -0.1610606989484252,
+                    0.009701519087787077, -0.012766026792868212, -0.0043488589639194275] .+ dq
+        
+        sol = NEOs.propagate(dynamics, 10, jd0, 0.02, sseph, q0, Val(true), order = order, abstol = abstol, parse_eqs = parse_eqs)
+        jldsave("test.jld2"; sol = sol)
+        recovered_sol = JLD2.load("test.jld2", "sol")
+        @test sol == recovered_sol
+        rm("test.jld2")
+
+        sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, 1, jd0, 0.02, sseph, q0, Val(true), order = order, abstol = abstol,
+                                                 parse_eqs = parse_eqs)
+        jldsave("test.jld2"; sol = sol, tvS = tvS, xvS = xvS, gvS = gvS)
+        recovered_sol = JLD2.load("test.jld2", "sol")
+        recovered_tvS = JLD2.load("test.jld2", "tvS")
+        recovered_xvS = JLD2.load("test.jld2", "xvS")
+        recovered_gvS = JLD2.load("test.jld2", "gvS")
+        @test sol == recovered_sol
+        @test tvS == recovered_tvS
+        @test xvS == recovered_xvS
+        @test gvS == recovered_gvS
+        rm("test.jld2")
+
+        # It is unlikely that such a short integration generates a non-trivial tvS, xvS and gvS. Therefore, to test
+        # VectorTaylorNSerialization I suggest to generate random TaylorN and check it saves correctly...
+        local random_TaylorN = [cos(sum(dq .* rand(6))), sin(sum(dq .* rand(6))), tan(sum(dq .* rand(6)))]
+        jldsave("test.jld2"; random_TaylorN = random_TaylorN)
+        recovered_taylorN = JLD2.load("test.jld2", "random_TaylorN")
+        @test recovered_taylorN == random_TaylorN
+        rm("test.jld2")
+
     end
 
 end

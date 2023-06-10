@@ -1979,6 +1979,7 @@ L99  30.602810.635913+0.769201Novoselki
 M02   0.863860.754439+0.654271Astropriorat Observatory
 M03   2.258220.750568+0.658591Badalona Boreal
 M04   1.425600.747640+0.662070Pujalt Observatory, Barcelona
+M05   1.331610.729979+0.681267Observatoire de la Nine, Canens
 M09   5.600940.630164+0.773882Observatory Gromme - Oudsbergen
 M10   6.854110.724305+0.687343CPF Observatory, St Vallier de Thiey
 M11   5.647180.720589+0.691192Novaastro Observatory, Banon
@@ -2302,6 +2303,7 @@ X06 289.146490.862374-0.505110Skygems Chile, Rio Hurtado
 X07 289.146390.862374-0.505109iTelescope Deep Sky Chile, Rio Hurtado
 X08 289.235000.862852-0.504255ShAO Chile station, El Sauce
 X10 291.820400.921644-0.387717OVTLN, San Pedro de Atacama
+X11 289.596040.909953-0.414324VLT Survey Telescope, Paranal
 X12 295.712000.803430-0.593455Observatorio Los Cabezones
 X13 295.449800.852690-0.521030Observatorio Remoto Bosque Alegre
 X14 295.832220.854475-0.517879Observatorio Orbis Tertius, Cordoba
@@ -2312,6 +2314,7 @@ X39 301.137800.826150-0.561580Observatorio Antares, Pilar
 X40 301.616890.822572-0.566762Cielos de Banfield, Banfield
 X50 303.824190.821025-0.568999Observatorio Astronomico de Montevideo
 X57 305.406260.903659-0.426885Polo Astronomico CMF,Foz do Iguacu
+X60 306.425560.895232-0.444317Guaraciaba Observatory
 X70 308.433220.931623-0.362375Observatorio OATU, Tupi Paulista
 X74 309.150600.929870-0.366840Observatorio Campo dos Amarais
 X77 309.924750.900184-0.434346Centro Astron. Nevoeiro, Antonio Olinto
