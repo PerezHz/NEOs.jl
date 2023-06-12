@@ -2,6 +2,10 @@ module NEOs
 
 # __precompile__(false)
 
+if !isdefined(Base, :get_extension)
+    using Requires
+end
+
 import Base: hash, ==, show, isless, isnan, convert
 import PlanetaryEphemeris as PE
 import JLD2: writeas
@@ -63,5 +67,13 @@ include("observations/process_radar.jl")
 include("orbit_determination/gauss_method.jl")
 include("propagation/propagation.jl")
 include("postprocessing/least_squares.jl")
+
+function __init__()
+    @static if !isdefined(Base, :get_extension)
+        @require DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0" begin
+            include("../ext/DataFramesExt.jl")
+        end
+    end
+end
 
 end

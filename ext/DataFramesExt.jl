@@ -1,10 +1,17 @@
 module DataFramesExt
 
-using NEOs, DataFrames
+using NEOs
 using NEOs: AbstractAstrometry
 
 import NEOs: RadecMPC, RadarJPL
-import DataFrames: DataFrame
+
+if isdefined(Base, :get_extension)
+    using DataFrames
+    import DataFrames: DataFrame
+else
+    using ..DataFrames
+    import ..DataFrames: DataFrame
+end
 
 # Method to convert a vector of observations to DataFrame
 function DataFrame(obs::Vector{T}) where {T <: AbstractAstrometry}
