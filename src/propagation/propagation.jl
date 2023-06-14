@@ -57,7 +57,6 @@ function loadeph(ss16asteph_::TaylorInterpolant, μ::Vector{T}) where {T <: Real
     fill!(newtonianNb_Potential.x, zero(ss16asteph.x[1]))
 
     # Iterator over all bodies except asteroid
-    _1_to_Nm1 = Base.OneTo(Nm1)
     for j in 1:Nm1
         for i in 1:Nm1
             if i == j
@@ -278,7 +277,7 @@ Integrate the orbit of a NEO via the Taylor method.
 - `dynamics::D`: dynamical model function.
 - `maxsteps::Int`: maximum number of steps for the integration.
 - `jd0::T`: initial Julian date.
-- `tspan::T`: time span of the integration [in Julian days].
+- `tspan::T`: time span of the integration [in years].
 - `ss16asteph_et::TaylorInterpolant`: solar system ephemeris.
 - `q0::Vector{U}`: vector of initial conditions.
 - `Val(true/false)`: whether to output the Taylor polynomials generated at each time step (`true`) or not.
@@ -301,7 +300,7 @@ Integrate the orbit of a NEO via the Taylor method while finding the zeros of `r
 - `dynamics::D`: dynamical model function.
 - `maxsteps::Int`: maximum number of steps for the integration.
 - `jd0::T`: initial Julian date.
-- `tspan::T`: time span of the integration [in Julian days].
+- `tspan::T`: time span of the integration [in years].
 - `ss16asteph_et::TaylorInterpolant`: solar system ephemeris.
 - `q0::Vector{U}`: vector of initial conditions.
 - `Val(true/false)`: whether to output the Taylor polynomials generated at each time step (`true`) or not.
@@ -322,8 +321,10 @@ for V_dense in V_true_false
                            ::$V_dense; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
                            parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
-            # Parameters for apophisinteg
-            _q0, _t0, _eph, _params = propagate_params(jd0, sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
+            _sseph = loadpeeph(julian2etsecs(ceil(jd0+tspan*yr)))
+
+            # Parameters for neosinteg
+            _q0, _t0, _eph, _params = propagate_params(jd0, _sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
 
             # Final time of integration (days)
             _tmax = _t0 + tspan*yr
@@ -367,8 +368,10 @@ for V_dense in V_true_false
                                 ::$V_dense; parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T),
                                 μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
 
-            # Parameters for apophisinteg
-            _q0, _t0, _eph, _params = propagate_params(jd0, sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
+            _sseph = loadpeeph(julian2etsecs(ceil(jd0+tspan*yr)))
+
+            # Parameters for neosinteg
+            _q0, _t0, _eph, _params = propagate_params(jd0, _sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
 
             # Final time of integration (days)
             _tmax = _t0 + tspan*yr
