@@ -70,8 +70,8 @@ include("postprocessing/least_squares.jl")
 
 function __init__()
     @static if !isdefined(Base, :get_extension)
-        @require DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0" begin
-            include("../ext/DataFramesExt.jl")
+        @require Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c" begin
+            @require DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0" include("../ext/DataFramesExt.jl")
         end
     end
 end

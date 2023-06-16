@@ -1,31 +1,29 @@
 module DataFramesExt
 
 using NEOs
-using NEOs: AbstractAstrometry
-
 import NEOs: RadecMPC, RadarJPL
 
 if isdefined(Base, :get_extension)
-    using DataFrames
-    import DataFrames: DataFrame
+    using DataFrames: DataFrame, nrow
+    import Tables: istable, rowaccess, rows, schema, Schema
 else
-    using ..DataFrames
-    import ..DataFrames: DataFrame
+    using ..DataFrames: DataFrame, nrow
+    import ..Tables: istable, rowaccess, rows, schema, Schema
 end
 
-# Method to convert a vector of observations to DataFrame
-function DataFrame(obs::Vector{T}) where {T <: AbstractAstrometry}
-    colnames = fieldnames(T)
-    coltypes = fieldtypes(T)
-    df = DataFrame([name => type[] for (name, type) in zip(colnames, coltypes)])
-    for i in eachindex(obs)
-        push!(df, [getfield(obs[i], colnames[j]) for j in eachindex(colnames)])
-    end 
+# Methods to convert a Vector{RadecMPC{T}} to a DataFrame
+istable(::Type{Vector{RadecMPC{T}}}) where {T <: AbstractFloat} = true
+rowaccess(::Type{Vector{RadecMPC{T}}}) where {T <: AbstractFloat} = true
+rows(x::Vector{RadecMPC{T}}) where {T <: AbstractFloat} = x
+schema(::Vector{RadecMPC{T}}) where {T <: AbstractFloat} = Schema(fieldnames(RadecMPC{T}), Tuple{fieldtypes(RadecMPC{T})...})
 
-    return df 
-end 
+# Methods to convert a Vector{RadarJPL{T}} to a DataFrame
+istable(::Type{Vector{RadarJPL{T}}}) where {T <: AbstractFloat} = true
+rowaccess(::Type{Vector{RadarJPL{T}}}) where {T <: AbstractFloat} = true
+rows(x::Vector{RadarJPL{T}}) where {T <: AbstractFloat} = x
+schema(::Vector{RadarJPL{T}}) where {T <: AbstractFloat} = Schema(fieldnames(RadarJPL{T}), Tuple{fieldtypes(RadarJPL{T})...})
 
-# Methods to convert a DataFrame to a vector of AbstractAstrometry
+# Methods to convert a DataFrame to a Vector{RadecMPC{T}} / Vector{RadarJPL{T}}
 for T in (:(RadecMPC), :(RadarJPL))
     @eval begin
         function $T(df::DataFrame)

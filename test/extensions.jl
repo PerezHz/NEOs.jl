@@ -1,4 +1,5 @@
 using NEOs
+using Tables
 using DataFrames
 using Test
 
@@ -12,7 +13,7 @@ using NEOs: read_radec_mpc, RadecMPC, read_radar_jpl, RadarJPL
     df_2023DW = DataFrame(radec_2023DW)
 
     @test nrow(df_2023DW) == length(radec_2023DW)
-    @test all(names(df_2023DW) .== String.(fieldnames(RadecMPC)))
+    @test all(names(df_2023DW) .== String.(fieldnames(RadecMPC{Float64})))
 
     recovered_2023DW = RadecMPC(df_2023DW)
 
@@ -24,7 +25,7 @@ using NEOs: read_radec_mpc, RadecMPC, read_radar_jpl, RadarJPL
     df_Apophis = DataFrame(radar_Apophis)
 
     @test nrow(df_Apophis) == length(radar_Apophis)
-    @test all(names(df_Apophis) .== String.(fieldnames(RadarJPL)))
+    @test all(names(df_Apophis) .== String.(fieldnames(RadarJPL{Float64})))
 
     recovered_Apophis = RadarJPL(df_Apophis)
 
