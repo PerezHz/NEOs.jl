@@ -18,7 +18,7 @@ using NEOs: read_radec_mpc, RadecMPC, read_radar_jpl, RadarJPL
     @test all(names(df_2023DW) .== String.(fieldnames(RadecMPC{Float64})))
     @test all(eltype.(eachcol(df_2023DW)) .== fieldtypes(RadecMPC{Float64}))
 
-    recovered_2023DW = RadecMPC(df_2023DW)
+    recovered_2023DW = Vector{RadecMPC{Float64}}(df_2023DW)
 
     @test recovered_2023DW == radec_2023DW
 
@@ -38,7 +38,7 @@ using NEOs: read_radec_mpc, RadecMPC, read_radar_jpl, RadarJPL
     @test all(names(df_Apophis) .== String.(fieldnames(RadarJPL{Float64})))
     @test all(eltype.(eachcol(df_Apophis)) .== fieldtypes(RadarJPL{Float64}))
 
-    recovered_Apophis = RadarJPL(df_Apophis)
+    recovered_Apophis = Vector{RadarJPL{Float64}}(df_Apophis)
 
     @test recovered_Apophis == radar_Apophis
 
