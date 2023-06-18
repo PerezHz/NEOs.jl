@@ -32,8 +32,6 @@ using InteractiveUtils: methodswith
         objname = "2023DW"
         maxsteps = 1000
         nyears = 0.2
-        dense = true
-        quadmath = false # use quadruple precision
         dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
         jd0 = datetime2julian(DateTime(2023,2,25,0,0,0)) #Julian date of integration initial time
         # unperturbed initial condition
@@ -141,8 +139,6 @@ using InteractiveUtils: methodswith
         objname = "Apophis"
         maxsteps = 5000
         nyears = 9.0
-        dense = true
-        quadmath = false
         dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
         jd0 = datetime2julian(DateTime(2004,6,1)) #Julian date of integration initial time
         # JPL #199 solution for Apophis at June 1st, 2004
@@ -267,16 +263,16 @@ using InteractiveUtils: methodswith
         # Initial conditions
         local q0 = [-0.9170913888342959, -0.37154308794738056, -0.1610606989484252,
                     0.009701519087787077, -0.012766026792868212, -0.0043488589639194275] .+ dq
-        
-        sol = NEOs.propagate(dynamics, 10, jd0, 0.02, sseph, q0, Val(true), order = order, abstol = abstol, parse_eqs = parse_eqs)
-        jldsave("test.jld2"; sol = sol)
+
+        sol = NEOs.propagate(dynamics, 10, jd0, 0.02, sseph, q0, Val(true); order, abstol, parse_eqs)
+        jldsave("test.jld2"; sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol
         rm("test.jld2")
 
-        sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, 1, jd0, 0.02, sseph, q0, Val(true), order = order, abstol = abstol,
-                                                 parse_eqs = parse_eqs)
-        jldsave("test.jld2"; sol = sol, tvS = tvS, xvS = xvS, gvS = gvS)
+        sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, 1, jd0, 0.02, sseph, q0, Val(true); order, abstol,
+                                                 parse_eqs)
+        jldsave("test.jld2"; sol, tvS, xvS, gvS)
         recovered_sol = JLD2.load("test.jld2", "sol")
         recovered_tvS = JLD2.load("test.jld2", "tvS")
         recovered_xvS = JLD2.load("test.jld2", "xvS")
