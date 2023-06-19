@@ -10,7 +10,7 @@ fitter in Julia. `NEOs.jl` exploits jet transport techniques via
 
 ## Authors
 
-- [Jorge A. Pérez](https://www.linkedin.com/in/perezhz),
+- [Jorge A. Pérez](https://github.com/PerezHz),
 Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
 - [Luis Benet](http://www.cicc.unam.mx/~benet/),
 Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
