@@ -2,12 +2,16 @@ module NEOs
 
 # __precompile__(false)
 
+if !isdefined(Base, :get_extension)
+    using Requires
+end
+
 import Base: hash, ==, show, isless, isnan, convert
 import PlanetaryEphemeris as PE
 import JLD2: writeas
 
 using Distributed, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
-      Dates, EarthOrientation, SPICE, Quadmath, LazyArtifacts, DataFrames, TaylorSeries,
+      Dates, EarthOrientation, SPICE, Quadmath, LazyArtifacts, TaylorSeries,
       InteractiveUtils, AutoHashEquals
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pole_rotation,
       au, c_au_per_day, R_sun, c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx,
@@ -63,5 +67,13 @@ include("observations/process_radar.jl")
 include("orbit_determination/gauss_method.jl")
 include("propagation/propagation.jl")
 include("postprocessing/least_squares.jl")
+
+function __init__()
+    @static if !isdefined(Base, :get_extension)
+        @require Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c" begin
+            @require DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0" include("../ext/DataFramesExt.jl")
+        end
+    end
+end
 
 end
