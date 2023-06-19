@@ -215,7 +215,6 @@ using InteractiveUtils: methodswith
         deldop_2005_2013 = NEOs.read_radar_jpl(joinpath("data", "99942_RADAR_2005_2013.dat"))
 
         # Compute mean radar (time-delay and Doppler-shift) residuals
-        println("Computing radar astrometric residuals")
         @time res_del, w_del, res_dop, w_dop = residuals(
             deldop_2005_2013,
             xve=t->auday2kmsec(eph_ea(t)),
@@ -291,6 +290,92 @@ using InteractiveUtils: methodswith
         @test recovered_taylorN == random_TaylorN
         rm("test.jld2")
 
+    end
+
+    @testset "Jet transport orbit propagation and astrometric observables: (99942) Apophis" begin
+
+        # integration parameters
+        objname::String = "Apophis"
+        maxsteps::Int = 2000
+        nyears::Float64 = 10.0
+        varorder::Int = 1
+        dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
+        jd0::Float64 = datetime2julian(DateTime(2004,6,1)) #Julian date of integration initial time
+        # JPL #199 solution for Apophis at June 1st, 2004
+        q00::Vector{Float64} = [-1.0506628055913627, -0.06064314196134998, -0.04997102228887035, 0.0029591421121582077, -0.01423233538611057, -0.005218412537773594, -5.592839897872e-14, 0.0]
+        dq::Vector{TaylorN{Float64}} = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14), order = varorder)
+        q0::Vector{TaylorN{Float64}} = q00 .+ vcat(dq, 0dq[1])
+        sseph::TaylorInterpolant{Float64,Float64,2} = NEOs.sseph
+
+        # propagate orbit
+        sol = NEOs.propagate(
+            dynamics,
+            maxsteps,
+            jd0,
+            nyears,
+            sseph,
+            q0,
+            Val(true),
+            order = 25,
+            abstol = 1e-20,
+            parse_eqs = true
+        )
+
+        sseph_obs::TaylorInterpolant{Float64,Float64,2} = loadpeeph(ceil((sol.t0+sol.t[end])*daysec))
+        # Sun's ephemeris
+        eph_su::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph_obs, su)
+        # Earth's ephemeris
+        eph_ea::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph_obs, ea)
+
+        # Read optical astrometry file
+        obs_radec_mpc_apophis = NEOs.read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
+
+        # Compute optical astrometry residuals
+        res_radec, w_radec = NEOs.residuals(
+            obs_radec_mpc_apophis,
+            xve=t->auday2kmsec(eph_ea(t)),
+            xvs=t->auday2kmsec(eph_su(t)),
+            xva=t->auday2kmsec(sol(t/daysec))
+        )
+        nobsopt = round(Int, length(res_radec))
+
+        # Compute mean optical astrometric residual (right ascension and declination)
+        res_ra = res_radec[1:round(Int,nobsopt/2)]()
+        res_dec = res_radec[round(Int,nobsopt/2)+1:end]()
+        mean_ra = mean(res_ra)
+        mean_dec = mean(res_dec)
+        std_ra = std(res_ra)
+        std_dec = std(res_dec)
+        rms_ra = nrms(res_ra,ones(length(res_ra)))
+        rms_dec = nrms(res_dec,ones(length(res_dec)))
+        @test mean_ra ≈ 0.0224 atol=1e-2
+        @test std_ra ≈ 0.136 atol=1e-2
+        @test rms_ra ≈ std_ra atol=1e-2
+        @test mean_dec ≈ -0.0124 atol=1e-2
+        @test std_dec ≈ 0.0714 atol=1e-2
+        @test rms_dec ≈ std_dec atol=1e-2
+
+        # Read radar astrometry file
+        deldop_2005_2013 = NEOs.read_radar_jpl(joinpath("data", "99942_RADAR_2005_2013.dat"))
+
+        # Compute mean radar (time-delay and Doppler-shift) residuals
+        @time res_del, w_del, res_dop, w_dop = residuals(
+            deldop_2005_2013[1:2],
+            xve=t->auday2kmsec(eph_ea(t)),
+            xvs=t->auday2kmsec(eph_su(t)),
+            xva=t->auday2kmsec(sol(t/daysec)),
+            niter=4,
+            tord=10
+        )
+
+        @test abs(res_dop[1]()) ≤ deldop_2005_2013[1].Δν_σ
+        @test abs(res_del[1]()) ≤ deldop_2005_2013[2].Δτ_σ
+        @test abs(res_dop[2]()) ≤ deldop_2005_2013[2].Δν_σ
+
+        dq_sample = vcat(1e-8randn(6), 1e-14randn())
+        @test abs(res_dop[1](dq_sample)) ≥ abs(res_dop[1]())
+        @test abs(res_del[1](dq_sample)) ≥ abs(res_del[1]())
+        @test abs(res_dop[2](dq_sample)) ≥ abs(res_dop[2]())
     end
 
 end
