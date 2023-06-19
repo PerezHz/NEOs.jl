@@ -372,7 +372,7 @@ using InteractiveUtils: methodswith
         @test abs(res_del[1]()) ≤ deldop_2005_2013[2].Δτ_σ
         @test abs(res_dop[2]()) ≤ deldop_2005_2013[2].Δν_σ
 
-        dq_sample = vcat(1e-8randn(6), 1e-14randn())
+        dq_sample = vcat(1e-8ones(6), 1e-14)
         @test abs(res_dop[1](dq_sample)) ≥ abs(res_dop[1]())
         @test abs(res_del[1](dq_sample)) ≥ abs(res_del[1]())
         @test abs(res_dop[2](dq_sample)) ≥ abs(res_dop[2]())
