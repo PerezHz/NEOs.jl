@@ -41,6 +41,40 @@ end
 obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.observatory)
 obs_pos_ECEF(x::RadarJPL{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.rcvr)
 
+function sv_ecef_to_eci(
+    sv::OrbitStateVector,
+    T_ECEF::Union{Val{:PEF}, Val{:TIRS}},
+    T_ECI::Union{T_ECIs, T_ECIs_IAU_2006},
+    jd_utc::Taylor1{TaylorN{Float64}},
+    eop_data::Union{Nothing, EOPData_IAU1980, EOPData_IAU2000A} = nothing
+)
+    # Get the matrix that converts the ECEF to the ECI.
+    if eop_data === nothing
+        D = r_ecef_to_eci(DCM, T_ECEF, T_ECI, jd_utc)
+    else
+        D = r_ecef_to_eci(DCM, T_ECEF, T_ECI, jd_utc, eop_data)
+    end
+
+    # Since the ECI and ECEF frames have a relative velocity between them, then
+    # we must account from it when converting the velocity and acceleration. The
+    # angular velocity between those frames is computed using `we` and corrected
+    # by the length of day (LOD) parameter of the EOP data, if available.
+    ω  = we * (1 - (eop_data !== nothing ? eop_data.LOD(jd_utc) / 86400000 : 0))
+    vω = [0, 0, ω]
+
+    # Compute the position in the ECI frame.
+    r_eci::Vector{Taylor1{TaylorN{Float64}}} = D * sv.r
+
+    # Compute the velocity in the ECI frame.
+    vω_x_r = vω × sv.r
+    v_eci::Vector{Taylor1{TaylorN{Float64}}} = D * (sv.v + vω_x_r )
+
+    # Compute the acceleration in the ECI frame.
+    a_eci::Vector{Taylor1{TaylorN{Float64}}} = D * (sv.a + vω × vω_x_r + 2vω × sv.v)
+
+    return orbsv(sv.t, r_eci, v_eci, a_eci)
+end
+
 @doc raw"""
     obsposvelECI(observatory::ObservatoryMPC{T}, et::T;
                eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat}

@@ -275,7 +275,7 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::
     xva1et0 = xva(et_r_secs_0)[1]
     # et_r_secs_0 as a Taylor polynomial
     et_r_secs = Taylor1([et_r_secs_0,one(et_r_secs_0)].*one(xva1et0), tord)
-    # Compute geocentric position/velocity of receiving antenna in inertial frame (au, au/day)
+    # Compute geocentric position/velocity of receiving antenna in inertial frame (km, km/sec)
     RV_r = obsposvelECI(observatory, et_r_secs)
     R_r = RV_r[1:3]
     # Earth's barycentric position and velocity at receive time
@@ -366,8 +366,8 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::
     # Transmit time, 1st estimate
     # See equation (6) of https://doi.org/10.1086/116062
     et_t_secs = et_b_secs - τ_U
-    # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-    RV_t = obsposvelECI(observatory, et_t_secs)
+    # Geocentric position and velocity of transmitting antenna in inertial frame (km, km/sec)
+    RV_t = RV_r(et_t_secs-et_r_secs_0)
     R_t = RV_t[1:3]
     V_t = RV_t[4:6]
     # Barycentric position and velocity of the Earth at transmit time
@@ -389,10 +389,8 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::
     Δτ_tropo_U = zero(τ_U)      # Delay due to Earth's troposphere
 
     for i in 1:niter
-        # Geocentric position and velocity of transmitting antenna in inertial frame (au, au/day)
-        # TODO: remove `constant_term` to take into account dependency of R_t, V_t wrt initial
-        # conditions variations via et_t_secs
-        RV_t = obsposvelECI(observatory, et_t_secs)
+        # Geocentric position and velocity of transmitting antenna in inertial frame (km, km/sec)
+        RV_t = RV_r(et_t_secs-et_r_secs_0)
         R_t = RV_t[1:3]
         V_t = RV_t[4:6]
         # Earth's barycentric position and velocity at transmit time
@@ -410,7 +408,7 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::
 
         # Compute up-leg Shapiro delay
 
-        # Sun barycentric position and velocity (in au, au/day) at transmit time (TDB)
+        # Sun barycentric position and velocity (in km, km/sec) at transmit time (TDB)
         r_s_t_t = xvs(et_t_secs)[1:3]
         # Heliocentric position of Earth at t_t
         e_U_vec = r_t_t_t - r_s_t_t
@@ -422,7 +420,6 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::
         p_U_vec = r_a_t_b - r_s_t_b
         # Heliocentric distance of asteroid at t_b
         p_U = sqrt(p_U_vec[1]^2 + p_U_vec[2]^2 + p_U_vec[3]^2)
-        q_U_vec = r_a_t_b - r_e_t_t
         # Signal path distance (up-leg)
         q_U = ρ_t
 
@@ -454,7 +451,7 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::
 
     # Compute TDB-UTC at receive time
     # Corrections to TT-TDB from Moyer (2003) / Folkner et al. (2014) due to position
-    # of measurement station on Earth  are of order 0.01μs
+    # of measurement station on Earth are of order 0.01μs
     # Δtt_tdb_station_r = - dot(v_e_t_r, r_r_t_r-r_e_t_r)/clightkms^2
     tdb_utc_r = tdb_utc(et_r_secs) # + Δtt_tdb_station_r
 

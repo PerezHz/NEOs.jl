@@ -1983,6 +1983,7 @@ M05   1.331610.729979+0.681267Observatoire de la Nine, Canens
 M09   5.600940.630164+0.773882Observatory Gromme - Oudsbergen
 M10   6.854110.724305+0.687343CPF Observatory, St Vallier de Thiey
 M11   5.647180.720589+0.691192Novaastro Observatory, Banon
+M13   7.742500.662866+0.746267Lucie Berger Observatory, Strasbourg
 M14   8.789390.699981+0.711832Schiaparelli Gallarate Station
 M15   9.150600.700390+0.711420Virgo Oservatory, Seveso
 M16   9.773190.719401+0.692358Osservatorio Il Coreggiolo
@@ -2332,6 +2333,7 @@ Y40 324.038890.989706-0.143217Discovery Observatory, Caruaru
 Y64 343.489610.881484+0.471433ATLAS-TDO, Teide
 Y65 343.490420.881484+0.471429Two-Meter Twin Telescope, TTT1, Teide
 Y66 343.490530.881484+0.471429Two-Meter Twin Telescope, TTT2, Teide
+Y85 351.853890.727084+0.684321Magalofes Observatory, Fene
 Y89 353.011890.741825+0.668670Proxima Centauri Observatory, Valdin
 Y90 354.555300.730150+0.681150Observatorio ESTELIA, Ladines
 Y91 354.833500.802497+0.594854Ras Algethi, Ronda
