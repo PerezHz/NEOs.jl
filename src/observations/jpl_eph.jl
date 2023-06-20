@@ -124,19 +124,27 @@ const ttmtdb = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
 
 @doc raw"""
     loadpeeph(et::Union{Nothing, Real} = nothing)
+    loadpeeph(et_0::Real, et_f::Real)
 
-Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` from Jan 1st 2000 up to `et > 0` [ephemeris seconds since J2000].
+Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[0, et]` (`[et_0, et_f]`) where `et` must have units
+of ephemeris seconds since J2000.
 
-**Caution**: running this function for the first time will download the `sseph_p100` artifact (∼554 MB) which can take several minutes.
+**Caution**: running this function for the first time will download the `sseph_p100` artifact (∼556 MB) which can take several minutes.
 """
 function loadpeeph(et::Union{Nothing, Real} = nothing)
     if isnothing(et)
         return sseph
     else
-        idxs = findall(x -> x <= et, sseph.t)
-        return TaylorInterpolant(sseph.t0, sseph.t[idxs], sseph.x[idxs[1:end-1], :])
+        i = searchsortedfirst(sseph.t, et)
+        return TaylorInterpolant(sseph.t0, sseph.t[1:i], sseph.x[1:i-1, :])
     end
 end
+
+function loadpeeph(et_0::Real, et_f::Real)
+    i_0 = searchsortedlast(sseph.t, et_0)
+    i_f = searchsortedfirst(sseph.t, et_f)
+    return TaylorInterpolant(sseph.t0, sseph.t[i_0:i_f], sseph.x[i_0:i_f-1, :])
+end 
 
 function bwdfwdeph(et::Union{T,TaylorN{T}},
         bwd::TaylorInterpolant{T,U,2},

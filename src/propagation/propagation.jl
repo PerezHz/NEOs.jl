@@ -321,7 +321,7 @@ for V_dense in V_true_false
                            ::$V_dense; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
                            parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
-            _sseph = loadpeeph(julian2etsecs(jd0+tspan*yr))
+            _sseph = loadpeeph(julian2etsecs.(minmax(jd0, jd0+tspan*yr))...)
 
             # Parameters for neosinteg
             _q0, _t0, _eph, _params = propagate_params(jd0, _sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
@@ -368,7 +368,7 @@ for V_dense in V_true_false
                                 ::$V_dense; parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T),
                                 μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
 
-            _sseph = loadpeeph(julian2etsecs(jd0+tspan*yr))
+            _sseph = loadpeeph(julian2etsecs.(minmax(jd0, jd0+tspan*yr))...)
 
             # Parameters for neosinteg
             _q0, _t0, _eph, _params = propagate_params(jd0, _sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
