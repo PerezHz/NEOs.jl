@@ -119,25 +119,24 @@ dtt_tdb(et) = getposvel(1000000001, 1000000000, cte(et))[4] # units: seconds/sec
 
 # Load Solar System 2000-2100 ephemeris
 const sseph_artifact_path = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
-const sseph = JLD2.load(sseph_artifact_path, "ss16ast_eph")
-const ttmtdb = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
+const sseph::TaylorInterpolant{Float64, Float64, 2} = JLD2.load(sseph_artifact_path, "ss16ast_eph")
+const ttmtdb::TaylorInterpolant{Float64, Float64, 1} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
 
 @doc raw"""
-    loadpeeph(et::Union{Nothing, Real} = nothing)
+    loadpeeph()
+    loadpeeph(et::Real)
     loadpeeph(et_0::Real, et_f::Real)
 
 Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[0, et]` (`[et_0, et_f]`) where `et` must have units
-of ephemeris seconds since J2000.
+of ephemeris seconds since J2000. If no `et` is given, return the full (100 years) integration. 
 
 **Caution**: running this function for the first time will download the `sseph_p100` artifact (∼556 MB) which can take several minutes.
 """
-function loadpeeph(et::Union{Nothing, Real} = nothing)
-    if isnothing(et)
-        return sseph
-    else
-        i = searchsortedfirst(sseph.t, et)
-        return TaylorInterpolant(sseph.t0, sseph.t[1:i], sseph.x[1:i-1, :])
-    end
+loadpeeph()::TaylorInterpolant{Float64, Float64, 2} = sseph
+
+function loadpeeph(et::Real)
+    i = searchsortedfirst(sseph.t, et)
+    return TaylorInterpolant(sseph.t0, sseph.t[1:i], sseph.x[1:i-1, :])
 end
 
 function loadpeeph(et_0::Real, et_f::Real)
