@@ -2317,6 +2317,7 @@ X50 303.824190.821025-0.568999Observatorio Astronomico de Montevideo
 X57 305.406260.903659-0.426885Polo Astronomico CMF,Foz do Iguacu
 X60 306.425560.895232-0.444317Guaraciaba Observatory
 X70 308.433220.931623-0.362375Observatorio OATU, Tupi Paulista
+X72 308.878890.868775-0.493560Waccobs, Sao Leopoldo
 X74 309.150600.929870-0.366840Observatorio Campo dos Amarais
 X77 309.924750.900184-0.434346Centro Astron. Nevoeiro, Antonio Olinto
 X87 312.088900.962180-0.272100Dogsheaven Observatory, Brasilia

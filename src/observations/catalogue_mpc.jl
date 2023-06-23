@@ -159,19 +159,26 @@ function write_catalogues_mpc(cats::Vector{CatalogueMPC}, filename::String)
 end
 
 @doc raw"""
-    update_catalogues_mpc()
+    update_catalogues_mpc(force_download::Bool = false)
 
 Update the local catalogues file.
 """
-function update_catalogues_mpc()
+function update_catalogues_mpc(force_download::Bool = false)
+    # Set remote file 
+    @RemoteFile(catalogue_codes, mpc_catalogues_url, file = CatalogueCodes_path, dir = observations_path, updates = :daily)
     # Download source file 
     @info "Downloading file $mpc_catalogues_url"
-    txt = get_raw_html(mpc_catalogues_url)
+    RemoteFiles.download(catalogue_codes; force = force_download, force_update = true)
+    # Read local file 
+    txt = read(CatalogueCodes_path, String)
     # Parse catalogues  
     cats = parse_catalogues_mpc(txt)
-    m_before = length(mpc_catalogues[])
-    m_after = length(cats)
-    @info "Found $m_after catalogues ($m_before in the previous version of the file)"
+    # Previous version of the file 
+    L_before = length(mpc_catalogues[])
+    # New version of the file 
+    L_after = length(cats)
+    # Compare versions 
+    @info "Found $L_after catalogues ($L_before in the previous version of the file)"
     # Write catalogues to local file 
     @info "Updating file $CatalogueCodes_path"
     write_catalogues_mpc(cats, CatalogueCodes_path)
@@ -179,7 +186,7 @@ function update_catalogues_mpc()
     @info "Updating variable NEOs.mpc_catalogues[]"
     global mpc_catalogues[] = read_catalogues_mpc(CatalogueCodes_path)
 
-    return 
+    return nothing
 end
 
 @doc raw"""
