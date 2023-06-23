@@ -42,7 +42,7 @@ using Test
         @test source_cat == check_cat
 
         # Update catalogues file
-        update_catalogues_mpc()
+        update_catalogues_mpc(true)
         @test allunique(NEOs.mpc_catalogues[])
         @test isa(NEOs.mpc_catalogues[], Vector{CatalogueMPC})
 
@@ -109,7 +109,7 @@ using Test
         @test source_obs == check_obs
 
         # Update observatories file
-        update_observatories_mpc()
+        update_observatories_mpc(true)
         @test allunique(NEOs.mpc_observatories[])
         @test isa(NEOs.mpc_observatories[], Vector{ObservatoryMPC{Float64}})
 
