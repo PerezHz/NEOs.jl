@@ -36,7 +36,7 @@ using InteractiveUtils: methodswith
         jd0 = datetime2julian(DateTime(2023,2,25,0,0,0)) #Julian date of integration initial time
         # unperturbed initial condition
         q0 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01, -9.071450085084557E-03, -9.353197026254517E-03, -5.610023032269034E-03]
-        # Solar System ephemeris 
+        # Solar System ephemeris
         sseph = loadpeeph()
         # Sun's ephemeris
         eph_su = selecteph(sseph, su)
@@ -58,10 +58,11 @@ using InteractiveUtils: methodswith
         )
 
         # propagate orbit
-        sol = NEOs.propagate(
+        sol_bwd, sol = NEOs.propagate(
             dynamics,
             maxsteps,
             jd0,
+            -nyears,
             nyears,
             q0,
             Val(true),
@@ -71,10 +72,22 @@ using InteractiveUtils: methodswith
         )
 
         # check that solution saves correctly
-        jldsave("test.jld2"; sol = sol)
+        jldsave("test.jld2"; sol_bwd, sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
+        recovered_sol_bwd = JLD2.load("test.jld2", "sol_bwd")
         @test sol == recovered_sol
+        @test sol_bwd == recovered_sol_bwd
         rm("test.jld2")
+
+        @test sol_bwd.t0 == sol.t0
+        @test (sol_bwd.t[end]-sol_bwd.t[1])/yr ≈ -nyears
+        @test (sol.t[end]-sol.t[1])/yr ≈ nyears
+        @test sol(sol.t0) == q0
+        q_fwd_end = [-1.0168239304400228, -0.3800432452351079, -0.2685901784950398, 0.007623614213394988, -0.00961901551025335, -0.004682171726467166]
+        @test norm(sol(sol.t0 + sol.t[end])-q_fwd_end, Inf) < 1e-12
+        @test sol_bwd(sol_bwd.t0) == q0
+        q_bwd_end = [0.2689956497466164, 0.4198851302334139, 0.2438053951982368, -0.018875911266050937, 0.0167349306087375, 0.007789382070881366]
+        @test norm(sol_bwd(sol_bwd.t0 + sol_bwd.t[end])-q_bwd_end, Inf) < 1e-12
 
         # Read optical astrometry file
 
