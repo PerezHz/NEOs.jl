@@ -266,9 +266,9 @@ function propagate_params(jd0::T, ss16asteph_et::TaylorInterpolant, q0::Vector{U
 end
 
 @doc raw"""
-    propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
-              q0::Vector{U}, ::$V_dense; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order,
-              abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
+    propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense; 
+              μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol, 
+              parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
 Integrate the orbit of a NEO via the Taylor method.
 
@@ -278,7 +278,6 @@ Integrate the orbit of a NEO via the Taylor method.
 - `maxsteps::Int`: maximum number of steps for the integration.
 - `jd0::T`: initial Julian date.
 - `tspan::T`: time span of the integration [in years].
-- `ss16asteph_et::TaylorInterpolant`: solar system ephemeris.
 - `q0::Vector{U}`: vector of initial conditions.
 - `Val(true/false)`: whether to output the Taylor polynomials generated at each time step (`true`) or not.
 - `μ_ast::Vector`: vector of gravitational parameters.
@@ -288,10 +287,9 @@ Integrate the orbit of a NEO via the Taylor method.
 """ propagate
 
 @doc raw"""
-    propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
-                   q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10,
-                   nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order,
-                   abstol::T = abstol) where {T <: Real, U <: Number, D}
+    propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true, 
+                   eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end],
+                   order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
 
 Integrate the orbit of a NEO via the Taylor method while finding the zeros of `rvelea`.
 
@@ -301,7 +299,6 @@ Integrate the orbit of a NEO via the Taylor method while finding the zeros of `r
 - `maxsteps::Int`: maximum number of steps for the integration.
 - `jd0::T`: initial Julian date.
 - `tspan::T`: time span of the integration [in years].
-- `ss16asteph_et::TaylorInterpolant`: solar system ephemeris.
 - `q0::Vector{U}`: vector of initial conditions.
 - `Val(true/false)`: whether to output the Taylor polynomials generated at each time step (`true`) or not.
 - `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` (`true`) or not.
@@ -317,11 +314,12 @@ for V_dense in V_true_false
 
     @eval begin
 
-        function propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, sseph::TaylorInterpolant, q0::Vector{U},
-                           ::$V_dense; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
+        function propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense; 
+                           μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
                            parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
-            _sseph = loadpeeph(julian2etsecs(jd0+tspan*yr))
+            # Load Solar System ephemeris 
+            _sseph = loadpeeph(julian2etsecs.(minmax(jd0, jd0+tspan*yr))...)
 
             # Parameters for neosinteg
             _q0, _t0, _eph, _params = propagate_params(jd0, _sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
@@ -339,36 +337,37 @@ for V_dense in V_true_false
 
         end
 
-        function propagate(dynamics::D, maxsteps::Int, jd0::T1, tspan::T2, sseph::TaylorInterpolant, q0::Vector{U},
-                           ::$V_dense; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T3 = abstol,
+        function propagate(dynamics::D, maxsteps::Int, jd0::T1, tspan::T2, q0::Vector{U}, ::$V_dense; 
+                           μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T3 = abstol,
                            parse_eqs::Bool = true) where {T1, T2, T3 <: Real, U <: Number, D}
 
             _jd0, _tspan, _abstol = promote(jd0, tspan, abstol)
 
-            return propagate(dynamics, maxsteps, _jd0, _tspan, sseph, q0, $V_dense(); μ_ast = μ_ast, order = order,
+            return propagate(dynamics, maxsteps, _jd0, _tspan, q0, $V_dense(); μ_ast = μ_ast, order = order,
                              abstol = _abstol, parse_eqs = parse_eqs)
         end
 
-        function propagate(dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, sseph::TaylorInterpolant,
-                           q0::Vector{U}, ::$V_dense; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
+        function propagate(dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, q0::Vector{U}, ::$V_dense; 
+                           μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
                            parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
             # Backward integration
-            bwd = propagate(dynamics, maxsteps, jd0, nyears_bwd, sseph, q0, $V_dense(); μ_ast = μ_ast, order = order,
+            bwd = propagate(dynamics, maxsteps, jd0, nyears_bwd, q0, $V_dense(); μ_ast = μ_ast, order = order,
                             abstol = abstol, parse_eqs = parse_eqs)
             # Forward integration
-            fwd = propagate(dynamics, maxsteps, jd0, nyears_fwd, sseph, q0, $V_dense(); μ_ast = μ_ast, order = order,
+            fwd = propagate(dynamics, maxsteps, jd0, nyears_fwd, q0, $V_dense(); μ_ast = μ_ast, order = order,
                             abstol = abstol, parse_eqs = parse_eqs)
 
             return bwd, fwd
 
         end
 
-        function propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, sseph::TaylorInterpolant, q0::Vector{U},
-                                ::$V_dense; parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T),
-                                μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
+        function propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true, 
+                                eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end],
+                                order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
 
-            _sseph = loadpeeph(julian2etsecs(jd0+tspan*yr))
+            # Load Solar System ephemeris 
+            _sseph = loadpeeph(julian2etsecs.(minmax(jd0, jd0+tspan*yr))...)
 
             # Parameters for neosinteg
             _q0, _t0, _eph, _params = propagate_params(jd0, _sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
@@ -385,27 +384,27 @@ for V_dense in V_true_false
 
         end
 
-        function propagate_root(dynamics::D, maxsteps::Int, jd0::T1, tspan::T2, sseph::TaylorInterpolant, q0::Vector{U},
-                                ::$V_dense; parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T3 = eps(T),
-                                μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T4 = abstol) where {T1, T2, T3, T4 <: Real, U <: Number, D}
+        function propagate_root(dynamics::D, maxsteps::Int, jd0::T1, tspan::T2, q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true, 
+                                eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T3 = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end],
+                                order::Int = order, abstol::T4 = abstol) where {T1, T2, T3, T4 <: Real, U <: Number, D}
 
             _jd0, _tspan, _nrabstol, _abstol = promote(jd0, tspan, nrabstol, abstol)
 
-            return propagate_root(dynamics, maxsteps, _jd0, _tspan, sseph, q0, $V_dense(); parse_eqs = parse_eqs,
+            return propagate_root(dynamics, maxsteps, _jd0, _tspan, q0, $V_dense(); parse_eqs = parse_eqs,
                                   eventorder = eventorder, newtoniter = newtoniter, nrabstol = _nrabstol, μ_ast = μ_ast,
                                   order = order, abstol = _abstol)
         end
 
-        function propagate_root(dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, sseph::TaylorInterpolant,
-                                q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10,
-                                nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
+        function propagate_root(dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, q0::Vector{U}, ::$V_dense; 
+                                parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T), 
+                                μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
 
             # Backward integration
-            bwd, tvS_bwd, xvS_bwd, gvS_bwd = propagate_root(dynamics, maxsteps, jd0, nyears_bwd, sseph, q0, $V_dense(); parse_eqs = parse_eqs,
+            bwd, tvS_bwd, xvS_bwd, gvS_bwd = propagate_root(dynamics, maxsteps, jd0, nyears_bwd, q0, $V_dense(); parse_eqs = parse_eqs,
                                                             eventorder = eventorder, newtoniter = newtoniter, nrabstol = nrabstol,
                                                             μ_ast = μ_ast, order = order, abstol = abstol)
             # Forward integration
-            fwd, tvS_fwd, xvS_fwd, gvS_fwd = propagate_root(dynamics, maxsteps, jd0, nyears_fwd, sseph, q0, $V_dense(); parse_eqs = parse_eqs,
+            fwd, tvS_fwd, xvS_fwd, gvS_fwd = propagate_root(dynamics, maxsteps, jd0, nyears_fwd, q0, $V_dense(); parse_eqs = parse_eqs,
                                                             eventorder = eventorder, newtoniter = newtoniter, nrabstol = nrabstol,
                                                             μ_ast = μ_ast, order = order, abstol = abstol)
 
@@ -417,9 +416,8 @@ for V_dense in V_true_false
 end
 
 @doc raw"""
-    propagate_lyap(dynamics::D, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
-                   q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order,
-                   abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number}
+    propagate_lyap(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end],
+                   order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number}
 
 Compute the Lyapunov spectrum of a NEO.
 
@@ -429,19 +427,20 @@ Compute the Lyapunov spectrum of a NEO.
 - `maxsteps::Int`: maximum number of steps for the integration.
 - `jd0::T`: initial Julian date.
 - `tspan::T`: time span of the integration [in Julian days].
-- `ss16asteph_et::TaylorInterpolant`: solar system ephemeris.
 - `q0::Vector{U}`: vector of initial conditions.
 - `μ_ast::Vector`: vector of gravitational parameters.
 - `order::Int=order`: order of the Taylor expansions to be used in the integration.
 - `abstol::T`: absolute tolerance.
 - `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` (`true`) or not.
 """ propagate_lyap
-function propagate_lyap(dynamics::D, maxsteps::Int, jd0::T, tspan::T, ss16asteph_et::TaylorInterpolant,
-                        q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order,
-                        abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
+function propagate_lyap(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], 
+                        order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
+
+    # Load Solar System ephemeris 
+    _sseph = loadpeeph(julian2etsecs.(minmax(jd0, jd0+tspan*yr))...)
 
     # Parameters for apophisinteg
-    _q0, _t0, _eph, _params = propagate_params(jd0, ss16asteph_et, q0; μ_ast = μ_ast, order = order, abstol = abstol)
+    _q0, _t0, _eph, _params = propagate_params(jd0, _sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
 
     # Final time of integration (days)
     _tmax = _t0 + tspan*yr

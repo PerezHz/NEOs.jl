@@ -36,19 +36,20 @@ using InteractiveUtils: methodswith
         jd0 = datetime2julian(DateTime(2023,2,25,0,0,0)) #Julian date of integration initial time
         # unperturbed initial condition
         q0 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01, -9.071450085084557E-03, -9.353197026254517E-03, -5.610023032269034E-03]
-        sseph = NEOs.sseph
+        # Solar System ephemeris
+        sseph = loadpeeph()
         # Sun's ephemeris
         eph_su = selecteph(sseph, su)
         # Earth's ephemeris
         eph_ea = selecteph(sseph, ea)
 
-        # warmup propagation
+        # warmup propagation (backward and forward)
         NEOs.propagate(
             dynamics,
             1,
             jd0,
+            -nyears,
             nyears,
-            sseph,
             q0,
             Val(true),
             order = 25,
@@ -57,12 +58,12 @@ using InteractiveUtils: methodswith
         )
 
         # propagate orbit
-        sol = NEOs.propagate(
+        sol_bwd, sol = NEOs.propagate(
             dynamics,
             maxsteps,
             jd0,
+            -nyears,
             nyears,
-            sseph,
             q0,
             Val(true),
             order = 25,
@@ -71,10 +72,22 @@ using InteractiveUtils: methodswith
         )
 
         # check that solution saves correctly
-        jldsave("test.jld2"; sol = sol)
+        jldsave("test.jld2"; sol_bwd, sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
+        recovered_sol_bwd = JLD2.load("test.jld2", "sol_bwd")
         @test sol == recovered_sol
+        @test sol_bwd == recovered_sol_bwd
         rm("test.jld2")
+
+        @test sol_bwd.t0 == sol.t0
+        @test (sol_bwd.t[end]-sol_bwd.t[1])/yr ≈ -nyears
+        @test (sol.t[end]-sol.t[1])/yr ≈ nyears
+        @test sol(sol.t0) == q0
+        q_fwd_end = [-1.0168239304400228, -0.3800432452351079, -0.2685901784950398, 0.007623614213394988, -0.00961901551025335, -0.004682171726467166]
+        @test norm(sol(sol.t0 + sol.t[end])-q_fwd_end, Inf) < 1e-12
+        @test sol_bwd(sol_bwd.t0) == q0
+        q_bwd_end = [0.2689956497466164, 0.4198851302334139, 0.2438053951982368, -0.018875911266050937, 0.0167349306087375, 0.007789382070881366]
+        @test norm(sol_bwd(sol_bwd.t0 + sol_bwd.t[end])-q_bwd_end, Inf) < 1e-12
 
         # Read optical astrometry file
 
@@ -103,7 +116,6 @@ using InteractiveUtils: methodswith
             maxsteps,
             jd0,
             nyears,
-            sseph,
             q1,
             Val(true),
             order = 25,
@@ -143,7 +155,8 @@ using InteractiveUtils: methodswith
         jd0 = datetime2julian(DateTime(2004,6,1)) #Julian date of integration initial time
         # JPL #199 solution for Apophis at June 1st, 2004
         q0 = [-1.0506628055913627, -0.06064314196134998, -0.04997102228887035, 0.0029591421121582077, -0.01423233538611057, -0.005218412537773594, -5.592839897872e-14, 0.0]
-        sseph = NEOs.sseph
+        # Solar System ephemeris
+        sseph = loadpeeph()
         # Sun's ephemeris
         eph_su = selecteph(sseph, su)
         # Earth's ephemeris
@@ -155,7 +168,6 @@ using InteractiveUtils: methodswith
             1,
             jd0,
             nyears,
-            sseph,
             q0,
             Val(true),
             order = 25,
@@ -169,7 +181,6 @@ using InteractiveUtils: methodswith
             maxsteps,
             jd0,
             nyears,
-            sseph,
             q0,
             Val(true),
             order = 25,
@@ -254,7 +265,7 @@ using InteractiveUtils: methodswith
         # Whether to use @taylorize
         local parse_eqs = true
         # Solar System ephemeris
-        local sseph = NEOs.sseph
+        local sseph = loadpeeph()
         # Perturbation to nominal initial condition (Taylor1 jet transport)
         local dq = NEOs.scaled_variables()
         # Initial date of integration (julian days)
@@ -263,14 +274,14 @@ using InteractiveUtils: methodswith
         local q0 = [-0.9170913888342959, -0.37154308794738056, -0.1610606989484252,
                     0.009701519087787077, -0.012766026792868212, -0.0043488589639194275] .+ dq
 
-        sol = NEOs.propagate(dynamics, 10, jd0, 0.02, sseph, q0, Val(true); order, abstol, parse_eqs)
+        sol = NEOs.propagate(dynamics, 10, jd0, 0.02, q0, Val(true); order, abstol, parse_eqs)
         jldsave("test.jld2"; sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol
         rm("test.jld2")
 
-        sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, 1, jd0, 0.02, sseph, q0, Val(true); order, abstol,
-                                                 parse_eqs)
+        sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, 1, jd0, 0.02, q0, Val(true); order, abstol, parse_eqs)
+
         jldsave("test.jld2"; sol, tvS, xvS, gvS)
         recovered_sol = JLD2.load("test.jld2", "sol")
         recovered_tvS = JLD2.load("test.jld2", "tvS")
@@ -305,7 +316,7 @@ using InteractiveUtils: methodswith
         q00::Vector{Float64} = [-1.0506628055913627, -0.06064314196134998, -0.04997102228887035, 0.0029591421121582077, -0.01423233538611057, -0.005218412537773594, -5.592839897872e-14, 0.0]
         dq::Vector{TaylorN{Float64}} = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14), order = varorder)
         q0::Vector{TaylorN{Float64}} = q00 .+ vcat(dq, 0dq[1])
-        sseph::TaylorInterpolant{Float64,Float64,2} = NEOs.sseph
+        sseph::TaylorInterpolant{Float64,Float64,2} = loadpeeph()
 
         # propagate orbit
         sol = NEOs.propagate(
@@ -313,7 +324,6 @@ using InteractiveUtils: methodswith
             maxsteps,
             jd0,
             nyears,
-            sseph,
             q0,
             Val(true),
             order = 25,
