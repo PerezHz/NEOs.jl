@@ -1,6 +1,7 @@
 # NEOs.jl
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5152449.svg)](https://doi.org/10.5281/zenodo.5152449)
+[![CI](https://github.com/PerezHz/NEOs.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/PerezHz/NEOs.jl/actions/workflows/CI.yml)
 [![Coverage Status](https://coveralls.io/repos/github/PerezHz/NEOs.jl/badge.svg?branch=main)](https://coveralls.io/github/PerezHz/NEOs.jl?branch=main)
 [![codecov](https://codecov.io/gh/PerezHz/NEOs.jl/branch/main/graph/badge.svg?token=F1IY79YP3J)](https://codecov.io/gh/PerezHz/NEOs.jl)
 
