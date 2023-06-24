@@ -145,6 +145,12 @@ function loadpeeph(et_0::Real, et_f::Real)
     return TaylorInterpolant(sseph.t0, sseph.t[i_0:i_f], sseph.x[i_0:i_f-1, :])
 end 
 
+@doc raw"""
+    bwdfwdeph(et::Union{T, TaylorN{T}}, bwd::TaylorInterpolant{T, U, 2}, 
+              fwd::TaylorInterpolant{T, U, 2}) where {T <: AbstractFloat, U <: Union{T, TaylorN{T}}}
+
+Paste a backward and a forward integration, evaluate at `et` and convert from [au, au/day] -> [km, km/sec].
+"""
 function bwdfwdeph(et::Union{T,TaylorN{T}},
         bwd::TaylorInterpolant{T,U,2},
         fwd::TaylorInterpolant{T,U,2}
