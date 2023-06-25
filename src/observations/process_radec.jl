@@ -441,7 +441,7 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}; debias_table::String = "2018
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
 
     # Iterate over the observations
-    for i in 1:n_optical_obs
+    Threads.@threads for i in 1:n_optical_obs
 
         # Time of observation
         datetime_obs[i] = obs[i].date
