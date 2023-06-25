@@ -170,9 +170,6 @@ function parse_observatories_mpc(text::String)
     return obs
 end
 
-# List of mpc observatories
-const mpc_observatories = Ref{Vector{ObservatoryMPC{Float64}}}(read_observatories_mpc(ObsCodes_path))
-
 @doc raw"""
     mpc_long_str(x::T) where {T <: AbstractFloat}
 
@@ -271,36 +268,32 @@ function write_observatories_mpc(obs::Vector{ObservatoryMPC{T}}, filename::Strin
     end
 end
 
+# List of mpc observatories
+const mpc_observatories = Ref{Vector{ObservatoryMPC{Float64}}}([unknownobs()])
+
 @doc raw"""
-    update_observatories_mpc(force_download::Bool = false)
+    update_observatories_mpc()
 
 Update the local observatories file.
 """
-function update_observatories_mpc(force_download::Bool = false)
-    # Set remote file 
-    @RemoteFile(observatory_codes, mpc_observatories_url, file = ObsCodes_path, dir = observations_path, updates = :daily)
+function update_observatories_mpc()
+    # Local file 
+    ObsCodes_path = joinpath(ObsCodes_cache[], "ObsCodes.txt")
     # Download source file 
-    @info "Downloading file $mpc_observatories_url"
-    RemoteFiles.download(observatory_codes; force = force_download, force_update = true)
+    download(mpc_observatories_url, ObsCodes_path)
     # Read local file 
     txt = read(ObsCodes_path, String)
     # Parse observatories 
     obs = parse_observatories_mpc(txt)
-    # Previous version of the file 
-    L_before = length(mpc_observatories[])
-    # New version of the file 
-    L_after = length(obs)
-    # Compare versions 
-    @info "Found $L_after observatories ($L_before in the previous version of the file)"
     # Write observatories to local file 
-    @info "Updating file $ObsCodes_path"
     write_observatories_mpc(obs, ObsCodes_path)
     # Update global variable 
-    @info "Updating variable NEOs.mpc_observatories[]"
     global mpc_observatories[] = read_observatories_mpc(ObsCodes_path)
 
     return nothing 
 end
+
+update_observatories_mpc()
 
 @doc raw"""
     search_obs_code(obscode::String)

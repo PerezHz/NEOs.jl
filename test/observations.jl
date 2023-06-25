@@ -7,10 +7,7 @@ using Test
 
     @testset "CatalogueMPC" begin
 
-        using NEOs: mpc_catalogue_regex, CatalogueMPC, CatalogueCodes_path, observations_path
-
-        # Check that local catalogues file exists
-        @test isfile(joinpath(observations_path, "CatalogueCodes.txt"))
+        using NEOs: mpc_catalogue_regex, CatalogueMPC
 
         # Check global variable NEOs.mpc_catalogues[]
         @test allunique(NEOs.mpc_catalogues[])
@@ -34,15 +31,14 @@ using Test
         @test gaia != unkcat
 
         # Read/write catalogues file
-        source_cat = read_catalogues_mpc(CatalogueCodes_path)
-        check_file = joinpath(observations_path, "CatalogueCodes_.txt")
-        write_catalogues_mpc(source_cat, check_file)
+        check_file = "CatalogueCodes.txt"
+        write_catalogues_mpc(NEOs.mpc_catalogues[], check_file)
         check_cat = read_catalogues_mpc(check_file)
         rm(check_file)
-        @test source_cat == check_cat
+        @test NEOs.mpc_catalogues[] == check_cat
 
         # Update catalogues file
-        update_catalogues_mpc(true)
+        update_catalogues_mpc()
         @test allunique(NEOs.mpc_catalogues[])
         @test isa(NEOs.mpc_catalogues[], Vector{CatalogueMPC})
 
@@ -53,10 +49,7 @@ using Test
 
     @testset "ObservatoryMPC" begin
 
-        using NEOs: mpc_observatory_regex, ObservatoryMPC, ObsCodes_path
-
-        # Check that local observatories file exists
-        @test isfile(joinpath(observations_path, "ObsCodes.txt"))
+        using NEOs: mpc_observatory_regex, ObservatoryMPC
 
         # Check global variable NEOs.mpc_observatories[]
         @test allunique(NEOs.mpc_observatories[])
@@ -101,15 +94,14 @@ using Test
         @test arecibo != hubble
 
         # Read/write observatories file
-        source_obs = read_observatories_mpc(ObsCodes_path)
-        check_file = joinpath(observations_path, "ObsCodes_.txt")
-        write_observatories_mpc(source_obs, check_file)
+        check_file = "ObsCodes.txt"
+        write_observatories_mpc(NEOs.mpc_observatories[], check_file)
         check_obs = read_observatories_mpc(check_file)
         rm(check_file)
-        @test source_obs == check_obs
+        @test NEOs.mpc_observatories[] == check_obs
 
         # Update observatories file
-        update_observatories_mpc(true)
+        update_observatories_mpc()
         @test allunique(NEOs.mpc_observatories[])
         @test isa(NEOs.mpc_observatories[], Vector{ObservatoryMPC{Float64}})
 

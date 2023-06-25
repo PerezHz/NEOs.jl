@@ -2,12 +2,10 @@
 
 # Path to NEOs src directory 
 const src_path = dirname(pathof(NEOs))
-# Path to NEOs observations directory
-const observations_path = joinpath(src_path, "observations")
-# Path to MPC catalogues file 
-const CatalogueCodes_path = joinpath(observations_path, "CatalogueCodes.txt")
-# Path to mpc observatories file 
-const ObsCodes_path = joinpath(observations_path, "ObsCodes.txt")
+# Path to MPC catalogues file scratch space 
+const CatalogueCodes_cache = Ref{String}("")
+# Path to MPC observatories file scratch space  
+const ObsCodes_cache = Ref{String}("")
 
 # URLs
 
