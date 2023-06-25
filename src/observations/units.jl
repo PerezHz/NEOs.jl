@@ -76,12 +76,13 @@ datetime2days(x::DateTime) = datetime2julian(x) - JD_J2000
 
 Convert `d` days since J2000 to `DateTime`.
 """
-days2datetime(d::T) where {T <: Number} = julian2datetime(d + JD_J2000)
+days2datetime(d::Number) = julian2datetime(d + JD_J2000)
 
 @doc raw"""
-    tdb_utc(et::T) where {T<:Number}
+    tdb_utc(et::Number)
 
-Auxiliary function to compute (TDB-UTC)
+Given `et`, a number of TDB seconds past J2000.0 epoch, compute
+the difference (TDB-UTC)
 ```math
 \begin{align*}
 TDB-UTC & = (TDB-TAI) + (TAI-UTC) \\
@@ -89,7 +90,7 @@ TDB-UTC & = (TDB-TAI) + (TAI-UTC) \\
         & = (TDB-TT) + 32.184 s + ΔAT,
 \end{align*}
 ```
-where TDB is the Solar System barycentric ephemeris time, TT is the Terrestrial time,
+where TDB is the Barycentric Dynamical Time (Temps Dynamique Barycentrique), TT is the Terrestrial Time,
 TAI is the International Atomic Time, and UTC is the Coordinated Universal Time.
 
 This function is useful to convert TDB to UTC via UTC + (TDB-UTC) and viceversa. It does
@@ -98,35 +99,56 @@ not include the correction due to the position of the measurement station ``v_E.
 
 # Arguments
 
-- `et::T`: TDB seconds since J2000.0.
+- `et::Number`: TDB seconds since J2000.0.
 """
-function tdb_utc(et::T) where {T<:Number}
+function tdb_utc(et::Number)
     # TT-TDB
     tt_tdb_et = ttmtdb(et)
     # TT-TAI
     tt_tai = 32.184
+    # TDB - TAI = (TT-TAI) + (TDB-TT) = (TDB-TT) + 32.184 s
+    tdb_tai = tt_tai - tt_tdb_et
 
-    et_00 = cte(cte(et))
-    # Used only to determine ΔAT; no high-precision needed
-    utc_secs = et_00 - deltet(et_00, "ET")
-    # ΔAT
-    jd_utc = JD_J2000 + utc_secs/daysec
-    tai_utc = get_Δat(jd_utc)
-    # TDB-UTC = (TDB-TT) + (TT-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
-    return (tt_tai + tai_utc) - tt_tdb_et
+    # TAI seconds since J2000.0; used to determine ΔAT = TAI - UTC
+    tai_secs = cte(cte(et)) - cte(cte(tdb_tai))
+    # Julian date corresponding to tai_secs
+    jd_tai = JD_J2000 + tai_secs/daysec
+    # ΔAT = TAI - UTC
+    tai_utc = get_Δat(jd_tai)
+    # TDB-UTC = (TDB-TAI) + (TAI-UTC) = (TDB-TT) + 32.184 s + ΔAT
+    return tdb_tai + tai_utc
 end
 
-# TODO: add tdb_utc(utc) method!!!
-# strategy: given UTC, do UTC + (TT-TAI) + (TAI-UTC) to get TT
-# then, use ttmtdb(et) function iteratively (Newton) to compute TDB
+@doc raw"""
+    tt_tdb_tt(tt::Real)
 
-# function dtutc2et(t_utc::DateTime)
-#     tt_tai = 32.184
-#     jd_utc = datetime2julian(t_utc)
-#     fd_utc = (jd_utc+0.5) - floor(jd_utc+0.5)
-#     j, tai_utc = iauDat(year(t_utc), month(t_utc), day(t_utc), fd_utc)
-#     return et
-# end
+Given `tt`, a number of TT seconds past J2000.0 epoch, compute
+the difference (TT-TDB), where TDB is the Barycentric Dynamical Time (Temps Dynamique
+Barycentrique) and TT is the Terrestrial Time.
+
+This function is useful during the reduction of observations, when the TDB instant is
+computed from a known UTC instant. The computed value does not include the
+correction due to the position of the measurement station ``v_E.(r_S-r_E)/c^2``
+(Folkner et al. 2014; Moyer, 2003).
+
+# Arguments
+
+- `tt::Real`: tt seconds since J2000.0.
+"""
+function ttmtdb_tt(tt::Real; niter=5)
+    # Ansatz: TDB - TT = 0
+    ttmtdb_order = ttmtdb.x[1].order
+    tdb = Taylor1([tt,one(tt)], ttmtdb_order)
+    for _ in 1:niter
+        ttmtdb_tdb = ttmtdb(tdb)
+        # we look for TDB* such that TT-TDB* = (TT-TDB)(TDB*)
+        y = tt - tdb - ttmtdb_tdb
+        dy = - 1 - TaylorSeries.differentiate(ttmtdb_tdb)
+        # perform Newton iteration
+        tdb[0] -= cte(y/dy)
+    end
+    return ttmtdb(tdb[0])
+end
 
 @doc raw"""
     rad2arcsec(x)
