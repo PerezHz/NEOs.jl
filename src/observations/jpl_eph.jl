@@ -8,8 +8,6 @@ See also [`SPICE.furnsh`](@ref).
 """
 function loadjpleph()
     furnsh(
-        # NAIF IDs
-        joinpath(artifact"naif0012", "naif0012.tls"),
         # JPL DE430 TT-TDB
         joinpath(artifact"TTmTDBde430", "TTmTDB.de430.19feb2015.bsp"),
         # JPL DE430 ephemerides
@@ -128,7 +126,7 @@ const ttmtdb::TaylorInterpolant{Float64, Float64, 1} = TaylorInterpolant(sseph.t
     loadpeeph(et_0::Real, et_f::Real)
 
 Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[0, et]` (`[et_0, et_f]`) where `et` must have units
-of ephemeris seconds since J2000. If no `et` is given, return the full (100 years) integration. 
+of ephemeris seconds since J2000. If no `et` is given, return the full (100 years) integration.
 
 **Caution**: running this function for the first time will download the `sseph_p100` artifact (∼556 MB) which can take several minutes.
 """
@@ -143,7 +141,7 @@ function loadpeeph(et_0::Real, et_f::Real)
     i_0 = searchsortedlast(sseph.t, et_0)
     i_f = searchsortedfirst(sseph.t, et_f)
     return TaylorInterpolant(sseph.t0, sseph.t[i_0:i_f], sseph.x[i_0:i_f-1, :])
-end 
+end
 
 @doc raw"""
     bwdfwdeph(et::Union{T, TaylorN{T}}, bwd::TaylorInterpolant{T, U, 2}, 
