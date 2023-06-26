@@ -277,12 +277,8 @@ const mpc_observatories = Ref{Vector{ObservatoryMPC{Float64}}}([unknownobs()])
 Update the local observatories file.
 """
 function update_observatories_mpc()
-    # Local file 
-    ObsCodes_path = joinpath(scratch_path[], "ObsCodes.txt")
-    # Download source file 
-    download(mpc_observatories_url, ObsCodes_path)
-    # Read local file 
-    txt = read(ObsCodes_path, String)
+    # Download and read observatories file 
+    ObsCodes_path, txt = download_scratch(mpc_observatories_url, "ObsCodes.txt")
     # Parse observatories 
     obs = parse_observatories_mpc(txt)
     # Write observatories to local file 

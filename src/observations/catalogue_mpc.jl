@@ -155,6 +155,30 @@ function write_catalogues_mpc(cats::Vector{CatalogueMPC}, filename::String)
     end
 end
 
+@doc raw"""
+    download_scratch(url::String, filename::String)
+
+Download `url` and save the output to NEOs scratch space as `filename`. Return the local path and the contents of the file as a `String`. 
+"""
+function download_scratch(url::String, filename::String)
+    # Local file 
+    path = joinpath(scratch_path[], filename)
+    # Download function
+    f = retry(delays = fill(0.1, 3)) do
+        try 
+            download(url, path)
+        catch
+            rethrow()
+        end 
+    end
+    # Download source_file
+    f()
+    # Read local file 
+    txt = read(path, String)
+
+    return path, txt 
+end 
+
 # List of MPC catalogues 
 const mpc_catalogues = Ref{Vector{CatalogueMPC}}([unknowncat()])
 
@@ -164,12 +188,8 @@ const mpc_catalogues = Ref{Vector{CatalogueMPC}}([unknowncat()])
 Update the local catalogues file.
 """
 function update_catalogues_mpc()
-    # Local file 
-    CatalogueCodes_path = joinpath(scratch_path[], "CatalogueCodes.txt")
-    # Download source file 
-    download(mpc_catalogues_url, CatalogueCodes_path)
-    # Read local file 
-    txt = read(CatalogueCodes_path, String)
+    # Download and read catalogues file 
+    CatalogueCodes_path, txt = download_scratch(mpc_catalogues_url, "CatalogueCodes.txt")
     # Parse catalogues  
     cats = parse_catalogues_mpc(txt)
     # Write catalogues to local file 
