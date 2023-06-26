@@ -74,9 +74,20 @@ include("postprocessing/least_squares.jl")
 function __init__()
     # Initialize scratch space
     global scratch_path[] = @get_scratch!("NEOsScratch")
-    # Update catalogues and observatories 
-    update_catalogues_mpc()
-    update_observatories_mpc()
+    # Load catalogues 
+    CatalogueCodes_path = joinpath(scratch_path[], "CatalogueCodes.txt")
+    if isfile(CatalogueCodes_path)
+        global mpc_catalogues[] = read_catalogues_mpc(CatalogueCodes_path)
+    else 
+        update_catalogues_mpc()
+    end 
+    # Load observatories 
+    ObsCodes_path = joinpath(scratch_path[], "ObsCodes.txt")
+    if isfile(ObsCodes_path)
+        global mpc_observatories[] = read_observatories_mpc(ObsCodes_path)
+    else 
+        update_observatories_mpc()
+    end 
     # Extensions 
     @static if !isdefined(Base, :get_extension)
         @require Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c" begin
