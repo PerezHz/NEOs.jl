@@ -2,10 +2,8 @@
 
 # Path to NEOs src directory 
 const src_path = dirname(pathof(NEOs))
-# Path to MPC catalogues file scratch space 
-const CatalogueCodes_cache = Ref{String}("")
-# Path to MPC observatories file scratch space  
-const ObsCodes_cache = Ref{String}("")
+# Path to scratch space 
+const scratch_path = Ref{String}("")
 
 # URLs
 

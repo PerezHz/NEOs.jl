@@ -3,6 +3,8 @@
 using NEOs
 using Test
 
+using NEOs: src_path
+
 @testset "Observations" begin
 
     @testset "CatalogueMPC" begin
@@ -31,7 +33,7 @@ using Test
         @test gaia != unkcat
 
         # Read/write catalogues file
-        check_file = "CatalogueCodes.txt"
+        check_file = joinpath(dirname(src_path), "test", "data", "CatalogueCodes.txt")
         write_catalogues_mpc(NEOs.mpc_catalogues[], check_file)
         check_cat = read_catalogues_mpc(check_file)
         rm(check_file)
@@ -94,7 +96,7 @@ using Test
         @test arecibo != hubble
 
         # Read/write observatories file
-        check_file = "ObsCodes.txt"
+        check_file = joinpath(dirname(src_path), "test", "data", "ObsCodes.txt")
         write_observatories_mpc(NEOs.mpc_observatories[], check_file)
         check_obs = read_observatories_mpc(check_file)
         rm(check_file)
@@ -114,7 +116,7 @@ using Test
 
     @testset "RadecMPC" begin
 
-        using NEOs: mpc_radec_regex, RadecMPC, src_path
+        using NEOs: mpc_radec_regex, RadecMPC
         using Dates
 
         # Parse RadecMPC

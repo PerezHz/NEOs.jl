@@ -278,7 +278,7 @@ Update the local observatories file.
 """
 function update_observatories_mpc()
     # Local file 
-    ObsCodes_path = joinpath(ObsCodes_cache[], "ObsCodes.txt")
+    ObsCodes_path = joinpath(scratch_path[], "ObsCodes.txt")
     # Download source file 
     download(mpc_observatories_url, ObsCodes_path)
     # Read local file 
@@ -292,8 +292,6 @@ function update_observatories_mpc()
 
     return nothing 
 end
-
-update_observatories_mpc()
 
 @doc raw"""
     search_obs_code(obscode::String)

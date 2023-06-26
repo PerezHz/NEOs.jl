@@ -165,7 +165,7 @@ Update the local catalogues file.
 """
 function update_catalogues_mpc()
     # Local file 
-    CatalogueCodes_path = joinpath(CatalogueCodes_cache[], "CatalogueCodes.txt")
+    CatalogueCodes_path = joinpath(scratch_path[], "CatalogueCodes.txt")
     # Download source file 
     download(mpc_catalogues_url, CatalogueCodes_path)
     # Read local file 
@@ -179,8 +179,6 @@ function update_catalogues_mpc()
 
     return nothing
 end
-
-update_catalogues_mpc()
 
 @doc raw"""
     search_cat_code(catcode::String)

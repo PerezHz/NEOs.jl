@@ -24,6 +24,7 @@ using SatelliteToolbox: get_iers_eop_iau_2000A, EOPData_IAU1980, EOPData_IAU2000
       we, OrbitStateVector, r_ecef_to_eci, DCM
 import SatelliteToolbox.sv_ecef_to_eci
 using Dates: format
+using Downloads: download
 using HTTP: get
 using IntervalRootFinding: roots, interval, Interval, mid
 
@@ -71,9 +72,11 @@ include("propagation/propagation.jl")
 include("postprocessing/least_squares.jl")
 
 function __init__()
-    # Initialize scratch spaces 
-    global CatalogueCodes_cache[] = @get_scratch!("CatalogueCodes")
-    global ObsCodes_cache[] = @get_scratch!("ObsCodes")
+    # Initialize scratch space
+    global scratch_path[] = @get_scratch!("NEOsScratch")
+    # Update catalogues and observatories 
+    update_catalogues_mpc()
+    update_observatories_mpc()
     # Extensions 
     @static if !isdefined(Base, :get_extension)
         @require Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c" begin
