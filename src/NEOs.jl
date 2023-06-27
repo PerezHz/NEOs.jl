@@ -25,6 +25,7 @@ using SatelliteToolbox: get_iers_eop_iau_2000A, EOPData_IAU1980, EOPData_IAU2000
 import SatelliteToolbox.sv_ecef_to_eci
 using Dates: format
 using Downloads: download
+import Downloads
 using HTTP: get
 using IntervalRootFinding: roots, interval, Interval, mid
 
