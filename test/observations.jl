@@ -3,14 +3,13 @@
 using NEOs
 using Test
 
+using NEOs: src_path
+
 @testset "Observations" begin
 
     @testset "CatalogueMPC" begin
 
-        using NEOs: mpc_catalogue_regex, CatalogueMPC, CatalogueCodes_path, observations_path
-
-        # Check that local catalogues file exists
-        @test isfile(joinpath(observations_path, "CatalogueCodes.txt"))
+        using NEOs: mpc_catalogue_regex, CatalogueMPC
 
         # Check global variable NEOs.mpc_catalogues[]
         @test allunique(NEOs.mpc_catalogues[])
@@ -34,12 +33,11 @@ using Test
         @test gaia != unkcat
 
         # Read/write catalogues file
-        source_cat = read_catalogues_mpc(CatalogueCodes_path)
-        check_file = joinpath(observations_path, "CatalogueCodes_.txt")
-        write_catalogues_mpc(source_cat, check_file)
+        check_file = joinpath(dirname(src_path), "test", "data", "CatalogueCodes.txt")
+        write_catalogues_mpc(NEOs.mpc_catalogues[], check_file)
         check_cat = read_catalogues_mpc(check_file)
         rm(check_file)
-        @test source_cat == check_cat
+        @test NEOs.mpc_catalogues[] == check_cat
 
         # Update catalogues file
         update_catalogues_mpc()
@@ -53,10 +51,7 @@ using Test
 
     @testset "ObservatoryMPC" begin
 
-        using NEOs: mpc_observatory_regex, ObservatoryMPC, ObsCodes_path
-
-        # Check that local observatories file exists
-        @test isfile(joinpath(observations_path, "ObsCodes.txt"))
+        using NEOs: mpc_observatory_regex, ObservatoryMPC
 
         # Check global variable NEOs.mpc_observatories[]
         @test allunique(NEOs.mpc_observatories[])
@@ -101,12 +96,11 @@ using Test
         @test arecibo != hubble
 
         # Read/write observatories file
-        source_obs = read_observatories_mpc(ObsCodes_path)
-        check_file = joinpath(observations_path, "ObsCodes_.txt")
-        write_observatories_mpc(source_obs, check_file)
+        check_file = joinpath(dirname(src_path), "test", "data", "ObsCodes.txt")
+        write_observatories_mpc(NEOs.mpc_observatories[], check_file)
         check_obs = read_observatories_mpc(check_file)
         rm(check_file)
-        @test source_obs == check_obs
+        @test NEOs.mpc_observatories[] == check_obs
 
         # Update observatories file
         update_observatories_mpc()
@@ -122,7 +116,7 @@ using Test
 
     @testset "RadecMPC" begin
 
-        using NEOs: mpc_radec_regex, RadecMPC, src_path
+        using NEOs: mpc_radec_regex, RadecMPC, mpc_radec_str
         using Dates
 
         # Parse RadecMPC
@@ -148,9 +142,15 @@ using Test
         @test apophis == apophis
 
         # Read/write radec file
-        source_file = joinpath(dirname(src_path), "data/99942.dat")
+        source_file = joinpath("data", "RADEC_2023_DW.dat")
         source_radec = read_radec_mpc(source_file)
-        check_file = joinpath(dirname(src_path), "data/99942_.dat")
+
+        @test isa(source_radec, Vector{RadecMPC{Float64}})
+        @test issorted(source_radec)
+        @test allunique(source_radec)
+        @test all( length.(mpc_radec_str.(source_radec)) .== 81)
+
+        check_file = joinpath("data", "RADEC_2023_DW_.dat")
         write_radec_mpc(source_radec, check_file)
         check_radec = read_radec_mpc(check_file)
         rm(check_file)
@@ -177,6 +177,27 @@ using Test
         @test issorted(obs)
         @test allunique(obs)
         @test all( (getfield.(obs, :num) .== "99942") .| (getfield.(obs, :tmpdesig) .== "N00hp15") )
+
+        # Get RadecMPC
+        source_file = joinpath("data", "99942.txt")
+        get_radec_mpc("99942", source_file)
+        
+        @test isfile(source_file)
+
+        source_radec = read_radec_mpc(source_file)
+        rm(source_file)
+
+        @test isa(source_radec, Vector{RadecMPC{Float64}})
+        @test issorted(source_radec)
+        @test allunique(source_radec)
+        @test all( length.(mpc_radec_str.(source_radec)) .== 81)
+
+        check_file = joinpath("data", "99942_.txt")
+        write_radec_mpc(source_radec, check_file)
+        check_radec = read_radec_mpc(check_file)
+        rm(check_file)
+
+        @test source_radec == check_radec
     end
 
     @testset "RadarJPL" begin

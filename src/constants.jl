@@ -2,12 +2,8 @@
 
 # Path to NEOs src directory 
 const src_path = dirname(pathof(NEOs))
-# Path to NEOs observations directory
-const observations_path = joinpath(src_path, "observations")
-# Path to MPC catalogues file 
-const CatalogueCodes_path = joinpath(observations_path, "CatalogueCodes.txt")
-# Path to mpc observatories file 
-const ObsCodes_path = joinpath(observations_path, "ObsCodes.txt")
+# Path to scratch space 
+const scratch_path = Ref{String}("")
 
 # URLs
 
@@ -15,6 +11,10 @@ const ObsCodes_path = joinpath(observations_path, "ObsCodes.txt")
 const mpc_catalogues_url = "https://minorplanetcenter.net/iau/info/CatalogueCodes.html"
 # MPC observatories file url 
 const mpc_observatories_url = "https://minorplanetcenter.net/iau/lists/ObsCodes.html"
+# MPC database search url 
+const search_mpc_url = "https://www.minorplanetcenter.net/db_search/show_object?utf8=%E2%9C%93&object_id="
+# MPC observations url 
+const obs_mpc_url = "https://www.minorplanetcenter.net/tmp/"
 
 # Abbreviations
 const cte = constant_term

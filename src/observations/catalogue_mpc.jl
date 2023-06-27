@@ -120,9 +120,6 @@ function parse_catalogues_mpc(text::String)
     return cats 
 end
 
-# List of MPC catalogues 
-const mpc_catalogues = Ref{Vector{CatalogueMPC}}(read_catalogues_mpc(CatalogueCodes_path))
-
 @doc raw"""
     mpc_catalogue_str(cat::CatalogueMPC)
 
@@ -159,27 +156,48 @@ function write_catalogues_mpc(cats::Vector{CatalogueMPC}, filename::String)
 end
 
 @doc raw"""
+    download_scratch(url::String, filename::String)
+
+Download `url` and save the output to NEOs scratch space as `filename`. Return the local path and the contents of the file as a `String`. 
+"""
+function download_scratch(url::String, filename::String)
+    # Local file 
+    path = joinpath(scratch_path[], filename)
+    # Download function
+    f = retry(delays = fill(0.1, 3)) do
+        try 
+            download(url, path)
+        catch
+            rethrow()
+        end 
+    end
+    # Download source_file
+    f()
+    # Read local file 
+    txt = read(path, String)
+
+    return path, txt 
+end 
+
+# List of MPC catalogues 
+const mpc_catalogues = Ref{Vector{CatalogueMPC}}([unknowncat()])
+
+@doc raw"""
     update_catalogues_mpc()
 
 Update the local catalogues file.
 """
 function update_catalogues_mpc()
-    # Download source file 
-    @info "Downloading file $mpc_catalogues_url"
-    txt = get_raw_html(mpc_catalogues_url)
+    # Download and read catalogues file 
+    CatalogueCodes_path, txt = download_scratch(mpc_catalogues_url, "CatalogueCodes.txt")
     # Parse catalogues  
     cats = parse_catalogues_mpc(txt)
-    m_before = length(mpc_catalogues[])
-    m_after = length(cats)
-    @info "Found $m_after catalogues ($m_before in the previous version of the file)"
     # Write catalogues to local file 
-    @info "Updating file $CatalogueCodes_path"
     write_catalogues_mpc(cats, CatalogueCodes_path)
     # Update global variable 
-    @info "Updating variable NEOs.mpc_catalogues[]"
     global mpc_catalogues[] = read_catalogues_mpc(CatalogueCodes_path)
 
-    return 
+    return nothing
 end
 
 @doc raw"""

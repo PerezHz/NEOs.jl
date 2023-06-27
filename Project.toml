@@ -1,7 +1,7 @@
 name = "NEOs"
 uuid = "b41c07a2-2abb-11e9-070a-c3c1b239e7df"
 authors = ["Jorge A. Pérez Hernández", "Luis Benet", "Luis Eduardo Ramírez Montoya"]
-version = "0.6.2"
+version = "0.6.3"
 
 [deps]
 Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -9,6 +9,7 @@ AutoHashEquals = "15f4f7f2-30c1-5605-9d31-71845cf9641f"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 EarthOrientation = "732a3c5d-d6c0-58bc-adb1-1b51709a25e2"
 HORIZONS = "5a3ac768-beb4-554a-9c98-3342fe3377f5"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
@@ -25,10 +26,18 @@ Quadmath = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 SPICE = "5bab7191-041a-5c2e-a744-024b9c3a5062"
 SatelliteToolbox = "6ac157d9-b43d-51bb-8fab-48bf53814f4a"
+Scratch = "6c6a2e73-6563-6170-7368-637461726353"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 TaylorIntegration = "92b13dbe-c966-51a2-8445-caca9f8a7d42"
 TaylorSeries = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[weakdeps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
+
+[extensions]
+DataFramesExt = ["DataFrames", "Tables"]
 
 [compat]
 AutoHashEquals = "0.2"
@@ -46,19 +55,13 @@ Quadmath = "0.5"
 Requires = "0.5.2, 1"
 SPICE = "0.2"
 SatelliteToolbox = "0.10"
+Scratch = "1.2"
 StatsBase = "0.33, 0.34"
 Tables = "1.10"
 TaylorIntegration = "0.13"
 TaylorSeries = "0.15"
 julia = "1.6"
 
-[extensions]
-DataFramesExt = ["DataFrames", "Tables"]
-
 [extras]
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
-
-[weakdeps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"

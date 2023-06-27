@@ -12,7 +12,7 @@ import JLD2: writeas
 
 using Distributed, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
       Dates, EarthOrientation, SPICE, Quadmath, LazyArtifacts, TaylorSeries,
-      InteractiveUtils, AutoHashEquals
+      InteractiveUtils, AutoHashEquals, Scratch 
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pole_rotation,
       au, c_au_per_day, R_sun, c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx,
       Ry, Rz, semimajoraxis, eccentricity, inclination, longascnode, argperi, timeperipass,
@@ -24,6 +24,7 @@ using SatelliteToolbox: get_iers_eop_iau_2000A, EOPData_IAU1980, EOPData_IAU2000
       we, OrbitStateVector, r_ecef_to_eci, DCM
 import SatelliteToolbox.sv_ecef_to_eci
 using Dates: format
+using Downloads: download
 using HTTP: get
 using IntervalRootFinding: roots, interval, Interval, mid
 
@@ -37,7 +38,7 @@ export unknownobs, hascoord, read_observatories_mpc, parse_observatories_mpc, wr
        update_observatories_mpc, search_obs_code
 # RadecMPC
 export num, tmpdesig, discovery, publishnote, obstech, ra, dec, info1, mag, band, catalogue, info2, observatory,
-       read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc
+       read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc, get_radec_mpc
 # RadarJPL
 export hasdelay, hasdoppler, ismonostatic, date, delay, delay_sigma, delay_units, doppler, doppler_sigma,
        doppler_units, freq, rcvr, xmit, bouncepoint, read_radar_jpl, write_radar_jpl
@@ -69,13 +70,6 @@ include("observations/process_radar.jl")
 include("orbit_determination/gauss_method.jl")
 include("propagation/propagation.jl")
 include("postprocessing/least_squares.jl")
-
-function __init__()
-    @static if !isdefined(Base, :get_extension)
-        @require Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c" begin
-            @require DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0" include("../ext/DataFramesExt.jl")
-        end
-    end
-end
+include("init.jl")
 
 end
