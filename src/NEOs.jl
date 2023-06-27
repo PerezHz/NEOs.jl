@@ -11,7 +11,7 @@ import PlanetaryEphemeris as PE
 import JLD2: writeas
 
 using Distributed, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
-      Dates, SPICE, Quadmath, Artifacts, TaylorSeries,
+      Dates, SPICE, Quadmath, LazyArtifacts, TaylorSeries,
       InteractiveUtils, AutoHashEquals, Scratch
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pole_rotation,
       au, c_au_per_day, R_sun, c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx,
