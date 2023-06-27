@@ -116,7 +116,7 @@ using NEOs: src_path
 
     @testset "RadecMPC" begin
 
-        using NEOs: mpc_radec_regex, RadecMPC
+        using NEOs: mpc_radec_regex, RadecMPC, mpc_radec_str
         using Dates
 
         # Parse RadecMPC
@@ -142,9 +142,15 @@ using NEOs: src_path
         @test apophis == apophis
 
         # Read/write radec file
-        source_file = joinpath(dirname(src_path), "data/99942.dat")
+        source_file = joinpath("data", "RADEC_2023_DW.dat")
         source_radec = read_radec_mpc(source_file)
-        check_file = joinpath(dirname(src_path), "data/99942_.dat")
+
+        @test isa(source_radec, Vector{RadecMPC{Float64}})
+        @test issorted(source_radec)
+        @test allunique(source_radec)
+        @test all( length.(mpc_radec_str.(source_radec)) .== 81)
+
+        check_file = joinpath("data", "RADEC_2023_DW_.dat")
         write_radec_mpc(source_radec, check_file)
         check_radec = read_radec_mpc(check_file)
         rm(check_file)
@@ -171,6 +177,27 @@ using NEOs: src_path
         @test issorted(obs)
         @test allunique(obs)
         @test all( (getfield.(obs, :num) .== "99942") .| (getfield.(obs, :tmpdesig) .== "N00hp15") )
+
+        # Get RadecMPC
+        source_file = joinpath("data", "99942.txt")
+        get_radec_mpc("99942", source_file)
+        
+        @test isfile(source_file)
+
+        source_radec = read_radec_mpc(source_file)
+        rm(source_file)
+
+        @test isa(source_radec, Vector{RadecMPC{Float64}})
+        @test issorted(source_radec)
+        @test allunique(source_radec)
+        @test all( length.(mpc_radec_str.(source_radec)) .== 81)
+
+        check_file = joinpath("data", "99942_.txt")
+        write_radec_mpc(source_radec, check_file)
+        check_radec = read_radec_mpc(check_file)
+        rm(check_file)
+
+        @test source_radec == check_radec
     end
 
     @testset "RadarJPL" begin

@@ -38,7 +38,7 @@ export unknownobs, hascoord, read_observatories_mpc, parse_observatories_mpc, wr
        update_observatories_mpc, search_obs_code
 # RadecMPC
 export num, tmpdesig, discovery, publishnote, obstech, ra, dec, info1, mag, band, catalogue, info2, observatory,
-       read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc
+       read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc, get_radec_mpc
 # RadarJPL
 export hasdelay, hasdoppler, ismonostatic, date, delay, delay_sigma, delay_units, doppler, doppler_sigma,
        doppler_units, freq, rcvr, xmit, bouncepoint, read_radar_jpl, write_radar_jpl

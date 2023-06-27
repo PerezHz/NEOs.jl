@@ -495,3 +495,20 @@ function write_radec_mpc(obs::Vector{RadecMPC{T}}, filename::String) where {T <:
         end
     end
 end
+
+@doc raw"""
+    get_radec_mpc(id::AbstractString, filename::AbstractString)
+
+Download MPC optical astrometry of NEO `id` and save the output to `filename`. 
+"""
+function get_radec_mpc(id::AbstractString, filename::AbstractString)
+    # MPC search url 
+    search_url = search_mpc_url *  replace(id, " " => "+")
+    # MPC observations file url 
+    obs_url = obs_mpc_url * replace(id, " " => "_") * ".txt"
+    # Download database search 
+    download(search_url, filename)
+    # Download observations file 
+    download(obs_url, filename)
+    return nothing
+end 
