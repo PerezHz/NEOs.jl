@@ -156,7 +156,7 @@ function write_catalogues_mpc(cats::Vector{CatalogueMPC}, filename::String)
 end
 
 const downloader = Downloads.Downloader()
-downloader.easy_hook = (easy, info) -> Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_LOW_SPEED_TIME, 0)
+downloader.easy_hook = (easy, info) -> Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_LOW_SPEED_TIME, 60)
 
 @doc raw"""
     download_scratch(url::String, filename::String)
