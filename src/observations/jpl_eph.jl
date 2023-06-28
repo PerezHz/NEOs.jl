@@ -122,24 +122,25 @@ const ttmtdb::TaylorInterpolant{Float64, Float64, 1} = TaylorInterpolant(sseph.t
 
 @doc raw"""
     loadpeeph()
-    loadpeeph(et::Real)
-    loadpeeph(et_0::Real, et_f::Real)
+    loadpeeph(t::Real)
+    loadpeeph(t_0::Real, t_f::Real)
 
-Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[0, et]` (`[et_0, et_f]`) where `et` must have units
-of ephemeris seconds since J2000. If no `et` is given, return the full (100 years) integration.
+Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[0, t]` (`[t_0, t_f]`) where `t` must have units
+of TDB days since J2000. If no `t` is given, return the full (100 years) integration.
 
-**Caution**: running this function for the first time will download the `sseph_p100` artifact (∼556 MB) which can take several minutes.
+!!! warning
+    Running this function for the first time will download the `sseph_p100` artifact (885 MB) which can take several minutes.
 """
 loadpeeph()::TaylorInterpolant{Float64, Float64, 2} = sseph
 
-function loadpeeph(et::Real)
-    i = searchsortedfirst(sseph.t, et)
+function loadpeeph(t::Real)
+    i = searchsortedfirst(sseph.t, t)
     return TaylorInterpolant(sseph.t0, sseph.t[1:i], sseph.x[1:i-1, :])
 end
 
-function loadpeeph(et_0::Real, et_f::Real)
-    i_0 = searchsortedlast(sseph.t, et_0)
-    i_f = searchsortedfirst(sseph.t, et_f)
+function loadpeeph(t_0::Real, t_f::Real)
+    i_0 = searchsortedlast(sseph.t, t_0)
+    i_f = searchsortedfirst(sseph.t, t_f)
     return TaylorInterpolant(sseph.t0, sseph.t[i_0:i_f], sseph.x[i_0:i_f-1, :])
 end
 
