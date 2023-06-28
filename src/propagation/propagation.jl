@@ -4,7 +4,7 @@ include("integration_methods.jl")
 include("serialization.jl")
 
 @doc raw"""
-    rvelea(dx, x, eph, params, t)
+    rvelea(dx, x, params, t)
 
 Return `true` and the asteroid's radial velocity with respect to the Earth.
 
@@ -12,76 +12,18 @@ Return `true` and the asteroid's radial velocity with respect to the Earth.
 
 - `dx`: asteroid's velocities.
 - `x`: asteroid's degrees of freedom.
-- `eph`: ephemeris.
 - `params`: parameters (ephemeris + accelerations + newtonian N body potential + julian date of start time + matrix of extended body interactions + number of bodies + mass parameters).
 - `t`: time.
 """
-function rvelea(dx, x, eph, params, t)
+function rvelea(dx, x, params, t)
 
-    N = params[6]                                  # Number of bodies in the ephemeris
-    xe = params[1][nbodyind(N-1,ea)]               # Earth's ephemeris
+    jd0 = params[4]                                 # Julian date of start time
+    dsj2k = t + (jd0 - JD_J2000)                    # Days since J2000
+    ss16asteph_t = evaleph(params[1], dsj2k, x[1])  # Evaluate ephemeris at dsj2k
+    N = params[6]                                   # Total number of bodies
+    xe = ss16asteph_t[nbodyind(N-1,ea)]             # Earth's ephemeris
 
     return true, (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
-end
-
-@doc raw"""
-    loadeph(ss16asteph_::TaylorInterpolant, μ::Vector{T}) where {T <: Real}
-
-Return the ephemeris in `ss16asteph_` with times converted from seconds to days,
-the point-mass newtonian accelerations and the newtonian N body potential.
-
-# Arguments
-
-- `ss16asteph_`: solar system ephemeris.
-- `μ::Vector{T}`: vector of mass parameters.
-"""
-function loadeph(ss16asteph_::TaylorInterpolant, μ::Vector{T}) where {T <: Real}
-
-    # Read Solar System ephemeris (Sun + 8 planets + Moon + Pluto + 16 main belt asteroids)
-    ss16asteph_t0 = T(ss16asteph_.t0 / daysec)    # Start time [days]
-    ss16asteph_t = T.(ss16asteph_.t ./ daysec)      # Vector of times [days]
-    ephord = ss16asteph_.x[1].order               # Order of the Taylor polynomials
-    ss16asteph_x = map(x -> x(Taylor1(T, ephord)*daysec), ss16asteph_.x)          # Vector of Taylor polynomials [au, au/day]
-    ss16asteph = TaylorInterpolant(ss16asteph_t0, ss16asteph_t, ss16asteph_x)  # TaylorInterpolant ephemeris  [au, au/day]
-
-    # Compute point-mass Newtonian accelerations from ephemeris: all bodies except asteroid
-    # accelerations of "everybody else" are needed when evaluating asteroid post-Newtonian acceleration
-    # Number of bodies that contibute to the asteroid's acceleration
-    Nm1 = numberofbodies(ss16asteph_x)
-    # Initialize a TaylorInterpolant for the point-mass Newtonian accelerations
-    acc_eph = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, 3Nm1))
-    # Initialize a TaylorInterpolant for the newtonian N body potential
-    newtonianNb_Potential = TaylorInterpolant(ss16asteph.t0, ss16asteph.t, Matrix{eltype(ss16asteph.x)}(undef, length(ss16asteph.t)-1, Nm1))
-    # Fill TaylorInterpolant.x with zero polynomials
-    fill!(acc_eph.x, zero(ss16asteph.x[1]))
-    fill!(newtonianNb_Potential.x, zero(ss16asteph.x[1]))
-
-    # Iterator over all bodies except asteroid
-    for j in 1:Nm1
-        for i in 1:Nm1
-            if i == j
-                #
-            else
-                # Difference between two positions (\mathbf{r}_i - \mathbf{r}_j)
-                X_ij = ss16asteph.x[:, 3i-2] .- ss16asteph.x[:, 3j-2]  # X-axis component
-                Y_ij = ss16asteph.x[:, 3i-1] .- ss16asteph.x[:, 3j-1]  # Y-axis component
-                Z_ij = ss16asteph.x[:, 3i  ] .- ss16asteph.x[:, 3j  ]  # Z-axis component
-                # Distance between two bodies squared ||\mathbf{r}_i - \mathbf{r}_j||^2
-                r_p2_ij = ( (X_ij.^2) .+ (Y_ij.^2) ) .+ (Z_ij.^2)
-                # Distance between two bodies ||\mathbf{r}_i - \mathbf{r}_j||
-                r_ij = sqrt.(r_p2_ij)
-                # Newtonian potential
-                newtonianNb_Potential.x[:, j] .+= (μ[i]./r_ij)
-            end
-        end
-
-        # Fill acelerations by differentiating velocities
-        acc_eph.x[:, 3j-2] .= ordpres_differentiate.(ss16asteph.x[:, 3(Nm1+j)-2])  # X-axis component
-        acc_eph.x[:, 3j-1] .= ordpres_differentiate.(ss16asteph.x[:, 3(Nm1+j)-1])  # Y-axis component
-        acc_eph.x[:, 3j  ] .= ordpres_differentiate.(ss16asteph.x[:, 3(Nm1+j)  ])  # Z-axis component
-    end
-
-    return ss16asteph, acc_eph, newtonianNb_Potential
 end
 
 @doc raw"""
@@ -192,25 +134,37 @@ function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6); o
 end
 
 @doc raw"""
-    propagate_params(jd0::T, ss16asteph_et::TaylorInterpolant, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end],
-                     order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number}
+    propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, 
+                     abstol::T = abstol) where {T <: Real, U <: Number}
 
-Return the parameters needed for `propagate`, `propagate_lyap` and `propagate_root`.
+Return the parameters needed for `propagate`, `propagate_root` and `propagate_lyap`.
 
 # Arguments
 
 - `jd0::T`: initial Julian date.
-- `ss16asteph_et::TaylorInterpolant`: solar system ephemeris.
+- `tspan::T`: time span of the integration [in years].
 - `q0::Vector{U}`: vector of initial conditions.
 - `μ_ast::Vector`: vector of gravitational parameters.
 - `order::Int`: order of the Taylor expansions to be used in the integration.
 - `abstol::T`: absolute tolerance.
 """
-function propagate_params(jd0::T, ss16asteph_et::TaylorInterpolant, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end],
-                          order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number}
+function propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, 
+                          abstol::T = abstol) where {T <: Real, U <: Number}
+
+    # Time limits [days since J2000]
+    days_0, days_f = minmax(jd0, jd0 + tspan*yr) .- JD_J2000
+
+    # Load Solar System ephemeris [au, au/day]
+    _sseph = convert(T, loadpeeph(sseph, days_0, days_f))
+
+    # Load accelerations
+    _acceph = convert(T, loadpeeph(acceph, days_0, days_f))
+
+    # Load Newtonian potentials
+    _poteph = convert(T, loadpeeph(poteph, days_0, days_f))
 
     # Number of massive bodies
-    Nm1 = numberofbodies(ss16asteph_et.x)
+    Nm1 = numberofbodies(_sseph)
 
     # Number of bodies, including NEA
     N = Nm1 + 1
@@ -221,10 +175,6 @@ function propagate_params(jd0::T, ss16asteph_et::TaylorInterpolant, q0::Vector{U
     # Check: number of SS bodies (N) in ephemeris must be equal to length of GM vector (μ)
     @assert N == length(μ) "Total number of bodies in ephemeris must be equal to length of GM vector μ"
 
-    # Process ephemeris (convert from seconds to days)
-    # Compute Newtonian accelerations and potentials (used in post-Newtonian accelerations)
-    ss16asteph_auday, acc_eph, newtonianNb_Potential = loadeph(ss16asteph_et, μ)
-
     # Interaction matrix with flattened bodies
     UJ_interaction = fill(false, N)
 
@@ -234,39 +184,21 @@ function propagate_params(jd0::T, ss16asteph_et::TaylorInterpolant, q0::Vector{U
     # Initial time
     _t0 = zero(T)
 
-    # Time as Taylor variable
-    t = _t0 + Taylor1( T, order )
-
-    # Days since J2000
-    dsj2k = t + (jd0 - JD_J2000)
+    # Final time
+    _tmax = _t0 + tspan*yr
 
     # Initial conditions
     _q0 = one(T) * q0
 
-    # Auxiliary variable (to know the type of evaleph)
-    aux_q0 = Taylor1(eltype(_q0), order)
-
-    # Ephemeris at dsj2k
-    ss16asteph_t = evaleph(ss16asteph_auday, dsj2k, aux_q0)
-
-    # Accelerations at dsj2k
-    acceph_t = evaleph(acc_eph, dsj2k, aux_q0)
-
-    # Newtonian potentials at dsj2k
-    newtonianNb_Potential_t = evaleph(newtonianNb_Potential, dsj2k, aux_q0)
-
-    # Ephemeris vector
-    _eph = (ss16asteph_auday, acc_eph, newtonianNb_Potential)
-
     # Vector of parameters for neosinteg
-    _params = (ss16asteph_t, acceph_t, newtonianNb_Potential_t, jd0, UJ_interaction, N, μ)
+    _params = (_sseph, _acceph, _poteph, jd0, UJ_interaction, N, μ)
 
-    return _q0, _t0, _eph, _params
+    return _q0, _t0, _tmax, _params
 
 end
 
 @doc raw"""
-    propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense; 
+    propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, Val(true/false); 
               μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol, 
               parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
@@ -287,7 +219,7 @@ Integrate the orbit of a NEO via the Taylor method.
 """ propagate
 
 @doc raw"""
-    propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true, 
+    propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, Val(true/false); parse_eqs::Bool = true, 
                    eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end],
                    order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
 
@@ -318,22 +250,22 @@ for V_dense in V_true_false
                            μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
                            parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
-            # Load Solar System ephemeris 
-            _sseph = loadpeeph(julian2etsecs.(minmax(jd0, jd0+tspan*yr))...)
-
-            # Parameters for neosinteg
-            _q0, _t0, _eph, _params = propagate_params(jd0, _sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
-
-            # Final time of integration (days)
-            _tmax = _t0 + tspan*yr
+            # Parameters for taylorinteg
+            _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
 
             # Propagate orbit
-
+            
+            @time sol = taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, $V_dense(), _params;
+                                    maxsteps = maxsteps, parse_eqs = parse_eqs)
+            
             # Dense output (save Taylor polynomials in each step)
-            @time sol = neosinteg(dynamics, _q0, _t0, _tmax, order, abstol, $V_dense(), _eph, _params;
-                                  maxsteps = maxsteps, parse_eqs = parse_eqs)
-
-            return sol
+            if $V_dense == Val{true}
+                tv, xv, polynV = sol 
+                return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], polynV[2:end, :])
+            # Point output
+            elseif $V_dense == Val{false}
+                return sol 
+            end
 
         end
 
@@ -366,21 +298,15 @@ for V_dense in V_true_false
                                 eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end],
                                 order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
 
-            # Load Solar System ephemeris 
-            _sseph = loadpeeph(julian2etsecs.(minmax(jd0, jd0+tspan*yr))...)
-
             # Parameters for neosinteg
-            _q0, _t0, _eph, _params = propagate_params(jd0, _sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
-
-            # Final time of integration (days)
-            _tmax = _t0 + tspan*yr
+            _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
 
             # Propagate orbit
-            @time sol = neosinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, $V_dense(), _eph, _params;
+            @time sol = neosinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, $V_dense(), _params;
                                   maxsteps = maxsteps, parse_eqs = parse_eqs,  eventorder = eventorder, newtoniter = newtoniter,
                                   nrabstol = nrabstol)
 
-            return sol
+            return sol 
 
         end
 
@@ -436,18 +362,12 @@ Compute the Lyapunov spectrum of a NEO.
 function propagate_lyap(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], 
                         order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
-    # Load Solar System ephemeris 
-    _sseph = loadpeeph(julian2etsecs.(minmax(jd0, jd0+tspan*yr))...)
-
-    # Parameters for apophisinteg
-    _q0, _t0, _eph, _params = propagate_params(jd0, _sseph, q0; μ_ast = μ_ast, order = order, abstol = abstol)
-
-    # Final time of integration (days)
-    _tmax = _t0 + tspan*yr
+    # Parameters for taylorinteg
+    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
 
     # Propagate orbit
-    @time sol = lyap_neosinteg(dynamics, _q0, _t0, _tmax, order, abstol, _eph, _params;
-                               maxsteps = maxsteps, parse_eqs = parse_eqs)
+    @time sol = lyap_taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, _params;
+                                 maxsteps = maxsteps, parse_eqs = parse_eqs)
 
     return sol
 

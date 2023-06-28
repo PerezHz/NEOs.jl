@@ -33,11 +33,14 @@ using InteractiveUtils: methodswith
         maxsteps = 1000
         nyears = 0.2
         dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
-        jd0 = datetime2julian(DateTime(2023,2,25,0,0,0)) #Julian date of integration initial time
+        # Initial time [Julian date]
+        jd0 = datetime2julian(DateTime(2023,2,25,0,0,0))
+        # Initial time [days since J2000]
+        t0 = jd0 - PE.J2000
         # unperturbed initial condition
         q0 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01, -9.071450085084557E-03, -9.353197026254517E-03, -5.610023032269034E-03]
         # Solar System ephemeris
-        sseph = loadpeeph()
+        sseph = loadpeeph(NEOs.sseph, t0 - nyears*yr, t0 + nyears*yr)
         # Sun's ephemeris
         eph_su = selecteph(sseph, su)
         # Earth's ephemeris
@@ -96,8 +99,8 @@ using InteractiveUtils: methodswith
         # Compute residuals
         res, _ = NEOs.residuals(
             obs_radec_mpc_2023DW,
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec))
         )
 
@@ -131,8 +134,8 @@ using InteractiveUtils: methodswith
         # compute residuals for orbit with perturbed initial conditions
         res1, _ = NEOs.residuals(
             obs_radec_mpc_2023DW,
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol1(t/daysec))
         )
         mean_radec1 = mean(res1)
@@ -151,11 +154,14 @@ using InteractiveUtils: methodswith
         maxsteps = 5000
         nyears = 9.0
         dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
-        jd0 = datetime2julian(DateTime(2004,6,1)) #Julian date of integration initial time
+        # Initial time [Julian date]
+        jd0 = datetime2julian(DateTime(2004,6,1)) 
+        # Initial time [days since J2000]
+        t0 = jd0 - PE.J2000
         # JPL #199 solution for Apophis at June 1st, 2004
         q0 = [-1.0506628055913627, -0.06064314196134998, -0.04997102228887035, 0.0029591421121582077, -0.01423233538611057, -0.005218412537773594, -5.592839897872e-14, 0.0]
         # Solar System ephemeris
-        sseph = loadpeeph()
+        sseph = loadpeeph(NEOs.sseph, t0, t0 + nyears*yr)
         # Sun's ephemeris
         eph_su = selecteph(sseph, su)
         # Earth's ephemeris
@@ -199,8 +205,8 @@ using InteractiveUtils: methodswith
         # Compute optical astrometry residuals
         res_radec, w_radec = NEOs.residuals(
             obs_radec_mpc_apophis,
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec))
         )
         nobsopt = round(Int, length(res_radec))
@@ -227,8 +233,8 @@ using InteractiveUtils: methodswith
         # Compute mean radar (time-delay and Doppler-shift) residuals
         @time res_del, w_del, res_dop, w_dop = residuals(
             deldop_2005_2013,
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec)),
             niter=4,
             tord=5
@@ -263,8 +269,6 @@ using InteractiveUtils: methodswith
         local abstol = 1e-20
         # Whether to use @taylorize
         local parse_eqs = true
-        # Solar System ephemeris
-        local sseph = loadpeeph()
         # Perturbation to nominal initial condition (Taylor1 jet transport)
         local dq = NEOs.scaled_variables()
         # Initial date of integration (julian days)
@@ -315,7 +319,6 @@ using InteractiveUtils: methodswith
         q00::Vector{Float64} = [-1.0506628055913627, -0.06064314196134998, -0.04997102228887035, 0.0029591421121582077, -0.01423233538611057, -0.005218412537773594, -5.592839897872e-14, 0.0]
         dq::Vector{TaylorN{Float64}} = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14), order = varorder)
         q0::Vector{TaylorN{Float64}} = q00 .+ vcat(dq, 0dq[1])
-        sseph::TaylorInterpolant{Float64,Float64,2} = loadpeeph()
 
         # propagate orbit
         sol = NEOs.propagate(
@@ -330,7 +333,7 @@ using InteractiveUtils: methodswith
             parse_eqs = true
         )
 
-        sseph_obs::TaylorInterpolant{Float64,Float64,2} = loadpeeph(ceil((sol.t0+sol.t[end])*daysec))
+        sseph_obs::TaylorInterpolant{Float64,Float64,2} = loadpeeph(NEOs.sseph, sol.t0, sol.t0 + sol.t[end])
         # Sun's ephemeris
         eph_su::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph_obs, su)
         # Earth's ephemeris
@@ -342,8 +345,8 @@ using InteractiveUtils: methodswith
         # Compute optical astrometry residuals
         res_radec, w_radec = NEOs.residuals(
             obs_radec_mpc_apophis,
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec))
         )
         nobsopt = round(Int, length(res_radec))
@@ -370,8 +373,8 @@ using InteractiveUtils: methodswith
         # Compute mean radar (time-delay and Doppler-shift) residuals
         @time res_del, w_del, res_dop, w_dop = residuals(
             deldop_2005_2013[1:4],
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec)),
             niter=4,
             tord=10

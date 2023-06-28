@@ -221,7 +221,7 @@ function t2c_rotation_iau_76_80(et::T; eo::Bool = true) where {T <: Number}
     t_utc = JD_J2000 + utc_secs/daysec                 # days
     t_utc_00 = constant_term(constant_term(t_utc))     # days
     # TT
-    t0_tt = et + ttmtdb(et)                            # seconds
+    t0_tt = et + ttmtdb(et/daysec)                            # seconds
     tt = t0_tt/daysec                                  # days
 
     # Nutation corrections wrt IAU 1976/1980
