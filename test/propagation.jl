@@ -94,7 +94,6 @@ using InteractiveUtils: methodswith
         obs_radec_mpc_2023DW = NEOs.read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
 
         # Compute residuals
-        loadjpleph() # load JPL ephemeris
         res, _ = NEOs.residuals(
             obs_radec_mpc_2023DW,
             xve=t->auday2kmsec(eph_ea(t)),
@@ -370,7 +369,7 @@ using InteractiveUtils: methodswith
 
         # Compute mean radar (time-delay and Doppler-shift) residuals
         @time res_del, w_del, res_dop, w_dop = residuals(
-            deldop_2005_2013[1:2],
+            deldop_2005_2013[1:4],
             xve=t->auday2kmsec(eph_ea(t)),
             xvs=t->auday2kmsec(eph_su(t)),
             xva=t->auday2kmsec(sol(t/daysec)),
@@ -381,11 +380,17 @@ using InteractiveUtils: methodswith
         @test abs(res_dop[1]()) ≤ deldop_2005_2013[1].Δν_σ
         @test abs(res_del[1]()) ≤ deldop_2005_2013[2].Δτ_σ
         @test abs(res_dop[2]()) ≤ deldop_2005_2013[2].Δν_σ
+        @test abs(res_del[2]()) ≤ deldop_2005_2013[2].Δτ_σ
+        @test abs(res_dop[3]()) ≤ deldop_2005_2013[3].Δν_σ
+        @test abs(res_dop[4]()) ≤ 1.1deldop_2005_2013[4].Δν_σ # TODO: fix this residual ("high" residual artifact due to non-optimal initial condition)
 
-        dq_sample = vcat(1e-8ones(6), 1e-14)
-        @test abs(res_dop[1](dq_sample)) ≥ abs(res_dop[1]())
-        @test abs(res_del[1](dq_sample)) ≥ abs(res_del[1]())
-        @test abs(res_dop[2](dq_sample)) ≥ abs(res_dop[2]())
+        dq_sample = vcat(1e-10randn(6), 1e-16randn())
+        @test abs(res_dop[1](dq_sample)) ≤ 2deldop_2005_2013[1].Δν_σ
+        @test abs(res_del[1](dq_sample)) ≤ 2deldop_2005_2013[2].Δτ_σ
+        @test abs(res_dop[2](dq_sample)) ≤ 2deldop_2005_2013[2].Δν_σ
+        @test abs(res_del[2](dq_sample)) ≤ 2deldop_2005_2013[2].Δτ_σ
+        @test abs(res_dop[3](dq_sample)) ≤ 2deldop_2005_2013[3].Δν_σ
+        @test abs(res_dop[4](dq_sample)) ≤ 2deldop_2005_2013[4].Δν_σ
     end
 
 end

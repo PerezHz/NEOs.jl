@@ -3,9 +3,9 @@
 
 An astrometric reference catalogue in MPC format. The format is described in https://minorplanetcenter.net/iau/info/CatalogueCodes.html.
 
-# Fields 
+# Fields
 
-- `code::String`: catalogue's identifier. 
+- `code::String`: catalogue's identifier.
 - `name::String`: catalogue's name.
 """
 @auto_hash_equals struct CatalogueMPC
@@ -20,7 +20,7 @@ end
 @doc raw"""
     unknowncat()
 
-Return a `CatalogueMPC` with no code or name. 
+Return a `CatalogueMPC` with no code or name.
 """
 function unknowncat()
     return CatalogueMPC("", "")
@@ -33,10 +33,10 @@ Check whether `m` equals `unknowncat()`.
 """
 function isunknown(m::CatalogueMPC)
     return m == unknowncat()
-end 
+end
 
-# Print method for CatalogueMPC 
-# Examples: 
+# Print method for CatalogueMPC
+# Examples:
 # Unknown catalogue
 # USNO-A1.0 [a]
 function show(io::IO, m::CatalogueMPC)
@@ -55,10 +55,10 @@ const mpc_catalogue_regex = r"\s{2}(?P<code>\w{1})\s{4}(?P<name>.*)"
 
 Convert a match of `NEOs.mpc_catalogue_regex` to `CatalogueMPC`.
 """
-function CatalogueMPC(m::RegexMatch) 
+function CatalogueMPC(m::RegexMatch)
     @assert m.regex == mpc_catalogue_regex "Only matches of `NEOs.mpc_catalogue_regex` can be converted to `CatalogueMPC`."
     return CatalogueMPC(string(m["code"]), string(m["name"]))
-end 
+end
 
 @doc raw"""
     read_catalogues_mpc(filename::String)
@@ -66,7 +66,7 @@ end
 Return the matches of `NEOs.mpc_catalogue_regex` in `filename` as `CatalogueMPC`.
 """
 function read_catalogues_mpc(filename::String)
-    # Check that file exists 
+    # Check that file exists
     @assert isfile(filename) "Invalid filename"
     # Read lines of mpc formatted file (except header)
     lines = readlines(filename)[2:end]
@@ -76,9 +76,9 @@ function read_catalogues_mpc(filename::String)
     filter!(!isnothing, matches)
     # Convert matches to CatalogueMPC
     cats = CatalogueMPC.(matches)
-    # Eliminate repeated entries 
+    # Eliminate repeated entries
     unique!(cats)
-    
+
     return cats
 end
 
@@ -88,15 +88,15 @@ end
 Return the raw html text of webpage `url`.
 """
 function get_raw_html(url::String)
-    # Get raw html 
+    # Get raw html
     resp = get(url)
-    # Convert to string 
+    # Convert to string
     text = String(resp.body)
-    
+
     return text
 end
 
-# Header of MPC catalogues file 
+# Header of MPC catalogues file
 const mpc_catalogues_header = "Char   Catalogue"
 
 @doc raw"""
@@ -105,19 +105,19 @@ const mpc_catalogues_header = "Char   Catalogue"
 Return de matches of `NEOs.mpc_catalogue_regex` in `text` as `CatalogueMPC`.
 """
 function parse_catalogues_mpc(text::String)
-    # Eliminate catalogues file header 
+    # Eliminate catalogues file header
     text = replace(text, mpc_catalogues_header => "")
-    # Vector of MPC catalogues  
+    # Vector of MPC catalogues
     cats = Vector{CatalogueMPC}(undef, 0)
-    # Iterate over the matches 
+    # Iterate over the matches
     for m in eachmatch(mpc_catalogue_regex, text)
         push!(cats, CatalogueMPC(m))
     end
 
-    # Eliminate repeated entries 
+    # Eliminate repeated entries
     unique!(cats)
-    
-    return cats 
+
+    return cats
 end
 
 @doc raw"""
@@ -128,8 +128,8 @@ Convert `cat` to a string according to MPC format.
 function mpc_catalogue_str(cat::CatalogueMPC)
     if isunknown(cat)
         return ""
-    else 
-        # Code string 
+    else
+        # Code string
         code_s = join(["  ", cat.code, "    "])
         # Join everything
         cat_s = join([code_s, cat.name])
@@ -141,45 +141,48 @@ end
 @doc raw"""
     write_catalogues_mpc(cats::Vector{CatalogueMPC}, filename::String)
 
-Write `cats` to `filename` in MPC format. 
+Write `cats` to `filename` in MPC format.
 """
 function write_catalogues_mpc(cats::Vector{CatalogueMPC}, filename::String)
     open(filename, "w") do file
-        # Header 
+        # Header
         write(file, mpc_catalogues_header, "\n")
-        # Write observatories 
+        # Write observatories
         for i in eachindex(cats)
             line = mpc_catalogue_str(cats[i])
             write(file, line, "\n")
-        end 
+        end
     end
 end
+
+const downloader = Downloads.Downloader()
+downloader.easy_hook = (easy, info) -> Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_LOW_SPEED_TIME, 60)
 
 @doc raw"""
     download_scratch(url::String, filename::String)
 
-Download `url` and save the output to NEOs scratch space as `filename`. Return the local path and the contents of the file as a `String`. 
+Download `url` and save the output to NEOs scratch space as `filename`. Return the local path and the contents of the file as a `String`.
 """
 function download_scratch(url::String, filename::String)
-    # Local file 
+    # Local file
     path = joinpath(scratch_path[], filename)
     # Download function
     f = retry(delays = fill(0.1, 3)) do
-        try 
-            download(url, path)
+        try
+            download(url, path; downloader)
         catch
             rethrow()
-        end 
+        end
     end
     # Download source_file
     f()
-    # Read local file 
+    # Read local file
     txt = read(path, String)
 
-    return path, txt 
-end 
+    return path, txt
+end
 
-# List of MPC catalogues 
+# List of MPC catalogues
 const mpc_catalogues = Ref{Vector{CatalogueMPC}}([unknowncat()])
 
 @doc raw"""
@@ -188,13 +191,13 @@ const mpc_catalogues = Ref{Vector{CatalogueMPC}}([unknowncat()])
 Update the local catalogues file.
 """
 function update_catalogues_mpc()
-    # Download and read catalogues file 
+    # Download and read catalogues file
     CatalogueCodes_path, txt = download_scratch(mpc_catalogues_url, "CatalogueCodes.txt")
-    # Parse catalogues  
+    # Parse catalogues
     cats = parse_catalogues_mpc(txt)
-    # Write catalogues to local file 
+    # Write catalogues to local file
     write_catalogues_mpc(cats, CatalogueCodes_path)
-    # Update global variable 
+    # Update global variable
     global mpc_catalogues[] = read_catalogues_mpc(CatalogueCodes_path)
 
     return nothing
@@ -206,7 +209,7 @@ end
 Return the catalogue in `NEOs.mpc_catalogues` that matches `catcode`.
 """
 function search_cat_code(catcode::String)
-    
+
     # Find indexes in mpc_catalogues that match catcode
     idxs = findall(x -> x.code == catcode, mpc_catalogues[])
     L_i = length(idxs)
@@ -219,11 +222,11 @@ function search_cat_code(catcode::String)
         catalogue = mpc_catalogues[][idxs[1]]
         # More than one catalogue matches catcode
         if L_i > 1
-            @warn("""More than one catalogue $(mpc_catalogues[][idxs]) has code $catcode, 
+            @warn("""More than one catalogue $(mpc_catalogues[][idxs]) has code $catcode,
             selecting first: $(catalogue.name)""")
         end
     end
-    
-    return catalogue 
-    
+
+    return catalogue
+
 end

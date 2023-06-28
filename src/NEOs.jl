@@ -11,8 +11,8 @@ import PlanetaryEphemeris as PE
 import JLD2: writeas
 
 using Distributed, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
-      Dates, EarthOrientation, SPICE, Quadmath, LazyArtifacts, TaylorSeries,
-      InteractiveUtils, AutoHashEquals, Scratch 
+      Dates, SPICE, Quadmath, LazyArtifacts, TaylorSeries,
+      InteractiveUtils, AutoHashEquals, Scratch
 using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pole_rotation,
       au, c_au_per_day, R_sun, c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx,
       Ry, Rz, semimajoraxis, eccentricity, inclination, longascnode, argperi, timeperipass,
@@ -25,6 +25,7 @@ using SatelliteToolbox: get_iers_eop_iau_2000A, EOPData_IAU1980, EOPData_IAU2000
 import SatelliteToolbox.sv_ecef_to_eci
 using Dates: format
 using Downloads: download
+import Downloads
 using HTTP: get
 using IntervalRootFinding: roots, interval, Interval, mid
 

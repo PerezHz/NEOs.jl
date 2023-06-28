@@ -1,7 +1,7 @@
 name = "NEOs"
 uuid = "b41c07a2-2abb-11e9-070a-c3c1b239e7df"
 authors = ["Jorge A. Pérez Hernández", "Luis Benet", "Luis Eduardo Ramírez Montoya"]
-version = "0.6.3"
+version = "0.6.4"
 
 [deps]
 Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -10,7 +10,6 @@ Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
-EarthOrientation = "732a3c5d-d6c0-58bc-adb1-1b51709a25e2"
 HORIZONS = "5a3ac768-beb4-554a-9c98-3342fe3377f5"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 Healpix = "9f4e344d-96bc-545a-84a3-ae6b9e1b672b"
@@ -43,7 +42,6 @@ DataFramesExt = ["DataFrames", "Tables"]
 AutoHashEquals = "0.2"
 DataFrames = "1.5"
 DelimitedFiles = "1"
-EarthOrientation = "0.7"
 HORIZONS = "0.3"
 HTTP = "1.9.5"
 Healpix = "4"

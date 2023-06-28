@@ -541,7 +541,7 @@ function radar_astrometry(astradardata::Vector{RadarJPL{T}}; xva::AstEph, kwargs
     vdoppler = Array{S}(undef, length(astradardata))
 
     # Iterate over the measurements
-    for i in eachindex(astradardata)
+    Threads.@threads for i in eachindex(astradardata)
         # Compute time delay and doppler shift
         vdelay[i], vdoppler[i] = radar_astrometry(astradardata[i]; xva, kwargs...)
     end
