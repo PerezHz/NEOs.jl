@@ -1,5 +1,4 @@
 using ArgParse, NEOs, PlanetaryEphemeris, Dates, TaylorIntegration, JLD2
-# using Revise, NEOs, PlanetaryEphemeris, Dates, TaylorIntegration, JLD2
 
 # Load JPL ephemeris
 loadjpleph()
@@ -45,10 +44,6 @@ function parse_commandline()
             help = "Whether to use the taylorized method of jetcoeffs or not"
             arg_type = Bool
             default = true
-        "--ss_eph_file"
-            help = "Path to local Solar System ephemeris file (loaded via artifact by default)"
-            arg_type = Union{String,Nothing}
-            default = nothing
     end
 
     s.epilog = """
@@ -65,15 +60,20 @@ function parse_commandline()
     return parse_args(s)
 end
 
-function print_header(header::String)
+function print_header(header::String, level::Int = 1)
     L = length(header)
-    println(repeat("-", L))
+    if level == 1
+        c = "="
+    else 
+        c = "-"
+    end 
+    println(repeat(c, L))
     println(header)
-    println(repeat("-", L))
-end
+    println(repeat(c, L))
+end 
 
-function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T, nyears_fwd::T,
-              ss16asteph_et::TaylorInterpolant, order::Int, varorder::Int, abstol::T, parse_eqs::Bool) where {T <: Real, D}
+function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T, nyears_fwd::T, order::Int, varorder::Int, 
+              abstol::T, parse_eqs::Bool) where {T <: Real, D}
 
     # Initial conditions from Apophis JPL solution #197
     q00 = kmsec2auday(apophisposvel197(datetime2et(jd0_datetime)))
@@ -94,27 +94,30 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     # Initial date (in julian days)
     jd0 = datetime2julian(jd0_datetime)
 
-    print_header("Integrator warmup")
-    # sol_bwd = NEOs.propagate(dynamics, 1, jd0, nyears_fwd, ss16asteph_et, q0, Val(true);
-    #                      order = order, abstol = abstol, parse_eqs = parse_eqs)
+    print_header("Integrator warmup", 2)
+    _ = NEOs.propagate(dynamics, 1, jd0, nyears_fwd, q0, Val(true);
+                       order = order, abstol = abstol, parse_eqs = parse_eqs)
+    println()
 
-    print_header("Main integration")
+    print_header("Main integration", 2)
     tmax = nyears_bwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
     println("• Final time of integration: ", julian2datetime(jd0 + tmax))
 
-    sol_bwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_bwd, ss16asteph_et, q0, Val(true);
-                         order = order, abstol = abstol, parse_eqs = parse_eqs)
-    PlanetaryEphemeris.save2jld2andcheck("Apophis_bwd.jld2", (asteph = sol_bwd,))
+    sol_bwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_bwd, q0, Val(true);
+                             order = order, abstol = abstol, parse_eqs = parse_eqs)
+    PE.save2jld2andcheck("Apophis_bwd.jld2", (asteph = sol_bwd,))
 
     tmax = nyears_fwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
     println("• Final time of integration: ", julian2datetime(jd0 + tmax))
 
-    sol_fwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_fwd, ss16asteph_et, q0, Val(true),
-                         order = order, abstol = abstol, parse_eqs = parse_eqs)
-    PlanetaryEphemeris.save2jld2andcheck("Apophis_fwd.jld2", (asteph = sol_fwd,))
-
+    sol_fwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_fwd, q0, Val(true);
+                             order = order, abstol = abstol, parse_eqs = parse_eqs)
+    PE.save2jld2andcheck("Apophis_fwd.jld2", (asteph = sol_fwd,))
+    
+    println()
+    
     # NEO
     # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
     xva_bwd(et) = auday2kmsec(sol_bwd(et/daysec)[1:6])
@@ -122,12 +125,12 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     xva(et) = bwdfwdeph(et, sol_bwd, sol_fwd)
     # Earth
     # Change x, v units, resp., from au, au/day to km, km/sec
-    eph_ea = selecteph(ss16asteph_et, ea)
-    xve(et) = auday2kmsec(eph_ea(et))
+    eph_ea = selecteph(NEOs.sseph, ea)
+    xve(et) = auday2kmsec(eph_ea(et/daysec))
     # Sun
     # Change x, v units, resp., from au, au/day to km, km/sec
-    eph_su = selecteph(ss16asteph_et, su)
-    xvs(et) = auday2kmsec(eph_su(et))
+    eph_su = selecteph(NEOs.sseph, su)
+    xvs(et) = auday2kmsec(eph_su(et/daysec))
 
 
     radec_2004_2020 = read_radec_mpc("/Users/Jorge/projects/NEOs/data/99942_2004_2020.dat")
@@ -140,7 +143,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     # deldop = vcat(deldop_2005_2013,deldop_2021)
 
     # Compute optical residuals
-    print_header("Compute residuals")
+    print_header("Compute residuals", 2)
     res_radec, w_radec = residuals(radec, xvs = xvs, xve = xve, xva = xva)
 
     # Compute radar residuals
@@ -149,12 +152,12 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     res_del_bwd, w_del_bwd, res_dop_bwd, w_dop_bwd = residuals(deldop_2005_2013, xvs = xvs, xve = xve, xva = xva_bwd, niter=5)
     res_del_fwd, w_del_fwd, res_dop_fwd, w_dop_fwd = residuals(deldop_2021, xvs = xvs, xve = xve, xva = xva_fwd, niter=5)
 
-    PlanetaryEphemeris.save2jld2andcheck("resw_radec.jld2", (;res_radec,w_radec,res_del_bwd,w_del_bwd,res_dop_bwd,w_dop_bwd,res_del_fwd,w_del_fwd,res_dop_fwd,w_dop_fwd))
+    PE.save2jld2andcheck("resw_radec.jld2", (;res_radec,w_radec,res_del_bwd,w_del_bwd,res_dop_bwd,w_dop_bwd,res_del_fwd,w_del_fwd,res_dop_fwd,w_dop_fwd))
 
     @show NEOs.cte(res) NEOs.cte(w)
 
     nothing
-
+    
 end
 
 function main()
@@ -163,7 +166,8 @@ function main()
     parsed_args = parse_commandline()
 
     print_header("Asteroid Apophis")
-    print_header("General parameters")
+    println()
+    print_header("General parameters", 2)
 
     # Number of threads
     N_threads = Threads.nthreads()
@@ -190,12 +194,6 @@ function main()
     # Number of years in forward integration
     nyears_fwd = parsed_args["nyears_fwd"]
 
-    # Solar system ephemeris
-    print("• Loading Solar System ephemeris... ")
-    ss_eph_file = parsed_args["ss_eph_file"]
-    ss16asteph_et = ss_eph_file === nothing ? NEOs.sseph : JLD2.load(ss_eph_file, "ss16asteph_et")
-    println("Done")
-
     # Order of Taylor polynomials
     order = parsed_args["order"]
     println("• Order of Taylor polynomials: ", order)
@@ -210,10 +208,9 @@ function main()
 
     # Whether to use @taylorize or not
     parse_eqs = parsed_args["parse_eqs"]
-    println("• Use @taylorize: ", parse_eqs)
+    println("• Use @taylorize: ", parse_eqs, "\n")
 
-    main(dynamics, maxsteps, jd0_datetime,  nyears_bwd, nyears_fwd, ss16asteph_et,
-         order, varorder, abstol, parse_eqs)
+    main(dynamics, maxsteps, jd0_datetime,  nyears_bwd, nyears_fwd, order, varorder, abstol, parse_eqs)
 end
 
 main()
