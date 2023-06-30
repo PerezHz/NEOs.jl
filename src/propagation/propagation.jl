@@ -261,7 +261,7 @@ for V_dense in V_true_false
             # Dense output (save Taylor polynomials in each step)
             if $V_dense == Val{true}
                 tv, xv, polynV = sol 
-                return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], polynV[2:end, :])
+                return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], polynV)
             # Point output
             elseif $V_dense == Val{false}
                 return sol 
