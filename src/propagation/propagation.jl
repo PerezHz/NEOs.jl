@@ -263,8 +263,8 @@ for V_dense in V_true_false
 
             # Dense output (save Taylor polynomials in each step)
             if $V_dense == Val{true}
-                tv, xv, polynV = sol
-                return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], polynV)
+                tv, xv, psol = sol
+                return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], psol)
             # Point output
             elseif $V_dense == Val{false}
                 return sol
@@ -305,9 +305,8 @@ for V_dense in V_true_false
             _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
 
             # Propagate orbit
-            @time sol = neosinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, $V_dense(), _params;
-                                  maxsteps = maxsteps, parse_eqs = parse_eqs,  eventorder = eventorder, newtoniter = newtoniter,
-                                  nrabstol = nrabstol)
+            @time sol = taylorinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, $V_dense(), _params;
+                                  maxsteps, parse_eqs, eventorder, newtoniter, nrabstol)
 
             return sol
 
