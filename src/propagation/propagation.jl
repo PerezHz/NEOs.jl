@@ -1,7 +1,10 @@
 include("asteroid_dynamical_models.jl")
 include("jetcoeffs.jl")
-include("integration_methods.jl")
 include("serialization.jl")
+
+const V_true = :(Val{true})
+const V_false = :(Val{false})
+const V_true_false = (V_true, V_false)
 
 @doc raw"""
     rvelea(dx, x, params, t)
@@ -134,7 +137,7 @@ function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6); o
 end
 
 @doc raw"""
-    propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, 
+    propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order,
                      abstol::T = abstol) where {T <: Real, U <: Number}
 
 Return the parameters needed for `propagate`, `propagate_root` and `propagate_lyap`.
@@ -148,7 +151,7 @@ Return the parameters needed for `propagate`, `propagate_root` and `propagate_ly
 - `order::Int`: order of the Taylor expansions to be used in the integration.
 - `abstol::T`: absolute tolerance.
 """
-function propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, 
+function propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order,
                           abstol::T = abstol) where {T <: Real, U <: Number}
 
     # Time limits [days since J2000]
@@ -198,8 +201,8 @@ function propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_a
 end
 
 @doc raw"""
-    propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, Val(true/false); 
-              μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol, 
+    propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, Val(true/false);
+              μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
               parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
 Integrate the orbit of a NEO via the Taylor method.
@@ -219,7 +222,7 @@ Integrate the orbit of a NEO via the Taylor method.
 """ propagate
 
 @doc raw"""
-    propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, Val(true/false); parse_eqs::Bool = true, 
+    propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, Val(true/false); parse_eqs::Bool = true,
                    eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end],
                    order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
 
@@ -246,7 +249,7 @@ for V_dense in V_true_false
 
     @eval begin
 
-        function propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense; 
+        function propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense;
                            μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
                            parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
@@ -254,22 +257,22 @@ for V_dense in V_true_false
             _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
 
             # Propagate orbit
-            
+
             @time sol = taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, $V_dense(), _params;
                                     maxsteps = maxsteps, parse_eqs = parse_eqs)
-            
+
             # Dense output (save Taylor polynomials in each step)
             if $V_dense == Val{true}
-                tv, xv, polynV = sol 
+                tv, xv, polynV = sol
                 return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], polynV)
             # Point output
             elseif $V_dense == Val{false}
-                return sol 
+                return sol
             end
 
         end
 
-        function propagate(dynamics::D, maxsteps::Int, jd0::T1, tspan::T2, q0::Vector{U}, ::$V_dense; 
+        function propagate(dynamics::D, maxsteps::Int, jd0::T1, tspan::T2, q0::Vector{U}, ::$V_dense;
                            μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T3 = abstol,
                            parse_eqs::Bool = true) where {T1, T2, T3 <: Real, U <: Number, D}
 
@@ -279,7 +282,7 @@ for V_dense in V_true_false
                              abstol = _abstol, parse_eqs = parse_eqs)
         end
 
-        function propagate(dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, q0::Vector{U}, ::$V_dense; 
+        function propagate(dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, q0::Vector{U}, ::$V_dense;
                            μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
                            parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
@@ -294,7 +297,7 @@ for V_dense in V_true_false
 
         end
 
-        function propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true, 
+        function propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true,
                                 eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end],
                                 order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
 
@@ -306,11 +309,11 @@ for V_dense in V_true_false
                                   maxsteps = maxsteps, parse_eqs = parse_eqs,  eventorder = eventorder, newtoniter = newtoniter,
                                   nrabstol = nrabstol)
 
-            return sol 
+            return sol
 
         end
 
-        function propagate_root(dynamics::D, maxsteps::Int, jd0::T1, tspan::T2, q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true, 
+        function propagate_root(dynamics::D, maxsteps::Int, jd0::T1, tspan::T2, q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true,
                                 eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T3 = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end],
                                 order::Int = order, abstol::T4 = abstol) where {T1, T2, T3, T4 <: Real, U <: Number, D}
 
@@ -321,8 +324,8 @@ for V_dense in V_true_false
                                   order = order, abstol = _abstol)
         end
 
-        function propagate_root(dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, q0::Vector{U}, ::$V_dense; 
-                                parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T), 
+        function propagate_root(dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, q0::Vector{U}, ::$V_dense;
+                                parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T),
                                 μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
 
             # Backward integration
@@ -359,7 +362,7 @@ Compute the Lyapunov spectrum of a NEO.
 - `abstol::T`: absolute tolerance.
 - `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` (`true`) or not.
 """ propagate_lyap
-function propagate_lyap(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], 
+function propagate_lyap(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end],
                         order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
     # Parameters for taylorinteg
