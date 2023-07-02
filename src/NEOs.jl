@@ -19,10 +19,11 @@ using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pol
       nbodyind, ordpres_differentiate, numberofbodies, kmsec2auday, auday2kmsec, meanmotion,
       meananomaly
 using Healpix: ang2pixRing, Resolution
-using SatelliteToolbox: get_iers_eop_iau_2000A, EOPData_IAU1980, EOPData_IAU2000A, JD_J2000,
-      orbsv, sv_ecef_to_eci, get_Δat, nutation_fk5, r_ecef_to_eci, T_ECIs, T_ECIs_IAU_2006,
-      we, OrbitStateVector, r_ecef_to_eci, DCM
-import SatelliteToolbox.sv_ecef_to_eci
+using SatelliteToolboxTransformations
+    #     : fetch_iers_eop, EopIau1980, EopIau2000A, JD_J2000,
+    #   sv_ecef_to_eci, get_Δat, nutation_fk5, r_ecef_to_eci, T_ECIs, T_ECIs_IAU_2006,
+    #   EARTH_ANGULAR_SPEED, OrbitStateVector, r_ecef_to_eci, DCM
+import SatelliteToolboxTransformations.sv_ecef_to_eci
 using Dates: format
 using Downloads: download
 import Downloads

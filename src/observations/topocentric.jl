@@ -1,7 +1,7 @@
 # Earth orientation parameters (eop) 1980
 # const eop_IAU1980 = ST.get_iers_eop_iau_1980()
 # Earth orientation parameters (eop) 2000
-const eop_IAU2000A = get_iers_eop_iau_2000A()
+const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
 
 @doc raw"""
     obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
@@ -46,7 +46,7 @@ function sv_ecef_to_eci(
     T_ECEF::Union{Val{:PEF}, Val{:TIRS}},
     T_ECI::Union{T_ECIs, T_ECIs_IAU_2006},
     jd_utc::Taylor1{TaylorN{Float64}},
-    eop_data::Union{Nothing, EOPData_IAU1980, EOPData_IAU2000A} = nothing
+    eop_data::Union{Nothing, EopIau1980, EopIau2000A} = nothing
 )
     # Get the matrix that converts the ECEF to the ECI.
     if eop_data === nothing
@@ -59,7 +59,7 @@ function sv_ecef_to_eci(
     # we must account from it when converting the velocity and acceleration. The
     # angular velocity between those frames is computed using `we` and corrected
     # by the length of day (LOD) parameter of the EOP data, if available.
-    ω  = we * (1 - (eop_data !== nothing ? eop_data.LOD(jd_utc) / 86400000 : 0))
+    ω  = EARTH_ANGULAR_SPEED * (1 - (eop_data !== nothing ? eop_data.lod(jd_utc) / 86400000 : 0))
     vω = [0, 0, ω]
 
     # Compute the position in the ECI frame.
@@ -77,14 +77,14 @@ end
 
 @doc raw"""
     obsposvelECI(observatory::ObservatoryMPC{T}, et::T;
-               eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat}
-    obsposvelECI(x::RadecMPC{T}; eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat}
-    obsposvelECI(x::RadarJPL{T}; eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat}
+               eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
+    obsposvelECI(x::RadecMPC{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
+    obsposvelECI(x::RadarJPL{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
 
 Return the observer's geocentric `[x, y, z, v_x, v_y, v_z]` "state" vector in Earth-Centered
 Inertial (ECI) reference frame. By default, the IAU200A Earth orientation model is used to
 transform from Earth-centered, Earth-fixed (ECEF) frame to ECI frame. Other Earth orientation
-models, such as the IAU1976/80 model can be used by importing the `SatelliteToolbox.EOPData_IAU1980`
+models, such as the IAU1976/80 model can be used by importing the `SatelliteToolbox.EopIau1980`
 type and passing it to the `eop` keyword argument in the function call.
 
 See also [`SatelliteToolbox.orbsv`](@ref) and [`SatelliteToolbox.sv_ecef_to_eci`](@ref).
@@ -93,10 +93,10 @@ See also [`SatelliteToolbox.orbsv`](@ref) and [`SatelliteToolbox.sv_ecef_to_eci`
 
 - `observatory::ObservatoryMPC{T}`: observation site.
 - `et::T`: ephemeris time (TDB seconds since J2000.0 epoch).
-- `eop::Union{EOPData_IAU1980, EOPData_IAU2000A}`: Earth Orientation Parameters (eop).
+- `eop::Union{EopIau1980, EopIau2000A}`: Earth Orientation Parameters (eop).
 """
 function obsposvelECI(observatory::ObservatoryMPC{T}, et::ET;
-        eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat, ET<:Union{T,Taylor1{T},Taylor1{TaylorN{T}}}}
+        eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat, ET<:Union{T,Taylor1{T},Taylor1{TaylorN{T}}}}
     # Earth-Centered Earth-Fixed position position of observer
     pos_ECEF = obs_pos_ECEF(observatory)
 
@@ -121,11 +121,11 @@ function obsposvelECI(observatory::ObservatoryMPC{T}, et::ET;
     return vcat(p_ECI, v_ECI)
 end
 
-function obsposvelECI(x::RadecMPC{T}; eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat}
-    return obsposvelECI(x.observatory, datetime2et(x.date); eop = eop)
+function obsposvelECI(x::RadecMPC{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
+    return obsposvelECI(x.observatory, datetime2et(x.date); eop)
 end
-function obsposvelECI(x::RadarJPL{T}; eop::Union{EOPData_IAU1980, EOPData_IAU2000A} = eop_IAU2000A) where {T <: AbstractFloat}
-    return obsposvelECI(x.rcvr, datetime2et(x.date); eop = eop)
+function obsposvelECI(x::RadarJPL{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
+    return obsposvelECI(x.rcvr, datetime2et(x.date); eop)
 end
 
 @doc raw"""
