@@ -155,7 +155,7 @@ using InteractiveUtils: methodswith
         nyears = 9.0
         dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
         # Initial time [Julian date]
-        jd0 = datetime2julian(DateTime(2004,6,1)) 
+        jd0 = datetime2julian(DateTime(2004,6,1))
         # Initial time [days since J2000]
         t0 = jd0 - PE.J2000
         # JPL #199 solution for Apophis at June 1st, 2004
@@ -385,15 +385,15 @@ using InteractiveUtils: methodswith
         @test abs(res_dop[2]()) ≤ deldop_2005_2013[2].Δν_σ
         @test abs(res_del[2]()) ≤ deldop_2005_2013[2].Δτ_σ
         @test abs(res_dop[3]()) ≤ deldop_2005_2013[3].Δν_σ
-        @test abs(res_dop[4]()) ≤ 1.1deldop_2005_2013[4].Δν_σ # TODO: fix this residual ("high" residual artifact due to non-optimal initial condition)
+        @test abs(res_dop[4]()) ≤ deldop_2005_2013[4].Δν_σ # TODO: fix this residual ("high" residual artifact due to non-optimal initial condition)
 
-        dq_sample = vcat(1e-10randn(6), 1e-16randn())
-        @test abs(res_dop[1](dq_sample)) ≤ 2deldop_2005_2013[1].Δν_σ
-        @test abs(res_del[1](dq_sample)) ≤ 2deldop_2005_2013[2].Δτ_σ
-        @test abs(res_dop[2](dq_sample)) ≤ 2deldop_2005_2013[2].Δν_σ
-        @test abs(res_del[2](dq_sample)) ≤ 2deldop_2005_2013[2].Δτ_σ
-        @test abs(res_dop[3](dq_sample)) ≤ 2deldop_2005_2013[3].Δν_σ
-        @test abs(res_dop[4](dq_sample)) ≤ 2deldop_2005_2013[4].Δν_σ
+        dq_sample = randn(7)
+        @test abs(res_dop[1](dq_sample)) ≥ deldop_2005_2013[1].Δν_σ
+        @test abs(res_del[1](dq_sample)) ≥ deldop_2005_2013[2].Δτ_σ
+        @test abs(res_dop[2](dq_sample)) ≥ deldop_2005_2013[2].Δν_σ
+        @test abs(res_del[2](dq_sample)) ≥ deldop_2005_2013[2].Δτ_σ
+        @test abs(res_dop[3](dq_sample)) ≥ deldop_2005_2013[3].Δν_σ
+        @test abs(res_dop[4](dq_sample)) ≥ deldop_2005_2013[4].Δν_σ
     end
 
 end

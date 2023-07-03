@@ -20,10 +20,8 @@ using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pol
       meananomaly
 using Healpix: ang2pixRing, Resolution
 using SatelliteToolboxTransformations
-    #     : fetch_iers_eop, EopIau1980, EopIau2000A, JD_J2000,
-    #   sv_ecef_to_eci, get_Δat, nutation_fk5, r_ecef_to_eci, T_ECIs, T_ECIs_IAU_2006,
-    #   EARTH_ANGULAR_SPEED, OrbitStateVector, r_ecef_to_eci, DCM
 import SatelliteToolboxTransformations.sv_ecef_to_eci
+import SatelliteToolboxTransformations.sv_ecef_to_ecef
 using Dates: format
 using Downloads: download
 import Downloads
@@ -53,7 +51,7 @@ export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophis
 # Osculating
 export pv2kep, yarkp2adot
 # Topocentric
-export obs_pos_ECEF, obsposvelECI, t2c_rotation_iau_76_80
+export obs_pos_ECEF, obsposvelECI
 # Process radec
 export compute_radec, debiasing, w8sveres17, radec_astrometry, residuals
 # Process radar
