@@ -64,15 +64,15 @@ function print_header(header::String, level::Int = 1)
     L = length(header)
     if level == 1
         c = "="
-    else 
+    else
         c = "-"
-    end 
+    end
     println(repeat(c, L))
     println(header)
     println(repeat(c, L))
-end 
+end
 
-function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T, nyears_fwd::T, order::Int, varorder::Int, 
+function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T, nyears_fwd::T, order::Int, varorder::Int,
               abstol::T, parse_eqs::Bool) where {T <: Real, D}
 
     # Initial conditions from Apophis JPL solution #197
@@ -115,9 +115,9 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     sol_fwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_fwd, q0, Val(true);
                              order = order, abstol = abstol, parse_eqs = parse_eqs)
     PE.save2jld2andcheck("Apophis_fwd.jld2", (asteph = sol_fwd,))
-    
+
     println()
-    
+
     # NEO
     # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
     xva_bwd(et) = auday2kmsec(sol_bwd(et/daysec)[1:6])
@@ -157,7 +157,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     @show NEOs.cte(res) NEOs.cte(w)
 
     nothing
-    
+
 end
 
 function main()
@@ -174,11 +174,8 @@ function main()
     println("• Number of threads: ", N_threads)
 
     # Dynamical function
-    if N_threads == 1
-        dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph!
-    else
-        dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
-    end
+    dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
+
     println("• Dynamical function: ", dynamics)
 
     # Maximum number of steps
