@@ -385,12 +385,12 @@ using InteractiveUtils: methodswith
         @test abs(res_dop[4]()) ≤ deldop_2005_2013[4].Δν_σ
 
         dq_sample = 2ones(7)
-        @test abs(res_dop[1](dq_sample)) >= deldop_2005_2013[1].Δν_σ
-        @test abs(res_del[1](dq_sample)) >= deldop_2005_2013[2].Δτ_σ
-        @test abs(res_dop[2](dq_sample)) ≤  deldop_2005_2013[2].Δν_σ
-        @test abs(res_del[2](dq_sample)) >= deldop_2005_2013[2].Δτ_σ
-        @test abs(res_dop[3](dq_sample)) >= deldop_2005_2013[3].Δν_σ
-        @test abs(res_dop[4](dq_sample)) >= deldop_2005_2013[4].Δν_σ
+        @test abs(res_dop[1](dq_sample)) ≥ deldop_2005_2013[1].Δν_σ
+        @test abs(res_del[1](dq_sample)) ≥ deldop_2005_2013[2].Δτ_σ
+        @test abs(res_dop[2](dq_sample)) ≥  deldop_2005_2013[2].Δν_σ
+        @test abs(res_del[2](dq_sample)) ≥ deldop_2005_2013[2].Δτ_σ
+        @test abs(res_dop[3](dq_sample)) ≥ deldop_2005_2013[3].Δν_σ
+        @test abs(res_dop[4](dq_sample)) ≥ deldop_2005_2013[4].Δν_σ
     end
 
 end
