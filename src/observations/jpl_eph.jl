@@ -115,32 +115,31 @@ See also [`getposvel`](@ref).
 """
 dtt_tdb(et) = getposvel(1000000001, 1000000000, cte(et))[4] # units: seconds/seconds
 
-# Load Solar System 2000-2100 ephemeris
+# Load Solar System, accelerations, newtonian potentials and TT-TDB 2000-2100 ephemeris
 const sseph_artifact_path = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
 const sseph::TaylorInterpolant{Float64, Float64, 2} = JLD2.load(sseph_artifact_path, "ss16ast_eph")
+const acceph::TaylorInterpolant{Float64, Float64, 2} = JLD2.load(sseph_artifact_path, "acc_eph")
+const poteph::TaylorInterpolant{Float64, Float64, 2} = JLD2.load(sseph_artifact_path, "pot_eph")
 const ttmtdb::TaylorInterpolant{Float64, Float64, 1} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
 
 @doc raw"""
-    loadpeeph()
-    loadpeeph(et::Real)
-    loadpeeph(et_0::Real, et_f::Real)
+    loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::Real = 0.0, t_f::Real = 36525.0)
 
-Load Solar System ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[0, et]` (`[et_0, et_f]`) where `et` must have units
-of ephemeris seconds since J2000. If no `et` is given, return the full (100 years) integration.
+Load ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[t_0, t_f] ⊆ [0.0, 36525.0]` where `t` must have units of TDB 
+days since J2000. The available options for `eph` are:
 
-**Caution**: running this function for the first time will download the `sseph_p100` artifact (∼556 MB) which can take several minutes.
+- `NEOs.sseph`: Solar system ephemeris. 
+- `NEOs.acceph`: accelerations ephemeris. 
+- `NEOs.poteph`: newtonian potentials ephemeris.
+
+!!! warning
+    Running this function for the first time will download the `sseph_p100` artifact (885 MB) which can take several minutes.
 """
-loadpeeph()::TaylorInterpolant{Float64, Float64, 2} = sseph
-
-function loadpeeph(et::Real)
-    i = searchsortedfirst(sseph.t, et)
-    return TaylorInterpolant(sseph.t0, sseph.t[1:i], sseph.x[1:i-1, :])
-end
-
-function loadpeeph(et_0::Real, et_f::Real)
-    i_0 = searchsortedlast(sseph.t, et_0)
-    i_f = searchsortedfirst(sseph.t, et_f)
-    return TaylorInterpolant(sseph.t0, sseph.t[i_0:i_f], sseph.x[i_0:i_f-1, :])
+function loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::Real = sseph.t0, t_f::Real = sseph.t0 + sseph.t[end])
+    @assert 0.0 ≤ t_0 ≤ t_f ≤ 36525.0
+    i_0 = searchsortedlast(eph.t, t_0)
+    i_f = searchsortedfirst(eph.t, t_f)
+    return TaylorInterpolant(eph.t0, eph.t[i_0:i_f], eph.x[i_0:i_f-1, :])
 end
 
 @doc raw"""

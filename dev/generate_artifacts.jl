@@ -2,9 +2,10 @@
 # - debiasing tables from Chesley et al. (2010), Farnocchia et al. (2015) and Eggl et al. (2020)
 # - JPL lsk and spk
 # - PlanetaryEphemeris.jl Solar System ephemeris
-
-# TO DO: adapt script for julia1.6+
-# TO DO: adapt script for 2010 debiasing tables (requires extra unpacking)
+# TODO: adapt script for 2010 debiasing tables (requires extra unpacking)
+#
+# This script can be run from NEOs.jl root directory with:
+#      julia --project dev/generate_artifacts.jl
 
 using Pkg.Artifacts
 using Pkg.PlatformEngines: sha256, unpack

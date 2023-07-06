@@ -13,9 +13,6 @@ using InteractiveUtils: methodswith
 
     @testset "Integration methods" begin
 
-        @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_ng_eph!}, TaylorIntegration.jetcoeffs!))
-        @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_ng_eph!}, TaylorIntegration._allocate_jetcoeffs!))
-
         @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}, TaylorIntegration.jetcoeffs!))
         @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}, TaylorIntegration._allocate_jetcoeffs!))
 
@@ -33,11 +30,14 @@ using InteractiveUtils: methodswith
         maxsteps = 1000
         nyears = 0.2
         dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
-        jd0 = datetime2julian(DateTime(2023,2,25,0,0,0)) #Julian date of integration initial time
+        # Initial time [Julian date]
+        jd0 = datetime2julian(DateTime(2023,2,25,0,0,0))
+        # Initial time [days since J2000]
+        t0 = jd0 - PE.J2000
         # unperturbed initial condition
         q0 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01, -9.071450085084557E-03, -9.353197026254517E-03, -5.610023032269034E-03]
         # Solar System ephemeris
-        sseph = loadpeeph()
+        sseph = loadpeeph(NEOs.sseph, t0 - nyears*yr, t0 + nyears*yr)
         # Sun's ephemeris
         eph_su = selecteph(sseph, su)
         # Earth's ephemeris
@@ -96,8 +96,8 @@ using InteractiveUtils: methodswith
         # Compute residuals
         res, _ = NEOs.residuals(
             obs_radec_mpc_2023DW,
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec))
         )
 
@@ -131,8 +131,8 @@ using InteractiveUtils: methodswith
         # compute residuals for orbit with perturbed initial conditions
         res1, _ = NEOs.residuals(
             obs_radec_mpc_2023DW,
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol1(t/daysec))
         )
         mean_radec1 = mean(res1)
@@ -151,11 +151,14 @@ using InteractiveUtils: methodswith
         maxsteps = 5000
         nyears = 9.0
         dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
-        jd0 = datetime2julian(DateTime(2004,6,1)) #Julian date of integration initial time
+        # Initial time [Julian date]
+        jd0 = datetime2julian(DateTime(2004,6,1))
+        # Initial time [days since J2000]
+        t0 = jd0 - PE.J2000
         # JPL #199 solution for Apophis at June 1st, 2004
         q0 = [-1.0506628055913627, -0.06064314196134998, -0.04997102228887035, 0.0029591421121582077, -0.01423233538611057, -0.005218412537773594, -5.592839897872e-14, 0.0]
         # Solar System ephemeris
-        sseph = loadpeeph()
+        sseph = loadpeeph(NEOs.sseph, t0, t0 + nyears*yr)
         # Sun's ephemeris
         eph_su = selecteph(sseph, su)
         # Earth's ephemeris
@@ -199,8 +202,8 @@ using InteractiveUtils: methodswith
         # Compute optical astrometry residuals
         res_radec, w_radec = NEOs.residuals(
             obs_radec_mpc_apophis,
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec))
         )
         nobsopt = round(Int, length(res_radec))
@@ -227,8 +230,8 @@ using InteractiveUtils: methodswith
         # Compute mean radar (time-delay and Doppler-shift) residuals
         @time res_del, w_del, res_dop, w_dop = residuals(
             deldop_2005_2013,
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec)),
             niter=4,
             tord=5
@@ -263,8 +266,6 @@ using InteractiveUtils: methodswith
         local abstol = 1e-20
         # Whether to use @taylorize
         local parse_eqs = true
-        # Solar System ephemeris
-        local sseph = loadpeeph()
         # Perturbation to nominal initial condition (Taylor1 jet transport)
         local dq = NEOs.scaled_variables()
         # Initial date of integration (julian days)
@@ -312,10 +313,9 @@ using InteractiveUtils: methodswith
         dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
         jd0::Float64 = datetime2julian(DateTime(2004,6,1)) #Julian date of integration initial time
         # JPL #199 solution for Apophis at June 1st, 2004
-        q00::Vector{Float64} = [-1.0506628055913627, -0.06064314196134998, -0.04997102228887035, 0.0029591421121582077, -0.01423233538611057, -0.005218412537773594, -5.592839897872e-14, 0.0]
+        q00::Vector{Float64} = [-1.0506627988664696, -0.060643124245514164, -0.0499709975200415, 0.0029591416313078838, -0.014232335581939919, -0.0052184125285361415, -2.898870403031058e-14, -0.0]
         dq::Vector{TaylorN{Float64}} = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14), order = varorder)
         q0::Vector{TaylorN{Float64}} = q00 .+ vcat(dq, 0dq[1])
-        sseph::TaylorInterpolant{Float64,Float64,2} = loadpeeph()
 
         # propagate orbit
         sol = NEOs.propagate(
@@ -330,7 +330,7 @@ using InteractiveUtils: methodswith
             parse_eqs = true
         )
 
-        sseph_obs::TaylorInterpolant{Float64,Float64,2} = loadpeeph(ceil((sol.t0+sol.t[end])*daysec))
+        sseph_obs::TaylorInterpolant{Float64,Float64,2} = loadpeeph(NEOs.sseph, sol.t0, sol.t0 + sol.t[end])
         # Sun's ephemeris
         eph_su::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph_obs, su)
         # Earth's ephemeris
@@ -342,8 +342,8 @@ using InteractiveUtils: methodswith
         # Compute optical astrometry residuals
         res_radec, w_radec = NEOs.residuals(
             obs_radec_mpc_apophis,
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec))
         )
         nobsopt = round(Int, length(res_radec))
@@ -357,7 +357,7 @@ using InteractiveUtils: methodswith
         std_dec = std(res_dec)
         rms_ra = nrms(res_ra,ones(length(res_ra)))
         rms_dec = nrms(res_dec,ones(length(res_dec)))
-        @test mean_ra ≈ 0.0224 atol=1e-2
+        @test mean_ra ≈ 0.00574 atol=1e-2
         @test std_ra ≈ 0.136 atol=1e-2
         @test rms_ra ≈ std_ra atol=1e-2
         @test mean_dec ≈ -0.0124 atol=1e-2
@@ -370,10 +370,10 @@ using InteractiveUtils: methodswith
         # Compute mean radar (time-delay and Doppler-shift) residuals
         @time res_del, w_del, res_dop, w_dop = residuals(
             deldop_2005_2013[1:4],
-            xve=t->auday2kmsec(eph_ea(t)),
-            xvs=t->auday2kmsec(eph_su(t)),
+            xve=t->auday2kmsec(eph_ea(t/daysec)),
+            xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec)),
-            niter=4,
+            niter=10,
             tord=10
         )
 
@@ -382,15 +382,15 @@ using InteractiveUtils: methodswith
         @test abs(res_dop[2]()) ≤ deldop_2005_2013[2].Δν_σ
         @test abs(res_del[2]()) ≤ deldop_2005_2013[2].Δτ_σ
         @test abs(res_dop[3]()) ≤ deldop_2005_2013[3].Δν_σ
-        @test abs(res_dop[4]()) ≤ 1.1deldop_2005_2013[4].Δν_σ # TODO: fix this residual ("high" residual artifact due to non-optimal initial condition)
+        @test abs(res_dop[4]()) ≤ deldop_2005_2013[4].Δν_σ
 
-        dq_sample = vcat(1e-10randn(6), 1e-16randn())
-        @test abs(res_dop[1](dq_sample)) ≤ 2deldop_2005_2013[1].Δν_σ
-        @test abs(res_del[1](dq_sample)) ≤ 2deldop_2005_2013[2].Δτ_σ
-        @test abs(res_dop[2](dq_sample)) ≤ 2deldop_2005_2013[2].Δν_σ
-        @test abs(res_del[2](dq_sample)) ≤ 2deldop_2005_2013[2].Δτ_σ
-        @test abs(res_dop[3](dq_sample)) ≤ 2deldop_2005_2013[3].Δν_σ
-        @test abs(res_dop[4](dq_sample)) ≤ 2deldop_2005_2013[4].Δν_σ
+        dq_sample = 2ones(7)
+        @test abs(res_dop[1](dq_sample)) ≥ deldop_2005_2013[1].Δν_σ
+        @test abs(res_del[1](dq_sample)) ≥ deldop_2005_2013[2].Δτ_σ
+        @test abs(res_dop[2](dq_sample)) ≥ deldop_2005_2013[2].Δν_σ
+        @test abs(res_del[2](dq_sample)) ≥ deldop_2005_2013[2].Δτ_σ
+        @test abs(res_dop[3](dq_sample)) ≥ deldop_2005_2013[3].Δν_σ
+        @test abs(res_dop[4](dq_sample)) ≥ deldop_2005_2013[4].Δν_σ
     end
 
 end

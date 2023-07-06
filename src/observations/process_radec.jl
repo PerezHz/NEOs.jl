@@ -294,7 +294,7 @@ function debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, t
         # Seconds since J2000 (TDB)
         et_secs_i = datetime2et(obs.date)
         # Seconds sinde J2000 (TT)
-        tt_secs_i = et_secs_i - ttmtdb(et_secs_i)
+        tt_secs_i = et_secs_i - ttmtdb(et_secs_i/daysec)
         # Years since J2000
         yrs_J2000_tt = tt_secs_i/(daysec*yr)
         # Total debiasing correction in right ascension (arcsec)

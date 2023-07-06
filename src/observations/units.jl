@@ -103,7 +103,7 @@ not include the correction due to the position of the measurement station ``v_E.
 """
 function tdb_utc(et::Number)
     # TT-TDB
-    tt_tdb_et = ttmtdb(et)
+    tt_tdb_et = ttmtdb(et/daysec)
     # TT-TAI
     tt_tai = 32.184
     # TDB - TAI = (TT-TAI) + (TDB-TT) = (TDB-TT) + 32.184 s
@@ -140,14 +140,14 @@ function ttmtdb_tt(tt::Real; niter=5)
     ttmtdb_order = ttmtdb.x[1].order
     tdb = Taylor1([tt,one(tt)], ttmtdb_order)
     for _ in 1:niter
-        ttmtdb_tdb = ttmtdb(tdb)
+        ttmtdb_tdb = ttmtdb(tdb/daysec)
         # we look for TDB* such that TT-TDB* = (TT-TDB)(TDB*)
         y = tt - tdb - ttmtdb_tdb
         dy = - 1 - TaylorSeries.differentiate(ttmtdb_tdb)
         # perform Newton iteration
         tdb[0] -= cte(y/dy)
     end
-    return ttmtdb(tdb[0])
+    return ttmtdb(tdb[0]/daysec)
 end
 
 @doc raw"""
