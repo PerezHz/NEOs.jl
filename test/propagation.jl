@@ -313,7 +313,7 @@ using InteractiveUtils: methodswith
         dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
         jd0::Float64 = datetime2julian(DateTime(2004,6,1)) #Julian date of integration initial time
         # JPL #199 solution for Apophis at June 1st, 2004
-        q00::Vector{Float64} = [-1.0506627941258015, -0.06064313293987095, -0.049970989369473584, 0.002959141747263133, -0.014232335663044254, -0.005218412470120484, -2.789420270048772e-14, 0.0]
+        q00::Vector{Float64} = [-1.0506627988664696, -0.060643124245514164, -0.0499709975200415, 0.0029591416313078838, -0.014232335581939919, -0.0052184125285361415, -2.898870403031058e-14, -0.0]
         dq::Vector{TaylorN{Float64}} = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14), order = varorder)
         q0::Vector{TaylorN{Float64}} = q00 .+ vcat(dq, 0dq[1])
 
@@ -387,7 +387,7 @@ using InteractiveUtils: methodswith
         dq_sample = 2ones(7)
         @test abs(res_dop[1](dq_sample)) ≥ deldop_2005_2013[1].Δν_σ
         @test abs(res_del[1](dq_sample)) ≥ deldop_2005_2013[2].Δτ_σ
-        @test abs(res_dop[2](dq_sample)) ≥  deldop_2005_2013[2].Δν_σ
+        @test abs(res_dop[2](dq_sample)) ≥ deldop_2005_2013[2].Δν_σ
         @test abs(res_del[2](dq_sample)) ≥ deldop_2005_2013[2].Δτ_σ
         @test abs(res_dop[3](dq_sample)) ≥ deldop_2005_2013[3].Δν_σ
         @test abs(res_dop[4](dq_sample)) ≥ deldop_2005_2013[4].Δν_σ
