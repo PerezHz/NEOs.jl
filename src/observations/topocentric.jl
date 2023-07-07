@@ -20,16 +20,20 @@ function obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
     # where ϕ' is the geocentric latitude and ρ is the geocentric distance in km
 
     # Cilindrical components of Earth-Centered Earth-Fixed position of observer
-    λ_deg = observatory.long # deg
-    u_km = observatory.cos   # Earth radii
-    v_km = observatory.sin   # Earth radii
+    λ_deg = observatory.long     # deg
+    u = observatory.cos * RE     # km
+    v = observatory.sin * RE     # km
 
     # Cartesian components of Earth-Centered Earth-Fixed position of observer
-    λ_rad = deg2rad(λ_deg)  # rad
-    ϕ_rad = atan(v_km,u_km) # rad
+    λ_rad = deg2rad(λ_deg)       # rad
+    x_gc = u * cos(λ_rad)        # km
+    y_gc = u * sin(λ_rad)        # km
+    z_gc = v                     # km
 
     # Earth-Centered Earth-Fixed position position of observer
-    return geocentric_to_ecef(ϕ_rad,λ_rad,RE) # km
+    pos_ECEF = [x_gc, y_gc, z_gc] # km
+
+    return pos_ECEF
 end
 
 obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.observatory)
