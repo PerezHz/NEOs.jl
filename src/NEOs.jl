@@ -61,7 +61,7 @@ export gauss_method
 # Asteroid dynamical models
 export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!
 # Propagate
-export propagate, propagate_lyap, propagate_root, save2jldandcheck
+export propagate, propagate_lyap, propagate_root
 
 export valsecchi_circle, nrms, chi2, newtonls, newtonls_6v, diffcorr, newtonls_Q, bopik
 
