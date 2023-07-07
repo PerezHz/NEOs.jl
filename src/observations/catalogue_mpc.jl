@@ -180,7 +180,7 @@ function download_scratch(url::String, filename::String)
     # txt = read(path, String)
 
     # Get raw html (HTTP.get retries four times by default)
-    resp = get(url, connect_timeout=60, readtimeout=60)
+    resp = get(url, connect_timeout=120, readtimeout=120)
     # Read local file
     txt = String(resp.body)
 
