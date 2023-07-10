@@ -1,4 +1,32 @@
-using ArgParse, NEOs, PlanetaryEphemeris, Dates, TaylorIntegration, JLD2
+# This file is part of the NEOs.jl package; MIT licensed
+
+### This script can be run either as a standalone script or via ArgParse. In any case,
+### this folder's Project.toml environment has to be already active and instantiated
+### before running this script. Uncomment the following three lines to activate and
+### instantiate this folder's environment:
+
+# import Pkg
+# Pkg.activate(".")
+# Pkg.instantiate()
+
+### If ran as a standalone and the environment defined in this folder's Project.toml is
+### already active and instantiated, then this script can be run from this folder with the
+### default settings simply as:
+### $ julia -t <number-of-threads> --project=. apophis.jl
+### Finally, this script can be run via the ArgParse mechanism. Help can be displayed doing:
+### $ julia --project=. apophis.jl --help
+
+using ArgParse
+using NEOs
+using Dates
+using TaylorIntegration
+using JLD2
+using PlanetaryEphemeris
+using DataFrames
+using DelimitedFiles
+using LinearAlgebra: diag
+using Statistics
+using StatsBase
 
 # Load JPL ephemeris
 loadjpleph()
@@ -19,7 +47,7 @@ function parse_commandline()
         "--varorder"
             help = "Order of the jet transport perturbation"
             arg_type = Int
-            default = 5
+            default = 1
         "--maxsteps"
             help = "Maximum number of steps during integration"
             arg_type = Int
@@ -47,13 +75,13 @@ function parse_commandline()
     end
 
     s.epilog = """
-        examples:\n
+        Examples (run from the `pha` folder):\n
         \n
         # Multi-threaded\n
-        julia -t 4 --project apophis.jl --maxsteps 100 --nyears_bwd -0.02 --nyears_fwd 0.02 --parse_eqs true\n
+        julia -t 4 --project=. apophis.jl --maxsteps 100 --nyears_bwd -0.02 --nyears_fwd 0.02 --parse_eqs true\n
         \n
         # Single-threaded\n
-        julia --project apophis.jl --maxsteps 100 --nyears_bwd -0.02 --nyears_fwd 0.02 --parse_eqs true\n
+        julia --project=. apophis.jl --maxsteps 100 --nyears_bwd -0.02 --nyears_fwd 0.02 --parse_eqs true\n
         \n
     """
 
@@ -91,7 +119,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     q0 = vcat(q00, 0.0, 0.0) .+ vcat(dq, zero(dq[1]))
 
-    # Initial date (in julian days)
+    # Initial date (in Julian days)
     jd0 = datetime2julian(jd0_datetime)
 
     print_header("Integrator warmup", 2)
@@ -105,18 +133,23 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     println("• Final time of integration: ", julian2datetime(jd0 + tmax))
 
     sol_bwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_bwd, q0, Val(true);
-                             order = order, abstol = abstol, parse_eqs = parse_eqs)
-    PE.save2jld2andcheck("Apophis_bwd.jld2", (asteph = sol_bwd,))
+                             order, abstol, parse_eqs)
+    jldsave("Apophis_bwd.jld2", asteph = sol_bwd)
 
     tmax = nyears_fwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
     println("• Final time of integration: ", julian2datetime(jd0 + tmax))
 
     sol_fwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_fwd, q0, Val(true);
-                             order = order, abstol = abstol, parse_eqs = parse_eqs)
-    PE.save2jld2andcheck("Apophis_fwd.jld2", (asteph = sol_fwd,))
+                             order, abstol, parse_eqs)
+    jldsave("Apophis_fwd.jld2", asteph = sol_fwd)
 
     println()
+
+    # load Solar System ephemeris
+    sseph::TaylorInterpolant{Float64,Float64,2} = loadpeeph(NEOs.sseph, NEOs.sseph.t0, sol.t0+sol.t[end])
+    eph_su::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph, su)
+    eph_ea::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph, ea)
 
     # NEO
     # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
@@ -125,39 +158,100 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     xva(et) = bwdfwdeph(et, sol_bwd, sol_fwd)
     # Earth
     # Change x, v units, resp., from au, au/day to km, km/sec
-    eph_ea = selecteph(NEOs.sseph, ea)
     xve(et) = auday2kmsec(eph_ea(et/daysec))
     # Sun
     # Change x, v units, resp., from au, au/day to km, km/sec
-    eph_su = selecteph(NEOs.sseph, su)
     xvs(et) = auday2kmsec(eph_su(et/daysec))
 
 
-    radec_2004_2020 = read_radec_mpc("/Users/Jorge/projects/NEOs/data/99942_2004_2020.dat")
-    radec_2020_2021 = read_radec_mpc("/Users/Jorge/projects/NEOs/data/99942_2020_2021.dat")
+    radec_2004_2020 = read_radec_mpc(joinpath(pkgdir("NEOs"), "data", "99942_2004_2020.dat"))
+    radec_2020_2021 = read_radec_mpc(joinpath(pkgdir("NEOs"), "data", "99942_2020_2021.dat"))
     radec = vcat(radec_2004_2020,radec_2020_2021)
 
-    deldop_2005_2013 = read_radar_jpl("/Users/Jorge/projects/NEOs/data/99942_RADAR_2005_2013.dat")
-    deldop_2021 = read_radar_jpl("/Users/Jorge/projects/NEOs/data/99942_RADAR_2021.dat")
-    # TODO: make radar astrometry residuals work with functions!!!
-    # deldop = vcat(deldop_2005_2013,deldop_2021)
+    deldop_2005_2013 = read_radar_jpl(joinpath(pkgdir("NEOs"), "data", "99942_RADAR_2005_2013.dat"))
+    deldop_2021 = read_radar_jpl(joinpath(pkgdir("NEOs"), "data", "99942_RADAR_2021.dat"))
+    deldop = vcat(deldop_2005_2013,deldop_2021)
 
     # Compute optical residuals
     print_header("Compute residuals", 2)
-    res_radec, w_radec = residuals(radec, xvs = xvs, xve = xve, xva = xva)
+    res_radec_all, w_radec_all = NEOs.residuals(radec; xvs, xve, xva)
 
     # Compute radar residuals
-    #### TODO: make radar astrometry residuals work with functions!!!
-    #### res_deldop, w_deldop = residuals(deldop, xvs = xvs, xve = xve, xva = xva_bwd)
-    res_del_bwd, w_del_bwd, res_dop_bwd, w_dop_bwd = residuals(deldop_2005_2013, xvs = xvs, xve = xve, xva = xva_bwd, niter=5)
-    res_del_fwd, w_del_fwd, res_dop_fwd, w_dop_fwd = residuals(deldop_2021, xvs = xvs, xve = xve, xva = xva_fwd, niter=5)
+    res_del, w_del, res_dop, w_dop = NEOs.residuals(deldop; xvs, xve, xvaniter=10, tord=10)
 
-    PE.save2jld2andcheck("resw_radec.jld2", (;res_radec,w_radec,res_del_bwd,w_del_bwd,res_dop_bwd,w_dop_bwd,res_del_fwd,w_del_fwd,res_dop_fwd,w_dop_fwd))
+    ### Process optical astrometry (filter, weight, debias)
 
-    @show NEOs.cte(res) NEOs.cte(w)
+    # filter out biased observations from observatory 217 on 28-Jan-2021
+    df_radec = DataFrame(radec)
+    # add residuals and weights to optical astrometry DataFrame
+    df_radec[!, :res_α] .= res_radec_all[1:round(Int,length(res_radec_all)/2)]
+    df_radec[!, :res_δ] .= res_radec_all[1+round(Int,length(res_radec_all)/2):end]
+    df_radec[!, :w_α] .= w_radec_all[1:round(Int,length(res_radec_all)/2)]
+    df_radec[!, :w_δ] .= w_radec_all[1+round(Int,length(res_radec_all)/2):end]
+    filter!(
+        x->(Date(x.date) != Date(2021, 1, 28)),
+        df_radec
+    )
+
+    # read astrometric errors from Tholen et al. (2013)
+    tho13_errors = readdlm(joinpath(pkgdir(NEOs), "data", "tholenetal2013_opterror.dat"), ',')
+    # compute weights
+    w_α_tho13 = 1 ./ (tho13_errors[:,1].^2 .+ tho13_errors[:,3].^2 .+ tho13_errors[:,5].^2)
+    w_δ_tho13 = 1 ./ (tho13_errors[:,2].^2 .+ tho13_errors[:,4].^2 .+ tho13_errors[:,6].^2)
+    # Tholen et al. (2013) obs table
+    radec_tho13 = DataFrame(read_radec_mpc(joinpath(pkgdir(NEOs), "test", "data", "99942_Tholen_etal_2013.dat")))
+    # vector of RA values from Tholen et al. (2013) observations (used for filtering)
+    tho13_α = radec_tho13[!,:α]
+    # set weights in Tholen et al. (2013) astrometry corresponding to associated uncertainties
+    df_radec[in.(df_radec.α, Ref(tho13_α)),:w_α] = w_α_tho13
+    df_radec[in.(df_radec.α, Ref(tho13_α)),:w_δ] = w_δ_tho13
+
+    # Relaxation factor (account for correlations in optical astrometry data)
+    # for each observation batch, count the number of observations made in
+    # the same night by the same observatory
+    # Ref: Veres et al. (2017)
+    date_site_v = select(df_radec, :date => ByRow(Date), :observatory)
+    Nv = [count(x->x.date_Date==i.date_Date && x.observatory==i.observatory, eachrow(date_site_v)) for i in eachrow(date_site_v)]
+    relax_factor = map(x->x>4.0 ? x/4.0 : 1.0, Nv)
+    # inflate uncertainties (i.e., relax weights) by relaxation factor
+    df_radec[!, :w_α] .= (df_radec.w_α)./relax_factor
+    df_radec[!, :w_δ] .= (df_radec.w_δ)./relax_factor
+
+    # update optical residuals and weights
+    res_radec = vcat(df_radec.res_α, df_radec.res_δ)
+    w_radec = vcat(df_radec.w_α, df_radec.w_δ)
+
+    ### Perform orbital fit to optical and radar astrometry data
+
+    res = vcat(res_radec, res_del, res_dop)
+    w = vcat(w_radec, w_del, w_dop)
+
+    success, x_new, Γ = newtonls(res, w, zeros(get_numvars()), 10)
+
+    nradec = length(res_radec)
+    res_ra = view(res_radec, 1:nradec÷2)
+    res_dec = view(res_radec, 1+nradec÷2:nradec)
+    w_ra = view(w_radec, 1:nradec÷2)
+    w_dec = view(w_radec, 1+nradec÷2:nradec)
+
+    ### Print results
+
+    # orbital fit
+    @show success
+    @show sol(sol.t0)(x_new)
+    @show sqrt.(diag(Γ))
+
+    # post-fit statistics
+    @show nrms_radec = nrms(res_radec(x_new),w_radec)
+    @show nrms_radec = nrms(vcat(res_del,res_dop)(x_new),vcat(w_del,w_dop))
+    @show nrms_optrad = nrms(res(x_new),w)
+    @show mean_ra = mean(res_ra(x_new), weights(w_ra))
+    @show mean_dec = mean(res_dec(x_new), weights(w_dec))
+    @show mean_del = mean(res_del(x_new), weights(w_del))
+    @show mean_dop = mean(res_dop(x_new), weights(w_dop))
+    @show chi2_optrad = chi2(res(x_new),w)
 
     nothing
-
 end
 
 function main()
