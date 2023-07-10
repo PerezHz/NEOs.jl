@@ -112,7 +112,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     # The magnitudes correspond to the typical order of magnitude of errors in
     # position/velocity (1e-8), Yarkovsky (1e-13) and radiation pressure (1e-14)
     if varorder == 0
-        dq = zeros(8)
+        dq = zeros(7)
     else
         dq = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14), order = varorder)
     end
@@ -147,7 +147,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     println()
 
     # load Solar System ephemeris
-    sseph::TaylorInterpolant{Float64,Float64,2} = loadpeeph(NEOs.sseph, NEOs.sseph.t0, sol.t0+sol.t[end])
+    sseph::TaylorInterpolant{Float64,Float64,2} = loadpeeph(NEOs.sseph, NEOs.sol_bwd.t0+sol_bwd.t[end], sol_fwd.t0+sol_fwd.t[end])
     eph_su::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph, su)
     eph_ea::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph, ea)
 
