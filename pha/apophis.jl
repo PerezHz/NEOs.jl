@@ -147,7 +147,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     println()
 
     # load Solar System ephemeris
-    sseph::TaylorInterpolant{Float64,Float64,2} = loadpeeph(NEOs.sseph, NEOs.sol_bwd.t0+sol_bwd.t[end], sol_fwd.t0+sol_fwd.t[end])
+    sseph::TaylorInterpolant{Float64,Float64,2} = loadpeeph(NEOs.sseph, sol_bwd.t0+sol_bwd.t[end], sol_fwd.t0+sol_fwd.t[end])
     eph_su::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph, su)
     eph_ea::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph, ea)
 
