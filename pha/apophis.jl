@@ -164,12 +164,12 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     xvs(et) = auday2kmsec(eph_su(et/daysec))
 
 
-    radec_2004_2020 = read_radec_mpc(joinpath(pkgdir("NEOs"), "data", "99942_2004_2020.dat"))
-    radec_2020_2021 = read_radec_mpc(joinpath(pkgdir("NEOs"), "data", "99942_2020_2021.dat"))
+    radec_2004_2020 = read_radec_mpc(joinpath(pkgdir(NEOs), "data", "99942_2004_2020.dat"))
+    radec_2020_2021 = read_radec_mpc(joinpath(pkgdir(NEOs), "data", "99942_2020_2021.dat"))
     radec = vcat(radec_2004_2020,radec_2020_2021)
 
-    deldop_2005_2013 = read_radar_jpl(joinpath(pkgdir("NEOs"), "data", "99942_RADAR_2005_2013.dat"))
-    deldop_2021 = read_radar_jpl(joinpath(pkgdir("NEOs"), "data", "99942_RADAR_2021.dat"))
+    deldop_2005_2013 = read_radar_jpl(joinpath(pkgdir(NEOs), "data", "99942_RADAR_2005_2013.dat"))
+    deldop_2021 = read_radar_jpl(joinpath(pkgdir(NEOs), "data", "99942_RADAR_2021.dat"))
     deldop = vcat(deldop_2005_2013,deldop_2021)
 
     # Compute optical residuals
