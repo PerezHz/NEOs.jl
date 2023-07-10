@@ -177,7 +177,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     res_radec_all, w_radec_all = NEOs.residuals(radec; xvs, xve, xva)
 
     # Compute radar residuals
-    res_del, w_del, res_dop, w_dop = NEOs.residuals(deldop; xvs, xve, xvaniter=10, tord=10)
+    res_del, w_del, res_dop, w_dop = NEOs.residuals(deldop; xvs, xve, xva, niter=10, tord=10)
 
     ### Process optical astrometry (filter, weight, debias)
 
