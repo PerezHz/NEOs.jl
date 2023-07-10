@@ -125,11 +125,11 @@ const ttmtdb::TaylorInterpolant{Float64, Float64, 1} = TaylorInterpolant(sseph.t
 @doc raw"""
     loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::Real = 0.0, t_f::Real = 36525.0)
 
-Load ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[t_0, t_f] ⊆ [0.0, 36525.0]` where `t` must have units of TDB 
+Load ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[t_0, t_f] ⊆ [0.0, 36525.0]` where `t` must have units of TDB
 days since J2000. The available options for `eph` are:
 
-- `NEOs.sseph`: Solar system ephemeris. 
-- `NEOs.acceph`: accelerations ephemeris. 
+- `NEOs.sseph`: Solar system ephemeris.
+- `NEOs.acceph`: accelerations ephemeris.
 - `NEOs.poteph`: newtonian potentials ephemeris.
 
 !!! warning
@@ -143,12 +143,12 @@ function loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::Rea
 end
 
 @doc raw"""
-    bwdfwdeph(et::Union{T, TaylorN{T}}, bwd::TaylorInterpolant{T, U, 2}, 
+    bwdfwdeph(et::Union{T,Taylor1{T},TaylorN{T}}, bwd::TaylorInterpolant{T, U, 2},
               fwd::TaylorInterpolant{T, U, 2}) where {T <: AbstractFloat, U <: Union{T, TaylorN{T}}}
 
 Paste a backward and a forward integration, evaluate at `et` and convert from [au, au/day] -> [km, km/sec].
 """
-function bwdfwdeph(et::Union{T,TaylorN{T}},
+function bwdfwdeph(et::Union{T,Taylor1{T},TaylorN{T}},
         bwd::TaylorInterpolant{T,U,2},
         fwd::TaylorInterpolant{T,U,2}
         ) where {T<:AbstractFloat, U<:Union{T,TaylorN{T}}}
