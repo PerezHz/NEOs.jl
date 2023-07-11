@@ -239,7 +239,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     # orbital fit
     @show success
-    @show sol(sol.t0)(x_new)
+    @show xva(daysec*sol.t0)(x_new)
     @show sqrt.(diag(Γ))
 
     # post-fit statistics
