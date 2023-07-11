@@ -5,7 +5,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/PerezHz/NEOs.jl/badge.svg?branch=main)](https://coveralls.io/github/PerezHz/NEOs.jl?branch=main)
 [![codecov](https://codecov.io/gh/PerezHz/NEOs.jl/branch/main/graph/badge.svg?token=F1IY79YP3J)](https://codecov.io/gh/PerezHz/NEOs.jl)
 
-`NEOs.jl` is Julia package for high-accuracy orbit determination and propagation of
+`NEOs.jl` is a Julia package for high-accuracy orbit determination and propagation of
 Near-Earth Objects. `NEOs.jl` exploits jet transport techniques via
 [TaylorIntegration.jl](https://github.com/PerezHz/TaylorIntegration.jl).
 
@@ -27,7 +27,7 @@ The current version of this package may be installed in Julia pkg manager via:
 
 ## Usage
 
-The `apophis.jl` file in the `pha` directory contains an example script which performs an
+The `pha` directory contains the `apophis.jl` script which performs an
 orbit determination for asteroid (99942) Apophis from optical and radar astrometry. In order
 to run this script, the environment corresponding to the `Project.toml` contained in the
 `pha` directory has to be active and instantiated. This can be done, for example, by running
