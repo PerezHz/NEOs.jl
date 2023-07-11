@@ -47,7 +47,7 @@ function parse_commandline()
         "--varorder"
             help = "Order of the jet transport perturbation"
             arg_type = Int
-            default = 1
+            default = 5
         "--maxsteps"
             help = "Maximum number of steps during integration"
             arg_type = Int
