@@ -155,8 +155,8 @@ function write_catalogues_mpc(cats::Vector{CatalogueMPC}, filename::String)
     end
 end
 
-# const downloader = Downloads.Downloader()
-# downloader.easy_hook = (easy, info) -> Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_LOW_SPEED_TIME, 60)
+const downloader = Downloads.Downloader()
+downloader.easy_hook = (easy, info) -> Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_LOW_SPEED_TIME, 300)
 
 @doc raw"""
     download_scratch(url::String, filename::String)
@@ -166,23 +166,18 @@ Download `url` and save the output to NEOs scratch space as `filename`. Return t
 function download_scratch(url::String, filename::String)
     # Local file
     path = joinpath(scratch_path[], filename)
-    # # Download function
-    # f = retry(delays = fill(0.1, 3)) do
-    #     try
-    #         download(url, path; downloader)
-    #     catch
-    #         rethrow()
-    #     end
-    # end
-    # # Download source_file
-    # f()
-    # # Read local file
-    # txt = read(path, String)
-
-    # Get raw html (HTTP.get retries four times by default)
-    resp = get(url, connect_timeout=120, readtimeout=120)
+    # Download function
+    f = retry(delays = fill(0.1, 4)) do
+        try
+            download(url, path; downloader)
+        catch
+            rethrow()
+        end
+    end
+    # Download source_file
+    f()
     # Read local file
-    txt = String(resp.body)
+    txt = read(path, String)
 
     return path, txt
 end
