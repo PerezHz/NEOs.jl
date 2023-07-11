@@ -225,6 +225,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     res = vcat(res_radec, res_del, res_dop)
     w = vcat(w_radec, w_del, w_dop)
+    jldsave("Apophis_res_w.jld2"; res_radec, res_del, res_dop, w_radec, w_del, w_dop)
 
     success, x_new, Γ = newtonls(res, w, zeros(get_numvars()), 10)
 
