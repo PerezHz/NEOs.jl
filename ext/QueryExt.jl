@@ -1,7 +1,7 @@
 module QueryExt
 
-using Dates 
-using NEOs: ObservatoryMPC, RadecMPC
+using Dates: DateTime, Date 
+using NEOs: ObservatoryMPC, RadecMPC, observatory, date, laplace_interpolation
 import NEOs: reduce_nights
 
 if isdefined(Base, :get_extension)
@@ -18,7 +18,10 @@ via Laplace interpolation.
 """
 function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Observations per observatory 
-    radec_per_obs = radec |> @groupby(_.observatory) |> @filter(length(_) >= 3) .|> collect
+    radec_per_obs = radec |> 
+                    @groupby(observatory(_)) |> 
+                    @filter(length(_) >= 3) .|> 
+                    collect
     # Initialize output vectos 
     observatories = Vector{ObservatoryMPC{T}}(undef, 0)
     dates = Vector{DateTime}(undef, 0)
@@ -30,7 +33,7 @@ function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
         obs = observatory(radec_per_obs[i][1])
         # Filter observation night 
         nights = radec_per_obs[i] |> 
-                @groupby(Date(_.date)) |> 
+                @groupby(Date(date(_))) |> 
                 @filter(length(_) >= 3) |> 
                 @map(laplace_interpolation(_)) |> 
                 @filter( !isnan(_[2]) && !isnan(_[3]) ) |> 
