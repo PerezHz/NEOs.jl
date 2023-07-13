@@ -204,6 +204,8 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
 
     # Check we have exactly three observations
     @assert length(observatories) == length(dates) == length(α) == length(δ) == 3 "Gauss method requires exactly three observations"
+    # Check observations are in temporal order 
+    @assert issorted(dates)
 
     # Julian days of observation
     t_julian = datetime2julian.(dates)
@@ -311,3 +313,57 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     end
 
 end
+
+function vandermonde(x::Vector{T}, order::Int) where {T <: Real}
+    # Number of points 
+    L = length(x)
+    # Initialize Vandermonde matrix 
+    V = Matrix{T}(undef, L, order+1)
+    # Fill first column
+    V[:, 1] .= one(T)
+    # Fill matrix 
+    for j in 1:order
+        for i in 1:L
+            V[i, j+1] = x[i]^j
+        end 
+    end 
+    return V
+end 
+
+function laplace_interpolation(x::Vector{T}, y::Vector{T}) where {T <: Real}
+    # Check we have as many x as y 
+    @assert length(x) == length(y)
+    # Polynomial order
+    order = length(x) - 1
+    # Vandermonde matrix 
+    V = vandermonde(x, order)
+    # Solve the system of equations 
+    if iszero(det(V))
+        coeffs = fill(T(NaN), order+1)
+    else 
+        coeffs = V \ y
+    end 
+    # Return polynomial 
+    return Taylor1{T}(coeffs, order)
+end 
+
+function laplace_interpolation(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+    # Julian days of observation
+    t_julian = datetime2julian.(date.(radec))
+    # Days of observation [relative to first observation]
+    t_rel = t_julian .- t_julian[1]
+    # Mean date 
+    t_mean = sum(t_rel) / length(t_rel)
+
+    # Interpolating polynomials 
+    α_p = laplace_interpolation(t_rel, ra.(radec))
+    δ_p = laplace_interpolation(t_rel, dec.(radec))
+    # Evaluate polynomials at mean date 
+    α_mean = α_p(t_mean)
+    δ_mean = δ_p(t_mean)
+
+    return julian2datetime(t_julian[1] + t_mean), α_mean, δ_mean
+end 
+
+# Empty method of reduce_nights, overloaded by QueryExt
+function reduce_nights end 
