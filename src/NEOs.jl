@@ -17,7 +17,7 @@ using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pol
       au, c_au_per_day, R_sun, c_cm_per_sec, c_au_per_sec, yr, RE, TaylorInterpolant, Rx,
       Ry, Rz, semimajoraxis, eccentricity, inclination, longascnode, argperi, timeperipass,
       nbodyind, ordpres_differentiate, numberofbodies, kmsec2auday, auday2kmsec, meanmotion,
-      meananomaly
+      meananomaly, selecteph
 using Healpix: ang2pixRing, Resolution
 using SatelliteToolboxTransformations
 import SatelliteToolboxTransformations.sv_ecef_to_eci
@@ -57,7 +57,7 @@ export compute_radec, debiasing, w8sveres17, radec_astrometry, residuals
 # Process radar
 export compute_delay, radar_astrometry
 # Gauss method
-export gauss_method, reduce_nights
+export gauss_method,  gauss_idxs, reduce_nights, gaussinitcond
 # Asteroid dynamical models
 export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!
 # Propagate

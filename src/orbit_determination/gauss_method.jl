@@ -46,9 +46,9 @@ end
 
 # Print method for GaussSolution
 # Examples:
-# unique Gauss solution (r = 1.0800950907383229)
+# unique Gauss solution (r = 1.0800950907383229 AU)
 function show(io::IO, g::GaussSolution{T, U}) where {T <: Real, U <: Number}
-    print(io, g.status, " Gauss solution (r = ", norm(cte.(g.statevect[1:3])), ")")
+    print(io, g.status, " Gauss solution (r = ", norm(cte.(g.statevect[1:3])), " AU)")
 end
 
 @doc raw"""
@@ -124,11 +124,11 @@ Derivative of Lagrange polynomial to be solved during Gauss method.
 lagrange_derivative(x::T, a::U, b::U) where {T, U <: Number} = 8*x^7 + 6*a*x^5 + 3*b*x^2
 
 # TO DO: Allow to control interval over which to look for solutions
-# Currently we look between the radius of the Sun ((0.00465047 au) and the radius of the Solar System (40 au)
+# Currently we look between the radius of the Sun (0.00465047 au) and the radius of the Solar System (40 au)
 
 @doc raw"""
-    solve_lagrange(a::T, b::T, c::T; niter::Int = niter) where {T <: Real}
-    solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T}; niter::Int = niter) where {T <: Real}
+    solve_lagrange(a::T, b::T, c::T; niter::Int = 5) where {T <: Real}
+    solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T}; niter::Int = 5) where {T <: Real}
 
 Solve Lagrange polynomial.
 
@@ -162,10 +162,9 @@ function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T}; niter::Int 
 end
 
 @doc raw"""
-    gauss_method(obs::Vector{RadecMPC{T}}; xve::EarthEph = et -> kmsec2auday(getposvel(399, 10, et)),
-                 niter::Int = 10) where {T <: AbstractFloat, EarthEph}
+    gauss_method(obs::Vector{RadecMPC{T}}; niter::Int = 5) where {T <: AbstractFloat}
     gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime}, α::Vector{U}, δ::Vector{U};
-                 xve::EarthEph = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: Real, U <: Number, EarthEph}
+                 niter::Int = 5) where {T <: Real, U <: Number}
 
 Core Gauss method of Initial Orbit determination (IOD). See Algorithm 5.5 in page 274 https://doi.org/10.1016/C2016-0-02107-1.
 
@@ -174,12 +173,11 @@ Core Gauss method of Initial Orbit determination (IOD). See Algorithm 5.5 in pag
 - `obs::Vector{RadecMPC{T}}`: three observations.
 - `observatories::Vector{ObservatoryMPC{T}}`: sites of observation.
 - `dates::Vector{DateTime}`: times of observation.
-- `α::Vector{U}`: right ascension.
-- `δ::Vector{U}`: declination.
-- `xve::EarthEph`: Earth's ephemeris [et -> au, au/day].
+- `α::Vector{U}`: right ascension [rad].
+- `δ::Vector{U}`: declination [rad].
 - `niter::Int`: Number of iterations for Newton's method.
 """
-function gauss_method(obs::Vector{RadecMPC{T}}; xve::EarthEph = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: AbstractFloat, EarthEph}
+function gauss_method(obs::Vector{RadecMPC{T}}; niter::Int = 5) where {T <: AbstractFloat}
 
     # Make sure observations are in temporal order
     sort!(obs)
@@ -196,37 +194,37 @@ function gauss_method(obs::Vector{RadecMPC{T}}; xve::EarthEph = et -> kmsec2auda
     # Declination
     δ = dec.(obs)
 
-    return gauss_method(observatories, dates, α, δ; xve = xve, niter = niter)
+    return gauss_method(observatories, dates, α, δ; niter = niter)
 end
 
 function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime}, α::Vector{U}, δ::Vector{U};
-                      xve::EarthEph = et -> kmsec2auday(getposvel(399, 10, et)), niter::Int = 5) where {T <: Real, U <: Number, EarthEph}
+                      niter::Int = 5) where {T <: Real, U <: Number}
 
     # Check we have exactly three observations
     @assert length(observatories) == length(dates) == length(α) == length(δ) == 3 "Gauss method requires exactly three observations"
     # Check observations are in temporal order 
-    @assert issorted(dates)
+    @assert issorted(dates) "Observations must be in temporal order"
 
-    # Julian days of observation
-    t_julian = datetime2julian.(dates)
+    # Times of observation [et]
+    t_et = datetime2et.(dates)
+    # Times of observation [days since J2000]
+    t_days = t_et ./ daysec
 
     # Time intervals
-    τ_1 = t_julian[1] - t_julian[2]
-    τ_3 = t_julian[3] - t_julian[2]
+    τ_1 = t_days[1] - t_days[2]
+    τ_3 = t_days[3] - t_days[2]
     τ = τ_3 - τ_1
 
     # NEO's topocentric position unit vectors
     ρ_vec = vectors2matrix(topounit.(α, δ))
-
-    # Times of observation [et]
-    t_et = datetime2et.(dates)
-
     # Geocentric state vector of the observer [au, au/day]
     g_vec = kmsec2auday.(obsposvelECI.(observatories, t_et))
-
+    # Sun's ephemeris 
+    eph_su = selecteph(sseph, su)
+    # Earth's ephemeris 
+    eph_ea = selecteph(sseph, ea)
     # Heliocentric state vector of the Earth [au, au/day]
-    G_vec = xve.(t_et)
-
+    G_vec = eph_ea.(t_days) - eph_su.(t_days)
     # Observer's heliocentric positions [au, au/day]
     R_vec = vectors2matrix(G_vec .+  g_vec)[:, 1:3]
 
@@ -266,7 +264,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     # Number of solutions
     n_sol = length(sol)
 
-    if n_sol == 0
+    if iszero(n_sol)
 
         @warn("""No solutions found for Lagrange equation $(_format_Lagrange_equation(cte(a), cte(b), cte(c)))""")
 
@@ -314,6 +312,11 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
 
 end
 
+@doc raw"""
+    vandermonde(x::Vector{T}, order::Int) where {T <: Real}
+
+Return the Vandermonde matrix of order `order` for points `x`. 
+"""
 function vandermonde(x::Vector{T}, order::Int) where {T <: Real}
     # Number of points 
     L = length(x)
@@ -330,7 +333,12 @@ function vandermonde(x::Vector{T}, order::Int) where {T <: Real}
     return V
 end 
 
-function laplace_interpolation(x::Vector{T}, y::Vector{T}) where {T <: Real}
+@doc raw"""
+    polynomial_interpolation(x::Vector{T}, y::Vector{T}) where {T <: Real}
+
+Return the polynomial that passes through points `(x, y)`. 
+"""
+function polynomial_interpolation(x::Vector{T}, y::Vector{T}) where {T <: Real}
     # Check we have as many x as y 
     @assert length(x) == length(y)
     # Polynomial order
@@ -347,7 +355,12 @@ function laplace_interpolation(x::Vector{T}, y::Vector{T}) where {T <: Real}
     return Taylor1{T}(coeffs, order)
 end 
 
-function laplace_interpolation(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+@doc raw"""
+    polynomial_interpolation(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+
+Return `(τ, α(τ), δ(τ))` where `τ` is the mean date, `α` the right ascension and `δ` the declination. 
+"""
+function polynomial_interpolation(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     # Julian days of observation
     t_julian = datetime2julian.(date.(radec))
     # Days of observation [relative to first observation]
@@ -356,8 +369,8 @@ function laplace_interpolation(radec::AbstractVector{RadecMPC{T}}) where {T <: R
     t_mean = sum(t_rel) / length(t_rel)
 
     # Interpolating polynomials 
-    α_p = laplace_interpolation(t_rel, ra.(radec))
-    δ_p = laplace_interpolation(t_rel, dec.(radec))
+    α_p = polynomial_interpolation(t_rel, ra.(radec))
+    δ_p = polynomial_interpolation(t_rel, dec.(radec))
     # Evaluate polynomials at mean date 
     α_mean = α_p(t_mean)
     δ_mean = δ_p(t_mean)
@@ -365,5 +378,33 @@ function laplace_interpolation(radec::AbstractVector{RadecMPC{T}}) where {T <: R
     return julian2datetime(t_julian[1] + t_mean), α_mean, δ_mean
 end 
 
-# Empty method of reduce_nights, overloaded by QueryExt
-function reduce_nights end 
+@doc raw"""
+    gauss_idxs(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
+
+Return `[i, j, k]` such that `j = length(dates)÷2` and `|dates[m] - dates[n]| > Δ` for `m, n ∈ {i, j, k}` with `m != n`. 
+"""
+function gauss_idxs(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
+    # Number of points 
+    L = length(dates)
+    # Naive indexes 
+    j = Int[1, L ÷ 2, L]
+    # Right iteration 
+    for i in j[2]+1:L
+        if (dates[i] - dates[j[2]]) > Δ
+            j[3] = i
+            break
+        end
+    end
+    # Left iteration
+    for i in j[2]-1:-1:1
+        if (dates[j[2]] - dates[i]) > Δ
+            j[1] = i
+            break
+        end
+    end
+    return j
+end
+
+# Empty methods to be overloaded by QueryExt
+function reduce_nights end
+function gaussinitcond end 

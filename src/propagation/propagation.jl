@@ -268,7 +268,7 @@ Compute the Lyapunov spectrum of a NEO.
 - `order::Int=order`: order of the Taylor expansions to be used in the integration.
 - `abstol::T`: absolute tolerance.
 - `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` (`true`) or not.
-""" propagate_lyap
+"""
 function propagate_lyap(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end],
                         order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
