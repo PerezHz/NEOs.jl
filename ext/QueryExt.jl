@@ -121,7 +121,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), nite
 
         # Orbit fit 
         success, x_new, Γ = newtonls(res, w, zeros(get_numvars()), niter)
-        @show success, x_new, Γ
+
         # TO DO: check cases where newton converges but diffcorr no
 
         if success
