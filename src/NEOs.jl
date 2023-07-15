@@ -57,7 +57,7 @@ export compute_radec, debiasing, w8sveres17, radec_astrometry, residuals
 # Process radar
 export compute_delay, radar_astrometry
 # Gauss method
-export gauss_method,  gauss_idxs, reduce_nights, gaussinitcond
+export gauss_method, gaussinitcond
 # Asteroid dynamical models
 export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!
 # Propagate

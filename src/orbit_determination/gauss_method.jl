@@ -313,11 +313,11 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
 end
 
 @doc raw"""
-    vandermonde(x::Vector{T}, order::Int) where {T <: Real}
+    vandermonde(x::AbstractVector{T}, order::Int) where {T <: Real}
 
 Return the Vandermonde matrix of order `order` for points `x`. 
 """
-function vandermonde(x::Vector{T}, order::Int) where {T <: Real}
+function vandermonde(x::AbstractVector{T}, order::Int) where {T <: Real}
     # Number of points 
     L = length(x)
     # Initialize Vandermonde matrix 
@@ -334,11 +334,11 @@ function vandermonde(x::Vector{T}, order::Int) where {T <: Real}
 end 
 
 @doc raw"""
-    polynomial_interpolation(x::Vector{T}, y::Vector{T}) where {T <: Real}
+    polynomial_interpolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
 
 Return the polynomial that passes through points `(x, y)`. 
 """
-function polynomial_interpolation(x::Vector{T}, y::Vector{T}) where {T <: Real}
+function polynomial_interpolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
     # Check we have as many x as y 
     @assert length(x) == length(y)
     # Polynomial order
@@ -353,29 +353,6 @@ function polynomial_interpolation(x::Vector{T}, y::Vector{T}) where {T <: Real}
     end 
     # Return polynomial 
     return Taylor1{T}(coeffs, order)
-end 
-
-@doc raw"""
-    polynomial_interpolation(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
-
-Return `(τ, α(τ), δ(τ))` where `τ` is the mean date, `α` the right ascension and `δ` the declination. 
-"""
-function polynomial_interpolation(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
-    # Julian days of observation
-    t_julian = datetime2julian.(date.(radec))
-    # Days of observation [relative to first observation]
-    t_rel = t_julian .- t_julian[1]
-    # Mean date 
-    t_mean = sum(t_rel) / length(t_rel)
-
-    # Interpolating polynomials 
-    α_p = polynomial_interpolation(t_rel, ra.(radec))
-    δ_p = polynomial_interpolation(t_rel, dec.(radec))
-    # Evaluate polynomials at mean date 
-    α_mean = α_p(t_mean)
-    δ_mean = δ_p(t_mean)
-
-    return julian2datetime(t_julian[1] + t_mean), α_mean, δ_mean
 end 
 
 @doc raw"""
@@ -405,6 +382,6 @@ function gauss_idxs(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
     return j
 end
 
-# Empty methods to be overloaded by QueryExt
+# Empty methods to be overloaded by DataFramesExt
 function reduce_nights end
 function gaussinitcond end 
