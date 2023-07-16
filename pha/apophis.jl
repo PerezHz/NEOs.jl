@@ -111,10 +111,11 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     # these are needed to ensure expansion coefficients remain small.
     # The magnitudes correspond to the typical order of magnitude of errors in
     # position/velocity (1e-8), Yarkovsky (1e-14) and radiation pressure (1e-15)
+    scalings = vcat(fill(1e-8, 6), 1e-14, 1e-15)
     if varorder == 0
         dq = zeros(8)
     else
-        dq = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14, 1e-15), order = varorder)
+        dq = NEOs.scaled_variables("δx", scalings, order = varorder)
     end
 
     q0 = vcat(q00, 0.0, 0.0) .+ dq
@@ -134,7 +135,8 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     sol_bwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_bwd, q0, Val(true);
                              order, abstol, parse_eqs)
-    jldsave("Apophis_bwd.jld2", asteph = sol_bwd)
+    jldsave("Apophis_bwd.jld2"; sol_bwd)
+    # sol_bwd = JLD2.load("Apophis_bwd.jld2", "asteph")
 
     tmax = nyears_fwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
@@ -142,8 +144,8 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     sol_fwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_fwd, q0, Val(true);
                              order, abstol, parse_eqs)
-    jldsave("Apophis_fwd.jld2", asteph = sol_fwd)
-
+    jldsave("Apophis_fwd.jld2"; sol_fwd)
+    # sol_fwd = JLD2.load("Apophis_fwd.jld2", "asteph")
     println()
 
     # load Solar System ephemeris
@@ -173,12 +175,14 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     deldop = vcat(deldop_2005_2013,deldop_2021)
 
     # Compute optical residuals
-    print_header("Compute optical astrometric residuals", 2)
     res_radec_all, w_radec_all = NEOs.residuals(radec; xvs, xve, xva)
+    jldsave("Apophis_res_w_radec.jld2"; res_radec_all, w_radec_all)
+    # JLD2.@load "Apophis_res_w_radec.jld2"
 
     # Compute radar residuals
-    print_header("Compute radar astrometric residuals", 2)
     res_del, w_del, res_dop, w_dop = NEOs.residuals(deldop; xvs, xve, xva, niter=10, tord=10)
+    jldsave("Apophis_res_w_radec.jld2"; res_del, w_del, res_dop, w_dop)
+    # JLD2.@load "Apophis_res_w_deldop.jld2"
 
     ### Process optical astrometry (filter, weight, debias)
 
@@ -226,11 +230,10 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     res = vcat(res_radec, res_del, res_dop)
     w = vcat(w_radec, w_del, w_dop)
-    jldsave("Apophis_res_w.jld2"; res_radec, res_del, res_dop, w_radec, w_del, w_dop)
 
     success, δx_OR8, Γ_OR8 = newtonls(res, w, zeros(get_numvars()), 10)
-    x_OR8 = xva(daysec*sol_fwd.t0)(δx_OR8)
-    σ_OR8 = sqrt.(diag(Γ_OR8))
+    x_OR8 = sol_fwd(sol_fwd.t0)(δx_OR8)
+    σ_OR8 = sqrt.(diag(Γ_OR8)).*scalings
 
     nradec = length(res_radec)
     res_ra = view(res_radec, 1:nradec÷2)
@@ -243,19 +246,19 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     print_header("Orbital fit and post-fit statistics", 2)
 
     # orbital fit
-    @show success
-    @show x_OR8
-    @show σ_OR8
+    println("Success flag                               : ", success, "\n")
+    println("Nominal solution Cartesian state vector    : ", x_OR8, " [au,au,au,au/d,au/d,au/d,au/d²,au/d²]\n")
+    println("1-sigma formal uncertainties               : ", σ_OR8, " [au,au,au,au/d,au/d,au/d,au/d²,au/d²]\n")
 
     # post-fit statistics
-    @show nrms_radec = nrms(res_radec(δx_OR8),w_radec)
-    @show nrms_radec = nrms(vcat(res_del,res_dop)(δx_OR8),vcat(w_del,w_dop))
-    @show nrms_optrad = nrms(res(δx_OR8),w)
-    @show mean_ra = mean(res_ra(δx_OR8), weights(w_ra))
-    @show mean_dec = mean(res_dec(δx_OR8), weights(w_dec))
-    @show mean_del = mean(res_del(δx_OR8), weights(w_del))
-    @show mean_dop = mean(res_dop(δx_OR8), weights(w_dop))
-    @show chi2_optrad = chi2(res(δx_OR8),w)
+    println("Normalized RMS (optical-only)              : ", nrms(res_radec(δx_OR8),w_radec), " [adimensional]")
+    println("Normalized RMS (radar-only)                : ", nrms(vcat(res_del,res_dop)(δx_OR8),vcat(w_del,w_dop)), " [adimensional]")
+    println("Normalized RMS (combined optical and radar): ", nrms(res(δx_OR8),w), " [adimensional]")
+    println("Mean weighted right-ascension residual     : ", mean(res_ra(δx_OR8), weights(w_ra)), " [arcseconds]")
+    println("Mean weighted declination residual         : ", mean(res_dec(δx_OR8), weights(w_dec)), " [arcseconds]")
+    println("Mean weighted time-delay residual          : ", mean(res_del(δx_OR8), weights(w_del)), " [micro-seconds]")
+    println("Mean weighted Doppler-shift residual       : ", mean(res_dop(δx_OR8), weights(w_dop)), " [Hz]")
+    println("Chi-squared statistic (χ²):                : ", chi2(res(δx_OR8),w), "[adimensional]")
 
     return sol_bwd, sol_fwd, res_radec, res_del, res_dop, w_radec, w_del, w_dop
 end
