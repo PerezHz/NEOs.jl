@@ -120,7 +120,7 @@ end
 
 Return cartesian state vector of orbit `osc` at time `t` (Julian day).
 """
-function (osc::OsculatingElements{T})(t::T) where {T <: Number}
+function (osc::OsculatingElements{T})(t::U) where {T,U <: Number}
 
     # Mean motion
     n = PE.meanmotion(μ_S, osc.a)
@@ -176,6 +176,6 @@ See https://doi.org/10.1016/j.icarus.2013.02.004.
 - `e`: eccentricity.
 - `μ_S`: mass parameter of the Sun.
 """
-function yarkp2adot(A2, a, e, μ_S)
-    return 2A2/(sqrt(a)*(1-e^2)*sqrt(μ_S))
+function yarkp2adot(A2, a, e; μ = μ_S)
+    return 2A2/(sqrt(a)*(1-e^2)*sqrt(μ))
 end
