@@ -107,17 +107,17 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     q00 = kmsec2auday(apophisposvel197(datetime2et(jd0_datetime)))
 
     # Perturbation to nominal initial condition (Taylor1 jet transport)
-    # vcat(fill(1e-8, 6), 1e-14, 1e-13) are the scaling factors for jet transport perturbation,
+    # vcat(fill(1e-8, 6), 1e-14, 1e-15) are the scaling factors for jet transport perturbation,
     # these are needed to ensure expansion coefficients remain small.
     # The magnitudes correspond to the typical order of magnitude of errors in
-    # position/velocity (1e-8), Yarkovsky (1e-13) and radiation pressure (1e-14)
+    # position/velocity (1e-8), Yarkovsky (1e-14) and radiation pressure (1e-15)
     if varorder == 0
-        dq = zeros(7)
+        dq = zeros(8)
     else
-        dq = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14), order = varorder)
+        dq = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14, 1e-15), order = varorder)
     end
 
-    q0 = vcat(q00, 0.0, 0.0) .+ vcat(dq, zero(dq[1]))
+    q0 = vcat(q00, 0.0, 0.0) .+ dq
 
     # Initial date (in Julian days)
     jd0 = datetime2julian(jd0_datetime)
@@ -173,10 +173,11 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     deldop = vcat(deldop_2005_2013,deldop_2021)
 
     # Compute optical residuals
-    print_header("Compute residuals", 2)
+    print_header("Compute optical astrometric residuals", 2)
     res_radec_all, w_radec_all = NEOs.residuals(radec; xvs, xve, xva)
 
     # Compute radar residuals
+    print_header("Compute radar astrometric residuals", 2)
     res_del, w_del, res_dop, w_dop = NEOs.residuals(deldop; xvs, xve, xva, niter=10, tord=10)
 
     ### Process optical astrometry (filter, weight, debias)
@@ -227,7 +228,9 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     w = vcat(w_radec, w_del, w_dop)
     jldsave("Apophis_res_w.jld2"; res_radec, res_del, res_dop, w_radec, w_del, w_dop)
 
-    success, x_new, Γ = newtonls(res, w, zeros(get_numvars()), 10)
+    success, δx_OR8, Γ_OR8 = newtonls(res, w, zeros(get_numvars()), 10)
+    x_OR8 = xva(daysec*sol_fwd.t0)(δx_OR8)
+    σ_OR8 = sqrt.(diag(Γ_OR8))
 
     nradec = length(res_radec)
     res_ra = view(res_radec, 1:nradec÷2)
@@ -237,22 +240,24 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     ### Print results
 
+    print_header("Orbital fit and post-fit statistics", 2)
+
     # orbital fit
     @show success
-    @show xva(daysec*sol_fwd.t0)(x_new)
-    @show sqrt.(diag(Γ))
+    @show x_OR8
+    @show σ_OR8
 
     # post-fit statistics
-    @show nrms_radec = nrms(res_radec(x_new),w_radec)
-    @show nrms_radec = nrms(vcat(res_del,res_dop)(x_new),vcat(w_del,w_dop))
-    @show nrms_optrad = nrms(res(x_new),w)
-    @show mean_ra = mean(res_ra(x_new), weights(w_ra))
-    @show mean_dec = mean(res_dec(x_new), weights(w_dec))
-    @show mean_del = mean(res_del(x_new), weights(w_del))
-    @show mean_dop = mean(res_dop(x_new), weights(w_dop))
-    @show chi2_optrad = chi2(res(x_new),w)
+    @show nrms_radec = nrms(res_radec(δx_OR8),w_radec)
+    @show nrms_radec = nrms(vcat(res_del,res_dop)(δx_OR8),vcat(w_del,w_dop))
+    @show nrms_optrad = nrms(res(δx_OR8),w)
+    @show mean_ra = mean(res_ra(δx_OR8), weights(w_ra))
+    @show mean_dec = mean(res_dec(δx_OR8), weights(w_dec))
+    @show mean_del = mean(res_del(δx_OR8), weights(w_del))
+    @show mean_dop = mean(res_dop(δx_OR8), weights(w_dop))
+    @show chi2_optrad = chi2(res(δx_OR8),w)
 
-    nothing
+    return sol_bwd, sol_fwd, res_radec, res_del, res_dop, w_radec, w_del, w_dop
 end
 
 function main()
