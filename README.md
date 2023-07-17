@@ -5,8 +5,8 @@
 [![Coverage Status](https://coveralls.io/repos/github/PerezHz/NEOs.jl/badge.svg?branch=main)](https://coveralls.io/github/PerezHz/NEOs.jl?branch=main)
 [![codecov](https://codecov.io/gh/PerezHz/NEOs.jl/branch/main/graph/badge.svg?token=F1IY79YP3J)](https://codecov.io/gh/PerezHz/NEOs.jl)
 
-`NEOs.jl` is a Near-Earth Object orbital propagator and
-fitter in Julia. `NEOs.jl` exploits jet transport techniques via
+`NEOs.jl` is a Julia package for high-accuracy orbit determination and propagation of
+Near-Earth Objects. `NEOs.jl` exploits jet transport techniques via
 [TaylorIntegration.jl](https://github.com/PerezHz/TaylorIntegration.jl).
 
 ## Authors
@@ -27,8 +27,20 @@ The current version of this package may be installed in Julia pkg manager via:
 
 ## Usage
 
-The `apophis.jl` file in the `pha` directory contains an example script. This
-script may be called as:
+The `pha` directory contains the `apophis.jl` script which performs an
+orbit determination for asteroid (99942) Apophis from optical and radar astrometry. In order
+to run this script, the environment corresponding to the `Project.toml` contained in the
+`pha` directory has to be active and instantiated. This can be done, for example, by running
+the following command from the `pha` directory:
+
+``julia -e `import Pkg; Pkg.activate(); Pkg.instantiate()` # run this from the `pha` directory ``
+
+Once the `pha` environment is active, this script may be called from the `pha` directory
+with the default settings as:
+
+`julia --project apophis.jl`
+
+The `--help` option can be passed to see a list of the customizable settings
 
 `julia --project apophis.jl --help`
 
@@ -43,6 +55,8 @@ resources provided by LANCAD-UNAM-DGTIC-284.
 
 ## References
 
+- Pérez-Hernández, J.A., Benet, L. Non-zero Yarkovsky acceleration for near-Earth asteroid
+    (99942) Apophis. Commun Earth Environ 3, 10 (2022). https://doi.org/10.1038/s43247-021-00337-x
 - Pérez-Hernández, Jorge A., & Benet, Luis. (2023).
     [PerezHz/TaylorIntegration.jl](https://github.com/PerezHzTaylorIntegration.jl):
-    v0.13.0 (Version v0.13.0). Zenodo. http://doi.org/10.5281/zenodo.7953772
+    v0.14.2 (Version v0.14.2). Zenodo. https://doi.org/10.5281/zenodo.8104080

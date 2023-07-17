@@ -39,6 +39,9 @@ end
 obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.observatory)
 obs_pos_ECEF(x::RadarJPL{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.rcvr)
 
+# TODO: avoid sv_ecef_to_ecef overload by defining proper product between DCMs and Taylor1/TaylorN
+# method below has been adapted from SatelliteToolboxTransformations.jl, MIT-licensed
+#   https://github.com/JuliaSpace/SatelliteToolboxTransformations.jl
 function sv_ecef_to_ecef(
     sv::OrbitStateVector,
     T_ECEF1::Val{:ITRF},
@@ -56,6 +59,9 @@ function sv_ecef_to_ecef(
     return OrbitStateVector(sv.t, r_ecef, v_ecef, a_ecef)
 end
 
+# TODO: avoid sv_ecef_to_eci overload by defining proper product between DCMs and Taylor1/TaylorN
+# method below has been adapted from SatelliteToolboxTransformations.jl, MIT-licensed
+#   https://github.com/JuliaSpace/SatelliteToolboxTransformations.jl
 function sv_ecef_to_eci(
     sv::OrbitStateVector,
     T_ECEF::Union{Val{:PEF}, Val{:TIRS}},
