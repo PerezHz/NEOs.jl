@@ -361,19 +361,24 @@ end
 Return `[i, j, k]` such that `j = length(dates)÷2` and `|dates[m] - dates[n]| > Δ` for `m, n ∈ {i, j, k}` with `m != n`. 
 """
 function gauss_idxs(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
+    @assert length(dates) >= 3 "length(dates) must be at least 3"
     # Number of points 
     L = length(dates)
     # Naive indexes 
-    j = Int[1, L ÷ 2, L]
+    if isodd(L)
+        j = Int[1, (L+1) ÷ 2, L]
+    else 
+        j = Int[1, L ÷ 2, L]
+    end     
     # Right iteration 
-    for i in j[2]+1:L
+    for i in j[2]+1:L-1
         if (dates[i] - dates[j[2]]) > Δ
             j[3] = i
             break
         end
     end
     # Left iteration
-    for i in j[2]-1:-1:1
+    for i in j[2]-1:-1:2
         if (dates[j[2]] - dates[i]) > Δ
             j[1] = i
             break

@@ -135,7 +135,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), nite
     # Jet transport perturbation (ra/dec)
     dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃"; order = varorder)
     # Gauss method solution 
-    sol = gauss_method(observatories[idxs], dates[idxs], α[idxs] + dq[1:3], δ[idxs] .+ dq[4:6]; niter = niter)
+    sol = gauss_method(observatories[idxs], dates[idxs], α[idxs] .+ dq[1:3], δ[idxs] .+ dq[4:6]; niter = niter)
 
     # Vector of errors 
     Q = Vector{T}(undef, length(sol))
