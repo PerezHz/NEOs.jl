@@ -243,22 +243,22 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     ### Print results
 
-    print_header("Orbital fit and post-fit statistics", 2)
+    print_header("Orbital fit (8-DOF) and post-fit statistics", 2)
 
     # orbital fit
-    println("Success flag                               : ", success, "\n")
-    println("Nominal solution Cartesian state vector    : ", x_OR8, " [au,au,au,au/d,au/d,au/d,au/d²,au/d²]\n")
-    println("1-sigma formal uncertainties               : ", σ_OR8, " [au,au,au,au/d,au/d,au/d,au/d²,au/d²]\n")
+    println("Success flag                                                      : ", success, "\n")
+    println("Nominal solution             [au,au,au,au/d,au/d,au/d,au/d²,au/d²]: ", x_OR8, "\n")
+    println("1-sigma formal uncertainties [au,au,au,au/d,au/d,au/d,au/d²,au/d²]: ", σ_OR8, "\n")
 
     # post-fit statistics
-    println("Normalized RMS (optical-only)              : ", nrms(res_radec(δx_OR8),w_radec), " [adimensional]")
-    println("Normalized RMS (radar-only)                : ", nrms(vcat(res_del,res_dop)(δx_OR8),vcat(w_del,w_dop)), " [adimensional]")
-    println("Normalized RMS (combined optical and radar): ", nrms(res(δx_OR8),w), " [adimensional]")
-    println("Mean weighted right-ascension residual     : ", mean(res_ra(δx_OR8), weights(w_ra)), " [arcseconds]")
-    println("Mean weighted declination residual         : ", mean(res_dec(δx_OR8), weights(w_dec)), " [arcseconds]")
-    println("Mean weighted time-delay residual          : ", mean(res_del(δx_OR8), weights(w_del)), " [micro-seconds]")
-    println("Mean weighted Doppler-shift residual       : ", mean(res_dop(δx_OR8), weights(w_dop)), " [Hz]")
-    println("Chi-squared statistic (χ²):                : ", chi2(res(δx_OR8),w), "[adimensional]")
+    println("Normalized RMS (optical-only)               [adimensional] : ", nrms(res_radec(δx_OR8),w_radec))
+    println("Normalized RMS (radar-only)                 [adimensional] : ", nrms(vcat(res_del,res_dop)(δx_OR8),vcat(w_del,w_dop)))
+    println("Normalized RMS (combined optical and radar) [adimensional] : ", nrms(res(δx_OR8),w), "\n")
+    println("Mean weighted right-ascension residual      [arcseconds]   : ", mean(res_ra(δx_OR8), weights(w_ra)))
+    println("Mean weighted declination residual          [arcseconds]   : ", mean(res_dec(δx_OR8), weights(w_dec)))
+    println("Mean weighted time-delay residual           [micro-seconds]: ", mean(res_del(δx_OR8), weights(w_del)))
+    println("Mean weighted Doppler-shift residual        [Hz]           : ", mean(res_dop(δx_OR8), weights(w_dop)), "\n")
+    println("Chi-squared statistic (χ²):                 [adimensional] : ", chi2(res(δx_OR8),w))
 
     return sol_bwd, sol_fwd, res_radec, res_del, res_dop, w_radec, w_del, w_dop
 end
