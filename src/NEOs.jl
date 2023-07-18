@@ -27,6 +27,7 @@ using Downloads: download
 import Downloads
 using HTTP: get
 using IntervalRootFinding: roots, interval, Interval, mid
+using Interpolations: Flat, Gridded, Linear, interpolate, extrapolate
 
 # Constants
 export d_EM_km, d_EM_au

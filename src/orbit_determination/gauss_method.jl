@@ -313,46 +313,19 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
 end
 
 @doc raw"""
-    vandermonde(x::AbstractVector{T}, order::Int) where {T <: Real}
+    extrapolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
 
-Return the Vandermonde matrix of order `order` for points `x`. 
+Return an extrapolation of points `(x, y)`. 
 """
-function vandermonde(x::AbstractVector{T}, order::Int) where {T <: Real}
-    # Number of points 
-    L = length(x)
-    # Initialize Vandermonde matrix 
-    V = Matrix{T}(undef, L, order+1)
-    # Fill first column
-    V[:, 1] .= one(T)
-    # Fill matrix 
-    for j in 1:order
-        for i in 1:L
-            V[i, j+1] = x[i]^j
-        end 
-    end 
-    return V
-end 
-
-@doc raw"""
-    polynomial_interpolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
-
-Return the polynomial that passes through points `(x, y)`. 
-"""
-function polynomial_interpolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
+function extrapolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
     # Check we have as many x as y 
     @assert length(x) == length(y)
-    # Polynomial order
-    order = length(x) - 1
-    # Vandermonde matrix 
-    V = vandermonde(x, order)
-    # Solve the system of equations 
-    if iszero(det(V))
-        coeffs = fill(T(NaN), order+1)
-    else 
-        coeffs = V \ y
-    end 
-    # Return polynomial 
-    return Taylor1{T}(coeffs, order)
+    # Interpolation 
+    itp = interpolate((x,), y, Gridded(Linear()))
+    # Extrapolation 
+    etpf = extrapolate(itp, Flat())
+
+    return etpf
 end 
 
 @doc raw"""

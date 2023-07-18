@@ -7,7 +7,7 @@ using NEOs: RadecMPC, date, gauss_idxs, propagate, RNp1BP_pN_A_J23E_J2S_eph_thre
             scaled_variables, gauss_method, residuals, bwdfwdeph, newtonls, diffcorr, nrms, hascoord
 
 import Base: convert
-import NEOs: AbstractAstrometry, polynomial_interpolation, reduce_nights, gaussinitcond
+import NEOs: AbstractAstrometry, extrapolation, reduce_nights, gaussinitcond
 
 if isdefined(Base, :get_extension)
     using DataFrames: AbstractDataFrame, DataFrame, nrow, eachcol, eachrow, groupby, combine
@@ -37,13 +37,13 @@ end
 convert(::Type{Vector{T}}, df::DataFrame) where {T <: AbstractAstrometry} = Vector{T}(df)
 
 @doc raw"""
-    polynomial_interpolation(df::AbstractDataFrame)
+    extrapolation(df::AbstractDataFrame)
 
-Special method of [`polynomial_interpolation`](@ref) to be used by [`gaussinitcond`](@ref).
+Special method of [`extrapolation`](@ref) to be used by [`gaussinitcond`](@ref).
 """
-function polynomial_interpolation(df::AbstractDataFrame)
-    if nrow(df) < 3
-        return (observatory = df.observatory[1], date = julian2datetime(0), α = NaN, δ = NaN)
+function extrapolation(df::AbstractDataFrame)
+    if isone(nrow(df))
+        return (observatory = df.observatory[1], date = df.date[1], α = df.α[1], δ = df.δ[1])
     end 
     
     # Julian days of observation
@@ -53,9 +53,9 @@ function polynomial_interpolation(df::AbstractDataFrame)
     # Mean date 
     t_mean = sum(t_rel) / length(t_rel)
 
-    # Interpolating polynomials 
-    α_p = polynomial_interpolation(t_rel, df.α)
-    δ_p = polynomial_interpolation(t_rel, df.δ)
+    # Extrapolate
+    α_p = extrapolation(t_rel, df.α)
+    δ_p = extrapolation(t_rel, df.δ)
     # Evaluate polynomials at mean date 
     α_mean = α_p(t_mean)
     δ_mean = δ_p(t_mean)
@@ -78,7 +78,7 @@ function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     df.Date = Date.(df.date)
     gdf = groupby(df, [:observatory, :Date])
     # Interpolate observation nights 
-    cdf = combine(gdf, polynomial_interpolation, keepkeys = false)
+    cdf = combine(gdf, extrapolation, keepkeys = false)
     # Eliminate unsuccesful interpolations 
     filter!(:α => !isnan, cdf)
     filter!(:δ => !isnan, cdf)
