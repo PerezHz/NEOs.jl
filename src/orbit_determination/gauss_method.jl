@@ -328,38 +328,72 @@ function extrapolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: R
     return etpf
 end 
 
+function closest_index_sorted(x::AbstractVector{T}, val::T) where {T}
+    L = length(x)
+    i = searchsortedfirst(x, val)
+    if i == L + 1
+        return 0
+    end 
+    j = searchsortedlast(x, val)
+    if j == 0
+        j = 1
+    end
+    
+    if abs(x[i] - val) < abs(x[j] - val)
+        return i 
+    else 
+        return j 
+    end
+end 
+
+gauss_norm(dates::Vector{DateTime}) = abs( (dates[2] - dates[1]).value - (dates[3] - dates[2]).value )
+
 @doc raw"""
     gauss_idxs(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
 
 Return `[i, j, k]` such that `j = length(dates)÷2` and `|dates[m] - dates[n]| > Δ` for `m, n ∈ {i, j, k}` with `m != n`. 
 """
 function gauss_idxs(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
-    @assert length(dates) >= 3 "length(dates) must be at least 3"
-    # Number of points 
     L = length(dates)
+    @assert L >= 3 "length(dates) must be at least 3"
+    @assert issorted(dates) "Vector of dates must be sorted"
+    if L == 3
+        return [1, 2, 3]
+    end 
     # Naive indexes 
     if isodd(L)
-        j = Int[1, (L+1) ÷ 2, L]
+        best_idxs = [1, (L+1) ÷ 2, L]
     else 
-        j = Int[1, L ÷ 2, L]
+        best_idxs = [1, L ÷ 2, L]
     end     
-    # Right iteration 
-    for i in j[2]+1:L-1
-        if (dates[i] - dates[j[2]]) > Δ
-            j[3] = i
+    best_norm = gauss_norm(dates[best_idxs])
+
+    idxs = [0, 0, 0]
+    norm = Inf
+
+    for i in 1:L-2
+        idxs[1] = i 
+        idxs[2] = closest_index_sorted(view(dates, idxs[1]+1:L), dates[idxs[1]] + Δ)
+        idxs[2] += idxs[1]
+        if (idxs[2] == idxs[1]) || (idxs[2] > L)
             break
-        end
-    end
-    # Left iteration
-    for i in j[2]-1:-1:2
-        if (dates[j[2]] - dates[i]) > Δ
-            j[1] = i
-            break
-        end
-    end
-    return j
-end
+        else  
+            idxs[3] = closest_index_sorted(view(dates, idxs[2]+1:L), dates[idxs[2]] + Δ)
+            idxs[3] += idxs[2]
+            if (idxs[3] == idxs[2]) || (idxs[3] > L)
+                break
+            end 
+        end 
+        norm = gauss_norm(dates[idxs])
+        if norm < best_norm
+            best_norm = norm
+            best_idxs .= idxs
+        end 
+    end 
+
+    return best_idxs
+end 
 
 # Empty methods to be overloaded by DataFramesExt
 function reduce_nights end
-function gaussinitcond end 
+function gaussinitcond end
