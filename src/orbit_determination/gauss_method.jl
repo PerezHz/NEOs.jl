@@ -328,17 +328,27 @@ function extrapolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: R
     return etpf
 end 
 
+@doc raw"""
+    closest_index_sorted(x::AbstractVector{T}, val::T) where {T}
+
+Return the index of the element in `x` that is closest to `val`, assuming `x` is sorted.
+"""
 function closest_index_sorted(x::AbstractVector{T}, val::T) where {T}
+    # Number of elements 
     L = length(x)
+    # Right closure
     i = searchsortedfirst(x, val)
+    # All x is below val 
     if i == L + 1
         return 0
     end 
+    # Left closure
     j = searchsortedlast(x, val)
+    # All x is above val
     if j == 0
         j = 1
     end
-    
+    # Choose closest element
     if abs(x[i] - val) < abs(x[j] - val)
         return i 
     else 
@@ -346,17 +356,30 @@ function closest_index_sorted(x::AbstractVector{T}, val::T) where {T}
     end
 end 
 
+@doc raw"""
+    gauss_norm(dates::Vector{DateTime})
+
+Return a measure of how evenly distributed in time a triplet is; used within [`gauss_idxs`](@ref) to select observations 
+for Gauss method. The function assumes `dates` is sorted.
+"""
 gauss_norm(dates::Vector{DateTime}) = abs( (dates[2] - dates[1]).value - (dates[3] - dates[2]).value )
 
 @doc raw"""
     gauss_idxs(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
 
-Return `[i, j, k]` such that `j = length(dates)÷2` and `|dates[m] - dates[n]| > Δ` for `m, n ∈ {i, j, k}` with `m != n`. 
+Return three indices `[i, j, k]` based on two criteria:
+    1.- The three dates are separated by `Δ` as close as possible,
+    2.- `|j - i|` and `|k - j|` are as close as possible.
+     
+See also [`gauss_norm`](@ref) and [`closest_index_sorted`](@ref).
 """
 function gauss_idxs(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
+    # Number of elements
     L = length(dates)
+    # Checks
     @assert L >= 3 "length(dates) must be at least 3"
     @assert issorted(dates) "Vector of dates must be sorted"
+    # Minimal case
     if L == 3
         return [1, 2, 3]
     end 
@@ -365,30 +388,33 @@ function gauss_idxs(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
         best_idxs = [1, (L+1) ÷ 2, L]
     else 
         best_idxs = [1, L ÷ 2, L]
-    end     
+    end
+    # Naive norm
     best_norm = gauss_norm(dates[best_idxs])
-
+    # Temporary idexes 
     idxs = [0, 0, 0]
+    # Temporary norm
     norm = Inf
 
     for i in 1:L-2
+        # First criterion
         idxs[1] = i 
-        idxs[2] = closest_index_sorted(view(dates, idxs[1]+1:L), dates[idxs[1]] + Δ)
-        idxs[2] += idxs[1]
+        idxs[2] = closest_index_sorted(view(dates, idxs[1]+1:L), dates[idxs[1]] + Δ) + idxs[1]
         if (idxs[2] == idxs[1]) || (idxs[2] > L)
             break
         else  
-            idxs[3] = closest_index_sorted(view(dates, idxs[2]+1:L), dates[idxs[2]] + Δ)
-            idxs[3] += idxs[2]
+            idxs[3] = closest_index_sorted(view(dates, idxs[2]+1:L), dates[idxs[2]] + Δ) + idxs[2]
             if (idxs[3] == idxs[2]) || (idxs[3] > L)
                 break
             end 
         end 
+        # Second criterion
         norm = gauss_norm(dates[idxs])
+        # Update norm and indexes
         if norm < best_norm
             best_norm = norm
             best_idxs .= idxs
-        end 
+        end
     end 
 
     return best_idxs
