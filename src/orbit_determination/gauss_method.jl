@@ -372,7 +372,7 @@ The triplets are sorted by [`gauss_norm`](@ref).
      
 See also [`closest_index_sorted`](@ref).
 """
-function gauss_triplets(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
+function gauss_triplets(dates::Vector{DateTime}, Δ::Period = Day(1))
     # Number of elements
     L = length(dates)
     # Checks

@@ -1,6 +1,6 @@
 module DataFramesExt
 
-using Dates: Date, DatePeriod, Day, datetime2julian, julian2datetime
+using Dates: Date, Period, Day, datetime2julian, julian2datetime
 using TaylorSeries: get_numvars
 using PlanetaryEphemeris: J2000, selecteph, su, ea, yr, daysec, auday2kmsec
 using NEOs: RadecMPC, date, gauss_triplets, propagate, RNp1BP_pN_A_J23E_J2S_eph_threads!, order, abstol, sseph,
@@ -110,7 +110,7 @@ See also [`gauss_method`](@ref).
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
-function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), Q_max::T = 0.75, niter::Int = 5, maxsteps::Int = 100, 
+function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::Period = Day(1), Q_max::T = 0.75, niter::Int = 5, maxsteps::Int = 100, 
                        varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
 
     # Sun's ephemeris
