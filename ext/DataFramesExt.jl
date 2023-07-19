@@ -3,7 +3,7 @@ module DataFramesExt
 using Dates: Date, DatePeriod, Day, datetime2julian, julian2datetime
 using TaylorSeries: get_numvars
 using PlanetaryEphemeris: J2000, selecteph, su, ea, yr, daysec, auday2kmsec
-using NEOs: RadecMPC, date, gauss_idxs, propagate, RNp1BP_pN_A_J23E_J2S_eph_threads!, order, abstol, sseph,
+using NEOs: RadecMPC, date, gauss_triplets, propagate, RNp1BP_pN_A_J23E_J2S_eph_threads!, order, abstol, sseph,
             scaled_variables, gauss_method, residuals, bwdfwdeph, newtonls, diffcorr, nrms, hascoord
 
 import Base: convert
@@ -98,7 +98,7 @@ See also [`gauss_method`](@ref).
 
 # Arguments
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `Δ::DatePeriod`: see [`gauss_idxs`](@ref).
+- `Δ::DatePeriod`: see [`gauss_triplets`](@ref).
 - `niter::Int`: number of iterations for Newton's method.
 - `maxsteps::Int`: maximum number of steps for propagation.
 - `varorder::Int`: order of jet transport perturbation. 
@@ -119,66 +119,107 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), nite
 
     # Reduce nights by interpolation 
     observatories, dates, α, δ = reduce_nights(radec)
-    # Pick three observations for Gauss method 
-    idxs = gauss_idxs(dates, Δ) 
-    
-    # [julian days]
-    t0, jd0, tf = datetime2julian.(dates[idxs])
-    # Number of years in forward integration 
-    nyears_fwd = (tf - jd0 + 2) / yr
-    # Number of years in backward integration
-    nyears_bwd = -(jd0 - t0 + 2) / yr
+    # Observations triplets
+    triplets = gauss_triplets(dates, Δ) 
 
-    # Subset of radec for residuals
-    sub_radec = filter(x -> dates[idxs[1]] <= date(x) <= dates[idxs[3]], radec)
+    # Initial date of integration [julian days]
+    jd0 = zero(T)
 
     # Jet transport perturbation (ra/dec)
     dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃"; order = varorder)
-    # Gauss method solution 
-    sol = gauss_method(observatories[idxs], dates[idxs], α[idxs] .+ dq[1:3], δ[idxs] .+ dq[4:6]; niter = niter)
 
     # Vector of errors 
-    Q = Vector{T}(undef, length(sol))
+    Q = Vector{T}(undef, 3*length(triplets))
     # Vector of initial conditions
-    Q0 = Matrix{T}(undef, length(sol), 6)
+    Q0 = Matrix{T}(undef, 3*length(triplets), 6)
 
-    # Iterate over Gauss solutions 
-    for i in eachindex(sol)
-        # Initial conditions (jet transport)
-        q0 = sol[i].statevect .+ eph_su(jd0 - J2000)
+    # Global counter
+    k = 1
+    # Break flag
+    flag = false
 
-        # Propagation 
-        bwd, fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, maxsteps, jd0, nyears_bwd, nyears_fwd, q0, Val(true); 
-                             order = order, abstol = abstol, parse_eqs = parse_eqs)
+    # Iterate over triplets
+    for j in eachindex(triplets)
+        
+        # Current triplet
+        idxs = triplets[j]
 
-        # O-C residuals
-        res, w = residuals(sub_radec; xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
-                           xva = et -> bwdfwdeph(et, bwd, fwd))
+        # [julian days]
+        t0, jd0, tf = datetime2julian.(dates[idxs])
+        # Number of years in forward integration 
+        nyears_fwd = (tf - jd0 + 2) / yr
+        # Number of years in backward integration
+        nyears_bwd = -(jd0 - t0 + 2) / yr
 
-        # Orbit fit 
-        success, x_new, Γ = newtonls(res, w, zeros(get_numvars()), niter)
+        # Subset of radec for residuals
+        sub_radec = filter(x -> dates[idxs[1]] <= date(x) <= dates[idxs[3]], radec)
 
-        # TO DO: check cases where newton converges but diffcorr no
+        # Gauss method solution 
+        sol = gauss_method(observatories[idxs], dates[idxs], α[idxs] .+ dq[1:3], δ[idxs] .+ dq[4:6]; niter = niter)
 
-        if success
-            # NRMS of the solution 
-            Q[i] = nrms(res(x_new), w)
-            # Initial conditions 
-            Q0[i, :] = bwd(bwd.t0)(x_new)
-        else
-            success, x_new, Γ = diffcorr(res, w, zeros(get_numvars()), niter)
+        # Iterate over Gauss solutions
+        for i in eachindex(sol)
+
+            # Initial conditions (jet transport)
+            q0 = sol[i].statevect .+ eph_su(jd0 - J2000)
+
+            # Propagation 
+            bwd, fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, maxsteps, jd0, nyears_bwd, nyears_fwd, q0, Val(true); 
+                                order = order, abstol = abstol, parse_eqs = parse_eqs)
+
+            # O-C residuals
+            res, w = residuals(sub_radec; xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
+                            xva = et -> bwdfwdeph(et, bwd, fwd))
+
+            # Orbit fit (Newton)
+            success, x_new, Γ = newtonls(res, w, zeros(get_numvars()), niter)
+            # Normalized root mean square error
+            tmpQ = nrms(res(x_new), w)
+
+            # TO DO: check cases where newton converges but diffcorr no
+
             if success
-                Q[i] = nrms(res(x_new), w)
-                Q0[i, :] = bwd(bwd.t0)(x_new)
+                # NRMS of the solution 
+                Q[k] = tmpQ
+                # Initial conditions 
+                Q0[k, :] = bwd(bwd.t0)(x_new)
+                # Break condition
+                if tmpQ <= 1
+                    flag = true
+                end
             else
-                Q[i] = T(Inf)
-                Q0[i, :] .= T(Inf)
+                # Orbit fit (differential corrections)
+                success, x_new, Γ = diffcorr(res, w, zeros(get_numvars()), niter)
+                # Normalized root mean square error
+                tmpQ = nrms(res(x_new), w)
+
+                if success
+                    # NRMS of the solution 
+                    Q[k] = tmpQ
+                    # Initial conditions 
+                    Q0[k, :] = bwd(bwd.t0)(x_new)
+                    # Break condition
+                    if tmpQ <= 1
+                        flag = true
+                    end
+                else
+                    Q[k] = T(Inf)
+                    Q0[k, :] .= T(Inf)
+                end 
             end 
-        end 
+            k += 1
+            # Break condition
+            if flag
+                break
+            end 
+        end
+        if flag
+            break
+        end
     end 
 
     # Solution with minimum NRMS
-    i = findmin(Q)[2]
+    i = findmin(Q[1:k-1])[2]
     # Case: all solutions were unsuccesful
     if isinf(Q[i])
         q00 = Vector{T}(undef, 0)

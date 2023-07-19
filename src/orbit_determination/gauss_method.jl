@@ -359,65 +359,50 @@ end
 @doc raw"""
     gauss_norm(dates::Vector{DateTime})
 
-Return a measure of how evenly distributed in time a triplet is; used within [`gauss_idxs`](@ref) to select observations 
+Return a measure of how evenly distributed in time a triplet is; used within [`gauss_triplets`](@ref) to sort triplets 
 for Gauss method. The function assumes `dates` is sorted.
 """
 gauss_norm(dates::Vector{DateTime}) = abs( (dates[2] - dates[1]).value - (dates[3] - dates[2]).value )
 
 @doc raw"""
-    gauss_idxs(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
+    gauss_triplets(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
 
-Return three indices `[i, j, k]` based on two criteria:
-    1.- The three dates are separated by `Δ` as close as possible,
-    2.- `|j - i|` and `|k - j|` are as close as possible.
+Return a vector of triplets to be used within [`gaussinitcond`](@ref) to select the best observations for Gauss method. 
+The triplets are sorted by [`gauss_norm`](@ref).
      
-See also [`gauss_norm`](@ref) and [`closest_index_sorted`](@ref).
+See also [`closest_index_sorted`](@ref).
 """
-function gauss_idxs(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
+function gauss_triplets(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
     # Number of elements
     L = length(dates)
     # Checks
     @assert L >= 3 "length(dates) must be at least 3"
     @assert issorted(dates) "Vector of dates must be sorted"
-    # Minimal case
-    if L == 3
-        return [1, 2, 3]
-    end 
-    # Naive indexes 
-    if isodd(L)
-        best_idxs = [1, (L+1) ÷ 2, L]
-    else 
-        best_idxs = [1, L ÷ 2, L]
-    end
-    # Naive norm
-    best_norm = gauss_norm(dates[best_idxs])
-    # Temporary idexes 
+    # Initialize triplets 
+    triplets = Vector{Vector{Int}}(undef, L-2)
+    # Initialize global counter
+    j = 1
+    # Temporary triplet 
     idxs = [0, 0, 0]
-    # Temporary norm
-    norm = Inf
-
+    
     for i in 1:L-2
-        # First criterion
+        # Construct triplet
         idxs[1] = i 
         idxs[2] = closest_index_sorted(view(dates, idxs[1]+1:L), dates[idxs[1]] + Δ) + idxs[1]
         if (idxs[2] == idxs[1]) || (idxs[2] > L)
-            break
+            continue
         else  
             idxs[3] = closest_index_sorted(view(dates, idxs[2]+1:L), dates[idxs[2]] + Δ) + idxs[2]
             if (idxs[3] == idxs[2]) || (idxs[3] > L)
-                break
+                continue
             end 
         end 
-        # Second criterion
-        norm = gauss_norm(dates[idxs])
-        # Update norm and indexes
-        if norm < best_norm
-            best_norm = norm
-            best_idxs .= idxs
-        end
+        # Add triplet
+        triplets[j] = copy(idxs)
+        j += 1
     end 
-
-    return best_idxs
+    # Sort by gauss_norm
+    return sort(triplets[1:j-1], by = x -> gauss_norm(dates[x]))
 end 
 
 # Empty methods to be overloaded by DataFramesExt
