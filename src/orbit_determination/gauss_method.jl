@@ -340,7 +340,7 @@ function closest_index_sorted(x::AbstractVector{T}, val::T) where {T}
     i = searchsortedfirst(x, val)
     # All x is below val 
     if i == L + 1
-        return 0
+        i = L
     end 
     # Left closure
     j = searchsortedlast(x, val)
@@ -389,11 +389,11 @@ function gauss_triplets(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
         # Construct triplet
         idxs[1] = i 
         idxs[2] = closest_index_sorted(view(dates, idxs[1]+1:L), dates[idxs[1]] + Δ) + idxs[1]
-        if (idxs[2] == idxs[1]) || (idxs[2] > L)
+        if idxs[2] >= L
             continue
         else  
             idxs[3] = closest_index_sorted(view(dates, idxs[2]+1:L), dates[idxs[2]] + Δ) + idxs[2]
-            if (idxs[3] == idxs[2]) || (idxs[3] > L)
+            if idxs[3] > L
                 continue
             end 
         end 

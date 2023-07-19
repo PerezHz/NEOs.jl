@@ -128,10 +128,10 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), nite
     # Jet transport perturbation (ra/dec)
     dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃"; order = varorder)
 
-    # Vector of errors 
-    Q = Vector{T}(undef, 3*length(triplets))
-    # Vector of initial conditions
-    Q0 = Matrix{T}(undef, 3*length(triplets), 6)
+    # Normalized root mean square error (NRMS)
+    best_Q = T(Inf)
+    # Initial conditions
+    best_Q0 = zeros(T, 6)
 
     # Global counter
     k = 1
@@ -173,38 +173,37 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), nite
 
             # Orbit fit (Newton)
             success, x_new, Γ = newtonls(res, w, zeros(get_numvars()), niter)
-            # Normalized root mean square error
-            tmpQ = nrms(res(x_new), w)
+            # NRMS
+            Q = nrms(res(x_new), w)
 
             # TO DO: check cases where newton converges but diffcorr no
 
             if success
-                # NRMS of the solution 
-                Q[k] = tmpQ
-                # Initial conditions 
-                Q0[k, :] = bwd(bwd.t0)(x_new)
+                # Update NRMS and initial conditions
+                if Q < best_Q
+                    best_Q = Q
+                    best_Q0 .= bwd(bwd.t0)(x_new)
+                end 
                 # Break condition
-                if tmpQ <= 1
+                if Q <= one(T)
                     flag = true
                 end
             else
                 # Orbit fit (differential corrections)
                 success, x_new, Γ = diffcorr(res, w, zeros(get_numvars()), niter)
-                # Normalized root mean square error
-                tmpQ = nrms(res(x_new), w)
+                # NRMS
+                Q = nrms(res(x_new), w)
 
                 if success
-                    # NRMS of the solution 
-                    Q[k] = tmpQ
-                    # Initial conditions 
-                    Q0[k, :] = bwd(bwd.t0)(x_new)
+                    # Update NRMS and initial conditions
+                    if Q < best_Q
+                        best_Q = Q
+                        best_Q0 .= bwd(bwd.t0)(x_new)
+                    end
                     # Break condition
-                    if tmpQ <= 1
+                    if Q <= one(T)
                         flag = true
                     end
-                else
-                    Q[k] = T(Inf)
-                    Q0[k, :] .= T(Inf)
                 end 
             end 
             k += 1
@@ -218,17 +217,13 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), nite
         end
     end 
 
-    # Solution with minimum NRMS
-    i = findmin(Q[1:k-1])[2]
     # Case: all solutions were unsuccesful
-    if isinf(Q[i])
-        q00 = Vector{T}(undef, 0)
+    if isinf(best_Q)
+        return jd0, Vector{T}(undef, 0)
     # Case: at least one solution was succesful
     else 
-        q00 = Q0[i, :]
+        return jd0, best_Q0
     end
-
-    return jd0, q00
 end 
 
 end # module
