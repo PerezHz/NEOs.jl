@@ -89,8 +89,8 @@ function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
 end 
 
 @doc raw"""
-    gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), niter::Int = 5, maxsteps::Int = 100, varorder::Int = 5,
-                  order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
+    gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), Q_max::T = 0.75, niter::Int = 5, maxsteps::Int = 100, 
+                  varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
 
 Return initial conditions via Gauss method. 
 
@@ -99,6 +99,7 @@ See also [`gauss_method`](@ref).
 # Arguments
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `Δ::DatePeriod`: see [`gauss_triplets`](@ref).
+- `Q_max::T`: The maximum nrms that is considered a good enough orbit.
 - `niter::Int`: number of iterations for Newton's method.
 - `maxsteps::Int`: maximum number of steps for propagation.
 - `varorder::Int`: order of jet transport perturbation. 
@@ -109,8 +110,8 @@ See also [`gauss_method`](@ref).
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
-function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), niter::Int = 5, maxsteps::Int = 100, varorder::Int = 5,
-                       order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
+function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), Q_max::T = 0.75, niter::Int = 5, maxsteps::Int = 100, 
+                       varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
 
     # Sun's ephemeris
     eph_su = selecteph(sseph, su)
@@ -185,7 +186,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), nite
                     best_Q0 .= bwd(bwd.t0)(x_new)
                 end 
                 # Break condition
-                if Q <= one(T)
+                if Q <= Q_max
                     flag = true
                 end
             else
@@ -201,7 +202,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), nite
                         best_Q0 .= bwd(bwd.t0)(x_new)
                     end
                     # Break condition
-                    if Q <= one(T)
+                    if Q <= Q_max
                         flag = true
                     end
                 end 
