@@ -89,7 +89,7 @@ function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
 end 
 
 @doc raw"""
-    gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::DatePeriod = Day(1), Q_max::T = 0.75, niter::Int = 5, maxsteps::Int = 100, 
+    gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::Period = Day(1), Q_max::T = 0.75, niter::Int = 5, maxsteps::Int = 100, 
                   varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
 
 Return initial conditions via Gauss method. 
@@ -98,7 +98,7 @@ See also [`gauss_method`](@ref).
 
 # Arguments
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `Δ::DatePeriod`: see [`gauss_triplets`](@ref).
+- `Δ::Period`: see [`gauss_triplets`](@ref).
 - `Q_max::T`: The maximum nrms that is considered a good enough orbit.
 - `niter::Int`: number of iterations for Newton's method.
 - `maxsteps::Int`: maximum number of steps for propagation.

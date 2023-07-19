@@ -365,7 +365,7 @@ for Gauss method. The function assumes `dates` is sorted.
 gauss_norm(dates::Vector{DateTime}) = abs( (dates[2] - dates[1]).value - (dates[3] - dates[2]).value )
 
 @doc raw"""
-    gauss_triplets(dates::Vector{DateTime}, Δ::DatePeriod = Day(1))
+    gauss_triplets(dates::Vector{DateTime}, Δ::Period = Day(1))
 
 Return a vector of triplets to be used within [`gaussinitcond`](@ref) to select the best observations for Gauss method. 
 The triplets are sorted by [`gauss_norm`](@ref).
