@@ -216,6 +216,16 @@ for V_dense in V_true_false
             @time sol = taylorinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, $V_dense(), _params;
                                   maxsteps, parse_eqs, eventorder, newtoniter, nrabstol)
 
+
+            # Dense output (save Taylor polynomials in each step)
+            if $V_dense == Val{true}
+                tv, xv, psol, tvS, xvS, gvS = sol
+                return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], psol), tvS, xvS, gvS
+            # Point output
+            elseif $V_dense == Val{false}
+                return sol
+            end
+
             return sol
 
         end
