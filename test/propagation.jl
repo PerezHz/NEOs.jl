@@ -281,6 +281,7 @@ using InteractiveUtils: methodswith
         rm("test.jld2")
 
         sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, 1, jd0, 0.02, q0, Val(true); order, abstol, parse_eqs)
+        @test sol isa TaylorInterpolant
 
         jldsave("test.jld2"; sol, tvS, xvS, gvS)
         recovered_sol = JLD2.load("test.jld2", "sol")

@@ -162,12 +162,12 @@ for V_dense in V_true_false
                            parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
             # Parameters for taylorinteg
-            _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
+            _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast, order, abstol)
 
             # Propagate orbit
 
             @time sol = taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, $V_dense(), _params;
-                                    maxsteps = maxsteps, parse_eqs = parse_eqs)
+                                    maxsteps, parse_eqs)
 
             # Dense output (save Taylor polynomials in each step)
             if $V_dense == Val{true}
@@ -186,8 +186,8 @@ for V_dense in V_true_false
 
             _jd0, _tspan, _abstol = promote(jd0, tspan, abstol)
 
-            return propagate(dynamics, maxsteps, _jd0, _tspan, q0, $V_dense(); μ_ast = μ_ast, order = order,
-                             abstol = _abstol, parse_eqs = parse_eqs)
+            return propagate(dynamics, maxsteps, _jd0, _tspan, q0, $V_dense(); μ_ast, order,
+                             abstol = _abstol, parse_eqs)
         end
 
         function propagate(dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, q0::Vector{U}, ::$V_dense;
@@ -195,11 +195,11 @@ for V_dense in V_true_false
                            parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
 
             # Backward integration
-            bwd = propagate(dynamics, maxsteps, jd0, nyears_bwd, q0, $V_dense(); μ_ast = μ_ast, order = order,
-                            abstol = abstol, parse_eqs = parse_eqs)
+            bwd = propagate(dynamics, maxsteps, jd0, nyears_bwd, q0, $V_dense(); μ_ast, order,
+                            abstol, parse_eqs)
             # Forward integration
-            fwd = propagate(dynamics, maxsteps, jd0, nyears_fwd, q0, $V_dense(); μ_ast = μ_ast, order = order,
-                            abstol = abstol, parse_eqs = parse_eqs)
+            fwd = propagate(dynamics, maxsteps, jd0, nyears_fwd, q0, $V_dense(); μ_ast, order,
+                            abstol, parse_eqs)
 
             return bwd, fwd
 
@@ -210,13 +210,20 @@ for V_dense in V_true_false
                                 order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
 
             # Parameters for neosinteg
-            _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
+            _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast, order, abstol)
 
             # Propagate orbit
             @time sol = taylorinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, $V_dense(), _params;
                                   maxsteps, parse_eqs, eventorder, newtoniter, nrabstol)
 
-            return sol
+            # Dense output (save Taylor polynomials in each step)
+            if $V_dense == Val{true}
+                tv, xv, psol, tvS, xvS, gvS = sol
+                return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], psol), tvS, xvS, gvS
+            # Point output
+            elseif $V_dense == Val{false}
+                return sol
+            end
 
         end
 
