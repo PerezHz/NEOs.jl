@@ -183,7 +183,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     # Compute radar residuals
     res_del, w_del, res_dop, w_dop = NEOs.residuals(deldop; xvs, xve, xva, niter=10, tord=10)
-    jldsave("Apophis_res_w_radec.jld2"; res_del, w_del, res_dop, w_dop)
+    jldsave("Apophis_res_w_deldop.jld2"; res_del, w_del, res_dop, w_dop)
     # JLD2.@load "Apophis_res_w_deldop.jld2"
 
     ### Process optical astrometry (filter, weight, debias)
