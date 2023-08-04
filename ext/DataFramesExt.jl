@@ -220,10 +220,10 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::Period = Day(1), Q_max::T
 
     # Case: all solutions were unsuccesful
     if isinf(best_Q)
-        return jd0, Vector{T}(undef, 0)
+        return jd0::T, Vector{T}(undef, 0)
     # Case: at least one solution was succesful
     else 
-        return jd0, best_Q0
+        return jd0::T, best_Q0
     end
 end 
 

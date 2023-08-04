@@ -162,6 +162,18 @@ function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T}; niter::Int 
 end
 
 @doc raw"""
+    heliocentric_energy(r::Vector{T}) where {T <: Number}
+
+Return the heliocentric energy per unit mass for heliocentric state vector `r` [au, au/day].
+"""
+function heliocentric_energy(r::Vector{T}) where {T <: Number}
+    @assert length(r) == 6 "r must have length 6"
+    kinetic = 0.5 * (r[4]^2 + r[5]^2 + r[6]^2) 
+    potential = k_gauss^2 / sqrt(r[1]^2 + r[2]^2 + r[3]^2)
+    return kinetic - potential 
+end
+
+@doc raw"""
     gauss_method(obs::Vector{RadecMPC{T}}; niter::Int = 5) where {T <: AbstractFloat}
     gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime}, α::Vector{U}, δ::Vector{U};
                  niter::Int = 5) where {T <: Real, U <: Number}
@@ -305,6 +317,8 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
 
             sol_gauss[i] = GaussSolution{T, U}(vcat(r_vec[2, :], v_2_vec), D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, status[i])
         end
+
+        filter!(x -> heliocentric_energy(x.statevect) <= 0, sol_gauss)
 
         return sort!(sol_gauss, by = x -> norm(x.statevect[1:3]))
 

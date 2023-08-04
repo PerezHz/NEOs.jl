@@ -70,3 +70,6 @@ const d_EM_au = 384_400 / au
 # Zeroth order obliquity of the ecliptic in degrees 
 # See equation (5-153) in page 5-61 of https://doi.org/10.1002/0471728470.
 const ϵ0_deg = 84381.448/3_600
+
+# Gauss gravitational constant
+const k_gauss = 0.017_202_098_95
