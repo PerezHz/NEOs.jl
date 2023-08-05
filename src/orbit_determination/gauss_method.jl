@@ -420,7 +420,7 @@ function gauss_triplets(dates::Vector{DateTime}, Δ::Period = Day(1))
     return sort(triplets[1:j-1], by = x -> gauss_norm(dates[x]))
 end 
 =#
-function gauss_triplets(dates::Vector{DateTime}; Δ_min::Period = Hour(1), Δ_max::Period = Day(7), N::Int = 10)
+function gauss_triplets(dates::Vector{DateTime}; Δ_min::Period = Hour(20), Δ_max::Period = Day(7), max_triplets::Int = 10)
     triplets = Vector{Vector{Int}}(undef, 0)
     L = length(dates)
     for i_1 in 1:L-2
@@ -435,7 +435,7 @@ function gauss_triplets(dates::Vector{DateTime}; Δ_min::Period = Hour(1), Δ_ma
 
     sort!(triplets, by = x -> gauss_norm(dates[x]))
 
-    n = min(length(triplets), N)
+    n = min(length(triplets), max_triplets)
 
     return triplets[1:n]
 end
