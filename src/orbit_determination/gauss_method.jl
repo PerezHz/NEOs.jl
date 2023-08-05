@@ -386,6 +386,7 @@ The triplets are sorted by [`gauss_norm`](@ref).
      
 See also [`closest_index_sorted`](@ref).
 """
+#=
 function gauss_triplets(dates::Vector{DateTime}, Δ::Period = Day(1))
     # Number of elements
     L = length(dates)
@@ -418,6 +419,26 @@ function gauss_triplets(dates::Vector{DateTime}, Δ::Period = Day(1))
     # Sort by gauss_norm
     return sort(triplets[1:j-1], by = x -> gauss_norm(dates[x]))
 end 
+=#
+function gauss_triplets(dates::Vector{DateTime}; Δ_min::Period = Hour(1), Δ_max::Period = Day(7), N::Int = 10)
+    triplets = Vector{Vector{Int}}(undef, 0)
+    L = length(dates)
+    for i_1 in 1:L-2
+        for i_2 in i_1+1:L-1
+            for i_3 in i_2+1:L
+                if Δ_min <= dates[i_3] - dates[i_1] <= Δ_max
+                    push!(triplets, [i_1, i_2, i_3])
+                end
+            end
+        end
+    end
+
+    sort!(triplets, by = x -> gauss_norm(dates[x]))
+
+    n = min(length(triplets), N)
+
+    return triplets[1:n]
+end
 
 # Empty methods to be overloaded by DataFramesExt
 function reduce_nights end

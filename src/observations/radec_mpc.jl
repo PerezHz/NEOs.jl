@@ -501,7 +501,7 @@ end
 
 Download MPC optical astrometry of NEO `id` and save the output to `filename`. 
 """
-function get_radec_mpc(id::AbstractString, filename::AbstractString)
+function get_radec_mpc(id::AbstractString, filename::AbstractString = replace(id, " " => "_") * ".txt")
     # MPC search url 
     search_url = search_mpc_url *  replace(id, " " => "+")
     # MPC observations file url 
