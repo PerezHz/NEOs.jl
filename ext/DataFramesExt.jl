@@ -1,6 +1,6 @@
 module DataFramesExt
 
-using Dates: Date, Period, Day, datetime2julian, julian2datetime
+using Dates: Date, Period, Hour, Day, datetime2julian, julian2datetime
 using TaylorSeries: get_numvars
 using PlanetaryEphemeris: J2000, selecteph, su, ea, yr, daysec, auday2kmsec
 using NEOs: RadecMPC, date, gauss_triplets, propagate, RNp1BP_pN_A_J23E_J2S_eph_threads!, order, abstol, sseph,
