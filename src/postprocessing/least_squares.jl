@@ -293,6 +293,29 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
     return true, x_new, Γ
 end
 
+function tryls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
+    # Newton's method
+    success_1, x_1, Γ_1 = newtonls(res, w, x0, niters)
+    # Differential corrections
+    success_2, x_2, Γ_2 = diffcorr(res, w, x0, niters)
+    if success_1 && success_2
+        Q_1 = nrms(res(x_1), w)
+        Q_2 = nrms(res(x_2), w)
+        if Q_1 <= Q_2
+            return success_1, x_1, Γ_1
+        else
+            return success_2, x_2, Γ_2
+        end
+    elseif success_1
+        return success_1, x_1, Γ_1
+    elseif success_2
+        return success_2, x_2, Γ_2
+    else
+        return false, x_1, Γ_1
+    end
+
+end
+
 @doc raw"""
     newtonls_Q(Q, nobs, x0, niters=5)
 
