@@ -122,7 +122,14 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ_min::Period = Hour(20), Δ
     # Reduce nights by interpolation 
     observatories, dates, α, δ = reduce_nights(radec)
     # Observations triplets
-    triplets = gauss_triplets(dates; Δ_min = Δ_min, Δ_max = Δ_max, max_triplets = max_triplets) 
+    Δ_min = Hour(20)
+    Δ_max = Day(7)
+    triplets = Vector{Vector{Int}}(undef, 0)
+    while iszero(length(triplets)) || Δ_min.value > 0
+        triplets = gauss_triplets(dates; Δ_min = Δ_min, Δ_max = Δ_max, max_triplets = max_triplets) 
+        Δ_min -= Hour(1)
+        Δ_max += Day(1)
+    end
 
     # Initial date of integration [julian days]
     jd0 = zero(T)
