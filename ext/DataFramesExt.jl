@@ -110,9 +110,8 @@ See also [`gauss_method`](@ref).
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
-function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ_min::Period = Hour(20), Δ_max::Period = Day(7), max_triplets::Int = 10,
-                       Q_max::T = 0.75, niter::Int = 5, maxsteps::Int = 100, varorder::Int = 5, order::Int = order, 
-                       abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
+function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 0.5, niter::Int = 5, maxsteps::Int = 100, 
+                       varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
 
     # Sun's ephemeris
     eph_su = selecteph(sseph, su)
@@ -122,15 +121,8 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ_min::Period = Hour(20), Δ
     # Reduce nights by interpolation 
     observatories, dates, α, δ = reduce_nights(radec)
     # Observations triplets
-    Δ_min = Hour(20)
-    Δ_max = Day(7)
-    triplets = Vector{Vector{Int}}(undef, 0)
-    while iszero(length(triplets)) && Δ_min.value > 0
-        triplets = gauss_triplets(dates; Δ_min = Δ_min, Δ_max = Δ_max, max_triplets = max_triplets) 
-        Δ_min -= Hour(1)
-        Δ_max += Day(1)
-    end
-
+    triplets = gauss_triplets(dates, max_triplets)
+    
     # Initial date of integration [julian days]
     jd0 = zero(T)
 

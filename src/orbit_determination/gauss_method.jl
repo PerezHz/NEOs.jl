@@ -343,34 +343,6 @@ function extrapolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: R
 end 
 
 @doc raw"""
-    closest_index_sorted(x::AbstractVector{T}, val::T) where {T}
-
-Return the index of the element in `x` that is closest to `val`, assuming `x` is sorted.
-"""
-function closest_index_sorted(x::AbstractVector{T}, val::T) where {T}
-    # Number of elements 
-    L = length(x)
-    # Right closure
-    i = searchsortedfirst(x, val)
-    # All x is below val 
-    if i == L + 1
-        i = L
-    end 
-    # Left closure
-    j = searchsortedlast(x, val)
-    # All x is above val
-    if j == 0
-        j = 1
-    end
-    # Choose closest element
-    if abs(x[i] - val) < abs(x[j] - val)
-        return i 
-    else 
-        return j 
-    end
-end 
-
-@doc raw"""
     gauss_norm(dates::Vector{DateTime})
 
 Return a measure of how evenly distributed in time a triplet is; used within [`gauss_triplets`](@ref) to sort triplets 
@@ -386,48 +358,16 @@ The triplets are sorted by [`gauss_norm`](@ref).
      
 See also [`closest_index_sorted`](@ref).
 """
-#=
-function gauss_triplets(dates::Vector{DateTime}, Δ::Period = Day(1))
-    # Number of elements
-    L = length(dates)
-    # Checks
-    @assert L >= 3 "length(dates) must be at least 3"
-    @assert issorted(dates) "Vector of dates must be sorted"
-    # Initialize triplets 
-    triplets = Vector{Vector{Int}}(undef, L-2)
-    # Initialize global counter
-    j = 1
-    # Temporary triplet 
-    idxs = [0, 0, 0]
+function gauss_triplets(dates::Vector{DateTime}, Δ_min::Period, Δ_max::Period, avoid::Vector{Vector{Int}}, max_triplets)
     
-    for i in 1:L-2
-        # Construct triplet
-        idxs[1] = i 
-        idxs[2] = closest_index_sorted(view(dates, idxs[1]+1:L), dates[idxs[1]] + Δ) + idxs[1]
-        if idxs[2] >= L
-            continue
-        else  
-            idxs[3] = closest_index_sorted(view(dates, idxs[2]+1:L), dates[idxs[2]] + Δ) + idxs[2]
-            if idxs[3] > L
-                continue
-            end 
-        end 
-        # Add triplet
-        triplets[j] = copy(idxs)
-        j += 1
-    end 
-    # Sort by gauss_norm
-    return sort(triplets[1:j-1], by = x -> gauss_norm(dates[x]))
-end 
-=#
-function gauss_triplets(dates::Vector{DateTime}; Δ_min::Period = Hour(20), Δ_max::Period = Day(7), max_triplets::Int = 10)
     triplets = Vector{Vector{Int}}(undef, 0)
     L = length(dates)
     for i_1 in 1:L-2
         for i_2 in i_1+1:L-1
             for i_3 in i_2+1:L
-                if Δ_min <= dates[i_3] - dates[i_1] <= Δ_max
-                    push!(triplets, [i_1, i_2, i_3])
+                tmp = [i_1, i_2, i_3]
+                if (Δ_min <= dates[i_3] - dates[i_1] <= Δ_max) && !(tmp in avoid)
+                    push!(triplets, tmp)
                 end
             end
         end
@@ -438,6 +378,23 @@ function gauss_triplets(dates::Vector{DateTime}; Δ_min::Period = Hour(20), Δ_m
     n = min(length(triplets), max_triplets)
 
     return triplets[1:n]
+end
+
+function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10)
+    Δ_min = Hour(20)
+    Δ_max = Day(7)
+
+    triplets = Vector{Vector{Int}}(undef, 0)
+
+    while length(triplets) < max_triplets
+        triplets = vcat(triplets, gauss_triplets(dates, Δ_min, Δ_max, triplets, max_triplets))
+        if Δ_min >= Hour(1)
+            Δ_min -= Hour(1)
+        end
+        Δ_max += Day(1)
+    end
+
+    return triplets[1:max_triplets]
 end
 
 # Empty methods to be overloaded by DataFramesExt
