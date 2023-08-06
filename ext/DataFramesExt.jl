@@ -125,7 +125,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; Δ_min::Period = Hour(20), Δ
     Δ_min = Hour(20)
     Δ_max = Day(7)
     triplets = Vector{Vector{Int}}(undef, 0)
-    while iszero(length(triplets)) || Δ_min.value > 0
+    while iszero(length(triplets)) && Δ_min.value > 0
         triplets = gauss_triplets(dates; Δ_min = Δ_min, Δ_max = Δ_max, max_triplets = max_triplets) 
         Δ_min -= Hour(1)
         Δ_max += Day(1)
