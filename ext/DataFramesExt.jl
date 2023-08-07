@@ -4,10 +4,10 @@ using Dates: Date, Period, Hour, Day, datetime2julian, julian2datetime
 using TaylorSeries: get_numvars
 using PlanetaryEphemeris: J2000, selecteph, su, ea, yr, daysec, auday2kmsec
 using NEOs: RadecMPC, date, gauss_triplets, propagate, RNp1BP_pN_A_J23E_J2S_eph_threads!, order, abstol, sseph,
-            scaled_variables, gauss_method, residuals, bwdfwdeph, newtonls, diffcorr, nrms, hascoord
+            scaled_variables, gauss_method, residuals, bwdfwdeph, newtonls, diffcorr, nrms, hascoord, tryls
 
 import Base: convert
-import NEOs: AbstractAstrometry, extrapolation, reduce_nights, gaussinitcond
+import NEOs: AbstractAstrometry, extrapolation, reduce_nights, gaussinitcond, relax_factor
 
 if isdefined(Base, :get_extension)
     using DataFrames: AbstractDataFrame, DataFrame, nrow, eachcol, eachrow, groupby, combine
@@ -72,8 +72,6 @@ via polynomial interpolation.
 function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Convert to DataFrame 
     df = DataFrame(radec)
-    # Eliminate observatories without coordinates 
-    filter!(:observatory => hascoord, df)
     # Group by observatory and Date 
     df.Date = Date.(df.date)
     gdf = groupby(df, [:observatory, :Date])
@@ -86,6 +84,20 @@ function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     sort!(cdf, :date)
 
     return cdf.observatory, cdf.date, cdf.α, cdf.δ
+end 
+
+function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+    # Convert to DataFrame 
+    df = DataFrame(radec)
+    # Group by observatory and Date 
+    df.Date = Date.(df.date)
+    gdf = groupby(df, [:observatory, :Date])
+    # Interpolate observation nights 
+    cdf = combine(gdf, nrow)
+    # Count observations in each group
+    Nv = cdf[gdf.groups, :nrow]
+    # Relaxation factor
+    return map(x -> x > 4.0 ? x/4.0 : 1.0, Nv)
 end 
 
 @doc raw"""
@@ -110,7 +122,7 @@ See also [`gauss_method`](@ref).
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
-function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 0.5, niter::Int = 5, maxsteps::Int = 100, 
+function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 100., niter::Int = 5, maxsteps::Int = 100, 
                        varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
 
     # Sun's ephemeris
@@ -118,12 +130,16 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
     # Earth's ephemeris
     eph_ea = selecteph(sseph, ea)
 
+    # Eliminate observatories without coordinates 
+    filter!(x -> hascoord(x.observatory), radec)
     # Reduce nights by interpolation 
     observatories, dates, α, δ = reduce_nights(radec)
     # Observations triplets
     triplets = gauss_triplets(dates, max_triplets)
-    
-    # Initial date of integration [julian days]
+
+    # Julian day of first (last) observation
+    t0, tf = datetime2julian(radec[1].date), datetime2julian(radec[end].date)
+    # Julian day when to start propagation
     jd0 = zero(T)
 
     # Jet transport perturbation (ra/dec)
@@ -133,9 +149,6 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
     best_Q = T(Inf)
     # Initial conditions
     best_Q0 = zeros(T, 6)
-
-    # Global counter
-    k = 1
     # Break flag
     flag = false
 
@@ -143,20 +156,17 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
     for j in eachindex(triplets)
         
         # Current triplet
-        idxs = triplets[j]
+        triplet = triplets[j]
 
-        # [julian days]
-        t0, jd0, tf = datetime2julian.(dates[idxs])
+        # Julian day when to start propagation
+        jd0 = datetime2julian(dates[triplet[2]])
         # Number of years in forward integration 
         nyears_fwd = (tf - jd0 + 2) / yr
         # Number of years in backward integration
         nyears_bwd = -(jd0 - t0 + 2) / yr
 
-        # Subset of radec for residuals
-        sub_radec = filter(x -> dates[idxs[1]] <= date(x) <= dates[idxs[3]], radec)
-
         # Gauss method solution 
-        sol = gauss_method(observatories[idxs], dates[idxs], α[idxs] .+ dq[1:3], δ[idxs] .+ dq[4:6]; niter = niter)
+        sol = gauss_method(observatories[triplet], dates[triplet], α[triplet] .+ dq[1:3], δ[triplet] .+ dq[4:6]; niter = niter)
 
         # Iterate over Gauss solutions
         for i in eachindex(sol)
@@ -169,45 +179,37 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
                                 order = order, abstol = abstol, parse_eqs = parse_eqs)
 
             # O-C residuals
-            res, w = residuals(sub_radec; xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
-                            xva = et -> bwdfwdeph(et, bwd, fwd))
+            res, w = residuals(radec; xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
+                               xva = et -> bwdfwdeph(et, bwd, fwd))
 
-            # Orbit fit (Newton)
-            success, x_new, Γ = newtonls(res, w, zeros(get_numvars()), niter)
+            # Subset of radec for orbit fit
+            i_O = findall(x -> dates[triplet[1]] <= date(x) <= dates[triplet[3]], radec)
+            i_ξ = vcat(i_O, i_O .+ length(radec))
+
+            # Relaxation factor
+            rex = relax_factor(radec)
+            rex = vcat(rex, rex)
+            w = w ./ rex
+
+            # Orbit fit
+            fit = tryls(res[i_ξ], w[i_ξ], zeros(get_numvars()), niter)
+
             # NRMS
-            Q = nrms(res(x_new), w)
+            Q = nrms(res(fit.x), w)
 
             # TO DO: check cases where newton converges but diffcorr no
 
-            if success
+            if fit.success
                 # Update NRMS and initial conditions
                 if Q < best_Q
                     best_Q = Q
-                    best_Q0 .= bwd(bwd.t0)(x_new)
+                    best_Q0 .= bwd(bwd.t0)(fit.x)
                 end 
                 # Break condition
                 if Q <= Q_max
                     flag = true
                 end
-            else
-                # Orbit fit (differential corrections)
-                success, x_new, Γ = diffcorr(res, w, zeros(get_numvars()), niter)
-                # NRMS
-                Q = nrms(res(x_new), w)
-
-                if success
-                    # Update NRMS and initial conditions
-                    if Q < best_Q
-                        best_Q = Q
-                        best_Q0 .= bwd(bwd.t0)(x_new)
-                    end
-                    # Break condition
-                    if Q <= Q_max
-                        flag = true
-                    end
-                end 
             end 
-            k += 1
             # Break condition
             if flag
                 break

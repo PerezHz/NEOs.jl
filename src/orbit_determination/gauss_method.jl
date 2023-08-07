@@ -400,3 +400,4 @@ end
 # Empty methods to be overloaded by DataFramesExt
 function reduce_nights end
 function gaussinitcond end
+function relax_factor end

@@ -64,7 +64,7 @@ export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!
 # Propagate
 export propagate, propagate_lyap, propagate_root
 
-export valsecchi_circle, nrms, chi2, newtonls, newtonls_6v, diffcorr, newtonls_Q, bopik
+export valsecchi_circle, nrms, chi2, newtonls, newtonls_6v, diffcorr, newtonls_Q, bopik, tryls, project
 
 include("constants.jl")
 include("observations/process_radar.jl")

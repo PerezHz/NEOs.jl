@@ -1,5 +1,33 @@
 include("b_plane.jl")
 
+struct OrbitFit{T <: Real}
+    success::Bool
+    x::Vector{T}
+    Γ::Matrix{T}
+    routine::Symbol
+    OrbitFit{T}(success::Bool, x::Vector{T}, Γ::Matrix{T}, routine::Symbol) where {T <: Real} = new{T}(success, x, Γ, routine)
+end
+
+OrbitFit(success::Bool, x::Vector{T}, Γ::Matrix{T}, routine::Symbol) where {T <: Real} = OrbitFit{T}(success, x, Γ, routine)
+
+# Print method for OrbitFit
+# Examples:
+# N00hp15 α: 608995.65 δ: -25653.3 t: 2020-12-04T10:41:43.209 obs: 703
+# 99942 α: 422475.3 δ: 97289.49 t: 2021-05-12T06:28:35.904 obs: F51
+function show(io::IO, fit::OrbitFit{T}) where {T <: Real}
+    success_s = fit.success ? "Succesful" : "Unsuccesful"
+    routine_s = fit.routine == :newton ? "Newton" : "differential corrections"
+    print(io, success_s, " ", routine_s)
+end
+
+function project(y::Vector{TaylorN{T}}, fit::OrbitFit{T}) where {T <: Real}
+    J = Matrix{T}(undef, get_numvars(), length(y))
+    for i in eachindex(y)
+        J[:, i] = TS.gradient(y[i])(fit.x)
+    end
+    return (J') * fit.Γ * J
+end
+
 @doc raw"""
     nrms(res, w)
     
@@ -194,7 +222,7 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
             error[i+1] = sqrt(error2)
         # The method do not converge
         else 
-            return false, x[:, i+1], inv(C)
+            return OrbitFit(false, x[:, i+1], inv(C), :diffcorr)
         end 
     end
     # Index with the lowest error 
@@ -206,7 +234,7 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
     # Covariance matrix
     Γ = inv(C)
     
-    return true, x_new, Γ
+    return OrbitFit(true, x_new, Γ, :diffcorr)
 end
 
 @doc raw"""
@@ -274,7 +302,7 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
             error[i+1] = sqrt(error2)
         # The method do not converge
         else 
-            return false, x[:, i+1], inv(C)
+            return OrbitFit(false, x[:, i+1], inv(C), :newton)
         end 
     end
     # TO DO: study Gauss method solution dependence on jt order 
@@ -290,28 +318,28 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
     # Covariance matrix
     Γ = inv(C)
 
-    return true, x_new, Γ
+    return OrbitFit(true, x_new, Γ, :newton)
 end
 
 function tryls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
     # Newton's method
-    success_1, x_1, Γ_1 = newtonls(res, w, x0, niters)
+    fit_1 = newtonls(res, w, x0, niters)
     # Differential corrections
-    success_2, x_2, Γ_2 = diffcorr(res, w, x0, niters)
-    if success_1 && success_2
-        Q_1 = nrms(res(x_1), w)
-        Q_2 = nrms(res(x_2), w)
+    fit_2 = diffcorr(res, w, x0, niters)
+    if fit_1.success && fit_2.success
+        Q_1 = nrms(res(fit_1.x), w)
+        Q_2 = nrms(res(fit_2.x), w)
         if Q_1 <= Q_2
-            return success_1, x_1, Γ_1
+            return fit_1
         else
-            return success_2, x_2, Γ_2
+            return fit_2
         end
-    elseif success_1
-        return success_1, x_1, Γ_1
-    elseif success_2
-        return success_2, x_2, Γ_2
+    elseif fit_1.success
+        return fit_1
+    elseif fit_2.success
+        return fit_2
     else
-        return false, x_1, Γ_1
+        return fit_1
     end
 
 end
