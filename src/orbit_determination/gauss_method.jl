@@ -380,21 +380,26 @@ function gauss_triplets(dates::Vector{DateTime}, Δ_min::Period, Δ_max::Period,
     return triplets[1:n]
 end
 
-function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10)
+function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_iter::Int = 100)
     Δ_min = Hour(20)
     Δ_max = Day(7)
 
     triplets = Vector{Vector{Int}}(undef, 0)
 
-    while length(triplets) < max_triplets
+    niter = 0
+
+    while length(triplets) < max_triplets && niter < max_iter
         triplets = vcat(triplets, gauss_triplets(dates, Δ_min, Δ_max, triplets, max_triplets))
         if Δ_min >= Hour(1)
             Δ_min -= Hour(1)
         end
         Δ_max += Day(1)
+        niter += 1
     end
 
-    return triplets[1:max_triplets]
+    n = min(length(triplets), max_triplets)
+
+    return triplets[1:n]
 end
 
 # Empty methods to be overloaded by DataFramesExt
