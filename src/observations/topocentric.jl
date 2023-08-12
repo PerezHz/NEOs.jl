@@ -1,6 +1,86 @@
 # Earth orientation parameters (eop) 2000
 const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
 
+@auto_hash_equals struct TimeOfDay
+    light::Symbol
+    start::Date
+    stop::Date
+    utc::Int 
+    function TimeOfDay(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
+        # Hours from UTC
+        utc = hours_from_UTC(observatory)
+        # Today's sunrise / sunset
+        today = sunriseset(date, observatory)
+        # Yesterday's sunrise / sunset 
+        yesterday = sunriseset(date - Day(1), observatory)
+        # Tomorrow's sunrise / sunset
+        tomorrow = sunriseset(date + Day(1), observatory)
+        # Selection
+        if yesterday[2] <= date <= today[1]
+            return new(:night, yesterday[2], today[1], utc)
+        elseif today[1] <= date <= today[2]
+            return new(:day, today[1], today[2], utc)
+        elseif today[2] <= date <= tomorrow[1]
+            return new(:night, today[2], tomorrow[1], utc)
+        end
+
+    end
+end
+
+isday(x::TimeOfDay) = x.light == :day
+isnight(x::TimeOfDay) = x.light == :night
+
+# Print method for RadecMPC
+# Examples:
+# N00hp15 α: 608995.65 δ: -25653.3 t: 2020-12-04T10:41:43.209 obs: 703
+# 99942 α: 422475.3 δ: 97289.49 t: 2021-05-12T06:28:35.904 obs: F51
+function show(io::IO, m::TimeOfDay)
+    print(io, uppercasefirst(string(m.light)), " from ", m.start, " to ", m.stop, " at UTC", @sprintf("%+d", m.utc))
+end
+
+hours_from_UTC(lon::T) where {T <: Number} = ceil(Int, 12*lon/π - 0.5)
+function hours_from_UTC(observatory::ObservatoryMPC{T}) where  {T <: AbstractFloat} 
+    lon, _ = lonlat(observatory)
+    return hours_from_UTC(lon)
+end
+
+function lonlat(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
+    # ECEF [km]
+    p_ECEF = obs_pos_ECEF(observatory)
+    # ECEF [m] -> Geodetic [m]
+    lat_geodetic, lon, altitude = ecef_to_geodetic(1_000 * p_ECEF)
+    # Geodetic [m] -> Geocentric [m]
+    lat_geocentric, _ = geodetic_to_geocentric(lat_geodetic, altitude)
+
+    return lon, lat_geocentric
+end 
+
+function sunriseset(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
+    # Fractional year [rad]
+    γ = 2π * (dayofyear(date) - 1 + (hour(date)-12)/24) / daysinyear(date)
+    # Equation of time [min]
+    eqtime = 229.18 * (0.000075 + 0.001868*cos(γ) - 0.032077*sin(γ) - 0.014615*cos(2γ) - 0.040849*sin(2γ) )
+    # Solar declination angle [rad]
+    δ = 0.006918 - 0.399912*cos(γ) + 0.070257*sin(γ) - 0.006758*cos(2γ) + 0.000907*sin(2γ) - 0.002697*cos(3γ) + 0.00148*sin(3γ)
+    # Longitude and latitude [rad]
+    lon, lat = lonlat(observatory)
+    # Solar hour angle [deg]
+    ha_sunrise = acosd(cosd(90.833)/cos(lat)/cos(δ) - tan(lat)*tan(δ))
+    ha_sunset = -ha_sunrise
+    # Day [DateTime]
+    day = DateTime(Date(date))
+    # UTC time of sunrise [min]
+    sunrise_min = 720 - 4*(rad2deg(lon) + ha_sunrise) - eqtime
+    # UTC time of sunrise [DateTime]
+    sunrise = day + Microsecond(round(Int, sunrise_min*6e7))
+    # UTC time of sunset [min]
+    sunset_min = 720 - 4*(rad2deg(lon) + ha_sunset) - eqtime 
+    # UTC time of sunset [DateTime]
+    sunset = day + Microsecond(round(Int, sunset_min*6e7))
+
+    return sunrise, sunset
+end
+
 @doc raw"""
     obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
     obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat}

@@ -1,10 +1,11 @@
 module DataFramesExt
 
-using Dates: Date, Period, Hour, Day, datetime2julian, julian2datetime
+using Dates: Period, Hour, Day, datetime2julian, julian2datetime
 using TaylorSeries: get_numvars
 using PlanetaryEphemeris: J2000, selecteph, su, ea, yr, daysec, auday2kmsec
 using NEOs: RadecMPC, date, gauss_triplets, propagate, RNp1BP_pN_A_J23E_J2S_eph_threads!, order, abstol, sseph,
-            scaled_variables, gauss_method, residuals, bwdfwdeph, newtonls, diffcorr, nrms, hascoord, tryls
+            scaled_variables, gauss_method, residuals, bwdfwdeph, newtonls, diffcorr, nrms, hascoord, tryls,
+            TimeOfDay
 
 import Base: convert
 import NEOs: AbstractAstrometry, extrapolation, reduce_nights, gaussinitcond, relax_factor
@@ -72,9 +73,9 @@ via polynomial interpolation.
 function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Convert to DataFrame 
     df = DataFrame(radec)
-    # Group by observatory and Date 
-    df.Date = Date.(df.date)
-    gdf = groupby(df, [:observatory, :Date])
+    # Group by observatory and TimeOfDay 
+    df.TimeOfDay = TimeOfDay.(df.date, df.observatory)
+    gdf = groupby(df, [:observatory, :TimeOfDay])
     # Interpolate observation nights 
     cdf = combine(gdf, extrapolation, keepkeys = false)
     # Eliminate unsuccesful interpolations 
@@ -89,9 +90,9 @@ end
 function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Convert to DataFrame 
     df = DataFrame(radec)
-    # Group by observatory and Date 
-    df.Date = Date.(df.date)
-    gdf = groupby(df, [:observatory, :Date])
+    # Group by observatory and TimeOfDay 
+    df.TimeOfDay = TimeOfDay.(df.date, df.observatory)
+    gdf = groupby(df, [:observatory, :TimeOfDay])
     # Interpolate observation nights 
     cdf = combine(gdf, nrow)
     # Count observations in each group
