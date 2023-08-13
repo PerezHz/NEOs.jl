@@ -1,4 +1,71 @@
 @doc raw"""
+    OpticalResidual{T <: Real, U <: Number}
+
+An astrometric optical observed minus computed residual. 
+
+# Fields
+
+- `ξ_α::U`: right ascension residual.
+- `ξ_δ::U`: declination residual.
+- `w_α::T`: right ascension weight.
+- `w_δ::T`: declination weight.
+- `relax_factor::T`: relaxation factor.
+- `outlier::Bool`: whether the residual is an outlier or not.
+"""
+@auto_hash_equals struct OpticalResidual{T <: Real, U <: Number}
+    ξ_α::U
+    ξ_δ::U
+    w_α::T
+    w_δ::T
+    relax_factor::T
+    outlier::Bool
+    function OpticalResidual{T, U}(ξ_α::U, ξ_δ::U, w_α::T, w_δ::T, relax_factor::T = one(T),
+                                   outlier::Bool = false) where {T <: Real, U <:  Number}
+        new{T, U}(ξ_α, ξ_δ, w_α, w_δ, relax_factor, outlier)
+    end
+end
+
+function OpticalResidual(ξ_α::U, ξ_δ::U, w_α::T, w_δ::T, relax_factor::T = one(T),
+                         outlier::Bool = false) where {T <: Real, U <: Number}
+    return OpticalResidual{T, U}(ξ_α, ξ_δ, w_α, w_δ, relax_factor, outlier)
+end
+
+# Evaluate methods
+function evaluate(res::OpticalResidual{T, TaylorN{T}}, x::Vector{T}) where {T <: Real}
+    return OpticalResidual(res.ξ_α(x), res.ξ_δ(x), res.w_α, res.w_δ, res.relax_factor, res.outlier)
+end
+(res::OpticalResidual{T, TaylorN{T}})(x::Vector{T}) where {T <: Real} = evaluate(res, x)
+
+function evaluate(res::Vector{OpticalResidual{T, TaylorN{T}}}, x::Vector{T}) where {T <: Real}
+    res_new = Vector{OpticalResidual{T, T}}(undef, length(res))
+    for i in eachindex(res)
+        res_new[i] = evaluate(res[i], x)
+    end
+    return res_new
+end
+(res::AbstractVector{OpticalResidual{T, TaylorN{T}}})(x::Vector{T}) where {T <: Real} = evaluate(res, x)
+
+# Print method for OpticalResidual
+# Examples:
+# α: -138.7980136773549 δ: -89.8002527255012
+# α: -134.79449984291568 δ: -91.42509376643284
+function show(io::IO, x::OpticalResidual{T, U}) where {T <: Real, U <: Number}
+    print(io, "α: ", cte(x.ξ_α), " δ: ", cte(x.ξ_δ))
+end
+
+@doc raw"""
+    unfold(ξs::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+
+Concatenate right ascension and declination residuals for an orbit fit.
+"""
+function unfold(ξs::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+    res = vcat(getfield.(ξs, :ξ_α), getfield.(ξs, :ξ_δ))
+    relax_factor = getfield.(ξs, :relax_factor)
+    w = vcat(getfield.(ξs, :w_α) ./ relax_factor, getfield.(ξs, :w_δ) ./ relax_factor)
+    return res, w
+end
+
+@doc raw"""
     compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
     xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
     compute_radec(obs::RadecMPC{T}; niter::Int = 5, xve::EarthEph = earthposvel, xvs::SunEph = sunposvel,
@@ -493,7 +560,6 @@ See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and 
 - `xva::AstEph`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
 function residuals(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloat}
-
     # Optical astrometry (dates + observed + computed + debiasing + weights)
     x_jt = radec_astrometry(obs; kwargs...)
     # Right ascension residuals
@@ -501,9 +567,5 @@ function residuals(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloa
     # Declination residuals
     res_δ = x_jt[3] .- x_jt[7] .- x_jt[5]
     # Total residuals
-    res = vcat(res_α, res_δ)
-    # Weights
-    w = repeat(1 ./ x_jt[end].^2, 2)
-
-    return res, w
+    return OpticalResidual.(res_α, res_δ, 1 ./ x_jt[end].^2, 1 ./ x_jt[end].^2, one(T), false)
 end

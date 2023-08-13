@@ -1,6 +1,17 @@
 # Earth orientation parameters (eop) 2000
 const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
 
+@doc raw"""
+    TimeOfDay
+
+Day/night at a particular timezone.
+
+# Fields 
+- `light::Symbol`: `:day` or `:night`.
+- `start::Date`.
+- `stop::Date`.
+- `utc::Int`: hours from UTC.
+"""
 @auto_hash_equals struct TimeOfDay
     light::Symbol
     start::Date
@@ -27,23 +38,35 @@ const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
     end
 end
 
+TimeOfDay(radec::RadecMPC{T}) where {T <: AbstractFloat} = TimeOfDay(date(radec), observatory(radec))
+
 isday(x::TimeOfDay) = x.light == :day
 isnight(x::TimeOfDay) = x.light == :night
 
-# Print method for RadecMPC
+# Print method for TimeOfDay
 # Examples:
-# N00hp15 α: 608995.65 δ: -25653.3 t: 2020-12-04T10:41:43.209 obs: 703
-# 99942 α: 422475.3 δ: 97289.49 t: 2021-05-12T06:28:35.904 obs: F51
+# Night from 2023-06-29 to 2023-06-29 at UTC-7
+# Night from 2023-06-29 to 2023-06-30 at UTC+3
 function show(io::IO, m::TimeOfDay)
     print(io, uppercasefirst(string(m.light)), " from ", m.start, " to ", m.stop, " at UTC", @sprintf("%+d", m.utc))
 end
 
-hours_from_UTC(lon::T) where {T <: Number} = ceil(Int, 12*lon/π - 0.5)
+@doc raw"""
+    hours_from_UTC(lon::T) where {T <: Real}
+
+Return the naive hour difference between longitude `lon` [rad] and UTC.
+"""
+hours_from_UTC(lon::T) where {T <: Real} = ceil(Int, 12*lon/π - 0.5)
 function hours_from_UTC(observatory::ObservatoryMPC{T}) where  {T <: AbstractFloat} 
     lon, _ = lonlat(observatory)
     return hours_from_UTC(lon)
 end
 
+@doc raw"""
+    lonlat(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
+
+Return longitude and latitude (both in rad) of an observatory.
+"""
 function lonlat(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
     # ECEF [km]
     p_ECEF = obs_pos_ECEF(observatory)
@@ -55,6 +78,14 @@ function lonlat(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
     return lon, lat_geocentric
 end 
 
+@doc raw"""
+    sunriseset(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
+
+Return `DateTime` of sunrise and sunset at a particular date and location.
+
+!!! reference
+    See "General Solar Position Calculations" by NOAA at https://gml.noaa.gov/grad/solcalc/solareqns.PDF.
+"""
 function sunriseset(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
     # Fractional year [rad]
     γ = 2π * (dayofyear(date) - 1 + (hour(date)-12)/24) / daysinyear(date)
@@ -80,6 +111,8 @@ function sunriseset(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: 
 
     return sunrise, sunset
 end
+
+sunriseset(radec::RadecMPC{T}) where {T <: AbstractFloat} = sunriseset(date(radec), observatory(radec))
 
 @doc raw"""
     obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}

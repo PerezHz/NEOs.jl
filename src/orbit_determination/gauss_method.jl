@@ -3,8 +3,7 @@ include("osculating.jl")
 @doc raw"""
     GaussSolution{T <: Real, U <: Number}
 
-A preliminary orbit obtained from Gauss method of orbit determination. See Algorithm 5.5 in page 274 of
-https://doi.org/10.1016/C2016-0-02107-1.
+A preliminary orbit obtained from Gauss method of orbit determination.
 
 See also [`gauss_method`](@ref).
 
@@ -18,6 +17,9 @@ See also [`gauss_method`](@ref).
 - `τ_3::T`: time between third and second observations.
 - `f_1, g_1, f_3, g_3::U`: Lagrange coefficients.
 - `status::Symbol`: the status of the solution (`:empty`, `:unkown` or `:unique`)
+
+!!! reference
+    See Algorithm 5.5 in page 274 of https://doi.org/10.1016/C2016-0-02107-1.
 """
 @auto_hash_equals struct GaussSolution{T <: Real, U <: Number}
     statevect::Vector{U}
@@ -48,7 +50,7 @@ end
 # Examples:
 # unique Gauss solution (r = 1.0800950907383229 AU)
 function show(io::IO, g::GaussSolution{T, U}) where {T <: Real, U <: Number}
-    print(io, g.status, " Gauss solution (r = ", norm(cte.(g.statevect[1:3])), " AU)")
+    print(io, uppercasefirst(string(g.status)), " Gauss solution (r = ", norm(cte.(g.statevect[1:3])), " AU)")
 end
 
 @doc raw"""
@@ -178,7 +180,7 @@ end
     gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime}, α::Vector{U}, δ::Vector{U};
                  niter::Int = 5) where {T <: Real, U <: Number}
 
-Core Gauss method of Initial Orbit determination (IOD). See Algorithm 5.5 in page 274 https://doi.org/10.1016/C2016-0-02107-1.
+Core Gauss method of Initial Orbit determination (IOD).
 
 # Arguments
 
@@ -188,6 +190,9 @@ Core Gauss method of Initial Orbit determination (IOD). See Algorithm 5.5 in pag
 - `α::Vector{U}`: right ascension [rad].
 - `δ::Vector{U}`: declination [rad].
 - `niter::Int`: Number of iterations for Newton's method.
+
+!!! reference
+    See Algorithm 5.5 in page 274 https://doi.org/10.1016/C2016-0-02107-1.
 """
 function gauss_method(obs::Vector{RadecMPC{T}}; niter::Int = 5) where {T <: AbstractFloat}
 
@@ -317,9 +322,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
 
             sol_gauss[i] = GaussSolution{T, U}(vcat(r_vec[2, :], v_2_vec), D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3, status[i])
         end
-
-        filter!(x -> heliocentric_energy(x.statevect) <= 0, sol_gauss)
-
+        # Sort solutions by heliocentric range
         return sort!(sol_gauss, by = x -> norm(x.statevect[1:3]))
 
     end
@@ -351,14 +354,12 @@ for Gauss method. The function assumes `dates` is sorted.
 gauss_norm(dates::Vector{DateTime}) = abs( (dates[2] - dates[1]).value - (dates[3] - dates[2]).value )
 
 @doc raw"""
-    gauss_triplets(dates::Vector{DateTime}, Δ::Period = Day(1))
+    gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_iter::Int = 100)
 
-Return a vector of triplets to be used within [`gaussinitcond`](@ref) to select the best observations for Gauss method. 
+Return a vector of `max_triplets` triplets to be used within [`gaussinitcond`](@ref) to select the best observations for Gauss method. 
 The triplets are sorted by [`gauss_norm`](@ref).
-     
-See also [`closest_index_sorted`](@ref).
 """
-function gauss_triplets(dates::Vector{DateTime}, Δ_min::Period, Δ_max::Period, avoid::Vector{Vector{Int}}, max_triplets)
+function gauss_triplets(dates::Vector{DateTime}, Δ_min::Period, Δ_max::Period, avoid::Vector{Vector{Int}}, max_triplets::Int)
     
     triplets = Vector{Vector{Int}}(undef, 0)
     L = length(dates)

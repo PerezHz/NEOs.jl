@@ -5,7 +5,7 @@ using TaylorSeries: get_numvars
 using PlanetaryEphemeris: J2000, selecteph, su, ea, yr, daysec, auday2kmsec
 using NEOs: RadecMPC, date, gauss_triplets, propagate, RNp1BP_pN_A_J23E_J2S_eph_threads!, order, abstol, sseph,
             scaled_variables, gauss_method, residuals, bwdfwdeph, newtonls, diffcorr, nrms, hascoord, tryls,
-            TimeOfDay
+            TimeOfDay, OpticalResidual, heliocentric_energy
 
 import Base: convert
 import NEOs: AbstractAstrometry, extrapolation, reduce_nights, gaussinitcond, relax_factor
@@ -87,6 +87,12 @@ function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     return cdf.observatory, cdf.date, cdf.α, cdf.δ
 end 
 
+@doc raw"""
+    relax_factor(radec::Vector{RadecMPC{T}}, ξs::Vector{OpticalResidual{T}}) where {T <: Real}
+
+Modify the weights in `ξs` by a relaxing factor quantifying the correlation between observations taken on the 
+same night by the same observatory.
+"""
 function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Convert to DataFrame 
     df = DataFrame(radec)
@@ -101,8 +107,14 @@ function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     return map(x -> x > 4.0 ? x/4.0 : 1.0, Nv)
 end 
 
+function relax_factor(radec::Vector{RadecMPC{T}}, ξs::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+    rex = relax_factor(radec)
+    return OpticalResidual.(getfield.(ξs, :ξ_α), getfield.(ξs, :ξ_δ), getfield.(ξs, :w_α), getfield.(ξs, :w_δ), rex,
+                            getfield.(ξs, :outlier))
+end
+
 @doc raw"""
-    gaussinitcond(radec::Vector{RadecMPC{T}}; Δ::Period = Day(1), Q_max::T = 0.75, niter::Int = 5, maxsteps::Int = 100, 
+    gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 100., niter::Int = 5, maxsteps::Int = 100, 
                   varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
 
 Return initial conditions via Gauss method. 
@@ -111,7 +123,7 @@ See also [`gauss_method`](@ref).
 
 # Arguments
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `Δ::Period`: see [`gauss_triplets`](@ref).
+- `max_triplets::Int`: maximum number of triplets.
 - `Q_max::T`: The maximum nrms that is considered a good enough orbit.
 - `niter::Int`: number of iterations for Newton's method.
 - `maxsteps::Int`: maximum number of steps for propagation.
@@ -169,6 +181,9 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
         # Gauss method solution 
         sol = gauss_method(observatories[triplet], dates[triplet], α[triplet] .+ dq[1:3], δ[triplet] .+ dq[4:6]; niter = niter)
 
+        # Filter Gauss solutions by heliocentric energy
+        filter!(x -> heliocentric_energy(x.statevect) <= 0, sol)
+
         # Iterate over Gauss solutions
         for i in eachindex(sol)
 
@@ -180,23 +195,20 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
                                 order = order, abstol = abstol, parse_eqs = parse_eqs)
 
             # O-C residuals
-            res, w = residuals(radec; xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
-                               xva = et -> bwdfwdeph(et, bwd, fwd))
+            res = residuals(radec; xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
+                            xva = et -> bwdfwdeph(et, bwd, fwd))
 
             # Subset of radec for orbit fit
-            i_O = findall(x -> dates[triplet[1]] <= date(x) <= dates[triplet[3]], radec)
-            i_ξ = vcat(i_O, i_O .+ length(radec))
+            idxs = findall(x -> dates[triplet[1]] <= date(x) <= dates[triplet[3]], radec)
 
             # Relaxation factor
-            rex = relax_factor(radec)
-            rex = vcat(rex, rex)
-            w = w ./ rex
-
+            res = relax_factor(radec, res)
+            
             # Orbit fit
-            fit = tryls(res[i_ξ], w[i_ξ], zeros(get_numvars()), niter)
+            fit = tryls(res[idxs], zeros(get_numvars()), niter)
 
             # NRMS
-            Q = nrms(res(fit.x), w)
+            Q = nrms(res, fit)
 
             # TO DO: check cases where newton converges but diffcorr no
 
