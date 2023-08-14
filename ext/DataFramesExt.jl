@@ -1,9 +1,9 @@
 module DataFramesExt
 
-using Dates: Period, Hour, Day, datetime2julian, julian2datetime
+using Dates: Period, Hour, Day, DateTime, datetime2julian, julian2datetime
 using TaylorSeries: get_numvars
 using PlanetaryEphemeris: J2000, selecteph, su, ea, yr, daysec, auday2kmsec
-using NEOs: RadecMPC, date, gauss_triplets, propagate, RNp1BP_pN_A_J23E_J2S_eph_threads!, order, abstol, sseph,
+using NEOs: RadecMPC, ObservatoryMPC, date, gauss_triplets, propagate, RNp1BP_pN_A_J23E_J2S_eph_threads!, order, abstol, sseph,
             scaled_variables, gauss_method, residuals, bwdfwdeph, newtonls, diffcorr, nrms, hascoord, tryls,
             TimeOfDay, OpticalResidual, heliocentric_energy
 
@@ -11,10 +11,10 @@ import Base: convert
 import NEOs: AbstractAstrometry, extrapolation, reduce_nights, gaussinitcond, relax_factor
 
 if isdefined(Base, :get_extension)
-    using DataFrames: AbstractDataFrame, DataFrame, nrow, eachcol, eachrow, groupby, combine
+    using DataFrames: AbstractDataFrame, GroupedDataFrame, DataFrame, nrow, eachcol, eachrow, groupby, combine
     import Tables: istable, rowaccess, rows, schema, Schema
 else
-    using ..DataFrames: AbstractDataFrame, DataFrame, nrow, eachcol, eachrow, groupby, combine
+    using ..DataFrames: AbstractDataFrame, GroupedDataFrame, DataFrame, nrow, eachcol, eachrow, groupby, combine
     import ..Tables: istable, rowaccess, rows, schema, Schema
 end
 
@@ -73,18 +73,19 @@ via polynomial interpolation.
 function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Convert to DataFrame 
     df = DataFrame(radec)
-    # Group by observatory and TimeOfDay 
+    # Compute TimeOfDay
     df.TimeOfDay = TimeOfDay.(df.date, df.observatory)
+    # Group by observatory and TimeOfDay 
     gdf = groupby(df, [:observatory, :TimeOfDay])
     # Interpolate observation nights 
     cdf = combine(gdf, extrapolation, keepkeys = false)
     # Eliminate unsuccesful interpolations 
     filter!(:α => !isnan, cdf)
     filter!(:δ => !isnan, cdf)
-    # Sorbt by date 
-    sort!(cdf, :date)
+    # Sort by date 
+    idxs = sortperm(cdf, :date)   
 
-    return cdf.observatory, cdf.date, cdf.α, cdf.δ
+    return cdf.observatory[idxs], cdf.date[idxs], cdf.α[idxs], cdf.δ[idxs], gdf[idxs]
 end 
 
 @doc raw"""
@@ -135,7 +136,7 @@ See also [`gauss_method`](@ref).
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
-function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 100., niter::Int = 5, maxsteps::Int = 100, 
+function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 10., niter::Int = 5, maxsteps::Int = 100, 
                        varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
 
     # Sun's ephemeris
@@ -146,7 +147,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
     # Eliminate observatories without coordinates 
     filter!(x -> hascoord(x.observatory), radec)
     # Reduce nights by interpolation 
-    observatories, dates, α, δ = reduce_nights(radec)
+    observatories, dates, α, δ, gdf = reduce_nights(radec)
     # Observations triplets
     triplets = gauss_triplets(dates, max_triplets)
 
@@ -162,6 +163,9 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
     best_Q = T(Inf)
     # Initial conditions
     best_Q0 = zeros(T, 6)
+    # Boundaries
+    best_min = 0
+    best_max = 0
     # Break flag
     flag = false
 
@@ -198,31 +202,62 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
             res = residuals(radec; xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
                             xva = et -> bwdfwdeph(et, bwd, fwd))
 
-            # Subset of radec for orbit fit
-            idxs = findall(x -> dates[triplet[1]] <= date(x) <= dates[triplet[3]], radec)
-
             # Relaxation factor
             res = relax_factor(radec, res)
-            
+
+            # Subset of radec for orbit fit
+            idxs = findall(x -> triplet[1] <= x <= triplet[3], gdf.groups)
+            sort!(idxs)
+
             # Orbit fit
             fit = tryls(res[idxs], zeros(get_numvars()), niter)
+
+            !fit.success && continue
+
+            # Right iteration
+            for k in triplet[3]+1:length(gdf)
+                extra = findall(x -> x == k, gdf.groups)
+                fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
+                if fit_new.success
+                    fit = fit_new
+                    idxs = vcat(idxs, extra)
+                    sort!(idxs)
+                else 
+                    break
+                end
+            end
+
+            # Left iteration
+            for k in triplet[1]-1:-1:1
+                extra = findall(x -> x == k, gdf.groups)
+                fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
+                if fit_new.success
+                    fit = fit_new
+                    idxs = vcat(idxs, extra)
+                    sort!(idxs)
+                else 
+                    break
+                end
+            end
 
             # NRMS
             Q = nrms(res, fit)
 
             # TO DO: check cases where newton converges but diffcorr no
-
             if fit.success
                 # Update NRMS and initial conditions
                 if Q < best_Q
                     best_Q = Q
                     best_Q0 .= bwd(bwd.t0)(fit.x)
+                    best_min = idxs[1]
+                    best_max = idxs[end]
                 end 
                 # Break condition
                 if Q <= Q_max
                     flag = true
                 end
             end 
+
             # Break condition
             if flag
                 break
@@ -235,10 +270,10 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
 
     # Case: all solutions were unsuccesful
     if isinf(best_Q)
-        return jd0::T, Vector{T}(undef, 0)
+        return jd0::T, Vector{T}(undef, 0), zero(T), 0, 0
     # Case: at least one solution was succesful
     else 
-        return jd0::T, best_Q0
+        return jd0::T, best_Q0, best_Q, best_min, best_max
     end
 end 
 
