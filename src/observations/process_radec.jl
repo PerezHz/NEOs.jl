@@ -536,6 +536,30 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}; debias_table::String = "2018
     return datetime_obs, α_obs, δ_obs, α_comp, δ_comp, α_corr, δ_corr, w8s
 end
 
+
+@doc raw"""
+    relax_factor(radec::Vector{RadecMPC{T}}) where {T <: Real}
+
+Return a relax factor for each element of `radec` quantifying the correlation between observations taken on
+the same night by the same observatory.
+
+!!! reference
+    See https://doi.org/10.1016/j.icarus.2017.05.021.
+"""
+function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+    # Convert to DataFrame 
+    df = DataFrame(radec)
+    # Group by observatory and TimeOfDay 
+    df.TimeOfDay = TimeOfDay.(df.date, df.observatory)
+    gdf = groupby(df, [:observatory, :TimeOfDay])
+    # Interpolate observation nights 
+    cdf = combine(gdf, nrow)
+    # Count observations in each group
+    Nv = cdf[gdf.groups, :nrow]
+    # Relaxation factor
+    return map(x -> x > 4.0 ? x/4.0 : 1.0, Nv)
+end 
+
 @doc raw"""
     residuals(obs::Vector{RadecMPC{T}}; niter::Int = 5, debias_table::String = "2018",
     xvs::SunEph = sunposvel, xve::EarthEph = earthposvel, xva::AstEph) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
@@ -566,6 +590,76 @@ function residuals(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloa
     res_α = x_jt[2] .- x_jt[6] .- x_jt[4]
     # Declination residuals
     res_δ = x_jt[3] .- x_jt[7] .- x_jt[5]
+    # Relax factors
+    rex = relax_factor(obs)
     # Total residuals
-    return OpticalResidual.(res_α, res_δ, 1 ./ x_jt[end].^2, 1 ./ x_jt[end].^2, one(T), false)
+    return OpticalResidual.(res_α, res_δ, 1 ./ x_jt[end].^2, 1 ./ x_jt[end].^2, rex, false)
 end
+
+
+@doc raw"""
+    extrapolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
+
+Return an extrapolation of points `(x, y)`. 
+"""
+function extrapolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
+    # Check we have as many x as y 
+    @assert length(x) == length(y)
+    # Interpolation 
+    itp = interpolate((x,), y, Gridded(Linear()))
+    # Extrapolation 
+    etpf = extrapolate(itp, Flat())
+
+    return etpf
+end 
+
+@doc raw"""
+    extrapolation(df::AbstractDataFrame)
+
+Special method of [`extrapolation`](@ref) to be used by [`gaussinitcond`](@ref).
+"""
+function extrapolation(df::AbstractDataFrame)
+    if isone(nrow(df))
+        return (observatory = df.observatory[1], date = df.date[1], α = df.α[1], δ = df.δ[1])
+    end 
+    
+    # Julian days of observation
+    t_julian = datetime2julian.(df.date)
+    # Days of observation [relative to first observation]
+    t_rel = t_julian .- t_julian[1]
+    # Mean date 
+    t_mean = sum(t_rel) / length(t_rel)
+
+    # Extrapolate
+    α_p = extrapolation(t_rel, df.α)
+    δ_p = extrapolation(t_rel, df.δ)
+    # Evaluate polynomials at mean date 
+    α_mean = α_p(t_mean)
+    δ_mean = δ_p(t_mean)
+
+    return (observatory = df.observatory[1], date = julian2datetime(t_julian[1] + t_mean), α = α_mean, δ = δ_mean)
+end 
+
+@doc raw"""
+    reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+
+Return one observatory, date, right ascension and declination per observation night in `radec`. The reduction is performed 
+via polynomial interpolation. 
+"""
+function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+    # Convert to DataFrame 
+    df = DataFrame(radec)
+    # Compute TimeOfDay
+    df.TimeOfDay = TimeOfDay.(df.date, df.observatory)
+    # Group by observatory and TimeOfDay 
+    gdf = groupby(df, [:observatory, :TimeOfDay])
+    # Interpolate observation nights 
+    cdf = combine(gdf, extrapolation, keepkeys = false)
+    # Eliminate unsuccesful interpolations 
+    filter!(:α => !isnan, cdf)
+    filter!(:δ => !isnan, cdf)
+    # Sort by date 
+    idxs = sortperm(cdf, :date)   
+
+    return cdf.observatory[idxs], cdf.date[idxs], cdf.α[idxs], cdf.δ[idxs], gdf[idxs]
+end 

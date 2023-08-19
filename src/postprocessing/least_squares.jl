@@ -1,5 +1,3 @@
-include("b_plane.jl")
-
 @doc raw"""
     OrbitFit{T <: Real}
 
@@ -112,7 +110,8 @@ end
 
 @doc raw"""
     nrms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
-    nrms(res::Vector{OpticalResidual{T}}, fit::OrbitFit{T}) where {T <: Real}
+    nrms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+    nrms(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T}) where {T <: Real}
 
 Returns the normalized root mean square error
 ```math
@@ -137,7 +136,12 @@ function nrms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
     return sqrt( chi2(res, w)/length(res) )
 end
 
-function nrms(res::Vector{OpticalResidual{T, U}}, fit::OrbitFit{T}) where {T <: Real, U <: Number}
+function nrms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+    res_, w = unfold(res)
+    return nrms(res_, w)
+end
+
+function nrms(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T}) where {T <: Real}
     res_, w = unfold(res)
     return nrms(res_(fit.x), w)
 end

@@ -2,13 +2,13 @@ module NEOs
 
 # __precompile__(false)
 
-if !isdefined(Base, :get_extension)
-    using Requires
-end
-
-import Base: hash, ==, show, isless, isnan, convert
+import Base: hash, ==, show, isless, isnan, convert, zero, iszero
 import PlanetaryEphemeris as PE
 import JLD2: writeas
+import Tables: istable, rowaccess, rows, schema, Schema
+import SatelliteToolboxTransformations.sv_ecef_to_eci
+import SatelliteToolboxTransformations.sv_ecef_to_ecef
+import Downloads
 
 using Distributed, JLD2, TaylorIntegration, Printf, DelimitedFiles, Test, LinearAlgebra,
       Dates, SPICE, Quadmath, LazyArtifacts, TaylorSeries,
@@ -20,11 +20,9 @@ using PlanetaryEphemeris: daysec, su, ea, α_p_sun, δ_p_sun, t2c_jpl_de430, pol
       meananomaly, selecteph
 using Healpix: ang2pixRing, Resolution
 using SatelliteToolboxTransformations
-import SatelliteToolboxTransformations.sv_ecef_to_eci
-import SatelliteToolboxTransformations.sv_ecef_to_ecef
 using Dates: format
 using Downloads: download
-import Downloads
+using DataFrames: AbstractDataFrame, GroupedDataFrame, DataFrame, nrow, eachcol, eachrow, groupby, combine
 using HTTP: get
 using IntervalRootFinding: roots, interval, Interval, mid
 using Interpolations: Flat, Gridded, Linear, interpolate, extrapolate
@@ -63,14 +61,15 @@ export gauss_method, gaussinitcond
 export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!
 # Propagate
 export propagate, propagate_lyap, propagate_root
-
-export valsecchi_circle, nrms, chi2, newtonls, newtonls_6v, diffcorr, newtonls_Q, bopik, tryls, project
+# Post processing
+export valsecchi_circle, nrms, chi2, newtonls, newtonls_6v, diffcorr, newtonls_Q, bopik, tryls, project,
+       orbitdetermination
 
 include("constants.jl")
 include("observations/process_radar.jl")
 include("orbit_determination/gauss_method.jl")
 include("propagation/propagation.jl")
-include("postprocessing/least_squares.jl")
+include("postprocessing/neosolution.jl")
 include("init.jl")
 
 end
