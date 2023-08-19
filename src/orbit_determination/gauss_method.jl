@@ -462,7 +462,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
         for i in eachindex(sol)
 
             # Initial conditions (jet transport)
-            q0 = sol[i].statevect .+ eph_su(jd0 - J2000)
+            q0 = sol[i].statevect .+ eph_su(jd0 - PE.J2000)
 
             # Propagation 
             bwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, maxsteps, jd0, nyears_bwd, q0; 
