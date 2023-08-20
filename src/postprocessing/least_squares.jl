@@ -9,7 +9,7 @@ A least squares fit.
 - `Γ::Matrix{T}`: covariance matrix.
 - `routine::Symbol`: minimization routine (`:newton` or `:diffcorr`).
 """
-struct OrbitFit{T <: Real}
+@auto_hash_equals struct OrbitFit{T <: Real}
     success::Bool
     x::Vector{T}
     Γ::Matrix{T}
