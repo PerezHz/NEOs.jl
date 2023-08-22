@@ -387,8 +387,15 @@ function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_ite
     return triplets[1:n]
 end
 
+function numberofdays(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+    # Time difference [ms]
+    Δ_ms =  getfield(date(radec[end]) - date(radec[1]), :value)
+    # Time difference [days]
+    return Δ_ms / 86_400_000
+end
+
 @doc raw"""
-    gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 100., niter::Int = 5, maxsteps::Int = 100, 
+    gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 100., niter::Int = 5,
                   varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
 
 Return initial conditions via Gauss method. 
@@ -400,7 +407,6 @@ See also [`gauss_method`](@ref).
 - `max_triplets::Int`: maximum number of triplets.
 - `Q_max::T`: The maximum nrms that is considered a good enough orbit.
 - `niter::Int`: number of iterations for Newton's method.
-- `maxsteps::Int`: maximum number of steps for propagation.
 - `varorder::Int`: order of jet transport perturbation. 
 - `order::Int`: order of Taylor polynomials w.r.t. time.
 - `abstol::T`: absolute tolerance.
@@ -409,7 +415,7 @@ See also [`gauss_method`](@ref).
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
-function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 10., niter::Int = 5, maxsteps::Int = 100, 
+function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 10., niter::Int = 5,
                        varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
 
     # Sun's ephemeris
@@ -428,6 +434,8 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
     t0, tf = datetime2julian(radec[1].date), datetime2julian(radec[end].date)
     # Julian day when to start propagation
     jd0 = zero(T)
+    # Maximum number of steps
+    maxsteps = ceil(Int, 1.5 * numberofdays(radec))
 
     # Jet transport perturbation (ra/dec)
     dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃"; order = varorder)
@@ -467,10 +475,14 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
             # Propagation 
             bwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, maxsteps, jd0, nyears_bwd, q0; 
                             order = order, abstol = abstol, parse_eqs = parse_eqs)
+            if length(bwd.t) == maxsteps+1
+                continue
+            end
+            
             fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, maxsteps, jd0, nyears_fwd, q0; 
                             order = order, abstol = abstol, parse_eqs = parse_eqs)
 
-            if length(bwd.t) == maxsteps+1 || length(fwd.t) == maxsteps + 1
+            if length(fwd.t) == maxsteps + 1
                 continue
             end
 
