@@ -497,16 +497,14 @@ function write_radec_mpc(obs::Vector{RadecMPC{T}}, filename::String) where {T <:
 end
 
 @doc raw"""
-    get_radec_mpc(id::AbstractString, filename::AbstractString)
+    get_radec_mpc(id::Pair{String, String}, filename::String = replace(id[2], " " => "_") * ".txt")
 
 Download MPC optical astrometry of NEO `id` and save the output to `filename`. 
 """
-function get_radec_mpc(id::AbstractString, filename::AbstractString = replace(id, " " => "_") * ".txt")
+function get_radec_mpc(id::Pair{String, String}, filename::String = replace(id[2], " " => "_") * ".txt")
     # HTTP query
-    resp = get(
-        "http://minorplanetcenter.net/search_db";
-        query = ["table" => "observations", "designation" => id]
-    )
+    query = ["table" => "observations", id]
+    resp = get("http://minorplanetcenter.net/search_db"; query = query)
     # Converty to String
     text = String(resp.body)
     # Parse JSON
@@ -523,7 +521,7 @@ function get_radec_mpc(id::AbstractString, filename::AbstractString = replace(id
     # Write observations to file
     write_radec_mpc(radec, filename)
 
-    return radec
+    return filename
 end 
 
 # Methods to convert a Vector{<:AbstractAstrometry} to a DataFrame
