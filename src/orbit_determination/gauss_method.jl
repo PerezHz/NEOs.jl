@@ -387,11 +387,17 @@ function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_ite
     return triplets[1:n]
 end
 
-function numberofdays(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+function adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Time difference [ms]
     Δ_ms =  getfield(date(radec[end]) - date(radec[1]), :value)
     # Time difference [days]
-    return Δ_ms / 86_400_000
+    Δ_day = Δ_ms / 86_400_000
+    # Adaptative maxsteps
+    if Δ_day <= 6
+        return ceil(Int, 5*Δ_day)
+    else 
+        return ceil(Int, Δ_day/2 + 27)
+    end
 end
 
 @doc raw"""
@@ -435,7 +441,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
     # Julian day when to start propagation
     jd0 = zero(T)
     # Maximum number of steps
-    maxsteps = ceil(Int, 1.5 * numberofdays(radec))
+    maxsteps = adaptative_maxsteps(radec)
 
     # Jet transport perturbation (ra/dec)
     dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃"; order = varorder)
