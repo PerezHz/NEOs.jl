@@ -446,6 +446,19 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
     end
 end
 
+function anglediff(x::T, y::S) where {T, S <: Number}
+    # Signed difference
+    Δ = x - y
+    # Absolute difference 
+    Δ_abs = abs(Δ)
+    # Reflection
+    if Δ_abs > 648_000 # Half circle in arcsec
+        return -sign(cte(Δ)) * (1_296_000 - Δ_abs)    
+    else 
+        return Δ
+    end
+end
+
 @doc raw"""
     radec_astrometry(obs::Vector{RadecMPC{T}}; niter::Int = 5, debias_table::String = "2018",
                      xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
@@ -470,13 +483,13 @@ See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and 
 - `xvs`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 - `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
-function radec_astrometry(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
+function residuals(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
 
     # Number of observations
-    n_optical_obs = length(obs)
+    N_obs = length(obs)
 
     # UTC time of first astrometric observation
-    utc1 = obs[1].date
+    utc1 = date(obs[1])
     # TDB seconds since J2000.0 for first astrometric observation
     et1 = datetime2et(utc1)
     # Asteroid ephemeris at et1
@@ -484,56 +497,45 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}; debias_table::String = "2018
     # Type of asteroid ephemeris
     S = typeof(a1_et1)
 
-    # Observed right ascension
-    α_obs = Array{Float64}(undef, n_optical_obs)
-    # Observed declination
-    δ_obs = Array{Float64}(undef, n_optical_obs)
-
-    # Computed right ascension
-    α_comp = Array{S}(undef, n_optical_obs)
-    # Computed declination
-    δ_comp = Array{S}(undef, n_optical_obs)
-
-    # Total debiasing correction in right ascension (arcsec)
-    α_corr = Array{Float64}(undef, n_optical_obs)
-    # Total debiasing correction in declination (arcsec)
-    δ_corr = Array{Float64}(undef, n_optical_obs)
-
-    # Times of observations
-    datetime_obs = Array{DateTime}(undef, n_optical_obs)
-    # Statistical weights
-    w8s = Array{Float64}(undef, n_optical_obs)
-
     # Select debias table
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
 
-    # Iterate over the observations
-    Threads.@threads for i in 1:n_optical_obs
+    # Relax factors 
+    rex = relax_factor(obs)
 
-        # Time of observation
-        datetime_obs[i] = obs[i].date
+    # Vector of residuals
+    res = Vector{OpticalResidual{T, S}}(undef, N_obs)
+
+    # Iterate over the observations
+    Threads.@threads for i in 1:N_obs
 
         # Observed ra/dec
-        # Note: ra is multiplied by a metric factor cos(dec) to match the format of debiasing corrections
-        δ_obs[i] = rad2arcsec(obs[i].δ)                 # arcsec
-        α_obs[i] = rad2arcsec(obs[i].α) * cos(obs[i].δ) # arcsec
+        α_obs = rad2arcsec(ra(obs[i]))   # arcsec
+        δ_obs = rad2arcsec(dec(obs[i]))  # arcsec
 
         # Computed ra/dec
-        α_comp_as, δ_comp_as = compute_radec(obs[i]; xva, kwargs...)
-        # Multiply by metric factor cos(dec)
-        α_comp[i] = α_comp_as * cos(obs[i].δ)  # arcsec
-        δ_comp[i] = δ_comp_as                  # arcsec
+        α_comp, δ_comp = compute_radec(obs[i]; xva, kwargs...)   # arcsec
 
         # Debiasing corrections
-        α_corr[i], δ_corr[i] = debiasing(obs[i], mpc_catalogue_codes_201X, truth, resol, bias_matrix)
+        α_corr, δ_corr = debiasing(obs[i], mpc_catalogue_codes_201X, truth, resol, bias_matrix)
 
         # Statistical weights from Veres et al. (2017)
-        w8s[i] = w8sveres17(obs[i])
+        w8 = w8sveres17(obs[i])
+
+        # O-C residual ra/dec
+        # Note: ra is multiplied by a metric factor cos(dec) to match the format of debiasing corrections
+        res[i] = OpticalResidual(
+            anglediff(α_obs, α_comp) * cos(δ_obs) - α_corr,
+            δ_obs - δ_comp - δ_corr,
+            1 / w8^2,
+            1 / w8^2,
+            rex[i],
+            false
+        )
 
     end
 
-    # Return time of observation, observed ra/dec, computed ra/dec, total debiasing correction in ra/dec and statistical weights
-    return datetime_obs, α_obs, δ_obs, α_comp, δ_comp, α_corr, δ_corr, w8s
+    return res
 end
 
 
@@ -583,11 +585,12 @@ See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and 
 - `xve::SunEph`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 - `xva::AstEph`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
+#=
 function residuals(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloat}
     # Optical astrometry (dates + observed + computed + debiasing + weights)
     x_jt = radec_astrometry(obs; kwargs...)
     # Right ascension residuals
-    res_α = x_jt[2] .- x_jt[6] .- x_jt[4]
+    res_α = x_jt[4] .- x_jt[6] # .- x_jt[4]
     # Declination residuals
     res_δ = x_jt[3] .- x_jt[7] .- x_jt[5]
     # Relax factors
@@ -595,7 +598,7 @@ function residuals(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloa
     # Total residuals
     return OpticalResidual.(res_α, res_δ, 1 ./ x_jt[end].^2, 1 ./ x_jt[end].^2, rex, false)
 end
-
+=#
 
 @doc raw"""
     extrapolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
@@ -631,11 +634,20 @@ function extrapolation(df::AbstractDataFrame)
     t_mean = sum(t_rel) / length(t_rel)
 
     # Extrapolate
-    α_p = extrapolation(t_rel, df.α)
+    if issorted(df.α) || issorted(df.α, rev = true)
+        α_p = extrapolation(t_rel, df.α)
+    elseif df.α[1] > π && df.α[end] < π
+        α = map(x -> x < π ? x + 2π : x, df.α)
+        α_p = extrapolation(t_rel, α)
+    elseif df.α[1] < π && df.α[end] > π
+        α = map(x -> x > π ? x - 2π : x, df.α)
+        α_p = extrapolation(t_rel, α) 
+    end
     δ_p = extrapolation(t_rel, df.δ)
+
     # Evaluate polynomials at mean date 
-    α_mean = α_p(t_mean)
-    δ_mean = δ_p(t_mean)
+    α_mean = mod2pi(α_p(t_mean))
+    δ_mean = mod2pi(δ_p(t_mean))
 
     return (observatory = df.observatory[1], date = julian2datetime(t_julian[1] + t_mean), α = α_mean, δ = δ_mean)
 end 

@@ -56,7 +56,7 @@ Outlier rejection algorithm.
 !!! reference
     See https://doi.org/10.1016/S0019-1035(03)00051-4.
 """
-function outlier_rejection(ξs::Vector{OpticalResidual{T}}, fit::OrbitFit{T}; χ2_rec::T = 7., χ2_rej::T = 8.,
+function outlier_rejection(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T}; χ2_rec::T = 7., χ2_rej::T = 8.,
                            α::T = 0.25) where {T <: Real}
     # Number of residuals
     N = length(ξs)
@@ -79,7 +79,7 @@ function outlier_rejection(ξs::Vector{OpticalResidual{T}}, fit::OrbitFit{T}; χ
     end
 
     χ2_max = maximum(χ2s)
-    new_ξs = Vector{OpticalResidual{T}}(undef, N)
+    new_ξs = Vector{OpticalResidual{T, TaylorN{T}}}(undef, N)
     N_sel = count(x -> !x.outlier, ξs)
 
     for i in eachindex(χ2s)

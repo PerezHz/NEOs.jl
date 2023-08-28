@@ -387,16 +387,190 @@ function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_ite
     return triplets[1:n]
 end
 
+function numberofdays(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+    t0 = date(radec[1])
+    tf = date(radec[end])
+    Δ = (tf - t0).value / 86_400_000
+    return Δ
+end
+
 function adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Time difference [ms]
     Δ_ms =  getfield(date(radec[end]) - date(radec[1]), :value)
     # Time difference [days]
     Δ_day = Δ_ms / 86_400_000
     # Adaptative maxsteps
-    if Δ_day <= 6
-        return ceil(Int, 5*Δ_day)
-    else 
-        return ceil(Int, Δ_day/2 + 27)
+    return 30 + ceil(Int, Δ_day/4)
+end
+
+for i in 1:2
+    @eval begin
+        function _gaussinitcond(radec::Vector{RadecMPC{T}}, max_triplets::Int, Q_max::T, niter::Int, varorder::Int, order::Int,
+                                abstol::T, parse_eqs::Bool, ::Val{$i}) where {T <: AbstractFloat}
+
+            # Allocate memory for initial conditions
+            best_sol = zero(NEOSolution{T, T})
+
+            if $i == 1
+                # Reduce nights by interpolation 
+                observatories, dates, α, δ, gdf = reduce_nights(radec)
+            elseif $i == 2
+                # Use plain observations
+                observatories, dates, α, δ = observatory.(radec), date.(radec), ra.(radec), dec.(radec)
+            end
+
+            # Cannot process less than 3 nights / observations
+            if length(dates) < 3
+                return best_sol
+            end  
+            # Observations triplets
+            triplets = gauss_triplets(dates, max_triplets)
+            # Julian day of first (last) observation
+            t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
+            # Julian day when to start propagation
+            jd0 = zero(T)
+            # Maximum number of steps
+            maxsteps = adaptative_maxsteps(radec)
+            # Jet transport perturbation (ra/dec)
+            dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃"; order = varorder)
+            # Sun's ephemeris
+            eph_su = selecteph(sseph, su)
+            # Earth's ephemeris
+            eph_ea = selecteph(sseph, ea)
+            # Normalized root mean square error (NRMS)
+            best_Q = T(Inf)
+            # Break flag
+            flag = false
+
+            # Iterate over triplets
+            for j in eachindex(triplets)
+
+                # Current triplet
+                triplet = triplets[j]
+                # Julian day when to start propagation
+                jd0 = datetime2julian(dates[triplet[2]])
+                # Number of years in forward integration 
+                nyears_fwd = (tf - jd0 + 2) / yr
+                # Number of years in backward integration
+                nyears_bwd = -(jd0 - t0 + 2) / yr
+                # Gauss method solution 
+                sol = gauss_method(observatories[triplet], dates[triplet], α[triplet] .+ dq[1:3], δ[triplet] .+ dq[4:6]; niter = niter)
+                # Filter Gauss solutions by heliocentric energy
+                filter!(x -> heliocentric_energy(x.statevect) <= 0, sol)
+
+                # Iterate over Gauss solutions
+                for i in eachindex(sol)
+
+                    # Initial conditions (jet transport)
+                    q0 = sol[i].statevect .+ eph_su(jd0 - PE.J2000)
+                    # Backward propagation 
+                    bwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, maxsteps, jd0, nyears_bwd, q0; 
+                                    order = order, abstol = abstol, parse_eqs = parse_eqs)
+                    if length(bwd.t) == maxsteps + 1
+                        continue
+                    end
+                    # Forward propagation
+                    fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, maxsteps, jd0, nyears_fwd, q0; 
+                                    order = order, abstol = abstol, parse_eqs = parse_eqs)
+                    if length(fwd.t) == maxsteps + 1
+                        continue
+                    end
+                    # O-C residuals
+                    res = residuals(radec; xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
+                                    xva = et -> bwdfwdeph(et, bwd, fwd))
+
+                    # Subset of radec for orbit fit
+                    if $i == 1
+                        idxs = findall(x -> triplet[1] <= x <= triplet[3], gdf.groups)
+                    elseif $i == 2
+                        # Subset of radec for orbit fit
+                        idxs = findall(x -> dates[triplet[1]] <= x <= dates[triplet[3]], dates)
+                    end
+                    sort!(idxs)
+                    # Orbit fit
+                    fit = tryls(res[idxs], zeros(get_numvars()), niter)
+                    !fit.success && continue
+
+                    if $i == 1
+                        # Right iteration
+                        for k in triplet[3]+1:length(gdf)
+                            extra = findall(x -> x == k, gdf.groups)
+                            fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
+                            if fit_new.success
+                                fit = fit_new
+                                idxs = vcat(idxs, extra)
+                                sort!(idxs)
+                            else 
+                                break
+                            end
+                        end
+
+                        # Left iteration
+                        for k in triplet[1]-1:-1:1
+                            extra = findall(x -> x == k, gdf.groups)
+                            fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
+                            if fit_new.success
+                                fit = fit_new
+                                idxs = vcat(idxs, extra)
+                                sort!(idxs)
+                            else 
+                                break
+                            end
+                        end
+                    elseif $i == 2
+                        # Right iteration
+                        for k in triplet[3]+1:length(dates)
+                            fit_new = tryls(res[idxs ∪ k], zeros(get_numvars()), niter)
+                            if fit_new.success
+                                fit = fit_new
+                                idxs = vcat(idxs, k)
+                                sort!(idxs)
+                            else 
+                                break
+                            end
+                        end
+
+                        # Left iteration
+                        for k in triplet[1]-1:-1:1
+                            fit_new = tryls(res[idxs ∪ k], zeros(get_numvars()), niter)
+                            if fit_new.success
+                                fit = fit_new
+                                idxs = vcat(idxs, k)
+                                sort!(idxs)
+                            else 
+                                break
+                            end
+                        end
+                    end
+
+                    # NRMS
+                    Q = nrms(res, fit)
+
+                    # TO DO: check cases where newton converges but diffcorr no
+                    # Update NRMS and initial conditions
+                    if Q < best_Q
+                        best_Q = Q
+                        best_sol = evalfit(NEOSolution(bwd, fwd, res[idxs], fit))
+                    end 
+                    # Break condition
+                    if Q <= Q_max
+                        flag = true
+                        break
+                    end
+                end
+                if flag
+                    break
+                end
+            end 
+
+            # Case: all solutions were unsuccesful
+            if isinf(best_Q)
+                return zero(NEOSolution{T, T})
+            # Case: at least one solution was succesful
+            else 
+                return best_sol
+            end
+        end
     end
 end
 
@@ -424,138 +598,21 @@ See also [`gauss_method`](@ref).
 function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 10., niter::Int = 5,
                        varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
 
-    # Sun's ephemeris
-    eph_su = selecteph(sseph, su)
-    # Earth's ephemeris
-    eph_ea = selecteph(sseph, ea)
-
     # Eliminate observatories without coordinates 
-    filter!(x -> hascoord(x.observatory), radec)
-    # Reduce nights by interpolation 
-    observatories, dates, α, δ, gdf = reduce_nights(radec)
-    # Observations triplets
-    triplets = gauss_triplets(dates, max_triplets)
+    filter!(x -> hascoord(observatory(x)), radec)
 
-    # Julian day of first (last) observation
-    t0, tf = datetime2julian(radec[1].date), datetime2julian(radec[end].date)
-    # Julian day when to start propagation
-    jd0 = zero(T)
-    # Maximum number of steps
-    maxsteps = adaptative_maxsteps(radec)
-
-    # Jet transport perturbation (ra/dec)
-    dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃"; order = varorder)
-
-    # Normalized root mean square error (NRMS)
-    best_Q = T(Inf)
-    # Initial conditions
-    best_sol = zero(NEOSolution{T, T})
-    # Break flag
-    flag = false
-
-    # Iterate over triplets
-    for j in eachindex(triplets)
-        
-        # Current triplet
-        triplet = triplets[j]
-
-        # Julian day when to start propagation
-        jd0 = datetime2julian(dates[triplet[2]])
-        # Number of years in forward integration 
-        nyears_fwd = (tf - jd0 + 2) / yr
-        # Number of years in backward integration
-        nyears_bwd = -(jd0 - t0 + 2) / yr
-
-        # Gauss method solution 
-        sol = gauss_method(observatories[triplet], dates[triplet], α[triplet] .+ dq[1:3], δ[triplet] .+ dq[4:6]; niter = niter)
-
-        # Filter Gauss solutions by heliocentric energy
-        filter!(x -> heliocentric_energy(x.statevect) <= 0, sol)
-
-        # Iterate over Gauss solutions
-        for i in eachindex(sol)
-
-            # Initial conditions (jet transport)
-            q0 = sol[i].statevect .+ eph_su(jd0 - PE.J2000)
-
-            # Propagation 
-            bwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, maxsteps, jd0, nyears_bwd, q0; 
-                            order = order, abstol = abstol, parse_eqs = parse_eqs)
-            if length(bwd.t) == maxsteps+1
-                continue
-            end
-            
-            fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, maxsteps, jd0, nyears_fwd, q0; 
-                            order = order, abstol = abstol, parse_eqs = parse_eqs)
-
-            if length(fwd.t) == maxsteps + 1
-                continue
-            end
-
-            # O-C residuals
-            res = residuals(radec; xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
-                            xva = et -> bwdfwdeph(et, bwd, fwd))
-
-            # Subset of radec for orbit fit
-            idxs = findall(x -> triplet[1] <= x <= triplet[3], gdf.groups)
-            sort!(idxs)
-
-            # Orbit fit
-            fit = tryls(res[idxs], zeros(get_numvars()), niter)
-
-            !fit.success && continue
-
-            # Right iteration
-            for k in triplet[3]+1:length(gdf)
-                extra = findall(x -> x == k, gdf.groups)
-                fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
-                if fit_new.success
-                    fit = fit_new
-                    idxs = vcat(idxs, extra)
-                    sort!(idxs)
-                else 
-                    break
-                end
-            end
-
-            # Left iteration
-            for k in triplet[1]-1:-1:1
-                extra = findall(x -> x == k, gdf.groups)
-                fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
-                if fit_new.success
-                    fit = fit_new
-                    idxs = vcat(idxs, extra)
-                    sort!(idxs)
-                else 
-                    break
-                end
-            end
-
-            # NRMS
-            Q = nrms(res, fit)
-
-            # TO DO: check cases where newton converges but diffcorr no
-            # Update NRMS and initial conditions
-            if Q < best_Q
-                best_Q = Q
-                best_sol = evalfit(NEOSolution(bwd, fwd, res, fit))
-            end 
-            # Break condition
-            if Q <= Q_max
-                flag = true
-                break
-            end
+    best_sol_1 = _gaussinitcond(radec, max_triplets, Q_max, niter, varorder, order, abstol, parse_eqs, Val(1))
+    Q_1 = nrms(best_sol_1.res)
+    
+    if Q_1 > Q_max && numberofdays(radec) <= 3
+        best_sol_2 = _gaussinitcond(radec, max_triplets, Q_max, niter, varorder, order, abstol, parse_eqs, Val(2))
+        Q_2 = nrms(best_sol_2.res)
+        if Q_2 < Q_1
+            return best_sol_2
+        else 
+            return best_sol_1
         end
-        if flag
-            break
-        end
-    end 
-
-    # Case: all solutions were unsuccesful
-    if isinf(best_Q)
-        return zero(NEOSolution{T, T})
-    # Case: at least one solution was succesful
     else 
-        return best_sol
+        return best_sol_1
     end
 end 
