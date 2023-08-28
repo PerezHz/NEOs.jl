@@ -604,7 +604,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max
     best_sol_1 = _gaussinitcond(radec, max_triplets, Q_max, niter, varorder, order, abstol, parse_eqs, Val(1))
     Q_1 = nrms(best_sol_1.res)
     
-    if Q_1 > Q_max && numberofdays(radec) <= 3
+    if Q_1 > Q_max
         best_sol_2 = _gaussinitcond(radec, max_triplets, Q_max, niter, varorder, order, abstol, parse_eqs, Val(2))
         Q_2 = nrms(best_sol_2.res)
         if Q_2 < Q_1
