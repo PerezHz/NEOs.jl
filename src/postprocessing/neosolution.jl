@@ -125,3 +125,11 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::I
     return evalfit(NEOSolution(bwd, fwd, res, fit))
 
 end
+
+function nrms(sol::NEOSolution{T, T}) where {T <: Real}
+    if iszero(sol)
+        return T(Inf)
+    else
+        return nrms(sol.res)
+    end
+end

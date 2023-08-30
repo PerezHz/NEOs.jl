@@ -59,9 +59,18 @@ end
 Concatenate right ascension and declination residuals for an orbit fit.
 """
 function unfold(ξs::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
-    res = vcat(getfield.(ξs, :ξ_α), getfield.(ξs, :ξ_δ))
-    relax_factor = getfield.(ξs, :relax_factor)
-    w = vcat(getfield.(ξs, :w_α) ./ relax_factor, getfield.(ξs, :w_δ) ./ relax_factor)
+    L = length(ξs)
+
+    res = Vector{U}(undef, 2*L)
+    w = Vector{T}(undef, 2*L)
+
+    for i in eachindex(ξs)
+        res[i] = ξs[i].ξ_α
+        res[i+L] = ξs[i].ξ_δ
+        w[i] = ξs[i].w_α / ξs[i].relax_factor
+        w[i+L] = ξs[i].w_δ / ξs[i].relax_factor
+    end
+
     return res, w
 end
 
@@ -632,6 +641,8 @@ function extrapolation(df::AbstractDataFrame)
     t_rel = t_julian .- t_julian[1]
     # Mean date 
     t_mean = sum(t_rel) / length(t_rel)
+
+    α_p = extrapolation([0., 1.], [0., 1.])
 
     # Extrapolate
     if issorted(df.α) || issorted(df.α, rev = true)
