@@ -410,15 +410,14 @@ for i in 1:2
 
             # Allocate memory for initial conditions
             best_sol = zero(NEOSolution{T, T})
-
+            # Reduce nights by interpolation 
+            gdf, cdf = reduce_nights(radec)
             if $i == 1
-                # Reduce nights by interpolation 
-                observatories, dates, α, δ, gdf = reduce_nights(radec)
+                observatories, dates, α, δ = cdf.observatory, cdf.date, cdf.α, cdf.δ
             elseif $i == 2
                 # Use plain observations
                 observatories, dates, α, δ = observatory.(radec), date.(radec), ra.(radec), dec.(radec)
             end
-
             # Cannot process less than 3 nights / observations
             if length(dates) < 3
                 return best_sol
@@ -481,65 +480,41 @@ for i in 1:2
 
                     # Subset of radec for orbit fit
                     if $i == 1
-                        idxs = findall(x -> triplet[1] <= x <= triplet[3], gdf.groups)
+                        g_0 = triplet[1]
+                        g_f = triplet[3]
                     elseif $i == 2
-                        # Subset of radec for orbit fit
-                        idxs = findall(x -> dates[triplet[1]] <= x <= dates[triplet[3]], dates)
+                        g_0 = gdf.groups[triplet[1]]
+                        g_f = gdf.groups[triplet[3]]
                     end
+                    idxs = findall(x -> g_0 <= x <= g_f, gdf.groups)
                     sort!(idxs)
                     # Orbit fit
                     fit = tryls(res[idxs], zeros(get_numvars()), niter)
                     !fit.success && continue
 
-                    if $i == 1
-                        # Right iteration
-                        for k in triplet[3]+1:length(gdf)
-                            extra = findall(x -> x == k, gdf.groups)
-                            fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
-                            if fit_new.success
-                                fit = fit_new
-                                idxs = vcat(idxs, extra)
-                                sort!(idxs)
-                            else 
-                                break
-                            end
+                    # Right iteration
+                    for k in g_f+1:length(gdf)
+                        extra = findall(x -> x == k, gdf.groups)
+                        fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
+                        if fit_new.success
+                            fit = fit_new
+                            idxs = vcat(idxs, extra)
+                            sort!(idxs)
+                        else 
+                            break
                         end
+                    end
 
-                        # Left iteration
-                        for k in triplet[1]-1:-1:1
-                            extra = findall(x -> x == k, gdf.groups)
-                            fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
-                            if fit_new.success
-                                fit = fit_new
-                                idxs = vcat(idxs, extra)
-                                sort!(idxs)
-                            else 
-                                break
-                            end
-                        end
-                    elseif $i == 2
-                        # Right iteration
-                        for k in triplet[3]+1:length(dates)
-                            fit_new = tryls(res[idxs ∪ k], zeros(get_numvars()), niter)
-                            if fit_new.success
-                                fit = fit_new
-                                idxs = vcat(idxs, k)
-                                sort!(idxs)
-                            else 
-                                break
-                            end
-                        end
-
-                        # Left iteration
-                        for k in triplet[1]-1:-1:1
-                            fit_new = tryls(res[idxs ∪ k], zeros(get_numvars()), niter)
-                            if fit_new.success
-                                fit = fit_new
-                                idxs = vcat(idxs, k)
-                                sort!(idxs)
-                            else 
-                                break
-                            end
+                    # Left iteration
+                    for k in g_0-1:-1:1
+                        extra = findall(x -> x == k, gdf.groups)
+                        fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
+                        if fit_new.success
+                            fit = fit_new
+                            idxs = vcat(idxs, extra)
+                            sort!(idxs)
+                        else 
+                            break
                         end
                     end
 

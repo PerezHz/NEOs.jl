@@ -109,6 +109,30 @@ function project(y::Vector{TaylorN{T}}, fit::OrbitFit{T}) where {T <: Real}
 end
 
 @doc raw"""
+    chi2(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
+
+Returns the chi square
+```math
+\chi^2 = \sum_{i=1}^m \frac{ \xi_i^2}{\sigma_i^2},
+```
+where ``\mathbf{w} = (1/\sigma_1^2,\ldots,1/\sigma_m^2)^T`` and ``\mathbf{\xi} = (\xi_1,\ldots,\xi_m)^T`` 
+are the vectors of weights and residuals respectively. 
+
+# Arguments
+
+- `res::Vector{U}`: Vector of residuals.
+- `w::Vector{T}`: Vector of weights. 
+"""
+function chi2(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
+    # Have as many residuals as weights
+    @assert length(res) == length(w)
+    # Chi square
+    return sum(w .* (res.^2))
+end
+
+nms(res, w) = chi2(res, w) / length(res)
+
+@doc raw"""
     nrms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
     nrms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
     nrms(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T}) where {T <: Real}
@@ -144,28 +168,6 @@ end
 function nrms(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T}) where {T <: Real}
     res_, w = unfold(res)
     return nrms(res_(fit.x), w)
-end
-
-@doc raw"""
-    chi2(res, w)
-
-Returns the chi square
-```math
-\chi^2 = \sum_{i=1}^m \frac{ \xi_i^2}{\sigma_i^2},
-```
-where ``\mathbf{w} = (1/\sigma_1^2,\ldots,1/\sigma_m^2)^T`` and ``\mathbf{\xi} = (\xi_1,\ldots,\xi_m)^T`` 
-are the vectors of weights and residuals respectively. 
-
-# Arguments
-
-- `res`: Vector of residuals.
-- `w`: Vector of weights. 
-"""
-function chi2(res, w)
-    # Have as many residuals as weights
-    @assert length(res) == length(w)
-    # Chi square
-    return sum(w .* (res.^2))
 end
 
 @doc raw"""

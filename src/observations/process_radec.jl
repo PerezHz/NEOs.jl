@@ -455,6 +455,29 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
     end
 end
 
+@doc raw"""
+    relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+
+Return a relax factor for each element of `radec` quantifying the correlation between observations taken on
+the same night by the same observatory.
+
+!!! reference
+    See https://doi.org/10.1016/j.icarus.2017.05.021.
+"""
+function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+    # Convert to DataFrame 
+    df = DataFrame(radec)
+    # Group by observatory and TimeOfDay 
+    df.TimeOfDay = TimeOfDay.(df.date, df.observatory)
+    gdf = groupby(df, [:observatory, :TimeOfDay])
+    # Interpolate observation nights 
+    cdf = combine(gdf, nrow)
+    # Count observations in each group
+    Nv = cdf[gdf.groups, :nrow]
+    # Relaxation factor
+    return map(x -> x > 4.0 ? x/4.0 : 1.0, Nv)
+end
+
 function anglediff(x::T, y::S) where {T, S <: Number}
     # Signed difference
     Δ = x - y
@@ -469,11 +492,9 @@ function anglediff(x::T, y::S) where {T, S <: Number}
 end
 
 @doc raw"""
-    radec_astrometry(obs::Vector{RadecMPC{T}}; niter::Int = 5, debias_table::String = "2018",
-                     xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
+    residuals(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
 
-Compute optical astrometry, i.e. dates of observation plus observed, computed, debiasing corrections and statistical weights for
-right ascension and declination (in arcsec). Corrections to Earth orientation parameters provided by IERS are computed by default.
+Compute O-C residuals for optical astrometry. Corrections due to Earth orientation, LOD, polar motion are computed by default.
 
 See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and [`Healpix.ang2pixRing`](@ref).
 
@@ -493,6 +514,11 @@ See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and 
 - `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
 """
 function residuals(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
+    mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
+    return residuals(obs, mpc_catalogue_codes_201X, truth, resol, bias_matrix; xva, kwargs...)
+end
+function residuals(obs::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String}, truth::String, resol::Resolution,
+                   bias_matrix::Matrix{T}; xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
 
     # Number of observations
     N_obs = length(obs)
@@ -505,9 +531,6 @@ function residuals(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva:
     a1_et1 = xva(et1)[1]
     # Type of asteroid ephemeris
     S = typeof(a1_et1)
-
-    # Select debias table
-    mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
 
     # Relax factors 
     rex = relax_factor(obs)
@@ -546,68 +569,6 @@ function residuals(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva:
 
     return res
 end
-
-
-@doc raw"""
-    relax_factor(radec::Vector{RadecMPC{T}}) where {T <: Real}
-
-Return a relax factor for each element of `radec` quantifying the correlation between observations taken on
-the same night by the same observatory.
-
-!!! reference
-    See https://doi.org/10.1016/j.icarus.2017.05.021.
-"""
-function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
-    # Convert to DataFrame 
-    df = DataFrame(radec)
-    # Group by observatory and TimeOfDay 
-    df.TimeOfDay = TimeOfDay.(df.date, df.observatory)
-    gdf = groupby(df, [:observatory, :TimeOfDay])
-    # Interpolate observation nights 
-    cdf = combine(gdf, nrow)
-    # Count observations in each group
-    Nv = cdf[gdf.groups, :nrow]
-    # Relaxation factor
-    return map(x -> x > 4.0 ? x/4.0 : 1.0, Nv)
-end 
-
-@doc raw"""
-    residuals(obs::Vector{RadecMPC{T}}; niter::Int = 5, debias_table::String = "2018",
-    xvs::SunEph = sunposvel, xve::EarthEph = earthposvel, xva::AstEph) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
-
-Compute O-C residuals for optical astrometry. Corrections due to Earth orientation, LOD, polar motion are computed by default.
-
-See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and [`radec_astrometry`](@ref).
-
-# Arguments
-
-- `obs::Vector{RadecMPC{T}}`: vector of observations.
-
-# Keyword arguments
-
-- `niter::Int`: number of light-time solution iterations.
-- `debias_table::String`: possible values are:
-    - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
-    - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
-    - `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596.
-- `xvs::EarthEph`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xve::SunEph`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xva::AstEph`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-"""
-#=
-function residuals(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloat}
-    # Optical astrometry (dates + observed + computed + debiasing + weights)
-    x_jt = radec_astrometry(obs; kwargs...)
-    # Right ascension residuals
-    res_α = x_jt[4] .- x_jt[6] # .- x_jt[4]
-    # Declination residuals
-    res_δ = x_jt[3] .- x_jt[7] .- x_jt[5]
-    # Relax factors
-    rex = relax_factor(obs)
-    # Total residuals
-    return OpticalResidual.(res_α, res_δ, 1 ./ x_jt[end].^2, 1 ./ x_jt[end].^2, rex, false)
-end
-=#
 
 @doc raw"""
     extrapolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
@@ -684,5 +645,5 @@ function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Sort by date 
     idxs = sortperm(cdf, :date)   
 
-    return cdf.observatory[idxs], cdf.date[idxs], cdf.α[idxs], cdf.δ[idxs], gdf[idxs]
+    return gdf[idxs], cdf[idxs, :]
 end 
