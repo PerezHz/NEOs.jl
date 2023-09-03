@@ -480,7 +480,7 @@ for i in 1:2
                         continue
                     end
                     # O-C residuals
-                    res = residuals(radec; mpc_catalogue_codes_201X, truth, resol, bias_matrix,
+                    res = residuals(radec, mpc_catalogue_codes_201X, truth, resol, bias_matrix;
                                     xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
                                     xva = et -> bwdfwdeph(et, bwd, fwd))
 
