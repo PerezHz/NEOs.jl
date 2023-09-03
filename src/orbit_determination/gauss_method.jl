@@ -583,11 +583,11 @@ See also [`gauss_method`](@ref).
 """
 function gaussinitcond(radec::Vector{RadecMPC{T}}; debias_table::String = "2018",  kwargs...) where {T <: AbstractFloat}
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
-    return gaussinitcond(radec; mpc_catalogue_codes_201X, truth, resol, bias_matrix, kwargs...)
+    return gaussinitcond(radec, mpc_catalogue_codes_201X, truth, resol, bias_matrix; kwargs...)
 end 
 
-function gaussinitcond(radec::Vector{RadecMPC{T}}; mpc_catalogue_codes_201X::Vector{String}, truth::String, 
-                       resol::Resolution, bias_matrix::Matrix{T}, max_triplets::Int = 10, Q_max::T = 10.,
+function gaussinitcond(radec::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String}, truth::String, 
+                       resol::Resolution, bias_matrix::Matrix{T}; max_triplets::Int = 10, Q_max::T = 10.,
                        niter::Int = 5, varorder::Int = 5, order::Int = order, abstol::T = abstol,
                        parse_eqs::Bool = true) where {T <: AbstractFloat}
 

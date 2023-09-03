@@ -102,13 +102,13 @@ iszero(x::NEOSolution{T, U}) where {T <: Real, U <: Number} = x == zero(NEOSolut
 function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T,
                             q0::Vector{U}; debias_table::String = "2018",  kwargs...) where {T <: Real, U <: Number, D}
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
-    return orbitdetermination(radec, dynamics, maxsteps, jd0, nyears_bwd, nyears_fwd, q0;
-                              mpc_catalogue_codes_201X, truth, resol, bias_matrix, kwargs...)
+    return orbitdetermination(radec, dynamics, maxsteps, jd0, nyears_bwd, nyears_fwd, q0,
+                              mpc_catalogue_codes_201X, truth, resol, bias_matrix; kwargs...)
 end 
 
 function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T,
-                            nyears_fwd::T, q0::Vector{U}; mpc_catalogue_codes_201X::Vector{String}, truth::String, 
-                            resol::Resolution, bias_matrix::Matrix{T}, niter::Int = 5, order::Int = order,
+                            nyears_fwd::T, q0::Vector{U}, mpc_catalogue_codes_201X::Vector{String}, truth::String, 
+                            resol::Resolution, bias_matrix::Matrix{T}; niter::Int = 5, order::Int = order,
                             abstol::T = abstol, parse_eqs::Bool = true,
                             μ_ast::Vector = μ_ast343_DE430[1:end], ) where {T <: Real, U <: Number, D}
 
