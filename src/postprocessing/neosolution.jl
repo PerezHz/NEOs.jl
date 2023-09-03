@@ -99,9 +99,18 @@ end
 
 iszero(x::NEOSolution{T, U}) where {T <: Real, U <: Number} = x == zero(NEOSolution{T, U})
 
+function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T,
+                            q0::Vector{U}; debias_table::String = "2018",  kwargs...) where {T <: Real, U <: Number, D}
+    mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
+    return orbitdetermination(radec, dynamics, maxsteps, jd0, nyears_bwd, nyears_fwd, q0;
+                              mpc_catalogue_codes_201X, truth, resol, bias_matrix, kwargs...)
+end 
+
 function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T,
-                            nyears_fwd::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], niter::Int = 5,
-                            order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
+                            nyears_fwd::T, q0::Vector{U}; mpc_catalogue_codes_201X::Vector{String}, truth::String, 
+                            resol::Resolution, bias_matrix::Matrix{T}, niter::Int = 5, order::Int = order,
+                            abstol::T = abstol, parse_eqs::Bool = true,
+                            μ_ast::Vector = μ_ast343_DE430[1:end], ) where {T <: Real, U <: Number, D}
 
     # Sun's ephemeris
     eph_su = selecteph(sseph, su)
@@ -116,7 +125,8 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::I
                     abstol = abstol, parse_eqs = parse_eqs)
 
     # Residuals
-    res = residuals(radec; xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)),
+    res = residuals(radec; mpc_catalogue_codes_201X, truth, resol, bias_matrix,
+                    xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)),
                     xva = et -> bwdfwdeph(et, bwd, fwd))
     # Orbit fit
     fit = tryls(res, zeros(get_numvars()), niter)

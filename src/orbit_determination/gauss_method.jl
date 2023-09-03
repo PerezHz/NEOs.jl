@@ -409,8 +409,9 @@ end
 
 for i in 1:2
     @eval begin
-        function _gaussinitcond(radec::Vector{RadecMPC{T}}, max_triplets::Int, Q_max::T, niter::Int, varorder::Int, order::Int,
-                                abstol::T, parse_eqs::Bool, ::Val{$i}) where {T <: AbstractFloat}
+        function _gaussinitcond(radec::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String}, truth::String, 
+                                resol::Resolution, bias_matrix::Matrix{T}, max_triplets::Int, Q_max::T, niter::Int,
+                                varorder::Int, order::Int, abstol::T, parse_eqs::Bool, ::Val{$i}) where {T <: AbstractFloat}
 
             # Allocate memory for initial conditions
             best_sol = zero(NEOSolution{T, T})
@@ -479,7 +480,8 @@ for i in 1:2
                         continue
                     end
                     # O-C residuals
-                    res = residuals(radec; xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
+                    res = residuals(radec; mpc_catalogue_codes_201X, truth, resol, bias_matrix,
+                                    xvs = et -> auday2kmsec(eph_su(et/daysec)), xve = et -> auday2kmsec(eph_ea(et/daysec)), 
                                     xva = et -> bwdfwdeph(et, bwd, fwd))
 
                     # Subset of radec for orbit fit
@@ -554,8 +556,7 @@ for i in 1:2
 end
 
 @doc raw"""
-    gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 100., niter::Int = 5,
-                  varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
+    gaussinitcond(radec::Vector{RadecMPC{T}}; debias_table::String = "2018",  kwargs...) where {T <: AbstractFloat}
 
 Return initial conditions via Gauss method. 
 
@@ -563,6 +564,12 @@ See also [`gauss_method`](@ref).
 
 # Arguments
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
+
+# Keyword arguments
+- `debias_table::String`: possible values are:
+    - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
+    - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
+    - `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596.
 - `max_triplets::Int`: maximum number of triplets.
 - `Q_max::T`: The maximum nrms that is considered a good enough orbit.
 - `niter::Int`: number of iterations for Newton's method.
@@ -574,17 +581,26 @@ See also [`gauss_method`](@ref).
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
-function gaussinitcond(radec::Vector{RadecMPC{T}}; max_triplets::Int = 10, Q_max::T = 10., niter::Int = 5,
-                       varorder::Int = 5, order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: AbstractFloat}
+function gaussinitcond(radec::Vector{RadecMPC{T}}; debias_table::String = "2018",  kwargs...) where {T <: AbstractFloat}
+    mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
+    return gaussinitcond(radec; mpc_catalogue_codes_201X, truth, resol, bias_matrix, kwargs...)
+end 
+
+function gaussinitcond(radec::Vector{RadecMPC{T}}; mpc_catalogue_codes_201X::Vector{String}, truth::String, 
+                       resol::Resolution, bias_matrix::Matrix{T}, max_triplets::Int = 10, Q_max::T = 10.,
+                       niter::Int = 5, varorder::Int = 5, order::Int = order, abstol::T = abstol,
+                       parse_eqs::Bool = true) where {T <: AbstractFloat}
 
     # Eliminate observatories without coordinates 
     filter!(x -> hascoord(observatory(x)), radec)
 
-    best_sol_1 = _gaussinitcond(radec, max_triplets, Q_max, niter, varorder, order, abstol, parse_eqs, Val(1))
+    best_sol_1 = _gaussinitcond(radec, mpc_catalogue_codes_201X, truth, resol, bias_matrix,
+                                max_triplets, Q_max, niter, varorder, order, abstol, parse_eqs, Val(1))
     Q_1 = nrms(best_sol_1)
 
     if Q_1 > Q_max
-        best_sol_2 = _gaussinitcond(radec, max_triplets, Q_max, niter, varorder, order, abstol, parse_eqs, Val(2))
+        best_sol_2 = _gaussinitcond(radec, mpc_catalogue_codes_201X, truth, resol, bias_matrix,
+                                    max_triplets, Q_max, niter, varorder, order, abstol, parse_eqs, Val(2))
         Q_2 = nrms(best_sol_2)
         if Q_2 < Q_1
             return best_sol_2
