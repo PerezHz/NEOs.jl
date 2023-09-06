@@ -9,15 +9,15 @@ using NEOs: src_path
 
     @testset "CatalogueMPC" begin
 
-        using NEOs: mpc_catalogue_regex, CatalogueMPC
+        using NEOs: CATALOGUE_MPC_REGEX, CatalogueMPC
 
-        # Check global variable NEOs.mpc_catalogues[]
-        @test allunique(NEOs.mpc_catalogues[])
-        @test isa(NEOs.mpc_catalogues[], Vector{CatalogueMPC})
+        # Check global variable NEOs.CATALOGUES_MPC[]
+        @test allunique(NEOs.CATALOGUES_MPC[])
+        @test isa(NEOs.CATALOGUES_MPC[], Vector{CatalogueMPC})
 
         # Parse CatalogueMPC
         gaia_s = "  6    Gaia2016"
-        gaia_m = match(mpc_catalogue_regex, gaia_s)
+        gaia_m = match(CATALOGUE_MPC_REGEX, gaia_s)
         gaia = CatalogueMPC(gaia_m)
         @test gaia.code == "6"
         @test gaia.name == "Gaia2016"
@@ -34,15 +34,15 @@ using NEOs: src_path
 
         # Read/write catalogues file
         check_file = joinpath(dirname(src_path), "test", "data", "CatalogueCodes.txt")
-        write_catalogues_mpc(NEOs.mpc_catalogues[], check_file)
+        write_catalogues_mpc(NEOs.CATALOGUES_MPC[], check_file)
         check_cat = read_catalogues_mpc(check_file)
         rm(check_file)
-        @test NEOs.mpc_catalogues[] == check_cat
+        @test NEOs.CATALOGUES_MPC[] == check_cat
 
         # Update catalogues file
         update_catalogues_mpc()
-        @test allunique(NEOs.mpc_catalogues[])
-        @test isa(NEOs.mpc_catalogues[], Vector{CatalogueMPC})
+        @test allunique(NEOs.CATALOGUES_MPC[])
+        @test isa(NEOs.CATALOGUES_MPC[], Vector{CatalogueMPC})
 
         # Search catalogue code
         cat = search_cat_code("6")
@@ -157,30 +157,9 @@ using NEOs: src_path
 
         @test source_radec == check_radec
 
-        # Search MPC circulars
-        function search_apophis(m::RegexMatch)
-            if (m["num"] == "99942") || (m["tmpdesig"] == "N00hp15")
-                return true
-            else
-                return false
-            end
-        end
-
-        obs = search_circulars_mpc(
-            search_apophis,
-            "https://minorplanetcenter.net/mpec/K20/K20YA9.html",
-            "https://minorplanetcenter.net/mpec/K21/K21JL0.html";
-            max_iter = 10
-        )
-
-        @test isa(obs, Vector{RadecMPC{Float64}})
-        @test issorted(obs)
-        @test allunique(obs)
-        @test all( (getfield.(obs, :num) .== "99942") .| (getfield.(obs, :tmpdesig) .== "N00hp15") )
-
         # Get RadecMPC
         source_file = joinpath("data", "99942.txt")
-        get_radec_mpc("99942", source_file)
+        get_radec_mpc("number" => "99942", source_file)
         
         @test isfile(source_file)
 

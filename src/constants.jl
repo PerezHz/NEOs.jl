@@ -7,8 +7,6 @@ const scratch_path = Ref{String}("")
 
 # URLs
 
-# MPC catalogues file url 
-const mpc_catalogues_url = "https://minorplanetcenter.net/iau/info/CatalogueCodes.html"
 # MPC observatories file url 
 const mpc_observatories_url = "https://minorplanetcenter.net/iau/lists/ObsCodes.html"
 # MPC database search url 

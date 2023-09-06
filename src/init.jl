@@ -4,7 +4,7 @@ function __init__()
     # Load catalogues 
     CatalogueCodes_path = joinpath(scratch_path[], "CatalogueCodes.txt")
     if isfile(CatalogueCodes_path)
-        global mpc_catalogues[] = read_catalogues_mpc(CatalogueCodes_path)
+        global CATALOGUES_MPC[] = read_catalogues_mpc(CatalogueCodes_path)
     else 
         update_catalogues_mpc()
     end 

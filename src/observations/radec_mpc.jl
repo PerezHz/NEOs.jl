@@ -135,6 +135,25 @@ const mpc_radec_regex = Regex(join(
         raw"(?P<obscode>.{3})"
     ]
 ))
+#=
+re = NEOs.mpc_radec_regex * Regex(string(
+    raw"(?:\n)?",
+    raw"(?P<_num_>.{5})?",
+    raw"(?P<_tmpdesig_>.{7})?",
+    raw"(?P<_discovery_>.{1})?",
+    raw"(?P<_publishnote_>.{1})?",
+    raw"(?P<_obstech_>.{1})?",
+    raw"(?P<_year_>\d{4})?(?:\s)?",
+    raw"(?P<_month_>\d{2})?(?:\s)?",
+    raw"(?P<_day_>\d{2})?",
+    raw"(?P<_utc_>\.[\d\s]{6})?",
+    raw"(?P<_sep_>1\s)?",
+    raw"(?P<x>[\-\+]{1}[\.\d\s]{11})?",
+    raw"(?P<y>[\-\+]{1}[\.\d\s]{11})?",
+    raw"(?P<z>[\-\+]{1}[\.\d\s]{11})?"
+))
+
+=#
 
 @doc raw"""
     datetime(year::Int, month::Int, day::Int, utc::T) where {T <: Real}
@@ -279,64 +298,6 @@ function parse_radec_mpc(f::F, text::String) where F
     return radecs
 end
 parse_radec_mpc(text::String) = parse_radec_mpc(t -> true, text)
-
-# MPC main page url
-const mpc_url = "https://minorplanetcenter.net"
-
-# Regex for next circular url
-const next_circular_regex = r"<a href=\"(?P<next>.*)\"><img src=\"/iau/figs/RArrow.gif\""
-
-@doc raw"""
-    search_circulars_mpc(url1::String, url2::String; max_iter::Int = 10_000)
-    search_circulars_mpc(f::F, url1::String, url2::String; max_iter::Int = 10_000) where F
-
-Iterate MPC circulars from `url1` to `url2` and return the matches of `NEOs.mpc_radec_regex`.
-A function `f(m::RegexMatch) -> Bool` can be passed to filter the observations. If `url2` is not
-reached before `max_iter` iterations, the function will print a warning and return the
-matches found so far.
-"""
-function search_circulars_mpc(f::F, url1::String, url2::String; max_iter::Int = 10_000) where F
-
-    # Vector of observations
-    obs = Vector{RadecMPC{Float64}}(undef, 0)
-
-    # Number of urls checked
-    n = 0
-    # First url
-    u = url1
-
-    while true
-        n += 1
-        if n > max_iter
-            @warn("$n pages checked before getting to $url2")
-            break
-        end
-        # Raw html text of webpage u
-        text = get_raw_html(u)
-        # Observations found in text
-        obs_ = parse_radec_mpc(f, text)
-        # Add new observations
-        obs = vcat(obs, obs_)
-        # Final url
-        if u == url2
-            break
-        end
-        # Next circular url
-        next = match(next_circular_regex, text)["next"]
-        u = mpc_url * next
-    end
-    # If there is at least one observation
-    if length(obs) > 0
-        # Sort observations by date
-        sort!(obs)
-        # Eliminate repeated observations
-        unique!(obs)
-    end
-
-    return obs
-end
-
-search_circulars_mpc(url1::String, url2::String; max_iter::Int = 10_000) = search_circulars_mpc(t -> true, url1, url2; max_iter = max_iter)
 
 @doc raw"""
     mpc_date_str(date::DateTime)

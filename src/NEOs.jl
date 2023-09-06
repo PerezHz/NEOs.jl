@@ -2,7 +2,7 @@ module NEOs
 
 # __precompile__(false)
 
-import Base: hash, ==, show, isless, isnan, convert, zero, iszero
+import Base: hash, ==, show, isless, isnan, convert, zero, iszero, string
 import PlanetaryEphemeris as PE
 import JLD2: writeas
 import Tables: istable, rowaccess, rows, schema, Schema
@@ -30,7 +30,7 @@ using Interpolations: Flat, Gridded, Linear, interpolate, extrapolate
 # Constants
 export d_EM_km, d_EM_au
 # CatalogueMPC
-export unknowncat, isunknown, read_catalogues_mpc, parse_catalogues_mpc, write_catalogues_mpc, update_catalogues_mpc,
+export unknowncat, isunknown, read_catalogues_mpc, write_catalogues_mpc, update_catalogues_mpc,
        search_cat_code
 # ObservatoryMPC
 export unknownobs, hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc,
