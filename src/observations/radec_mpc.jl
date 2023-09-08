@@ -356,9 +356,9 @@ end
 
 function mpc_x_str(x::T) where {T <: AbstractFloat}
     sgn = x > 0 ? "+" : "-"
-    y = @sprintf("%.5f", abs(x))
-    y = lpad(y, 11)
-    return string(sgn, y)
+    y = string(abs(x))
+    y = lpad(y, 10)
+    return string(sgn, y, " ")
 end
 
 # Convert `obs` to a string according to MPC format.

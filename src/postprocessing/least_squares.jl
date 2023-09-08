@@ -361,6 +361,11 @@ See also [`chi2`](@ref).
 function newtonls(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
     # Unfold residuals and weights
     res, w = unfold(ξs)
+    
+    return newtonls(res, w, x0, niters)
+end
+
+function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
     # Number of observations
     nobs = length(res)
     # Degrees of freedom

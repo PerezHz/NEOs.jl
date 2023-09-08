@@ -18,6 +18,10 @@ Day/night at a particular timezone.
     stop::Date
     utc::Int 
     function TimeOfDay(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
+        if issatellite(observatory)
+            today = Date(date)
+            return new(:day, today - Day(1), today + Day(1), 0)
+        end
         # Hours from UTC
         utc = hours_from_UTC(observatory)
         # Today's sunrise / sunset
