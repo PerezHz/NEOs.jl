@@ -116,24 +116,24 @@ using NEOs: src_path
 
     @testset "RadecMPC" begin
 
-        using NEOs: mpc_radec_regex, RadecMPC, mpc_radec_str
+        using NEOs: RADEC_MPC_REGEX, RadecMPC
         using Dates
 
         # Parse RadecMPC
         apophis_s = "99942K04M04N  C2004 03 15.10789 04 06 08.08 +16 55 04.6                om6394691"
-        apophis_m = match(mpc_radec_regex, apophis_s)
+        apophis_m = match(RADEC_MPC_REGEX, apophis_s)
         apophis = RadecMPC(apophis_m)
         @test apophis.num == "99942"
         @test apophis.tmpdesig == "K04M04N"
-        @test apophis.discovery == " "
-        @test apophis.publishnote == " "
+        @test apophis.discovery == ""
+        @test apophis.publishnote == ""
         @test apophis.obstech == "C"
         @test apophis.date == DateTime("2004-03-15T02:35:21.696")
         @test apophis.α == 1.0739650841580173
         @test apophis.δ == 0.2952738332250385
-        @test apophis.info1 == "         "
-        @test apophis.mag == "     "
-        @test apophis.band == " "
+        @test apophis.info1 == ""
+        @test isnan(apophis.mag)
+        @test apophis.band == ""
         @test apophis.catalogue == search_cat_code("o")
         @test apophis.info2 == "m6394"
         @test apophis.observatory == search_obs_code("691")
@@ -148,7 +148,7 @@ using NEOs: src_path
         @test isa(source_radec, Vector{RadecMPC{Float64}})
         @test issorted(source_radec)
         @test allunique(source_radec)
-        @test all( length.(mpc_radec_str.(source_radec)) .== 81)
+        @test all( length.(string.(source_radec)) .== 80)
 
         check_file = joinpath("data", "RADEC_2023_DW_.dat")
         write_radec_mpc(source_radec, check_file)
@@ -169,7 +169,7 @@ using NEOs: src_path
         @test isa(source_radec, Vector{RadecMPC{Float64}})
         @test issorted(source_radec)
         @test allunique(source_radec)
-        @test all( length.(mpc_radec_str.(source_radec)) .== 81)
+        @test all( map(x -> length(string(x)) ∈ [80, 161], source_radec))
 
         check_file = joinpath("data", "99942_.txt")
         write_radec_mpc(source_radec, check_file)

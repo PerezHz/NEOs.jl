@@ -71,7 +71,7 @@ function isunknown(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
 end 
 
 isground(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :ground
-issatellite(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :sattelite
+issatellite(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :satellite
 
 @doc raw"""
     hascoord(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
@@ -98,7 +98,7 @@ function show(io::IO, m::ObservatoryMPC{T}) where {T <: AbstractFloat}
 end
 
 function neoparse(x::RegexMatch, i::Int, ::Type{Float64})
-    y = tryparse(Float64, x[i])
+    y = tryparse(Float64, replace(x[i], " " => ""))
     if isnothing(y)
         return NaN
     else
@@ -136,9 +136,9 @@ function ObservatoryMPC(m::RegexMatch)
     args = map(i -> neoparse(m, i, types[i]), 1:5)
 
     if isnan(args[2]) && isnan(args[3]) && isnan(args[4])
-        ObservatoryMPC(args..., DateTime(2000, 1, 1), :satellite, 0)
+        return ObservatoryMPC(args..., DateTime(2000, 1, 1), :satellite, 0)
     else 
-        ObservatoryMPC(args...)
+        return ObservatoryMPC(args...)
     end 
 end
 

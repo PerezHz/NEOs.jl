@@ -69,7 +69,7 @@ Return longitude and latitude (both in rad) of an observatory.
 """
 function lonlat(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
     # ECEF [km]
-    p_ECEF = obs_pos_ECEF(observatory)
+    p_ECEF = obsposECEF(observatory)
     # ECEF [m] -> Geodetic [m]
     lat_geodetic, lon, altitude = ecef_to_geodetic(1_000 * p_ECEF)
     # Geodetic [m] -> Geocentric [m]
@@ -115,42 +115,67 @@ end
 sunriseset(radec::RadecMPC{T}) where {T <: AbstractFloat} = sunriseset(date(radec), observatory(radec))
 
 @doc raw"""
-    obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
-    obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat}
-    obs_pos_ECEF(x::RadarJPL{T}) where {T <: AbstractFloat}
+    obsposECEF(observatory::ObservatoryMPC{T}; kwarg) where {T <: AbstractFloat}
+    obsposECEF(x::RadecMPC{T}; kwarg) where {T <: AbstractFloat}
+    obsposECEF(x::RadarJPL{T}; kwarg) where {T <: AbstractFloat}
 
 Return the observer's geocentric `[x, y, z]` position vector in Earth-Centered Earth-Fixed (ECEF) reference frame.
+
+# Keyword argument
+- `eop::Union{EopIau1980, EopIau2000A}`: Earth Orientation Parameters (eop).
 """
-function obs_pos_ECEF(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
+function obsposECEF(observatory::ObservatoryMPC{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
 
     # Make sure observatory has coordinates
-    @assert !isunknown(observatory) "Cannot compute position for unknown observatory."
     @assert hascoord(observatory) "Cannot compute position for observatory [$(observatory.code)] without coordinates"
 
-    # λ_deg: longitude [degrees east of Greenwich]
-    # u: distance from spin axis [km], u = ρ*cos(ϕ')
-    # v: height above equatorial plane [km], v = ρ*sin(ϕ'),
-    # where ϕ' is the geocentric latitude and ρ is the geocentric distance in km
+    if issatellite(observatory)
+        # Ephemeris seconds since J2000
+        et = datetime2et(observatory.date)
+        # Earth-Centered Inertial position position of observer
+        posvel_ECI = obsposvelECI(observatory, et; eop)
+        # UTC seconds
+        utc_secs = et - tdb_utc(et)
+        # Julian days UTC
+        jd_utc = JD_J2000 + utc_secs/daysec
+        # State vector
+        pv_ECI = OrbitStateVector(jd_utc, posvel_ECI[1:3], posvel_ECI[4:6], zeros(3))
 
-    # Cilindrical components of Earth-Centered Earth-Fixed position of observer
-    λ_deg = observatory.long     # deg
-    u = observatory.cos * RE     # km
-    v = observatory.sin * RE     # km
+        # Transform position/velocity from Earth-Centered Inertial (ECI) fraom to Earth-Centered Earth-fixed (ECEF) frame
+        # ITRF: International Terrestrial Reference Frame
+        # GCRF: Geocentric Celestial Reference Frame
+        pv_ECEF = sv_eci_to_ecef(pv_ECI, Val(:GCRF), Val(:ITRF), jd_utc, eop)
 
-    # Cartesian components of Earth-Centered Earth-Fixed position of observer
-    λ_rad = deg2rad(λ_deg)       # rad
-    x_gc = u * cos(λ_rad)        # km
-    y_gc = u * sin(λ_rad)        # km
-    z_gc = v                     # km
+        # ECEF position
+        pos_ECEF = convert(Vector{eltype(pv_ECEF.r)}, pv_ECEF.r)
+        
+        return pos_ECEF
+    else 
+        # λ_deg: longitude [degrees east of Greenwich]
+        # u: distance from spin axis [km], u = ρ*cos(ϕ')
+        # v: height above equatorial plane [km], v = ρ*sin(ϕ'),
+        # where ϕ' is the geocentric latitude and ρ is the geocentric distance in km
 
-    # Earth-Centered Earth-Fixed position position of observer
-    pos_ECEF = [x_gc, y_gc, z_gc] # km
+        # Cilindrical components of Earth-Centered Earth-Fixed position of observer
+        λ_deg = observatory.long     # deg
+        u = observatory.cos * RE     # km
+        v = observatory.sin * RE     # km
 
-    return pos_ECEF
+        # Cartesian components of Earth-Centered Earth-Fixed position of observer
+        λ_rad = deg2rad(λ_deg)       # rad
+        x_gc = u * cos(λ_rad)        # km
+        y_gc = u * sin(λ_rad)        # km
+        z_gc = v                     # km
+
+        # Earth-Centered Earth-Fixed position position of observer
+        pos_ECEF = [x_gc, y_gc, z_gc] # km
+
+        return pos_ECEF
+    end
 end
 
-obs_pos_ECEF(x::RadecMPC{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.observatory)
-obs_pos_ECEF(x::RadarJPL{T}) where {T <: AbstractFloat} = obs_pos_ECEF(x.rcvr)
+obsposECEF(x::RadecMPC{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat} = obsposECEF(x.observatory; eop)
+obsposECEF(x::RadarJPL{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat} = obsposECEF(x.rcvr; eop)
 
 # TODO: avoid sv_ecef_to_ecef overload by defining proper product between DCMs and Taylor1/TaylorN
 # method below has been adapted from SatelliteToolboxTransformations.jl, MIT-licensed
@@ -210,10 +235,9 @@ function sv_ecef_to_eci(
 end
 
 @doc raw"""
-    obsposvelECI(observatory::ObservatoryMPC{T}, et::T;
-               eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
-    obsposvelECI(x::RadecMPC{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
-    obsposvelECI(x::RadarJPL{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
+    obsposvelECI(observatory::ObservatoryMPC{T}, et::T; kwarg) where {T <: AbstractFloat}
+    obsposvelECI(x::RadecMPC{T}; kwarg) where {T <: AbstractFloat}
+    obsposvelECI(x::RadarJPL{T}; kwarg) where {T <: AbstractFloat}
 
 Return the observer's geocentric `[x, y, z, v_x, v_y, v_z]` "state" vector in Earth-Centered
 Inertial (ECI) reference frame. By default, the IAU200A Earth orientation model is used to
@@ -228,32 +252,44 @@ See also [`SatelliteToolboxBase.OrbitStateVector`](@ref) and [`SatelliteToolboxT
 
 - `observatory::ObservatoryMPC{T}`: observation site.
 - `et::T`: ephemeris time (TDB seconds since J2000.0 epoch).
+
+# Keyword argument
+
 - `eop::Union{EopIau1980, EopIau2000A}`: Earth Orientation Parameters (eop).
 """
 function obsposvelECI(observatory::ObservatoryMPC{T}, et::ET;
         eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat, ET<:Union{T,Taylor1{T},Taylor1{TaylorN{T}}}}
-    # Earth-Centered Earth-Fixed position position of observer
-    pos_ECEF = obs_pos_ECEF(observatory)
+    
+    # Make sure observatory has coordinates
+    @assert hascoord(observatory) "Cannot compute position for observatory [$(observatory.code)] without coordinates"
 
-    # UTC seconds
-    utc_secs = et - tdb_utc(et)
-    # Julian days UTC
-    jd_utc = JD_J2000 + utc_secs/daysec
-    # State vector
-    pv_ECEF = OrbitStateVector(jd_utc, pos_ECEF, zeros(3), zeros(3))
+    if issatellite(observatory)
+        #@assert datetime2et(observatory.date) == cte(et)
+        return [observatory.long, observatory.cos, observatory.sin, zero(T), zero(T), zero(T)]
+    else 
+        # Earth-Centered Earth-Fixed position position of observer
+        pos_ECEF = obsposECEF(observatory)
 
-    # Transform position/velocity from Earth-Centered Earth-fixed (ECEF) frame to Earth-Centered Inertial (ECI) frame
-    # ITRF: International Terrestrial Reference Frame
-    # GCRF: Geocentric Celestial Reference Frame
-    pv_ECI = sv_ecef_to_eci(pv_ECEF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
+        # UTC seconds
+        utc_secs = et - tdb_utc(et)
+        # Julian days UTC
+        jd_utc = JD_J2000 + utc_secs/daysec
+        # State vector
+        pv_ECEF = OrbitStateVector(jd_utc, pos_ECEF, zeros(3), zeros(3))
 
-    # Inertial position
-    p_ECI = convert(Vector{eltype(pv_ECI.r)}, pv_ECI.r)
-    # Inertial velocity
-    v_ECI = convert(Vector{eltype(pv_ECI.v)}, pv_ECI.v)
+        # Transform position/velocity from Earth-Centered Earth-fixed (ECEF) frame to Earth-Centered Inertial (ECI) frame
+        # ITRF: International Terrestrial Reference Frame
+        # GCRF: Geocentric Celestial Reference Frame
+        pv_ECI = sv_ecef_to_eci(pv_ECEF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
 
-    # Concat position and velocity
-    return vcat(p_ECI, v_ECI)
+        # Inertial position
+        p_ECI = convert(Vector{eltype(pv_ECI.r)}, pv_ECI.r)
+        # Inertial velocity
+        v_ECI = convert(Vector{eltype(pv_ECI.v)}, pv_ECI.v)
+
+        # Concat position and velocity
+        return vcat(p_ECI, v_ECI)
+    end
 end
 
 function obsposvelECI(x::RadecMPC{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
