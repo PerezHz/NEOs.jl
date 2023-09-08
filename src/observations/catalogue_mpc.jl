@@ -57,7 +57,7 @@ const CATALOGUES_MPC_HEADER = "Char   Catalogue"
 @doc raw"""
     CatalogueMPC(m::RegexMatch)
 
-Convert a match of `NEOs.mpc_catalogue_regex` to `CatalogueMPC`.
+Convert a match of `NEOs.CATALOGUE_MPC_REGEX` to `CatalogueMPC`.
 """
 function CatalogueMPC(m::RegexMatch)
     # Check that matched regex is correct

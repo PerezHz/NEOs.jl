@@ -11,7 +11,7 @@ function __init__()
     # Load observatories 
     ObsCodes_path = joinpath(scratch_path[], "ObsCodes.txt")
     if isfile(ObsCodes_path)
-        global mpc_observatories[] = read_observatories_mpc(ObsCodes_path)
+        global OBSERVATORIES_MPC[] = read_observatories_mpc(ObsCodes_path)
     else 
         update_observatories_mpc()
     end

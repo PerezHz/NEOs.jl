@@ -33,8 +33,7 @@ export d_EM_km, d_EM_au
 export unknowncat, isunknown, read_catalogues_mpc, write_catalogues_mpc, update_catalogues_mpc,
        search_cat_code
 # ObservatoryMPC
-export unknownobs, hascoord, read_observatories_mpc, parse_observatories_mpc, write_observatories_mpc,
-       update_observatories_mpc, search_obs_code
+export unknownobs, hascoord, read_observatories_mpc, write_observatories_mpc, update_observatories_mpc, search_obs_code
 # RadecMPC
 export num, tmpdesig, discovery, publishnote, obstech, ra, dec, info1, mag, band, catalogue, info2, observatory,
        read_radec_mpc, parse_radec_mpc, search_circulars_mpc, write_radec_mpc, get_radec_mpc

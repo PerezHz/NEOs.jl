@@ -51,15 +51,15 @@ using NEOs: src_path
 
     @testset "ObservatoryMPC" begin
 
-        using NEOs: mpc_observatory_regex, ObservatoryMPC
+        using NEOs: OBSERVATORY_MPC_REGEX, ObservatoryMPC
 
-        # Check global variable NEOs.mpc_observatories[]
-        @test allunique(NEOs.mpc_observatories[])
-        @test isa(NEOs.mpc_observatories[], Vector{ObservatoryMPC{Float64}})
+        # Check global variable NEOs.OBSERVATORIES_MPC[]
+        @test allunique(NEOs.OBSERVATORIES_MPC[])
+        @test isa(NEOs.OBSERVATORIES_MPC[], Vector{ObservatoryMPC{Float64}})
 
         # Parse ObservatoryMPC
         arecibo_s = "251 293.246920.949577+0.312734Arecibo"
-        arecibo_m = match(mpc_observatory_regex, arecibo_s)
+        arecibo_m = match(OBSERVATORY_MPC_REGEX, arecibo_s)
         arecibo = ObservatoryMPC(arecibo_m)
         @test arecibo.code == "251"
         @test arecibo.long == 293.24692
@@ -68,7 +68,7 @@ using NEOs: src_path
         @test arecibo.name == "Arecibo"
 
         hubble_s = "250                           Hubble Space Telescope"
-        hubble_m = match(mpc_observatory_regex, hubble_s)
+        hubble_m = match(OBSERVATORY_MPC_REGEX, hubble_s)
         hubble = ObservatoryMPC(hubble_m)
         @test hubble.code == "250"
         @test isnan(hubble.long)
@@ -97,15 +97,15 @@ using NEOs: src_path
 
         # Read/write observatories file
         check_file = joinpath(dirname(src_path), "test", "data", "ObsCodes.txt")
-        write_observatories_mpc(NEOs.mpc_observatories[], check_file)
+        write_observatories_mpc(NEOs.OBSERVATORIES_MPC[], check_file)
         check_obs = read_observatories_mpc(check_file)
         rm(check_file)
-        @test NEOs.mpc_observatories[] == check_obs
+        @test NEOs.OBSERVATORIES_MPC[] == check_obs
 
         # Update observatories file
         update_observatories_mpc()
-        @test allunique(NEOs.mpc_observatories[])
-        @test isa(NEOs.mpc_observatories[], Vector{ObservatoryMPC{Float64}})
+        @test allunique(NEOs.OBSERVATORIES_MPC[])
+        @test isa(NEOs.OBSERVATORIES_MPC[], Vector{ObservatoryMPC{Float64}})
 
         # Search observatory code
         obs = search_obs_code("250")

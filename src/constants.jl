@@ -7,8 +7,6 @@ const scratch_path = Ref{String}("")
 
 # URLs
 
-# MPC observatories file url 
-const mpc_observatories_url = "https://minorplanetcenter.net/iau/lists/ObsCodes.html"
 # MPC database search url 
 const search_mpc_url = "https://www.minorplanetcenter.net/db_search/show_object?utf8=%E2%9C%93&object_id="
 # MPC observations url 

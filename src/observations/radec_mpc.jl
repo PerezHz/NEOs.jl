@@ -224,7 +224,7 @@ function RadecMPC(m::RegexMatch)
     )
     # Find catalogue in mpc_catalogues[] that matches catalogue
     catalogue = search_cat_code(string(m["catalogue"]))
-    # Find observatory in mpc_observatories[] that matches obscode
+    # Find observatory in OBSERVATORIES_MPC[] that matches obscode
     observatory = search_obs_code(string(m["obscode"]))
 
     return RadecMPC(
