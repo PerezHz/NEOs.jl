@@ -76,7 +76,7 @@ end
 Return the matches of `NEOs.CATALOGUE_MPC_REGEX` in `s` as `CatalogueMPC`. `s` can be either a filename or a text.
 """
 function read_catalogues_mpc(s::String)
-    if isfile(s)
+    if !contains(s, "\n") && isfile(s)
         # Read MPC formatted file
         s = String(read(s))
     end
