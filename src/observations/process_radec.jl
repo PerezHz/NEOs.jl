@@ -592,6 +592,11 @@ end
 Special method of [`extrapolation`](@ref) to be used by [`gaussinitcond`](@ref).
 """
 function extrapolation(df::AbstractDataFrame)
+    if !allunique(df.date)
+        gdf = groupby(df, :date)
+        df = combine(gdf, [:α, :δ] .=> x -> sum(x)/length(x), :observatory => identity, renamecols = false)
+    end
+
     if isone(nrow(df))
         return (observatory = df.observatory[1], date = df.date[1], α = df.α[1], δ = df.δ[1])
     end 
@@ -619,7 +624,7 @@ function extrapolation(df::AbstractDataFrame)
 
     # Evaluate polynomials at mean date 
     α_mean = mod2pi(α_p(t_mean))
-    δ_mean = mod2pi(δ_p(t_mean))
+    δ_mean = δ_p(t_mean)
 
     return (observatory = df.observatory[1], date = julian2datetime(t_julian[1] + t_mean), α = α_mean, δ = δ_mean)
 end 

@@ -466,13 +466,13 @@ for i in 1:2
                     # Backward propagation 
                     bwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, maxsteps, jd0, nyears_bwd, q0; 
                                     order = order, abstol = abstol, parse_eqs = parse_eqs)
-                    if length(bwd.t) == maxsteps + 1
+                    if bwd.t[end] > t0 - jd0
                         continue
                     end
                     # Forward propagation
                     fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, maxsteps, jd0, nyears_fwd, q0; 
                                     order = order, abstol = abstol, parse_eqs = parse_eqs)
-                    if length(fwd.t) == maxsteps + 1
+                    if fwd.t[end] < tf - jd0
                         continue
                     end
                     # O-C residuals
