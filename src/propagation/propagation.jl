@@ -178,7 +178,7 @@ function propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector
     _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
 
     # Propagate orbit
-    @time tv, xv, psol, tvS, xvS, gvS = taylorinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, val(true), _params;
+    @time tv, xv, psol, tvS, xvS, gvS = taylorinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, Val(true), _params;
                                                     maxsteps, parse_eqs, eventorder, newtoniter, nrabstol)
 
     return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], psol), tvS, xvS, gvS

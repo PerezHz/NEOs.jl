@@ -43,29 +43,35 @@ using InteractiveUtils: methodswith
         # Earth's ephemeris
         eph_ea = selecteph(sseph, ea)
 
-        # warmup propagation (backward and forward)
+        # warmup propagation (forward)
         NEOs.propagate(
             dynamics,
             1,
             jd0,
-            -nyears,
             nyears,
             q0,
-            Val(true),
             order = 25,
             abstol = 1e-20,
             parse_eqs = true
         )
 
         # propagate orbit
-        sol_bwd, sol = NEOs.propagate(
+        sol_bwd = NEOs.propagate(
             dynamics,
             maxsteps,
             jd0,
             -nyears,
+            q0,
+            order = 25,
+            abstol = 1e-20,
+            parse_eqs = true
+        )
+        sol = NEOs.propagate(
+            dynamics,
+            maxsteps,
+            jd0,
             nyears,
             q0,
-            Val(true),
             order = 25,
             abstol = 1e-20,
             parse_eqs = true
@@ -94,19 +100,20 @@ using InteractiveUtils: methodswith
         obs_radec_mpc_2023DW = NEOs.read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
 
         # Compute residuals
-        res, _ = NEOs.residuals(
+        _res_ = NEOs.residuals(
             obs_radec_mpc_2023DW,
             xve=t->auday2kmsec(eph_ea(t/daysec)),
             xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec))
         )
+        res, w = NEOs.unfold(_res_)
 
         mean_radec0 = mean(res)
         std_radec0 = std(res)
         rms_radec0 = nrms(res,ones(length(res))) # un-normalized RMS
-        @test mean_radec0 ≈ -0.667 atol=1e-2
-        @test std_radec0 ≈ 0.736 atol=1e-2
-        @test rms_radec0 ≈ 0.992 atol=1e-2
+        @test mean_radec0 ≈ -0.009 atol=1e-3
+        @test std_radec0 ≈ 0.697 atol=1e-3
+        @test rms_radec0 ≈ 0.696 atol=1e-3
 
         # propagate orbit with perturbed initial conditions
         q1 = q0 + vcat(1e-3randn(3), 1e-5randn(3))
@@ -116,7 +123,6 @@ using InteractiveUtils: methodswith
             jd0,
             nyears,
             q1,
-            Val(true),
             order = 25,
             abstol = 1e-20,
             parse_eqs = true
@@ -129,12 +135,13 @@ using InteractiveUtils: methodswith
         rm("test.jld2")
 
         # compute residuals for orbit with perturbed initial conditions
-        res1, _ = NEOs.residuals(
+        _res1_ = NEOs.residuals(
             obs_radec_mpc_2023DW,
             xve=t->auday2kmsec(eph_ea(t/daysec)),
             xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol1(t/daysec))
         )
+        res1, _ = NEOs.unfold(_res1_)
         mean_radec1 = mean(res1)
         std_radec1 = std(res1)
         rms_radec1 = nrms(res1,ones(length(res1)))
@@ -171,7 +178,6 @@ using InteractiveUtils: methodswith
             jd0,
             nyears,
             q0,
-            Val(true),
             order = 25,
             abstol = 1e-20,
             parse_eqs = true
@@ -184,7 +190,6 @@ using InteractiveUtils: methodswith
             jd0,
             nyears,
             q0,
-            Val(true),
             order = 25,
             abstol = 1e-20,
             parse_eqs = true
@@ -200,12 +205,13 @@ using InteractiveUtils: methodswith
         obs_radec_mpc_apophis = NEOs.read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
 
         # Compute optical astrometry residuals
-        res_radec, w_radec = NEOs.residuals(
+        _res_radec_ = NEOs.residuals(
             obs_radec_mpc_apophis,
             xve=t->auday2kmsec(eph_ea(t/daysec)),
             xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec))
         )
+        res_radec, w_radec = NEOs.unfold(_res_radec_)
         nobsopt = round(Int, length(res_radec))
 
         # Compute mean optical astrometric residual (right ascension and declination)
@@ -217,8 +223,8 @@ using InteractiveUtils: methodswith
         std_dec = std(res_dec)
         rms_ra = nrms(res_ra,ones(length(res_ra)))
         rms_dec = nrms(res_dec,ones(length(res_dec)))
-        @test mean_ra ≈ 0.0224 atol=1e-2
-        @test std_ra ≈ 0.136 atol=1e-2
+        @test mean_ra ≈ -0.0467 atol=1e-4
+        @test std_ra ≈ 0.121 atol=1e-3
         @test rms_ra ≈ std_ra atol=1e-2
         @test mean_dec ≈ -0.0124 atol=1e-2
         @test std_dec ≈ 0.0714 atol=1e-2
@@ -251,7 +257,7 @@ using InteractiveUtils: methodswith
         w = vcat(w_radec, w_del, w_dop)
 
         # Total normalized RMS
-        @test nrms(res, w) ≈ 0.375 atol=1e-2
+        @test nrms(res, w) ≈ 0.364 atol=1e-3
     end
 
     @testset "Jet transport propagation and TaylorN serialization" begin
@@ -274,13 +280,13 @@ using InteractiveUtils: methodswith
         local q0 = [-0.9170913888342959, -0.37154308794738056, -0.1610606989484252,
                     0.009701519087787077, -0.012766026792868212, -0.0043488589639194275] .+ dq
 
-        sol = NEOs.propagate(dynamics, 10, jd0, 0.02, q0, Val(true); order, abstol, parse_eqs)
+        sol = NEOs.propagate(dynamics, 10, jd0, 0.02, q0; order, abstol, parse_eqs)
         jldsave("test.jld2"; sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol
         rm("test.jld2")
 
-        sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, 1, jd0, 0.02, q0, Val(true); order, abstol, parse_eqs)
+        sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, 1, jd0, 0.02, q0; order, abstol, parse_eqs)
 
         jldsave("test.jld2"; sol, tvS, xvS, gvS)
         recovered_sol = JLD2.load("test.jld2", "sol")
@@ -324,7 +330,6 @@ using InteractiveUtils: methodswith
             jd0,
             nyears,
             q0,
-            Val(true),
             order = 25,
             abstol = 1e-20,
             parse_eqs = true
@@ -340,12 +345,13 @@ using InteractiveUtils: methodswith
         obs_radec_mpc_apophis = NEOs.read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
 
         # Compute optical astrometry residuals
-        res_radec, w_radec = NEOs.residuals(
+        _res_radec_ = NEOs.residuals(
             obs_radec_mpc_apophis,
             xve=t->auday2kmsec(eph_ea(t/daysec)),
             xvs=t->auday2kmsec(eph_su(t/daysec)),
             xva=t->auday2kmsec(sol(t/daysec))
         )
+        res_radec, w_radec = NEOs.unfold(_res_radec_)
         nobsopt = round(Int, length(res_radec))
 
         # Compute mean optical astrometric residual (right ascension and declination)
@@ -357,8 +363,8 @@ using InteractiveUtils: methodswith
         std_dec = std(res_dec)
         rms_ra = nrms(res_ra,ones(length(res_ra)))
         rms_dec = nrms(res_dec,ones(length(res_dec)))
-        @test mean_ra ≈ 0.00574 atol=1e-2
-        @test std_ra ≈ 0.136 atol=1e-2
+        @test mean_ra ≈ -0.0463 atol=1e-4
+        @test std_ra ≈ 0.118 atol=1e-3
         @test rms_ra ≈ std_ra atol=1e-2
         @test mean_dec ≈ -0.0124 atol=1e-2
         @test std_dec ≈ 0.0714 atol=1e-2
