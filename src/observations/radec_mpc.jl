@@ -167,7 +167,7 @@ const RADEC_MPC_REGEX = Regex(string(
     # Publishable note regex (column 14)
     raw"(?P<publishnote>.{1})",
     # Observation technique regex (column 15)
-    raw"(?P<obstech>.{1})",
+    raw"(?P<obstech>[^xX]{1})",
     # Date of observation regex (columns 16-32)
     raw"(?P<date>\d{4}\s\d{2}\s\d{2}\.[\d\s]{6})",
     # Right ascension regex (columns 33-44)
@@ -450,7 +450,7 @@ function get_radec_mpc(id::Pair{String, String}, filename::String = replace(id[2
     # Parse JSON
     obs = JSON.parse(text)
     # Find matches
-    matches = Vector{RegexMatch}(undef, length(obs))
+    matches = Vector{Union{RegexMatch, Nothing}}(undef, length(obs))
     for i in eachindex(obs)
         s = obs[i]["original_record"]
         matches[i] = match(RADEC_MPC_REGEX, s)
