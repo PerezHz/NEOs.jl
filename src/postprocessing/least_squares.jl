@@ -283,6 +283,11 @@ See also [`BHC`](@ref).
 function diffcorr(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
     # Unfold residuals and weights
     res, w = unfold(ξs)
+    
+    return diffcorr(res, w, x0, niters)
+end
+
+function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
     # Degrees of freedom
     npar = length(x0)
     # Design matrix B, H array and normal matrix C

@@ -401,7 +401,7 @@ function adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFlo
     Δ_day = Δ_ms / 86_400_000
     # Adaptative maxsteps
     if Δ_day <= 30
-        return 50 - floor(Int, 2*Δ_day/3)
+        return 55 - floor(Int, 5*Δ_day/6)
     else
         return ceil(Int, (Δ_day + 360)/13)
     end

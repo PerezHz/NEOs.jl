@@ -610,15 +610,16 @@ function extrapolation(df::AbstractDataFrame)
 
     α_p = extrapolation([0., 1.], [0., 1.])
 
-    # Extrapolate
-    if issorted(df.α) || issorted(df.α, rev = true)
-        α_p = extrapolation(t_rel, df.α)
-    elseif df.α[1] > π && df.α[end] < π
+    # Discontinuity 2π -> 0
+    if df.α[1] > π && df.α[end] < π
         α = map(x -> x < π ? x + 2π : x, df.α)
         α_p = extrapolation(t_rel, α)
+    # Discontinuity 0 -> 2π
     elseif df.α[1] < π && df.α[end] > π
         α = map(x -> x > π ? x - 2π : x, df.α)
         α_p = extrapolation(t_rel, α) 
+    else
+        α_p = extrapolation(t_rel, df.α)
     end
     δ_p = extrapolation(t_rel, df.δ)
 
