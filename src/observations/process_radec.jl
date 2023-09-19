@@ -610,16 +610,17 @@ function extrapolation(df::AbstractDataFrame)
 
     α_p = extrapolation([0., 1.], [0., 1.])
 
-    # Discontinuity 2π -> 0
-    if df.α[1] > π && df.α[end] < π
+    # Points in top quarter
+    N_top = count(x -> x > 3π/2, df.α)
+    # Points in bottom quarter
+    N_bottom = count(x -> x < π/2, df.α)
+    # No discontinuity
+    if iszero(N_top) || iszero(N_bottom)
+        α_p = extrapolation(t_rel, df.α)
+    # Discontinuity
+    else
         α = map(x -> x < π ? x + 2π : x, df.α)
         α_p = extrapolation(t_rel, α)
-    # Discontinuity 0 -> 2π
-    elseif df.α[1] < π && df.α[end] > π
-        α = map(x -> x > π ? x - 2π : x, df.α)
-        α_p = extrapolation(t_rel, α) 
-    else
-        α_p = extrapolation(t_rel, df.α)
     end
     δ_p = extrapolation(t_rel, df.δ)
 
