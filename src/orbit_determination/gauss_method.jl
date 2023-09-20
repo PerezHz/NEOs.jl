@@ -329,6 +329,8 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
 
 end
 
+numberofdays(dates::Vector{DateTime}) = (dates[end] - dates[1]).value / 86_400_000
+
 @doc raw"""
     gauss_norm(dates::Vector{DateTime})
 
@@ -362,7 +364,11 @@ function gauss_triplets(dates::Vector{DateTime}, Δ_min::Period, Δ_max::Period,
         end
     end
 
-    sort!(triplets, by = x -> gauss_norm(dates[x]))
+    if numberofdays(dates) <= 1
+        sort!(triplets, by = x -> gauss_norm(dates[x]))
+    else
+        sort!(triplets, by = x -> gauss_evenness(dates[x]))
+    end
 
     n = min(length(triplets), max_triplets)
 
