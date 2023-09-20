@@ -557,7 +557,7 @@ function residuals(obs::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{St
         # O-C residual ra/dec
         # Note: ra is multiplied by a metric factor cos(dec) to match the format of debiasing corrections
         res[i] = OpticalResidual(
-            anglediff(α_obs, α_comp) * cos(δ_obs) - α_corr,
+            anglediff(α_obs, α_comp) * cos(dec(obs[i])) - α_corr,
             δ_obs - δ_comp - δ_corr,
             1 / w8^2,
             1 / w8^2,

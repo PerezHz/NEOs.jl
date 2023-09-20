@@ -335,7 +335,11 @@ end
 Return a measure of how evenly distributed in time a triplet is; used within [`gauss_triplets`](@ref) to sort triplets 
 for Gauss method. The function assumes `dates` is sorted.
 """
-gauss_norm(dates::Vector{DateTime}) = abs( (dates[2] - dates[1]).value - (dates[3] - dates[2]).value )
+gauss_evenness(dates::Vector{DateTime}) = abs( (dates[2] - dates[1]).value - (dates[3] - dates[2]).value ) / 86_400_000
+
+gauss_optimal_span(dates::Vector{DateTime}) = abs( (dates[3] - dates[1]).value/86_400_000 - 1)
+
+gauss_norm(dates::Vector{DateTime}) = gauss_evenness(dates) + gauss_optimal_span(dates)
 
 @doc raw"""
     gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_iter::Int = 100)
@@ -385,13 +389,6 @@ function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_ite
     n = min(length(triplets), max_triplets)
 
     return triplets[1:n]
-end
-
-function numberofdays(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
-    t0 = date(radec[1])
-    tf = date(radec[end])
-    Δ = (tf - t0).value / 86_400_000
-    return Δ
 end
 
 function adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}

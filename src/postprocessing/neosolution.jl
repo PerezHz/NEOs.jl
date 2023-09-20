@@ -116,13 +116,24 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::I
     eph_su = selecteph(sseph, su)
     # Earth's ephemeris
     eph_ea = selecteph(sseph, ea)
+    # Julian day of first (last) observation
+    t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
 
     # Backward integration
     bwd = propagate(dynamics, maxsteps, jd0, nyears_bwd, q0; μ_ast = μ_ast, order = order,
                     abstol = abstol, parse_eqs = parse_eqs)
+
+    if bwd.t[end] > t0 - jd0
+        return zero(NEOSolution{T, T})
+    end
+
     # Forward integration
     fwd = propagate(dynamics, maxsteps, jd0, nyears_fwd, q0; μ_ast = μ_ast, order = order,
                     abstol = abstol, parse_eqs = parse_eqs)
+
+    if fwd.t[end] < tf - jd0
+        return zero(NEOSolution{T, T})
+    end
 
     # Residuals
     res = residuals(radec, mpc_catalogue_codes_201X, truth, resol, bias_matrix;
