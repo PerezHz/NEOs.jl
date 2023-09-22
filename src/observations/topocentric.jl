@@ -7,20 +7,21 @@ const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
 Day/night at a particular timezone.
 
 # Fields 
-- `light::Symbol`: `:day` or `:night`.
-- `start::Date`.
-- `stop::Date`.
+- `light::Symbol`: 
+    - for ground observatories: `:day` or `:night`,
+    - for space observatories: `:space`.
+- `start::DateTime`.
+- `stop::DateTime`.
 - `utc::Int`: hours from UTC.
 """
 @auto_hash_equals struct TimeOfDay
     light::Symbol
-    start::Date
-    stop::Date
+    start::DateTime
+    stop::DateTime
     utc::Int 
     function TimeOfDay(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
         if issatellite(observatory)
-            today = Date(date)
-            return new(:day, today - Day(1), today + Day(1), 0)
+            return new(:space, date, date, 0)
         end
         # Hours from UTC
         utc = hours_from_UTC(observatory)
@@ -32,11 +33,11 @@ Day/night at a particular timezone.
         tomorrow = sunriseset(date + Day(1), observatory)
         # Selection
         if yesterday[2] <= date <= today[1]
-            return new(:night, yesterday[2], today[1], utc)
+            return new(:night, Date(yesterday[2]), Date(today[1]), utc)
         elseif today[1] <= date <= today[2]
-            return new(:day, today[1], today[2], utc)
+            return new(:day, Date(today[1]), Date(today[2]), utc)
         elseif today[2] <= date <= tomorrow[1]
-            return new(:night, today[2], tomorrow[1], utc)
+            return new(:night, Date(today[2]), Date(tomorrow[1]), utc)
         end
 
     end

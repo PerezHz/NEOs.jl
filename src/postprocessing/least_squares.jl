@@ -130,8 +130,6 @@ function chi2(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
     return sum(w .* (res.^2))
 end
 
-nms(res, w) = chi2(res, w) / length(res)
-
 @doc raw"""
     nrms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
     nrms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}

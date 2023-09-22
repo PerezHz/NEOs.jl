@@ -111,9 +111,9 @@ using InteractiveUtils: methodswith
         mean_radec0 = mean(res)
         std_radec0 = std(res)
         rms_radec0 = nrms(res,ones(length(res))) # un-normalized RMS
-        @test mean_radec0 ≈ -0.009 atol=1e-3
-        @test std_radec0 ≈ 0.697 atol=1e-3
-        @test rms_radec0 ≈ 0.696 atol=1e-3
+        @test mean_radec0 ≈ -0.667 atol=1e-3
+        @test std_radec0 ≈ 0.736 atol=1e-3
+        @test rms_radec0 ≈ 0.992 atol=1e-3
 
         # propagate orbit with perturbed initial conditions
         q1 = q0 + vcat(1e-3randn(3), 1e-5randn(3))
@@ -223,8 +223,8 @@ using InteractiveUtils: methodswith
         std_dec = std(res_dec)
         rms_ra = nrms(res_ra,ones(length(res_ra)))
         rms_dec = nrms(res_dec,ones(length(res_dec)))
-        @test mean_ra ≈ -0.0467 atol=1e-4
-        @test std_ra ≈ 0.121 atol=1e-3
+        @test mean_ra ≈ 0.0224 atol=1e-4
+        @test std_ra ≈ 0.136 atol=1e-3
         @test rms_ra ≈ std_ra atol=1e-2
         @test mean_dec ≈ -0.0124 atol=1e-2
         @test std_dec ≈ 0.0714 atol=1e-2
@@ -257,7 +257,7 @@ using InteractiveUtils: methodswith
         w = vcat(w_radec, w_del, w_dop)
 
         # Total normalized RMS
-        @test nrms(res, w) ≈ 0.364 atol=1e-3
+        @test nrms(res, w) ≈  0.366 atol=1e-3
     end
 
     @testset "Jet transport propagation and TaylorN serialization" begin
@@ -363,8 +363,8 @@ using InteractiveUtils: methodswith
         std_dec = std(res_dec)
         rms_ra = nrms(res_ra,ones(length(res_ra)))
         rms_dec = nrms(res_dec,ones(length(res_dec)))
-        @test mean_ra ≈ -0.0463 atol=1e-4
-        @test std_ra ≈ 0.118 atol=1e-3
+        @test mean_ra ≈  0.0083 atol=1e-4
+        @test std_ra ≈ 0.136 atol=1e-3
         @test rms_ra ≈ std_ra atol=1e-2
         @test mean_dec ≈ -0.0124 atol=1e-2
         @test std_dec ≈ 0.0714 atol=1e-2
