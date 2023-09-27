@@ -72,6 +72,7 @@ end
 
 isground(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :ground
 issatellite(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :satellite
+isoccultation(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :occultation
 
 @doc raw"""
     hascoord(m::ObservatoryMPC{T}) where {T <: AbstractFloat}

@@ -134,7 +134,7 @@ function obsposECEF(observatory::ObservatoryMPC{T}; eop::Union{EopIau1980, EopIa
     # Make sure observatory has coordinates
     @assert hascoord(observatory) "Cannot compute position for observatory [$(observatory.code)] without coordinates"
 
-    if issatellite(observatory)
+    if issatellite(observatory) || isoccultation(observatory)
         # Ephemeris seconds since J2000
         et = datetime2et(observatory.date)
         # Earth-Centered Inertial position position of observer
@@ -268,7 +268,7 @@ function obsposvelECI(observatory::ObservatoryMPC{T}, et::ET;
     # Make sure observatory has coordinates
     @assert hascoord(observatory) "Cannot compute position for observatory [$(observatory.code)] without coordinates"
 
-    if issatellite(observatory)
+    if issatellite(observatory) || isoccultation(observatory)
         #@assert datetime2et(observatory.date) == cte(et)
         return [observatory.long, observatory.cos, observatory.sin, zero(T), zero(T), zero(T)]
     else 

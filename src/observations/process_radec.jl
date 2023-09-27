@@ -58,21 +58,38 @@ end
 
 Concatenate right ascension and declination residuals for an orbit fit.
 """
-function unfold(ξs::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
-    L = length(ξs)
-
+function unfold(ξs::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+    # Number of non outliers
+    L = count(x -> !x.outlier, ξs)
+    # Vector of residuals
     res = Vector{U}(undef, 2*L)
+    # Vector of weights
     w = Vector{T}(undef, 2*L)
-
+    # Global counter
+    k = 1
+    # Fill residuals and weights
     for i in eachindex(ξs)
-        res[i] = ξs[i].ξ_α
-        res[i+L] = ξs[i].ξ_δ
-        w[i] = ξs[i].w_α / ξs[i].relax_factor
-        w[i+L] = ξs[i].w_δ / ξs[i].relax_factor
+        if !ξs[i].outlier
+            # Right ascension
+            res[k] = ξs[i].ξ_α
+            w[k] = ξs[i].w_α / ξs[i].relax_factor
+            # Declination
+            res[k+L] = ξs[i].ξ_δ
+            w[k+L] = ξs[i].w_δ / ξs[i].relax_factor
+            # Update global counter
+            k += 1
+        end
     end
 
     return res, w
 end
+
+ra(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.ξ_α
+dec(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.ξ_δ
+weight_ra(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.w_α
+weight_dec(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.w_δ
+relax_factor(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.relax_factor
+outlier(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.outlier
 
 @doc raw"""
     compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,

@@ -56,43 +56,96 @@ Outlier rejection algorithm.
 !!! reference
     See https://doi.org/10.1016/S0019-1035(03)00051-4.
 """
-function outlier_rejection(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T}; χ2_rec::T = 7., χ2_rej::T = 8.,
-                           α::T = 0.25) where {T <: Real}
-    # Number of residuals
-    N = length(ξs)
-    # Vector of chi2s
-    χ2s = Vector{T}(undef, N)
+function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T};
+                           χ2_rec::T = 7., χ2_rej::T = 8., α::T = 0.25, max_per::T = 10.) where {T <: Real}
 
+    # Number of residuals
+    L = length(res)
+    # Evaluate residuals 
+    eval_res = res(fit.x)
+    # Vector of χ2
+    χ2s = Vector{T}(undef, L)
+    # Maximum χ2 (over non outliers)
+    χ2_max = zero(T)
+    # Number of non outliers
+    N_sel = 0
+    
+    # Compute χ2s
     for i in eachindex(χ2s)
+        # Weights of current residual
+        w_α, w_δ = res[i].w_α/res[i].relax_factor, res[i].w_δ/res[i].relax_factor
         # Current observation covariance matrix
-        γ = diagm([ξs[i].w_α/ξs[i].relax_factor, ξs[i].w_δ/ξs[i].relax_factor])
+        γ = [w_α zero(T); zero(T) w_δ]
         # Current model matrix
-        A = hcat(TS.gradient(ξs[i].ξ_α)(fit.x), TS.gradient(ξs[i].ξ_δ)(fit.x))
+        A = hcat(TS.gradient(res[i].ξ_α)(fit.x), TS.gradient(res[i].ξ_δ)(fit.x))
         # Outlier sign
-        outlier_sign = ξs[i].outlier*2-1
+        outlier_sign = res[i].outlier*2-1
         # Current residual covariance matrix
         γ_ξ = γ + outlier_sign*(A')*fit.Γ*A
         # Current residual
-        ξ = [ξs[i].ξ_α(fit.x), ξs[i].ξ_δ(fit.x)]
+        ξ = [eval_res[i].ξ_α, eval_res[i].ξ_δ]
         # Current chi2
         χ2s[i] = ξ' * inv(γ_ξ) * ξ
-    end
-
-    χ2_max = maximum(χ2s)
-    new_ξs = Vector{OpticalResidual{T, TaylorN{T}}}(undef, N)
-    N_sel = count(x -> !x.outlier, ξs)
-
-    for i in eachindex(χ2s)
-        if χ2s[i] > max(χ2_rej + carpino_smoothing(N_sel), α*χ2_max)
-            new_ξs[i] = OpticalResidual(ξs[i].ξ_α, ξs[i].ξ_δ, ξs[i].w_α, ξs[i].w_δ, ξs[i].relax_factor, true)
-        elseif χ2s[i] < χ2_rec
-            new_ξs[i] = OpticalResidual(ξs[i].ξ_α, ξs[i].ξ_δ, ξs[i].w_α, ξs[i].w_δ, ξs[i].relax_factor, false)
-        else
-            new_ξs[i] = ξs[i]
+        # Update N_sel
+        if !res[i].outlier 
+            N_sel += 1
+            # Update maximum χ2
+            if χ2s[i] > χ2_max
+                χ2_max = χ2s[i]
+            end
         end
     end
 
-    return new_ξs
+    # Maximum allowed drops
+    max_drop = ceil(Int, max_per * L / 100)
+    # Number of dropped residuals
+    N_drop = 0
+    # New outliers
+    new_outliers = outlier.(res)
+    # Sort χ2s
+    idxs = sortperm(χ2s, rev = true)
+    # Rejection threshold
+    χ2_rej = max(χ2_rej + carpino_smoothing(N_sel), α*χ2_max)
+
+    for i in idxs
+        if χ2s[i] >  χ2_rej && N_drop < max_drop
+            new_outliers[i] = true
+            N_drop += 1
+        elseif χ2s[i] < χ2_rec
+            new_outliers[i] = false
+        end
+    end
+
+    if N_drop == max_drop
+        return OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
+    end
+
+    # Residuals norm
+    norms = map(x -> x.w_α * x.ξ_α^2 + x.w_δ * x.ξ_δ^2, eval_res)
+    # Residuals included in fit
+    new_outliers = .!new_outliers
+    # Initial NRMS
+    Q = nrms(view(eval_res, new_outliers))
+    # Sort norms
+    idxs = sortperm(norms, rev = true)
+
+    for i in view(idxs, 1:(max_drop - N_drop))
+        if new_outliers[i]
+            # Try removing i-th residual
+            new_outliers[i] = false
+            # NRMS without i-th residual
+            _Q_ = nrms(view(eval_res, new_outliers))
+            if _Q_ < 1
+                break
+            elseif _Q_ < Q
+                Q = _Q_
+            else 
+                new_outliers[i] = true
+            end
+        end
+    end
+
+    return OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), .!new_outliers)
 end
 
 @doc raw"""
@@ -158,7 +211,7 @@ function nrms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
     return sqrt( chi2(res, w)/length(res) )
 end
 
-function nrms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+function nrms(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
     res_, w = unfold(res)
     return nrms(res_, w)
 end

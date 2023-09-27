@@ -142,7 +142,26 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::I
     # Orbit fit
     fit = tryls(res, zeros(get_numvars()), niter)
 
-    # Return NEOs solution
+    if nrms(res, fit) < 1
+        return evalfit(NEOSolution(bwd, fwd, res, fit))
+    end
+    
+    # Orbit fit / outlier rejection loop
+    mask, _mask_ = outlier.(res), outlier.(res)
+    for i in 1:10
+        # Update outliers
+        res = outlier_rejection(res, fit)
+        # Update fit
+        fit = tryls(res, zeros(get_numvars()), niter)
+
+        _mask_ = outlier.(res)
+        if all( mask .== _mask_ )
+            break
+        else
+            mask = _mask_
+        end
+    end
+    
     return evalfit(NEOSolution(bwd, fwd, res, fit))
 
 end
