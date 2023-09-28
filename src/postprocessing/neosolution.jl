@@ -99,18 +99,17 @@ end
 
 iszero(x::NEOSolution{T, U}) where {T <: Real, U <: Number} = x == zero(NEOSolution{T, U})
 
-function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T,
-                            q0::Vector{U}; debias_table::String = "2018",  kwargs...) where {T <: Real, U <: Number, D}
+function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::Int, jd0::T, q0::Vector{U};
+                            debias_table::String = "2018",  kwargs...) where {T <: Real, U <: Number, D}
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
-    return orbitdetermination(radec, dynamics, maxsteps, jd0, nyears_bwd, nyears_fwd, q0,
+    return orbitdetermination(radec, dynamics, maxsteps, jd0, q0,
                               mpc_catalogue_codes_201X, truth, resol, bias_matrix; kwargs...)
 end 
 
-function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T,
-                            nyears_fwd::T, q0::Vector{U}, mpc_catalogue_codes_201X::Vector{String}, truth::String, 
-                            resol::Resolution, bias_matrix::Matrix{T}; niter::Int = 5, order::Int = order,
-                            abstol::T = abstol, parse_eqs::Bool = true,
-                            μ_ast::Vector = μ_ast343_DE430[1:end], ) where {T <: Real, U <: Number, D}
+function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::Int, jd0::T, q0::Vector{U},
+                            mpc_catalogue_codes_201X::Vector{String}, truth::String, resol::Resolution,
+                            bias_matrix::Matrix{T}; niter::Int = 5, order::Int = order, abstol::T = abstol,
+                            parse_eqs::Bool = true, μ_ast::Vector = μ_ast343_DE430[1:end]) where {T <: Real, U <: Number, D}
 
     # Sun's ephemeris
     eph_su = selecteph(sseph, su)
@@ -118,6 +117,10 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::I
     eph_ea = selecteph(sseph, ea)
     # Julian day of first (last) observation
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
+    # Number of years in forward integration 
+    nyears_fwd = (tf - jd0 + 2) / yr
+    # Number of years in backward integration
+    nyears_bwd = -(jd0 - t0 + 2) / yr
 
     # Backward integration
     bwd = propagate(dynamics, maxsteps, jd0, nyears_bwd, q0; μ_ast = μ_ast, order = order,

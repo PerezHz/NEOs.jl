@@ -33,7 +33,8 @@ export d_EM_km, d_EM_au
 export unknowncat, isunknown, read_catalogues_mpc, write_catalogues_mpc, update_catalogues_mpc,
        search_cat_code
 # ObservatoryMPC
-export unknownobs, hascoord, read_observatories_mpc, write_observatories_mpc, update_observatories_mpc, search_obs_code
+export unknownobs, hascoord, read_observatories_mpc, write_observatories_mpc, update_observatories_mpc, search_obs_code,
+       issatellite
 # RadecMPC
 export num, tmpdesig, discovery, publishnote, obstech, ra, dec, info1, mag, band, catalogue, info2, observatory,
        read_radec_mpc, search_circulars_mpc, write_radec_mpc, get_radec_mpc
@@ -51,7 +52,7 @@ export pv2kep, yarkp2adot
 # Topocentric
 export obsposECEF, obsposvelECI
 # Process radec
-export compute_radec, select_debiasing_table, debiasing, w8sveres17, residuals
+export compute_radec, select_debiasing_table, debiasing, w8sveres17, residuals, unfold, relax_factor, outlier
 # Process radar
 export compute_delay, radar_astrometry
 # Gauss method
@@ -62,7 +63,7 @@ export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!
 export propagate, propagate_lyap, propagate_root
 # Post processing
 export valsecchi_circle, nrms, chi2, newtonls, newtonls_6v, diffcorr, newtonls_Q, bopik, tryls, project,
-       orbitdetermination
+       orbitdetermination, outlier_rejection
 
 include("constants.jl")
 include("observations/process_radar.jl")
