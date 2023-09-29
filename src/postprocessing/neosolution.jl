@@ -99,6 +99,34 @@ end
 
 iszero(x::NEOSolution{T, U}) where {T <: Real, U <: Number} = x == zero(NEOSolution{T, U})
 
+function residual_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T};
+                            max_per::T = 10., quan::T = 0.95) where {T <: Real}
+
+    @assert zero(T) <= quan <= one(T) "Quantile must be between 0 and 1 (got $quan)"
+    # Number of residuals
+    L = length(res)
+    # Maximum allowed drops
+    max_drop = ceil(Int, max_per * L / 100)
+    # Evaluate residuals 
+    eval_res = res(fit.x)
+    # Residuals norm
+    norms = map(x -> x.w_α * x.ξ_α^2 / x.relax_factor + x.w_δ * x.ξ_δ^2 / x.relax_factor, eval_res)
+    # Residuals included in fit
+    new_outliers = .!outlier.(res)
+    # Initial NRMS
+    Q = quantile(norms, quan)
+    # Sort norms
+    idxs = sortperm(norms, rev = true)
+
+    for i in view(idxs, 1:max_drop)
+        if new_outliers[i] && norms[i] >= Q
+            new_outliers[i] = false
+        end
+    end
+
+    return OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), .!new_outliers)
+end
+
 function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::Int, jd0::T, q0::Vector{U};
                             debias_table::String = "2018",  kwargs...) where {T <: Real, U <: Number, D}
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
@@ -154,6 +182,7 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::I
     for i in 1:10
         # Update outliers
         res = outlier_rejection(res, fit)
+        res = residual_rejection(res, fit)
         # Update fit
         fit = tryls(res, zeros(get_numvars()), niter)
 
@@ -164,9 +193,8 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::I
             mask = _mask_
         end
     end
-    
-    return evalfit(NEOSolution(bwd, fwd, res, fit))
 
+    return evalfit(NEOSolution(bwd, fwd, res, fit))
 end
 
 function nrms(sol::NEOSolution{T, T}) where {T <: Real}

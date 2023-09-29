@@ -4,7 +4,7 @@
 A least squares fit.
 
 # Fields
-- `success::Bool`: wheter the routine converged or not.
+- `success::Bool`: whether the routine converged or not.
 - `x::Vector{T}`: deltas that minimize the objective function.
 - `Γ::Matrix{T}`: covariance matrix.
 - `routine::Symbol`: minimization routine (`:newton` or `:diffcorr`).
@@ -73,7 +73,7 @@ function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::Orb
     # Compute χ2s
     for i in eachindex(χ2s)
         # Weights of current residual
-        w_α, w_δ = res[i].w_α/res[i].relax_factor, res[i].w_δ/res[i].relax_factor
+        w_α, w_δ = res[i].w_α / res[i].relax_factor, res[i].w_δ / res[i].relax_factor
         # Current observation covariance matrix
         γ = [w_α zero(T); zero(T) w_δ]
         # Current model matrix
@@ -116,36 +116,7 @@ function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::Orb
         end
     end
 
-    if N_drop == max_drop
-        return OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
-    end
-
-    # Residuals norm
-    norms = map(x -> x.w_α * x.ξ_α^2 + x.w_δ * x.ξ_δ^2, eval_res)
-    # Residuals included in fit
-    new_outliers = .!new_outliers
-    # Initial NRMS
-    Q = nrms(view(eval_res, new_outliers))
-    # Sort norms
-    idxs = sortperm(norms, rev = true)
-
-    for i in view(idxs, 1:(max_drop - N_drop))
-        if new_outliers[i]
-            # Try removing i-th residual
-            new_outliers[i] = false
-            # NRMS without i-th residual
-            _Q_ = nrms(view(eval_res, new_outliers))
-            if _Q_ < 1
-                break
-            elseif _Q_ < Q
-                Q = _Q_
-            else 
-                new_outliers[i] = true
-            end
-        end
-    end
-
-    return OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), .!new_outliers)
+    return OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
 end
 
 @doc raw"""

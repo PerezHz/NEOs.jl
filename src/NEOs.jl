@@ -26,6 +26,7 @@ using DataFrames: AbstractDataFrame, GroupedDataFrame, DataFrame, nrow, eachcol,
 using HTTP: get
 using IntervalRootFinding: roots, interval, Interval, mid
 using Interpolations: Flat, Gridded, Linear, interpolate, extrapolate
+using StatsBase: quantile
 
 # Constants
 export d_EM_km, d_EM_au
