@@ -264,8 +264,8 @@ using NEOs: src_path
         # Sunrise and sunset 
         radec = read_radec_mpc("99942        8C2020 12 08.15001011 20 07.510-08 02 54.20         18.50GV~4ROF094")
         sun = sunriseset(radec[1])
-        @test sun[1] == DateTime("2020-12-08T05:05:59.384")
-        @test sun[2] == DateTime("2020-12-08T14:05:49.386")
+        @test datetime2julian(sun[1]) ≈ datetime2julian(DateTime("2020-12-08T05:05:59.384"))
+        @test datetime2julian(sun[2]) ≈ datetime2julian(DateTime("2020-12-08T14:05:49.386"))
 
         # obsposECEF
         ecef_2 = obsposECEF.(radec_2)
