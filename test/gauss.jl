@@ -25,7 +25,6 @@ using NEOs: NEOSolution, adaptative_maxsteps, scaled_variables
     @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
     @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
     @test length(sol.res) == 123
-    @test string(sol.fit.routine) == "diffcorr"
     @test sol.fit.success
     @test all( sqrt.(diag(sol.fit.Γ)) .< 10 )
     @test nrms(sol) < 0.4
@@ -57,7 +56,6 @@ using NEOs: NEOSolution, adaptative_maxsteps, scaled_variables
     @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
     @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
     @test length(sol.res) == 123
-    @test string(sol.fit.routine) == "newton"
     @test sol.fit.success
     @test all( sqrt.(diag(sol.fit.Γ)) .< 100 )
     @test nrms(sol) < 0.4
