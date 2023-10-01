@@ -182,7 +182,7 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::I
     for i in 1:10
         # Update outliers
         res = outlier_rejection(res, fit)
-        res = residual_rejection(res, fit)
+        # res = residual_rejection(res, fit)
         # Update fit
         fit = tryls(res, zeros(get_numvars()), niter)
 
