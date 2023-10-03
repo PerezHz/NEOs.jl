@@ -13,6 +13,8 @@ using NEOs: NEOSolution, adaptative_maxsteps, scaled_variables
     abstol = 1e-20
     # Order (wrt time)
     order = 25
+    # Use @taylorize
+    parse_eqs = true
     
     # Gauss initial conditions
     sol = gaussinitcond(radec; order = order, abstol = abstol)

@@ -227,7 +227,6 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
     points = [[Qs[i], N_outliers[i]] for i in 1:max_drop]
     # Remove points with Q > 1
     filter!(x -> x[1] < 1., points)
-    @show points
     # Mean point 
     avg = sum(points) ./ length(points)
     # Number of remaining points
@@ -242,12 +241,13 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
         diff = [norm([Qs[i], N_outliers[i]] .- avg) for i in 1:max_drop]
         # Find pair closest to mean point
         i = findmin(diff)[2]
+        idxs = idxs[i:end]
     end
 
     # Reset boolean mask
     new_outliers[1:end] .= false
     # Outliers
-    new_outliers[idxs[i:end]] .= true
+    new_outliers[idxs] .= true
     # Update residuals
     res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
     # Update fit
