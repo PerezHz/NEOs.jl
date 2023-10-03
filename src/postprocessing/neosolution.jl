@@ -99,56 +99,46 @@ end
 
 iszero(x::NEOSolution{T, U}) where {T <: Real, U <: Number} = x == zero(NEOSolution{T, U})
 
-function residual_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T};
-                            max_per::T = 10., quan::T = 0.95) where {T <: Real}
+@doc raw"""
+    residual_norm(x::OpticalResidual{T, T}) where {T <: Real}
 
-    @assert zero(T) <= quan <= one(T) "Quantile must be between 0 and 1 (got $quan)"
-    # Number of residuals
-    L = length(res)
-    # Maximum allowed drops
-    max_drop = ceil(Int, max_per * L / 100)
-    # Evaluate residuals 
-    eval_res = res(fit.x)
-    # Residuals norm
-    norms = map(x -> x.w_α * x.ξ_α^2 / x.relax_factor + x.w_δ * x.ξ_δ^2 / x.relax_factor, eval_res)
-    # Residuals included in fit
-    new_outliers = .!outlier.(res)
-    # Initial NRMS
-    Q = quantile(norms, quan)
-    # Sort norms
-    idxs = sortperm(norms, rev = true)
+Return the contribution of `x` to the nrms.
+"""
+residual_norm(x::OpticalResidual{T, T}) where {T <: Real} = x.w_α * x.ξ_α^2 / x.relax_factor + x.w_δ * x.ξ_δ^2 / x.relax_factor
 
-    for i in view(idxs, 1:max_drop)
-        if new_outliers[i] && norms[i] >= Q
-            new_outliers[i] = false
-        end
-    end
-
-    return OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), .!new_outliers)
-end
-
-function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::Int, jd0::T, q0::Vector{U};
-                            debias_table::String = "2018",  kwargs...) where {T <: Real, U <: Number, D}
+function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T};
+                            debias_table::String = "2018",  kwargs...) where {T <: Real}
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
-    return orbitdetermination(radec, dynamics, maxsteps, jd0, q0,
-                              mpc_catalogue_codes_201X, truth, resol, bias_matrix; kwargs...)
+    return orbitdetermination(radec, sol, mpc_catalogue_codes_201X, truth, resol, bias_matrix; kwargs...)
 end 
 
-function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::Int, jd0::T, q0::Vector{U},
-                            mpc_catalogue_codes_201X::Vector{String}, truth::String, resol::Resolution,
-                            bias_matrix::Matrix{T}; niter::Int = 5, order::Int = order, abstol::T = abstol,
-                            parse_eqs::Bool = true, μ_ast::Vector = μ_ast343_DE430[1:end]) where {T <: Real, U <: Number, D}
+function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, mpc_catalogue_codes_201X::Vector{String},
+                            truth::String, resol::Resolution, bias_matrix::Matrix{T}; max_per = 18., niter::Int = 5,
+                            order::Int = order, varorder::Int = 5, abstol::T = abstol, parse_eqs::Bool = true,
+                            μ_ast::Vector = μ_ast343_DE430[1:end]) where {T <: Real}
 
     # Sun's ephemeris
     eph_su = selecteph(sseph, su)
     # Earth's ephemeris
     eph_ea = selecteph(sseph, ea)
+    # Julian day to start propagation
+    jd0 = sol.bwd.t0 + PE.J2000
     # Julian day of first (last) observation
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
     # Number of years in forward integration 
     nyears_fwd = (tf - jd0 + 2) / yr
     # Number of years in backward integration
     nyears_bwd = -(jd0 - t0 + 2) / yr
+    # Dynamical function 
+    dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
+    # Maximum number of steps
+    maxsteps = adaptative_maxsteps(radec)
+    # Initial conditions (T)
+    q00 = sol(sol.bwd.t0)
+    # Jet transport perturbation
+    dq = scaled_variables("δx", fill(1e-6, 6); order = varorder)
+    # Initial conditions (jet transport)
+    q0 = q00 .+ dq
 
     # Backward integration
     bwd = propagate(dynamics, maxsteps, jd0, nyears_bwd, q0; μ_ast = μ_ast, order = order,
@@ -176,23 +166,92 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, dynamics::D, maxsteps::I
     if nrms(res, fit) < 1
         return evalfit(NEOSolution(bwd, fwd, res, fit))
     end
-    
-    # Orbit fit / outlier rejection loop
-    mask, _mask_ = outlier.(res), outlier.(res)
-    for i in 1:10
-        # Update outliers
-        res = outlier_rejection(res, fit)
-        # res = residual_rejection(res, fit)
-        # Update fit
-        fit = tryls(res, zeros(get_numvars()), niter)
 
-        _mask_ = outlier.(res)
-        if all( mask .== _mask_ )
-            break
-        else
-            mask = _mask_
+    # Number of observations
+    N_radec = length(radec)
+    # Maximum allowed outliers
+    max_drop = ceil(Int, N_radec * max_per / 100)
+    # Boolean mask (0: included in fit, 1: outlier)
+    new_outliers = BitVector(zeros(N_radec))
+
+    # Drop loop
+    for i in 1:max_drop
+        # Contribution of each residual to nrms
+        norms = residual_norm.(res(fit.x))
+        # Iterate norms from largest to smallest
+        idxs = sortperm(norms, rev = true)
+
+        for j in idxs
+            if !new_outliers[j]
+                # Drop residual
+                new_outliers[j] = true
+                # Update residuals
+                res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
+                # Update fit
+                fit = newtonls(res, zeros(get_numvars()), niter)
+                break
+            end
         end
     end
+
+    # Outliers
+    idxs = Vector{Int}(undef, max_drop)
+    # NRMS
+    Qs = Vector{T}(undef, max_drop)
+    # Number of outliers
+    N_outliers = Vector{T}(undef, max_drop)
+
+    # Recovery loop
+    for i in 1:max_drop
+        # NRMS of current fit
+        Qs[i] = nrms(res, fit)
+        # Number of outliers in current fit
+        N_outliers[i] = float(max_drop - i + 1)
+        # Contribution of each residual to nrms
+        norms = residual_norm.(res(fit.x))
+        # Minimum norm among outliers
+        j = findmin(norms[new_outliers])[2]
+        # Find residual with minimum norm
+        j = findall(new_outliers)[j]
+        # Add j-th residual to outliers list
+        idxs[i] = j
+        # Recover residual
+        new_outliers[j] = false
+        # Update residuals
+        res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
+        # Update fit
+        fit = newtonls(res, zeros(get_numvars()), niter)
+    end
+
+    # Assemble points
+    points = [[Qs[i], N_outliers[i]] for i in 1:max_drop]
+    # Remove points with Q > 1
+    filter!(x -> x[1] < 1., points)
+    @show points
+    # Mean point 
+    avg = sum(points) ./ length(points)
+    # Number of remaining points
+    N_points = length(points)
+    # Find optimal fit
+    if N_points == 0
+        idxs = Vector{Int}(undef, 0)
+    elseif N_points <= 2
+        idxs = idxs[N_points:end]
+    else
+        # Distance from each point to mean points
+        diff = [norm([Qs[i], N_outliers[i]] .- avg) for i in 1:max_drop]
+        # Find pair closest to mean point
+        i = findmin(diff)[2]
+    end
+
+    # Reset boolean mask
+    new_outliers[1:end] .= false
+    # Outliers
+    new_outliers[idxs[i:end]] .= true
+    # Update residuals
+    res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
+    # Update fit
+    fit = newtonls(res, zeros(get_numvars()), niter)
 
     return evalfit(NEOSolution(bwd, fwd, res, fit))
 end

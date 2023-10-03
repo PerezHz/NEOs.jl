@@ -29,24 +29,8 @@ using NEOs: NEOSolution, adaptative_maxsteps, scaled_variables
     @test all( sqrt.(diag(sol.fit.Γ)) .< 10 )
     @test nrms(sol) < 0.4
 
-    # Dynamical function
-    dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
-    # Use @taylorize
-    parse_eqs = true
-    # Maximum number of steps
-    maxsteps = adaptative_maxsteps(radec)
-    # Initil time of integration
-    jd0 = sol.bwd.t0 + PE.J2000
-    # Initial conditions (Float64)
-    q00 = sol(sol.bwd.t0)
-    # Jet transport perturbation
-    dq = scaled_variables("δx", fill(1e-6, 6); order = 5)
-    # Initial conditions (Jet transport)
-    q0 = q00 .+ dq
-
     # Orbit determination (with outlier rejection)
-    sol = orbitdetermination(radec, dynamics, maxsteps, jd0, q0;
-                             order = order, abstol = abstol, parse_eqs = parse_eqs)
+    sol = orbitdetermination(radec, sol; order = order, abstol = abstol, parse_eqs = parse_eqs)
 
     @test isa(sol, NEOSolution{Float64, Float64})
     @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
