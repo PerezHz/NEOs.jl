@@ -188,7 +188,7 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
                 # Update residuals
                 res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
                 # Update fit
-                fit = newtonls(res, zeros(get_numvars()), niter)
+                fit = tryls(res, zeros(get_numvars()), niter)
                 break
             end
         end
@@ -220,15 +220,13 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
         # Update residuals
         res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
         # Update fit
-        fit = newtonls(res, zeros(get_numvars()), niter)
+        fit = tryls(res, zeros(get_numvars()), niter)
     end
 
     # Assemble points
     points = [[Qs[i], N_outliers[i]] for i in 1:max_drop]
     # Remove points with Q > 1
     filter!(x -> x[1] < 1., points)
-    # Mean point 
-    avg = sum(points) ./ length(points)
     # Number of remaining points
     N_points = length(points)
     # Find optimal fit
@@ -237,6 +235,8 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
     elseif N_points <= 2
         idxs = idxs[N_points:end]
     else
+        # Mean point 
+        avg = sum(points) ./ length(points)
         # Distance from each point to mean points
         diff = [norm([Qs[i], N_outliers[i]] .- avg) for i in 1:max_drop]
         # Find pair closest to mean point
@@ -251,7 +251,7 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
     # Update residuals
     res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
     # Update fit
-    fit = newtonls(res, zeros(get_numvars()), niter)
+    fit = tryls(res, zeros(get_numvars()), niter)
 
     return evalfit(NEOSolution(bwd, fwd, res, fit))
 end
