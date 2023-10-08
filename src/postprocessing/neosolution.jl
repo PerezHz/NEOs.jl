@@ -250,8 +250,10 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
         end
         # K-means clustering
         cluster = kmeans(points, 2)
+        # Index of smallest cluster
+        i_0 = cluster.assignments[1]
         # Find last fit of smallest cluster
-        i = findfirst(isone, cluster.assignments) - 1
+        i = findfirst(x -> x != i_0, cluster.assignments) - 1
         # Update outliers indexes 
         idxs = idxs[i:end]
     end
