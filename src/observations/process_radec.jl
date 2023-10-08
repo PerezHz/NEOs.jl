@@ -264,7 +264,7 @@ function compute_radec(obs::Vector{RadecMPC{T}}; xva::AstEph, kwargs...) where {
 
     # Iterate over the number of observations
     for i in 1:n_optical_obs
-        vra[i], vdec[i] = compute_radec(obs[i]; kwargs...)
+        vra[i], vdec[i] = compute_radec(obs[i]; xva = xva, kwargs...)
     end
 
     return vra, vdec # arcsec, arcsec

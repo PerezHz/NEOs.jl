@@ -163,7 +163,10 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
     # Orbit fit
     fit = tryls(res, zeros(get_numvars()), niter)
 
-    if nrms(res, fit) < 1
+    # NRMS (with 0 outliers)
+    Q_0 = nrms(res, fit)
+
+    if Q_0 < 1
         return evalfit(NEOSolution(bwd, fwd, res, fit))
     end
 
@@ -197,9 +200,9 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
     # Outliers
     idxs = Vector{Int}(undef, max_drop)
     # NRMS
-    Qs = Vector{T}(undef, max_drop)
+    Qs = Vector{T}(undef, max_drop + 1)
     # Number of outliers
-    N_outliers = Vector{T}(undef, max_drop)
+    N_outliers = Vector{T}(undef, max_drop + 1)
 
     # Recovery loop
     for i in 1:max_drop
@@ -222,11 +225,27 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
         # Update fit
         fit = tryls(res, zeros(get_numvars()), niter)
     end
+    # Add 0 outliers fit 
+    Qs[end] = Q_0
+    N_outliers[end] = zero(T)
+
+    # Outlier rejection cannot reduce Q
+    if all(Qs .> 1.)
+        # Reset boolean mask
+        new_outliers[1:end] .= false
+        # Update residuals
+        res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
+        # Update fit
+        fit = tryls(res, zeros(get_numvars()), niter)
+
+        return evalfit(NEOSolution(bwd, fwd, res, fit)) 
+    end
 
     # Assemble points
-    points = [[Qs[i], N_outliers[i]] for i in 1:max_drop]
-    # Remove points with Q > 1
-    filter!(x -> x[1] < 1., points)
+    points = [[Qs[i], N_outliers[i]] for i in eachindex(Qs)]
+    # Leave only first point with Q > 1
+    i_1 = findfirst(x -> x[1] > 1, points)
+    points = points[1:i_1]
     # Number of remaining points
     N_points = length(points)
     # Find optimal fit
@@ -235,13 +254,28 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
     elseif N_points <= 2
         idxs = idxs[N_points:end]
     else
-        # Mean point 
-        avg = sum(points) ./ length(points)
-        # Distance from each point to mean points
-        diff = [norm([Qs[i], N_outliers[i]] .- avg) for i in 1:max_drop]
-        # Find pair closest to mean point
-        i = findmin(diff)[2]
-        idxs = idxs[i:end]
+        # Difference in NRMS
+        dQ = Base.diff(first.(points))
+        # Mean difference 
+        mQ = mean(dQ)
+        # Standard deviation of difference
+        sQ = std(dQ)
+        # Maximum difference
+        dQ_max, i_max = findmax(dQ)
+
+        if dQ_max > mQ + sQ
+            idxs = idxs[i_max:end]
+        else 
+            # Remove points with Q < 1
+            filter!(x -> x[1] < 1, points)
+            # Mean point 
+            avg = sum(points) ./ length(points)
+            # Distance from each point to mean points
+            diff = [norm([Qs[i], N_outliers[i]] .- avg) for i in 1:max_drop]
+            # Find pair closest to mean point
+            i = findmin(diff)[2]
+            idxs = idxs[i:end]
+        end
     end
 
     # Reset boolean mask
