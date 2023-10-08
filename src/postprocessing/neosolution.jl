@@ -241,41 +241,19 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
         return evalfit(NEOSolution(bwd, fwd, res, fit)) 
     end
 
-    # Assemble points
-    points = [[Qs[i], N_outliers[i]] for i in eachindex(Qs)]
-    # Leave only first point with Q > 1
-    i_1 = findfirst(x -> x[1] > 1, points)
-    points = points[1:i_1]
-    # Number of remaining points
-    N_points = length(points)
-    # Find optimal fit
-    if N_points == 0
-        idxs = Vector{Int}(undef, 0)
-    elseif N_points <= 2
-        idxs = idxs[N_points:end]
-    else
-        # Difference in NRMS
-        dQ = Base.diff(first.(points))
-        # Mean difference 
-        mQ = mean(dQ)
-        # Standard deviation of difference
-        sQ = std(dQ)
-        # Maximum difference
-        dQ_max, i_max = findmax(dQ)
-
-        if dQ_max > mQ + sQ
-            idxs = idxs[i_max:end]
-        else 
-            # Remove points with Q < 1
-            filter!(x -> x[1] < 1, points)
-            # Mean point 
-            avg = sum(points) ./ length(points)
-            # Distance from each point to mean points
-            diff = [norm([Qs[i], N_outliers[i]] .- avg) for i in 1:max_drop]
-            # Find pair closest to mean point
-            i = findmin(diff)[2]
-            idxs = idxs[i:end]
+    if max_drop > 1
+        # Assemble points
+        points = Matrix{T}(undef, 2, max_drop + 1)
+        for i in eachindex(Qs)
+            points[1, i] = Qs[i]
+            points[2, i] = N_outliers[i]
         end
+        # K-means clustering
+        cluster = kmeans(points, 2)
+        # Find last fit of smallest cluster
+        i = findfirst(isone, cluster.assignments) - 1
+        # Update outliers indexes 
+        idxs = idxs[i:end]
     end
 
     # Reset boolean mask
