@@ -42,6 +42,7 @@ DataFramesExt = ["DataFrames", "Tables"]
 AutoHashEquals = "0.2"
 DataFrames = "1.5"
 DelimitedFiles = "1"
+Downloads = "1"
 HORIZONS = "0.3"
 HTTP = "1.9.5"
 Healpix = "4"
