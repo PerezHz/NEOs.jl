@@ -14,10 +14,17 @@ A least squares fit.
     x::Vector{T}
     Γ::Matrix{T}
     routine::Symbol
-    OrbitFit{T}(success::Bool, x::Vector{T}, Γ::Matrix{T}, routine::Symbol) where {T <: Real} = new{T}(success, x, Γ, routine)
+    # Inner constructor
+    function OrbitFit{T}(success::Bool, x::Vector{T}, Γ::Matrix{T},
+                         routine::Symbol) where {T <: Real}
+        return new{T}(success, x, Γ, routine)
+    end
 end
-
-OrbitFit(success::Bool, x::Vector{T}, Γ::Matrix{T}, routine::Symbol) where {T <: Real} = OrbitFit{T}(success, x, Γ, routine)
+# Outer constructor
+function OrbitFit(success::Bool, x::Vector{T}, Γ::Matrix{T},
+                  routine::Symbol) where {T <: Real}
+    return OrbitFit{T}(success, x, Γ, routine)
+end
 
 # Print method for OrbitFit
 # Examples:
@@ -40,8 +47,8 @@ Fudge term for rejection condition in [`outlier_rejection`](@ref).
 carpino_smoothing(n::T) where {T <: Real} = 400*(1.2)^(-n)
 
 @doc raw"""
-    outlier_rejection(ξs::Vector{OpticalResidual{T}}, fit::OrbitFit{T}; χ2_rec::T = 7., χ2_rej::T = 8.,
-                      α::T = 0.25) where {T <: Real}
+    outlier_rejection(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T};
+                      χ2_rec::T = 7.0, χ2_rej::T = 8.0, α::T = 0.25, max_per::T = 10.) where {T <: Real}
 
 Outlier rejection algorithm.
 
@@ -49,9 +56,10 @@ Outlier rejection algorithm.
 
 - `ξs::Vector{OpticalResidual{T}}`: vector of residuals.
 - `fit::OrbitFit{T}`: least squares fit.
-- `χ2_rec::T`: recovery conditions.
+- `χ2_rec::T`: recovery condition.
 - `χ2_rej::T`: rejection condition.
 - `α::T`: scaling factor for maximum chi.
+- `max_per::T`: maximum allowed drop percentage.
 
 !!! reference
     See https://doi.org/10.1016/S0019-1035(03)00051-4.
@@ -116,7 +124,8 @@ function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::Orb
         end
     end
 
-    return OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res), relax_factor.(res), new_outliers)
+    return OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
+                            relax_factor.(res), new_outliers)
 end
 
 @doc raw"""
@@ -134,6 +143,7 @@ end
 
 @doc raw"""
     chi2(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
+    chi2(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
 
 Returns the chi square
 ```math
@@ -144,14 +154,30 @@ are the vectors of weights and residuals respectively.
 
 # Arguments
 
-- `res::Vector{U}`: Vector of residuals.
-- `w::Vector{T}`: Vector of weights. 
+- `res::Vector{U}/Vector{OpticalResidual{T, U}}`: vector of residuals.
+- `w::Vector{T}`: vector of weights. 
 """
 function chi2(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
     # Have as many residuals as weights
     @assert length(res) == length(w)
     # Chi square
     return sum(w .* (res.^2))
+end
+function chi2(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+    _res_, _w_ = unfold(res)
+    return chi2(_res_, _w_)
+end
+
+@doc raw"""
+    nms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
+    nms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+
+Return the normalized chi square. See [`chi2`](@ref).
+""" 
+nms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number} = chi2(res, w) / length(res)
+function nms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+    _res_, _w_ = unfold(res)
+    return nms(_res_, _w_)
 end
 
 @doc raw"""
@@ -170,9 +196,9 @@ See also [`chi2`](@ref).
 
 # Arguments
 
-- `res`: Vector of residuals.
-- `w`: Vector of weights. 
-- `fit`: least squares fit.
+- `res::Vector{U}/Vector{OpticalResidual{T, U}}`: Vector of residuals.
+- `w::Vector{T}`: Vector of weights. 
+- `fit::OrbitFit{T}`: least squares fit.
 
 """
 function nrms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
@@ -182,18 +208,18 @@ function nrms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
     return sqrt( chi2(res, w)/length(res) )
 end
 
-function nrms(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
-    res_, w = unfold(res)
-    return nrms(res_, w)
+function nrms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+    _res_, _w_ = unfold(res)
+    return nrms(_res_, _w_)
 end
 
 function nrms(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T}) where {T <: Real}
-    res_, w = unfold(res)
-    return nrms(res_(fit.x), w)
+    _res_, _w_ = unfold(res)
+    return nrms(_res_(fit.x), _w_)
 end
 
 @doc raw"""
-    BHC(res, w, npar)
+    BHC(res::Vector{TaylorN{T}}, w::Vector{T}, npar::Int) where {T <: Real}
 
 Returns the ``\mathbf{B}``, ``\mathbf{H}`` and ``\mathbf{C}`` arrays
 ```math
@@ -202,27 +228,29 @@ Returns the ``\mathbf{B}``, ``\mathbf{H}`` and ``\mathbf{C}`` arrays
 \mathbf{C} = \mathbf{B}^T\mathbf{W}\mathbf{B}, 
 ```
 where ``\mathbf{x}_0 = (x_1,\ldots,x_n)^T`` and ``\mathbf{\xi} = (\xi_1,\ldots,\xi_m)^T`` 
-are the vectors of initial conditions and residuals respectively; and ``\mathbf{W} = \text{diag}(1/\sigma_1^2,\ldots,1/\sigma_m^2)``
-is the weights matrix. 
+are the vectors of initial conditions and residuals respectively; and 
+``\mathbf{W} = \text{diag}(1/\sigma_1^2,\ldots,1/\sigma_m^2)`` is the weights matrix. 
 
 ``\mathbf{B}`` is called the design matrix and is of size ``m\times n``, ``\mathbf{H}`` is a three index
 array of size ``m\times n\times n`` and ``\mathbf{C}`` is called the normal matrix and is of size ``n\times n``.
-See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
 
 # Arguments
 
-- `res`: Vector of residuals.
-- `w`: Vector of weights. 
-- `npar`: Degrees of freedom ``n``. 
+- `res::Vector{TaylorN{T}}`: vector of residuals.
+- `w::Vector{T}`: vector of weights. 
+- `npar::Int`: degrees of freedom ``n``.
+
+!!! reference
+    See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
 """
-function BHC(res, w, npar)
+function BHC(res::Vector{TaylorN{T}}, w::Vector{T}, npar::Int) where {T <: Real}
     # Number of observations
     nobs = length(res)
 
     # Allocate memory for the three arrays
-    B_mat = Matrix{TaylorN{Float64}}(undef, nobs, npar)
-    H_mat = Array{TaylorN{Float64}}(undef, nobs, npar, npar)
-    C_mat = Array{TaylorN{Float64}}(undef, npar, npar)
+    B_mat = Matrix{TaylorN{T}}(undef, nobs, npar)
+    H_mat = Array{TaylorN{T}}(undef, nobs, npar, npar)
+    C_mat = Array{TaylorN{T}}(undef, npar, npar)
 
     # Design matrix B
     for i in 1:nobs
@@ -276,9 +304,13 @@ function ξTH(w, res, H_mat, npar)
 end
 
 @doc raw"""
-    diffcorr(ξs::Vector{OpticalResidual{T}}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
+    diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
+             niters::Int = 5) where {T <: Real}
+    diffcorr(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+             niters::Int = 5) where {T <: Real}
 
-Differential corrections subroutine for least-squares fitting. Returns the `niters`-th 
+Differential corrections subroutine for least-squares fitting. Returns an
+`OrbitFit` with the `niters`-th 
 correction
 ```math
 \mathbf{x}_{k+1} = \mathbf{x}_k - \mathbf{C}^{-1}\mathbf{D},
@@ -292,24 +324,20 @@ where ``\mathbf{C} = \mathbf{B}^T\mathbf{W}\mathbf{B}`` is the normal matrix and
 the vector of residuals, ``\mathbf{B}`` the design matrix and ``\mathbf{W} = \text{diag}(1/\sigma_1^2,\ldots,1/\sigma_m^2)``
 the weights matrix. 
 
-See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371. 
-
 See also [`BHC`](@ref).
 
 # Arguments
 
-- `ξs::Vector{OpticalResidual{T, TaylorN{T}}}`: Vector of residuals.
-- `x_0::Vector{T}`: First guess for the initial conditions.
-- `niters::Int`: Number of iterations.
-"""
-function diffcorr(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
-    # Unfold residuals and weights
-    res, w = unfold(ξs)
-    
-    return diffcorr(res, w, x0, niters)
-end
+- `res::Vector{TaylorN{T}/Vector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
+- `w::Vector{T}`: vector of weights.
+- `x_0::Vector{T}`: first guess.
+- `niters::Int`: number of iterations.
 
-function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
+!!! reference
+    See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371. 
+"""
+function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
+                  niters::Int = 5) where {T <: Real}
     # Degrees of freedom
     npar = length(x0)
     # Design matrix B, H array and normal matrix C
@@ -358,10 +386,22 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
     return OrbitFit(true, x_new, Γ, :diffcorr)
 end
 
-@doc raw"""
-    newtonls(res, w, x0, niters=5)
+function diffcorr(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+                  niters::Int = 5) where {T <: Real}
+    # Unfold residuals and weights
+    _res_, _w_ = unfold(res)
+    
+    return diffcorr(_res_, _w_, x0, niters)
+end
 
-Newton method subroutine for least-squares fitting. Returns the `niters`-th iteration
+@doc raw"""
+    newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
+             niters::Int = 5) where {T <: Real}
+    newtonls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+             niters::Int = 5) where {T <: Real}
+
+Newton method subroutine for least-squares fitting. Returns an `OrbitFit`
+with the `niters`-th iteration
 ```math
 \mathbf{x}_{k+1} = \mathbf{x}_k - 
 \left(\frac{\partial^2 Q}{\partial\mathbf{x}_0^2}\right)^{-1}
@@ -375,24 +415,20 @@ where ``\mathbf{C} = \frac{m}{2}\frac{\partial^2 Q}{\partial\mathbf{x}_0^2}`` is
 matrix, ``Q = \frac{\chi^2}{m}`` is the mean square residual, ``m`` is the number of 
 observations and ``\mathbf{x}_0 = (x_1,\ldots,x_n)`` is the vector of initial conditions. 
 
-See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371. 
-
 See also [`chi2`](@ref).
 
 # Arguments
 
-- `ξs::Vector{OpticalResidual{T, TaylorN{T}}}`: Vector of residuals.
-- `x_0::Vector{T}`: First guess for the initial conditions.
-- `niters::Int`: Number of iterations.
-"""
-function newtonls(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
-    # Unfold residuals and weights
-    res, w = unfold(ξs)
-    
-    return newtonls(res, w, x0, niters)
-end
+- `res::Vector{TaylorN{T}/Vector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
+- `w::Vector{T}`: vector of weights.
+- `x_0::Vector{T}`: first guess.
+- `niters::Int`: number of iterations.
 
-function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
+!!! reference
+    See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371. 
+"""
+function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
+                  niters::Int = 5) where {T <: Real}
     # Number of observations
     nobs = length(res)
     # Degrees of freedom
@@ -446,25 +482,36 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}, niters::
     return OrbitFit(true, x_new, Γ, :newton)
 end
 
-@doc raw"""
-    tryls(ξs::Vector{OpticalResidual{T}}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
+function newtonls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+                  niters::Int = 5) where {T <: Real}
+    # Unfold residuals and weights
+    _res_, _w_ = unfold(res)
+    
+    return newtonls(_res_, _w_, x0, niters)
+end
 
-Returns the best least squares fit between two routines: [`newtonls`](@ref) and [`diffcorr`](@ref).
+@doc raw"""
+    tryls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+          niters::Int = 5) where {T <: Real}
+
+Return the best least squares fit between two routines: [`newtonls`](@ref) and 
+[`diffcorr`](@ref).
 
 # Arguments
 
-- `ξs::Vector{OpticalResidual{T, TaylorN{T}}}`: Vector of residuals.
-- `x_0::Vector{T}`: First guess for the initial conditions.
-- `niters::Int`: Number of iterations.
+- `res::Vector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
+- `x_0::Vector{T}`: first guess.
+- `niters::Int`: number of iterations.
 """
-function tryls(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T}, niters::Int = 5) where {T <: Real}
+function tryls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+               niters::Int = 5) where {T <: Real}
     # Newton's method
-    fit_1 = newtonls(ξs, x0, niters)
+    fit_1 = newtonls(res, x0, niters)
     # Differential corrections
-    fit_2 = diffcorr(ξs, x0, niters)
+    fit_2 = diffcorr(res, x0, niters)
     if fit_1.success && fit_2.success
-        Q_1 = nrms(ξs, fit_1)
-        Q_2 = nrms(ξs, fit_2)
+        Q_1 = nrms(res, fit_1)
+        Q_2 = nrms(res, fit_2)
         if Q_1 <= Q_2
             return fit_1
         else
@@ -479,6 +526,8 @@ function tryls(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T}, niter
     end
 
 end
+
+# TO DO: update / deprecate the following three functions
 
 @doc raw"""
     newtonls_Q(Q, nobs, x0, niters=5)

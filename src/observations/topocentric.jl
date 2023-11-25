@@ -1,6 +1,3 @@
-# Earth orientation parameters (eop) 2000
-const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
-
 @doc raw"""
     TimeOfDay
 
@@ -53,7 +50,8 @@ isnight(x::TimeOfDay) = x.light == :night
 # Night from 2023-06-29 to 2023-06-29 at UTC-7
 # Night from 2023-06-29 to 2023-06-30 at UTC+3
 function show(io::IO, m::TimeOfDay)
-    print(io, uppercasefirst(string(m.light)), " from ", m.start, " to ", m.stop, " at UTC", @sprintf("%+d", m.utc))
+    print(io, uppercasefirst(string(m.light)), " from ", m.start, " to ", m.stop,
+          " at UTC", @sprintf("%+d", m.utc))
 end
 
 @doc raw"""
@@ -85,19 +83,23 @@ end
 
 @doc raw"""
     sunriseset(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
+    sunriseset(radec::RadecMPC{T}) where {T <: AbstractFloat}
 
 Return `DateTime` of sunrise and sunset at a particular date and location.
 
 !!! reference
-    See "General Solar Position Calculations" by NOAA at https://gml.noaa.gov/grad/solcalc/solareqns.PDF.
+    See "General Solar Position Calculations" by NOAA at
+    https://gml.noaa.gov/grad/solcalc/solareqns.PDF.
 """
 function sunriseset(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
     # Fractional year [rad]
     γ = 2π * (dayofyear(date) - 1 + (hour(date)-12)/24) / daysinyear(date)
     # Equation of time [min]
-    eqtime = 229.18 * (0.000075 + 0.001868*cos(γ) - 0.032077*sin(γ) - 0.014615*cos(2γ) - 0.040849*sin(2γ) )
+    eqtime = 229.18 * (0.000075 + 0.001868*cos(γ) - 0.032077*sin(γ) - 0.014615*cos(2γ)
+             - 0.040849*sin(2γ) )
     # Solar declination angle [rad]
-    δ = 0.006918 - 0.399912*cos(γ) + 0.070257*sin(γ) - 0.006758*cos(2γ) + 0.000907*sin(2γ) - 0.002697*cos(3γ) + 0.00148*sin(3γ)
+    δ = 0.006918 - 0.399912*cos(γ) + 0.070257*sin(γ) - 0.006758*cos(2γ) + 0.000907*sin(2γ)
+        - 0.002697*cos(3γ) + 0.00148*sin(3γ)
     # Longitude and latitude [rad]
     lon, lat = lonlat(observatory)
     # Solar hour angle [deg]
@@ -124,7 +126,8 @@ sunriseset(radec::RadecMPC{T}) where {T <: AbstractFloat} = sunriseset(date(rade
     obsposECEF(x::RadecMPC{T}; kwarg) where {T <: AbstractFloat}
     obsposECEF(x::RadarJPL{T}; kwarg) where {T <: AbstractFloat}
 
-Return the observer's geocentric `[x, y, z]` position vector in Earth-Centered Earth-Fixed (ECEF) reference frame.
+Return the observer's geocentric `[x, y, z]` position vector in Earth-Centered Earth-Fixed
+(ECEF) reference frame.
 
 # Keyword argument
 - `eop::Union{EopIau1980, EopIau2000A}`: Earth Orientation Parameters (eop).
@@ -251,7 +254,8 @@ models, such as the IAU1976/80 model, can be used by importing the
 `SatelliteToolboxTransformations.EopIau1980` type and passing it to the `eop` keyword
 argument in the function call.
 
-See also [`SatelliteToolboxBase.OrbitStateVector`](@ref) and [`SatelliteToolboxTransformations.sv_ecef_to_eci`](@ref).
+See also [`SatelliteToolboxBase.OrbitStateVector`](@ref) and 
+[`SatelliteToolboxTransformations.sv_ecef_to_eci`](@ref).
 
 # Arguments
 

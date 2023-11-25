@@ -1,3 +1,8 @@
+# List of MPC catalogues
+const CATALOGUES_MPC = Ref{Vector{CatalogueMPC}}([unknowncat()])
+# List of MPC observatories
+const OBSERVATORIES_MPC = Ref{Vector{ObservatoryMPC{Float64}}}([unknownobs()])
+
 function __init__()
     # Initialize scratch space
     global scratch_path[] = @get_scratch!("NEOsScratch")

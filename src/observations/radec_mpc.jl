@@ -1,12 +1,13 @@
+# Abstract type of RadecMPC and RadarJPL
 abstract type AbstractAstrometry end
+# Dummy types to parse right ascension and declination
 struct RightAscension <: AbstractAstrometry end
 struct Declination <: AbstractAstrometry end
 
 @doc raw"""
     RadecMPC{T <: AbstractFloat} <: AbstractAstrometry
 
-An optical (α, δ) measurement in MPC format. The format is described in https://minorplanetcenter.net/iau/info/OpticalObs.html
-and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.2010.06.003.
+An optical (right ascension, declination) measurement in MPC format. 
 
 # Fields
 
@@ -24,6 +25,10 @@ and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.20
 - `catalogue::CatalogueMPC`: catalogue.
 - `info2::String`: additional information.
 - `observatory::ObservatoryMPC{T}`: observatory.
+
+!!! reference
+    The format is described in https://minorplanetcenter.net/iau/info/OpticalObs.html
+    and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.2010.06.003.
 """
 @auto_hash_equals struct RadecMPC{T <: AbstractFloat} <: AbstractAstrometry
     num::String
@@ -63,8 +68,8 @@ end
 
 # Print method for RadecMPC
 # Examples:
-# N00hp15 α: 608995.65 δ: -25653.3 t: 2020-12-04T10:41:43.209 obs: 703
-# 99942 α: 422475.3 δ: 97289.49 t: 2021-05-12T06:28:35.904 obs: F51
+# K08E68K α: 166.27754° δ: -0.66325° t: 2008-03-05T10:34:27.840 obs: Mt. Lemmon Survey
+# 99942 α: 146.12752° δ: 13.31300° t: 2004-06-19T04:11:47.990 obs: Kitt Peak
 function show(io::IO, m::RadecMPC{T}) where {T <: AbstractFloat}
     # If there is no number, use temporary designation
     id_str = filter(!isspace, m.num) == "" ? m.tmpdesig : m.num
@@ -79,6 +84,7 @@ tmpdesig(r::RadecMPC{T}) where {T <: AbstractFloat} = r.tmpdesig
 discovery(r::RadecMPC{T}) where {T <: AbstractFloat} = r.discovery
 publishnote(r::RadecMPC{T}) where {T <: AbstractFloat} = r.publishnote
 obstech(r::RadecMPC{T}) where {T <: AbstractFloat} = r.obstech
+date(r::T) where {T <: AbstractAstrometry} = r.date
 ra(r::RadecMPC{T}) where {T <: AbstractFloat} = r.α
 dec(r::RadecMPC{T}) where {T <: AbstractFloat} = r.δ
 info1(r::RadecMPC{T}) where {T <: AbstractFloat} = r.info1
@@ -87,6 +93,9 @@ band(r::RadecMPC{T}) where {T <: AbstractFloat} = r.band
 catalogue(r::RadecMPC{T}) where {T <: AbstractFloat} = r.catalogue
 info2(r::RadecMPC{T}) where {T <: AbstractFloat} = r.info2
 observatory(r::RadecMPC{T}) where {T <: AbstractFloat} = r.observatory
+
+# Order in AbstractAstrometry is given by date
+isless(a::T, b::T) where {T <: AbstractAstrometry} = a.date < b.date
 
 function neoparse(x::RegexMatch, i::Int, ::Type{Int64})
     y = tryparse(Int64, x[i])
@@ -156,69 +165,6 @@ function neoparse(m::RegexMatch, i::Int, ::Type{ObservatoryMPC{Float64}})
     end
 end
 
-# Regular expression to parse an optical measurement in MPC format
-const RADEC_MPC_REGEX = Regex(string(
-    # Number regex (columns 1-5)
-    raw"(?P<num>.{5})",
-    # Temporary designation regex (columns 6-12)
-    raw"(?P<tmpdesig>.{7})",
-    # Discovery asterisk regex (column 13)
-    raw"(?P<discovery>[\*\s]{1})",
-    # Publishable note regex (column 14)
-    raw"(?P<publishnote>.{1})",
-    # Observation technique regex (column 15)
-    raw"(?P<obstech>[^xX]{1})",
-    # Date of observation regex (columns 16-32)
-    raw"(?P<date>\d{4}\s\d{2}\s\d{2}\.[\d\s]{6})",
-    # Right ascension regex (columns 33-44)
-    raw"(?P<α>\d{2}\s\d{2}\s\d{2}\.[\d\s]{3})",
-    # Declination regex (columns 45-56)
-    raw"(?P<δ>[\+|\-]{1}\d{2}\s\d{2}\s\d{2}\.[\d\s]{2})",
-    # Info 1 regex (columns 57-65)
-    raw"(?P<info1>.{9})",
-    # Magnitude regex (columns 66-70)
-    raw"(?P<mag>[\.\s\d]{5})",
-    # Band regex (column 71)
-    raw"(?P<band>[\w\s]{1})",
-    # Catalogue regex (column 72)
-    raw"(?P<catalogue>[\w\s]{1})",
-    # Info 2 regex (columns 73-77)
-    raw"(?P<info2>.{5})",
-    # Observatory code regex (columns 78-80)
-    raw"(?P<obscode>\w{3})",
-    # Optional fields (in case of satellite observations)
-    # Breakline regex
-    raw"(?:\n)?",
-    # Number regex (columns 1-5)
-    raw"(?<optional>(?P<_num_>.{5})?",
-    # Temporary designation regex (columns 6-12)
-    raw"(?P<_tmpdesig_>.{7})?",
-    # Blank space regex (column 13)
-    raw"(?P<_discovery_>\s)?",
-    # Publishable note regex (column 14)
-    raw"(?P<_publishnote_>.{1})?",
-    # s regex (column 15)
-    raw"(?P<_obstech_>s)?",
-    # Date of observation regex (columns 16-32)
-    raw"(?P<_date_>\d{4}\s\d{2}\s\d{2}\.[\d\s]{6})",
-    # Units + space regex (columns 33-34)
-    raw"(?P<_units_>\d\s)",
-    # X component of geocentric vector (columns 35-46)
-    raw"(?P<_x_>[\-\+]{1}[\.\d\s]{11})",
-    # Y component of geocentric vector (columns 47-58)
-    raw"(?P<_y_>[\-\+]{1}[\.\d\s]{11})",
-    # Z component of geocentric vector (columns 59-70)
-    raw"(?P<_z_>[\-\+]{1}[\.\d\s]{11})",
-    # Band regex (column 71)
-    raw"(?P<_band_>[\w\s]{1})?",
-    # Catalogue regex (column 72)
-    raw"(?P<_catalogue_>[\w\s]{1})?",
-    # Info 2 regex (columns 73-77)
-    raw"(?P<_info2_>.{5})?",
-    # Observatory code regex (columns 78-80)
-    raw"(?P<_obscode_>\w{3})?)?",
-))
-
 @doc raw"""
     RadecMPC(m::RegexMatch)
 
@@ -246,7 +192,8 @@ end
 @doc raw"""
     read_radec_mpc(s::String)
 
-Return the matches of `NEOs.RADEC_MPC_REGEX` in `s` as `RadecMPC`.
+Return the matches of `NEOs.RADEC_MPC_REGEX` in `s` as `Vector{RadecMPC{Float64}}`.
+`s` can be either a filename or a text.
 """
 function read_radec_mpc(s::String)
     if !contains(s, "\n") && isfile(s)

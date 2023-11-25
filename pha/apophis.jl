@@ -314,3 +314,36 @@ function main()
 end
 
 main()
+
+#=
+-0.18034827489412805
+0.9406910783153754
+0.3457360118643932
+-0.016265940057745887
+4.3915296805381036e-5
+-0.0003952032399008921
+-2.883842658925719e-14
+-1.6977850502837174e-11
+
+
+6.991681792970175e-9
+3.3210758500485412e-9
+8.763895947794195e-9
+5.485729074188412e-11
+9.846074910774499e-11
+1.3782767177665416e-10
+2.525644870489942e-16
+3.2193289354129716e-12
+
+Normalized RMS (optical-only)               [adimensional] : 0.4365429773707507
+Normalized RMS (radar-only)                 [adimensional] : 0.5421268387032326
+Normalized RMS (combined optical and radar) [adimensional] : 0.43685679642513925
+
+Mean weighted right-ascension residual      [arcseconds]   : -0.002787272519210798
+Mean weighted declination residual          [arcseconds]   : -0.003376099885054764
+Mean weighted time-delay residual           [micro-seconds]: -0.0007329351962194035
+Mean weighted Doppler-shift residual        [Hz]           : -0.03025601266756564
+
+Chi-squared statistic (χ²):                 [adimensional] : 3597.4067719864497
+
+=#

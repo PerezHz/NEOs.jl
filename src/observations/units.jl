@@ -1,23 +1,23 @@
 @doc raw"""
-    julian2etsecs(jd)
+    julian2etsecs(jd::T) where {T <: Number}
 
 Convert the Julian date `jd` to ephemeris seconds since J2000.
 
 See also [`etsecs2julian`](@ref).
 """
-function julian2etsecs(jd)
-    return (jd-JD_J2000)*daysec
+function julian2etsecs(jd::T) where {T <: Number}
+    return (jd - JD_J2000) * daysec
 end
 
 @doc raw"""
-    etsecs2julian(et)
+    etsecs2julian(et::T) where {T <: Number}
 
 Convert `et` ephemeris seconds since J2000 to Julian date.
 
 See also [`julian2etsecs`](@ref).
 """
-function etsecs2julian(et)
-    return JD_J2000 + et/daysec
+function etsecs2julian(et::T) where {T <: Number}
+    return JD_J2000 + et / daysec
 end
 
 @doc raw"""
@@ -41,21 +41,21 @@ function datetime2et(x::DateTime)
     return tt_seconds - ttmtdb_tt(tt_seconds)
 end
 
-datetime2et(x::AbstractAstrometry) = datetime2et(x.date)
+datetime2et(x::T) where {T <: AbstractAstrometry} = datetime2et(x.date)
 
 @doc raw"""
     et_to_200X(et::T) where {T <: Number}
 
 Convert `et` ephemeris seconds since J2000 to years `200X`.
 """
-et_to_200X(et::Number) = 2000 + et/daysec/yr
+et_to_200X(et::T) where {T <: Number} = 2000 + et/daysec/yr
 
 @doc raw"""
     days_to_200X(d::T) where {T <: Number}
 
 Convert `d` days since J2000 to years `200X`.
 """
-days_to_200X(d::Number) = 2000 + d/yr
+days_to_200X(d::T) where {T <: Number} = 2000 + d/yr
 
 @doc raw"""
     datetime_to_200X(x::DateTime)
@@ -76,10 +76,10 @@ datetime2days(x::DateTime) = datetime2julian(x) - JD_J2000
 
 Convert `d` days since J2000 to `DateTime`.
 """
-days2datetime(d::Number) = julian2datetime(d + JD_J2000)
+days2datetime(d::T) where {T <: Number} = julian2datetime(d + JD_J2000)
 
 @doc raw"""
-    tdb_utc(et::Number)
+    tdb_utc(et::T) where {T <: Number} 
 
 Given `et`, a number of TDB seconds past J2000.0 epoch, compute
 the difference (TDB-UTC)
@@ -90,18 +90,20 @@ TDB-UTC & = (TDB-TAI) + (TAI-UTC) \\
         & = (TDB-TT) + 32.184 s + ΔAT,
 \end{align*}
 ```
-where TDB is the Barycentric Dynamical Time (Temps Dynamique Barycentrique), TT is the Terrestrial Time,
-TAI is the International Atomic Time, and UTC is the Coordinated Universal Time.
-
-This function is useful to convert TDB to UTC via UTC + (TDB-UTC) and viceversa. It does
-not include the correction due to the position of the measurement station ``v_E.(r_S-r_E)/c^2``
-(Folkner et al. 2014; Moyer, 2003).
+where TDB is the Barycentric Dynamical Time (Temps Dynamique Barycentrique), 
+TT is the Terrestrial Time, TAI is the International Atomic Time, and UTC is 
+the Coordinated Universal Time.
 
 # Arguments
 
 - `et::Number`: TDB seconds since J2000.0.
+
+!!! reference
+    This function is useful to convert TDB to UTC via UTC + (TDB-UTC) and viceversa. 
+    It does not include the correction due to the position of the measurement station
+    ``v_E.(r_S-r_E)/c^2`` (Folkner et al. 2014; Moyer, 2003).
 """
-function tdb_utc(et::Number)
+function tdb_utc(et::T) where {T <: Number} 
     # TT-TDB
     tt_tdb_et = ttmtdb(et/daysec)
     # TT-TAI
@@ -120,22 +122,23 @@ function tdb_utc(et::Number)
 end
 
 @doc raw"""
-    tt_tdb_tt(tt::Real)
+    ttmtdb_tt(tt::T; niter::Int = 5) where {T <: Real}
 
 Given `tt`, a number of TT seconds past J2000.0 epoch, compute
 the difference (TT-TDB), where TDB is the Barycentric Dynamical Time (Temps Dynamique
 Barycentrique) and TT is the Terrestrial Time.
 
-This function is useful during the reduction of observations, when the TDB instant is
-computed from a known UTC instant. The computed value does not include the
-correction due to the position of the measurement station ``v_E.(r_S-r_E)/c^2``
-(Folkner et al. 2014; Moyer, 2003).
-
 # Arguments
 
-- `tt::Real`: tt seconds since J2000.0.
+- `tt::T`: tt seconds since J2000.0.
+
+!!! reference
+    This function is useful during the reduction of observations, when the TDB instant
+    is computed from a known UTC instant. The computed value does not include the
+    correction due to the position of the measurement station ``v_E.(r_S-r_E)/c^2``
+    (Folkner et al. 2014; Moyer, 2003).
 """
-function ttmtdb_tt(tt::Real; niter=5)
+function ttmtdb_tt(tt::T; niter::Int = 5) where {T <: Real}
     # Ansatz: TDB - TT = 0
     ttmtdb_order = ttmtdb.x[1].order
     tdb = Taylor1([tt,one(tt)], ttmtdb_order)
@@ -151,28 +154,28 @@ function ttmtdb_tt(tt::Real; niter=5)
 end
 
 @doc raw"""
-    rad2arcsec(x)
+    rad2arcsec(x::T) where {T <: Number}
 
 Convert radians to arcseconds.
 
 See also [`arcsec2rad`](@ref) and [`mas2rad`](@ref).
 """
-rad2arcsec(x) = 3600 * rad2deg(x) # rad2deg(rad) -> deg; 3600 * deg -> arcsec
+rad2arcsec(x::T) where {T <: Number} = 3600 * rad2deg(x) # rad2deg(rad) -> deg; 3600 * deg -> arcsec
 
 @doc raw"""
-    arcsec2rad(x)
+    arcsec2rad(x::T) where {T <: Number}
 
 Convert arcseconds to radians.
 
 See also [`rad2arcsec`](@ref) and [`mas2rad`](@ref).
 """
-arcsec2rad(x) = deg2rad(x / 3600) # arcsec/3600 -> deg; deg2rad(deg) -> rad
+arcsec2rad(x::T) where {T <: Number} = deg2rad(x / 3600) # arcsec/3600 -> deg; deg2rad(deg) -> rad
 
 @doc raw"""
-    mas2rad(x)
+    mas2rad(x::T) where {T <: Number}
 
 Convert milli-arcseconds to radians.
 
 See also [`rad2arcsec`](@ref) and [`arcsec2rad`](@ref).
 """
-mas2rad(x) = arcsec2rad(x / 1000) # mas/1000 -> arcsec; arcsec2rad(arcsec) -> rad
+mas2rad(x::T) where {T <: Number} = arcsec2rad(x / 1000) # mas/1000 -> arcsec; arcsec2rad(arcsec) -> rad

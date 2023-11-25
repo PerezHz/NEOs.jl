@@ -10,7 +10,7 @@ using NEOs: src_path
 
     @testset "CatalogueMPC" begin
 
-        using NEOs: CATALOGUE_MPC_REGEX, CatalogueMPC
+        using NEOs: CATALOGUE_MPC_REGEX, CatalogueMPC, isunknown
 
         # Check global variable NEOs.CATALOGUES_MPC[]
         @test allunique(NEOs.CATALOGUES_MPC[])
@@ -52,7 +52,7 @@ using NEOs: src_path
 
     @testset "ObservatoryMPC" begin
 
-        using NEOs: OBSERVATORY_MPC_REGEX, ObservatoryMPC
+        using NEOs: OBSERVATORY_MPC_REGEX, ObservatoryMPC, isunknown
 
         # Check global variable NEOs.OBSERVATORIES_MPC[]
         @test allunique(NEOs.OBSERVATORIES_MPC[])
@@ -182,14 +182,14 @@ using NEOs: src_path
 
     @testset "RadarJPL" begin
 
-        using NEOs: jpl_radar_regex, RadarJPL, jpl_radar_dateformat
+        using NEOs: RADAR_JPL_REGEX, RadarJPL, RADAR_JPL_DATEFORMAT, ismonostatic
 
         # Parse RadarJPL
         apophis_s = "99942 Apophis (2004 MN4)	2005-01-27 23:31:00	-100849.1434	0.250	Hz	2380	251	251	C"
-        apophis_m = match(jpl_radar_regex, apophis_s)
+        apophis_m = match(RADAR_JPL_REGEX, apophis_s)
         apophis = RadarJPL(Val(false), apophis_m)
         @test apophis.id == "99942 Apophis (2004 MN4)"
-        @test apophis.date == DateTime("2005-01-27 23:31:00", jpl_radar_dateformat)
+        @test apophis.date == DateTime("2005-01-27 23:31:00", RADAR_JPL_DATEFORMAT)
         @test isnan(apophis.Δτ)
         @test isnan(apophis.Δτ_σ)
         @test apophis.Δτ_units == ""

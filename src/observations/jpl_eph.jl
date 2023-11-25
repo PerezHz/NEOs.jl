@@ -2,7 +2,8 @@
 @doc raw"""
     loadjpleph()
 
-Load JPL ephemerides (NAIF IDs, DE430 TT-TDB and ephemerides, #197 and #199 solutions for Apophis).
+Load JPL ephemerides (NAIF IDs, DE430 TT-TDB and ephemerides, #197 and #199 solutions for
+Apophis).
 
 See also [`SPICE.furnsh`](@ref).
 """
@@ -115,27 +116,23 @@ See also [`getposvel`](@ref).
 """
 dtt_tdb(et) = getposvel(1000000001, 1000000000, cte(et))[4] # units: seconds/seconds
 
-# Load Solar System, accelerations, newtonian potentials and TT-TDB 2000-2100 ephemeris
-const sseph_artifact_path = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
-const sseph::TaylorInterpolant{Float64, Float64, 2} = JLD2.load(sseph_artifact_path, "ss16ast_eph")
-const acceph::TaylorInterpolant{Float64, Float64, 2} = JLD2.load(sseph_artifact_path, "acc_eph")
-const poteph::TaylorInterpolant{Float64, Float64, 2} = JLD2.load(sseph_artifact_path, "pot_eph")
-const ttmtdb::TaylorInterpolant{Float64, Float64, 1} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
-
 @doc raw"""
-    loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::Real = 0.0, t_f::Real = 36525.0)
+    loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::T = sseph.t0,
+              t_f::S = sseph.t0 + sseph.t[end]) where {T, S <: Real}
 
-Load ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[t_0, t_f] ⊆ [0.0, 36525.0]` where `t` must have units of TDB
-days since J2000. The available options for `eph` are:
+Load ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[t_0, t_f] ⊆ [0.0, 36525.0]`
+where `t` must have units of TDB days since J2000. The available options for `eph` are:
 
 - `NEOs.sseph`: Solar system ephemeris.
 - `NEOs.acceph`: accelerations ephemeris.
 - `NEOs.poteph`: newtonian potentials ephemeris.
 
 !!! warning
-    Running this function for the first time will download the `sseph_p100` artifact (885 MB) which can take several minutes.
+    Running this function for the first time will download the `sseph_p100` artifact (885 MB)
+    which can take several minutes.
 """
-function loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::Real = sseph.t0, t_f::Real = sseph.t0 + sseph.t[end])
+function loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::T = sseph.t0,
+                   t_f::S = sseph.t0 + sseph.t[end]) where {T, S <: Real}
     @assert 0.0 ≤ t_0 ≤ t_f ≤ 36525.0
     i_0 = searchsortedlast(eph.t, t_0)
     i_f = searchsortedfirst(eph.t, t_f)
@@ -143,15 +140,18 @@ function loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::Rea
 end
 
 @doc raw"""
-    bwdfwdeph(et::Union{T,Taylor1{T},TaylorN{T},Taylor1{TaylorN{T}}}, bwd::TaylorInterpolant{T, U, 2},
-              fwd::TaylorInterpolant{T, U, 2}) where {T <: AbstractFloat, U <: Union{T, TaylorN{T}}}
+    bwdfwdeph(et::Union{T, Taylor1{T}, TaylorN{T}, Taylor1{TaylorN{T}}},
+              bwd::TaylorInterpolant{T, U, 2},
+              fwd::TaylorInterpolant{T, U, 2}
+              ) where {T <: AbstractFloat, U <: Union{T, TaylorN{T}}}
 
-Paste a backward and a forward integration, evaluate at `et` and convert from [au, au/day] -> [km, km/sec].
+Paste a backward and a forward integration, evaluate at `et` and convert from 
+[au, au/day] -> [km, km/sec].
 """
-function bwdfwdeph(et::Union{T,Taylor1{T},TaylorN{T},Taylor1{TaylorN{T}}},
-        bwd::TaylorInterpolant{T,U,2},
-        fwd::TaylorInterpolant{T,U,2}
-        ) where {T<:AbstractFloat, U<:Union{T,TaylorN{T}}}
+function bwdfwdeph(et::Union{T, Taylor1{T}, TaylorN{T}, Taylor1{TaylorN{T}}},
+                   bwd::TaylorInterpolant{T,U,2}, 
+                   fwd::TaylorInterpolant{T,U,2}
+                   ) where {T <: AbstractFloat, U <: Union{T, TaylorN{T}}}
     @assert bwd.t0 == fwd.t0 "Backward and forward TaylorInterpolant initial times must match"
     t = et/daysec
     t0 = bwd.t0

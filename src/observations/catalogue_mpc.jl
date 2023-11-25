@@ -1,12 +1,15 @@
 @doc raw"""
     CatalogueMPC
 
-An astrometric reference catalogue in MPC format. The format is described in https://minorplanetcenter.net/iau/info/CatalogueCodes.html.
+An astrometric reference catalogue in MPC format. 
 
 # Fields
 
-- `code::String`: catalogue's identifier.
+- `code::String`: catalogue's single character identifier.
 - `name::String`: catalogue's name.
+
+!!! reference 
+    The format is described in https://minorplanetcenter.net/iau/info/CatalogueCodes.html.
 """
 @auto_hash_equals struct CatalogueMPC
     code::String
@@ -49,11 +52,6 @@ end
 
 neoparse(x::RegexMatch, i::Int, ::Type{String}) = String(strip(x[i]))
 
-# Regular expression to parse a catalogue in MPC format
-const CATALOGUE_MPC_REGEX = r"\s{2}(?P<code>\w{1})\s{4}(?P<name>.*)"
-# Header of MPC catalogues file
-const CATALOGUES_MPC_HEADER = "Char   Catalogue"
-
 @doc raw"""
     CatalogueMPC(m::RegexMatch)
 
@@ -73,7 +71,8 @@ end
 @doc raw"""
     read_catalogues_mpc(s::String)
 
-Return the matches of `NEOs.CATALOGUE_MPC_REGEX` in `s` as `CatalogueMPC`. `s` can be either a filename or a text.
+Return the matches of `NEOs.CATALOGUE_MPC_REGEX` in `s` as `Vector{CatalogueMPC}`. 
+`s` can be either a filename or a text.
 """
 function read_catalogues_mpc(s::String)
     if !contains(s, "\n") && isfile(s)
@@ -125,15 +124,13 @@ function write_catalogues_mpc(cats::Vector{CatalogueMPC}, filename::String)
     end
 end
 
-# MPC catalogues file url 
-const CATALOGUES_MPC_URL = "https://minorplanetcenter.net/iau/info/CatalogueCodes.html"
-
 @doc raw"""
-    download_scratch(url::String, filename::String; connect_timeout=180, readtimeout=180)
+    download_scratch(url::String, filename::String; connect_timeout = 180, readtimeout = 180)
 
-Download `url` and save the output to NEOs scratch space as `filename`. Return the local path and the contents of the file as a `String`.
+Download `url` and save the output to NEOs scratch space as `filename`. Return the local
+path and the contents of the file as a `String`.
 """
-function download_scratch(url::String, filename::String; connect_timeout=180, readtimeout=180)
+function download_scratch(url::String, filename::String; connect_timeout = 180, readtimeout = 180)
     # Local file
     path = joinpath(scratch_path[], filename)
     # Get raw html (HTTP.get retries four times by default)
@@ -143,9 +140,6 @@ function download_scratch(url::String, filename::String; connect_timeout=180, re
 
     return path, txt
 end
-
-# List of MPC catalogues
-const CATALOGUES_MPC = Ref{Vector{CatalogueMPC}}([unknowncat()])
 
 @doc raw"""
     update_catalogues_mpc()
@@ -168,7 +162,7 @@ end
 @doc raw"""
     search_cat_code(catcode::String)
 
-Return the catalogue in `NEOs.mpc_catalogues` that matches `catcode`.
+Return the catalogue in `NEOs.CATALOGUES_MPC` that matches `catcode`.
 """
 function search_cat_code(catcode::String)
 

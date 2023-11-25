@@ -19,12 +19,13 @@ An astrometric optical observed minus computed residual.
     w_δ::T
     relax_factor::T
     outlier::Bool
+    # Inner constructor
     function OpticalResidual{T, U}(ξ_α::U, ξ_δ::U, w_α::T, w_δ::T, relax_factor::T = one(T),
                                    outlier::Bool = false) where {T <: Real, U <:  Number}
         new{T, U}(ξ_α, ξ_δ, w_α, w_δ, relax_factor, outlier)
     end
 end
-
+# Outer constructor
 function OpticalResidual(ξ_α::U, ξ_δ::U, w_α::T, w_δ::T, relax_factor::T = one(T),
                          outlier::Bool = false) where {T <: Real, U <: Number}
     return OpticalResidual{T, U}(ξ_α, ξ_δ, w_α, w_δ, relax_factor, outlier)
@@ -36,7 +37,7 @@ function evaluate(res::OpticalResidual{T, TaylorN{T}}, x::Vector{T}) where {T <:
 end
 (res::OpticalResidual{T, TaylorN{T}})(x::Vector{T}) where {T <: Real} = evaluate(res, x)
 
-function evaluate(res::Vector{OpticalResidual{T, TaylorN{T}}}, x::Vector{T}) where {T <: Real}
+function evaluate(res::AbstractVector{OpticalResidual{T, TaylorN{T}}}, x::Vector{T}) where {T <: Real}
     res_new = Vector{OpticalResidual{T, T}}(undef, length(res))
     for i in eachindex(res)
         res_new[i] = evaluate(res[i], x)
@@ -47,10 +48,10 @@ end
 
 # Print method for OpticalResidual
 # Examples:
-# α: -138.7980136773549 δ: -89.8002527255012
-# α: -134.79449984291568 δ: -91.42509376643284
+# α: -138.79801 δ: -89.80025
+# α: -134.79450 δ: -91.42509
 function show(io::IO, x::OpticalResidual{T, U}) where {T <: Real, U <: Number}
-    print(io, "α: ", cte(x.ξ_α), " δ: ", cte(x.ξ_δ))
+    print(io, "α: ", @sprintf("%+.5f", cte(x.ξ_α)), " δ: ", @sprintf("%+.5f", cte(x.ξ_δ)))
 end
 
 @doc raw"""
@@ -84,6 +85,7 @@ function unfold(ξs::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U 
     return res, w
 end
 
+# Functions to get specific fields of a OpticalResidual object
 ra(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.ξ_α
 dec(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.ξ_δ
 weight_ra(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.w_α
@@ -92,24 +94,29 @@ relax_factor(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.re
 outlier(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.outlier
 
 @doc raw"""
-    compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
-    xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
-    compute_radec(obs::RadecMPC{T}; niter::Int = 5, xve::EarthEph = earthposvel, xvs::SunEph = sunposvel,
-                  xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
-    compute_radec(obs::Vector{RadecMPC{T}}; niter::Int=5, xve::EarthEph=earthposvel, xvs::SunEph=sunposvel,
-                  xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
+    compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; kwargs...) where {T <: AbstractFloat}
+    compute_radec(obs::RadecMPC{T}; kwargs...) where {T <: AbstractFloat}
+    compute_radec(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloat}
 
-Compute astrometric right ascension and declination (both in arcsec) for a set of MPC-formatted observations.
-Corrections due to Earth orientation, LOD, polar motion are considered in computations.
+Compute astrometric right ascension and declination (both in arcsec) for a set of MPC-formatted
+observations. Corrections due to Earth orientation, LOD, polar motion are considered in
+computations.
 
 # Arguments
 
 - `observatory::ObservatoryMPC{T}`: observation site.
 - `t_r_utc::DateTime`: UTC time of astrometric observation.
-- `niter::Int`: number of light-time solution iterations.
-- `xve`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xvs`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `obs::Vector{RadecMPC{T}}`: optical observation(s).
+
+# Keyword arguments
+
+- `niter::Int = 5`: number of light-time solution iterations.
+- `xve::EarthEph = earthposvel`: Earth ephemeris.
+- `xvs::SunEph = sunposvel`: Sun ephemeris.
+- `xva::AstEph`: asteroid ephemeris.
+
+All ephemeris must take [et seconds since J2000] and return [barycentric position in km 
+and velocity in km/sec].
 """
 function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
                        xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
@@ -270,19 +277,11 @@ function compute_radec(obs::Vector{RadecMPC{T}}; xva::AstEph, kwargs...) where {
     return vra, vdec # arcsec, arcsec
 end
 
-# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2014.07.033
-const mpc_catalogue_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "o", "p", "q", "r",
-                                  "u", "v", "w", "L", "N"]
-
-# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2019.113596
-const mpc_catalogue_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "n", "o", "p", "q",
-                                  "r", "t", "u", "v", "w", "L", "N", "Q", "R", "S", "U", "W"]
-
 @doc raw"""
     select_debiasing_table(debias_table::String = "2018")
 
-Return the catalogue codes, truth catalogue, resolution and bias matrix of the corresponding debias table. The possible values
-for `debias_table` are:
+Return the catalogue codes, truth catalogue, resolution and bias matrix of the corresponding
+debias table. The possible values for `debias_table` are:
 - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
 - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
 - `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596.
@@ -327,8 +326,8 @@ function select_debiasing_table(debias_table::String = "2018")
 end
 
 @doc raw"""
-    debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, truth::String, resol::Resolution,
-              bias_matrix::Matrix{T}) where {T <: AbstractFloat}
+    debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, truth::String,
+              resol::Resolution, bias_matrix::Matrix{T}) where {T <: AbstractFloat}
 
 Return total debiasing correction in right ascension and declination (both in arcsec).
 
@@ -340,8 +339,8 @@ Return total debiasing correction in right ascension and declination (both in ar
 - `resol::Resolution`: resolution.
 - `bias_matrix::Matrix{T}`: debiasing table.
 """
-function debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, truth::String, resol::Resolution,
-                   bias_matrix::Matrix{T}) where {T <: AbstractFloat}
+function debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, truth::String,
+                   resol::Resolution, bias_matrix::Matrix{T}) where {T <: AbstractFloat}
 
     # Catalogue code
     catcode = obs.catalogue.code
@@ -475,8 +474,8 @@ end
 @doc raw"""
     relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
 
-Return a relax factor for each element of `radec` quantifying the correlation between observations taken on
-the same night by the same observatory.
+Return a relax factor for each element of `radec` quantifying the correlation between
+observations taken on the same night by the same observatory.
 
 !!! reference
     See https://doi.org/10.1016/j.icarus.2017.05.021.
@@ -495,6 +494,8 @@ function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     return map(x -> x > 4.0 ? x/4.0 : 1.0, Nv)
 end
 
+# Angle difference taking into account the discontinuity in [0, 2π] -> [0, 2π]
+# x and y must be in arcsec
 function anglediff(x::T, y::S) where {T, S <: Number}
     # Signed difference
     Δ = x - y
@@ -509,11 +510,13 @@ function anglediff(x::T, y::S) where {T, S <: Number}
 end
 
 @doc raw"""
-    residuals(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
+    residuals(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloat, AstEph}
 
-Compute O-C residuals for optical astrometry. Corrections due to Earth orientation, LOD, polar motion are computed by default.
+Compute O-C residuals for optical astrometry. Corrections due to Earth orientation, LOD,
+polar motion are computed by default.
 
-See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and [`Healpix.ang2pixRing`](@ref).
+See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and
+[`Healpix.ang2pixRing`](@ref).
 
 # Arguments
 
@@ -521,21 +524,25 @@ See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and 
 
 # Keyword arguments
 
-- `niter::Int`: number of light-time solution iterations.
-- `debias_table::String`: possible values are:
+- `niter::Int = 5`: number of light-time solution iterations.
+- `debias_table::String = "2018"`: possible values are:
     - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
     - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
     - `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596.
-- `xve`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xvs`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `xve::EarthEph = earthposvel`: Earth ephemeris.
+- `xvs::SunEph = sunposvel`: Sun ephemeris.
+- `xva::AstEph`: asteroid ephemeris.
+
+All ephemeris must take [et seconds since J2000] and return [barycentric position in km 
+and velocity in km/sec].
 """
-function residuals(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
+function residuals(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph,
+                   kwargs...) where {T <: AbstractFloat, AstEph}
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
     return residuals(obs, mpc_catalogue_codes_201X, truth, resol, bias_matrix; xva, kwargs...)
 end
-function residuals(obs::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String}, truth::String, resol::Resolution,
-                   bias_matrix::Matrix{T}; xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
+function residuals(obs::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String}, truth::String,
+                   resol::Resolution, bias_matrix::Matrix{T}; xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
 
     # Number of observations
     N_obs = length(obs)
@@ -588,64 +595,48 @@ function residuals(obs::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{St
 end
 
 @doc raw"""
-    extrapolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
-
-Return an extrapolation of points `(x, y)`. 
-"""
-function extrapolation(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real}
-    # Check we have as many x as y 
-    @assert length(x) == length(y)
-    # Interpolation 
-    itp = interpolate((x,), y, Gridded(Linear()))
-    # Extrapolation 
-    etpf = extrapolate(itp, Flat())
-
-    return etpf
-end 
-
-@doc raw"""
     extrapolation(df::AbstractDataFrame)
 
 Special method of [`extrapolation`](@ref) to be used by [`gaussinitcond`](@ref).
 """
 function extrapolation(df::AbstractDataFrame)
-    if !allunique(df.date)
-        gdf = groupby(df, :date)
-        df = combine(gdf, [:α, :δ] .=> x -> sum(x)/length(x), :observatory => identity, renamecols = false)
-    end
-
+    # Only one observation
     if isone(nrow(df))
-        return (observatory = df.observatory[1], date = df.date[1], α = df.α[1], δ = df.δ[1])
+        return (observatory = df.observatory[1], date = df.date[1], α = df.α[1],
+                δ = df.δ[1], v_α = 0.0, v_δ = 0.0)
     end 
+
+    # Make sure there are no repeated dates
+    gdf = groupby(df, :date)
+    df = combine(gdf, [:α, :δ] .=> mean, :observatory => identity, renamecols = false)
     
     # Julian days of observation
-    t_julian = datetime2julian.(df.date)
+    df.t_julian = datetime2julian.(df.date)
     # Days of observation [relative to first observation]
-    t_rel = t_julian .- t_julian[1]
+    df.t_rel = df.t_julian .- df.t_julian[1]
     # Mean date 
-    t_mean = sum(t_rel) / length(t_rel)
-
-    α_p = extrapolation([0., 1.], [0., 1.])
+    t_mean = mean(df.t_rel)
 
     # Points in top quarter
     N_top = count(x -> x > 3π/2, df.α)
     # Points in bottom quarter
     N_bottom = count(x -> x < π/2, df.α)
-    # No discontinuity
-    if iszero(N_top) || iszero(N_bottom)
-        α_p = extrapolation(t_rel, df.α)
     # Discontinuity
-    else
-        α = map(x -> x < π ? x + 2π : x, df.α)
-        α_p = extrapolation(t_rel, α)
+    if !iszero(N_top) && !iszero(N_bottom)
+        df.α = map(x -> x < π ? x + 2π : x, df.α)
     end
-    δ_p = extrapolation(t_rel, df.δ)
+    # Linear regression
+    α_p = lm(@formula(α ~ t_rel), df)
+    α_coef = coef(α_p)
+    δ_p = lm(@formula(δ ~ t_rel), df)
+    δ_coef = coef(δ_p)
 
     # Evaluate polynomials at mean date 
-    α_mean = mod2pi(α_p(t_mean))
-    δ_mean = δ_p(t_mean)
+    α_mean = mod2pi(α_coef[1] + α_coef[2] * t_mean)
+    δ_mean = δ_coef[1] + δ_coef[2] * t_mean
 
-    return (observatory = df.observatory[1], date = julian2datetime(t_julian[1] + t_mean), α = α_mean, δ = δ_mean)
+    return (observatory = df.observatory[1], date = julian2datetime(df.t_julian[1] + t_mean),
+            α = α_mean, δ = δ_mean, v_α = α_coef[2], v_δ = δ_coef[2])
 end 
 
 @doc raw"""

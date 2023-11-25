@@ -10,13 +10,14 @@ encounter. ``\mu_P`` is the planet's gravitational parameter, ``R_P`` is the pla
 radius and ``v_\infty`` is the asymptotic inbound velocity. If actual ``B`` is equal or 
 less to this, then impact happens. Output is in planet radii. 
 
-See equations (13)-(14) in pages 4-5 of https://doi.org/10.1007/s10569-019-9914-4.
-
 # Arguments 
 
 - `μ_P`: planetary gravitational parameter (au^3/day^2).
 - `R_P`: planetary radius (au).
 - `vinf`: asymptotic inbound velocity (au/day).
+
+!!! reference
+    See equations (13)-(14) in pages 4-5 of https://doi.org/10.1007/s10569-019-9914-4.
 """
 function crosssection(μ_P, R_P, vinf)
     return sqrt( 1 + (2μ_P)/(R_P*(vinf)^2) )
@@ -28,7 +29,7 @@ end
 Computes Öpik's coordinates of impact parameter vector ``\mathbf{B}`` in hyperbolic planetary
 close encounter. Returns a named tuple with the following fields:
 
-- `ξ` = ``\mathbf{B}\cdot\hat{\mathbf{\xi}}/R_E`` and `ζ` = ``\mathbf{B}\cdot\hat{\mathbf{\zeta}}/R_E``, where ``\mathbf{B}`` is the impact parameter vector, ``(\hat{\mathbf{\xi}}, \hat{\mathbf{\zeta}})`` is Öpik's frame and ``R_E`` is the Earth's radius in au. See equations (37)-(38) in page 14 of https://doi.org/10.1007/s10569-019-9914-4.
+- `ξ` = ``\mathbf{B}\cdot\hat{\mathbf{\xi}}/R_E`` and `ζ` = ``\mathbf{B}\cdot\hat{\mathbf{\zeta}}/R_E``, where ``\mathbf{B}`` is the impact parameter vector, ``(\hat{\mathbf{\xi}}, \hat{\mathbf{\zeta}})`` is Öpik's frame and ``R_E`` is the Earth's radius in au.
 
 - `U` is another named tuple with the following fields:
     - `y` = ``U_y``.
@@ -40,6 +41,9 @@ close encounter. Returns a named tuple with the following fields:
 
 - `xae`: asteroid's geocentric position/velocity vector at closest approach in au, au/day.
 - `xes`: planet's heliocentric position/velocity vector at asteroid's closest approach in au, au/day.
+
+!!! reference
+    See equations (37)-(38) in page 14 of https://doi.org/10.1007/s10569-019-9914-4.
 """
 function bopik(xae, xes)
 
@@ -137,8 +141,6 @@ and then substitutes into `valsecchi_circle(U_y, U_norm, k, h; m_pl=3.0034896149
 `a `, `e` and `i` are the asteroid heliocentric semimajor axis (au), eccentricity and 
 inclination (rad) respectively. 
 
-See section 2.1 in page 1181 of https://doi.org/10.1051/0004-6361:20031039.
-
 # Arguments
 
 - `a`: asteroid heliocentric semimajor axis (au).
@@ -146,6 +148,9 @@ See section 2.1 in page 1181 of https://doi.org/10.1051/0004-6361:20031039.
 - `i`: asteroid heliocentric inclination, ecliptic (rad).
 - `k/h`: `h` heliocentric revolutions of asteroid per `k` heliocentric revolutions of Earth.
 - `m_pl`: planet mass normalized to Sun's mass, equal to Earth mass in solar masses by default.
+
+!!! reference
+    See section 2.1 in page 1181 of https://doi.org/10.1051/0004-6361:20031039.
 """
 function valsecchi_circle(a, e, i, k, h; m_pl=3.003489614915764e-6)
     # Components and norm of the planetocentric velocity vector
@@ -173,14 +178,15 @@ where ``c = m/U^2`` with ``m`` the mass of the planet and ``U = ||\mathbf{U}||``
 the planetocentric velocity vector; and ``\theta``, ``\theta_0'`` are the angles between Y-axis
 and ``\mathbf{U}`` pre and post encounter respectively. 
 
-See pages 1181, 1182 and 1187 of https://doi.org/10.1051/0004-6361:20031039.
-
 # Arguments 
 - `U_y`: Y-component of unperturbed planetocentric velocity (Y-axis coincides with the direction of motion of the planet).
 - `U_norm`: Euclidean norm of unperturbed planetocentric velocity. Both `U_y`, `U_norm` are in units such that the heliocentric velocity of the planet is 1.
 - `k/h`: `h` heliocentric revolutions of asteroid per `k` heliocentric revolutions of Earth.
 - `m_pl`: planet mass normalized to Sun's mass, equal to Earth mass in solar masses by default.
 - `a_pl`: planetary heliocentric semimajor axis in au; default value is 1.
+
+!!! reference
+    See pages 1181, 1182 and 1187 of https://doi.org/10.1051/0004-6361:20031039.
 """
 function valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6, a_pl=1.0)
     # Post-encounter semimajor axis

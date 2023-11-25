@@ -1,15 +1,23 @@
 @doc raw"""
     ObservatoryMPC{T <: AbstractFloat} 
 
-An observatory in MPC format. The format is described in https://minorplanetcenter.net/iau/lists/ObsCodesF.html.
+An observatory in MPC format. 
 
-# Fields 
+# Fields
 
-- `code::String`: observatory's identifier. 
-- `long::T`: longitude [degrees east of Greenwich].
-- `cos::T`: `ρ*cos(ϕ')`,
-- `sin::T`: `ρ*sin(ϕ')`, where `ϕ'` is the geocentric latitude and `ρ` is the geocentric distance in earth radii.
+- `code::String`: observatory's three character identifier. 
+- `long::T`, `cos::T`,  `sin::T`:
+    - For ground-based observatories: longitude [degrees east of Greenwich],
+      `ρ*cos(ϕ')` and `ρ*sin(ϕ')`, where `ϕ'` is the geocentric latitude and 
+      `ρ` is the geocentric distance in earth radii.
+    - For space-based observatories: `x`, `y` and `z` geocentric coordinates.
 - `name::String`: observatory's name.
+- `date::DateTime`: time of observation (for `:satellite`/`:occultation` observatories).
+- `type::Symbol`: `:ground`, `:satellite` or `:occultation`.
+- `units::Int`: whether position is encrypted in AU (1) or KM (2).
+
+!!! reference 
+    The format is described in https://minorplanetcenter.net/iau/lists/ObsCodesF.html.
 """
 struct ObservatoryMPC{T <: AbstractFloat}
     code::String
@@ -107,22 +115,6 @@ function neoparse(x::RegexMatch, i::Int, ::Type{Float64})
     end
 end
 
-# Regular expression to parse an observatory in MPC format
-const OBSERVATORY_MPC_REGEX = Regex(string(
-    # Code regex + space (columns 1-3)
-    raw"(?P<code>[A-Z\d]{3})",
-    # Longitude regex (columns 4-13)
-    raw"(?P<long>[\.\d\s]{10})",
-    # Cosine regex + space (column 14-21)
-    raw"(?P<cos>[\.\d\s]{8})",
-    # Sine regex (column 22-30)
-    raw"(?P<sin>[\+\-\.\d\s]{9})",
-    # Name regex (columns 31-80)
-    raw"(?P<name>.*)",
-))
-# Header of MPC observatories file 
-const OBSERVATORIES_MPC_HEADER = "Code  Long.   cos      sin    Name"
-
 @doc raw"""
     ObservatoryMPC(m::RegexMatch)
 
@@ -146,7 +138,8 @@ end
 @doc raw"""
     read_observatories_mpc(s::String)
 
-Return the matches of `NEOs.OBSERVATORY_MPC_REGEX` in `s` as `ObservatoryMPC`.
+Return the matches of `NEOs.OBSERVATORY_MPC_REGEX` in `s` as `Vector{ObservatoryMPC{Float64}}`.
+`s` can be either a filename or a text.
 """
 function read_observatories_mpc(s::String)
     if !contains(s, "\n") && isfile(s)
@@ -253,11 +246,6 @@ function write_observatories_mpc(obs::Vector{ObservatoryMPC{T}}, filename::Strin
         end 
     end
 end
-
-# MPC observatories file url 
-const OBSERVATORIES_MPC_URL = "https://minorplanetcenter.net/iau/lists/ObsCodes.html"
-# List of mpc observatories
-const OBSERVATORIES_MPC = Ref{Vector{ObservatoryMPC{Float64}}}([unknownobs()])
 
 @doc raw"""
     update_observatories_mpc()

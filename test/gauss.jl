@@ -5,19 +5,17 @@ using PlanetaryEphemeris
 using LinearAlgebra
 using Test
 
-using NEOs: NEOSolution, adaptative_maxsteps, scaled_variables
+using NEOs: NEOSolution, reduce_nights, adaptative_maxsteps, scaled_variables
 @testset "Gauss initial conditions" begin
     # Load observations 
     radec = read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
-    # Abstolute tolerance
-    abstol = 1e-20
-    # Order (wrt time)
-    order = 25
-    # Use @taylorize
-    parse_eqs = true
+    # Reduce nights by linear regression
+    gdf, cdf = reduce_nights(radec)
+    # Parameters
+    params = Parameters(abstol = 1e-20, order = 25, parse_eqs = true)
     
     # Gauss initial conditions
-    sol = gaussinitcond(radec; order = order, abstol = abstol)
+    sol = gaussinitcond(radec, gdf, cdf, params)
 
     @test isa(sol, NEOSolution{Float64, Float64})
     @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
@@ -31,8 +29,8 @@ using NEOs: NEOSolution, adaptative_maxsteps, scaled_variables
     @test all( sqrt.(diag(sol.fit.Γ)) .< 10 )
     @test nrms(sol) < 0.4
 
-    # Orbit determination (with outlier rejection)
-    sol = orbitdetermination(radec, sol; order = order, abstol = abstol, parse_eqs = parse_eqs)
+    # Gauss  refinement (with outlier rejection)
+    sol = gauss_refinement(radec, sol, params)
 
     @test isa(sol, NEOSolution{Float64, Float64})
     @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
