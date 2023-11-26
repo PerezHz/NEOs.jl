@@ -2,6 +2,15 @@ include("osculating.jl")
 include("tooshortarc.jl")
 include("gauss_method.jl")
 
+function issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <: AbstractFloat}
+    for i in 2:length(radec)
+        if date(radec[i]) - date(radec[i-1]) > arc
+            return false
+        end
+    end
+    return true
+end
+
 @doc raw"""
     orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T}; kwargs...) where {T <: AbstractFloat}
 
