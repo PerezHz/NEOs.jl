@@ -448,8 +448,6 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::D
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
     # Julian day when to start propagation
     jd0 = zero(T)
-    # Maximum number of steps
-    params = Parameters(params; maxsteps = adaptative_maxsteps(radec))
     # Jet transport perturbation (ra/dec)
     dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃"; order = varorder)
     # Sun's ephemeris

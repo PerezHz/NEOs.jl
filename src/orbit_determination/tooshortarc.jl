@@ -159,7 +159,7 @@ Return the maximum range for the left connected component of `A`.
 function max_range(A::AdmissibleRegion{T}) where {T <: AbstractFloat}
     # Find max_range    
     ρ = find_zeros(s -> A.coeffs[2]^2/4 - admsreg_W(A, s) + 2*k_gauss^2/sqrt(admsreg_S(A, s)),
-                   R_SI, 1.0)[1]
+                   R_SI, 2.0)[1]
     # Make sure there is no sqrt(negative)
     niter = 0
     while admsreg_S(A, ρ) < 0 && niter < 100
@@ -283,16 +283,18 @@ end
 
 @doc raw"""
     gradient_descent(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-                     params::Parameters{T}; maxiter::Int = 50) where {T <: AbstractFloat}
+                     params::Parameters{T}; maxiter::Int = 200) where {T <: AbstractFloat}
 
 Gradient descent minimizer of root mean square error over `A`.
 """
 function gradient_descent(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-                          params::Parameters{T}; maxiter::Int = 50) where {T <: AbstractFloat}
+                          params::Parameters{T}; maxiter::Int = 200) where {T <: AbstractFloat}
     # Origin
     x0 = zeros(T, 2)
+    # Scaling factors
+    scalings = [1e-3, 1e-5]
     # Jet transport variables
-    dq = scaled_variables("dρ dvρ", fill(1e-3, 2), order = 1)
+    dq = scaled_variables("dρ dvρ", scalings, order = 1)
     # Allocate memory
     ρs = Vector{T}(undef, maxiter+1)
     v_ρs = Vector{T}(undef, maxiter+1)
@@ -342,18 +344,20 @@ end
 
 @doc raw"""
     momentum_descent(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-                     params::Parameters{T}; maxiter::Int = 50, α::T = 1.0,
+                     params::Parameters{T}; maxiter::Int = 200, α::T = 10.0,
                      β::T = 0.75, Qtol::T = 0.01) where {T <: AbstractFloat}
 
 Momentum gradient descent minimizer of root mean square error over `A`.
 """
 function momentum_descent(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-                          params::Parameters{T}; maxiter::Int = 50, α::T = 1.0,
+                          params::Parameters{T}; maxiter::Int = 200, α::T = 10.0,
                           β::T = 0.75, Qtol::T = 0.01) where {T <: AbstractFloat}
     # Origin
     x0 = zeros(T, 2)
+    # Scaling factors
+    scalings = [1e-3, 1e-5]
     # Jet transport variables
-    dq = scaled_variables("dρ dvρ", fill(1e-3, 2), order = 1)
+    dq = scaled_variables("dρ dvρ", scalings, order = 1)
     # Allocate memory
     ρs = Vector{T}(undef, maxiter+1)
     v_ρs = Vector{T}(undef, maxiter+1)
@@ -406,18 +410,20 @@ end
 
 @doc raw"""
     rmsprop(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-            params::Parameters{T}; maxiter::Int = 50, α::T = 1.0, β::T = 0.9,
+            params::Parameters{T}; maxiter::Int = 200, α::T = 10.0, β::T = 0.9,
             ϵ::T = 1e-8, Qtol::T = 0.01) where {T <: AbstractFloat}
 
 RMSPROP minimizer of root mean square error over `A`.
 """
 function rmsprop(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-                 params::Parameters{T}; maxiter::Int = 50, α::T = 1.0, β::T = 0.9,
+                 params::Parameters{T}; maxiter::Int = 200, α::T = 10.0, β::T = 0.9,
                  ϵ::T = 1e-8, Qtol::T = 0.01) where {T <: AbstractFloat}
     # Origin
     x0 = zeros(T, 2)
+    # Scaling factors
+    scalings = [1e-3, 1e-5]
     # Jet transport variables
-    dq = scaled_variables("dρ dvρ", fill(1e-3, 2), order = 1)
+    dq = scaled_variables("dρ dvρ", scalings, order = 1)
     # Allocate memory
     ρs = Vector{T}(undef, maxiter+1)
     v_ρs = Vector{T}(undef, maxiter+1)
@@ -469,18 +475,20 @@ end
 
 @doc raw"""
     adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-         params::Parameters{T}; maxiter::Int = 50, α::T = 1.0, β_1::T = 0.75,
+         params::Parameters{T}; maxiter::Int = 200, α::T = 10.0, β_1::T = 0.75,
          β_2::T = 0.85, ϵ::T = 1e-8, Qtol::T =  0.01) where {T <: AbstractFloat}
 
 ADAM minimizer of root mean square error over `A`.
 """
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-              params::Parameters{T}; maxiter::Int = 50, α::T = 1.0, β_1::T = 0.75,
+              params::Parameters{T}; maxiter::Int = 200, α::T = 10.0, β_1::T = 0.75,
               β_2::T = 0.85, ϵ::T = 1e-8, Qtol::T = 0.01) where {T <: AbstractFloat}
     # Origin
     x0 = zeros(T, 2)
+    # Scaling factors
+    scalings = [1e-3, 1e-5]
     # Jet transport variables
-    dq = scaled_variables("dρ dvρ", fill(1e-3, 2), order = 1)
+    dq = scaled_variables("dρ dvρ", scalings, order = 1)
     # Allocate memory
     ρs = Vector{T}(undef, maxiter+1)
     v_ρs = Vector{T}(undef, maxiter+1)
@@ -540,8 +548,10 @@ function tryls(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{T}, params::Parame
                maxiter::Int = 5) where {T <: AbstractFloat}
     # Origin
     x0 = zeros(T, 6)
+    # Scaling factors
+    scalings = [1e-5, 1e-5, 1e-5, 1e-7, 1e-7, 1e-7]
     # Jet transport variables
-    dq = scaled_variables("dx", fill(1e-6, 6), order = 6)
+    dq = scaled_variables("dx", scalings, order = 6)
     # Allocate memory
     qs = Matrix{T}(undef, 6, maxiter+1)
     Qs = Vector{T}(undef, maxiter+1)
@@ -600,29 +610,33 @@ the admissible region.
 
 # Keyword arguments
 
-- `maxiter::Int = 50`:  maximum number of iterations.
+- `maxiter::Int = 200`:  maximum number of iterations.
 """
 function tooshortarc(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::DataFrame,
-                     params::Parameters{T}; maxiter::Int = 50) where {T <: AbstractFloat}
-    # Find indexes corresponding to observatory with the most number of 
-    # observations
-    frecs = map(i -> nrow(gdf[i]), 1:nrow(cdf))
-    obs_max = argmax(frecs)
-    idxs = getfield(gdf[obs_max], :rows)
-    # Admissible region
-    A = AdmissibleRegion(cdf[obs_max, :])
-    # Center
-    ρ = (R_SI + max_range(A)) / 2
-    v_ρ = sum(range_rate(A, R_SI)) / 2
-    # Minimization over admissible region
-    ρs, v_ρs, Qs = adam(radec[idxs], A, ρ, v_ρ, params; maxiter = maxiter)
-    # 6 variables least squares
-    q0 = topo2bary(A, ρs[end], v_ρs[end])
-    sol = tryls(radec[idxs], datetime2julian(A.date), q0, params; maxiter = 5)
-    if length(idxs) < length(radec)
-        # 6 variables least squares
-        sol = tryls(radec, datetime2julian(A.date), sol(), params; maxiter = 5)
-    end
+                     params::Parameters{T}; maxiter::Int = 200) where {T <: AbstractFloat}
+    
+    # Number of observations per night
+    nobs = map(i -> nrow(gdf[i]), 1:nrow(cdf))
+    # Sort nights by number of observations 
+    idxs = sortperm(nobs, rev = true)
+    # Allocate memory for output
+    sol = zero(NEOSolution{T, T})
 
+    for i in idxs
+        # Admissible region
+        A = AdmissibleRegion(cdf[i, :])
+        # Center
+        ρ = (R_SI + max_range(A)) / 2
+        v_ρ = sum(range_rate(A, R_SI)) / 2
+        # Minimization over admissible region
+        ρs, v_ρs, Qs = adam(radec, A, ρ, v_ρ, params; maxiter = maxiter)
+        # 6 variables least squares
+        q0 = topo2bary(A, ρs[end], v_ρs[end])
+        sol = tryls(radec, datetime2julian(A.date), q0, params; maxiter = 5)
+        if nrms(sol) < 1
+            return sol
+        end
+    end
+    
     return sol
 end

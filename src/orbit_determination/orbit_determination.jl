@@ -33,6 +33,8 @@ Initial Orbit Determination (IOD) routine.
 function orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T}; maxiter::Int = 50,
                             max_triplets::Int = 10, Q_max::T = 10., niter::Int = 5,
                             varorder::Int = 5, max_per::T = 18.0) where {T <: AbstractFloat}
+    # Maximum number of steps
+    params = Parameters(params; maxsteps = adaptative_maxsteps(radec))
     # Eliminate observatories without coordinates 
     filter!(x -> hascoord(observatory(x)), radec)
     # Reduce observation nights by linear regression
