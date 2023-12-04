@@ -159,7 +159,7 @@ Return the maximum range for the left connected component of `A`.
 function max_range(A::AdmissibleRegion{T}) where {T <: AbstractFloat}
     # Find max_range    
     ρ = find_zeros(s -> A.coeffs[2]^2/4 - admsreg_W(A, s) + 2*k_gauss^2/sqrt(admsreg_S(A, s)),
-                   R_SI, 2.0)[1]
+                   R_SI, 10.0)[1]
     # Make sure there is no sqrt(negative)
     niter = 0
     while admsreg_S(A, ρ) < 0 && niter < 100
@@ -481,12 +481,12 @@ end
 ADAM minimizer of root mean square error over `A`.
 """
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-              params::Parameters{T}; maxiter::Int = 200, α::T = 10.0, β_1::T = 0.75,
+              params::Parameters{T}; maxiter::Int = 200, α::T = 25.0, β_1::T = 0.5,
               β_2::T = 0.85, ϵ::T = 1e-8, Qtol::T = 0.01) where {T <: AbstractFloat}
     # Origin
     x0 = zeros(T, 2)
     # Scaling factors
-    scalings = [1e-3, 1e-5]
+    scalings = [max_range(A) - R_SI, boundary(A, 1)[2]- boundary(A, 0)[2]] / 1_000
     # Jet transport variables
     dq = scaled_variables("dρ dvρ", scalings, order = 1)
     # Allocate memory
@@ -544,55 +544,45 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     return ρs[1:niter], v_ρs[1:niter], Qs[1:niter]
 end
 
+# Special method of tryls for tooshortarc
 function tryls(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{T}, params::Parameters{T};
                maxiter::Int = 5) where {T <: AbstractFloat}
+    # Allocate memory
+    sols = zeros(NEOSolution{T, T}, maxiter)
     # Origin
     x0 = zeros(T, 6)
     # Scaling factors
-    scalings = [1e-5, 1e-5, 1e-5, 1e-7, 1e-7, 1e-7]
+    scalings = abs.(q0) ./ 10^5
     # Jet transport variables
     dq = scaled_variables("dx", scalings, order = 6)
-    # Allocate memory
-    qs = Matrix{T}(undef, 6, maxiter+1)
-    Qs = Vector{T}(undef, maxiter+1)
-    # Initial conditions
-    qs[:, 1] = q0
-    q = q0 + dq
-    bwd, fwd, res = propres(radec, jd0, q, params)
-    Qs[1] = nms(res(x0))
     # Number of iterations
     niter = 1
     # Minimization loop
     while niter <= maxiter
-        # Try fit
+        # Initial conditions
+        q = q0 + dq
+        # Propagation & residuals
+        bwd, fwd, res = propres(radec, jd0, q, params)
+        # Least squares fit
         fit = tryls(res, x0, 5)
-        # Temporary Q
-        _Q_ = nms(res(fit.x))
-        if _Q_ < Qs[niter]
-            # Update values
-            q0 = q(fit.x)
-            # Save current variables
-            qs[:, niter+1] = q0
-            Qs[niter+1] = _Q_
-            
-            # Convergence condition
-            if Qs[niter+1] < 1
-                return evalfit(NEOSolution(bwd, fwd, res, fit))
-            end
-
-            # New initial conditions
-            q = q0 + dq 
-            # Update obbjective function
-            bwd, fwd, res = propres(radec, jd0, q, params)
-            
-            niter += 1
-
-        else
+        # Case: unsuccessful fit
+        if !fit.success || any(diag(fit.Γ) .< 0)
             break
-        end        
+        end
+        # Current solution
+        sols[niter] = evalfit(NEOSolution(bwd, fwd, res, fit))
+        # Convergence condition
+        if niter > 1 && nrms(sols[niter-1]) - nrms(sols[niter]) < 0.1
+            break
+        end
+        # Update values
+        q0 = q(fit.x)
+        # Update number of iterations
+        niter += 1
     end
 
-    return zero(NEOSolution{T, T})
+    return sols[niter]
+
 end
 
 @doc raw"""
@@ -615,10 +605,10 @@ the admissible region.
 function tooshortarc(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::DataFrame,
                      params::Parameters{T}; maxiter::Int = 200) where {T <: AbstractFloat}
     
-    # Number of observations per night
-    nobs = map(i -> nrow(gdf[i]), 1:nrow(cdf))
+    # Reverse temporal order
+    reverse!(cdf)
     # Sort nights by number of observations 
-    idxs = sortperm(nobs, rev = true)
+    idxs = sortperm(cdf.nobs, rev = true)
     # Allocate memory for output
     sol = zero(NEOSolution{T, T})
 
@@ -629,11 +619,13 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::Dat
         ρ = (R_SI + max_range(A)) / 2
         v_ρ = sum(range_rate(A, R_SI)) / 2
         # Minimization over admissible region
-        ρs, v_ρs, Qs = adam(radec, A, ρ, v_ρ, params; maxiter = maxiter)
-        # 6 variables least squares
+        ρs, v_ρs, Qs = adam(radec, A, ρ, v_ρ, params; maxiter)
+        # Barycentric initial conditions
         q0 = topo2bary(A, ρs[end], v_ρs[end])
+        # 6 variables least squares
         sol = tryls(radec, datetime2julian(A.date), q0, params; maxiter = 5)
-        if nrms(sol) < 1
+
+        if nrms(sol) < 1.5
             return sol
         end
     end
