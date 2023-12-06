@@ -11,9 +11,12 @@ some dynamical constrainits on a too short arc.
 - `δ::T`: declination.
 - `v_α::T`: right ascension velocity.
 - `v_δ::T`: declination velocity.
-- `ρ_unit, ρ_α, _δ::Vector{T}`: topocentric unit vector and its partials.
+- `ρ_unit, ρ_α, ρ_δ::Vector{T}`: topocentric unit vector and its partials.
 - `q::Vector{T}`: heliocentric position of observer.
 - `coeffs::Vector{T}`: polynomial coefficients.
+- `ρ_domain::Vector{T}`: range domain.
+- `v_ρ_domain::Vector{T}`: range-rate domain.
+- `Fs::Matrix{T}`: boundary points.
 - `observatory::ObservatoryMPC{T}`: observing station.
 
 !!! reference
@@ -30,13 +33,16 @@ some dynamical constrainits on a too short arc.
     ρ_δ::Vector{T}
     q::Vector{T}
     coeffs::Vector{T}
+    ρ_domain::Vector{T}
+    v_ρ_domain::Vector{T}
+    Fs::Matrix{T}
     observatory::ObservatoryMPC{T}
 end
 
 # Outer constructor
 function AdmissibleRegion(cdf::DataFrameRow)
     # Unfold
-    obs, t_datetime, α, δ, v_α, v_δ = cdf
+    obs, t_datetime, α, δ, v_α, v_δ, mag, _ = cdf
     # Topocentric unit vector and partials
     ρ, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Time of observation [days since J2000]
@@ -50,9 +56,57 @@ function AdmissibleRegion(cdf::DataFrameRow)
     q = eph_ea(t_days) + kmsec2auday(obsposvelECI(obs, t_et)) - eph_su(t_days)
     # Admissible region coefficients
     coeffs = admsreg_coeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
-
+    # Tiny object boundary
+    H_max = 32.0                # Maximum allowed absolute magnitude
+    if isnan(mag)
+        ρ_min = R_SI
+    else
+        ρ_min = 10^((mag - H_max)/5)
+    end
+    # Maximum range (heliocentric constraint)
+    ρ_max = find_zeros(s -> admsreg_U(coeffs, s), ρ_min, 10.0)[1]
+    # Make sure U(ρ) ≥ 0
+    niter = 0
+    while admsreg_U(coeffs, ρ_max) < 0 && niter < 1_000
+        niter += 1
+        ρ_max = prevfloat(ρ_max)
+    end
+    # Range domain
+    ρ_domain = [ρ_min, ρ_max]
+    # Range rate domain
+    v_ρ_min, v_ρ_max = range_rate(coeffs, ρ_min)[1:2]
+    v_ρ_domain = [v_ρ_min, v_ρ_max]
+    # Range rate symmetry level
+    v_ρ_mid = range_rate(coeffs, ρ_max)[1]
+    # Boundary points
+    Fs = Matrix{Float64}(undef, 3, 2)
+    Fs[1, :] .= [ρ_min, v_ρ_min]
+    Fs[2, :] .= [ρ_min, v_ρ_max]
+    Fs[3, :] .= [ρ_max, v_ρ_mid]
+    
     return AdmissibleRegion{Float64}(t_datetime, α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q,
-                                     coeffs, obs)
+                                     coeffs, ρ_domain, v_ρ_domain, Fs, obs)
+end
+
+@doc raw"""
+    admsreg_coeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
+                   ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
+
+Return the polynomial coefficients for an [`AdmissibleRegioin`](@ref). 
+
+!!! reference
+    See equation (8.8) of https://doi.org/10.1017/CBO9781139175371.
+"""
+function admsreg_coeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
+                        ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
+    coeffs = Vector{T}(undef, 6)
+    coeffs[1] = dot(q[1:3], q[1:3])
+    coeffs[2] = 2 *  dot(q[4:6], ρ) 
+    coeffs[3] = v_α^2 * cos(δ)^2 + v_δ^2
+    coeffs[4] = 2 * v_α * dot(q[4:6], ρ_α) + 2 * v_δ * dot(q[4:6], ρ_δ) 
+    coeffs[5] = dot(q[4:6], q[4:6]) 
+    coeffs[6] = 2*dot(q[1:3], ρ) 
+    return coeffs
 end
 
 @doc raw"""
@@ -73,102 +127,66 @@ function topounitpdv(α::T, δ::T) where {T <: Number}
 end
 
 @doc raw"""
-    admsreg_coeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
-                   ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
-
-Return the polynomial coefficients for an [`AdmissibleRegioin`](@ref). 
-
-!!! reference
-    See equation (8.8) of https://doi.org/10.1017/CBO9781139175371.
-"""
-function admsreg_coeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
-                        ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
-    coeffs = Vector{T}(undef, 6)
-    coeffs[1] = dot(q[1:3], q[1:3])
-    coeffs[2] = 2 *  dot(q[4:6], ρ) 
-    coeffs[3] = v_α^2 * cos(δ)^2 + v_δ^2 
-    coeffs[4] = 2 * v_α * dot(q[4:6], ρ_α) + 2 * v_δ * dot(q[4:6], ρ_δ) 
-    coeffs[5] = dot(q[4:6], q[4:6]) 
-    coeffs[6] = 2*dot(q[1:3], ρ) 
-    return coeffs
-end
-
-@doc raw"""
-    solve_quadratic(a::T, b::T, c::T) where {T <: AbstractFloat}
-
-Return real solutions of cuadratic equation `ax² + bx + c = 0`.
-"""
-function solve_quadratic(a::T, b::T, c::T) where {T <: AbstractFloat}
-    # Discriminant
-    Δ = b^2 - 4*a*c
-    # Cases
-    if Δ > 0
-        x_1 = (-b + sqrt(Δ))/(2*a)
-        x_2 = (-b - sqrt(Δ))/(2*a)
-    elseif iszero(Δ)
-        x_1 = -b / (2*a)
-        x_2 = T(NaN)
-    else
-        x_1 = T(NaN)
-        x_2 = T(NaN)
-    end
-    
-    return x_1, x_2
-end
-
-@doc raw"""
     admsreg_W(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
 
-W function of an [`AdmissibleRegioin`](@ref). 
+W function of an [`AdmissibleRegion`](@ref). 
 
 !!! reference
     See equation (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_W(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
-    return A.coeffs[3] * ρ^2 + A.coeffs[4] * ρ + A.coeffs[5]
+function admsreg_W(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+    return coeffs[3] * ρ^2 + coeffs[4] * ρ + coeffs[5]
 end
+admsreg_W(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}  = admsreg_W(A.coeffs, ρ)
 
 @doc raw"""
     admsreg_S(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
 
-S function of an [`AdmissibleRegioin`](@ref). 
+S function of an [`AdmissibleRegion`](@ref). 
 
 !!! reference
     See equation (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_S(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
-    return ρ^2 + A.coeffs[6] * ρ + A.coeffs[1]
+function admsreg_S(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+    return ρ^2 + coeffs[6] * ρ + coeffs[1]
 end
+admsreg_S(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_S(A.coeffs, ρ)
+
+@doc raw"""
+    admsreg_U(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+
+U function of an [`AdmissibleRegion`](@ref). 
+
+!!! reference
+    See second equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
+"""
+function admsreg_U(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+    return coeffs[2]^2/4 - admsreg_W(coeffs, ρ) + 2*k_gauss^2/sqrt(admsreg_S(coeffs, ρ))
+end
+admsreg_U(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_U(A.coeffs, ρ)
+
+@doc raw"""
+    admsreg_V(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+
+V function of an [`AdmissibleRegion`](@ref). 
+
+!!! reference
+    See first equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
+"""
+function admsreg_V(coeffs::Vector{T}, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <: Number} 
+    return v_ρ^2 + coeffs[2] * v_ρ + admsreg_W(coeffs, ρ) - 2*k_gauss^2/sqrt(admsreg_S(coeffs, ρ))
+end
+admsreg_V(A::AdmissibleRegion{T}, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_V(A.coeffs, ρ, v_ρ)
 
 @doc raw"""
     range_rate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat}
 
 Return the two possible range rates in the boundary of `A` for a given range `ρ`.
 """
-function range_rate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat}
-    c = admsreg_W(A, ρ) - 2*k_gauss^2/sqrt(admsreg_S(A, ρ))
-    sol = solve_quadratic(one(T), A.coeffs[2], c)
-    return minmax(sol[1], sol[2])
+function range_rate(coeffs::Vector{T}, ρ::S) where {T, S <: AbstractFloat}
+    return find_zeros(s -> admsreg_V(coeffs, ρ, s), -10.0, 10.0)
 end
-
-@doc raw"""
-    max_range(A::AdmissibleRegion{T}) where {T <: AbstractFloat}
-
-Return the maximum range for the left connected component of `A`.
-"""
-function max_range(A::AdmissibleRegion{T}) where {T <: AbstractFloat}
-    # Find max_range    
-    ρ = find_zeros(s -> A.coeffs[2]^2/4 - admsreg_W(A, s) + 2*k_gauss^2/sqrt(admsreg_S(A, s)),
-                   R_SI, 10.0)[1]
-    # Make sure there is no sqrt(negative)
-    niter = 0
-    while admsreg_S(A, ρ) < 0 && niter < 100
-        niter += 1
-        ρ -= eps()
-    end
-    
-    return ρ
-end
+range_rate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat} = range_rate(A.coeffs, ρ)
 
 @doc raw"""
     boundary(A::AdmissibleRegion{T}, t::S) where {T <: AbstractFloat, S <: Number}
@@ -179,20 +197,20 @@ function boundary(A::AdmissibleRegion{T}, t::S) where {T <: AbstractFloat, S <: 
     # Parametrization domain
     @assert 0.0 <= t <= 3.0
     # Lower (upper) bounds
-    y_min, y_max = range_rate(A, R_SI)
-    # ρ =  R_SI
+    x_min, x_max = A.ρ_domain
+    y_min, y_max = A.v_ρ_domain
+    # ρ = x_min
     if 0.0 <= t <= 1.0
-        return [R_SI, y_min + t * (y_max - y_min)]
+        return [x_min, y_min + t * (y_max - y_min)]
     else 
-        x_max = max_range(A)
         # Upper curve
         if 1.0 <= t <= 2.0
-            ρ = R_SI + (t-1)*(x_max - R_SI)
-            _, v_ρ = range_rate(A, ρ)
+            ρ = x_min + (t-1)*(x_max - x_min)
+            v_ρ = range_rate(A, ρ)[end]
         # Lower curve
         elseif 2.0 <= t <= 3.0
-            ρ = x_max - (t-2)*(x_max - R_SI)
-            v_ρ, _ = range_rate(A, ρ)
+            ρ = x_max - (t-2)*(x_max - x_min)
+            v_ρ = range_rate(A, ρ)[1]
         end
         return [ρ, v_ρ] 
     end
@@ -205,7 +223,7 @@ Project `[ρ, v_ρ]` into `A`'s boundary.
 """
 function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <: AbstractFloat}
     # Project range
-    ρ = clamp(ρ,  R_SI, max_range(A))
+    ρ = clamp(ρ,  A.ρ_domain[1], A.ρ_domain[2])
     # Project range-rate
     y_min, y_max = range_rate(A, ρ)
     v_ρ = clamp(v_ρ, y_min, y_max)
@@ -216,7 +234,7 @@ end
 # Check whether P is inside A's boundary
 function in(P::Vector{T}, A::AdmissibleRegion{T}) where {T <: AbstractFloat}
     @assert length(P) == 2 "Points in admissible region are of dimension 2"
-    if R_SI <= P[1] <= max_range(A) && boundary(A, 0.0)[2] <= P[2] <= boundary(A, 1.0)[2]
+    if A.ρ_domain[1] <= P[1] <= A.ρ_domain[2] && A.v_ρ_domain[1] <= P[2] <= A.v_ρ_domain[2]
         y_min, y_max = range_rate(A, P[1])
         return y_min <= P[2] <= y_max
     else 
@@ -282,198 +300,6 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
 end
 
 @doc raw"""
-    gradient_descent(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-                     params::Parameters{T}; maxiter::Int = 200) where {T <: AbstractFloat}
-
-Gradient descent minimizer of root mean square error over `A`.
-"""
-function gradient_descent(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-                          params::Parameters{T}; maxiter::Int = 200) where {T <: AbstractFloat}
-    # Origin
-    x0 = zeros(T, 2)
-    # Scaling factors
-    scalings = [1e-3, 1e-5]
-    # Jet transport variables
-    dq = scaled_variables("dρ dvρ", scalings, order = 1)
-    # Allocate memory
-    ρs = Vector{T}(undef, maxiter+1)
-    v_ρs = Vector{T}(undef, maxiter+1)
-    Qs = fill(T(Inf), maxiter+1)
-    # Initial time of integration [julian days]
-    jd0 = datetime2julian(A.date)
-    # Initial conditions
-    ρs[1] = ρ
-    v_ρs[1] = v_ρ  
-    q0 = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
-    _, _, res = propres(radec, jd0, q0, params)
-    Q = nms(res)
-    Qs[1] = Q(x0)
-    # Number of iterations
-    niter = 0
-    # Gradient descent
-    while niter < maxiter
-        # Update number of iterations
-        niter += 1
-        # Gradient of objective function
-        dQ = TaylorSeries.gradient(Q)(x0)
-        # Step
-        x1 = x0 - normalize(dQ)
-        # Update values
-        ρ, v_ρ = bary2topo(A, q0(x1))
-        # Projection
-        ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
-        # New initial conditions
-        q0 = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
-        # Update objective function
-        _, _, res = propres(radec, jd0, q0, params)
-        Q = nms(res)
-        # Convergence condition
-        if Q(x0) > Qs[niter]
-            break
-        end
-        # Save current variables
-        ρs[niter+1] = ρ
-        v_ρs[niter+1] = v_ρ
-        Qs[niter+1] = Q(x0)
-    end
-
-    niter = argmin(Qs)
-
-    return ρs[1:niter], v_ρs[1:niter], Qs[1:niter]
-end
-
-@doc raw"""
-    momentum_descent(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-                     params::Parameters{T}; maxiter::Int = 200, α::T = 10.0,
-                     β::T = 0.75, Qtol::T = 0.01) where {T <: AbstractFloat}
-
-Momentum gradient descent minimizer of root mean square error over `A`.
-"""
-function momentum_descent(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-                          params::Parameters{T}; maxiter::Int = 200, α::T = 10.0,
-                          β::T = 0.75, Qtol::T = 0.01) where {T <: AbstractFloat}
-    # Origin
-    x0 = zeros(T, 2)
-    # Scaling factors
-    scalings = [1e-3, 1e-5]
-    # Jet transport variables
-    dq = scaled_variables("dρ dvρ", scalings, order = 1)
-    # Allocate memory
-    ρs = Vector{T}(undef, maxiter+1)
-    v_ρs = Vector{T}(undef, maxiter+1)
-    Qs = fill(T(Inf), maxiter+1)
-    # Initial time of integration [julian days]
-    jd0 = datetime2julian(A.date)
-    # Initial conditions
-    ρs[1] = ρ
-    v_ρs[1] = v_ρ  
-    q0 = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
-    _, _, res = propres(radec, jd0, q0, params)
-    Q = nms(res)
-    Qs[1] = Q(x0)
-    m = zeros(T, 2)
-    # Number of iterations
-    niter = 0
-    # Gradient descent
-    while niter < maxiter
-        # Update number of iterations
-        niter += 1
-        # Gradient of objective function
-        dQ = TaylorSeries.gradient(Q)(x0)
-        # Momentum
-        m = β * m + (1 - β) * dQ
-        # Step
-        x1 = x0 - α * m
-        # Update values
-        ρ, v_ρ = bary2topo(A, q0(x1))
-        # Projection
-        ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
-        # New initial conditions
-        q0 = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
-        # Update obbjective function
-        _, _, res = propres(radec, jd0, q0, params)
-        Q = nms(res)
-        # Convergence condition
-        if abs(Q(x0) - Qs[niter]) < Qtol
-            break
-        end
-        # Save current variables
-        ρs[niter+1] = ρ
-        v_ρs[niter+1] = v_ρ
-        Qs[niter+1] = Q(x0)
-    end
-
-    niter = argmin(Qs)
-
-    return ρs[1:niter], v_ρs[1:niter], Qs[1:niter]
-end
-
-@doc raw"""
-    rmsprop(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-            params::Parameters{T}; maxiter::Int = 200, α::T = 10.0, β::T = 0.9,
-            ϵ::T = 1e-8, Qtol::T = 0.01) where {T <: AbstractFloat}
-
-RMSPROP minimizer of root mean square error over `A`.
-"""
-function rmsprop(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-                 params::Parameters{T}; maxiter::Int = 200, α::T = 10.0, β::T = 0.9,
-                 ϵ::T = 1e-8, Qtol::T = 0.01) where {T <: AbstractFloat}
-    # Origin
-    x0 = zeros(T, 2)
-    # Scaling factors
-    scalings = [1e-3, 1e-5]
-    # Jet transport variables
-    dq = scaled_variables("dρ dvρ", scalings, order = 1)
-    # Allocate memory
-    ρs = Vector{T}(undef, maxiter+1)
-    v_ρs = Vector{T}(undef, maxiter+1)
-    Qs = fill(T(Inf), maxiter+1)
-    # Initial time of integration [julian days]
-    jd0 = datetime2julian(A.date)
-    # Initial conditions
-    ρs[1] = ρ
-    v_ρs[1] = v_ρ  
-    q0 = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
-    Q, _ = nms6v(radec, q0, jd0, params)
-    Qs[1] = Q(x0)
-    v = zeros(T, 2)
-    # Number of iterations
-    niter = 0
-    # Gradient descent
-    while niter < maxiter
-        # Update number of iterations
-        niter += 1
-        # Gradient of objective function
-        dQ = TaylorSeries.gradient(Q)(x0)
-        # Sum of square of past gradients
-        v = β * v + (1 - β) * dQ .^ 2
-        # Step
-        x1 = x0 - α * dQ ./ sqrt.(v .+ ϵ)
-        # Update values
-        ρ, v_ρ = bary2topo(A, q0(x1))
-        # Projection
-        ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
-        # New initial conditions
-        q0 = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
-        # Update obbjective function
-        _, _, res = propres(radec, jd0, q0, params)
-        Q = nms(res)
-        # Convergence condition
-        if abs(Q(x0) - Qs[niter]) < Qtol
-            break
-        end
-        # Save current variables
-        ρs[niter+1] = ρ
-        v_ρs[niter+1] = v_ρ
-        Qs[niter+1] = Q(x0)
-    end
-
-    niter = argmin(Qs)
-
-    return ρs[1:niter], v_ρs[1:niter], Qs[1:niter]
-end
-
-@doc raw"""
     adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
          params::Parameters{T}; maxiter::Int = 200, α::T = 10.0, β_1::T = 0.75,
          β_2::T = 0.85, ϵ::T = 1e-8, Qtol::T =  0.01) where {T <: AbstractFloat}
@@ -486,7 +312,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     # Origin
     x0 = zeros(T, 2)
     # Scaling factors
-    scalings = [max_range(A) - R_SI, boundary(A, 1)[2]- boundary(A, 0)[2]] / 1_000
+    scalings = [A.ρ_domain[2] - A.ρ_domain[1], A.v_ρ_domain[2] - A.v_ρ_domain[1]] / 1_000
     # Jet transport variables
     dq = scaled_variables("dρ dvρ", scalings, order = 1)
     # Allocate memory
@@ -616,8 +442,8 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::Dat
         # Admissible region
         A = AdmissibleRegion(cdf[i, :])
         # Center
-        ρ = (R_SI + max_range(A)) / 2
-        v_ρ = sum(range_rate(A, R_SI)) / 2
+        ρ = sum(A.ρ_domain) / 2
+        v_ρ = sum(A.v_ρ_domain) / 2
         # Minimization over admissible region
         ρs, v_ρs, Qs = adam(radec, A, ρ, v_ρ, params; maxiter)
         # Barycentric initial conditions

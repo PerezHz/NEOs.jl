@@ -603,12 +603,12 @@ function extrapolation(df::AbstractDataFrame)
     # Only one observation
     if isone(nrow(df))
         return (observatory = df.observatory[1], date = df.date[1], α = df.α[1],
-                δ = df.δ[1], v_α = 0.0, v_δ = 0.0, nobs = 1)
+                δ = df.δ[1], v_α = 0.0, v_δ = 0.0, mag = df.mag[1], nobs = 1)
     end 
 
     # Make sure there are no repeated dates
     gdf = groupby(df, :date)
-    df = combine(gdf, [:α, :δ] .=> mean, :observatory => identity, renamecols = false)
+    df = combine(gdf, [:α, :δ, :mag] .=> mean, :observatory => identity, renamecols = false)
     
     # Julian days of observation
     df.t_julian = datetime2julian.(df.date)
@@ -635,8 +635,11 @@ function extrapolation(df::AbstractDataFrame)
     α_mean = mod2pi(α_coef[1] + α_coef[2] * t_mean)
     δ_mean = δ_coef[1] + δ_coef[2] * t_mean
 
+    # Mean apparent magnitude
+    mag = mean(filter(!isnan, df.mag))
+
     return (observatory = df.observatory[1], date = julian2datetime(df.t_julian[1] + t_mean),
-            α = α_mean, δ = δ_mean, v_α = α_coef[2], v_δ = δ_coef[2], nobs = nrow(df))
+            α = α_mean, δ = δ_mean, v_α = α_coef[2], v_δ = δ_coef[2], mag = mag, nobs = nrow(df))
 end 
 
 @doc raw"""
