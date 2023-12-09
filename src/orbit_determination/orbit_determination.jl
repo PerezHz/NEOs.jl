@@ -2,6 +2,12 @@ include("osculating.jl")
 include("tooshortarc.jl")
 include("gauss_method.jl")
 
+@doc raw"""
+    issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <: AbstractFloat}
+
+Check whether `radec` is a single observational arc, i.e. no two consecutive observations
+are more than `arc` days appart.
+"""
 function issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <: AbstractFloat}
     for i in 2:length(radec)
         if date(radec[i]) - date(radec[i-1]) > arc
@@ -24,14 +30,14 @@ Initial Orbit Determination (IOD) routine.
 # Keyword arguments
 
 - `maxiter::Int = 200`:  maximum number of iterations.
-- `varorder::Int`: order of jet transport perturbation. 
-- `max_triplets::Int`: maximum number of triplets.
-- `Q_max::T`: the maximum nrms that is considered a good enough orbit.
-- `niter::Int`: number of iterations for Newton's method.
+- `max_triplets::Int = 10`: maximum number of triplets.
+- `Q_max::T = 5.0`: the maximum nrms that is considered a good enough orbit.
+- `niter::Int = 5`: number of iterations for Newton's method.
+- `varorder::Int = 5`: order of jet transport perturbation. 
 - `max_per::T =  18.0`: maximum allowed rejection percentage.
 """
 function orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T}; maxiter::Int = 200,
-                            max_triplets::Int = 10, Q_max::T = 10., niter::Int = 5,
+                            max_triplets::Int = 10, Q_max::T = 5.0, niter::Int = 5,
                             varorder::Int = 5, max_per::T = 18.0) where {T <: AbstractFloat}
     
     # Allocate memory for output

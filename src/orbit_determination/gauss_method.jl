@@ -435,7 +435,7 @@ See also [`gauss_method`](@ref).
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
 function gaussinitcond(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::DataFrame,
-                       params::Parameters{T}; max_triplets::Int = 10, Q_max::T = 10.,
+                       params::Parameters{T}; max_triplets::Int = 10, Q_max::T = 5.0,
                        niter::Int = 5, varorder::Int = 5) where {T <: AbstractFloat}
 
     # Allocate memory for initial conditions
