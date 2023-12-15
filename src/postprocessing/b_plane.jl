@@ -10,7 +10,7 @@ encounter. ``\mu_P`` is the planet's gravitational parameter, ``R_P`` is the pla
 radius and ``v_\infty`` is the asymptotic inbound velocity. If actual ``B`` is equal or 
 less to this, then impact happens. Output is in planet radii. 
 
-# Arguments 
+# Arguments
 
 - `μ_P`: planetary gravitational parameter (au^3/day^2).
 - `R_P`: planetary radius (au).
@@ -37,7 +37,7 @@ close encounter. Returns a named tuple with the following fields:
 
 - `b` = ``b_E``, where ``b_E`` is the Earth impact cross section ("critical B"). See [`crosssection`](@ref).
 
-# Arguments 
+# Arguments
 
 - `xae`: asteroid's geocentric position/velocity vector at closest approach in au, au/day.
 - `xes`: planet's heliocentric position/velocity vector at asteroid's closest approach in au, au/day.
@@ -90,7 +90,7 @@ function bopik(xae, xes)
 
     # Computation of Öpik's coordinates of impact parameter vector \mathbf{B}
 
-    # B-vector: "vector from the planet center to the intersection between the B-plane 
+    # B-vector: "vector from the planet center to the intersection between the B-plane
     # and the asymptote".
     # See equation (4) in page 3 of https://doi.org/10.1007/s10569-019-9914-4
     Bvec = cross(S_v, hvec)./v_infty
@@ -99,23 +99,16 @@ function bopik(xae, xes)
     B_dot_ζ = dot(Bvec, ζ_v)
 
     # Computation of planetocentric velocity (U) vector
-    # res = xes[1:3] # Earth's heliocentric position, au
-    # res_norm = norm(res) # Earth's heliocentric range, au
-    # res_unit = res/res_norm # Earth's heliocentric radius unit vector
-    # @show res_norm
-    ves = v_pl*au/daysec # Earth's velocity, km/s
-    ves_norm = norm(ves) # Earth's speed, km/s
+    ves = v_pl # Earth's velocity, au/day
+    ves_norm = sqrt(ves[1]^2 + ves[2]^2 + ves[3]^2) # Earth's speed, au/day
     ves_unit = ves/ves_norm # Earth's velocity unit vector
-    # X-Y angle (degrees)
-    # @show rad2deg(acos(dot(ves_unit, res_unit)))
     # angle between Y-axis and \vec{U}
     cosθ = dot(S_v, ves_unit)
-    # @show cosθ()
     v_infty_kms = v_infty*au/daysec # Asteroid unperturbed speed, km/sec
     # @show v_infty_kms()
     # The norm of \vec{U} in appropriate units
-    U_unit = (2pi*au)/(yr*daysec) # 1 U in km/s
-    U_norm = v_infty_kms/U_unit
+    U_unit = ves_norm # 1 U = v_ast/v_pl
+    U_norm = v_infty/U_unit
     # U_y
     U_y = U_norm*cosθ
     # @show U_y U_norm
@@ -128,13 +121,13 @@ function bopik(xae, xes)
 end
 
 @doc raw"""
-    valsecchi_circle(a, e, i, k, h; m_pl=3.003489614915764e-6)  
+    valsecchi_circle(a, e, i, k, h; m_pl=3.003489614915764e-6)
 
 Computes Valsecchi circle associated to a mean motion resonance. Returns radius ``R`` (au) and
 ``\zeta``-axis coordinate ``D`` (au). This function first computes the Y-component and norm
 of the planetocentric velocity vector ``\mathbf{U}``
 ```math
-U_y = \sqrt{a(1-e^2)}\cos i - 1 \quad \text{and} \quad 
+U_y = \sqrt{a(1-e^2)}\cos i - 1 \quad \text{and} \quad
 U = ||\mathbf{U}|| = \sqrt{3 - \frac{1}{a} - 2\sqrt{a(1-e^2)}\cos i},
 ```
 and then substitutes into `valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6, a_pl=1.0)`.
@@ -174,11 +167,11 @@ Computes Valsecchi circle associated to a mean motion resonance. Returns radius 
 R = \left|\frac{c\sin\theta_0'}{\cos\theta_0' - \cos\theta}\right| \quad \text{and} \quad
 D = \frac{c\sin\theta}{\cos\theta_0' - \cos\theta},
 ```
-where ``c = m/U^2`` with ``m`` the mass of the planet and ``U = ||\mathbf{U}||`` the norm of 
+where ``c = m/U^2`` with ``m`` the mass of the planet and ``U = ||\mathbf{U}||`` the norm of
 the planetocentric velocity vector; and ``\theta``, ``\theta_0'`` are the angles between Y-axis
 and ``\mathbf{U}`` pre and post encounter respectively. 
 
-# Arguments 
+# Arguments
 - `U_y`: Y-component of unperturbed planetocentric velocity (Y-axis coincides with the direction of motion of the planet).
 - `U_norm`: Euclidean norm of unperturbed planetocentric velocity. Both `U_y`, `U_norm` are in units such that the heliocentric velocity of the planet is 1.
 - `k/h`: `h` heliocentric revolutions of asteroid per `k` heliocentric revolutions of Earth.
@@ -203,8 +196,8 @@ function valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6, a_pl=1.0
     # See page 1187 of https://doi.org/10.1051/0004-6361:20031039
     cosθ0p = (1-(U_norm^2)-(1/a0p))/(2U_norm)
     sinθ0p = sin(acos(cosθ0p))
-    # c = m/U^2 
-    # See first sentence below equation (3) in section 2.3, page 1182 of 
+    # c = m/U^2
+    # See first sentence below equation (3) in section 2.3, page 1182 of
     # https://doi.org/10.1051/0004-6361:20031039
     c = m_pl/(U_norm^2)
     # Radius of the Valsecchi circle R and its ζ-axis component D

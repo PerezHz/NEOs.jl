@@ -125,7 +125,9 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     print_header("Integrator warmup", 2)
     _ = NEOs.propagate(dynamics, 1, jd0, nyears_fwd, q0, Val(true);
-                       order = order, abstol = abstol, parse_eqs = parse_eqs)
+                       order, abstol, parse_eqs)
+    _ = NEOs.propagate_root(dynamics, 1, jd0, nyears_fwd, q0, Val(true);
+                       order, abstol, parse_eqs)
     println()
 
     print_header("Main integration", 2)
@@ -136,16 +138,16 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     sol_bwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_bwd, q0, Val(true);
                              order, abstol, parse_eqs)
     jldsave("Apophis_bwd.jld2"; sol_bwd)
-    # sol_bwd = JLD2.load("Apophis_bwd.jld2", "asteph")
+    # sol_bwd = JLD2.load("Apophis_bwd.jld2", "sol_bwd")
 
     tmax = nyears_fwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
     println("• Final time of integration: ", julian2datetime(jd0 + tmax))
 
-    sol_fwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_fwd, q0, Val(true);
+    sol_fwd, tvS, xvS, gvS = NEOs.propagate_root(dynamics, maxsteps, jd0, nyears_fwd, q0, Val(true);
                              order, abstol, parse_eqs)
-    jldsave("Apophis_fwd.jld2"; sol_fwd)
-    # sol_fwd = JLD2.load("Apophis_fwd.jld2", "asteph")
+    jldsave("Apophis_fwd.jld2"; sol_fwd, tvS, xvS, gvS)
+    # sol_fwd = JLD2.load("Apophis_fwd.jld2", "sol_bwd")
     println()
 
     # load Solar System ephemeris
@@ -181,7 +183,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     # Compute radar residuals
     res_del, w_del, res_dop, w_dop = NEOs.residuals(deldop; xvs, xve, xva, niter=10, tord=10)
-    jldsave("Apophis_res_w_radec.jld2"; res_del, w_del, res_dop, w_dop)
+    jldsave("Apophis_res_w_deldop.jld2"; res_del, w_del, res_dop, w_dop)
     # JLD2.@load "Apophis_res_w_deldop.jld2"
 
     ### Process optical astrometry (filter, weight, debias)
