@@ -5,6 +5,7 @@ include("radar_jpl.jl")
 include("units.jl")
 include("jpl_eph.jl")
 include("topocentric.jl")
+include("observation_night.jl")
 include("process_radec.jl")
 
 @doc raw"""

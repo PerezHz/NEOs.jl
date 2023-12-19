@@ -8,3 +8,4 @@ jldeph/
 notebooks/figs
 EOP_IAU*.TXT
 Manifest.toml
+*.DS_Store

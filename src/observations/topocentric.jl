@@ -50,7 +50,7 @@ isnight(x::TimeOfDay) = x.light == :night
 # Night from 2023-06-29 to 2023-06-29 at UTC-7
 # Night from 2023-06-29 to 2023-06-30 at UTC+3
 function show(io::IO, m::TimeOfDay)
-    print(io, uppercasefirst(string(m.light)), " from ", m.start, " to ", m.stop,
+    print(io, uppercasefirst(string(m.light)), " from ", Date(m.start), " to ", Date(m.stop),
           " at UTC", @sprintf("%+d", m.utc))
 end
 

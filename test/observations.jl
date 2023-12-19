@@ -283,4 +283,28 @@ using NEOs: src_path
 
     end
 
+    @testset "ObservationNight" begin
+        using NEOs: reduce_nights
+
+        # Choose this example because of the discontinuity in α
+
+        # Optical astrometry file
+        filename = joinpath("data", "2020_TJ6.txt")
+        # Download optical astrometry
+        get_radec_mpc("designation" => "2020 TJ6", filename)
+        # Parse observations
+        radec = read_radec_mpc(filename)
+        # Reduce observation nights
+        nights = reduce_nights(radec)
+        # Remove downloaded file
+        rm(filename)
+
+        # Values by December 19, 2023
+        @test length(nights) == 5
+        @test getfield.(nights, :nobs) == [4, 4, 3, 4, 3]
+        @test nights[3].α ≈ 6.2831 atol = 1e-4
+        @test nights[3].observatory == search_obs_code("J04")
+        @test nights[3].night.utc == -1
+    end
+
 end
