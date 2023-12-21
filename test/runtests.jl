@@ -4,7 +4,7 @@ testfiles = (
     "osculating.jl",
     "observations.jl",
     "propagation.jl",
-    "gauss.jl",
+    "orbit_determination.jl",
     "extensions.jl"
     )
 

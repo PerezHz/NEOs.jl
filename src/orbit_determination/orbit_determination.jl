@@ -18,6 +18,14 @@ function issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <:
 end
 
 @doc raw"""
+    istsa(sol::NEOSolution{T, T}) where {T <: AbstractFloat}
+Check whether `sol` was computed via Too Short Arc (`true`) or via Gauss Method (`false`).
+"""
+function istsa(sol::NEOSolution{T, T}) where {T <: AbstractFloat}
+    return length(sol.nights) < 3 || numberofdays(sol.nights) < 1
+end
+
+@doc raw"""
     orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T};
                        kwargs...) where {T <: AbstractFloat}
 

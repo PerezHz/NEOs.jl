@@ -339,6 +339,7 @@ end
 @doc raw"""
     numberofdays(dates::Vector{DateTime})
     numberofdays(dates::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+    numberofdays(dates::Vector{ObservationNight{T}}) where {T <: AbstractFloat}
 
 Return the time span of `dates` in days. The function assumes `dates` is sorted.
 """
@@ -346,6 +347,10 @@ numberofdays(dates::Vector{DateTime}) = (dates[end] - dates[1]).value / 86_400_0
 
 function numberofdays(dates::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     return (dates[end].date - dates[1].date).value / 86_400_000
+end
+
+function numberofdays(dates::Vector{ObservationNight{T}}) where {T <: AbstractFloat}
+    return (dates[end].radec[end].date - dates[1].radec[1].date).value / 86_400_000
 end
 
 @doc raw"""

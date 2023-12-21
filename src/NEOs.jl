@@ -61,7 +61,7 @@ export Parameters, propagate, propagate_lyap, propagate_root
 # B plane
 export valsecchi_circle, bopik
 # Least squares
-export outlier_rejection, project, chi2, nms, nrms, diffcorr, newtonls, tryls
+export outlier_rejection, project, chi2, nms, nrms, diffcorr, newtonls, tryls, sigmas
 # Osculating
 export pv2kep, yarkp2adot
 # Too Short Arc
@@ -69,7 +69,7 @@ export tooshortarc
 # Gauss method
 export gauss_method, gaussinitcond, gauss_refinement
 # Orbit determination
-export issinglearc, orbitdetermination, sigmas
+export issinglearc, istsa, orbitdetermination
 
 include("constants.jl")
 include("observations/process_radar.jl")
