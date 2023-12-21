@@ -489,7 +489,7 @@ function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Convert to DataFrame 
     df = DataFrame(radec)
     # Group by observatory and TimeOfDay 
-    df.TimeOfDay = TimeOfDay.(df.date, df.observatory)
+    df.TimeOfDay = TimeOfDay.(radec)
     gdf = groupby(df, [:observatory, :TimeOfDay])
     # Interpolate observation nights 
     cdf = combine(gdf, nrow)
