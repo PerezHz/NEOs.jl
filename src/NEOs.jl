@@ -69,7 +69,7 @@ export tooshortarc
 # Gauss method
 export gauss_method, gaussinitcond, gauss_refinement
 # Orbit determination
-export issinglearc, orbitdetermination
+export issinglearc, orbitdetermination, sigmas
 
 include("constants.jl")
 include("observations/process_radar.jl")

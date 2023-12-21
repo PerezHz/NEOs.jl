@@ -1,70 +1,7 @@
 include("asteroid_dynamical_models.jl")
 include("jetcoeffs.jl")
 include("serialization.jl")
-
-struct Parameters{T <: AbstractFloat}
-    maxsteps::Int
-    mpc_catalogue_codes_201X::Vector{String}
-    truth::String
-    resol::Resolution
-    bias_matrix::Matrix{T}
-    μ_ast::Vector{T}
-    order::Int
-    abstol::T
-    parse_eqs::Bool
-    function Parameters{T}(maxsteps::Int, mpc_catalogue_codes_201X::Vector{String},
-                           truth::String, resol::Resolution, bias_matrix::Matrix{T},
-                           μ_ast::Vector{T}, order::Int, abstol::T, parse_eqs::Bool) where {T <: AbstractFloat}        
-        
-        return new{T}(maxsteps, mpc_catalogue_codes_201X, truth, resol, bias_matrix, μ_ast,
-                      order, abstol, parse_eqs)
-    end
-end
-
-@doc raw"""
-    Parameters(params::Parameters{T}; kwargs...) where {T <: AbstractFloat}
-
-Parameters for `propagate` and related functions.
-
-# Keyword arguments
-
-- `maxsteps::Int = 100`: maximum number of steps for the integration.
-- `debias_table::String = "2018"`: possible values are:
-    - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
-    - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
-    - `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596.
-- `μ_ast::Vector`: vector of gravitational parameters.
-- `order::Int = 25`: order of Taylor expansions wrt time.
-- `abstol::T = 1e-20`: absolute tolerance (used to compute propagation timestep).
-- `parse_eqs::Bool = true`: whether to use the specialized method of `jetcoeffs` (`true`) or not.
-"""
-function Parameters(; maxsteps::Int = 100, debias_table::String = "2018", 
-                      μ_ast::Vector{T} = μ_ast343_DE430[1:end], order::Int = 25,
-                      abstol::T = 1e-20, parse_eqs::Bool = true) where {T <: AbstractFloat}
-
-    mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
-    return Parameters{T}(maxsteps, mpc_catalogue_codes_201X, truth, resol, bias_matrix,
-                         μ_ast, order, abstol, parse_eqs)
-end                            
-
-function Parameters(params::Parameters{T}; kwargs...) where {T <: AbstractFloat}
-    fields = fieldnames(Parameters{T})
-    vals = Vector{Any}(undef, length(fields))
-    for i in eachindex(vals)
-        if fields[i] in keys(kwargs)
-            vals[i] = kwargs[i]
-        else
-            vals[i] = getfield(params, i)
-        end
-    end
-
-    return Parameters{T}(vals...)
-end
-
-function residuals(obs::Vector{RadecMPC{T}}, params::Parameters{T}; kwargs...) where {T <: AbstractFloat}
-    return residuals(obs, params.mpc_catalogue_codes_201X, params.truth, params.resol,
-                     params.bias_matrix; kwargs...)
-end
+include("parameters.jl")
 
 @doc raw"""
     rvelea(dx, x, params, t)

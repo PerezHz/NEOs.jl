@@ -75,7 +75,8 @@ topounit(obs::RadecMPC{T}) where {T <: AbstractFloat} = topounit(obs.α, obs.δ)
 Return the 1st order approximation to Lagrange's f function.
 """
 function f_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
-    return 1 - μ_S * (τ^2) / 2 / (r^3)
+    r3 = r * r * r 
+    return 1 - μ_S * (τ^2) / 2 / r3
 end
 
 @doc raw"""
@@ -84,7 +85,8 @@ end
 Return the 1st order approximation to Lagrange's g function.
 """
 function g_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
-    return τ - μ_S * (τ^3) / 6 / (r^3)
+    r3 = r * r * r 
+    return τ - μ_S * (τ^3) / 6 / r3
 end
 
 @doc raw"""
@@ -112,14 +114,24 @@ end
 
 Lagrange polynomial to be solved during Gauss method.
 """
-lagrange(x::T, a::U, b::U, c::U) where {T, U <: Number} = x^8 + a*x^6 + b*x^3 + c
+function lagrange(x::T, a::U, b::U, c::U) where {T, U <: Number}
+    # Evaluate via Horner's method
+    x2 = x * x
+    x3 = x2 * x 
+    return c + x3 * (b + x3 * (a + x2))
+end
 
 @doc raw"""
     lagrange_derivative(x::T, a::T, b::T) where {T <: Number}
 
 Derivative of Lagrange polynomial to be solved during Gauss method.
 """
-lagrange_derivative(x::T, a::U, b::U) where {T, U <: Number} = 8*x^7 + 6*a*x^5 + 3*b*x^2
+function lagrange_derivative(x::T, a::U, b::U) where {T, U <: Number}
+    # Evaluate via Horner's method
+    x2 = x * x
+    x3 = x2 * x 
+    return x2 * (3*b + x3 * (6*a + 8*x2))
+end
 
 # TO DO: Allow to control interval over which to look for solutions
 # Currently we look between the radius of the Sun (∼0.00465047 AU) and 
@@ -142,11 +154,13 @@ function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T}; niter::Int 
     sol_0 = solve_lagrange(cte(a), cte(b), cte(c))
     # Vector of solutions
     sol = Vector{TaylorN{T}}(undef, length(sol_0))
+    # Conversion factor to TaylorN
+    oneN = one(a)
     # Iterate solutions
     for i in eachindex(sol)
         # Newton's method
-        r_0 = sol_0[i]
-        r_2 = sol_0[i]
+        r_0::TaylorN{T} = sol_0[i] * oneN
+        r_2::TaylorN{T} = sol_0[i] * oneN
         for j in 1:niter
             r_2 = r_0 - lagrange(r_0, a, b, c) / lagrange_derivative(r_0, a, b)
             r_0 = r_2
@@ -237,9 +251,9 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
 
     # Cross products
     p_vec = zeros(U, 3, 3)
-    p_vec[1, :] = cross(ρ_vec[2, :], ρ_vec[3, :])
-    p_vec[2, :] = cross(ρ_vec[1, :], ρ_vec[3, :])
-    p_vec[3, :] = cross(ρ_vec[1, :], ρ_vec[2, :])
+    p_vec[1, :] = @views cross(ρ_vec[2, :], ρ_vec[3, :])
+    p_vec[2, :] = @views cross(ρ_vec[1, :], ρ_vec[3, :])
+    p_vec[3, :] = @views cross(ρ_vec[1, :], ρ_vec[2, :])
 
     # Gauss scalar
     D_0 = dot(ρ_vec[1, :], p_vec[1, :])
@@ -248,7 +262,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     D = zeros(U, 3, 3)
     for i in 1:3
         for j in 1:3
-            D[i, j] = dot(R_vec[i, :], p_vec[j, :])
+            D[i, j] = @views dot(R_vec[i, :], p_vec[j, :])
         end
     end
 
@@ -257,13 +271,13 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     B = (D[1, 2]*(τ_3^2 - τ^2)*τ_3/τ + D[3, 2]*(τ^2 - τ_1^2)*τ_1/τ) / 6 / D_0
 
     # E and F scalars
-    E = dot(R_vec[2, :], ρ_vec[2, :])
-    F = dot(R_vec[2, :], R_vec[2, :])
+    E = @views dot(R_vec[2, :], ρ_vec[2, :])
+    F = @views dot(R_vec[2, :], R_vec[2, :])
 
     # Lagrange equation coefficients
-    a = -(A^2 + 2*A*E + F)
+    a = -(A*A + 2*A*E + F)
     b = -2*μ_S*B*(A + E)
-    c = -(μ_S^2)*(B^2)
+    c = -(μ_S^2)*(B*B)
 
     # Solve Lagrange equation
     sol = solve_lagrange(a, b, c; niter = niter)
@@ -284,21 +298,23 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
         for i in eachindex(sol_gauss)
             # Heliocentric range
             r_2 = sol[i]
+            # Range cubed
+            r_23 = r_2 * r_2 * r_2
             # Slant ranges
             ρ = zeros(U, 3)
 
-            num_1 = 6*(D[3, 1]*τ_1/τ_3 + D[2, 1]*τ/τ_3)*(r_2^3) + μ_S*D[3, 1]*(τ^2 - τ_1^2)*τ_1/τ_3
-            den_1 = 6*(r_2^3) + μ_S*(τ^2 - τ_3^2)
+            num_1 = 6*(D[3, 1]*τ_1/τ_3 + D[2, 1]*τ/τ_3)*r_23 + μ_S*D[3, 1]*(τ^2 - τ_1^2)*τ_1/τ_3
+            den_1 = 6*r_23 + μ_S*(τ^2 - τ_3^2)
             ρ[1] = (num_1 / den_1 - D[1, 1]) / D_0
 
-            ρ[2] = A + μ_S*B/(r_2^3)
+            ρ[2] = A + μ_S*B/r_23
 
-            num_3 = 6*(D[1, 3]*τ_3/τ_1 - D[2, 3]*τ/τ_1)*(r_2^3) + μ_S*D[1, 3]*(τ^2 - τ_3^2)*τ_3/τ_1
-            den_3 = 6*(r_2^3) + μ_S*(τ^2 - τ_1^2)
+            num_3 = 6*(D[1, 3]*τ_3/τ_1 - D[2, 3]*τ/τ_1)*r_23 + μ_S*D[1, 3]*(τ^2 - τ_3^2)*τ_3/τ_1
+            den_3 = 6*r_23 + μ_S*(τ^2 - τ_1^2)
             ρ[3] = (num_3 / den_3 - D[3, 3]) / D_0
 
             # Heliocentric position of the NEO
-            r_vec = R_vec .+ ρ.*ρ_vec
+            r_vec = R_vec .+ ρ .* ρ_vec
 
             # f, g Lagrange coefficients
             f_1 = f_Lagrange(τ_1, r_2)
@@ -308,9 +324,10 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
             g_3 = g_Lagrange(τ_3, r_2)
 
             # Heliocentric velocity of the NEO
-            v_2_vec = (- f_3 * r_vec[1, :] + f_1 * r_vec[3, :]) / (f_1*g_3 - f_3*g_1)
+            v_2_vec = @views (- f_3 * r_vec[1, :] + f_1 * r_vec[3, :]) / (f_1*g_3 - f_3*g_1)
 
-            sol_gauss[i] = GaussSolution{T, U}(vcat(r_vec[2, :], v_2_vec), D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3)
+            sol_gauss[i] = GaussSolution{T, U}(vcat(r_vec[2, :], v_2_vec), D, R_vec, ρ_vec,
+                           τ_1, τ_3, f_1, g_1, f_3, g_3)
         end
         # Sort solutions by heliocentric range
         return sort!(sol_gauss, by = x -> norm(cte.(x.statevect[1:3])))
@@ -411,45 +428,42 @@ end
 
 
 @doc raw"""
-    gaussinitcond(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::DataFrame,
-                  params::Parameters{T}; kwargs...) where {T <: AbstractFloat}
+    gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+                  params::Parameters{T}) where {T <: AbstractFloat}
 
-Return initial conditions via Gauss method. 
+Return initial conditions via Gauss Method. 
 
 See also [`gauss_method`](@ref).
 
 # Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `gdf::GroupedDataFrame`, `cdf::DataFrame`: output of [`reduce_nights`](@ref).
-- `params::Parameters{T}`: see [`Parameters`](@ref).
-
-# Keyword arguments
-
-- `varorder::Int`: order of jet transport perturbation. 
-- `max_triplets::Int`: maximum number of triplets.
-- `Q_max::T`: the maximum nrms that is considered a good enough orbit.
-- `niter::Int`: number of iterations for Newton's method.
+- `nights::Vector{ObservationNight{T}},`: vector of observation nights.
+- `params::Parameters{T}`: see `Gauss Method Parameters` of [`Parameters`](@ref).
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
-function gaussinitcond(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::DataFrame,
-                       params::Parameters{T}; max_triplets::Int = 10, Q_max::T = 5.0,
-                       niter::Int = 5, varorder::Int = 5) where {T <: AbstractFloat}
+function gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+                       params::Parameters{T}) where {T <: AbstractFloat}
 
     # Allocate memory for initial conditions
     best_sol = zero(NEOSolution{T, T})
     # Unfold
-    observatories, dates, α, δ = cdf.observatory, cdf.date, cdf.α, cdf.δ
+    observatories, dates, α, δ = observatory.(nights), date.(nights), ra.(nights), dec.(nights)
     # Observations triplets
-    triplets = gauss_triplets(dates, max_triplets)
+    triplets = gauss_triplets(dates, params.max_triplets)
     # Julian day of first (last) observation
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
     # Julian day when to start propagation
     jd0 = zero(T)
+    # Start point of LS fits
+    x0 = zeros(T, 6)
+    # Jet transport scaling factors
+    scalings = fill(1e-6, 6)
     # Jet transport perturbation (ra/dec)
-    dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃"; order = varorder)
+    dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃", scalings,
+                          order = params.varorder)
     # Sun's ephemeris
     eph_su = selecteph(sseph, su)
     # Earth's ephemeris
@@ -466,13 +480,13 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::D
         triplet = triplets[j]
         # Julian day when to start propagation
         jd0 = datetime2julian(dates[triplet[2]])
-        # Number of years in forward integration 
+        # Number of years in forward integration
         nyears_fwd = (tf - jd0 + 2) / yr
         # Number of years in backward integration
         nyears_bwd = -(jd0 - t0 + 2) / yr
         # Gauss method solution 
         sol = gauss_method(observatories[triplet], dates[triplet], α[triplet] .+ dq[1:3],
-                           δ[triplet] .+ dq[4:6]; niter = niter)
+                           δ[triplet] .+ dq[4:6]; niter = params.niter)
         # Filter Gauss solutions by heliocentric energy
         filter!(x -> heliocentric_energy(x.statevect) <= 0, sol)
 
@@ -480,38 +494,44 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::D
         for i in eachindex(sol)
 
             # Initial conditions (jet transport)
-            q0 = sol[i].statevect .+ eph_su(jd0 - PE.J2000)
+            q0::Vector{TaylorN{T}} = sol[i].statevect .+ eph_su(jd0 - PE.J2000)
             # Backward propagation 
-            bwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q0, params) 
+            bwd::TaylorInterpolant{T, TaylorN{T}, 2} = propagate(
+                RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q0, params
+            ) 
 
-            if bwd.t[end] > t0 - jd0
+            if bwd.t[end]::T > t0 - jd0
                 continue
             end
             # Forward propagation
-            fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q0, params)
+            fwd::TaylorInterpolant{T, TaylorN{T}, 2} = propagate(
+                RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q0, params
+            )
 
-            if fwd.t[end] < tf - jd0
+            if fwd.t[end]::T < tf - jd0
                 continue
             end
             # O-C residuals
-            res = residuals(radec, params;
-                            xvs = et -> auday2kmsec(eph_su(et/daysec)),
-                            xve = et -> auday2kmsec(eph_ea(et/daysec)),
-                            xva = et -> bwdfwdeph(et, bwd, fwd))
+            res::Vector{OpticalResidual{T, TaylorN{T}}} = residuals(
+                radec, params;
+                xvs = et -> auday2kmsec(eph_su(et/daysec)),
+                xve = et -> auday2kmsec(eph_ea(et/daysec)),
+                xva = et -> bwdfwdeph(et, bwd, fwd)
+            )
 
             # Subset of radec for orbit fit
             g_0 = triplet[1]
             g_f = triplet[3]
-            idxs = findall(x -> g_0 <= x <= g_f, gdf.groups)
+            idxs = reduce(vcat, indices.(nights[g_0:g_f]))
             sort!(idxs)
             # Orbit fit
-            fit = tryls(res[idxs], zeros(get_numvars()), niter)
+            fit = tryls(res[idxs], x0, params.niter)
             !fit.success && continue
 
             # Right iteration
-            for k in g_f+1:length(gdf)
-                extra = findall(x -> x == k, gdf.groups)
-                fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
+            for k in g_f+1:length(nights)
+                extra = indices(nights[k])
+                fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
                 if fit_new.success
                     fit = fit_new
                     idxs = vcat(idxs, extra)
@@ -523,8 +543,8 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::D
 
             # Left iteration
             for k in g_0-1:-1:1
-                extra = findall(x -> x == k, gdf.groups)
-                fit_new = tryls(res[idxs ∪ extra], zeros(get_numvars()), niter)
+                extra = indices(nights[k])
+                fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
                 if fit_new.success
                     fit = fit_new
                     idxs = vcat(idxs, extra)
@@ -541,10 +561,11 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::D
             # Update NRMS and initial conditions
             if Q < best_Q
                 best_Q = Q
-                best_sol = evalfit(NEOSolution(bwd, fwd, res[idxs], fit))
+                best_sol = evalfit(NEOSolution(nights, bwd, fwd, res[idxs], 
+                                   fit, scalings))
             end 
             # Break condition
-            if Q <= Q_max
+            if Q <= params.Q_max
                 flag = true
                 break
             end
@@ -562,188 +583,4 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::D
         return best_sol
     end
 
-end
-
-@doc raw"""
-    residual_norm(x::OpticalResidual{T, T}) where {T <: Real}
-
-Return the contribution of `x` to the nrms.
-"""
-residual_norm(x::OpticalResidual{T, T}) where {T <: Real} = x.w_α * x.ξ_α^2 / x.relax_factor + x.w_δ * x.ξ_δ^2 / x.relax_factor
-
-@doc raw"""
-    gauss_refinement(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::Parameters{T};
-                     kwargs...) where {T <: AbstractFloat}
-
-Refine an orbit computed by [`gaussinitcond`](@ref) via propagation and/or outlier rejection.
-
-# Arguments
-
-- `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `sol::NEOSolution{T, T}`: orbit to be refined.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
-
-# Keyword arguments
-
-- `max_per::T =  18.0`: maximum allowed rejection percentage.
-- `niter::Int = 5`: number of iterations. 
-- `varorder::Int`: order of jet transport perturbation. 
-"""
-function gauss_refinement(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::Parameters{T};
-                          max_per::T = 18.0, niter::Int = 5, varorder::Int = 5) where {T <: AbstractFloat}
-
-    # Sun's ephemeris
-    eph_su = selecteph(sseph, su)
-    # Earth's ephemeris
-    eph_ea = selecteph(sseph, ea)
-    # Julian day to start propagation
-    jd0 = sol.bwd.t0 + PE.J2000
-    # Julian day of first (last) observation
-    t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
-    # Number of years in forward integration 
-    nyears_fwd = (tf - jd0 + 2) / yr
-    # Number of years in backward integration
-    nyears_bwd = -(jd0 - t0 + 2) / yr
-    # Dynamical function 
-    dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
-    # Maximum number of steps
-    params = Parameters(params; maxsteps = adaptative_maxsteps(radec))
-    # Initial conditions (T)
-    q00 = sol(sol.bwd.t0)
-    # Jet transport perturbation
-    dq = scaled_variables("δx", fill(1e-6, 6); order = varorder)
-    # Initial conditions (jet transport)
-    q0 = q00 .+ dq
-
-    # Backward integration
-    bwd = propagate(dynamics, jd0, nyears_bwd, q0, params)
-
-    if bwd.t[end] > t0 - jd0
-        return zero(NEOSolution{T, T})
-    end
-
-    # Forward integration
-    fwd = propagate(dynamics, jd0, nyears_fwd, q0, params)
-
-    if fwd.t[end] < tf - jd0
-        return zero(NEOSolution{T, T})
-    end
-
-    # Residuals
-    res = residuals(radec, params;
-                    xvs = et -> auday2kmsec(eph_su(et/daysec)),
-                    xve = et -> auday2kmsec(eph_ea(et/daysec)),
-                    xva = et -> bwdfwdeph(et, bwd, fwd))
-    # Orbit fit
-    fit = tryls(res, zeros(get_numvars()), niter)
-
-    # NRMS (with 0 outliers)
-    Q_0 = nrms(res, fit)
-
-    if Q_0 < 1
-        return evalfit(NEOSolution(bwd, fwd, res, fit))
-    end
-
-    # Number of observations
-    N_radec = length(radec)
-    # Maximum allowed outliers
-    max_drop = ceil(Int, N_radec * max_per / 100)
-    # Boolean mask (0: included in fit, 1: outlier)
-    new_outliers = BitVector(zeros(N_radec))
-
-    # Drop loop
-    for i in 1:max_drop
-        # Contribution of each residual to nrms
-        norms = residual_norm.(res(fit.x))
-        # Iterate norms from largest to smallest
-        idxs = sortperm(norms, rev = true)
-
-        for j in idxs
-            if !new_outliers[j]
-                # Drop residual
-                new_outliers[j] = true
-                # Update residuals
-                res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
-                                       relax_factor.(res), new_outliers)
-                # Update fit
-                fit = tryls(res, zeros(get_numvars()), niter)
-                break
-            end
-        end
-    end
-
-    # Outliers
-    idxs = Vector{Int}(undef, max_drop)
-    # NRMS
-    Qs = Vector{T}(undef, max_drop + 1)
-    # Number of outliers
-    N_outliers = Vector{T}(undef, max_drop + 1)
-
-    # Recovery loop
-    for i in 1:max_drop
-        # NRMS of current fit
-        Qs[i] = nrms(res, fit)
-        # Number of outliers in current fit
-        N_outliers[i] = float(max_drop - i + 1)
-        # Contribution of each residual to nrms
-        norms = residual_norm.(res(fit.x))
-        # Minimum norm among outliers
-        j = findmin(norms[new_outliers])[2]
-        # Find residual with minimum norm
-        j = findall(new_outliers)[j]
-        # Add j-th residual to outliers list
-        idxs[i] = j
-        # Recover residual
-        new_outliers[j] = false
-        # Update residuals
-        res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
-                               relax_factor.(res), new_outliers)
-        # Update fit
-        fit = tryls(res, zeros(get_numvars()), niter)
-    end
-    # Add 0 outliers fit 
-    Qs[end] = Q_0
-    N_outliers[end] = zero(T)
-
-    # Outlier rejection cannot reduce Q
-    if all(Qs .> 1.)
-        # Reset boolean mask
-        new_outliers[1:end] .= false
-        # Update residuals
-        res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
-                               relax_factor.(res), new_outliers)
-        # Update fit
-        fit = tryls(res, zeros(get_numvars()), niter)
-
-        return evalfit(NEOSolution(bwd, fwd, res, fit)) 
-    end
-
-    if max_drop > 1
-        # Assemble points
-        points = Matrix{T}(undef, 2, max_drop + 1)
-        for i in eachindex(Qs)
-            points[1, i] = Qs[i]
-            points[2, i] = N_outliers[i]
-        end
-        # K-means clustering
-        cluster = kmeans(points, 2)
-        # Index of smallest cluster
-        i_0 = cluster.assignments[1]
-        # Find last fit of smallest cluster
-        i = findfirst(x -> x != i_0, cluster.assignments) - 1
-        # Update outliers indexes 
-        idxs = idxs[i:end]
-    end
-
-    # Reset boolean mask
-    new_outliers[1:end] .= false
-    # Outliers
-    new_outliers[idxs] .= true
-    # Update residuals
-    res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
-                           relax_factor.(res), new_outliers)
-    # Update fit
-    fit = tryls(res, zeros(get_numvars()), niter)
-
-    return evalfit(NEOSolution(bwd, fwd, res, fit))
 end

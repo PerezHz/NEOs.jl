@@ -243,7 +243,7 @@ function sv_ecef_to_eci(
 end
 
 @doc raw"""
-    obsposvelECI(observatory::ObservatoryMPC{T}, et::T; kwarg) where {T <: AbstractFloat}
+    obsposvelECI(observatory::ObservatoryMPC{T}, et::U; kwarg) where {T <: AbstractFloat, U <: Number}
     obsposvelECI(x::RadecMPC{T}; kwarg) where {T <: AbstractFloat}
     obsposvelECI(x::RadarJPL{T}; kwarg) where {T <: AbstractFloat}
 
@@ -260,21 +260,25 @@ See also [`SatelliteToolboxBase.OrbitStateVector`](@ref) and
 # Arguments
 
 - `observatory::ObservatoryMPC{T}`: observation site.
-- `et::T`: ephemeris time (TDB seconds since J2000.0 epoch).
+- `et::U`: ephemeris time (TDB seconds since J2000.0 epoch).
+- `x::RadecMPC{T}/RadarJPL{T}`: astrometric observation.
 
 # Keyword argument
 
 - `eop::Union{EopIau1980, EopIau2000A}`: Earth Orientation Parameters (eop).
 """
-function obsposvelECI(observatory::ObservatoryMPC{T}, et::ET;
-        eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat, ET<:Union{T,Taylor1{T},Taylor1{TaylorN{T}}}}
+function obsposvelECI(observatory::ObservatoryMPC{T}, et::U;
+        eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat, U <: Number}
     
     # Make sure observatory has coordinates
     @assert hascoord(observatory) "Cannot compute position for observatory [$(observatory.code)] without coordinates"
+    # One with correct type
+    oneU = one(et)
 
     if issatellite(observatory) || isoccultation(observatory)
-        #@assert datetime2et(observatory.date) == cte(et)
-        return [observatory.long, observatory.cos, observatory.sin, zero(T), zero(T), zero(T)]
+        # @assert datetime2et(observatory.date) == cte(et)
+        return [observatory.long * oneU, observatory.cos * oneU, observatory.sin * oneU,
+                zero(et), zero(et), zero(et)]
     else 
         # Earth-Centered Earth-Fixed position position of observer
         pos_ECEF = obsposECEF(observatory)
@@ -291,13 +295,18 @@ function obsposvelECI(observatory::ObservatoryMPC{T}, et::ET;
         # GCRF: Geocentric Celestial Reference Frame
         pv_ECI = sv_ecef_to_eci(pv_ECEF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
 
+        # ECI state vector (of correct type)
+        r_ECI = Vector{U}(undef, 6)
         # Inertial position
-        p_ECI = convert(Vector{eltype(pv_ECI.r)}, pv_ECI.r)
+        for i in eachindex(pv_ECI.r)
+            r_ECI[i] = pv_ECI.r[i] * oneU
+        end
         # Inertial velocity
-        v_ECI = convert(Vector{eltype(pv_ECI.v)}, pv_ECI.v)
-
-        # Concat position and velocity
-        return vcat(p_ECI, v_ECI)
+        for i in eachindex(pv_ECI.v)
+            r_ECI[i+3] = pv_ECI.v[i] * oneU
+        end
+        
+        return r_ECI
     end
 end
 

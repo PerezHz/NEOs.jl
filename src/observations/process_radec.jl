@@ -93,6 +93,9 @@ weight_dec(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.w_δ
 relax_factor(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.relax_factor
 outlier(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.outlier
 
+euclid3D(x::Vector{U}) where {U <: Number} = sqrt(x[1]*x[1] + x[2]*x[2] + x[3]*x[3])
+dot3D(x::Vector{U}, y::Vector{V}) where {U, V <: Number} = x[1]*y[1] + x[2]*y[2] + x[3]*y[3]
+
 @doc raw"""
     compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; kwargs...) where {T <: AbstractFloat}
     compute_radec(obs::RadecMPC{T}; kwargs...) where {T <: AbstractFloat}
@@ -119,29 +122,30 @@ All ephemeris must take [et seconds since J2000] and return [barycentric positio
 and velocity in km/sec].
 """
 function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
-                       xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
+                       xvs::SunEph = sunposvel, xve::EarthEph = earthposvel,
+                       xva::AstEph) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
     # Transform receiving time from UTC to TDB seconds since J2000
     et_r_secs = datetime2et(t_r_utc)
-    # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
-    RV_r = obsposvelECI(observatory, et_r_secs)
-    R_r = RV_r[1:3]
-    # Earth's barycentric position and velocity at receive time
-    rv_e_t_r = xve(et_r_secs)
-    r_e_t_r = rv_e_t_r[1:3]
-    # Receiver barycentric position and velocity at receive time
-    r_r_t_r = r_e_t_r + R_r
-    # Asteroid barycentric position and velocity at receive time
-    rv_a_t_r = xva(et_r_secs)
-    r_a_t_r = rv_a_t_r[1:3]
     # Sun barycentric position and velocity at receive time
     rv_s_t_r = xvs(et_r_secs)
     r_s_t_r = rv_s_t_r[1:3]
-
+    # Earth's barycentric position and velocity at receive time
+    rv_e_t_r = xve(et_r_secs)
+    r_e_t_r = rv_e_t_r[1:3]
+    # Asteroid barycentric position and velocity at receive time
+    rv_a_t_r = xva(et_r_secs)
+    r_a_t_r = rv_a_t_r[1:3]
+    # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
+    RV_r = obsposvelECI(observatory, et_r_secs)
+    R_r = RV_r[1:3]
+    # Receiver barycentric position and velocity at receive time
+    r_r_t_r = r_e_t_r + R_r
+    
     # Down-leg iteration
     # τ_D first approximation
     # See equation (1) of https://doi.org/10.1086/116062
     ρ_vec_r = r_a_t_r - r_r_t_r
-    ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
+    ρ_r = euclid3D(ρ_vec_r)
     # -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
     τ_D = ρ_r/clightkms # (seconds)
     # Bounce time, new estimate
@@ -164,7 +168,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
         ρ_vec_r = r_a_t_b - r_r_t_r
         # Magnitude of ρ_vec_r
         # See equation (4) of https://doi.org/10.1086/116062
-        ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
+        ρ_r = euclid3D(ρ_vec_r)
 
         # Compute down-leg Shapiro delay
         # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay,
@@ -173,14 +177,14 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
         # Earth's position at t_r
         e_D_vec  = r_r_t_r - r_s_t_r
         # Heliocentric distance of Earth at t_r
-        e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2)
+        e_D = euclid3D(e_D_vec)
         # Barycentric position of Sun at estimated bounce time
         rv_s_t_b = xvs(et_b_secs)
         r_s_t_b = rv_s_t_b[1:3]
         # Heliocentric position of asteroid at t_b
         p_D_vec  = r_a_t_b - r_s_t_b
         # Heliocentric distance of asteroid at t_b
-        p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2)
+        p_D = euclid3D(p_D_vec)
         # Signal path distance (down-leg)
         q_D = ρ_r
 
@@ -194,7 +198,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
         Δτ_D = Δτ_rel_D # + Δτ_tropo_D #+ Δτ_corona_D # seconds
 
         # New estimate
-        p_dot_23 = dot(ρ_vec_r, v_a_t_b)/ρ_r
+        p_dot_23 = dot3D(ρ_vec_r, v_a_t_b)/ρ_r
         # Time delay correction
         Δt_2 = (τ_D - ρ_r/clightkms - Δτ_rel_D)/(1.0-p_dot_23/clightkms)
         # Time delay new estimate
@@ -203,6 +207,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
         # See equation (2) of https://doi.org/10.1086/116062
         et_b_secs = et_r_secs - τ_D
     end
+
     # Asteroid barycentric position (in km) and velocity (in km/s) at bounce time (TDB)
     rv_a_t_b = xva(et_b_secs)
     r_a_t_b = rv_a_t_b[1:3]
@@ -212,7 +217,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
     ρ_vec_r = r_a_t_b - r_r_t_r
     # Magnitude of ρ_vec_r
     # See equation (4) of https://doi.org/10.1086/116062
-    ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
+    ρ_r = euclid3D(ρ_vec_r)
 
     # TODO: add aberration and atmospheric refraction corrections
 
@@ -226,15 +231,15 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
     rv_s_t_b = xvs(et_b_secs)
     r_s_t_b = rv_s_t_b[1:3]
     Q_vec = r_a_t_b - r_s_t_b     # ESAA 2014, equation (7.113)
-    q_vec = Q_vec/sqrt(Q_vec[1]^2 + Q_vec[2]^2 + Q_vec[3]^2)
-    E_H = sqrt(E_H_vec[1]^2 + E_H_vec[2]^2 + E_H_vec[3]^2)
+    q_vec = Q_vec/ euclid3D(Q_vec)
+    E_H = euclid3D(E_H_vec)
     e_vec = E_H_vec/E_H
     # See ESAA 2014, equation (7.115)
     g1 = (2μ_DE430[su]/(c_au_per_day^2))/(E_H/au)
-    g2 = 1 + dot(q_vec, e_vec)
+    g2 = 1 + dot3D(q_vec, e_vec)
     # See ESAA 2014, equation (7.116)
-    u1_vec = U_norm*(  u_vec + (g1/g2)*( dot(u_vec,q_vec)*e_vec - dot(e_vec,u_vec)*q_vec )  )
-    u1_norm = sqrt(u1_vec[1]^2 + u1_vec[2]^2 + u1_vec[3]^2)
+    u1_vec = U_norm*(  u_vec + (g1/g2)*( dot3D(u_vec,q_vec)*e_vec - dot3D(e_vec,u_vec)*q_vec )  )
+    u1_norm = euclid3D(u1_vec)
 
     # Compute right ascension, declination angles
     α_rad_ = mod2pi(atan(u1_vec[2], u1_vec[1]))
@@ -570,7 +575,7 @@ function residuals(obs::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{St
         δ_obs = rad2arcsec(dec(obs[i]))  # arcsec
 
         # Computed ra/dec
-        α_comp, δ_comp = compute_radec(obs[i]; xva, kwargs...)   # arcsec
+        α_comp, δ_comp = compute_radec(obs[i]; xva = xva, kwargs...)   # arcsec
 
         # Debiasing corrections
         α_corr, δ_corr = debiasing(obs[i], mpc_catalogue_codes_201X, truth, resol, bias_matrix)

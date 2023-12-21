@@ -15,6 +15,7 @@ A set of optical observations taken by the same observatory on the same night.
 - `v_δ::T`: mean declination velocity.
 - `mag::T`: mean apparent magnitude.
 - `nobs::Int`: number of observations.
+- `idxs::Vector{Int}`: indices of original `radec` that entered the night.
 """
 @auto_hash_equals struct ObservationNight{T <: AbstractFloat}
     radec::Vector{RadecMPC{T}}
@@ -27,14 +28,22 @@ A set of optical observations taken by the same observatory on the same night.
     v_δ::T
     mag::T
     nobs::Int
+    indices::Vector{Int}
     # Inner constructor
     function ObservationNight{T}(radec::Vector{RadecMPC{T}}, observatory::ObservatoryMPC{T},
-                                 night::TimeOfDay, date::DateTime, α::T, δ::T, v_α::T,
-                                 v_δ::T, mag::T, nobs::Int) where {T <: AbstractFloat}
+                                 night::TimeOfDay, date::DateTime, α::T, δ::T, v_α::T, v_δ::T,
+                                 mag::T, nobs::Int, indices::Vector{Int}) where {T <: AbstractFloat}
 
-        return new{T}(radec, observatory, night, date, α, δ, v_α, v_δ, mag, nobs)
+        return new{T}(radec, observatory, night, date, α, δ, v_α, v_δ, mag, nobs, indices)
     end
 end
+
+# Functions to get specific fields of a ObservationNight object
+date(x::ObservationNight{T}) where {T <: AbstractFloat} = x.date
+ra(x::ObservationNight{T}) where {T <: AbstractFloat} = x.α
+dec(x::ObservationNight{T}) where {T <: AbstractFloat} = x.δ
+observatory(x::ObservationNight{T}) where {T <: AbstractFloat} = x.observatory
+indices(x::ObservationNight{T}) where {T <: AbstractFloat} = x.indices
 
 # Print method for ObservationNight{T}
 # Examples:
@@ -53,7 +62,7 @@ function ObservationNight(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) whe
     observatory = df.observatory[1]
     night = df.TimeOfDay[1]
     nobs = nrow(df)
-
+    indices = getfield(df, :rows)
     # Only one observation
     if isone(nobs)
         date = df.date[1]
@@ -61,7 +70,7 @@ function ObservationNight(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) whe
         v_α, v_δ = zero(T), zero(T)
         mag = df.mag[1]
         return ObservationNight{T}(radec, observatory, night, date, α,
-                                   δ, v_α, v_δ, mag, nobs)
+                                   δ, v_α, v_δ, mag, nobs, indices)
     end 
 
     # Make sure there are no repeated dates
@@ -102,7 +111,7 @@ function ObservationNight(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) whe
     mag = mean(filter(!isnan, df.mag))
 
     return ObservationNight{T}(radec, observatory, night, date, α, δ, v_α,
-                               v_δ, mag, nobs)
+                               v_δ, mag, nobs, indices)
 end 
 
 @doc raw"""
