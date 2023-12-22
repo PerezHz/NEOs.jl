@@ -40,9 +40,10 @@ some dynamical constrainits on a too short arc.
 end
 
 # Outer constructor
-function AdmissibleRegion(cdf::DataFrameRow)
+function AdmissibleRegion(night::ObservationNight{T}) where {T <: AbstractFloat}
     # Unfold
-    obs, t_datetime, α, δ, v_α, v_δ, mag, _ = cdf
+    obs, t_datetime, α, δ = observatory(night), date(night), ra(night), dec(night)
+    v_α, v_δ, h = vra(night), vdec(night), mag(night)
     # Topocentric unit vector and partials
     ρ, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Time of observation [days since J2000]
@@ -58,10 +59,10 @@ function AdmissibleRegion(cdf::DataFrameRow)
     coeffs = admsreg_coeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
     # Tiny object boundary
     H_max = 32.0                # Maximum allowed absolute magnitude
-    if isnan(mag)
+    if isnan(h)
         ρ_min = R_SI
     else
-        ρ_min = 10^((mag - H_max)/5)
+        ρ_min = 10^((h - H_max)/5)
     end
     # Maximum range (heliocentric constraint)
     ρ_max = find_zeros(s -> admsreg_U(coeffs, s), ρ_min, 10.0)[1]
@@ -305,14 +306,14 @@ end
 
 @doc raw"""
     adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-         params::Parameters{T}; maxiter::Int = 200, α::T = 10.0, β_1::T = 0.75,
-         β_2::T = 0.85, ϵ::T = 1e-8, Qtol::T =  0.01) where {T <: AbstractFloat}
+         params::Parameters{T}; α::T = 25.0, β_1::T = 0.5, β_2::T = 0.85,
+         ϵ::T = 1e-8, Qtol::T =  0.01) where {T <: AbstractFloat}
 
 ADAM minimizer of root mean square error over `A`.
 """
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-              params::Parameters{T}; maxiter::Int = 200, α::T = 25.0, β_1::T = 0.5,
-              β_2::T = 0.85, ϵ::T = 1e-8, Qtol::T = 0.01) where {T <: AbstractFloat}
+              params::Parameters{T}; α::T = 25.0, β_1::T = 0.5, β_2::T = 0.85,
+              ϵ::T = 1e-8, Qtol::T = 0.01) where {T <: AbstractFloat}
     # Origin
     x0 = zeros(T, 2)
     # Scaling factors
@@ -320,9 +321,9 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     # Jet transport variables
     dq = scaled_variables("dρ dvρ", scalings, order = 1)
     # Allocate memory
-    ρs = Vector{T}(undef, maxiter+1)
-    v_ρs = Vector{T}(undef, maxiter+1)
-    Qs = fill(T(Inf), maxiter+1)
+    ρs = Vector{T}(undef, params.maxiter+1)
+    v_ρs = Vector{T}(undef, params.maxiter+1)
+    Qs = fill(T(Inf), params.maxiter+1)
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
     # Initial conditions
@@ -337,7 +338,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     # Number of iterations
     niter = 0
     # Gradient descent
-    while niter < maxiter
+    while niter < params.maxiter
         # Update number of iterations
         niter += 1
         # Gradient of objective function
@@ -375,8 +376,8 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
 end
 
 # Special method of tryls for tooshortarc
-function tryls(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{T}, params::Parameters{T};
-               maxiter::Int = 5) where {T <: AbstractFloat}
+function tryls(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+               jd0::T, q0::Vector{T}, params::Parameters{T}; maxiter::Int = 5) where {T <: AbstractFloat}
     # Allocate memory
     sols = zeros(NEOSolution{T, T}, maxiter)
     # Origin
@@ -400,13 +401,17 @@ function tryls(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{T}, params::Parame
             break
         end
         # Current solution
-        sols[niter] = evalfit(NEOSolution(bwd, fwd, res, fit))
+        sols[niter] = evalfit(NEOSolution(nights, bwd, fwd, res, fit, scalings))
         # Convergence condition
         if niter > 1 && nrms(sols[niter-1]) - nrms(sols[niter]) < 0.1
             break
         end
         # Update values
         q0 = q(fit.x)
+        # Update scaling factors
+        scalings = abs.(q0) ./ 10^5 
+        # Update Jet transport variables
+        dq = scaled_variables("dx", scalings, order = 6)
         # Update number of iterations
         niter += 1
     end
@@ -416,44 +421,41 @@ function tryls(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{T}, params::Parame
 end
 
 @doc raw"""
-    tooshortarc(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::DataFrame,
-                params::Parameters{T}; kwargs...) where {T <: AbstractFloat}
+    tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+                params::Parameters{T}) where {T <: AbstractFloat}
 
-Return initial conditions by minimizing the normalized root mean square error over 
-the admissible region.
+Return initial conditions by minimizing the normalized root mean square residual
+over the admissible region.
 
 # Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `gdf::GroupedDataFrame`, `cdf::DataFrame`: output of [`reduce_nights`](@ref).
-- `params::Parameters{T}`: see [`Parameters`](@ref).
+- `nights::Vector{ObservationNight{T}},`: vector of observation nights.
+- `params::Parameters{T}`: see `Admissible Region Parameters` of [`Parameters`](@ref).
 
-# Keyword arguments
-
-- `maxiter::Int = 200`:  maximum number of iterations.
+!!! warning
+    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
 """
-function tooshortarc(radec::Vector{RadecMPC{T}}, gdf::GroupedDataFrame, cdf::DataFrame,
-                     params::Parameters{T}; maxiter::Int = 200) where {T <: AbstractFloat}
+function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+                     params::Parameters{T}) where {T <: AbstractFloat}
     
-    # Reverse temporal order
-    reverse!(cdf)
-    # Sort nights by number of observations 
-    idxs = sortperm(cdf.nobs, rev = true)
+    
     # Allocate memory for output
     sol = zero(NEOSolution{T, T})
 
-    for i in idxs
+    # Iterate observation nights (in reverse temporal order)
+    for i in reverse(eachindex(nights))
         # Admissible region
-        A = AdmissibleRegion(cdf[i, :])
+        A = AdmissibleRegion(nights[i])
         # Center
         ρ = sum(A.ρ_domain) / 2
         v_ρ = sum(A.v_ρ_domain) / 2
         # Minimization over admissible region
-        ρs, v_ρs, Qs = adam(radec, A, ρ, v_ρ, params; maxiter)
+        ρs, v_ρs, Qs = adam(radec, A, ρ, v_ρ, params)
         # Barycentric initial conditions
         q0 = topo2bary(A, ρs[end], v_ρs[end])
         # 6 variables least squares
-        sol = tryls(radec, datetime2julian(A.date), q0, params; maxiter = 5)
+        sol = tryls(radec, nights, datetime2julian(A.date), q0, params; maxiter = 5)
 
         if nrms(sol) < 1.5
             return sol

@@ -38,11 +38,10 @@ Initial Orbit Determination (IOD) routine.
 
 # Keyword arguments
 
-- `maxiter::Int = 200`:  maximum number of iterations.
 - `max_per::T =  18.0`: maximum allowed rejection percentage.
 """
 function orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T};
-                            maxiter::Int = 200, max_per::T = 18.0) where {T <: AbstractFloat}
+                            max_per::T = 18.0) where {T <: AbstractFloat}
     
     # Allocate memory for output
     sol = zero(NEOSolution{T, T})
@@ -58,7 +57,7 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T};
     nights = reduce_nights(radec)
     # Case 1: Too Short Arc (TSA)
     if length(nights) < 3 || numberofdays(radec) < 1
-        sol = tooshortarc(radec, gdf, cdf, params; maxiter)
+        sol = tooshortarc(radec, nights, params)
     # Case 2: Gauss Method
     else
         sol = gaussinitcond(radec, nights, params)

@@ -43,6 +43,9 @@ date(x::ObservationNight{T}) where {T <: AbstractFloat} = x.date
 ra(x::ObservationNight{T}) where {T <: AbstractFloat} = x.α
 dec(x::ObservationNight{T}) where {T <: AbstractFloat} = x.δ
 observatory(x::ObservationNight{T}) where {T <: AbstractFloat} = x.observatory
+vra(x::ObservationNight{T}) where {T <: AbstractFloat} = x.v_α
+vdec(x::ObservationNight{T}) where {T <: AbstractFloat} = x.v_δ
+mag(x::ObservationNight{T}) where {T <: AbstractFloat} = x.mag
 indices(x::ObservationNight{T}) where {T <: AbstractFloat} = x.indices
 
 # Print method for ObservationNight{T}
