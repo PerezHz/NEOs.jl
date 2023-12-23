@@ -6,30 +6,30 @@ Return the contribution of `x` to the nrms.
 residual_norm(x::OpticalResidual{T, T}) where {T <: Real} = x.w_α * x.ξ_α^2 / x.relax_factor + x.w_δ * x.ξ_δ^2 / x.relax_factor
 
 @doc raw"""
-    gauss_refinement(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::Parameters{T};
-                     kwargs...) where {T <: AbstractFloat}
+    outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
+                      params::Parameters{T}) where {T <: AbstractFloat}
 
-Refine an orbit computed by [`gaussinitcond`](@ref) via propagation and/or outlier rejection.
+Refine an orbit, computed by [`tooshortarc`](@ref) or [`gaussinitcond`](@ref),
+via propagation and/or outlier rejection.
 
 # Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `sol::NEOSolution{T, T}`: orbit to be refined.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
+- `params::Parameters{T}`: see `Outlier Rejection Parameters` of [`Parameters`](@ref).
 
-# Keyword arguments
-
-- `max_per::T =  18.0`: maximum allowed rejection percentage.
-- `niter::Int = 5`: number of iterations. 
-- `varorder::Int`: order of jet transport perturbation. 
+!!! warning
+    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
 """
-function gauss_refinement(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::Parameters{T};
-                          max_per::T = 18.0, niter::Int = 5, varorder::Int = 5) where {T <: AbstractFloat}
+function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
+                           params::Parameters{T}) where {T <: AbstractFloat}
 
     # Sun's ephemeris
     eph_su = selecteph(sseph, su)
     # Earth's ephemeris
     eph_ea = selecteph(sseph, ea)
+    # Origin
+    x0 = zeros(T, 6)
     # Julian day to start propagation
     jd0 = sol.bwd.t0 + PE.J2000
     # Julian day of first (last) observation
@@ -40,24 +40,24 @@ function gauss_refinement(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, pa
     nyears_bwd = -(jd0 - t0 + 2) / yr
     # Dynamical function 
     dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
-    # Maximum number of steps
-    params = Parameters(params; maxsteps = adaptative_maxsteps(radec))
     # Initial conditions (T)
-    q00 = sol(sol.bwd.t0)
+    q0 = sol(sol.bwd.t0)
+    # Scaling factors
+    scalings = abs.(q0) ./ 10^6
     # Jet transport perturbation
-    dq = scaled_variables("δx", fill(1e-6, 6); order = varorder)
+    dq = scaled_variables("δx", scalings; order = params.varorder)
     # Initial conditions (jet transport)
-    q0 = q00 .+ dq
+    q = q0 .+ dq
 
     # Backward integration
-    bwd = propagate(dynamics, jd0, nyears_bwd, q0, params)
+    bwd = propagate(dynamics, jd0, nyears_bwd, q, params)
 
     if bwd.t[end] > t0 - jd0
         return zero(NEOSolution{T, T})
     end
 
     # Forward integration
-    fwd = propagate(dynamics, jd0, nyears_fwd, q0, params)
+    fwd = propagate(dynamics, jd0, nyears_fwd, q, params)
 
     if fwd.t[end] < tf - jd0
         return zero(NEOSolution{T, T})
@@ -69,21 +69,21 @@ function gauss_refinement(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, pa
                     xve = et -> auday2kmsec(eph_ea(et/daysec)),
                     xva = et -> bwdfwdeph(et, bwd, fwd))
     # Orbit fit
-    fit = tryls(res, zeros(get_numvars()), niter)
+    fit = tryls(res, x0, params.niter)
 
     # NRMS (with 0 outliers)
     Q_0 = nrms(res, fit)
 
     if Q_0 < 1
-        return evalfit(NEOSolution(bwd, fwd, res, fit))
+        return evalfit(NEOSolution(sol.nights, bwd, fwd, res, fit, scalings))
     end
 
     # Number of observations
     N_radec = length(radec)
     # Maximum allowed outliers
-    max_drop = ceil(Int, N_radec * max_per / 100)
+    max_drop = ceil(Int, N_radec * params.max_per / 100)
     # Boolean mask (0: included in fit, 1: outlier)
-    new_outliers = BitVector(zeros(N_radec))
+    new_outliers = BitVector(zeros(Int, N_radec))
 
     # Drop loop
     for i in 1:max_drop
@@ -100,7 +100,7 @@ function gauss_refinement(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, pa
                 res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
                                        relax_factor.(res), new_outliers)
                 # Update fit
-                fit = tryls(res, zeros(get_numvars()), niter)
+                fit = tryls(res, x0, params.niter)
                 break
             end
         end
@@ -133,7 +133,7 @@ function gauss_refinement(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, pa
         res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
                                relax_factor.(res), new_outliers)
         # Update fit
-        fit = tryls(res, zeros(get_numvars()), niter)
+        fit = tryls(res, x0, params.niter)
     end
     # Add 0 outliers fit 
     Qs[end] = Q_0
@@ -147,9 +147,9 @@ function gauss_refinement(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, pa
         res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
                                relax_factor.(res), new_outliers)
         # Update fit
-        fit = tryls(res, zeros(get_numvars()), niter)
+        fit = tryls(res, x0, params.niter)
 
-        return evalfit(NEOSolution(bwd, fwd, res, fit)) 
+        return evalfit(NEOSolution(sol.nights, bwd, fwd, res, fit, scalings)) 
     end
 
     if max_drop > 1
@@ -177,7 +177,7 @@ function gauss_refinement(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, pa
     res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
                            relax_factor.(res), new_outliers)
     # Update fit
-    fit = tryls(res, zeros(get_numvars()), niter)
+    fit = tryls(res, x0, params.niter)
 
-    return evalfit(NEOSolution(bwd, fwd, res, fit))
+    return evalfit(NEOSolution(sol.nights, bwd, fwd, res, fit, scalings))
 end

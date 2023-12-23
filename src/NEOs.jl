@@ -61,13 +61,15 @@ export Parameters, propagate, propagate_lyap, propagate_root
 # B plane
 export valsecchi_circle, bopik
 # Least squares
-export outlier_rejection, project, chi2, nms, nrms, diffcorr, newtonls, tryls, sigmas
+export project, chi2, nms, nrms, diffcorr, newtonls, tryls, sigmas
 # Osculating
 export pv2kep, yarkp2adot
 # Too Short Arc
 export tooshortarc
 # Gauss method
 export gauss_method, gaussinitcond, gauss_refinement
+# Outlier rejection
+export outlier_rejection
 # Orbit determination
 export issinglearc, istsa, orbitdetermination
 

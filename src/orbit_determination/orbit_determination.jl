@@ -1,6 +1,7 @@
 include("osculating.jl")
 include("tooshortarc.jl")
 include("gauss_method.jl")
+include("outlier_rejection.jl")
 
 @doc raw"""
     issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <: AbstractFloat}
@@ -26,8 +27,7 @@ function istsa(sol::NEOSolution{T, T}) where {T <: AbstractFloat}
 end
 
 @doc raw"""
-    orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T};
-                       kwargs...) where {T <: AbstractFloat}
+    orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T}) where {T <: AbstractFloat}
 
 Initial Orbit Determination (IOD) routine.
 
@@ -35,13 +35,8 @@ Initial Orbit Determination (IOD) routine.
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `params::Parameters{T}`: see [`Parameters`](@ref).
-
-# Keyword arguments
-
-- `max_per::T =  18.0`: maximum allowed rejection percentage.
 """
-function orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T};
-                            max_per::T = 18.0) where {T <: AbstractFloat}
+function orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T}) where {T <: AbstractFloat}
     
     # Allocate memory for output
     sol = zero(NEOSolution{T, T})
@@ -63,8 +58,8 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T};
         sol = gaussinitcond(radec, nights, params)
     end
     # Outlier rejection (if needed)
-    if nrms(sol) > 1.0 && !iszero(sol)
-        sol = gauss_refinement(radec, sol, params; max_per, niter, varorder)
+    if nrms(sol) > 1 && !iszero(sol)
+        sol = outlier_rejection(radec, sol, params)
     end
 
     return sol::NEOSolution{T, T}

@@ -49,9 +49,11 @@ end
 # Print method for OpticalResidual
 # Examples:
 # α: -138.79801 δ: -89.80025
-# α: -134.79450 δ: -91.42509
+# α: -134.79450 δ: -91.42509 (outlier)
 function show(io::IO, x::OpticalResidual{T, U}) where {T <: Real, U <: Number}
-    print(io, "α: ", @sprintf("%+.5f", cte(x.ξ_α)), " δ: ", @sprintf("%+.5f", cte(x.ξ_δ)))
+    outlier_flag = outlier(x) ? " (outlier)" : ""
+    print(io, "α: ", @sprintf("%+.5f", cte(x.ξ_α)), " δ: ",
+          @sprintf("%+.5f", cte(x.ξ_δ)), outlier_flag)
 end
 
 @doc raw"""
