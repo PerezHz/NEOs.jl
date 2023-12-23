@@ -94,7 +94,7 @@ using NEOs: NEOSolution, numberofdays
         @test all(sol.scalings .< 1e-5)
     end
 
-    @test "Outlier Rejection" begin
+    @testset "Outlier Rejection" begin
         # Optical astrometry file
         filename = joinpath("data", "2007_VV7.txt")
         # Download observations
