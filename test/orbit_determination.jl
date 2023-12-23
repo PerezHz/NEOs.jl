@@ -93,24 +93,51 @@ using NEOs: NEOSolution, numberofdays
         # Scalig factors
         @test all(sol.scalings .< 1e-5)
     end
-    #=
-    @test "Outlier Rejection" begin
-        # Gauss  refinement (with outlier rejection)
 
-        sol = gauss_refinement(radec, sol, params)
-    
+    @test "Outlier Rejection" begin
+        # Optical astrometry file
+        filename = joinpath("data", "2007_VV7.txt")
+        # Download observations
+        get_radec_mpc("designation" => "2007 VV7", filename)
+        # Load observations 
+        radec = read_radec_mpc(filename)
+        # Delete astrometry file
+        rm(filename)
+        # Parameters
+        params = Parameters(abstol = 1e-20, order = 25, parse_eqs = true)
+
+        # Orbit Determination
+        sol = orbitdetermination(radec, params)
+
+        # Values by December 23, 2023
+
+        # Vector of observations
+        @test length(radec) == 21
+        @test numberofdays(radec) < 3.03
+        # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
+        # Observation nights
+        @test length(sol.nights) == 4
+        @test sol.nights[1].radec[1] == radec[1]
+        @test sol.nights[end].radec[end] == radec[end]
+        @test issorted(sol.nights)
+        # Backward integration
         @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
-        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
-        @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
+        # Forward integration
+        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
-        @test length(sol.res) == 123
+        # Vector of residuals
+        @test length(sol.res) == 21
+        @test count(outlier.(sol.res)) == 2
+        # Least squares fit
         @test sol.fit.success
-        @test all( sqrt.(diag(sol.fit.Γ)) .< 100 )
-        @test nrms(sol) < 0.4
-        @test count(outlier.(sol.res)) == 0
+        @test all( sigmas(sol) .< 5e-4 )
+        @test nrms(sol) < 0.25
+        # Scalig factors
+        @test all(sol.scalings .< 8e-7)
     end
-    =#
+
 end
