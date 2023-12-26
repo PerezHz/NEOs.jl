@@ -414,25 +414,6 @@ function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_ite
 end
 
 @doc raw"""
-    adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
-
-Empirical upper bound for the number of steps used for propagation.
-"""
-function adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
-    # Time difference [ms]
-    Δ_ms =  getfield(date(radec[end]) - date(radec[1]), :value)
-    # Time difference [days]
-    Δ_day = Δ_ms / 86_400_000
-    # Adaptative maxsteps
-    if Δ_day <= 30
-        return 55 - floor(Int, 5*Δ_day/6)
-    else
-        return ceil(Int, (Δ_day + 360)/13)
-    end
-end
-
-
-@doc raw"""
     gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
                   params::Parameters{T}) where {T <: AbstractFloat}
 

@@ -420,6 +420,15 @@ function tryls(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
 
 end
 
+# Order in which to check nights in tooshortarc
+function tsanightorder(x::ObservationNight{T}, y::ObservationNight{T}) where {T <: AbstractFloat}
+    if x.nobs == y.nobs
+        return x.date > y.date
+    else
+        return x.nobs > y.nobs
+    end
+end
+
 @doc raw"""
     tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
                 params::Parameters{T}) where {T <: AbstractFloat}
@@ -438,13 +447,14 @@ over the admissible region.
 """
 function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
                      params::Parameters{T}) where {T <: AbstractFloat}
-    
-    
+
     # Allocate memory for output
     sol = zero(NEOSolution{T, T})
+    # Sort nights by tsanightorder
+    idxs = sortperm(nights, lt = tsanightorder)
 
-    # Iterate observation nights (in reverse temporal order)
-    for i in reverse(eachindex(nights))
+    # Iterate observation nights
+    for i in idxs
         # Admissible region
         A = AdmissibleRegion(nights[i])
         # Center
