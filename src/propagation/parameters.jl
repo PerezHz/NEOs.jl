@@ -32,7 +32,7 @@ Parameters for all orbit determination functions.
 
 # Propagation Parameters
 
-- `maxsteps::Int`: maximum number of steps for the integration (default: `100`).
+- `maxsteps::Int`: maximum number of steps for the integration (default: `500`).
 - `μ_ast::Vector{T}`: vector of gravitational parameters (default: `μ_ast343_DE430[1:end]`).
 - `order::Int`: order of Taylor expansions wrt time (default: 25).
 - `abstol::T`: absolute tolerance used to compute propagation timestep (default: `1e-20`).
@@ -57,16 +57,16 @@ Parameters for all orbit determination functions.
 
 # Admissible Region Parameters
 
-- `maxiter::Int`: maximum number of iterations for admissible region `ADAM` optimizer (default: `200`).
+- `maxiter::Int`: maximum number of iterations for admissible region `ADAM` optimizer (default: `100`).
 
 # Outlier Rejection Parameters
 
 - `max_per::T`: maximum allowed rejection percentage (default: `18.0`).
 """
-function Parameters(; maxsteps::Int = 100, μ_ast::Vector{T} = μ_ast343_DE430[1:end],
+function Parameters(; maxsteps::Int = 500, μ_ast::Vector{T} = μ_ast343_DE430[1:end],
                       order::Int = 25, abstol::T = 1e-20, parse_eqs::Bool = true, 
                       debias_table::String = "2018", niter::Int = 5, max_triplets::Int = 10,
-                      varorder::Int = 5, Q_max::T = 5.0, maxiter::Int = 200,
+                      varorder::Int = 5, Q_max::T = 5.0, maxiter::Int = 100,
                       max_per::T = 18.0) where {T <: AbstractFloat}
     # Unfold debiasing matrix
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)

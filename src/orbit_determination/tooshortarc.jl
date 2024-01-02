@@ -292,6 +292,9 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
     # Backward (forward) integration
     bwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q0, params)
     fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q0, params)
+    if bwd.t[end] > t0 - jd0 || fwd.t[end] < tf - jd0
+        return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
+    end
     # Sun (Earth) ephemeris
     eph_su = selecteph(sseph, su)
     eph_ea = selecteph(sseph, ea)
@@ -306,118 +309,128 @@ end
 
 @doc raw"""
     adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-         params::Parameters{T}; α::T = 25.0, β_1::T = 0.5, β_2::T = 0.85,
-         ϵ::T = 1e-8, Qtol::T =  0.01) where {T <: AbstractFloat}
+         params::Parameters{T}; η::T = 25.0, μ::T = 0.75, ν::T = 0.9,
+         ϵ::T = 1e-8, Qtol::T = 0.001) where {T <: AbstractFloat}
 
-ADAM minimizer of root mean square error over `A`.
+Adaptative moment estimation (ADAM) minimizer of normalized mean square
+residual over and admissible region `A`.
+
+!!! warning
+    This function will set the (global) `TaylorSeries` variables to `δρ δvρ`. 
+
+!!! reference
+    See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
 """
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-              params::Parameters{T}; α::T = 25.0, β_1::T = 0.5, β_2::T = 0.85,
-              ϵ::T = 1e-8, Qtol::T = 0.01) where {T <: AbstractFloat}
-    # Origin
-    x0 = zeros(T, 2)
+              params::Parameters{T}; η::T = 25.0, μ::T = 0.75, ν::T = 0.9,
+              ϵ::T = 1e-8, Qtol::T = 0.001) where {T <: AbstractFloat}
+    # Initial time of integration [julian days]
+    jd0 = datetime2julian(A.date)
     # Scaling factors
     scalings = [A.ρ_domain[2] - A.ρ_domain[1], A.v_ρ_domain[2] - A.v_ρ_domain[1]] / 1_000
     # Jet transport variables
     dq = scaled_variables("dρ dvρ", scalings, order = 1)
+    # Maximum number of iterations
+    maxiter = params.maxiter
     # Allocate memory
-    ρs = Vector{T}(undef, params.maxiter+1)
-    v_ρs = Vector{T}(undef, params.maxiter+1)
-    Qs = fill(T(Inf), params.maxiter+1)
-    # Initial time of integration [julian days]
-    jd0 = datetime2julian(A.date)
-    # Initial conditions
-    ρs[1] = ρ
-    v_ρs[1] = v_ρ  
-    q0 = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
-    _, _, res = propres(radec, jd0, q0, params)
-    Q = nms(res)
-    Qs[1] = Q(x0)
+    ρs = Vector{T}(undef, maxiter+1)
+    v_ρs = Vector{T}(undef, maxiter+1)
+    Qs = fill(T(Inf), maxiter+1)
+    # Origin
+    x0 = zeros(T, 2)
+    # First momentum
     m = zeros(T, 2)
-    v = zeros(T, 2)
-    # Number of iterations
-    niter = 0
+    _m_ = zeros(T, 2)
+    # Second momentum
+    n = zeros(T, 2)
+    _n_ = zeros(T, 2)
     # Gradient descent
-    while niter < params.maxiter
-        # Update number of iterations
-        niter += 1
+    for t in 1:maxiter+1
+        # Current position in admissible region
+        ρs[t] = ρ
+        v_ρs[t] = v_ρ  
+        # Current barycentric state vector
+        q = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
+        # Propagation and residuals
+        _, _, res = propres(radec, jd0, q, params)
+        iszero(length(res)) && break
+        # Current Q
+        Q = nms(res)
+        Qs[t] = Q(x0)
+        # Convergence condition
+        t > 1 && abs(Qs[t] - Qs[t-1]) / Qs[t] < Qtol && break
         # Gradient of objective function
-        dQ = TaylorSeries.gradient(Q)(x0)
-        # Momentum
-        m = β_1 * m + (1 - β_1) * dQ
-        _m_ = m / (1 - β_1^niter)
-        # Sum of square of past gradients
-        v = β_2 * v + (1 - β_2) * dQ .^ 2
-        _v_ = v / (1 - β_2^niter)
+        g_t = TaylorSeries.gradient(Q)(x0)
+        # First momentum
+        m .= μ * m + (1 - μ) * g_t
+        _m_ .= m / (1 - μ^t)
+        # Second momentum
+        n .= ν * n + (1 - ν) * g_t .^ 2
+        _n_ .= n / (1 - ν^t)
         # Step
-        x1 = x0 - α * _m_ ./ (sqrt.(_v_) .+ ϵ)
+        x1 = x0 - η * _m_ ./ (sqrt.(_n_) .+ ϵ)
         # Update values
-        ρ, v_ρ = bary2topo(A, q0(x1))
+        ρ, v_ρ = bary2topo(A, q(x1))
         # Projection
         ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
-        # New initial conditions
-        q0 = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
-        # Update obbjective function
-        _, _, res = propres(radec, jd0, q0, params)
-        Q = nms(res)
-        # Convergence condition
-        if abs(Q(x0) - Qs[niter]) < Qtol
-            break
-        end
-        # Save current variables
-        ρs[niter+1] = ρ
-        v_ρs[niter+1] = v_ρ
-        Qs[niter+1] = Q(x0)
     end
-
-    niter = argmin(Qs)
-
-    return ρs[1:niter], v_ρs[1:niter], Qs[1:niter]
+    # Find point with smallest Q
+    t = argmin(Qs)
+    # Return path
+    return view(ρs, 1:t), view(v_ρs, 1:t), view(Qs, 1:t)
 end
 
-# Special method of tryls for tooshortarc
-function tryls(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
-               jd0::T, q0::Vector{T}, params::Parameters{T}; maxiter::Int = 5) where {T <: AbstractFloat}
-    # Allocate memory
-    sols = zeros(NEOSolution{T, T}, maxiter)
-    # Origin
-    x0 = zeros(T, 6)
+@doc raw"""
+    tsals(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+          jd0::T, q0::Vector{T}, params::Parameters{T}; maxiter::Int = 5,
+          Qtol::T = 0.1) where {T <: AbstractFloat}
+
+Used within [`tooshortarc`](@ref) to compute an orbit from a point in an
+admissible region via least squares.
+
+!!! warning
+    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
+"""
+function tsals(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+               jd0::T, q0::Vector{T}, params::Parameters{T}; maxiter::Int = 5,
+               Qtol::T = 0.1) where {T <: AbstractFloat}
     # Scaling factors
     scalings = abs.(q0) ./ 10^5
     # Jet transport variables
     dq = scaled_variables("dx", scalings, order = 6)
-    # Number of iterations
-    niter = 1
-    # Minimization loop
-    while niter <= maxiter
+    # Allocate memory
+    sols = zeros(NEOSolution{T, T}, maxiter+1)
+    Qs = fill(T(Inf), maxiter+1)
+    # Origin
+    x0 = zeros(T, 6)
+    # Least squares
+    for t in 1:maxiter+1
         # Initial conditions
         q = q0 + dq
         # Propagation & residuals
         bwd, fwd, res = propres(radec, jd0, q, params)
+        iszero(length(res)) && break
         # Least squares fit
-        fit = tryls(res, x0, 5)
+        fit = tryls(res, x0, params.niter)
         # Case: unsuccessful fit
         if !fit.success || any(diag(fit.Γ) .< 0)
             break
         end
         # Current solution
-        sols[niter] = evalfit(NEOSolution(nights, bwd, fwd, res, fit, scalings))
-        # Convergence condition
-        if niter > 1 && nrms(sols[niter-1]) - nrms(sols[niter]) < 0.1
-            break
+        sols[t] = evalfit(NEOSolution(nights, bwd, fwd, res, fit, scalings))
+        Qs[t] = nrms(sols[t])
+        # Convergence conditions
+        if t > 1
+            Qs[t] > Qs[t-1] && break
+            abs(Qs[t] - Qs[t-1]) < Qtol && break
         end
         # Update values
         q0 = q(fit.x)
-        # Update scaling factors
-        scalings = abs.(q0) ./ 10^5 
-        # Update Jet transport variables
-        dq = scaled_variables("dx", scalings, order = 6)
-        # Update number of iterations
-        niter += 1
     end
-
-    return sols[niter]
-
+    # Find solution with smallest Q
+    t = argmin(Qs)
+    # Return solution
+    return sols[t]
 end
 
 # Order in which to check nights in tooshortarc
@@ -449,7 +462,7 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight
                      params::Parameters{T}) where {T <: AbstractFloat}
 
     # Allocate memory for output
-    sol = zero(NEOSolution{T, T})
+    best_sol = zero(NEOSolution{T, T})
     # Sort nights by tsanightorder
     idxs = sortperm(nights, lt = tsanightorder)
 
@@ -461,16 +474,18 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight
         ρ = sum(A.ρ_domain) / 2
         v_ρ = sum(A.v_ρ_domain) / 2
         # Minimization over admissible region
-        ρs, v_ρs, Qs = adam(radec, A, ρ, v_ρ, params)
+        ρs, v_ρs, _ = adam(radec, A, ρ, v_ρ, params)
         # Barycentric initial conditions
         q0 = topo2bary(A, ρs[end], v_ρs[end])
         # 6 variables least squares
-        sol = tryls(radec, nights, datetime2julian(A.date), q0, params; maxiter = 5)
-
-        if nrms(sol) < 1.5
-            return sol
+        sol = tsals(radec, nights, datetime2julian(A.date), q0, params; maxiter = 5)
+        # Update best solution
+        if nrms(sol) < nrms(best_sol)
+            best_sol = sol
+            # Break condition
+            nrms(sol) < 1.5 && break
         end
     end
     
-    return sol
+    return best_sol
 end

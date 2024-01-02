@@ -44,7 +44,7 @@ function adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFlo
         return ceil(Int, (Δ_day + 360)/13)
     end
     =#
-    return 100
+    return 500
 end
 
 @doc raw"""
