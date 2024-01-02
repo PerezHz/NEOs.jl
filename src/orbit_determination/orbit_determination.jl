@@ -20,11 +20,26 @@ end
 
 @doc raw"""
     istsa(sol::NEOSolution{T, T}) where {T <: AbstractFloat}
-Check whether `sol` was computed via Too Short Arc (`true`) or via Gauss Method (`false`).
+
+Check whether `sol` was computed via [`tooshortarc`](@ref) (`true`) or
+via [`gaussinitcond`](@ref) (`false`).
 """
-function istsa(sol::NEOSolution{T, T}) where {T <: AbstractFloat}
-    return length(sol.nights) < 3 || numberofdays(sol.nights) < 1
+function istsa(nights::Vector{ObservationNight{T}}) where {T <: AbstractFloat}
+    # Observing stations
+    obs = observatory.(nights)
+    # Satellite observatories can only be handled by Gauss
+    any(issatellite.(obs)) && return false
+    # Gauss cannot handle less than 3 observation nights
+    length(nights) < 3 && return true
+    # Time span
+    Δ = numberofdays(nights)
+    # Gauss aproximation do not work with less than 1 day
+    Δ < 1 && return true
+    # All observations come from the same observatory
+    return allequal(obs) && Δ < 5
 end
+
+istsa(sol::NEOSolution{T, T}) where {T <: AbstractFloat} = istsa(sol.nights)
 
 @doc raw"""
     adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
@@ -72,7 +87,7 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T}) w
     # Reduce observation nights by linear regression
     nights = reduce_nights(radec)
     # Case 1: Too Short Arc (TSA)
-    if length(nights) < 3 || numberofdays(radec) < 1
+    if istsa(nights)
         sol = tooshortarc(radec, nights, params)
     # Case 2: Gauss Method
     else
