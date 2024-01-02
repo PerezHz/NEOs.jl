@@ -226,9 +226,15 @@ function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <:
     # Project range
     ρ = clamp(ρ,  A.ρ_domain[1], A.ρ_domain[2])
     # Project range-rate
-    y_min, y_max = range_rate(A, ρ)
-    v_ρ = clamp(v_ρ, y_min, y_max)
-    
+    y_domain = range_rate(A, ρ)
+    if iszero(length(y_domain))
+        v_ρ = sum(A.v_ρ_domain) / 2
+    elseif isone(length(y_domain))
+        v_ρ = y_domain[1]
+    else
+        v_ρ = clamp(v_ρ, y_domain[1], y_domain[2])
+    end
+
     return ρ, v_ρ
 end
 
