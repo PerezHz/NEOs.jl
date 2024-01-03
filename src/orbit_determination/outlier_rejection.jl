@@ -160,7 +160,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
             points[2, i] = N_outliers[i]
         end
         # K-means clustering
-        cluster = kmeans(points, 2)
+        cluster = kmeans(points, 2; init = [1, max_drop + 1])
         # Index of smallest cluster
         i_0 = cluster.assignments[1]
         # Find last fit of smallest cluster
