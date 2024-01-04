@@ -383,7 +383,11 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     # Covariance matrix
     Γ = inv(C)
     
-    return OrbitFit(true, x_new, Γ, :diffcorr)
+    if any(diag(Γ) .< 0)
+        return OrbitFit(false, x_new, Γ, :diffcorr)
+    else
+        return OrbitFit(true, x_new, Γ, :diffcorr)
+    end
 end
 
 function diffcorr(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
@@ -479,7 +483,11 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     # Covariance matrix
     Γ = inv(C)
 
-    return OrbitFit(true, x_new, Γ, :newton)
+    if any(diag(Γ) .< 0)
+        return OrbitFit(false, x_new, Γ, :newton)
+    else
+        return OrbitFit(true, x_new, Γ, :newton)
+    end
 end
 
 function newtonls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},

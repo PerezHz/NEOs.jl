@@ -65,13 +65,7 @@ function AdmissibleRegion(night::ObservationNight{T}) where {T <: AbstractFloat}
         ρ_min = 10^((h - H_max)/5)
     end
     # Maximum range (heliocentric constraint)
-    ρ_max = find_zeros(s -> admsreg_U(coeffs, s), ρ_min, 10.0)[1]
-    # Make sure U(ρ) ≥ 0
-    niter = 0
-    while admsreg_U(coeffs, ρ_max) < 0 && niter < 1_000
-        niter += 1
-        ρ_max = prevfloat(ρ_max)
-    end
+    ρ_max = max_range(coeffs, ρ_min)
     # Range domain
     ρ_domain = [ρ_min, ρ_max]
     # Range rate domain
@@ -188,6 +182,26 @@ function range_rate(coeffs::Vector{T}, ρ::S) where {T, S <: AbstractFloat}
     return find_zeros(s -> admsreg_V(coeffs, ρ, s), -10.0, 10.0)
 end
 range_rate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat} = range_rate(A.coeffs, ρ)
+
+@doc raw"""
+    max_range(coeffs::Vector{T}, ρ_min::T) where {T <: AbstractFloat}
+
+Return the maximum possible range in the boundary of an admissible region
+with coefficients `coeffs` and minimum allowed range `ρ_min`.
+"""
+function max_range(coeffs::Vector{T}, ρ_min::T) where {T <: AbstractFloat}
+    # Initial guess
+    ρ_max = find_zeros(s -> admsreg_U(coeffs, s), ρ_min, 10.0)[1]
+    # Make sure U(ρ) ≥ 0 and there is at least one range_rate solution
+    niter = 0
+    while admsreg_U(coeffs, ρ_max) < 0 || length(range_rate(coeffs, ρ_max)) == 0
+        niter += 1
+        ρ_max = prevfloat(ρ_max)
+        niter > 1_000 && break
+    end
+
+    return ρ_max
+end
 
 @doc raw"""
     boundary(A::AdmissibleRegion{T}, t::S) where {T <: AbstractFloat, S <: Number}
