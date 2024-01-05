@@ -23,7 +23,7 @@ using PlanetaryEphemeris: daysec, yr, TaylorInterpolant, auday2kmsec, su, ea, au
       meanmotion, meananomaly, selecteph
 using Healpix: ang2pixRing, Resolution
 using StatsBase: mean, std
-using GLM: @formula, lm, coef
+using LsqFit: curve_fit
 using Roots: find_zeros
 using Clustering: kmeans
 

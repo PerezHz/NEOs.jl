@@ -59,6 +59,45 @@ end
 # Order in ObservationNight is given by date
 isless(a::ObservationNight{T}, b::ObservationNight{T}) where {T <: AbstractFloat} = a.date < b.date
 
+# Evaluate a polynomial with coefficients p in every element of x
+polymodel(x, p) = map(y -> evalpoly(y, p), x)
+
+# Normalized mean square residual for polynomial fit
+polyerror(x) = sum(x .^ 2) / length(x)
+
+@doc raw"""
+    polyfit(x::Vector{T}, y::Vector{T}; tol::T = 1e-4) where {T <: AbstractFloat}
+
+Fit a polynomial to points `(x, y)`. The order of the polynomial is increased
+until `polyerror` is less than `tol`.
+"""
+function polyfit(x::Vector{T}, y::Vector{T}; tol::T = 1e-4) where {T <: AbstractFloat}
+    # Avoid odd and high orders (to have a defined concavity and avoid overfit)
+    for order in [1, 2, 4, 6]
+        # Initial guess for coefficients
+        coeffs = ones(T, order+1)
+        # Polynomial fit
+        fit = curve_fit(polymodel, x, y, coeffs)
+        # Convergence condition
+        if polyerror(fit.resid) < tol || order == 6
+            return fit.param
+        end
+    end
+end
+
+@doc raw"""
+    diffcoeffs(x::Vector{T}) where {T <: AbstractFloat}
+
+Return the coefficients of the derivative of a polynomial with coefficients `x`.
+"""
+function diffcoeffs(x::Vector{T}) where {T <: AbstractFloat}
+    y = Vector{T}(undef, length(x)-1)
+    for i in eachindex(y)
+        y[i] = i * x[i+1]
+    end
+    return y
+end
+
 # Outer constructor
 function ObservationNight(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) where {T <: AbstractFloat}
     # Defining quantities of an ObservationNight
@@ -98,17 +137,15 @@ function ObservationNight(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) whe
         df.α = map(x -> x < π ? x + 2π : x, df.α)
     end
 
-    # Linear regression
-    α_p = lm(@formula(α ~ t_rel), df)
-    α_coef = coef(α_p)
-    δ_p = lm(@formula(δ ~ t_rel), df)
-    δ_coef = coef(δ_p)
+    # Polynomial regression
+    α_coef = polyfit(df.t_rel, df.α)
+    δ_coef = polyfit(df.t_rel, df.δ)
 
     # Evaluate polynomials at mean date 
-    α = mod2pi(α_coef[1] + α_coef[2] * t_mean)
-    δ = δ_coef[1] + δ_coef[2] * t_mean
-    v_α = α_coef[2]
-    v_δ = δ_coef[2]
+    α = mod2pi(polymodel(t_mean, α_coef))
+    δ = polymodel(t_mean, δ_coef)
+    v_α = polymodel(t_mean, diffcoeffs(α_coef))
+    v_δ = polymodel(t_mean, diffcoeffs(δ_coef))
 
     # Mean apparent magnitude
     mag = mean(filter(!isnan, df.mag))
