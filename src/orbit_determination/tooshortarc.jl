@@ -497,8 +497,36 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight
         ρs, v_ρs, _ = adam(radec, A, ρ, v_ρ, params)
         # Barycentric initial conditions
         q0 = topo2bary(A, ρs[end], v_ρs[end])
+        # Initial time of integration [julian days]
+        jd0 = datetime2julian(A.date)
         # 6 variables least squares
-        sol = tsals(radec, nights, datetime2julian(A.date), q0, params; maxiter = 5)
+        sol = tsals(radec, nights, jd0, q0, params; maxiter = 5)
+        # Update best solution
+        if nrms(sol) < nrms(best_sol)
+            best_sol = sol
+            # Break condition
+            nrms(sol) < 1.5 && break
+        end
+        # Heel anomaly
+        ρ = A.ρ_domain[1]
+        v_ρs = LinRange(A.v_ρ_domain[1], A.v_ρ_domain[2], 25)
+        Qs = fill(Inf, 25)
+        for i in eachindex(Qs)
+            # Barycentric initial conditions
+            q = topo2bary(A, ρ, v_ρs[i])
+            # Propagation & residuals
+            _, _, res = propres(radec, jd0, q, params)
+            iszero(length(res)) && continue
+            # NRMS
+            Qs[i] = nrms(res) 
+        end
+        # Find solution with smallest Q
+        t = argmin(Qs)
+        isinf(Qs[t]) && continue
+        # Barycentric initial conditions
+        q0 = topo2bary(A, ρ, v_ρs[t])
+        # 6 variables least squares
+        sol = tsals(radec, nights, jd0, q0, params; maxiter = 5)
         # Update best solution
         if nrms(sol) < nrms(best_sol)
             best_sol = sol
@@ -506,6 +534,6 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight
             nrms(sol) < 1.5 && break
         end
     end
-    
+
     return best_sol
 end
