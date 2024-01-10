@@ -42,6 +42,26 @@ function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6); o
     return dq
 end
 
+# Definition of zero TaylorInterpolant{T, U, 2}
+function zero(::Type{TaylorInterpolant{T, U, 2}}) where {T <: Real, U <: Number}
+    return TaylorInterpolant{T, U, 2}(zero(T), zeros(T, 1), Matrix{Taylor1{U}}(undef, 0, 0))
+end
+
+iszero(x::TaylorInterpolant{T, U, 2}) where {T <: Real, U <: Number} = x == zero(TaylorInterpolant{T, U, 2})
+
+function unsuccessful_propagation(sol::TaylorInterpolant{T, U, 2}, t::T) where {T <: Real, U <: Number}
+
+    if issorted(sol.t)
+        c = sol.t[end] < t
+    elseif issorted(sol.t, rev = true)
+        c = sol.t[end] > t
+    else
+        c = true
+    end
+
+    return iszero(sol) || any(norm.(sol.x, Inf) .> 10) || c 
+end
+
 @doc raw"""
     propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order,
                      abstol::T = abstol) where {T <: Real, U <: Number}
@@ -138,8 +158,14 @@ function propagate(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
     @time tv, xv, psol = taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, Val(true), _params;
                                      maxsteps = maxsteps, parse_eqs = parse_eqs)
 
-    return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], psol)
-
+    # Assemble TaylorInterpolant
+    t0 = jd0 - JD_J2000
+    t = tv .- tv[1]
+    if issorted(t) || issorted(t, rev = true)
+        return TaylorInterpolant{T, U, 2}(t0, t, psol)
+    else
+        return zero(TaylorInterpolant{T, U, 2})
+    end
 end
 
 @doc raw"""

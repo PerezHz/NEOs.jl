@@ -39,6 +39,17 @@ some dynamical constrainits on a too short arc.
     observatory::ObservatoryMPC{T}
 end
 
+# Definition of zero AdmissibleRegion{T}
+function zero(::Type{AdmissibleRegion{T}}) where {T <: AbstractFloat}
+    return AdmissibleRegion{T}(
+        DateTime(2000), zero(T), zero(T), zero(T), zero(T), Vector{T}(undef, 0),
+        Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
+        Vector{T}(undef, 0), Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs()
+    )
+end
+
+iszero(x::AdmissibleRegion{T}) where {T <: AbstractFloat} = x == zero(AdmissibleRegion{T})
+
 # Outer constructor
 function AdmissibleRegion(night::ObservationNight{T}) where {T <: AbstractFloat}
     # Unfold
@@ -66,6 +77,7 @@ function AdmissibleRegion(night::ObservationNight{T}) where {T <: AbstractFloat}
     end
     # Maximum range (heliocentric constraint)
     ρ_max = max_range(coeffs, ρ_min)
+    iszero(ρ_max) && return zero(AdmissibleRegion{Float64})
     # Range domain
     ρ_domain = [ρ_min, ρ_max]
     # Range rate domain
@@ -87,7 +99,7 @@ end
     admsreg_coeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
                    ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
 
-Return the polynomial coefficients for an [`AdmissibleRegioin`](@ref). 
+Return the polynomial coefficients for an [`AdmissibleRegion`](@ref). 
 
 !!! reference
     See equation (8.8) of https://doi.org/10.1017/CBO9781139175371.
@@ -191,7 +203,9 @@ with coefficients `coeffs` and minimum allowed range `ρ_min`.
 """
 function max_range(coeffs::Vector{T}, ρ_min::T) where {T <: AbstractFloat}
     # Initial guess
-    ρ_max = find_zeros(s -> admsreg_U(coeffs, s), ρ_min, 10.0)[1]
+    sol = find_zeros(s -> admsreg_U(coeffs, s), ρ_min, 10.0)
+    iszero(length(sol)) && return zero(T)
+    ρ_max = sol[1]
     # Make sure U(ρ) ≥ 0 and there is at least one range_rate solution
     niter = 0
     while admsreg_U(coeffs, ρ_max) < 0 || length(range_rate(coeffs, ρ_max)) == 0
@@ -312,8 +326,7 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
     # Backward (forward) integration
     bwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q0, params)
     fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q0, params)
-    if bwd.t[end] > t0 - jd0 || fwd.t[end] < tf - jd0 ||
-       any(norm.(bwd.x, Inf) .> 100) || any(norm.(fwd.x, Inf) .> 100) 
+    if unsuccessful_propagation(bwd, t0 - jd0) || unsuccessful_propagation(fwd, tf - jd0)
         return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
     end
     # Sun (Earth) ephemeris
@@ -491,6 +504,7 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight
     for i in idxs
         # Admissible region
         A = AdmissibleRegion(nights[i])
+        iszero(A) && continue
         # Center
         ρ = sum(A.ρ_domain) / 2
         v_ρ = sum(A.v_ρ_domain) / 2

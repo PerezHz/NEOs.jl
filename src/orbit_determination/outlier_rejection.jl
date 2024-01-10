@@ -52,14 +52,14 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     # Backward integration
     bwd = propagate(dynamics, jd0, nyears_bwd, q, params)
 
-    if bwd.t[end] > t0 - jd0 || any(norm.(bwd.x, Inf) .> 100)
+    if unsuccessful_propagation(bwd, t0 - jd0)
         return zero(NEOSolution{T, T})
     end
 
     # Forward integration
     fwd = propagate(dynamics, jd0, nyears_fwd, q, params)
 
-    if fwd.t[end] < tf - jd0 || any(norm.(fwd.x, Inf) .> 100) 
+    if unsuccessful_propagation(fwd, tf - jd0)
         return zero(NEOSolution{T, T})
     end
 

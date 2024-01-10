@@ -485,18 +485,18 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNig
             bwd::TaylorInterpolant{T, TaylorN{T}, 2} = propagate(
                 RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q0, params
             ) 
-
-            if bwd.t[end]::T > t0 - jd0
+            if unsuccessful_propagation(bwd, t0 - jd0)
                 continue
             end
+
             # Forward propagation
             fwd::TaylorInterpolant{T, TaylorN{T}, 2} = propagate(
                 RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q0, params
             )
-
-            if fwd.t[end]::T < tf - jd0
+            if unsuccessful_propagation(fwd, tf - jd0)
                 continue
             end
+
             # O-C residuals
             res::Vector{OpticalResidual{T, TaylorN{T}}} = residuals(
                 radec, params;
