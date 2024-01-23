@@ -76,7 +76,7 @@ export issinglearc, istsa, orbitdetermination
 include("constants.jl")
 include("observations/process_radar.jl")
 include("propagation/propagation.jl")
-include("postprocessing/neosolution.jl")
+include("postprocessing/b_plane.jl")
 include("orbit_determination/orbit_determination.jl")
 include("init.jl")
 

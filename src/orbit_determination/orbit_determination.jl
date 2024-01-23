@@ -1,4 +1,6 @@
 include("osculating.jl")
+include("least_squares.jl")
+include("neosolution.jl")
 include("tooshortarc.jl")
 include("gauss_method.jl")
 include("outlier_rejection.jl")

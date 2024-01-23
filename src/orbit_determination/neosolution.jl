@@ -1,6 +1,3 @@
-include("b_plane.jl")
-include("least_squares.jl")
-
 @doc raw"""
     NEOSolution{T <: Real, U <: Number}
 
@@ -14,7 +11,7 @@ The outcome of the orbit determination process for a NEO.
 - `x_bwd/x_fwd::Vector{U}`: state vector at Earth close approach.
 - `g_bwd/g_fwd::Vector{U}`: geocentric distance at close approach.
 - `res::Vector{OpticalResidual{T, U}}`: vector of optical residuals.
-- `fit::OrbitFit{T}`: least squares fit.
+- `fit::LeastSquaresFit{T}`: least squares fit.
 - `scalings::Vector{T}`: jet transport scaling factors.
 """
 @auto_hash_equals struct NEOSolution{T <: Real, U <: Number}
@@ -28,14 +25,14 @@ The outcome of the orbit determination process for a NEO.
     x_fwd::Matrix{U}
     g_fwd::Vector{U}
     res::Vector{OpticalResidual{T, U}}
-    fit::OrbitFit{T}
+    fit::LeastSquaresFit{T}
     scalings::Vector{T}
     # Inner constructor
     function NEOSolution{T, U}(
         nights::Vector{ObservationNight{T}},
         bwd::TaylorInterpolant{T, U, 2}, t_bwd::Vector{U}, x_bwd::Matrix{U}, g_bwd::Vector{U},
         fwd::TaylorInterpolant{T, U, 2}, t_fwd::Vector{U}, x_fwd::Matrix{U}, g_fwd::Vector{U},
-        res::Vector{OpticalResidual{T, U}}, fit::OrbitFit{T}, scalings::Vector{T}
+        res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
     ) where {T <: Real, U <: Number}
         @assert bwd.t0 == fwd.t0 "Backward and forward propagation initial times must match"
         new{T, U}(
@@ -51,7 +48,7 @@ function NEOSolution(
     nights::Vector{ObservationNight{T}},
     bwd::TaylorInterpolant{T, U, 2}, t_bwd::Vector{U}, x_bwd::Matrix{U}, g_bwd::Vector{U},
     fwd::TaylorInterpolant{T, U, 2}, t_fwd::Vector{U}, x_fwd::Matrix{U}, g_fwd::Vector{U},
-    res::Vector{OpticalResidual{T, U}}, fit::OrbitFit{T}, scalings::Vector{T}
+    res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
 ) where {T <: Real, U <: Number}
     NEOSolution{T, U}(
         nights, 
@@ -64,7 +61,7 @@ end
 function NEOSolution(
     nights::Vector{ObservationNight{T}},
     bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
-    res::Vector{OpticalResidual{T, U}}, fit::OrbitFit{T}, scalings::Vector{T}
+    res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
 ) where {T <: Real, U <: Number}
     # Backward roots
     t_bwd = Vector{U}(undef, 0)
@@ -140,7 +137,7 @@ function zero(::Type{NEOSolution{T, U}}) where {T <: Real, U <: Number}
     x_fwd = Matrix{U}(undef, 0, 0)
     g_fwd = Vector{U}(undef, 0)
     res = Vector{OpticalResidual{T, U}}(undef, 0)
-    fit = OrbitFit{T}(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), :newton)
+    fit = LeastSquaresFit{T}(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), :newton)
     scalings = Vector{T}(undef, 0)
 
     NEOSolution{T, U}(

@@ -1,5 +1,5 @@
 @doc raw"""
-    OrbitFit{T <: Real}
+    LeastSquaresFit{T <: Real}
 
 A least squares fit.
 
@@ -9,28 +9,28 @@ A least squares fit.
 - `Γ::Matrix{T}`: covariance matrix.
 - `routine::Symbol`: minimization routine (`:newton` or `:diffcorr`).
 """
-@auto_hash_equals struct OrbitFit{T <: Real}
+@auto_hash_equals struct LeastSquaresFit{T <: Real}
     success::Bool
     x::Vector{T}
     Γ::Matrix{T}
     routine::Symbol
     # Inner constructor
-    function OrbitFit{T}(success::Bool, x::Vector{T}, Γ::Matrix{T},
+    function LeastSquaresFit{T}(success::Bool, x::Vector{T}, Γ::Matrix{T},
                          routine::Symbol) where {T <: Real}
         return new{T}(success, x, Γ, routine)
     end
 end
 # Outer constructor
-function OrbitFit(success::Bool, x::Vector{T}, Γ::Matrix{T},
+function LeastSquaresFit(success::Bool, x::Vector{T}, Γ::Matrix{T},
                   routine::Symbol) where {T <: Real}
-    return OrbitFit{T}(success, x, Γ, routine)
+    return LeastSquaresFit{T}(success, x, Γ, routine)
 end
 
-# Print method for OrbitFit
+# Print method for LeastSquaresFit
 # Examples:
 # Succesful Newton
 # Succesful differential corrections
-function show(io::IO, fit::OrbitFit{T}) where {T <: Real}
+function show(io::IO, fit::LeastSquaresFit{T}) where {T <: Real}
     success_s = fit.success ? "Succesful" : "Unsuccesful"
     routine_s = fit.routine == :newton ? "Newton" : "differential corrections"
     print(io, success_s, " ", routine_s)
@@ -47,7 +47,7 @@ Fudge term for rejection condition in [`outlier_rejection`](@ref).
 carpino_smoothing(n::T) where {T <: Real} = 400*(1.2)^(-n)
 
 @doc raw"""
-    outlier_rejection(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T};
+    outlier_rejection(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, fit::LeastSquaresFit{T};
                       χ2_rec::T = 7.0, χ2_rej::T = 8.0, α::T = 0.25, max_per::T = 10.) where {T <: Real}
 
 Outlier rejection algorithm.
@@ -55,7 +55,7 @@ Outlier rejection algorithm.
 # Arguments
 
 - `ξs::Vector{OpticalResidual{T}}`: vector of residuals.
-- `fit::OrbitFit{T}`: least squares fit.
+- `fit::LeastSquaresFit{T}`: least squares fit.
 - `χ2_rec::T`: recovery condition.
 - `χ2_rej::T`: rejection condition.
 - `α::T`: scaling factor for maximum chi.
@@ -64,7 +64,7 @@ Outlier rejection algorithm.
 !!! reference
     See https://doi.org/10.1016/S0019-1035(03)00051-4.
 """
-function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T};
+function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::LeastSquaresFit{T};
                            χ2_rec::T = 7., χ2_rej::T = 8., α::T = 0.25, max_per::T = 10.) where {T <: Real}
 
     # Number of residuals
@@ -129,11 +129,11 @@ function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::Orb
 end
 
 @doc raw"""
-    project(y::Vector{TaylorN{T}}, fit::OrbitFit{T}) where {T <: Real}
+    project(y::Vector{TaylorN{T}}, fit::LeastSquaresFit{T}) where {T <: Real}
 
 Project `fit`'s covariance matrix into `y`.
 """
-function project(y::Vector{TaylorN{T}}, fit::OrbitFit{T}) where {T <: Real}
+function project(y::Vector{TaylorN{T}}, fit::LeastSquaresFit{T}) where {T <: Real}
     J = Matrix{T}(undef, get_numvars(), length(y))
     for i in eachindex(y)
         J[:, i] = TS.gradient(y[i])(fit.x)
@@ -183,7 +183,7 @@ end
 @doc raw"""
     nrms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
     nrms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
-    nrms(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T}) where {T <: Real}
+    nrms(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::LeastSquaresFit{T}) where {T <: Real}
 
 Returns the normalized root mean square error
 ```math
@@ -198,7 +198,7 @@ See also [`chi2`](@ref).
 
 - `res::Vector{U}/Vector{OpticalResidual{T, U}}`: Vector of residuals.
 - `w::Vector{T}`: Vector of weights. 
-- `fit::OrbitFit{T}`: least squares fit.
+- `fit::LeastSquaresFit{T}`: least squares fit.
 
 """
 function nrms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
@@ -213,7 +213,7 @@ function nrms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
     return nrms(_res_, _w_)
 end
 
-function nrms(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::OrbitFit{T}) where {T <: Real}
+function nrms(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::LeastSquaresFit{T}) where {T <: Real}
     _res_, _w_ = unfold(res)
     return nrms(_res_(fit.x), _w_)
 end
@@ -310,7 +310,7 @@ end
              niters::Int = 5) where {T <: Real}
 
 Differential corrections subroutine for least-squares fitting. Returns an
-`OrbitFit` with the `niters`-th 
+`LeastSquaresFit` with the `niters`-th 
 correction
 ```math
 \mathbf{x}_{k+1} = \mathbf{x}_k - \mathbf{C}^{-1}\mathbf{D},
@@ -371,7 +371,7 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
             error[i+1] = sqrt(error2)
         # The method do not converge
         else 
-            return OrbitFit(false, x[:, i+1], inv(C), :diffcorr)
+            return LeastSquaresFit(false, x[:, i+1], inv(C), :diffcorr)
         end 
     end
     # Index with the lowest error 
@@ -384,9 +384,9 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     Γ = inv(C)
     
     if any(diag(Γ) .< 0)
-        return OrbitFit(false, x_new, Γ, :diffcorr)
+        return LeastSquaresFit(false, x_new, Γ, :diffcorr)
     else
-        return OrbitFit(true, x_new, Γ, :diffcorr)
+        return LeastSquaresFit(true, x_new, Γ, :diffcorr)
     end
 end
 
@@ -404,7 +404,7 @@ end
     newtonls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
              niters::Int = 5) where {T <: Real}
 
-Newton method subroutine for least-squares fitting. Returns an `OrbitFit`
+Newton method subroutine for least-squares fitting. Returns an `LeastSquaresFit`
 with the `niters`-th iteration
 ```math
 \mathbf{x}_{k+1} = \mathbf{x}_k - 
@@ -467,7 +467,7 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
             error[i+1] = sqrt(error2)
         # The method do not converge
         else 
-            return OrbitFit(false, x[:, i+1], inv(C), :newton)
+            return LeastSquaresFit(false, x[:, i+1], inv(C), :newton)
         end 
     end
     # TO DO: study Gauss method solution dependence on jt order 
@@ -484,9 +484,9 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     Γ = inv(C)
 
     if any(diag(Γ) .< 0)
-        return OrbitFit(false, x_new, Γ, :newton)
+        return LeastSquaresFit(false, x_new, Γ, :newton)
     else
-        return OrbitFit(true, x_new, Γ, :newton)
+        return LeastSquaresFit(true, x_new, Γ, :newton)
     end
 end
 
