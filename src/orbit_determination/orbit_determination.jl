@@ -65,21 +65,21 @@ function adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFlo
 end
 
 @doc raw"""
-    orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T}) where {T <: AbstractFloat}
+    orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: AbstractFloat}
 
 Initial Orbit Determination (IOD) routine.
 
 # Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
+- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
 """
-function orbitdetermination(radec::Vector{RadecMPC{T}}, params::Parameters{T}) where {T <: AbstractFloat}
+function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: AbstractFloat}
     
     # Allocate memory for output
     sol = zero(NEOSolution{T, T})
     # Maximum number of steps
-    params = Parameters(params; maxsteps = adaptative_maxsteps(radec))
+    params = NEOParameters(params; maxsteps = adaptative_maxsteps(radec))
     # Eliminate observatories without coordinates 
     filter!(x -> hascoord(observatory(x)), radec)
     # Cannot handle zero observations or multiple arcs

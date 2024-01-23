@@ -57,7 +57,7 @@ export compute_delay, radar_astrometry
 # Asteroid dynamical models
 export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!
 # Propagate
-export Parameters, propagate, propagate_lyap, propagate_root
+export NEOParameters, propagate, propagate_lyap, propagate_root
 # B plane
 export valsecchi_circle, bopik
 # Least squares

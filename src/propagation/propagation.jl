@@ -128,7 +128,7 @@ end
 
 @doc raw"""
     propagate(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
-              params::Parameters{T}) where {T <: Real, U <: Number, D}
+              params::NEOParameters{T}) where {T <: Real, U <: Number, D}
 
 Integrate the orbit of a NEO via the Taylor method.
 
@@ -138,10 +138,10 @@ Integrate the orbit of a NEO via the Taylor method.
 - `jd0::T`: initial Julian date.
 - `tspan::T`: time span of the integration [in years].
 - `q0::Vector{U}`: vector of initial conditions.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
+- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
 """
 function propagate(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
-                   params::Parameters{T}) where {T <: Real, U <: Number, D}
+                   params::NEOParameters{T}) where {T <: Real, U <: Number, D}
 
     # Unfold
     maxsteps, μ_ast, order, abstol, parse_eqs = params.maxsteps, params.μ_ast, params.order,
@@ -170,7 +170,7 @@ end
 
 @doc raw"""
     propagate_root(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
-                   params::Parameters{T}; eventorder::Int = 0, newtoniter::Int = 10,
+                   params::NEOParameters{T}; eventorder::Int = 0, newtoniter::Int = 10,
                    nrabstol::T = eps(T)) where {T <: Real, U <: Number, D}
 
 Integrate the orbit of a NEO via the Taylor method while finding the zeros of
@@ -182,7 +182,7 @@ Integrate the orbit of a NEO via the Taylor method while finding the zeros of
 - `jd0::T`: initial Julian date.
 - `tspan::T`: time span of the integration [in years].
 - `q0::Vector{U}`: vector of initial conditions.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
+- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
 
 # Keyword arguments
 
@@ -191,7 +191,7 @@ Integrate the orbit of a NEO via the Taylor method while finding the zeros of
 - `nrabstol::T`: allowed tolerance for the Newton-Raphson process.
 """
 function propagate_root(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
-                        params::Parameters{T}; eventorder::Int = 0, newtoniter::Int = 10,
+                        params::NEOParameters{T}; eventorder::Int = 0, newtoniter::Int = 10,
                         nrabstol::T = eps(T)) where {T <: Real, U <: Number, D}
 
     # Unfold
@@ -214,7 +214,7 @@ end
 
 @doc raw"""
     propagate_lyap(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
-                   params::Parameters{T}) where {T <: Real, U <: Number}
+                   params::NEOParameters{T}) where {T <: Real, U <: Number}
 
 Compute the Lyapunov spectrum of a NEO.
 
@@ -224,10 +224,10 @@ Compute the Lyapunov spectrum of a NEO.
 - `jd0::T`: initial Julian date.
 - `tspan::T`: time span of the integration [in Julian days].
 - `q0::Vector{U}`: vector of initial conditions.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
+- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
 """
 function propagate_lyap(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
-                        params::Parameters{T}) where {T <: Real, U <: Number, D}
+                        params::NEOParameters{T}) where {T <: Real, U <: Number, D}
 
     # Unfold
     maxsteps, μ_ast, order, abstol, parse_eqs = params.maxsteps, params.μ_ast, params.order,

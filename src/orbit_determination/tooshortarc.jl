@@ -317,7 +317,7 @@ end
 
 # Propagate an orbit and compute residuals
 function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
-                 params::Parameters{T})  where {T <: AbstractFloat, U <: Number}
+                 params::NEOParameters{T})  where {T <: AbstractFloat, U <: Number}
     # Time of first (last) observation
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
     # Years in backward (forward) integration
@@ -343,7 +343,7 @@ end
 
 @doc raw"""
     adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-         params::Parameters{T}; η::T = 25.0, μ::T = 0.75, ν::T = 0.9,
+         params::NEOParameters{T}; η::T = 25.0, μ::T = 0.75, ν::T = 0.9,
          ϵ::T = 1e-8, Qtol::T = 0.001) where {T <: AbstractFloat}
 
 Adaptative moment estimation (ADAM) minimizer of normalized mean square
@@ -356,7 +356,7 @@ residual over and admissible region `A`.
     See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
 """
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-              params::Parameters{T}; η::T = 25.0, μ::T = 0.75, ν::T = 0.9,
+              params::NEOParameters{T}; η::T = 25.0, μ::T = 0.75, ν::T = 0.9,
               ϵ::T = 1e-8, Qtol::T = 0.001) where {T <: AbstractFloat}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
@@ -416,7 +416,7 @@ end
 
 @doc raw"""
     tsals(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
-          jd0::T, q0::Vector{T}, params::Parameters{T}; maxiter::Int = 5,
+          jd0::T, q0::Vector{T}, params::NEOParameters{T}; maxiter::Int = 5,
           Qtol::T = 0.1) where {T <: AbstractFloat}
 
 Used within [`tooshortarc`](@ref) to compute an orbit from a point in an
@@ -426,7 +426,7 @@ admissible region via least squares.
     This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
 """
 function tsals(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
-               jd0::T, q0::Vector{T}, params::Parameters{T}; maxiter::Int = 5,
+               jd0::T, q0::Vector{T}, params::NEOParameters{T}; maxiter::Int = 5,
                Qtol::T = 0.1) where {T <: AbstractFloat}
     # Scaling factors
     scalings = abs.(q0) ./ 10^5
@@ -478,7 +478,7 @@ end
 
 @doc raw"""
     tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
-                params::Parameters{T}) where {T <: AbstractFloat}
+                params::NEOParameters{T}) where {T <: AbstractFloat}
 
 Return initial conditions by minimizing the normalized root mean square residual
 over the admissible region.
@@ -487,13 +487,13 @@ over the admissible region.
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `nights::Vector{ObservationNight{T}},`: vector of observation nights.
-- `params::Parameters{T}`: see `Admissible Region Parameters` of [`Parameters`](@ref).
+- `params::NEOParameters{T}`: see `Admissible Region Parameters` of [`NEOParameters`](@ref).
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
 """
 function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
-                     params::Parameters{T}) where {T <: AbstractFloat}
+                     params::NEOParameters{T}) where {T <: AbstractFloat}
 
     # Allocate memory for output
     best_sol = zero(NEOSolution{T, T})

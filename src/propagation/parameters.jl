@@ -1,4 +1,4 @@
-struct Parameters{T <: AbstractFloat}
+struct NEOParameters{T <: AbstractFloat}
     # Propagation parameters
     maxsteps::Int
     μ_ast::Vector{T}
@@ -26,7 +26,7 @@ end
 # Outer constructors
 
 @doc raw"""
-    Parameters([params::Parameters{T};] kwargs...) where {T <: AbstractFloat}
+    NEOParameters([params::NEOParameters{T};] kwargs...) where {T <: AbstractFloat}
 
 Parameters for all orbit determination functions.
 
@@ -63,21 +63,21 @@ Parameters for all orbit determination functions.
 
 - `max_per::T`: maximum allowed rejection percentage (default: `18.0`).
 """
-function Parameters(; maxsteps::Int = 500, μ_ast::Vector{T} = μ_ast343_DE430[1:end],
+function NEOParameters(; maxsteps::Int = 500, μ_ast::Vector{T} = μ_ast343_DE430[1:end],
                       order::Int = 25, abstol::T = 1e-20, parse_eqs::Bool = true, 
                       debias_table::String = "2018", niter::Int = 5, max_triplets::Int = 10,
                       varorder::Int = 5, Q_max::T = 5.0, maxiter::Int = 100,
                       max_per::T = 18.0) where {T <: AbstractFloat}
     # Unfold debiasing matrix
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
-    # Assemble Parameters
-    return Parameters{T}(maxsteps, μ_ast, order, abstol, parse_eqs, mpc_catalogue_codes_201X,
+    # Assemble NEOParameters
+    return NEOParameters{T}(maxsteps, μ_ast, order, abstol, parse_eqs, mpc_catalogue_codes_201X,
                          truth, resol, bias_matrix, niter, max_triplets, varorder, Q_max,
                          maxiter, max_per)
 end                            
 
-function Parameters(params::Parameters{T}; kwargs...) where {T <: AbstractFloat}
-    fields = fieldnames(Parameters{T})
+function NEOParameters(params::NEOParameters{T}; kwargs...) where {T <: AbstractFloat}
+    fields = fieldnames(NEOParameters{T})
     vals = Vector{Any}(undef, length(fields))
     for i in eachindex(vals)
         if fields[i] in keys(kwargs)
@@ -87,10 +87,10 @@ function Parameters(params::Parameters{T}; kwargs...) where {T <: AbstractFloat}
         end
     end
 
-    return Parameters{T}(vals...)
+    return NEOParameters{T}(vals...)
 end
 
-function residuals(obs::Vector{RadecMPC{T}}, params::Parameters{T}; kwargs...) where {T <: AbstractFloat}
+function residuals(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}; kwargs...) where {T <: AbstractFloat}
     return residuals(obs, params.mpc_catalogue_codes_201X, params.truth, params.resol,
                      params.bias_matrix; kwargs...)
 end

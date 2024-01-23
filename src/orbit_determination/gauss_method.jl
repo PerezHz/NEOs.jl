@@ -415,7 +415,7 @@ end
 
 @doc raw"""
     gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
-                  params::Parameters{T}) where {T <: AbstractFloat}
+                  params::NEOParameters{T}) where {T <: AbstractFloat}
 
 Return initial conditions via Gauss Method. 
 
@@ -425,13 +425,13 @@ See also [`gauss_method`](@ref).
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `nights::Vector{ObservationNight{T}},`: vector of observation nights.
-- `params::Parameters{T}`: see `Gauss Method Parameters` of [`Parameters`](@ref).
+- `params::NEOParameters{T}`: see `Gauss Method Parameters` of [`NEOParameters`](@ref).
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
 function gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
-                       params::Parameters{T}) where {T <: AbstractFloat}
+                       params::NEOParameters{T}) where {T <: AbstractFloat}
 
     # Allocate memory for initial conditions
     best_sol = zero(NEOSolution{T, T})
