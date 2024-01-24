@@ -49,17 +49,28 @@ end
 
 iszero(x::TaylorInterpolant{T, U, 2}) where {T <: Real, U <: Number} = x == zero(TaylorInterpolant{T, U, 2})
 
-function unsuccessful_propagation(sol::TaylorInterpolant{T, U, 2}, t::T) where {T <: Real, U <: Number}
-
+function issuccessfulprop(sol::TaylorInterpolant{T, U, 2}, t::T;
+                          tol::T = 10.0) where {T <: Real, U <: Number}
+    # Zero TaylorInterpolant
+    iszero(sol) && return false
+    # Forward integration
     if issorted(sol.t)
-        c = sol.t[end] < t
+        # Insufficient steps
+        sol.t[end] < t && return false
+        # Step that covers t
+        i = searchsortedfirst(sol.t, t) - 1
+    # Backward integration
     elseif issorted(sol.t, rev = true)
-        c = sol.t[end] > t
+        # Insufficient steps
+        sol.t[end] > t && return false
+        # Step that covers t
+        i = searchsortedfirst(sol.t, t, lt = !isless) - 1
+    # This case should never happen
     else
-        c = true
+        return false
     end
-
-    return iszero(sol) || any(norm.(sol.x, Inf) .> 10) || c 
+    # All coefficients are below tol
+    return all( norm.(view(sol.x, 1:i, :), Inf) .< tol )
 end
 
 @doc raw"""

@@ -326,7 +326,7 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
     # Backward (forward) integration
     bwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q0, params)
     fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q0, params)
-    if unsuccessful_propagation(bwd, t0 - jd0) || unsuccessful_propagation(fwd, tf - jd0)
+    if !issuccessfulprop(bwd, t0 - jd0) || !issuccessfulprop(fwd, tf - jd0)
         return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
     end
     # Sun (Earth) ephemeris
