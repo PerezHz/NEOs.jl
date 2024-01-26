@@ -51,10 +51,10 @@ end
 iszero(x::AdmissibleRegion{T}) where {T <: AbstractFloat} = x == zero(AdmissibleRegion{T})
 
 # Outer constructor
-function AdmissibleRegion(night::Tracklet{T}) where {T <: AbstractFloat}
+function AdmissibleRegion(tracklet::Tracklet{T}) where {T <: AbstractFloat}
     # Unfold
-    obs, t_datetime, α, δ = observatory(night), date(night), ra(night), dec(night)
-    v_α, v_δ, h = vra(night), vdec(night), mag(night)
+    obs, t_datetime, α, δ = observatory(tracklet), date(tracklet), ra(tracklet), dec(tracklet)
+    v_α, v_δ, h = vra(tracklet), vdec(tracklet), mag(tracklet)
     # Topocentric unit vector and partials
     ρ, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Time of observation [days since J2000]
@@ -415,7 +415,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
 end
 
 @doc raw"""
-    tsals(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
+    tsals(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
           jd0::T, q0::Vector{T}, params::NEOParameters{T}; maxiter::Int = 5,
           Qtol::T = 0.1) where {T <: AbstractFloat}
 
@@ -425,7 +425,7 @@ admissible region via least squares.
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
 """
-function tsals(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
+function tsals(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                jd0::T, q0::Vector{T}, params::NEOParameters{T}; maxiter::Int = 5,
                Qtol::T = 0.1) where {T <: AbstractFloat}
     # Scaling factors
@@ -451,7 +451,7 @@ function tsals(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
             break
         end
         # Current solution
-        sols[t] = evalfit(NEOSolution(nights, bwd, fwd, res, fit, scalings))
+        sols[t] = evalfit(NEOSolution(tracklets, bwd, fwd, res, fit, scalings))
         Qs[t] = nrms(sols[t])
         # Convergence conditions
         if t > 1
@@ -467,8 +467,8 @@ function tsals(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
     return sols[t]
 end
 
-# Order in which to check nights in tooshortarc
-function tsanightorder(x::Tracklet{T}, y::Tracklet{T}) where {T <: AbstractFloat}
+# Order in which to check tracklets in tooshortarc
+function tsatrackletorder(x::Tracklet{T}, y::Tracklet{T}) where {T <: AbstractFloat}
     if x.nobs == y.nobs
         return x.date > y.date
     else
@@ -477,7 +477,7 @@ function tsanightorder(x::Tracklet{T}, y::Tracklet{T}) where {T <: AbstractFloat
 end
 
 @doc raw"""
-    tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
+    tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                 params::NEOParameters{T}) where {T <: AbstractFloat}
 
 Return initial conditions by minimizing the normalized root mean square residual
@@ -486,24 +486,24 @@ over the admissible region.
 # Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `nights::Vector{Tracklet{T}},`: vector of observation nights.
+- `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
 - `params::NEOParameters{T}`: see `Admissible Region Parameters` of [`NEOParameters`](@ref).
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
 """
-function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
+function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                      params::NEOParameters{T}) where {T <: AbstractFloat}
 
     # Allocate memory for output
     best_sol = zero(NEOSolution{T, T})
-    # Sort nights by tsanightorder
-    idxs = sortperm(nights, lt = tsanightorder)
+    # Sort tracklets by tsatrackletorder
+    idxs = sortperm(tracklets, lt = tsatrackletorder)
 
-    # Iterate observation nights
+    # Iterate tracklets
     for i in idxs
         # Admissible region
-        A = AdmissibleRegion(nights[i])
+        A = AdmissibleRegion(tracklets[i])
         iszero(A) && continue
         # Center
         ρ = sum(A.ρ_domain) / 2
@@ -515,7 +515,7 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
         # Initial time of integration [julian days]
         jd0 = datetime2julian(A.date)
         # 6 variables least squares
-        sol = tsals(radec, nights, jd0, q0, params; maxiter = 5)
+        sol = tsals(radec, tracklets, jd0, q0, params; maxiter = 5)
         # Update best solution
         if nrms(sol) < nrms(best_sol)
             best_sol = sol
@@ -541,7 +541,7 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
         # Barycentric initial conditions
         q0 = topo2bary(A, ρ, v_ρs[t])
         # 6 variables least squares
-        sol = tsals(radec, nights, jd0, q0, params; maxiter = 5)
+        sol = tsals(radec, tracklets, jd0, q0, params; maxiter = 5)
         # Update best solution
         if nrms(sol) < nrms(best_sol)
             best_sol = sol

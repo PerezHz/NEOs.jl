@@ -21,27 +21,28 @@ function issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <:
 end
 
 @doc raw"""
+    istsa(tracklets::Vector{Tracklet{T}}) where {T <: AbstractFloat}
     istsa(sol::NEOSolution{T, T}) where {T <: AbstractFloat}
 
 Check whether `sol` was computed via [`tooshortarc`](@ref) (`true`) or
 via [`gaussinitcond`](@ref) (`false`).
 """
-function istsa(nights::Vector{Tracklet{T}}) where {T <: AbstractFloat}
+function istsa(tracklets::Vector{Tracklet{T}}) where {T <: AbstractFloat}
     # Observing stations
-    obs = observatory.(nights)
+    obs = observatory.(tracklets)
     # Satellite observatories can only be handled by Gauss
     any(issatellite.(obs)) && return false
-    # Gauss cannot handle less than 3 observation nights
-    length(nights) < 3 && return true
+    # Gauss cannot handle less than 3 tracklets
+    length(tracklets) < 3 && return true
     # Time span
-    Δ = numberofdays(nights)
+    Δ = numberofdays(tracklets)
     # Gauss aproximation do not work with less than 1 day
     Δ < 1 && return true
     # All observations come from the same observatory
     return allequal(obs) && Δ < 5
 end
 
-istsa(sol::NEOSolution{T, T}) where {T <: AbstractFloat} = istsa(sol.nights)
+istsa(sol::NEOSolution{T, T}) where {T <: AbstractFloat} = istsa(sol.tracklets)
 
 @doc raw"""
     adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
@@ -86,14 +87,14 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}
     if iszero(length(radec)) || !issinglearc(radec)
         return sol::NEOSolution{T, T}
     end
-    # Reduce observation nights by linear regression
-    nights = reduce_nights(radec)
+    # Reduce tracklets by polynomial regression
+    tracklets = reduce_tracklets(radec)
     # Case 1: Too Short Arc (TSA)
-    if istsa(nights)
-        sol = tooshortarc(radec, nights, params)
+    if istsa(tracklets)
+        sol = tooshortarc(radec, tracklets, params)
     # Case 2: Gauss Method
     else
-        sol = gaussinitcond(radec, nights, params)
+        sol = gaussinitcond(radec, tracklets, params)
     end
     # Outlier rejection (if needed)
     if nrms(sol) > 1 && !iszero(sol)

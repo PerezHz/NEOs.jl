@@ -414,7 +414,7 @@ function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_ite
 end
 
 @doc raw"""
-    gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
+    gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                   params::NEOParameters{T}) where {T <: AbstractFloat}
 
 Return initial conditions via Gauss Method. 
@@ -424,19 +424,19 @@ See also [`gauss_method`](@ref).
 # Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `nights::Vector{Tracklet{T}},`: vector of observation nights.
+- `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
 - `params::NEOParameters{T}`: see `Gauss Method Parameters` of [`NEOParameters`](@ref).
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
-function gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
+function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                        params::NEOParameters{T}) where {T <: AbstractFloat}
 
     # Allocate memory for initial conditions
     best_sol = zero(NEOSolution{T, T})
     # Unfold
-    observatories, dates, α, δ = observatory.(nights), date.(nights), ra.(nights), dec.(nights)
+    observatories, dates, α, δ = observatory.(tracklets), date.(tracklets), ra.(tracklets), dec.(tracklets)
     # Observations triplets
     triplets = gauss_triplets(dates, params.max_triplets)
     # Julian day of first (last) observation
@@ -508,15 +508,15 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
             # Subset of radec for orbit fit
             g_0 = triplet[1]
             g_f = triplet[3]
-            idxs = reduce(vcat, indices.(nights[g_0:g_f]))
+            idxs = reduce(vcat, indices.(tracklets[g_0:g_f]))
             sort!(idxs)
             # Orbit fit
             fit = tryls(res[idxs], x0, params.niter)
             !fit.success && continue
 
             # Right iteration
-            for k in g_f+1:length(nights)
-                extra = indices(nights[k])
+            for k in g_f+1:length(tracklets)
+                extra = indices(tracklets[k])
                 fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
                 if fit_new.success
                     fit = fit_new
@@ -529,7 +529,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
 
             # Left iteration
             for k in g_0-1:-1:1
-                extra = indices(nights[k])
+                extra = indices(tracklets[k])
                 fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
                 if fit_new.success
                     fit = fit_new
@@ -547,7 +547,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
             # Update NRMS and initial conditions
             if Q < best_Q
                 best_Q = Q
-                best_sol = evalfit(NEOSolution(nights, bwd, fwd, res[idxs], 
+                best_sol = evalfit(NEOSolution(tracklets, bwd, fwd, res[idxs], 
                                    fit, scalings))
             end 
             # Break condition

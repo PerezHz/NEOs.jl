@@ -493,7 +493,7 @@ function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Group by observatory and TimeOfDay 
     df.TimeOfDay = TimeOfDay.(radec)
     gdf = groupby(df, [:observatory, :TimeOfDay])
-    # Interpolate observation nights 
+    # Number of observations per tracklet 
     cdf = combine(gdf, nrow)
     # Count observations in each group
     Nv = cdf[gdf.groups, :nrow]

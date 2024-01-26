@@ -75,7 +75,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     Q_0 = nrms(res, fit)
 
     if Q_0 < 1
-        return evalfit(NEOSolution(sol.nights, bwd, fwd, res, fit, scalings))
+        return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, scalings))
     end
 
     # Number of observations
@@ -149,7 +149,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
         # Update fit
         fit = tryls(res, x0, params.niter)
 
-        return evalfit(NEOSolution(sol.nights, bwd, fwd, res, fit, scalings)) 
+        return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, scalings)) 
     end
 
     if max_drop > 1
@@ -179,5 +179,5 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     # Update fit
     fit = tryls(res, x0, params.niter)
 
-    return evalfit(NEOSolution(sol.nights, bwd, fwd, res, fit, scalings))
+    return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, scalings))
 end

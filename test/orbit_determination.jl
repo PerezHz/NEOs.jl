@@ -24,11 +24,11 @@ using NEOs: NEOSolution, numberofdays
         @test numberofdays(radec) < 21.0
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
-        # Observation nights
-        @test length(sol.nights) == 44
-        @test sol.nights[1].radec[1] == radec[1]
-        @test sol.nights[end].radec[end] == radec[end]
-        @test issorted(sol.nights)
+        # Tracklets
+        @test length(sol.tracklets) == 44
+        @test sol.tracklets[1].radec[1] == radec[1]
+        @test sol.tracklets[end].radec[end] == radec[end]
+        @test issorted(sol.tracklets)
         # Backward integration
         @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
@@ -70,11 +70,11 @@ using NEOs: NEOSolution, numberofdays
         @test numberofdays(radec) < 0.05
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
-        # Observation nights
-        @test length(sol.nights) == 1
-        @test sol.nights[1].radec[1] == radec[1]
-        @test sol.nights[end].radec[end] == radec[end]
-        @test issorted(sol.nights)
+        # Tracklets
+        @test length(sol.tracklets) == 1
+        @test sol.tracklets[1].radec[1] == radec[1]
+        @test sol.tracklets[end].radec[end] == radec[end]
+        @test issorted(sol.tracklets)
         # Backward integration
         @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
@@ -116,11 +116,11 @@ using NEOs: NEOSolution, numberofdays
         @test numberofdays(radec) < 3.03
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
-        # Observation nights
-        @test length(sol.nights) == 4
-        @test sol.nights[1].radec[1] == radec[1]
-        @test sol.nights[end].radec[end] == radec[end]
-        @test issorted(sol.nights)
+        # Tracklets
+        @test length(sol.tracklets) == 4
+        @test sol.tracklets[1].radec[1] == radec[1]
+        @test sol.tracklets[end].radec[end] == radec[end]
+        @test issorted(sol.tracklets)
         # Backward integration
         @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )

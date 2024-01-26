@@ -15,7 +15,7 @@ A set of optical observations taken by the same observatory on the same night.
 - `v_δ::T`: mean declination velocity.
 - `mag::T`: mean apparent magnitude.
 - `nobs::Int`: number of observations.
-- `idxs::Vector{Int}`: indices of original `radec` that entered the night.
+- `idxs::Vector{Int}`: indices of original `radec` that entered the tracklet.
 """
 @auto_hash_equals struct Tracklet{T <: AbstractFloat}
     radec::Vector{RadecMPC{T}}
@@ -155,28 +155,28 @@ function Tracklet(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) where {T <:
 end 
 
 @doc raw"""
-    reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+    reduce_tracklets(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
 
 Return a `Vector{Tracklet{T}}` where each element corresponds to a batch of
 observations taken by the same observatory on the same night. The reduction
 is performed via polynomial regression. 
 """
-function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+function reduce_tracklets(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Convert to DataFrame 
     df = DataFrame(radec)
     # Compute TimeOfDay
     df.TimeOfDay = TimeOfDay.(radec)
     # Group by observatory and TimeOfDay 
     gdf = groupby(df, [:observatory, :TimeOfDay])
-    # Allocate memmory for nights vector
-    nights = Vector{Tracklet{T}}(undef, gdf.ngroups)
-    # Reduce nights
+    # Allocate memmory for tracklets vector
+    tracklets = Vector{Tracklet{T}}(undef, gdf.ngroups)
+    # Reduce tracklets
     Threads.@threads for i in 1:gdf.ngroups
         rows = getfield(gdf[i], :rows)
-        nights[i] = Tracklet(radec[rows], gdf[i])
+        tracklets[i] = Tracklet(radec[rows], gdf[i])
     end
     # Sort by date
-    sort!(nights)
+    sort!(tracklets)
     
-    return nights
+    return tracklets
 end
