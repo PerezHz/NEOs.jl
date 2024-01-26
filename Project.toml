@@ -1,7 +1,7 @@
 name = "NEOs"
 uuid = "b41c07a2-2abb-11e9-070a-c3c1b239e7df"
 authors = ["Jorge A. Pérez Hernández", "Luis Benet", "Luis Eduardo Ramírez Montoya"]
-version = "0.7.3"
+version = "0.7.4"
 
 [deps]
 Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -35,15 +35,18 @@ TaylorSeries = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
+Artifacts = "1"
 AutoHashEquals = "0.2"
 Clustering = "0.15"
 DataFrames = "1.5"
 DelimitedFiles = "1"
+Downloads = "1"
 HORIZONS = "0.3"
 HTTP = "1.9.5"
 Healpix = "4"
 JLD2 = "0.4"
 JSON = "0.21"
+LazyArtifacts = "1"
 PlanetaryEphemeris = "0.7"
 Quadmath = "0.5"
 SPICE = "0.2"
