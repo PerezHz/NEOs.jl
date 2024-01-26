@@ -140,4 +140,53 @@ using NEOs: NEOSolution, numberofdays
         @test all(sol.scalings .< 8e-7)
     end
 
+    @testset "Interesting NEOs" begin
+
+        # 2014 AA hit the Earth around January 2, 2014 02:49 UTC
+
+        # Optical astrometry file
+        filename = joinpath("data", "2011_AA.txt")
+        # Download observations
+        get_radec_mpc("designation" => "2014 AA", filename)
+        # Load observations 
+        radec = read_radec_mpc(filename)
+        # Delete astrometry file
+        rm(filename)
+        # Parameters
+        params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true)
+    
+        # Orbit Determination
+        sol = orbitdetermination(radec, params)
+
+        # Values by January 26, 2024
+        
+        # Vector of observations
+        @test length(radec) == 7
+        @test numberofdays(radec) < 0.05
+        # Orbit solution
+        @test isa(sol, NEOSolution{Float64, Float64})
+        # Tracklets
+        @test length(sol.tracklets) == 1
+        @test sol.tracklets[1].radec[1] == radec[1]
+        @test sol.tracklets[end].radec[end] == radec[end]
+        @test issorted(sol.tracklets)
+        # Backward integration
+        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test all( norm.(sol.bwd.x, Inf) .< 2 )
+        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
+        # Forward integration
+        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test all( norm.(sol.fwd.x, Inf) .< 1e9 )
+        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
+        # Vector of residuals
+        @test length(sol.res) == 7
+        @test iszero(count(outlier.(sol.res)))
+        # Least squares fit
+        @test sol.fit.success
+        @test all( sigmas(sol) .< 1e-3 )
+        @test nrms(sol) < 0.13
+        # Scalig factors
+        @test all(sol.scalings .< 1e-5)
+    end
+
 end
