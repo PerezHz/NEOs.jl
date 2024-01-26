@@ -286,7 +286,7 @@ using NEOs: NEOSolution, numberofdays
         @test all( sigmas(sol) .< 1e-7 )
         @test nrms(sol) < 0.61
         # Scalig factors
-        @test all(sol.scalings .< 1e-5)
+        @test all(sol.scalings .< 1e-6)
     end
 
 end
