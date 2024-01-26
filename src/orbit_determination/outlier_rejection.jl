@@ -35,9 +35,9 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     # Julian day of first (last) observation
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
     # Number of years in forward integration 
-    nyears_fwd = (tf - jd0 + 2) / yr
+    nyears_fwd = (tf - jd0 + params.fwdoffset) / yr
     # Number of years in backward integration
-    nyears_bwd = -(jd0 - t0 + 2) / yr
+    nyears_bwd = -(jd0 - t0 + params.bwdoffset) / yr
     # Dynamical function 
     dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
     # Initial conditions (T)
@@ -52,14 +52,14 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     # Backward integration
     bwd = propagate(dynamics, jd0, nyears_bwd, q, params)
 
-    if !issuccessfulprop(bwd, t0 - jd0)
+    if !issuccessfulprop(bwd, t0 - jd0; tol = params.coeffstol)
         return zero(NEOSolution{T, T})
     end
 
     # Forward integration
     fwd = propagate(dynamics, jd0, nyears_fwd, q, params)
 
-    if !issuccessfulprop(fwd, tf - jd0)
+    if !issuccessfulprop(fwd, tf - jd0; tol = params.coeffstol)
         return zero(NEOSolution{T, T})
     end
 

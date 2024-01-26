@@ -467,9 +467,9 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         # Julian day when to start propagation
         jd0 = datetime2julian(dates[triplet[2]])
         # Number of years in forward integration
-        nyears_fwd = (tf - jd0 + 2) / yr
+        nyears_fwd = (tf - jd0 + params.fwdoffset) / yr
         # Number of years in backward integration
-        nyears_bwd = -(jd0 - t0 + 2) / yr
+        nyears_bwd = -(jd0 - t0 + params.bwdoffset) / yr
         # Gauss method solution 
         sol = gauss_method(observatories[triplet], dates[triplet], α[triplet] .+ dq[1:3],
                            δ[triplet] .+ dq[4:6]; niter = params.niter)
@@ -485,7 +485,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
             bwd::TaylorInterpolant{T, TaylorN{T}, 2} = propagate(
                 RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q0, params
             ) 
-            if !issuccessfulprop(bwd, t0 - jd0)
+            if !issuccessfulprop(bwd, t0 - jd0; tol = params.coeffstol)
                 continue
             end
 
@@ -493,7 +493,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
             fwd::TaylorInterpolant{T, TaylorN{T}, 2} = propagate(
                 RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q0, params
             )
-            if !issuccessfulprop(fwd, tf - jd0)
+            if !issuccessfulprop(fwd, tf - jd0; tol = params.coeffstol)
                 continue
             end
 

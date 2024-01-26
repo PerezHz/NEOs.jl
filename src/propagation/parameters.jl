@@ -5,6 +5,9 @@ struct NEOParameters{T <: AbstractFloat}
     order::Int
     abstol::T
     parse_eqs::Bool
+    bwdoffset::T
+    fwdoffset::T
+    coeffstol::T
     # Residuals parameters
     mpc_catalogue_codes_201X::Vector{String}
     truth::String
@@ -37,6 +40,8 @@ Parameters for all orbit determination functions.
 - `order::Int`: order of Taylor expansions wrt time (default: 25).
 - `abstol::T`: absolute tolerance used to compute propagation timestep (default: `1e-20`).
 - `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` or not (default: `true`).
+- `bwdoffset/fwdoffset::T`: days to propagate beyond first (bwd) / last (fwd) observation (default: `0.5`).
+- `coeffstol::T`: maximum size of the coefficients (default: `10.0`).
 
 # Residuals Parameters
 
@@ -64,16 +69,17 @@ Parameters for all orbit determination functions.
 - `max_per::T`: maximum allowed rejection percentage (default: `18.0`).
 """
 function NEOParameters(; maxsteps::Int = 500, μ_ast::Vector{T} = μ_ast343_DE430[1:end],
-                      order::Int = 25, abstol::T = 1e-20, parse_eqs::Bool = true, 
-                      debias_table::String = "2018", niter::Int = 5, max_triplets::Int = 10,
-                      varorder::Int = 5, Q_max::T = 5.0, maxiter::Int = 100,
-                      max_per::T = 18.0) where {T <: AbstractFloat}
+                      order::Int = 25, abstol::T = 1e-20, parse_eqs::Bool = true, bwdoffset::T = 0.5,
+                      fwdoffset::T = 0.5, coeffstol::T = 10.0, debias_table::String = "2018",
+                      niter::Int = 5, max_triplets::Int = 10, varorder::Int = 5, Q_max::T = 5.0,
+                      maxiter::Int = 100, max_per::T = 18.0) where {T <: AbstractFloat}
     # Unfold debiasing matrix
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
     # Assemble NEOParameters
-    return NEOParameters{T}(maxsteps, μ_ast, order, abstol, parse_eqs, mpc_catalogue_codes_201X,
-                         truth, resol, bias_matrix, niter, max_triplets, varorder, Q_max,
-                         maxiter, max_per)
+    return NEOParameters{T}(maxsteps, μ_ast, order, abstol, parse_eqs, bwdoffset,
+                            fwdoffset, coeffstol, mpc_catalogue_codes_201X, truth,
+                            resol, bias_matrix, niter, max_triplets, varorder, Q_max,
+                            maxiter, max_per)
 end                            
 
 function NEOParameters(params::NEOParameters{T}; kwargs...) where {T <: AbstractFloat}

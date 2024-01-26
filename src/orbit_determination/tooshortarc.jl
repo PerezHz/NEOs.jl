@@ -321,12 +321,13 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
     # Time of first (last) observation
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
     # Years in backward (forward) integration
-    nyears_bwd = -(jd0 - t0 + 0.5) / yr
-    nyears_fwd = (tf - jd0 + 0.5) / yr
+    nyears_bwd = -(jd0 - t0 + params.bwdoffset) / yr
+    nyears_fwd = (tf - jd0 + params.fwdoffset) / yr
     # Backward (forward) integration
     bwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q0, params)
     fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q0, params)
-    if !issuccessfulprop(bwd, t0 - jd0) || !issuccessfulprop(fwd, tf - jd0)
+    if !issuccessfulprop(bwd, t0 - jd0; tol = params.coeffstol) || 
+       !issuccessfulprop(fwd, tf - jd0; tol = params.coeffstol)
         return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
     end
     # Sun (Earth) ephemeris
