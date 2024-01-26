@@ -51,7 +51,7 @@ end
 iszero(x::AdmissibleRegion{T}) where {T <: AbstractFloat} = x == zero(AdmissibleRegion{T})
 
 # Outer constructor
-function AdmissibleRegion(night::ObservationNight{T}) where {T <: AbstractFloat}
+function AdmissibleRegion(night::Tracklet{T}) where {T <: AbstractFloat}
     # Unfold
     obs, t_datetime, α, δ = observatory(night), date(night), ra(night), dec(night)
     v_α, v_δ, h = vra(night), vdec(night), mag(night)
@@ -415,7 +415,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
 end
 
 @doc raw"""
-    tsals(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+    tsals(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
           jd0::T, q0::Vector{T}, params::NEOParameters{T}; maxiter::Int = 5,
           Qtol::T = 0.1) where {T <: AbstractFloat}
 
@@ -425,7 +425,7 @@ admissible region via least squares.
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
 """
-function tsals(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+function tsals(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
                jd0::T, q0::Vector{T}, params::NEOParameters{T}; maxiter::Int = 5,
                Qtol::T = 0.1) where {T <: AbstractFloat}
     # Scaling factors
@@ -468,7 +468,7 @@ function tsals(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
 end
 
 # Order in which to check nights in tooshortarc
-function tsanightorder(x::ObservationNight{T}, y::ObservationNight{T}) where {T <: AbstractFloat}
+function tsanightorder(x::Tracklet{T}, y::Tracklet{T}) where {T <: AbstractFloat}
     if x.nobs == y.nobs
         return x.date > y.date
     else
@@ -477,7 +477,7 @@ function tsanightorder(x::ObservationNight{T}, y::ObservationNight{T}) where {T 
 end
 
 @doc raw"""
-    tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+    tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
                 params::NEOParameters{T}) where {T <: AbstractFloat}
 
 Return initial conditions by minimizing the normalized root mean square residual
@@ -486,13 +486,13 @@ over the admissible region.
 # Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `nights::Vector{ObservationNight{T}},`: vector of observation nights.
+- `nights::Vector{Tracklet{T}},`: vector of observation nights.
 - `params::NEOParameters{T}`: see `Admissible Region Parameters` of [`NEOParameters`](@ref).
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
 """
-function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+function tooshortarc(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
                      params::NEOParameters{T}) where {T <: AbstractFloat}
 
     # Allocate memory for output

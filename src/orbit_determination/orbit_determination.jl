@@ -26,7 +26,7 @@ end
 Check whether `sol` was computed via [`tooshortarc`](@ref) (`true`) or
 via [`gaussinitcond`](@ref) (`false`).
 """
-function istsa(nights::Vector{ObservationNight{T}}) where {T <: AbstractFloat}
+function istsa(nights::Vector{Tracklet{T}}) where {T <: AbstractFloat}
     # Observing stations
     obs = observatory.(nights)
     # Satellite observatories can only be handled by Gauss

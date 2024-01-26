@@ -283,7 +283,7 @@ using NEOs: src_path
 
     end
 
-    @testset "ObservationNight" begin
+    @testset "Tracklet" begin
         using NEOs: reduce_nights
 
         # Choose this example because of the discontinuity in α

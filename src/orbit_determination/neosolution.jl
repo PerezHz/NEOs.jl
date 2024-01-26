@@ -5,7 +5,7 @@ The outcome of the orbit determination process for a NEO.
 
 # Fields
 
-- `nights::Vector{ObservationNight{T}}`: vector of observation nights.
+- `nights::Vector{Tracklet{T}}`: vector of observation nights.
 - `bwd/fwd::TaylorInterpolant{T, U, 2}`: backward (forward) integration.
 - `t_bwd/t_fwd::Vector{U}`: time of Earth close approach.
 - `x_bwd/x_fwd::Vector{U}`: state vector at Earth close approach.
@@ -15,7 +15,7 @@ The outcome of the orbit determination process for a NEO.
 - `scalings::Vector{T}`: jet transport scaling factors.
 """
 @auto_hash_equals struct NEOSolution{T <: Real, U <: Number}
-    nights::Vector{ObservationNight{T}}
+    nights::Vector{Tracklet{T}}
     bwd::TaylorInterpolant{T, U, 2}
     t_bwd::Vector{U}
     x_bwd::Matrix{U}
@@ -29,7 +29,7 @@ The outcome of the orbit determination process for a NEO.
     scalings::Vector{T}
     # Inner constructor
     function NEOSolution{T, U}(
-        nights::Vector{ObservationNight{T}},
+        nights::Vector{Tracklet{T}},
         bwd::TaylorInterpolant{T, U, 2}, t_bwd::Vector{U}, x_bwd::Matrix{U}, g_bwd::Vector{U},
         fwd::TaylorInterpolant{T, U, 2}, t_fwd::Vector{U}, x_fwd::Matrix{U}, g_fwd::Vector{U},
         res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
@@ -45,7 +45,7 @@ The outcome of the orbit determination process for a NEO.
 end
 # Outer constructors
 function NEOSolution(
-    nights::Vector{ObservationNight{T}},
+    nights::Vector{Tracklet{T}},
     bwd::TaylorInterpolant{T, U, 2}, t_bwd::Vector{U}, x_bwd::Matrix{U}, g_bwd::Vector{U},
     fwd::TaylorInterpolant{T, U, 2}, t_fwd::Vector{U}, x_fwd::Matrix{U}, g_fwd::Vector{U},
     res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
@@ -59,7 +59,7 @@ function NEOSolution(
 end
 
 function NEOSolution(
-    nights::Vector{ObservationNight{T}},
+    nights::Vector{Tracklet{T}},
     bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
     res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
 ) where {T <: Real, U <: Number}
@@ -127,7 +127,7 @@ end
 
 # Definition of zero NEOSolution
 function zero(::Type{NEOSolution{T, U}}) where {T <: Real, U <: Number}
-    nights = Vector{ObservationNight{T}}(undef, 0)
+    nights = Vector{Tracklet{T}}(undef, 0)
     bwd = TaylorInterpolant{T, U, 2}(zero(T), zeros(T, 1), Matrix{Taylor1{U}}(undef, 0, 0))
     t_bwd = Vector{U}(undef, 0)
     x_bwd = Matrix{U}(undef, 0, 0)

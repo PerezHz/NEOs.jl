@@ -1,5 +1,5 @@
 @doc raw"""
-    ObservationNight{T <: AbstractFloat}
+    Tracklet{T <: AbstractFloat}
 
 A set of optical observations taken by the same observatory on the same night.
 
@@ -17,7 +17,7 @@ A set of optical observations taken by the same observatory on the same night.
 - `nobs::Int`: number of observations.
 - `idxs::Vector{Int}`: indices of original `radec` that entered the night.
 """
-@auto_hash_equals struct ObservationNight{T <: AbstractFloat}
+@auto_hash_equals struct Tracklet{T <: AbstractFloat}
     radec::Vector{RadecMPC{T}}
     observatory::ObservatoryMPC{T}
     night::TimeOfDay
@@ -30,7 +30,7 @@ A set of optical observations taken by the same observatory on the same night.
     nobs::Int
     indices::Vector{Int}
     # Inner constructor
-    function ObservationNight{T}(radec::Vector{RadecMPC{T}}, observatory::ObservatoryMPC{T},
+    function Tracklet{T}(radec::Vector{RadecMPC{T}}, observatory::ObservatoryMPC{T},
                                  night::TimeOfDay, date::DateTime, α::T, δ::T, v_α::T, v_δ::T,
                                  mag::T, nobs::Int, indices::Vector{Int}) where {T <: AbstractFloat}
 
@@ -38,26 +38,26 @@ A set of optical observations taken by the same observatory on the same night.
     end
 end
 
-# Functions to get specific fields of a ObservationNight object
-date(x::ObservationNight{T}) where {T <: AbstractFloat} = x.date
-ra(x::ObservationNight{T}) where {T <: AbstractFloat} = x.α
-dec(x::ObservationNight{T}) where {T <: AbstractFloat} = x.δ
-observatory(x::ObservationNight{T}) where {T <: AbstractFloat} = x.observatory
-vra(x::ObservationNight{T}) where {T <: AbstractFloat} = x.v_α
-vdec(x::ObservationNight{T}) where {T <: AbstractFloat} = x.v_δ
-mag(x::ObservationNight{T}) where {T <: AbstractFloat} = x.mag
-indices(x::ObservationNight{T}) where {T <: AbstractFloat} = x.indices
+# Functions to get specific fields of a Tracklet object
+date(x::Tracklet{T}) where {T <: AbstractFloat} = x.date
+ra(x::Tracklet{T}) where {T <: AbstractFloat} = x.α
+dec(x::Tracklet{T}) where {T <: AbstractFloat} = x.δ
+observatory(x::Tracklet{T}) where {T <: AbstractFloat} = x.observatory
+vra(x::Tracklet{T}) where {T <: AbstractFloat} = x.v_α
+vdec(x::Tracklet{T}) where {T <: AbstractFloat} = x.v_δ
+mag(x::Tracklet{T}) where {T <: AbstractFloat} = x.mag
+indices(x::Tracklet{T}) where {T <: AbstractFloat} = x.indices
 
-# Print method for ObservationNight{T}
+# Print method for Tracklet{T}
 # Examples:
-# 3 observation night around 2023-11-18T19:59:55.392 at WFST, Lenghu
-# 4 observation night around 2023-11-22T08:07:46.336 at Mt. Lemmon Survey
-function show(io::IO, x::ObservationNight{T}) where {T <: AbstractFloat}
-    print(io, x.nobs, " observation night around ", x.date, " at ", x.observatory.name)
+# 3 observation tracklet around 2023-11-18T19:59:55.392 at WFST, Lenghu
+# 4 observation tracklet around 2023-11-22T08:07:46.336 at Mt. Lemmon Survey
+function show(io::IO, x::Tracklet{T}) where {T <: AbstractFloat}
+    print(io, x.nobs, " observation tracklet around ", x.date, " at ", x.observatory.name)
 end
 
-# Order in ObservationNight is given by date
-isless(a::ObservationNight{T}, b::ObservationNight{T}) where {T <: AbstractFloat} = a.date < b.date
+# Order in Tracklet is given by date
+isless(a::Tracklet{T}, b::Tracklet{T}) where {T <: AbstractFloat} = a.date < b.date
 
 # Evaluate a polynomial with coefficients p in every element of x
 polymodel(x, p) = map(y -> evalpoly(y, p), x)
@@ -99,8 +99,8 @@ function diffcoeffs(x::Vector{T}) where {T <: AbstractFloat}
 end
 
 # Outer constructor
-function ObservationNight(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) where {T <: AbstractFloat}
-    # Defining quantities of an ObservationNight
+function Tracklet(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) where {T <: AbstractFloat}
+    # Defining quantities of a Tracklet
     observatory = df.observatory[1]
     night = df.TimeOfDay[1]
     nobs = nrow(df)
@@ -111,7 +111,7 @@ function ObservationNight(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) whe
         α, δ = df.α[1], df.δ[1]
         v_α, v_δ = zero(T), zero(T)
         mag = df.mag[1]
-        return ObservationNight{T}(radec, observatory, night, date, α,
+        return Tracklet{T}(radec, observatory, night, date, α,
                                    δ, v_α, v_δ, mag, nobs, indices)
     end 
 
@@ -150,16 +150,16 @@ function ObservationNight(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) whe
     # Mean apparent magnitude
     mag = mean(filter(!isnan, df.mag))
 
-    return ObservationNight{T}(radec, observatory, night, date, α, δ, v_α,
+    return Tracklet{T}(radec, observatory, night, date, α, δ, v_α,
                                v_δ, mag, nobs, indices)
 end 
 
 @doc raw"""
     reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
 
-Return a `Vector{ObservationNight{T}}` where each eleement corresponds to a batch of
-observations taken by the same observatory on the same night. 
-The reduction is performed via linear regression. 
+Return a `Vector{Tracklet{T}}` where each element corresponds to a batch of
+observations taken by the same observatory on the same night. The reduction
+is performed via polynomial regression. 
 """
 function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Convert to DataFrame 
@@ -169,11 +169,11 @@ function reduce_nights(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     # Group by observatory and TimeOfDay 
     gdf = groupby(df, [:observatory, :TimeOfDay])
     # Allocate memmory for nights vector
-    nights = Vector{ObservationNight{T}}(undef, gdf.ngroups)
+    nights = Vector{Tracklet{T}}(undef, gdf.ngroups)
     # Reduce nights
     Threads.@threads for i in 1:gdf.ngroups
         rows = getfield(gdf[i], :rows)
-        nights[i] = ObservationNight(radec[rows], gdf[i])
+        nights[i] = Tracklet(radec[rows], gdf[i])
     end
     # Sort by date
     sort!(nights)

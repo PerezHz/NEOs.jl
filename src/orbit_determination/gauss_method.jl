@@ -339,7 +339,7 @@ end
 @doc raw"""
     numberofdays(dates::Vector{DateTime})
     numberofdays(dates::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
-    numberofdays(dates::Vector{ObservationNight{T}}) where {T <: AbstractFloat}
+    numberofdays(dates::Vector{Tracklet{T}}) where {T <: AbstractFloat}
 
 Return the time span of `dates` in days. The function assumes `dates` is sorted.
 """
@@ -349,7 +349,7 @@ function numberofdays(dates::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     return (dates[end].date - dates[1].date).value / 86_400_000
 end
 
-function numberofdays(dates::Vector{ObservationNight{T}}) where {T <: AbstractFloat}
+function numberofdays(dates::Vector{Tracklet{T}}) where {T <: AbstractFloat}
     return (dates[end].radec[end].date - dates[1].radec[1].date).value / 86_400_000
 end
 
@@ -414,7 +414,7 @@ function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_ite
 end
 
 @doc raw"""
-    gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+    gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
                   params::NEOParameters{T}) where {T <: AbstractFloat}
 
 Return initial conditions via Gauss Method. 
@@ -424,13 +424,13 @@ See also [`gauss_method`](@ref).
 # Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `nights::Vector{ObservationNight{T}},`: vector of observation nights.
+- `nights::Vector{Tracklet{T}},`: vector of observation nights.
 - `params::NEOParameters{T}`: see `Gauss Method Parameters` of [`NEOParameters`](@ref).
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
 """
-function gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{ObservationNight{T}},
+function gaussinitcond(radec::Vector{RadecMPC{T}}, nights::Vector{Tracklet{T}},
                        params::NEOParameters{T}) where {T <: AbstractFloat}
 
     # Allocate memory for initial conditions
