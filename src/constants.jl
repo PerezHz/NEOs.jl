@@ -133,9 +133,9 @@ const mpc_catalogue_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "
 # URLs
 
 # MPC catalogues file url 
-const CATALOGUES_MPC_URL = "https://minorplanetcenter.net/iau/info/CatalogueCodes.html"
+const CATALOGUES_MPC_URL = "https://www.minorplanetcenter.net/iau/info/CatalogueCodes.html"
 # MPC observatories file url 
-const OBSERVATORIES_MPC_URL = "https://minorplanetcenter.net/iau/lists/ObsCodes.html"
+const OBSERVATORIES_MPC_URL = "https://www.minorplanetcenter.net/iau/lists/ObsCodes.html"
 
 # MPC database search url 
 const search_mpc_url = "https://www.minorplanetcenter.net/db_search/show_object?utf8=%E2%9C%93&object_id="
