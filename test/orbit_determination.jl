@@ -202,7 +202,7 @@ using NEOs: NEOSolution, numberofdays
         rm(filename)
         # Parameters
         params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
-                               coeffstol = Inf)
+                               coeffstol = Inf, fwdoffset = 0.007)
 
         # Observations before  October 6, 2008, 10:00 UTC
         idxs = findall(x -> date(x) < DateTime(2008, 10, 06, 10), radec)
