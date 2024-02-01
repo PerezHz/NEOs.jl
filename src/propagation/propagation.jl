@@ -42,15 +42,7 @@ function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6); o
     return dq
 end
 
-# Definition of zero TaylorInterpolant{T, U, 2}
-function zero(::Type{TaylorInterpolant{T, U, 2}}) where {T <: Real, U <: Number}
-    return TaylorInterpolant{T, U, 2}(zero(T), zeros(T, 1), Matrix{Taylor1{U}}(undef, 0, 0))
-end
-
-iszero(x::TaylorInterpolant{T, U, 2}) where {T <: Real, U <: Number} = x == zero(TaylorInterpolant{T, U, 2})
-
-function issuccessfulprop(sol::TaylorInterpolant{T, U, 2}, t::T;
-                          tol::T = 10.0) where {T <: Real, U <: Number}
+function issuccessfulprop(sol::TaylorInterpolant, t::T; tol::T = 10.0) where {T <: Real}
     # Zero TaylorInterpolant
     iszero(sol) && return false
     # Forward integration
@@ -169,14 +161,7 @@ function propagate(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
     @time tv, xv, psol = taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, Val(true), _params;
                                      maxsteps = maxsteps, parse_eqs = parse_eqs)
 
-    # Assemble TaylorInterpolant
-    t0 = jd0 - JD_J2000
-    t = tv .- tv[1]
-    if issorted(t) || issorted(t, rev = true)
-        return TaylorInterpolant{T, U, 2}(t0, t, psol)
-    else
-        return zero(TaylorInterpolant{T, U, 2})
-    end
+    return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], psol)
 end
 
 @doc raw"""

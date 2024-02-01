@@ -7,10 +7,10 @@ const scratch_path = Ref{String}("")
 
 # Load Solar System, accelerations, newtonian potentials and TT-TDB 2000-2100 ephemeris
 const sseph_artifact_path = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
-const sseph::TaylorInterpolant{Float64, Float64, 2} = JLD2.load(sseph_artifact_path, "ss16ast_eph")
-const acceph::TaylorInterpolant{Float64, Float64, 2} = JLD2.load(sseph_artifact_path, "acc_eph")
-const poteph::TaylorInterpolant{Float64, Float64, 2} = JLD2.load(sseph_artifact_path, "pot_eph")
-const ttmtdb::TaylorInterpolant{Float64, Float64, 1} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
+const sseph::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Taylor1{Float64}}} = JLD2.load(sseph_artifact_path, "ss16ast_eph")
+const acceph::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Taylor1{Float64}}} = JLD2.load(sseph_artifact_path, "acc_eph")
+const poteph::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Taylor1{Float64}}} = JLD2.load(sseph_artifact_path, "pot_eph")
+const ttmtdb::TaylorInterpolant{Float64, Float64, 1, Vector{Float64}, Vector{Taylor1{Float64}}} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
 
 # Earth orientation parameters (eop) 2000
 const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))

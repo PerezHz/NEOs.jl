@@ -117,7 +117,7 @@ See also [`getposvel`](@ref).
 dtt_tdb(et) = getposvel(1000000001, 1000000000, cte(et))[4] # units: seconds/seconds
 
 @doc raw"""
-    loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::T = sseph.t0,
+    loadpeeph(eph::TaylorInterpolant = sseph, t_0::T = sseph.t0,
               t_f::S = sseph.t0 + sseph.t[end]) where {T, S <: Real}
 
 Load ephemeris produced by `PlanetaryEphemeris.jl` in timerange `[t_0, t_f] ⊆ [0.0, 36525.0]`
@@ -131,7 +131,7 @@ where `t` must have units of TDB days since J2000. The available options for `ep
     Running this function for the first time will download the `sseph_p100` artifact (885 MB)
     which can take several minutes.
 """
-function loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::T = sseph.t0,
+function loadpeeph(eph::TaylorInterpolant = sseph, t_0::T = sseph.t0,
                    t_f::S = sseph.t0 + sseph.t[end]) where {T, S <: Real}
     @assert 0.0 ≤ t_0 ≤ t_f ≤ 36525.0
     i_0 = searchsortedlast(eph.t, t_0)
@@ -140,19 +140,13 @@ function loadpeeph(eph::TaylorInterpolant{Float64, Float64, 2} = sseph, t_0::T =
 end
 
 @doc raw"""
-    bwdfwdeph(et::Union{T, Taylor1{T}, TaylorN{T}, Taylor1{TaylorN{T}}},
-              bwd::TaylorInterpolant{T, U, 2},
-              fwd::TaylorInterpolant{T, U, 2}
-              ) where {T <: AbstractFloat, U <: Union{T, TaylorN{T}}}
+    bwdfwdeph(et::U, bwd::TaylorInterpolant, fwd::TaylorInterpolant) where {U <: Number}
 
 Paste a backward and a forward integration, evaluate at `et` and convert from 
 [au, au/day] -> [km, km/sec].
 """
-function bwdfwdeph(et::Union{T, Taylor1{T}, TaylorN{T}, Taylor1{TaylorN{T}}},
-                   bwd::TaylorInterpolant{T,U,2}, 
-                   fwd::TaylorInterpolant{T,U,2}
-                   ) where {T <: AbstractFloat, U <: Union{T, TaylorN{T}}}
-    @assert bwd.t0 == fwd.t0 "Backward and forward TaylorInterpolant initial times must match"
+function bwdfwdeph(et::U, bwd::TaylorInterpolant, fwd::TaylorInterpolant) where {U <: Number}
+    @assert bwd.t0 == fwd.t0 "Backward and forward initial times must match"
     t = et/daysec
     t0 = bwd.t0
     if t <= t0

@@ -482,7 +482,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
             # Initial conditions (jet transport)
             q0::Vector{TaylorN{T}} = sol[i].statevect .+ eph_su(jd0 - PE.J2000)
             # Backward propagation 
-            bwd::TaylorInterpolant{T, TaylorN{T}, 2} = propagate(
+            bwd = propagate(
                 RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q0, params
             ) 
             if !issuccessfulprop(bwd, t0 - jd0; tol = params.coeffstol)
@@ -490,7 +490,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
             end
 
             # Forward propagation
-            fwd::TaylorInterpolant{T, TaylorN{T}, 2} = propagate(
+            fwd = propagate(
                 RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q0, params
             )
             if !issuccessfulprop(fwd, tf - jd0; tol = params.coeffstol)

@@ -6,7 +6,7 @@ The outcome of the orbit determination process for a NEO.
 # Fields
 
 - `tracklets::Vector{Tracklet{T}}`: vector of tracklets.
-- `bwd/fwd::TaylorInterpolant{T, U, 2}`: backward (forward) integration.
+- `bwd/fwd::TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}}`: backward (forward) integration.
 - `t_bwd/t_fwd::Vector{U}`: time of Earth close approach.
 - `x_bwd/x_fwd::Vector{U}`: state vector at Earth close approach.
 - `g_bwd/g_fwd::Vector{U}`: geocentric distance at close approach.
@@ -16,11 +16,11 @@ The outcome of the orbit determination process for a NEO.
 """
 @auto_hash_equals struct NEOSolution{T <: Real, U <: Number}
     tracklets::Vector{Tracklet{T}}
-    bwd::TaylorInterpolant{T, U, 2}
+    bwd::TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}}
     t_bwd::Vector{U}
     x_bwd::Matrix{U}
     g_bwd::Vector{U}
-    fwd::TaylorInterpolant{T, U, 2}
+    fwd::TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}}
     t_fwd::Vector{U}
     x_fwd::Matrix{U}
     g_fwd::Vector{U}
@@ -30,15 +30,17 @@ The outcome of the orbit determination process for a NEO.
     # Inner constructor
     function NEOSolution{T, U}(
         tracklets::Vector{Tracklet{T}},
-        bwd::TaylorInterpolant{T, U, 2}, t_bwd::Vector{U}, x_bwd::Matrix{U}, g_bwd::Vector{U},
-        fwd::TaylorInterpolant{T, U, 2}, t_fwd::Vector{U}, x_fwd::Matrix{U}, g_fwd::Vector{U},
+        bwd::TaylorInterpolant{T, U, 2, VT, X}, t_bwd::Vector{U}, x_bwd::Matrix{U}, g_bwd::Vector{U},
+        fwd::TaylorInterpolant{T, U, 2, VT, X}, t_fwd::Vector{U}, x_fwd::Matrix{U}, g_fwd::Vector{U},
         res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
-    ) where {T <: Real, U <: Number}
+    ) where {T <: Real, U <: Number, VT <: AbstractVector{T}, X <: AbstractMatrix{Taylor1{U}}}
         @assert bwd.t0 == fwd.t0 "Backward and forward propagation initial times must match"
+        _bwd_ = TaylorInterpolant(bwd.t0, bwd.t, collect(bwd.x))
+        _fwd_ = TaylorInterpolant(fwd.t0, fwd.t, collect(fwd.x))
         new{T, U}(
             tracklets, 
-            bwd, t_bwd, x_bwd, g_bwd, 
-            fwd, t_fwd, x_fwd, g_fwd, 
+            _bwd_, t_bwd, x_bwd, g_bwd, 
+            _fwd_, t_fwd, x_fwd, g_fwd, 
             res, fit, scalings
         )
     end
@@ -46,10 +48,10 @@ end
 # Outer constructors
 function NEOSolution(
     tracklets::Vector{Tracklet{T}},
-    bwd::TaylorInterpolant{T, U, 2}, t_bwd::Vector{U}, x_bwd::Matrix{U}, g_bwd::Vector{U},
-    fwd::TaylorInterpolant{T, U, 2}, t_fwd::Vector{U}, x_fwd::Matrix{U}, g_fwd::Vector{U},
+    bwd::TaylorInterpolant{T, U, 2, VT, X}, t_bwd::Vector{U}, x_bwd::Matrix{U}, g_bwd::Vector{U},
+    fwd::TaylorInterpolant{T, U, 2, VT, X}, t_fwd::Vector{U}, x_fwd::Matrix{U}, g_fwd::Vector{U},
     res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
-) where {T <: Real, U <: Number}
+) where {T <: Real, U <: Number, VT <: AbstractVector{T}, X <: AbstractMatrix{Taylor1{U}}}
     NEOSolution{T, U}(
         tracklets, 
         bwd, t_bwd, x_bwd, g_bwd, 
@@ -60,9 +62,9 @@ end
 
 function NEOSolution(
     tracklets::Vector{Tracklet{T}},
-    bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
+    bwd::TaylorInterpolant{T, U, 2, VT, X}, fwd::TaylorInterpolant{T, U, 2, VT, X},
     res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
-) where {T <: Real, U <: Number}
+) where {T <: Real, U <: Number, VT <: AbstractVector{T}, X <: AbstractMatrix{Taylor1{U}}}
     # Backward roots
     t_bwd = Vector{U}(undef, 0)
     x_bwd = Matrix{U}(undef, 0, 0)
@@ -102,14 +104,14 @@ function evalfit(sol::NEOSolution{T, TaylorN{T}}) where {T <: Real}
     δs = sol.fit.x
     # Evaluate backward integration
     new_bwd_x = map(x -> Taylor1(x.coeffs(δs)), sol.bwd.x);
-    new_bwd = TaylorInterpolant{T, T, 2}(sol.bwd.t0, sol.bwd.t, new_bwd_x)
+    new_bwd = TaylorInterpolant(sol.bwd.t0, sol.bwd.t, new_bwd_x)
     # Evaluate backward roots
     new_t_bwd = sol.t_bwd(δs)
     new_x_bwd = sol.x_bwd(δs)
     new_g_bwd = sol.g_bwd(δs)
     # Evaluate forward integration
     new_fwd_x = map(x -> Taylor1(x.coeffs(δs)), sol.fwd.x);
-    new_fwd = TaylorInterpolant{T, T, 2}(sol.fwd.t0, sol.fwd.t, new_fwd_x)
+    new_fwd = TaylorInterpolant(sol.fwd.t0, sol.fwd.t, new_fwd_x)
     # Evaluate forward roots
     new_t_fwd = sol.t_fwd(δs)
     new_x_fwd = sol.x_fwd(δs)
@@ -128,11 +130,11 @@ end
 # Definition of zero NEOSolution
 function zero(::Type{NEOSolution{T, U}}) where {T <: Real, U <: Number}
     tracklets = Vector{Tracklet{T}}(undef, 0)
-    bwd = TaylorInterpolant{T, U, 2}(zero(T), zeros(T, 1), Matrix{Taylor1{U}}(undef, 0, 0))
+    bwd = zero(TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}})
     t_bwd = Vector{U}(undef, 0)
     x_bwd = Matrix{U}(undef, 0, 0)
     g_bwd = Vector{U}(undef, 0)
-    fwd = TaylorInterpolant{T, U, 2}(zero(T), zeros(T, 1), Matrix{Taylor1{U}}(undef, 0, 0))
+    fwd = zero(TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}})
     t_fwd = Vector{U}(undef, 0)
     x_fwd = Matrix{U}(undef, 0, 0)
     g_fwd = Vector{U}(undef, 0)
