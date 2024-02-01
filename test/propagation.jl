@@ -336,11 +336,11 @@ using InteractiveUtils: methodswith
         )
 
         # Solar System ephemeris
-        sseph_obs::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Taylor1{Float64}}} = loadpeeph(NEOs.sseph, sol.t0, sol.t0 + sol.t[end])
+        sseph_obs = loadpeeph(NEOs.sseph, sol.t0, sol.t0 + sol.t[end])
         # Sun's ephemeris
-        eph_su::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Taylor1{Float64}}} = selecteph(sseph_obs, su)
+        eph_su = selecteph(sseph_obs, su)
         # Earth's ephemeris
-        eph_ea::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Taylor1{Float64}}} = selecteph(sseph_obs, ea)
+        eph_ea = selecteph(sseph_obs, ea)
 
         # Read optical astrometry file
         obs_radec_mpc_apophis = NEOs.read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
