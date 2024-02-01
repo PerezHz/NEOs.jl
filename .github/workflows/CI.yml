@@ -46,8 +46,7 @@ jobs:
       - uses: codecov/codecov-action@v3
         with:
           files: lcov.info
-      - uses: coverallsapp/github-action@master
+      - uses: coverallsapp/github-action@v2
         with:
           path-to-lcov: lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel: false
