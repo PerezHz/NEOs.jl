@@ -74,7 +74,7 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     end
     # Maximum range (heliocentric constraint)
     ρ_max = max_range(coeffs, ρ_min)
-    iszero(ρ_max) && return zero(AdmissibleRegion{Float64})
+    iszero(ρ_max) && return zero(AdmissibleRegion{T})
     # Range domain
     ρ_domain = [ρ_min, ρ_max]
     # Range rate domain
@@ -83,13 +83,13 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     # Range rate symmetry level
     v_ρ_mid = range_rate(coeffs, ρ_max)[1]
     # Boundary points
-    Fs = Matrix{Float64}(undef, 3, 2)
+    Fs = Matrix{T}(undef, 3, 2)
     Fs[1, :] .= [ρ_min, v_ρ_min]
     Fs[2, :] .= [ρ_min, v_ρ_max]
     Fs[3, :] .= [ρ_max, v_ρ_mid]
     
-    return AdmissibleRegion{Float64}(t_datetime, α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q,
-                                     coeffs, ρ_domain, v_ρ_domain, Fs, obs)
+    return AdmissibleRegion{T}(t_datetime, α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q,
+                               coeffs, ρ_domain, v_ρ_domain, Fs, obs)
 end
 
 @doc raw"""
