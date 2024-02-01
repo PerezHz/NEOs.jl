@@ -51,7 +51,7 @@ end
 iszero(x::AdmissibleRegion{T}) where {T <: AbstractFloat} = x == zero(AdmissibleRegion{T})
 
 # Outer constructor
-function AdmissibleRegion(tracklet::Tracklet{T}) where {T <: AbstractFloat}
+function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where {T <: AbstractFloat}
     # Unfold
     obs, t_datetime, α, δ = observatory(tracklet), date(tracklet), ra(tracklet), dec(tracklet)
     v_α, v_δ, h = vra(tracklet), vdec(tracklet), mag(tracklet)
@@ -61,11 +61,8 @@ function AdmissibleRegion(tracklet::Tracklet{T}) where {T <: AbstractFloat}
     t_days = datetime2days(t_datetime)
     # Time of observation [et seconds]
     t_et = datetime2et(t_datetime)
-    # Sun (Earth) ephemeris
-    eph_su = selecteph(sseph, su)
-    eph_ea = selecteph(sseph, ea)
     # Heliocentric position of the observer
-    q = eph_ea(t_days) + kmsec2auday(obsposvelECI(obs, t_et)) - eph_su(t_days)
+    q = params.eph_ea(t_days) + kmsec2auday(obsposvelECI(obs, t_et)) - params.eph_su(t_days)
     # Admissible region coefficients
     coeffs = admsreg_coeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
     # Tiny object boundary
@@ -330,13 +327,10 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
        !issuccessfulprop(fwd, tf - jd0; tol = params.coeffstol)
         return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
     end
-    # Sun (Earth) ephemeris
-    eph_su = selecteph(sseph, su)
-    eph_ea = selecteph(sseph, ea)
     # O-C residuals
     res = residuals(radec, params;
-                    xvs = et -> auday2kmsec(eph_su(et/daysec)),
-                    xve = et -> auday2kmsec(eph_ea(et/daysec)),
+                    xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
+                    xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
                     xva = et -> bwdfwdeph(et, bwd, fwd))
     
     return bwd, fwd, res
@@ -504,7 +498,7 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
     # Iterate tracklets
     for i in idxs
         # Admissible region
-        A = AdmissibleRegion(tracklets[i])
+        A = AdmissibleRegion(tracklets[i], params)
         iszero(A) && continue
         # Center
         ρ = sum(A.ρ_domain) / 2

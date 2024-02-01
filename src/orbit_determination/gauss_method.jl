@@ -184,9 +184,9 @@ function heliocentric_energy(r::Vector{T}) where {T <: Number}
 end
 
 @doc raw"""
-    gauss_method(obs::Vector{RadecMPC{T}}; niter::Int = 5) where {T <: AbstractFloat}
+    gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: AbstractFloat}
     gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime},
-                 α::Vector{U}, δ::Vector{U}; niter::Int = 5) where {T <: Real, U <: Number}
+                 α::Vector{U}, δ::Vector{U}, params::NEOParameters{T}) where {T <: Real, U <: Number}
 
 Core Gauss method of Initial Orbit determination (IOD).
 
@@ -197,12 +197,12 @@ Core Gauss method of Initial Orbit determination (IOD).
 - `dates::Vector{DateTime}`: times of observation.
 - `α::Vector{U}`: right ascension [rad].
 - `δ::Vector{U}`: declination [rad].
-- `niter::Int`: number of iterations for Newton's method.
+- `params::NEOParameters{T}`: see `Gauss Method Parameters` of [`NEOParameters`](@ref).
 
 !!! reference
     See Algorithm 5.5 in page 274 https://doi.org/10.1016/C2016-0-02107-1.
 """
-function gauss_method(obs::Vector{RadecMPC{T}}; niter::Int = 5) where {T <: AbstractFloat}
+function gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: AbstractFloat}
 
     # Make sure observations are in temporal order
     sort!(obs)
@@ -215,11 +215,11 @@ function gauss_method(obs::Vector{RadecMPC{T}}; niter::Int = 5) where {T <: Abst
     # Declination
     δ = dec.(obs)
 
-    return gauss_method(observatories, dates, α, δ; niter = niter)
+    return gauss_method(observatories, dates, α, δ, params)
 end
 
 function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime},
-                      α::Vector{U}, δ::Vector{U}; niter::Int = 5) where {T <: Real, U <: Number}
+                      α::Vector{U}, δ::Vector{U}, params::NEOParameters{T}) where {T <: Real, U <: Number}
 
     # Check we have exactly three observations
     @assert length(observatories) == length(dates) == length(α) == length(δ) == 3 "Gauss method requires exactly three observations"
@@ -240,12 +240,8 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     ρ_vec = vectors2matrix(topounit.(α, δ))
     # Geocentric state vector of the observer [au, au/day]
     g_vec = kmsec2auday.(obsposvelECI.(observatories, t_et))
-    # Sun's ephemeris 
-    eph_su = selecteph(sseph, su)
-    # Earth's ephemeris 
-    eph_ea = selecteph(sseph, ea)
     # Heliocentric state vector of the Earth [au, au/day]
-    G_vec = eph_ea.(t_days) - eph_su.(t_days)
+    G_vec = params.eph_ea.(t_days) - params.eph_su.(t_days)
     # Observer's heliocentric positions [au, au/day]
     R_vec = vectors2matrix(G_vec .+  g_vec)[:, 1:3]
 
@@ -280,7 +276,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     c = -(μ_S^2)*(B*B)
 
     # Solve Lagrange equation
-    sol = solve_lagrange(a, b, c; niter = niter)
+    sol = solve_lagrange(a, b, c; niter = params.niter)
 
     # Number of solutions
     n_sol = length(sol)
@@ -439,8 +435,6 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
     observatories, dates, α, δ = observatory.(tracklets), date.(tracklets), ra.(tracklets), dec.(tracklets)
     # Observations triplets
     triplets = gauss_triplets(dates, params.max_triplets)
-    # Julian day of first (last) observation
-    t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
     # Julian day when to start propagation
     jd0 = zero(T)
     # Start point of LS fits
@@ -450,10 +444,6 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
     # Jet transport perturbation (ra/dec)
     dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃", scalings,
                           order = params.varorder)
-    # Sun's ephemeris
-    eph_su = selecteph(sseph, su)
-    # Earth's ephemeris
-    eph_ea = selecteph(sseph, ea)
     # Normalized root mean square error (NRMS)
     best_Q = T(Inf)
     # Break flag
@@ -466,13 +456,9 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         triplet = triplets[j]
         # Julian day when to start propagation
         jd0 = datetime2julian(dates[triplet[2]])
-        # Number of years in forward integration
-        nyears_fwd = (tf - jd0 + params.fwdoffset) / yr
-        # Number of years in backward integration
-        nyears_bwd = -(jd0 - t0 + params.bwdoffset) / yr
         # Gauss method solution 
         sol = gauss_method(observatories[triplet], dates[triplet], α[triplet] .+ dq[1:3],
-                           δ[triplet] .+ dq[4:6]; niter = params.niter)
+                           δ[triplet] .+ dq[4:6], params)
         # Filter Gauss solutions by heliocentric energy
         filter!(x -> heliocentric_energy(x.statevect) <= 0, sol)
 
@@ -480,30 +466,11 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         for i in eachindex(sol)
 
             # Initial conditions (jet transport)
-            q0::Vector{TaylorN{T}} = sol[i].statevect .+ eph_su(jd0 - PE.J2000)
-            # Backward propagation 
-            bwd = propagate(
-                RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q0, params
-            ) 
-            if !issuccessfulprop(bwd, t0 - jd0; tol = params.coeffstol)
-                continue
-            end
+            q0 = sol[i].statevect .+ params.eph_su(jd0 - PE.J2000)
 
-            # Forward propagation
-            fwd = propagate(
-                RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q0, params
-            )
-            if !issuccessfulprop(fwd, tf - jd0; tol = params.coeffstol)
-                continue
-            end
-
-            # O-C residuals
-            res::Vector{OpticalResidual{T, TaylorN{T}}} = residuals(
-                radec, params;
-                xvs = et -> auday2kmsec(eph_su(et/daysec)),
-                xve = et -> auday2kmsec(eph_ea(et/daysec)),
-                xva = et -> bwdfwdeph(et, bwd, fwd)
-            )
+            # Propagation and residuals
+            bwd, fwd, res = propres(radec, jd0, q0, params)
+            iszero(length(res)) && continue
 
             # Subset of radec for orbit fit
             g_0 = triplet[1]

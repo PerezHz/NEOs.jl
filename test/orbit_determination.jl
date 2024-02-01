@@ -211,29 +211,18 @@ using NEOs: NEOSolution, numberofdays
 
         # Tracklets 
         tracklets = reduce_tracklets(radec)
-        # Time of first (last) observation [julian days]
-        t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
-        # Sun (earth's) ephemeris
-        eph_su = selecteph(NEOs.sseph, su)
-        eph_ea = selecteph(sseph, ea)
-        
         # Initial time of propagation [julian days]
         jd0 = sol.bwd.t0 + J2000
-        # Years in backward (forward) propagation
-        nyears_bwd = -(jd0 - t0 + 0.5) / yr
-        nyears_fwd = (tf - jd0 + 0.5) / yr
         # Initial conditions
         q0 = sol()
         scalings = abs.(q0) ./ 10^6
         dq = NEOs.scaled_variables("dx", scalings, order = 5)
         q = q0 + dq
         # Propagation and residuals
-        bwd = NEOs.propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q, params)
-        fwd = NEOs.propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q, params)
-        res = residuals(radec, params;
-                        xvs = et -> auday2kmsec(eph_su(et/daysec)),
-                        xve = et -> auday2kmsec(eph_ea(et/daysec)),
-                        xva = et -> bwdfwdeph(et, bwd, fwd))
+        bwd, fwd, res = propres(radec, jd0, q, params)
+
+        @test length(res) == 883
+
         # Least squares fit
         fit = tryls(res, zeros(6), params.niter)
         # Orbit with all the observations
@@ -247,12 +236,10 @@ using NEOs: NEOSolution, numberofdays
         dq = NEOs.scaled_variables("dx", scalings, order = 5)
         q = q0 + dq
         # Propagation and residuals
-        bwd = NEOs.propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q, params)
-        fwd = NEOs.propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q, params)
-        res = residuals(radec, params;
-                        xvs = et -> auday2kmsec(eph_su(et/daysec)),
-                        xve = et -> auday2kmsec(eph_ea(et/daysec)),
-                        xva = et -> bwdfwdeph(et, bwd, fwd))
+        bwd, fwd, res = propres(radec, jd0, q, params)
+        
+        @test length(res) == 883
+        
         # Least squares fit
         fit = tryls(res, zeros(6), params.niter)
         # Orbit refinement

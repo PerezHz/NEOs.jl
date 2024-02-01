@@ -24,22 +24,10 @@ via propagation and/or outlier rejection.
 function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
                            params::NEOParameters{T}) where {T <: AbstractFloat}
 
-    # Sun's ephemeris
-    eph_su = selecteph(sseph, su)
-    # Earth's ephemeris
-    eph_ea = selecteph(sseph, ea)
     # Origin
     x0 = zeros(T, 6)
     # Julian day to start propagation
     jd0 = sol.bwd.t0 + PE.J2000
-    # Julian day of first (last) observation
-    t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
-    # Number of years in forward integration 
-    nyears_fwd = (tf - jd0 + params.fwdoffset) / yr
-    # Number of years in backward integration
-    nyears_bwd = -(jd0 - t0 + params.bwdoffset) / yr
-    # Dynamical function 
-    dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
     # Initial conditions (T)
     q0 = sol(sol.bwd.t0)
     # Scaling factors
@@ -49,25 +37,10 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     # Initial conditions (jet transport)
     q = q0 .+ dq
 
-    # Backward integration
-    bwd = propagate(dynamics, jd0, nyears_bwd, q, params)
-
-    if !issuccessfulprop(bwd, t0 - jd0; tol = params.coeffstol)
-        return zero(NEOSolution{T, T})
-    end
-
-    # Forward integration
-    fwd = propagate(dynamics, jd0, nyears_fwd, q, params)
-
-    if !issuccessfulprop(fwd, tf - jd0; tol = params.coeffstol)
-        return zero(NEOSolution{T, T})
-    end
-
-    # Residuals
-    res = residuals(radec, params;
-                    xvs = et -> auday2kmsec(eph_su(et/daysec)),
-                    xve = et -> auday2kmsec(eph_ea(et/daysec)),
-                    xva = et -> bwdfwdeph(et, bwd, fwd))
+    # Propagation and residuals
+    bwd, fwd, res = propres(radec, jd0, q, params)
+    iszero(length(res)) && return zero(NEOSolution{T, T})
+    
     # Orbit fit
     fit = tryls(res, x0, params.niter)
 

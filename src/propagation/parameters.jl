@@ -13,6 +13,8 @@ struct NEOParameters{T <: AbstractFloat}
     truth::String
     resol::Resolution
     bias_matrix::Matrix{T}
+    eph_su::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}
+    eph_ea::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}
     # Least squares fit parameters
     niter::Int
     # Gauss Method parameters
@@ -75,11 +77,16 @@ function NEOParameters(; maxsteps::Int = 500, μ_ast::Vector{T} = μ_ast343_DE43
                       maxiter::Int = 100, max_per::T = 18.0) where {T <: AbstractFloat}
     # Unfold debiasing matrix
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
+    # Sun (Earth) ephemeris
+    _su = selecteph(sseph, su)
+    eph_su = TaylorInterpolant(_su.t0, _su.t, collect(_su.x))
+    _ea = selecteph(sseph, ea)
+    eph_ea = TaylorInterpolant(_ea.t0, _ea.t, collect(_ea.x))
     # Assemble NEOParameters
     return NEOParameters{T}(maxsteps, μ_ast, order, abstol, parse_eqs, bwdoffset,
                             fwdoffset, coeffstol, mpc_catalogue_codes_201X, truth,
-                            resol, bias_matrix, niter, max_triplets, varorder, Q_max,
-                            maxiter, max_per)
+                            resol, bias_matrix, eph_su, eph_ea, niter, max_triplets,
+                            varorder, Q_max, maxiter, max_per)
 end                            
 
 function NEOParameters(params::NEOParameters{T}; kwargs...) where {T <: AbstractFloat}
