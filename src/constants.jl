@@ -201,3 +201,5 @@ const ϵ0_deg = 84381.448/3_600
 const k_gauss = 0.017_202_098_95
 # Earth's sphere of influence radius [AU]
 const R_SI = 0.010044
+# Earth's physical radius [AU]
+const R_EA = 4.2e-5

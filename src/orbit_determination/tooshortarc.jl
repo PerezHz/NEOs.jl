@@ -65,16 +65,25 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     q = params.eph_ea(t_days) + kmsec2auday(obsposvelECI(obs, t_et)) - params.eph_su(t_days)
     # Admissible region coefficients
     coeffs = admsreg_coeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
-    # Tiny object boundary
-    H_max = 32.0                # Maximum allowed absolute magnitude
+    # Maximum range (heliocentric constraint)
+    ρ_max = max_range(coeffs)
+    iszero(ρ_max) && return zero(AdmissibleRegion{T})
+    # Minimum range
     if isnan(h)
-        ρ_min = R_SI
+        if R_SI < ρ_max
+            # Earth's sphere of influence radius
+            ρ_min = R_SI
+        else
+            # Earth's physical radius
+            ρ_min = R_EA
+        end
     else
+        # Maximum allowed absolute magnitude
+        H_max = 32.0
+        # Tiny object boundary
         ρ_min = 10^((h - H_max)/5)
     end
-    # Maximum range (heliocentric constraint)
-    ρ_max = max_range(coeffs, ρ_min)
-    iszero(ρ_max) && return zero(AdmissibleRegion{T})
+    ρ_min > ρ_max && return zero(AdmissibleRegion{T})
     # Range domain
     ρ_domain = [ρ_min, ρ_max]
     # Range rate domain
@@ -193,14 +202,14 @@ end
 range_rate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat} = range_rate(A.coeffs, ρ)
 
 @doc raw"""
-    max_range(coeffs::Vector{T}, ρ_min::T) where {T <: AbstractFloat}
+    max_range(coeffs::Vector{T}) where {T <: AbstractFloat}
 
 Return the maximum possible range in the boundary of an admissible region
-with coefficients `coeffs` and minimum allowed range `ρ_min`.
+with coefficients `coeffs`.
 """
-function max_range(coeffs::Vector{T}, ρ_min::T) where {T <: AbstractFloat}
+function max_range(coeffs::Vector{T}) where {T <: AbstractFloat}
     # Initial guess
-    sol = find_zeros(s -> admsreg_U(coeffs, s), ρ_min, 10.0)
+    sol = find_zeros(s -> admsreg_U(coeffs, s), R_EA, 10.0)
     iszero(length(sol)) && return zero(T)
     ρ_max = sol[1]
     # Make sure U(ρ) ≥ 0 and there is at least one range_rate solution
@@ -266,7 +275,7 @@ end
 # Check whether P is inside A's boundary
 function in(P::Vector{T}, A::AdmissibleRegion{T}) where {T <: AbstractFloat}
     @assert length(P) == 2 "Points in admissible region are of dimension 2"
-    if A.ρ_domain[1] <= P[1] <= A.ρ_domain[2] && A.v_ρ_domain[1] <= P[2] <= A.v_ρ_domain[2]
+    if A.ρ_domain[1] <= P[1] <= A.ρ_domain[2]
         y_range = range_rate(A, P[1])
         if length(y_range) == 1
             return P[2] == y_range

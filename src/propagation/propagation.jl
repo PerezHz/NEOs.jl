@@ -161,7 +161,11 @@ function propagate(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
     @time tv, xv, psol = taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, Val(true), _params;
                                      maxsteps = maxsteps, parse_eqs = parse_eqs)
 
-    return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], psol)
+    if issorted(tv) || issorted(tv, rev = true)
+        return TaylorInterpolant(jd0 - JD_J2000, tv, psol)
+    else
+        return zero(TaylorInterpolant{T, U, 2, SubArray{T, 1}, SubArray{Taylor1{U}, 2}})
+    end
 end
 
 @doc raw"""
