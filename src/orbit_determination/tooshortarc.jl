@@ -362,8 +362,6 @@ residual over and admissible region `A`.
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
               params::NEOParameters{T}; η::T = 25.0, μ::T = 0.75, ν::T = 0.9,
               ϵ::T = 1e-8, Qtol::T = 0.001) where {T <: AbstractFloat}
-    # Initial time of integration [julian days]
-    jd0 = datetime2julian(A.date)
     # Scaling factors
     scalings = [A.ρ_domain[2] - A.ρ_domain[1], A.v_ρ_domain[2] - A.v_ρ_domain[1]] / 1_000
     # Jet transport variables
@@ -386,7 +384,10 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     for t in 1:maxiter+1
         # Current position in admissible region
         ρs[t] = ρ
-        v_ρs[t] = v_ρ  
+        v_ρs[t] = v_ρ
+        # Initial time of integration [julian days]
+        # (corrected for light-time)
+        jd0 = datetime2julian(A.date) - ρ / c_au_per_day
         # Current barycentric state vector
         q = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
         # Propagation and residuals
@@ -517,7 +518,8 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         # Barycentric initial conditions
         q0 = topo2bary(A, ρs[end], v_ρs[end])
         # Initial time of integration [julian days]
-        jd0 = datetime2julian(A.date)
+        # (corrected for light-time)
+        jd0 = datetime2julian(A.date) - ρs[end] / c_au_per_day
         # 6 variables least squares
         sol = tsals(radec, tracklets, jd0, q0, params; maxiter = 5)
         # Update best solution
@@ -529,6 +531,7 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         # Heel anomaly
         ρ = A.ρ_domain[1]
         v_ρs = LinRange(A.v_ρ_domain[1], A.v_ρ_domain[2], 25)
+        jd0 = datetime2julian(A.date) - ρ / c_au_per_day
         Qs = fill(Inf, 25)
         for i in eachindex(Qs)
             # Barycentric initial conditions

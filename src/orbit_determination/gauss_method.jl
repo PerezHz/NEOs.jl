@@ -435,8 +435,6 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
     observatories, dates, α, δ = observatory.(tracklets), date.(tracklets), ra.(tracklets), dec.(tracklets)
     # Observations triplets
     triplets = gauss_triplets(dates, params.max_triplets)
-    # Julian day when to start propagation
-    jd0 = zero(T)
     # Start point of LS fits
     x0 = zeros(T, 6)
     # Jet transport scaling factors
@@ -454,8 +452,8 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
 
         # Current triplet
         triplet = triplets[j]
-        # Julian day when to start propagation
-        jd0 = datetime2julian(dates[triplet[2]])
+        # Julian day of middle observation
+        _jd0_ = datetime2julian(dates[triplet[2]])
         # Gauss method solution 
         sol = gauss_method(observatories[triplet], dates[triplet], α[triplet] .+ dq[1:3],
                            δ[triplet] .+ dq[4:6], params)
@@ -465,6 +463,8 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         # Iterate over Gauss solutions
         for i in eachindex(sol)
 
+            # Light-time correction
+            jd0 = _jd0_ - cte(sol[i].ρ[2]) / c_au_per_day
             # Initial conditions (jet transport)
             q0 = sol[i].statevect .+ params.eph_su(jd0 - PE.J2000)
 
