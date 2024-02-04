@@ -8,9 +8,10 @@ See also [`gauss_method`](@ref).
 # Fields
 
 - `statevect::Vector{U}`: state vector at middle observation.
+- `ρ::Vector{U}`: topocentric ranges.
 - `D::Matrix{U}`: D matrix.
 - `R_vec::Matrix{T}`: observer's heliocentric positions.
-- `ρ_vec::Matrix{U}`: slant ranges.
+- `ρ_vec::Matrix{U}`: line of sight unit vectors.
 - `τ_1::T`: time between first and second observations.
 - `τ_3::T`: time between third and second observations.
 - `f_1, g_1, f_3, g_3::U`: Lagrange coefficients.
@@ -20,6 +21,7 @@ See also [`gauss_method`](@ref).
 """
 @auto_hash_equals struct GaussSolution{T <: Real, U <: Number}
     statevect::Vector{U}
+    ρ::Vector{U}
     D::Matrix{U}
     R_vec::Matrix{T}
     ρ_vec::Matrix{U}
@@ -30,16 +32,18 @@ See also [`gauss_method`](@ref).
     f_3::U
     g_3::U
     # Inner constructor
-    function GaussSolution{T, U}(statevect::Vector{U}, D::Matrix{U}, R_vec::Matrix{T}, ρ_vec::Matrix{U},
-                                 τ_1::T, τ_3::T, f_1::U, g_1::U, f_3::U, g_3::U) where {T <: Real, U <: Number}
-        return new{T, U}(statevect, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3)
+    function GaussSolution{T, U}(
+        statevect::Vector{U}, ρ::Vector{U}, D::Matrix{U}, R_vec::Matrix{T},
+        ρ_vec::Matrix{U}, τ_1::T, τ_3::T, f_1::U, g_1::U, f_3::U, g_3::U) where {T <: Real, U <: Number}
+        return new{T, U}(statevect, ρ, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3)
     end
 end
 
 # Outer constructor
-function GaussSolution(statevect::Vector{U}, D::Matrix{U}, R_vec::Matrix{T}, ρ_vec::Matrix{U}, τ_1::T,
-                       τ_3::T, f_1::U, g_1::U, f_3::U, g_3::U) where {T <: Real, U <: Number}
-    return GaussSolution{T, U}(statevect, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3)
+function GaussSolution(
+    statevect::Vector{U}, ρ::Vector{U}, D::Matrix{U}, R_vec::Matrix{T},
+    ρ_vec::Matrix{U}, τ_1::T, τ_3::T, f_1::U, g_1::U, f_3::U, g_3::U) where {T <: Real, U <: Number}
+    return GaussSolution{T, U}(statevect, ρ, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3)
 end
 
 # Print method for GaussSolution
@@ -322,8 +326,10 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
             # Heliocentric velocity of the NEO
             v_2_vec = @views (- f_3 * r_vec[1, :] + f_1 * r_vec[3, :]) / (f_1*g_3 - f_3*g_1)
 
-            sol_gauss[i] = GaussSolution{T, U}(vcat(r_vec[2, :], v_2_vec), D, R_vec, ρ_vec,
-                           τ_1, τ_3, f_1, g_1, f_3, g_3)
+            sol_gauss[i] = GaussSolution{T, U}(
+                vcat(r_vec[2, :], v_2_vec), ρ, D, R_vec,
+                ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3
+            )
         end
         # Sort solutions by heliocentric range
         return sort!(sol_gauss, by = x -> norm(cte.(x.statevect[1:3])))
