@@ -1174,3 +1174,105 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
 
     nothing
 end
+
+@taylorize function newtonian!(dq, q, params, t)
+    # Julian date of start time
+    local jd0 = params[4]
+    # Days since J2000.0 = 2.451545e6
+    local dsj2k = t + (jd0 - JD_J2000)
+    # Solar system ephemeris at dsj2k
+    local ss16asteph_t = evaleph(params[1], dsj2k, q[1])
+    # Type of position / velocity components
+    local S = eltype(q)
+    # Interaction matrix with flattened bodies
+    local UJ_interaction = params[5]
+    # Number of bodies, including NEA
+    local N = params[6]
+    # Number of bodies, except the asteroid
+    local Nm1 = N-1
+    # Vector of mass parameters GM's
+    local μ = params[7]
+
+    # zero(q[1])
+    local zero_q_1 = auxzero(q[1])
+
+    #=
+    Point-mass accelerations
+    See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
+    =#
+
+    # Position of the i-th body - position of the asteroid
+    X = Array{S}(undef, N)         # X-axis component
+    Y = Array{S}(undef, N)         # Y-axis component
+    Z = Array{S}(undef, N)         # Z-axis component
+
+    # Distance between the i-th body and the asteroid
+    r_p2 = Array{S}(undef, N)      # r_{i,asteroid}^2
+    r_p3d2 = Array{S}(undef, N)    # r_p2^1.5 <-> r_{i, asteroid}^3
+
+    # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
+    newtonianCoeff = Array{S}(undef, N)
+
+    # Newtonian coefficient * difference between two positions, i.e.,
+    # \mu_i * (\mathbf{r_i} - \mathbf{r_asteroid}) / r_{ij}^3
+    newton_acc_X = Array{S}(undef, N)   # X-axis component
+    newton_acc_Y = Array{S}(undef, N)   # Y-axis component
+    newton_acc_Z = Array{S}(undef, N)   # Z-axis component
+
+    # Temporary arrays for the sum of full extended body accelerations
+    temp_accX_i = Array{S}(undef, N)
+    temp_accY_i = Array{S}(undef, N)
+    temp_accZ_i = Array{S}(undef, N)
+
+    # Full extended-body accelerations
+    accX = zero_q_1
+    accY = zero_q_1
+    accZ = zero_q_1
+
+    # Fill first 3 elements of dq with velocities
+    dq[1] = q[4]
+    dq[2] = q[5]
+    dq[3] = q[6]
+
+    #=
+    Compute point-mass Newtonian accelerations, all bodies
+    See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
+    =#
+    Threads.@threads for i in 1:Nm1
+        # Position of the i-th body - position of the asteroid
+        X[i] = ss16asteph_t[3i-2]-q[1]      # X-axis component
+        Y[i] = ss16asteph_t[3i-1]-q[2]      # Y-axis component
+        Z[i] = ss16asteph_t[3i  ]-q[3]      # Z-axis component
+
+        # Distance between the i-th body and the asteroid
+        r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,asteroid}^2
+        r_p3d2[i] = r_p2[i]^1.5                     # r_p2^1.5 <-> r_{i, asteroid}^3
+
+        # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
+        newtonianCoeff[i] =  μ[i]/r_p3d2[i]
+
+        # Newtonian coefficient * difference between two positions, i.e.,
+        # \mu_i * (\mathbf{r_i} - \mathbf{r_asteroid}) / r_{ij}^3
+        newton_acc_X[i] = X[i]*newtonianCoeff[i]
+        newton_acc_Y[i] = Y[i]*newtonianCoeff[i]
+        newton_acc_Z[i] = Z[i]*newtonianCoeff[i]
+    end
+
+    for i in 1:Nm1
+        # Newtonian point-mass accelerations
+        temp_accX_i[i] = accX + newton_acc_X[i]
+        accX = temp_accX_i[i]
+        temp_accY_i[i] = accY + newton_acc_Y[i]
+        accY = temp_accY_i[i]
+        temp_accZ_i[i] = accZ + newton_acc_Z[i]
+        accZ = temp_accZ_i[i]
+    end
+
+    # Fill dq[4:6] with accelerations
+    # Newtonian point-mass accelerations
+    dq[4] = accX
+    dq[5] = accY
+    dq[6] = accZ
+
+    nothing
+end
