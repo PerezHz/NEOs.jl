@@ -495,6 +495,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
                     fit = fit_new
                     idxs = vcat(idxs, extra)
                     sort!(idxs)
+                    g_f = k
                 else 
                     break
                 end
@@ -508,6 +509,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
                     fit = fit_new
                     idxs = vcat(idxs, extra)
                     sort!(idxs)
+                    g_0 = k
                 else 
                     break
                 end
@@ -520,8 +522,8 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
             # Update NRMS and initial conditions
             if Q < best_Q
                 best_Q = Q
-                best_sol = evalfit(NEOSolution(tracklets, bwd, fwd, res[idxs], 
-                                   fit, scalings))
+                best_sol = evalfit(NEOSolution(tracklets[g_0:g_f], bwd, fwd,
+                                   res[idxs], fit, scalings))
             end 
             # Break condition
             if Q <= params.Q_max

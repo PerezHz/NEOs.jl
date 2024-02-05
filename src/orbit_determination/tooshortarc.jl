@@ -346,9 +346,8 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
 end
 
 @doc raw"""
-    adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-         params::NEOParameters{T}; η::T = 25.0, μ::T = 0.75, ν::T = 0.9,
-         ϵ::T = 1e-8, Qtol::T = 0.001) where {T <: AbstractFloat}
+    adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, params::NEOParameters{T};
+         η::T = 25.0, μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001) where {T <: AbstractFloat}
 
 Adaptative moment estimation (ADAM) minimizer of normalized mean square
 residual over and admissible region `A`.
@@ -359,9 +358,13 @@ residual over and admissible region `A`.
 !!! reference
     See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
 """
-function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T, 
-              params::NEOParameters{T}; η::T = 25.0, μ::T = 0.75, ν::T = 0.9,
-              ϵ::T = 1e-8, Qtol::T = 0.001) where {T <: AbstractFloat}
+function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, params::NEOParameters{T};
+              η::T = 25.0, μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001) where {T <: AbstractFloat}
+    # Initial time of integration [julian days]
+    jd0 = datetime2julian(A.date)
+    # Center
+    ρ = sum(A.ρ_domain) / 2
+    v_ρ = sum(A.v_ρ_domain) / 2
     # Scaling factors
     scalings = [A.ρ_domain[2] - A.ρ_domain[1], A.v_ρ_domain[2] - A.v_ρ_domain[1]] / 1_000
     # Jet transport variables
@@ -385,9 +388,6 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         # Current position in admissible region
         ρs[t] = ρ
         v_ρs[t] = v_ρ
-        # Initial time of integration [julian days]
-        # (corrected for light-time)
-        jd0 = datetime2julian(A.date) - ρ / c_au_per_day
         # Current barycentric state vector
         q = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
         # Propagation and residuals
@@ -415,14 +415,45 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     end
     # Find point with smallest Q
     t = argmin(Qs)
-    # Return path
-    return view(ρs, 1:t), view(v_ρs, 1:t), view(Qs, 1:t)
+
+    return T(ρs[t]), T(v_ρs[t]), T(Qs[t])
 end
 
 @doc raw"""
-    tsals(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-          jd0::T, q0::Vector{T}, params::NEOParameters{T}; maxiter::Int = 5,
-          Qtol::T = 0.1) where {T <: AbstractFloat}
+    ρminmontecarlo(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T},
+                   params::NEOParameters{T}; N_samples::Int = 25) where {T <: AbstractFloat}
+
+Monte Carlo sampling over the left boundary of `A`.
+"""
+function ρminmontecarlo(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T},
+                        params::NEOParameters{T}; N_samples::Int = 25) where {T <: AbstractFloat}
+    # Initial time of integration [julian days]
+    jd0 = datetime2julian(A.date)
+    # Range lower bound
+    ρ = A.ρ_domain[1]
+    # Sample range rate
+    v_ρs = LinRange(A.v_ρ_domain[1], A.v_ρ_domain[2], N_samples)
+    # Allocate memory
+    Qs = fill(Inf, N_samples)
+    # Monte Carlo
+    for i in eachindex(Qs)
+        # Barycentric initial conditions
+        q = topo2bary(A, ρ, v_ρs[i])
+        # Propagation & residuals
+        _, _, res = propres(radec, jd0, q, params)
+        iszero(length(res)) && continue
+        # NRMS
+        Qs[i] = nrms(res) 
+    end
+    # Find solution with smallest Q
+    t = argmin(Qs)
+
+    return T(ρ), T(v_ρs[t]), T(Qs[t])
+end
+
+@doc raw"""
+    tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
+          i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5) where {T <: AbstractFloat}
 
 Used within [`tooshortarc`](@ref) to compute an orbit from a point in an
 admissible region via least squares.
@@ -430,46 +461,88 @@ admissible region via least squares.
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
 """
-function tsals(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-               jd0::T, q0::Vector{T}, params::NEOParameters{T}; maxiter::Int = 5,
-               Qtol::T = 0.1) where {T <: AbstractFloat}
+function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
+               i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5) where {T <: AbstractFloat}
+    # Initial time of integration [julian days]
+    # (corrected for light-time)
+    jd0 = datetime2julian(A.date) - ρ / c_au_per_day
+    # Barycentric initial conditions
+    q0 = topo2bary(A, ρ, v_ρ)
     # Scaling factors
     scalings = abs.(q0) ./ 10^5
     # Jet transport variables
     dq = scaled_variables("dx", scalings, order = 6)
-    # Allocate memory
-    sols = zeros(NEOSolution{T, T}, maxiter+1)
-    Qs = fill(T(Inf), maxiter+1)
     # Origin
     x0 = zeros(T, 6)
+    # Subset of radec for orbit fit
+    g_0 = i
+    g_f = i
+    idxs = indices(tracklets[i])
+    sort!(idxs)
+    # Allocate memory
+    best_sol = zero(NEOSolution{T, T})
+    best_Q = T(Inf)
+    flag = false
     # Least squares
-    for t in 1:maxiter+1
+    for _ in 1:maxiter+1
         # Initial conditions
         q = q0 + dq
         # Propagation & residuals
         bwd, fwd, res = propres(radec, jd0, q, params)
         iszero(length(res)) && break
-        # Least squares fit
-        fit = tryls(res, x0, params.niter)
-        # Case: unsuccessful fit
-        if !fit.success || any(diag(fit.Γ) .< 0)
+        # Orbit fit
+        fit = tryls(res[idxs], x0, params.niter)
+        !fit.success && continue
+        # Right iteration
+        for k in g_f+1:length(tracklets)
+            extra = indices(tracklets[k])
+            fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
+            if fit_new.success
+                fit = fit_new
+                idxs = vcat(idxs, extra)
+                sort!(idxs)
+                g_f = k
+            else 
+                break
+            end
+        end
+        # Left iteration
+        for k in g_0-1:-1:1
+            extra = indices(tracklets[k])
+            fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
+            if fit_new.success
+                fit = fit_new
+                idxs = vcat(idxs, extra)
+                sort!(idxs)
+                g_0 = k
+            else 
+                break
+            end
+        end
+        # NRMS
+        Q = nrms(res, fit)
+        if length(idxs) == length(radec) && abs(best_Q - Q) < 0.1
+            flag = true
+        end
+        # Update NRMS and initial conditions
+        if Q < best_Q
+            best_Q = Q
+            best_sol = evalfit(NEOSolution(tracklets[g_0:g_f], bwd, fwd,
+                               res[idxs], fit, scalings))
+            flag && break
+        else
             break
-        end
-        # Current solution
-        sols[t] = evalfit(NEOSolution(tracklets, bwd, fwd, res, fit, scalings))
-        Qs[t] = nrms(sols[t])
-        # Convergence conditions
-        if t > 1
-            Qs[t] > Qs[t-1] && break
-            abs(Qs[t] - Qs[t-1]) < Qtol && break
-        end
+        end 
         # Update values
         q0 = q(fit.x)
     end
-    # Find solution with smallest Q
-    t = argmin(Qs)
-    # Return solution
-    return sols[t]
+    # Case: all solutions were unsuccesful
+    if isinf(best_Q)
+        return zero(NEOSolution{T, T})
+    # Case: at least one solution was succesful
+    else 
+        return best_sol
+    end
 end
 
 # Order in which to check tracklets in tooshortarc
@@ -510,45 +583,21 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         # Admissible region
         A = AdmissibleRegion(tracklets[i], params)
         iszero(A) && continue
-        # Center
-        ρ = sum(A.ρ_domain) / 2
-        v_ρ = sum(A.v_ρ_domain) / 2
-        # Minimization over admissible region
-        ρs, v_ρs, _ = adam(radec, A, ρ, v_ρ, params)
-        # Barycentric initial conditions
-        q0 = topo2bary(A, ρs[end], v_ρs[end])
-        # Initial time of integration [julian days]
-        # (corrected for light-time)
-        jd0 = datetime2julian(A.date) - ρs[end] / c_au_per_day
+        # ADAM minimization over admissible region
+        ρ, v_ρ, _ = adam(radec, A, params)
         # 6 variables least squares
-        sol = tsals(radec, tracklets, jd0, q0, params; maxiter = 5)
+        sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5)
         # Update best solution
         if nrms(sol) < nrms(best_sol)
             best_sol = sol
             # Break condition
             nrms(sol) < 1.5 && break
         end
-        # Heel anomaly
-        ρ = A.ρ_domain[1]
-        v_ρs = LinRange(A.v_ρ_domain[1], A.v_ρ_domain[2], 25)
-        jd0 = datetime2julian(A.date) - ρ / c_au_per_day
-        Qs = fill(Inf, 25)
-        for i in eachindex(Qs)
-            # Barycentric initial conditions
-            q = topo2bary(A, ρ, v_ρs[i])
-            # Propagation & residuals
-            _, _, res = propres(radec, jd0, q, params)
-            iszero(length(res)) && continue
-            # NRMS
-            Qs[i] = nrms(res) 
-        end
-        # Find solution with smallest Q
-        t = argmin(Qs)
-        isinf(Qs[t]) && continue
-        # Barycentric initial conditions
-        q0 = topo2bary(A, ρ, v_ρs[t])
+        # Left boundary Monte Carlo
+        ρ, v_ρ, Q = ρminmontecarlo(radec, A, params)
+        isinf(Q) && continue
         # 6 variables least squares
-        sol = tsals(radec, tracklets, jd0, q0, params; maxiter = 5)
+        sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5)
         # Update best solution
         if nrms(sol) < nrms(best_sol)
             best_sol = sol
