@@ -75,7 +75,7 @@ Initial Orbit Determination (IOD) routine.
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
 """
-function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}; dynamics::D=RNp1BP_pN_A_J23E_J2S_eph_threads!) where {T <: AbstractFloat, D}
+function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}; dynamics::D=newtonian!) where {T <: AbstractFloat, D}
 
     # Allocate memory for output
     sol = zero(NEOSolution{T, T})

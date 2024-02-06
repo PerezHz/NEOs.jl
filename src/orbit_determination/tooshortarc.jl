@@ -323,7 +323,7 @@ end
 
 # Propagate an orbit and compute residuals
 function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
-                 params::NEOParameters{T}; dynamics::D=RNp1BP_pN_A_J23E_J2S_eph_threads!)  where {D, T <: AbstractFloat, U <: Number}
+                 params::NEOParameters{T}; dynamics::D=newtonian!)  where {D, T <: AbstractFloat, U <: Number}
     # Time of first (last) observation
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
     # Years in backward (forward) integration
@@ -359,7 +359,7 @@ residual over and admissible region `A`.
     See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
 """
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, params::NEOParameters{T};
-              η::T = 25.0, μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, dynamics::D=RNp1BP_pN_A_J23E_J2S_eph_threads!) where {T <: AbstractFloat, D}
+              η::T = 25.0, μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, dynamics::D=newtonian!) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
     # Center
@@ -426,7 +426,7 @@ end
 Monte Carlo sampling over the left boundary of `A`.
 """
 function ρminmontecarlo(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T},
-                        params::NEOParameters{T}; N_samples::Int = 25, dynamics::D=RNp1BP_pN_A_J23E_J2S_eph_threads!) where {T <: AbstractFloat, D}
+                        params::NEOParameters{T}; N_samples::Int = 25, dynamics::D=newtonian!) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
     # Range lower bound
@@ -462,7 +462,7 @@ admissible region via least squares.
     This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`.
 """
 function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-               i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5, dynamics::D=RNp1BP_pN_A_J23E_J2S_eph_threads!) where {T <: AbstractFloat, D}
+               i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5, dynamics::D=newtonian!) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     # (corrected for light-time)
     jd0 = datetime2julian(A.date) - ρ / c_au_per_day
@@ -571,7 +571,7 @@ over the admissible region.
     This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`.
 """
 function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                     params::NEOParameters{T}; dynamics::D=RNp1BP_pN_A_J23E_J2S_eph_threads!) where {T <: AbstractFloat, D}
+                     params::NEOParameters{T}; dynamics::D=newtonian!) where {T <: AbstractFloat, D}
 
     # Allocate memory for output
     best_sol = zero(NEOSolution{T, T})

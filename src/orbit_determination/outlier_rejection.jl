@@ -22,7 +22,7 @@ via propagation and/or outlier rejection.
     This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`.
 """
 function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
-                           params::NEOParameters{T}; dynamics::D=RNp1BP_pN_A_J23E_J2S_eph_threads!) where {T <: AbstractFloat, D}
+                           params::NEOParameters{T}; dynamics::D=newtonian!) where {T <: AbstractFloat, D}
 
     # Origin
     x0 = zeros(T, 6)

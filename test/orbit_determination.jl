@@ -17,7 +17,7 @@ using NEOs: NEOSolution, numberofdays
                                bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Orbit Determination
-        sol = orbitdetermination(radec, params, dynamics=newtonian!)
+        sol = orbitdetermination(radec, params)
 
         # Values by February 4, 2024
 
@@ -68,7 +68,7 @@ using NEOs: NEOSolution, numberofdays
                                bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Orbit Determination
-        sol = orbitdetermination(radec, params, dynamics=newtonian!)
+        sol = orbitdetermination(radec, params)
 
         # Values by February 4, 2024
 
@@ -119,7 +119,7 @@ using NEOs: NEOSolution, numberofdays
                                bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Orbit Determination
-        sol = orbitdetermination(radec, params, dynamics=newtonian!)
+        sol = orbitdetermination(radec, params)
 
         # Values by February 4, 2024
 
@@ -174,7 +174,7 @@ using NEOs: NEOSolution, numberofdays
                                bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Orbit Determination
-        sol = orbitdetermination(radec, params, dynamics=newtonian!)
+        sol = orbitdetermination(radec, params)
 
         # Values by February 4, 2024
 
@@ -227,7 +227,7 @@ using NEOs: NEOSolution, numberofdays
         # Observations with <1" weight
         idxs = findall(x -> x < 1, w8sveres17.(radec))
         # Restricted Orbit Determination
-        sol = orbitdetermination(radec[idxs], params, dynamics=newtonian!)
+        sol = orbitdetermination(radec[idxs], params)
 
         # Values by February 4, 2024
 

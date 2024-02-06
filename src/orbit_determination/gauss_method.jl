@@ -433,7 +433,7 @@ See also [`gauss_method`](@ref).
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`.
 """
 function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                       params::NEOParameters{T}; dynamics::D=RNp1BP_pN_A_J23E_J2S_eph_threads!) where {T <: AbstractFloat, D}
+                       params::NEOParameters{T}; dynamics::D=newtonian!) where {T <: AbstractFloat, D}
 
     # Allocate memory for initial conditions
     best_sol = zero(NEOSolution{T, T})
