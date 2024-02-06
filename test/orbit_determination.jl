@@ -10,17 +10,17 @@ using NEOs: NEOSolution, numberofdays
 
 @testset "Orbit Determination" begin
     @testset "Gauss Method" begin
-        # Load observations 
+        # Load observations
         radec = read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
         # Parameters
         params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
                                bwdoffset = 0.007, fwdoffset = 0.007)
-    
+
         # Orbit Determination
-        sol = orbitdetermination(radec, params)
-    
+        sol = orbitdetermination(radec, params, dynamics=newtonian!)
+
         # Values by February 4, 2024
-        
+
         # Vector of observations
         @test length(radec) == 123
         @test numberofdays(radec) < 21.0
@@ -59,19 +59,19 @@ using NEOs: NEOSolution, numberofdays
         filename = joinpath("data", "2008_EK68.txt")
         # Download observations
         get_radec_mpc("designation" => "2008 EK68", filename)
-        # Load observations 
+        # Load observations
         radec = read_radec_mpc(filename)
         # Delete astrometry file
         rm(filename)
         # Parameters
         params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
                                bwdoffset = 0.007, fwdoffset = 0.007)
-    
+
         # Orbit Determination
-        sol = orbitdetermination(radec, params)
+        sol = orbitdetermination(radec, params, dynamics=newtonian!)
 
         # Values by February 4, 2024
-        
+
         # Vector of observations
         @test length(radec) == 10
         @test numberofdays(radec) < 0.05
@@ -110,7 +110,7 @@ using NEOs: NEOSolution, numberofdays
         filename = joinpath("data", "2007_VV7.txt")
         # Download observations
         get_radec_mpc("designation" => "2007 VV7", filename)
-        # Load observations 
+        # Load observations
         radec = read_radec_mpc(filename)
         # Delete astrometry file
         rm(filename)
@@ -119,7 +119,7 @@ using NEOs: NEOSolution, numberofdays
                                bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Orbit Determination
-        sol = orbitdetermination(radec, params)
+        sol = orbitdetermination(radec, params, dynamics=newtonian!)
 
         # Values by February 4, 2024
 
@@ -165,19 +165,19 @@ using NEOs: NEOSolution, numberofdays
         filename = joinpath("data", "2014_AA.txt")
         # Download observations
         get_radec_mpc("designation" => "2014 AA", filename)
-        # Load observations 
+        # Load observations
         radec = read_radec_mpc(filename)
         # Delete astrometry file
         rm(filename)
         # Parameters
         params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
                                bwdoffset = 0.007, fwdoffset = 0.007)
-    
+
         # Orbit Determination
-        sol = orbitdetermination(radec, params)
+        sol = orbitdetermination(radec, params, dynamics=newtonian!)
 
         # Values by February 4, 2024
-        
+
         # Vector of observations
         @test length(radec) == 7
         @test numberofdays(radec) < 0.05
@@ -216,7 +216,7 @@ using NEOs: NEOSolution, numberofdays
         filename = joinpath("data", "2008_TC3.txt")
         # Download observations
         get_radec_mpc("designation" => "2008 TC3", filename)
-        # Load observations 
+        # Load observations
         radec = read_radec_mpc(filename)
         # Delete astrometry file
         rm(filename)
@@ -224,13 +224,13 @@ using NEOs: NEOSolution, numberofdays
         params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
                                coeffstol = Inf, fwdoffset = 0.007)
 
-        # Observations with <1" weight 
+        # Observations with <1" weight
         idxs = findall(x -> x < 1, w8sveres17.(radec))
         # Restricted Orbit Determination
-        sol = orbitdetermination(radec[idxs], params)
+        sol = orbitdetermination(radec[idxs], params, dynamics=newtonian!)
 
         # Values by February 4, 2024
-        
+
         # Vector of observations
         @test length(radec) == 883
         @test numberofdays(radec) < 0.80

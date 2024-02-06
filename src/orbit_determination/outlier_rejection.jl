@@ -19,10 +19,10 @@ via propagation and/or outlier rejection.
 - `params::NEOParameters{T}`: see `Outlier Rejection Parameters` of [`NEOParameters`](@ref).
 
 !!! warning
-    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
+    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`.
 """
 function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
-                           params::NEOParameters{T}) where {T <: AbstractFloat}
+                           params::NEOParameters{T}; dynamics::D=RNp1BP_pN_A_J23E_J2S_eph_threads!) where {T <: AbstractFloat, D}
 
     # Origin
     x0 = zeros(T, 6)
@@ -38,9 +38,9 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     q = q0 .+ dq
 
     # Propagation and residuals
-    bwd, fwd, res = propres(radec, jd0, q, params)
+    bwd, fwd, res = propres(radec, jd0, q, params; dynamics)
     iszero(length(res)) && return zero(NEOSolution{T, T})
-    
+
     # Orbit fit
     fit = tryls(res, x0, params.niter)
 
@@ -108,7 +108,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
         # Update fit
         fit = tryls(res, x0, params.niter)
     end
-    # Add 0 outliers fit 
+    # Add 0 outliers fit
     Qs[end] = Q_0
     N_outliers[end] = zero(T)
 
@@ -122,7 +122,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
         # Update fit
         fit = tryls(res, x0, params.niter)
 
-        return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, scalings)) 
+        return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, scalings))
     end
 
     if max_drop > 1
@@ -138,7 +138,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
         i_0 = cluster.assignments[1]
         # Find last fit of smallest cluster
         i = findfirst(x -> x != i_0, cluster.assignments) - 1
-        # Update outliers indexes 
+        # Update outliers indexes
         idxs = idxs[i:end]
     end
 

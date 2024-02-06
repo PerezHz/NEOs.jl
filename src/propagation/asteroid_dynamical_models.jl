@@ -1187,11 +1187,11 @@ end
     # Interaction matrix with flattened bodies
     local UJ_interaction = params[5]
     # Number of bodies, including NEA
-    local N = params[6]
+    local N = 10 # Sun, Moon and planets # params[6]
     # Number of bodies, except the asteroid
     local Nm1 = N-1
     # Vector of mass parameters GM's
-    local μ = params[7]
+    local μ = params[7][1:10]
 
     # zero(q[1])
     local zero_q_1 = auxzero(q[1])
