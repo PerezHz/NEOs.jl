@@ -55,14 +55,9 @@ using NEOs: NEOSolution, numberofdays
     end
 
     @testset "Too Short Arc" begin
-        # Optical astrometry file
-        filename = joinpath("data", "2008_EK68.txt")
-        # Download observations
-        get_radec_mpc("designation" => "2008 EK68", filename)
-        # Load observations
-        radec = read_radec_mpc(filename)
-        # Delete astrometry file
-        rm(filename)
+        # Fetch optical astrometry
+        radec = fetch_radec_mpc("designation" => "2008 EK68")
+
         # Parameters
         params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
                                bwdoffset = 0.007, fwdoffset = 0.007)
@@ -106,14 +101,9 @@ using NEOs: NEOSolution, numberofdays
     end
 
     @testset "Outlier Rejection" begin
-        # Optical astrometry file
-        filename = joinpath("data", "2007_VV7.txt")
-        # Download observations
-        get_radec_mpc("designation" => "2007 VV7", filename)
-        # Load observations
-        radec = read_radec_mpc(filename)
-        # Delete astrometry file
-        rm(filename)
+        # Fetch optical astrometry
+        radec = fetch_radec_mpc("designation" => "2007 VV7")
+
         # Parameters
         params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
                                bwdoffset = 0.007, fwdoffset = 0.007)
@@ -157,18 +147,12 @@ using NEOs: NEOSolution, numberofdays
     end
 
     @testset "Interesting NEOs" begin
-        using NEOs: reduce_tracklets, selecteph, sseph, propres, evalfit
 
         # 2014 AA hit the Earth around January 2, 2014, 02:49 UTC
 
-        # Optical astrometry file
-        filename = joinpath("data", "2014_AA.txt")
-        # Download observations
-        get_radec_mpc("designation" => "2014 AA", filename)
-        # Load observations
-        radec = read_radec_mpc(filename)
-        # Delete astrometry file
-        rm(filename)
+        # Fetch optical astrometry
+        radec = fetch_radec_mpc("designation" => "2014 AA")
+
         # Parameters
         params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
                                bwdoffset = 0.007, fwdoffset = 0.007)
@@ -212,17 +196,12 @@ using NEOs: NEOSolution, numberofdays
 
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
-        # Optical astrometry file
-        filename = joinpath("data", "2008_TC3.txt")
-        # Download observations
-        get_radec_mpc("designation" => "2008 TC3", filename)
-        # Load observations
-        radec = read_radec_mpc(filename)
-        # Delete astrometry file
-        rm(filename)
+        # Fetch optical astrometry
+        radec = fetch_radec_mpc("designation" => "2008 TC3")
+
         # Parameters
         params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
-                               coeffstol = Inf, fwdoffset = 0.007)
+                               coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Observations with <1" weight
         idxs = findall(x -> x < 1, w8sveres17.(radec))

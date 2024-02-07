@@ -38,7 +38,8 @@ export unknowncat, read_catalogues_mpc, write_catalogues_mpc, update_catalogues_
 export unknownobs, hascoord, read_observatories_mpc, write_observatories_mpc,
        update_observatories_mpc, search_obs_code
 # RadecMPC
-export ra, dec, date, observatory, read_radec_mpc, write_radec_mpc, get_radec_mpc
+export ra, dec, date, observatory, read_radec_mpc, write_radec_mpc, get_radec_mpc,
+       fetch_radec_mpc
 # RadarJPL
 export hasdelay, hasdoppler, delay, doppler, rcvr, xmit, read_radar_jpl, write_radar_jpl
 # Units

@@ -96,7 +96,7 @@ using InteractiveUtils: methodswith
 
         # Read optical astrometry file
 
-        obs_radec_mpc_2023DW = NEOs.read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
+        obs_radec_mpc_2023DW = read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
 
         # Compute residuals
         _res_ = NEOs.residuals(
@@ -200,7 +200,7 @@ using InteractiveUtils: methodswith
         rm("test.jld2")
 
         # Read optical astrometry file
-        obs_radec_mpc_apophis = NEOs.read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
+        obs_radec_mpc_apophis = read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
 
         # Compute optical astrometry residuals
         _res_radec_ = NEOs.residuals(
@@ -343,7 +343,7 @@ using InteractiveUtils: methodswith
         eph_ea = selecteph(sseph_obs, ea)
 
         # Read optical astrometry file
-        obs_radec_mpc_apophis = NEOs.read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
+        obs_radec_mpc_apophis = read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
 
         # Compute optical astrometry residuals
         _res_radec_ = NEOs.residuals(

@@ -288,16 +288,10 @@ using NEOs: src_path
 
         # Choose this example because of the discontinuity in α
 
-        # Optical astrometry file
-        filename = joinpath("data", "2020_TJ6.txt")
-        # Download optical astrometry
-        get_radec_mpc("designation" => "2020 TJ6", filename)
-        # Parse observations
-        radec = read_radec_mpc(filename)
+        # Fetch optical astrometry
+        radec = fetch_radec_mpc("designation" => "2020 TJ6")
         # Reduce tracklets
         tracklets = reduce_tracklets(radec)
-        # Remove downloaded file
-        rm(filename)
 
         # Values by December 19, 2023
         @test length(tracklets) == 5

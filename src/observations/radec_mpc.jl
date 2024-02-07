@@ -411,6 +411,24 @@ function get_radec_mpc(id::Pair{String, String}, filename::String = replace(id[2
     return filename
 end 
 
+@doc raw"""
+    fetch_radec_mpc(id::Pair{String, String})
+
+Download MPC optical astrometry of NEO `id` and return the output as `Vector{RadecMPC{Float64}}`. 
+"""
+function fetch_radec_mpc(id::Pair{String, String})
+    # Temporary file
+    f = tempname()
+    # Download optical astrometry
+    get_radec_mpc(id, f)
+    # Parse optical astrometry
+    radec = read_radec_mpc(f)
+    # Delete temporary file
+    rm(f)
+
+    return radec
+end
+
 # Methods to convert a Vector{<:AbstractAstrometry} to a DataFrame
 istable(::Type{Vector{<:AbstractAstrometry}}) = true
 rowaccess(::Type{Vector{<:AbstractAstrometry}}) = true
