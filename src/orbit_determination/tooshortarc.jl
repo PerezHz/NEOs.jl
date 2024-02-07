@@ -484,7 +484,7 @@ function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Ve
     best_Q = T(Inf)
     flag = false
     # Least squares
-    for _ in 1:maxiter+1
+    for _ in 1:maxiter
         # Initial conditions
         q = q0 + dq
         # Propagation & residuals

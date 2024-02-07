@@ -51,7 +51,7 @@ using NEOs: NEOSolution, numberofdays
         # Compatibility with JPL
         JPL = [-1.100331943890894E+00, 2.077277940539948E-01, 4.202679172087372E-02,
                -4.735673360137306E-03, -1.062665933519790E-02, -6.016253165957075E-03]
-        @test all(abs.(sol() - JPL) .< 27)
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 27)
     end
 
     @testset "Too Short Arc" begin
@@ -102,7 +102,7 @@ using NEOs: NEOSolution, numberofdays
         # Compatibility with JPL
         JPL = [-9.698293924982635E-01, 2.403718659163320E-01, 1.028928812918412E-01,
                -9.512665381191419E-03, -1.532539714362475E-02,  -8.094608965098163E-03]
-        @test all(abs.(sol() - JPL) .< 1)
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1)
     end
 
     @testset "Outlier Rejection" begin
@@ -153,7 +153,7 @@ using NEOs: NEOSolution, numberofdays
         # Compatibility with JPL
         JPL = [7.673391189462907E-01, 6.484845064680100E-01, 2.932307930882956E-01,
                -1.102328578432002E-02, 1.539274577937339E-02, 6.528864069204219E-03]
-        @test all(abs.(sol() - JPL) .< 1)
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1)
     end
 
     @testset "Interesting NEOs" begin
@@ -208,7 +208,7 @@ using NEOs: NEOSolution, numberofdays
         # Compatibility with JPL
         JPL = [-1.793234664811157E-01, 8.874182631964184E-01, 3.841456198855505E-01,
                -1.755789723380711E-02, -5.781199629059458E-03, -2.007345498817972E-03]
-        @test all(abs.(sol() - JPL) .< 1)
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1)
 
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
@@ -261,7 +261,7 @@ using NEOs: NEOSolution, numberofdays
         # Compatibility with JPL
         JPL = [9.741084137931751E-01, 2.151459813682736E-01, 9.390733559030655E-02,
                -7.890343235423515E-03, 1.606273839327320E-02, 6.136052979678407E-03]
-        @test all(abs.(sol() - JPL) .< 9)
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 9)
     end
 
 end
