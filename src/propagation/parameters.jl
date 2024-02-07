@@ -22,6 +22,7 @@ struct NEOParameters{T <: AbstractFloat}
     varorder::Int
     Q_max::T
     # Admissible Region parameters
+    H_max::T
     maxiter::Int
     # Outlier rejection parameters
     max_per::T
@@ -64,6 +65,7 @@ Parameters for all orbit determination functions.
 
 # Admissible Region Parameters
 
+- `H_max::T`: maximum absolute magnitude (default: `32.0`).
 - `maxiter::Int`: maximum number of iterations for admissible region `ADAM` optimizer (default: `100`).
 
 # Outlier Rejection Parameters
@@ -74,7 +76,7 @@ function NEOParameters(; maxsteps::Int = 500, μ_ast::Vector{T} = μ_ast343_DE43
                       order::Int = 25, abstol::T = 1e-20, parse_eqs::Bool = true, bwdoffset::T = 0.5,
                       fwdoffset::T = 0.5, coeffstol::T = 10.0, debias_table::String = "2018",
                       niter::Int = 5, max_triplets::Int = 10, varorder::Int = 5, Q_max::T = 5.0,
-                      maxiter::Int = 100, max_per::T = 18.0) where {T <: AbstractFloat}
+                      H_max::T = 32.0, maxiter::Int = 100, max_per::T = 18.0) where {T <: AbstractFloat}
     # Unfold debiasing matrix
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
     # Sun (Earth) ephemeris
@@ -86,7 +88,7 @@ function NEOParameters(; maxsteps::Int = 500, μ_ast::Vector{T} = μ_ast343_DE43
     return NEOParameters{T}(maxsteps, μ_ast, order, abstol, parse_eqs, bwdoffset,
                             fwdoffset, coeffstol, mpc_catalogue_codes_201X, truth,
                             resol, bias_matrix, eph_su, eph_ea, niter, max_triplets,
-                            varorder, Q_max, maxiter, max_per)
+                            varorder, Q_max, H_max, maxiter, max_per)
 end                            
 
 function NEOParameters(params::NEOParameters{T}; kwargs...) where {T <: AbstractFloat}

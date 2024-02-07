@@ -78,10 +78,8 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
             ρ_min = R_EA
         end
     else
-        # Maximum allowed absolute magnitude
-        H_max = 32.0
         # Tiny object boundary
-        ρ_min = 10^((h - H_max)/5)
+        ρ_min = 10^((h - params.H_max)/5)
     end
     ρ_min > ρ_max && return zero(AdmissibleRegion{T})
     # Range domain
