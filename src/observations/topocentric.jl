@@ -149,7 +149,7 @@ function obsposECEF(observatory::ObservatoryMPC{T}; eop::Union{EopIau1980, EopIa
         # State vector
         pv_ECI = OrbitStateVector(jd_utc, posvel_ECI[1:3], posvel_ECI[4:6], zeros(3))
 
-        # Transform position/velocity from Earth-Centered Inertial (ECI) fraom to Earth-Centered Earth-fixed (ECEF) frame
+        # Transform position/velocity from Earth-Centered Inertial (ECI) frame to Earth-Centered Earth-fixed (ECEF) frame
         # ITRF: International Terrestrial Reference Frame
         # GCRF: Geocentric Celestial Reference Frame
         pv_ECEF = sv_eci_to_ecef(pv_ECI, Val(:GCRF), Val(:ITRF), jd_utc, eop)
