@@ -75,13 +75,13 @@ Initial Orbit Determination (IOD) routine.
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
 """
-function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: AbstractFloat}
-    
+function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}; dynamics::D=newtonian!) where {T <: AbstractFloat, D}
+
     # Allocate memory for output
     sol = zero(NEOSolution{T, T})
     # Maximum number of steps
     params = NEOParameters(params; maxsteps = adaptative_maxsteps(radec))
-    # Eliminate observatories without coordinates 
+    # Eliminate observatories without coordinates
     filter!(x -> hascoord(observatory(x)), radec)
     # Cannot handle zero observations or multiple arcs
     if iszero(length(radec)) || !issinglearc(radec)
@@ -91,16 +91,15 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}
     tracklets = reduce_tracklets(radec)
     # Case 1: Too Short Arc (TSA)
     if istsa(tracklets)
-        sol = tooshortarc(radec, tracklets, params)
+        sol = tooshortarc(radec, tracklets, params; dynamics)
     # Case 2: Gauss Method
     else
-        sol = gaussinitcond(radec, tracklets, params)
+        sol = gaussinitcond(radec, tracklets, params; dynamics)
     end
     # Outlier rejection (if needed)
     if nrms(sol) > 1 && !iszero(sol)
-        sol = outlier_rejection(radec, sol, params)
+        sol = outlier_rejection(radec, sol, params; dynamics)
     end
 
     return sol::NEOSolution{T, T}
 end
-    

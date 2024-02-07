@@ -35,7 +35,7 @@ export d_EM_km, d_EM_au
 export unknowncat, read_catalogues_mpc, write_catalogues_mpc, update_catalogues_mpc,
        search_cat_code
 # ObservatoryMPC
-export unknownobs, hascoord, read_observatories_mpc, write_observatories_mpc, 
+export unknownobs, hascoord, read_observatories_mpc, write_observatories_mpc,
        update_observatories_mpc, search_obs_code
 # RadecMPC
 export ra, dec, date, observatory, read_radec_mpc, write_radec_mpc, get_radec_mpc
@@ -55,7 +55,7 @@ export compute_radec, select_debiasing_table, debiasing, w8sveres17, residuals, 
 # Process radar
 export compute_delay, radar_astrometry
 # Asteroid dynamical models
-export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!
+export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!, newtonian!
 # Propagate
 export NEOParameters, propagate, propagate_lyap, propagate_root
 # B plane

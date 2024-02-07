@@ -79,7 +79,7 @@ topounit(obs::RadecMPC{T}) where {T <: AbstractFloat} = topounit(obs.α, obs.δ)
 Return the 1st order approximation to Lagrange's f function.
 """
 function f_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
-    r3 = r * r * r 
+    r3 = r * r * r
     return 1 - μ_S * (τ^2) / 2 / r3
 end
 
@@ -89,7 +89,7 @@ end
 Return the 1st order approximation to Lagrange's g function.
 """
 function g_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
-    r3 = r * r * r 
+    r3 = r * r * r
     return τ - μ_S * (τ^3) / 6 / r3
 end
 
@@ -121,7 +121,7 @@ Lagrange polynomial to be solved during Gauss method.
 function lagrange(x::T, a::U, b::U, c::U) where {T, U <: Number}
     # Evaluate via Horner's method
     x2 = x * x
-    x3 = x2 * x 
+    x3 = x2 * x
     return c + x3 * (b + x3 * (a + x2))
 end
 
@@ -133,12 +133,12 @@ Derivative of Lagrange polynomial to be solved during Gauss method.
 function lagrange_derivative(x::T, a::U, b::U) where {T, U <: Number}
     # Evaluate via Horner's method
     x2 = x * x
-    x3 = x2 * x 
+    x3 = x2 * x
     return x2 * (3*b + x3 * (6*a + 8*x2))
 end
 
 # TO DO: Allow to control interval over which to look for solutions
-# Currently we look between the radius of the Sun (∼0.00465047 AU) and 
+# Currently we look between the radius of the Sun (∼0.00465047 AU) and
 #  the radius of the Solar System (∼40 AU)
 
 @doc raw"""
@@ -182,9 +182,9 @@ Return the heliocentric energy per unit mass for heliocentric state vector `r` [
 """
 function heliocentric_energy(r::Vector{T}) where {T <: Number}
     @assert length(r) == 6 "r must have length 6"
-    kinetic = 0.5 * (r[4]^2 + r[5]^2 + r[6]^2) 
+    kinetic = 0.5 * (r[4]^2 + r[5]^2 + r[6]^2)
     potential = k_gauss^2 / sqrt(r[1]^2 + r[2]^2 + r[3]^2)
-    return kinetic - potential 
+    return kinetic - potential
 end
 
 @doc raw"""
@@ -227,7 +227,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
 
     # Check we have exactly three observations
     @assert length(observatories) == length(dates) == length(α) == length(δ) == 3 "Gauss method requires exactly three observations"
-    # Check observations are in temporal order 
+    # Check observations are in temporal order
     @assert issorted(dates) "Observations must be in temporal order"
 
     # Times of observation [et]
@@ -359,7 +359,7 @@ end
     gauss_norm(dates::Vector{DateTime})
 
 Return a measure of how evenly distributed in time a triplet is;
-used within [`gauss_triplets`](@ref) to sort triplets for Gauss method. 
+used within [`gauss_triplets`](@ref) to sort triplets for Gauss method.
 The function assumes `dates` is sorted.
 """
 gauss_norm(dates::Vector{DateTime}) = abs( (dates[2] - dates[1]).value - (dates[3] - dates[2]).value ) / 86_400_000
@@ -372,7 +372,7 @@ to select the best observations for Gauss method. The triplets are sorted by [`g
 """
 function gauss_triplets(dates::Vector{DateTime}, Δ_min::Period, Δ_max::Period,
                         avoid::Vector{Vector{Int}}, max_triplets::Int)
-    
+
     triplets = Vector{Vector{Int}}(undef, 0)
     L = length(dates)
     for i_1 in 1:L-2
@@ -419,7 +419,7 @@ end
     gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                   params::NEOParameters{T}) where {T <: AbstractFloat}
 
-Return initial conditions via Gauss Method. 
+Return initial conditions via Gauss Method.
 
 See also [`gauss_method`](@ref).
 
@@ -430,10 +430,10 @@ See also [`gauss_method`](@ref).
 - `params::NEOParameters{T}`: see `Gauss Method Parameters` of [`NEOParameters`](@ref).
 
 !!! warning
-    This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`. 
+    This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`.
 """
 function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                       params::NEOParameters{T}) where {T <: AbstractFloat}
+                       params::NEOParameters{T}; dynamics::D=newtonian!) where {T <: AbstractFloat, D}
 
     # Allocate memory for initial conditions
     best_sol = zero(NEOSolution{T, T})
@@ -460,7 +460,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         triplet = triplets[j]
         # Julian day of middle observation
         _jd0_ = datetime2julian(dates[triplet[2]])
-        # Gauss method solution 
+        # Gauss method solution
         sol = gauss_method(observatories[triplet], dates[triplet], α[triplet] .+ dq[1:3],
                            δ[triplet] .+ dq[4:6], params)
         # Filter Gauss solutions by heliocentric energy
@@ -475,7 +475,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
             q0 = sol[i].statevect .+ params.eph_su(jd0 - PE.J2000)
 
             # Propagation and residuals
-            bwd, fwd, res = propres(radec, jd0, q0, params)
+            bwd, fwd, res = propres(radec, jd0, q0, params; dynamics)
             iszero(length(res)) && continue
 
             # Subset of radec for orbit fit
@@ -496,7 +496,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
                     idxs = vcat(idxs, extra)
                     sort!(idxs)
                     g_f = k
-                else 
+                else
                     break
                 end
             end
@@ -510,7 +510,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
                     idxs = vcat(idxs, extra)
                     sort!(idxs)
                     g_0 = k
-                else 
+                else
                     break
                 end
             end
@@ -524,7 +524,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
                 best_Q = Q
                 best_sol = evalfit(NEOSolution(tracklets[g_0:g_f], bwd, fwd,
                                    res[idxs], fit, scalings))
-            end 
+            end
             # Break condition
             if Q <= params.Q_max
                 flag = true
@@ -534,13 +534,13 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         if flag
             break
         end
-    end 
+    end
 
     # Case: all solutions were unsuccesful
     if isinf(best_Q)
         return zero(NEOSolution{T, T})
     # Case: at least one solution was succesful
-    else 
+    else
         return best_sol
     end
 

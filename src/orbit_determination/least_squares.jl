@@ -69,7 +69,7 @@ function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::Lea
 
     # Number of residuals
     L = length(res)
-    # Evaluate residuals 
+    # Evaluate residuals
     eval_res = res(fit.x)
     # Vector of χ2
     χ2s = Vector{T}(undef, L)
@@ -77,7 +77,7 @@ function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::Lea
     χ2_max = zero(T)
     # Number of non outliers
     N_sel = 0
-    
+
     # Compute χ2s
     for i in eachindex(χ2s)
         # Weights of current residual
@@ -95,7 +95,7 @@ function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::Lea
         # Current chi2
         χ2s[i] = ξ' * inv(γ_ξ) * ξ
         # Update N_sel
-        if !res[i].outlier 
+        if !res[i].outlier
             N_sel += 1
             # Update maximum χ2
             if χ2s[i] > χ2_max
@@ -149,13 +149,13 @@ Returns the chi square
 ```math
 \chi^2 = \sum_{i=1}^m \frac{ \xi_i^2}{\sigma_i^2},
 ```
-where ``\mathbf{w} = (1/\sigma_1^2,\ldots,1/\sigma_m^2)^T`` and ``\mathbf{\xi} = (\xi_1,\ldots,\xi_m)^T`` 
-are the vectors of weights and residuals respectively. 
+where ``\mathbf{w} = (1/\sigma_1^2,\ldots,1/\sigma_m^2)^T`` and ``\mathbf{\xi} = (\xi_1,\ldots,\xi_m)^T``
+are the vectors of weights and residuals respectively.
 
 # Arguments
 
 - `res::Vector{U}/Vector{OpticalResidual{T, U}}`: vector of residuals.
-- `w::Vector{T}`: vector of weights. 
+- `w::Vector{T}`: vector of weights.
 """
 function chi2(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
     # Have as many residuals as weights
@@ -173,7 +173,7 @@ end
     nms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
 
 Return the normalized chi square. See [`chi2`](@ref).
-""" 
+"""
 nms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number} = chi2(res, w) / length(res)
 function nms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
     _res_, _w_ = unfold(res)
@@ -190,14 +190,14 @@ Returns the normalized root mean square error
 \texttt{NRMS} = \sqrt{\frac{\chi^2}{m}},
 ```
 where ``\chi^2`` is the chi square and ``\mathbf{\xi} = (\xi_1,\ldots,\xi_m)^T`` is the vector
-of residuals. 
+of residuals.
 
 See also [`chi2`](@ref).
 
 # Arguments
 
 - `res::Vector{U}/Vector{OpticalResidual{T, U}}`: Vector of residuals.
-- `w::Vector{T}`: Vector of weights. 
+- `w::Vector{T}`: Vector of weights.
 - `fit::LeastSquaresFit{T}`: least squares fit.
 
 """
@@ -225,11 +225,11 @@ Returns the ``\mathbf{B}``, ``\mathbf{H}`` and ``\mathbf{C}`` arrays
 ```math
 \mathbf{B} = \frac{\partial\mathbf{\xi}}{\partial\mathbf{x}_0}(\mathbf{x}_0), \quad
 \mathbf{H} = \frac{\partial^2\mathbf{\xi}}{\partial\mathbf{x}_0^2}(\mathbf{x}_0) \quad \text{and} \quad
-\mathbf{C} = \mathbf{B}^T\mathbf{W}\mathbf{B}, 
+\mathbf{C} = \mathbf{B}^T\mathbf{W}\mathbf{B},
 ```
-where ``\mathbf{x}_0 = (x_1,\ldots,x_n)^T`` and ``\mathbf{\xi} = (\xi_1,\ldots,\xi_m)^T`` 
-are the vectors of initial conditions and residuals respectively; and 
-``\mathbf{W} = \text{diag}(1/\sigma_1^2,\ldots,1/\sigma_m^2)`` is the weights matrix. 
+where ``\mathbf{x}_0 = (x_1,\ldots,x_n)^T`` and ``\mathbf{\xi} = (\xi_1,\ldots,\xi_m)^T``
+are the vectors of initial conditions and residuals respectively; and
+``\mathbf{W} = \text{diag}(1/\sigma_1^2,\ldots,1/\sigma_m^2)`` is the weights matrix.
 
 ``\mathbf{B}`` is called the design matrix and is of size ``m\times n``, ``\mathbf{H}`` is a three index
 array of size ``m\times n\times n`` and ``\mathbf{C}`` is called the normal matrix and is of size ``n\times n``.
@@ -237,7 +237,7 @@ array of size ``m\times n\times n`` and ``\mathbf{C}`` is called the normal matr
 # Arguments
 
 - `res::Vector{TaylorN{T}}`: vector of residuals.
-- `w::Vector{T}`: vector of weights. 
+- `w::Vector{T}`: vector of weights.
 - `npar::Int`: degrees of freedom ``n``.
 
 !!! reference
@@ -261,12 +261,12 @@ function BHC(res::Vector{TaylorN{T}}, w::Vector{T}, npar::Int) where {T <: Real}
     for i in 1:nobs
         for j in 1:npar
                 # Gradient of the (i, j)-th element of B with respect to to the initial
-                # conditions x_0 
+                # conditions x_0
                 H_mat[i,j,:] .= TaylorSeries.gradient(B_mat[i,j])
         end
     end
     # Normal matrix C
-    sqrtw_B = sqrt.(w) .* B_mat 
+    sqrtw_B = sqrt.(w) .* B_mat
     C_mat .= (sqrtw_B') * sqrtw_B
 
     return B_mat, H_mat, C_mat
@@ -276,18 +276,18 @@ end
     ξTH(w, res, H_mat, npar)
 
 Returns ``\mathbf{\xi}^T\mathbf{W}\mathbf{H}``, where ``\mathbf{\xi} = (\xi_1,\ldots,\xi_m)^T``
-is the vector of residuals, ``\mathbf{W} = \text{diag}(1/\sigma_1^2,\ldots,1/\sigma_m^2)`` is 
+is the vector of residuals, ``\mathbf{W} = \text{diag}(1/\sigma_1^2,\ldots,1/\sigma_m^2)`` is
 the weights matrix and ``\mathbf{H}`` is the matrix of second derivatives of ``\mathbf{\xi}``
-with respect to the initial conditions. 
+with respect to the initial conditions.
 
 See also [`BHC`](@ref).
 
-# Arguments 
+# Arguments
 
 - `w`: Vector of weights.
 - `res`: Vector or residuals.
 - `H_mat`: matrix of second derivatives of ``\mathbf{\xi}`` with respect to the initial conditions.
-- `npar`: Degrees of freedom ``n``. 
+- `npar`: Degrees of freedom ``n``.
 """
 function ξTH(w, res, H_mat, npar)
     # Allocate memory for output
@@ -310,7 +310,7 @@ end
              niters::Int = 5) where {T <: Real}
 
 Differential corrections subroutine for least-squares fitting. Returns an
-`LeastSquaresFit` with the `niters`-th 
+`LeastSquaresFit` with the `niters`-th
 correction
 ```math
 \mathbf{x}_{k+1} = \mathbf{x}_k - \mathbf{C}^{-1}\mathbf{D},
@@ -322,7 +322,7 @@ and the covariance matrix
 where ``\mathbf{C} = \mathbf{B}^T\mathbf{W}\mathbf{B}`` is the normal matrix and
 ``\mathbf{D} = \mathbf{B}^T\mathbf{W}\mathbf{\xi}``, with ``\mathbf{\xi} = (\xi_1,\ldots,\xi_m)^T``
 the vector of residuals, ``\mathbf{B}`` the design matrix and ``\mathbf{W} = \text{diag}(1/\sigma_1^2,\ldots,1/\sigma_m^2)``
-the weights matrix. 
+the weights matrix.
 
 See also [`BHC`](@ref).
 
@@ -334,7 +334,7 @@ See also [`BHC`](@ref).
 - `niters::Int`: number of iterations.
 
 !!! reference
-    See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371. 
+    See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
 """
 function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
                   niters::Int = 5) where {T <: Real}
@@ -345,13 +345,13 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     # D matrix: transpose(B) * W * ξ
     D_mat = B_mat' * (w .* res)
     # ξTH_mat = ξTH(w, res, H_mat, npar)
-    # Vector of x 
-    x = Matrix{T}(undef, npar, niters + 1) 
+    # Vector of x
+    x = Matrix{T}(undef, npar, niters + 1)
     # First guess
     x[:, 1] = x0
-    # Vector of errors 
+    # Vector of errors
     error = Vector{T}(undef, niters + 1)
-    # Error of first guess 
+    # Error of first guess
     error[1] = T(Inf)
     # Iteration
     for i in 1:niters
@@ -363,26 +363,26 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
         C = C_mat(xi) #.+ ξTH_mat(xi)
         # Update rule
         Δx = - inv(C)*D
-        # New x 
-        x[:, i+1] = xi + Δx 
-        # Error 
+        # New x
+        x[:, i+1] = xi + Δx
+        # Error
         error2 = ( (Δx') * (C*Δx) ) / npar
         if error2 ≥ 0
             error[i+1] = sqrt(error2)
         # The method do not converge
-        else 
+        else
             return LeastSquaresFit(false, x[:, i+1], inv(C), :diffcorr)
-        end 
+        end
     end
-    # Index with the lowest error 
+    # Index with the lowest error
     i = argmin(error)
-    # x with the lowest error 
+    # x with the lowest error
     x_new = x[:, i]
     # Normal C matrix evaluated in x_new
     C = C_mat(x_new)
     # Covariance matrix
     Γ = inv(C)
-    
+
     if any(diag(Γ) .< 0)
         return LeastSquaresFit(false, x_new, Γ, :diffcorr)
     else
@@ -394,7 +394,7 @@ function diffcorr(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
                   niters::Int = 5) where {T <: Real}
     # Unfold residuals and weights
     _res_, _w_ = unfold(res)
-    
+
     return diffcorr(_res_, _w_, x0, niters)
 end
 
@@ -407,7 +407,7 @@ end
 Newton method subroutine for least-squares fitting. Returns an `LeastSquaresFit`
 with the `niters`-th iteration
 ```math
-\mathbf{x}_{k+1} = \mathbf{x}_k - 
+\mathbf{x}_{k+1} = \mathbf{x}_k -
 \left(\frac{\partial^2 Q}{\partial\mathbf{x}_0^2}\right)^{-1}
 \frac{\partial Q}{\partial\mathbf{x}_0},
 ```
@@ -416,8 +416,8 @@ and the covariance matrix
 \mathbf{\Gamma} = \mathbf{C}^{-1},
 ```
 where ``\mathbf{C} = \frac{m}{2}\frac{\partial^2 Q}{\partial\mathbf{x}_0^2}`` is the normal
-matrix, ``Q = \frac{\chi^2}{m}`` is the mean square residual, ``m`` is the number of 
-observations and ``\mathbf{x}_0 = (x_1,\ldots,x_n)`` is the vector of initial conditions. 
+matrix, ``Q = \frac{\chi^2}{m}`` is the mean square residual, ``m`` is the number of
+observations and ``\mathbf{x}_0 = (x_1,\ldots,x_n)`` is the vector of initial conditions.
 
 See also [`chi2`](@ref).
 
@@ -429,7 +429,7 @@ See also [`chi2`](@ref).
 - `niters::Int`: number of iterations.
 
 !!! reference
-    See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371. 
+    See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
 """
 function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
                   niters::Int = 5) where {T <: Real}
@@ -439,13 +439,13 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     npar = length(x0)
     # Mean square residual
     Q = chi2(res, w)/nobs
-    # Vector of x 
-    x = Matrix{T}(undef, npar, niters + 1) 
+    # Vector of x
+    x = Matrix{T}(undef, npar, niters + 1)
     # First guess
     x[:, 1] = x0
-    # Vector of errors 
+    # Vector of errors
     error = Vector{T}(undef, niters + 1)
-    # Error of first guess 
+    # Error of first guess
     error[1] = T(Inf)
     # Iteration
     for i in 1:niters
@@ -457,26 +457,26 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
         d2Q = TaylorSeries.hessian(Q, xi)
         # Newton update rule
         Δx = - inv(d2Q)*dQ
-        # New x 
+        # New x
         x[:, i+1] = xi + Δx
         # Normal matrix
         C = d2Q/(2/nobs) # C = d2Q/(2/m)
-        # Error 
+        # Error
         error2 = ( (Δx') * (C*Δx) ) / npar
         if error2 ≥ 0
             error[i+1] = sqrt(error2)
         # The method do not converge
-        else 
+        else
             return LeastSquaresFit(false, x[:, i+1], inv(C), :newton)
-        end 
+        end
     end
-    # TO DO: study Gauss method solution dependence on jt order 
-    # TO DO: try even varorder 
-    # TO DO: study optimal number of iterations 
+    # TO DO: study Gauss method solution dependence on jt order
+    # TO DO: try even varorder
+    # TO DO: study optimal number of iterations
 
-    # Index with the lowest error 
+    # Index with the lowest error
     i = argmin(error)
-    # x with the lowest error 
+    # x with the lowest error
     x_new = x[:, i]
     # Normal matrix
     C = TaylorSeries.hessian(Q, x_new)/(2/nobs) # C = d2Q/(2/m)
@@ -494,7 +494,7 @@ function newtonls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
                   niters::Int = 5) where {T <: Real}
     # Unfold residuals and weights
     _res_, _w_ = unfold(res)
-    
+
     return newtonls(_res_, _w_, x0, niters)
 end
 
@@ -502,7 +502,7 @@ end
     tryls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
           niters::Int = 5) where {T <: Real}
 
-Return the best least squares fit between two routines: [`newtonls`](@ref) and 
+Return the best least squares fit between two routines: [`newtonls`](@ref) and
 [`diffcorr`](@ref).
 
 # Arguments
@@ -540,10 +540,10 @@ end
 @doc raw"""
     newtonls_Q(Q, nobs, x0, niters=5)
 
-Does the same as `newtonls`, but recives ``Q`` as an argument, instead of computing it. 
-Returns the `niters`-th iteration and the covariance matrix ``\Gamma``. 
+Does the same as `newtonls`, but recives ``Q`` as an argument, instead of computing it.
+Returns the `niters`-th iteration and the covariance matrix ``\Gamma``.
 
-See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371. 
+See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
 
 See also [`newtonls`](@ref).
 
@@ -561,7 +561,7 @@ function newtonls_Q(Q, nobs, x0, niters=5)
     x_new = x0
     # Iteration
     for i in 1:niters
-        # Gradient of Q with respect to x_0 
+        # Gradient of Q with respect to x_0
         dQ = TaylorSeries.gradient(Q)(x_new)
         # Hessian of Q with respect to x_0
         d2Q = TaylorSeries.hessian(Q, x_new)
@@ -583,14 +583,14 @@ end
 @doc raw"""
     newtonls_6v(res, w, x0, niters=5)
 
-Specialized version of `newtonls` on 6 variables for parametrized orbit determination 
-with respect to ``A_2`` Yarkovsky non-gravitational coefficient. Returns the `niters`-th 
-iteration and the covariance matrix ``\Gamma``. 
-    
-See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371. 
-    
+Specialized version of `newtonls` on 6 variables for parametrized orbit determination
+with respect to ``A_2`` Yarkovsky non-gravitational coefficient. Returns the `niters`-th
+iteration and the covariance matrix ``\Gamma``.
+
+See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
+
 See also [`newtonls`](@ref).
-    
+
 # Arguments
 
 - `res`: Vector of residuals.
@@ -633,14 +633,14 @@ end
 @doc raw"""
     newtonls_A2(res, w, x0, niters=5)
 
-Specialized version of `newtonls` with the Newton method only over the seventh degree of 
+Specialized version of `newtonls` with the Newton method only over the seventh degree of
 freedom, i.e., with respect to ``A_2`` Yarkovsky non-gravitational coefficient. Returns the
-`niters`-th iteration, the covariance matrix ``\Gamma`` and the normal matrix ``C``. 
-    
-See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371. 
-    
+`niters`-th iteration, the covariance matrix ``\Gamma`` and the normal matrix ``C``.
+
+See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
+
 See also [`newtonls`](@ref).
-    
+
 # Arguments
 
 - `res`: Vector of residuals.

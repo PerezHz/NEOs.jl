@@ -96,7 +96,7 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     Fs[1, :] .= [ρ_min, v_ρ_min]
     Fs[2, :] .= [ρ_min, v_ρ_max]
     Fs[3, :] .= [ρ_max, v_ρ_mid]
-    
+
     return AdmissibleRegion{T}(t_datetime, α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q,
                                coeffs, ρ_domain, v_ρ_domain, Fs, obs)
 end
@@ -105,7 +105,7 @@ end
     admsreg_coeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
                    ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
 
-Return the polynomial coefficients for an [`AdmissibleRegion`](@ref). 
+Return the polynomial coefficients for an [`AdmissibleRegion`](@ref).
 
 !!! reference
     See equation (8.8) of https://doi.org/10.1017/CBO9781139175371.
@@ -114,11 +114,11 @@ function admsreg_coeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
                         ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
     coeffs = Vector{T}(undef, 6)
     coeffs[1] = dot(q[1:3], q[1:3])
-    coeffs[2] = 2 *  dot(q[4:6], ρ) 
+    coeffs[2] = 2 *  dot(q[4:6], ρ)
     coeffs[3] = v_α^2 * cos(δ)^2 + v_δ^2
-    coeffs[4] = 2 * v_α * dot(q[4:6], ρ_α) + 2 * v_δ * dot(q[4:6], ρ_δ) 
-    coeffs[5] = dot(q[4:6], q[4:6]) 
-    coeffs[6] = 2*dot(q[1:3], ρ) 
+    coeffs[4] = 2 * v_α * dot(q[4:6], ρ_α) + 2 * v_δ * dot(q[4:6], ρ_δ)
+    coeffs[5] = dot(q[4:6], q[4:6])
+    coeffs[6] = 2*dot(q[1:3], ρ)
     return coeffs
 end
 
@@ -140,53 +140,53 @@ function topounitpdv(α::T, δ::T) where {T <: Number}
 end
 
 @doc raw"""
-    admsreg_W(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+    admsreg_W(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
 
-W function of an [`AdmissibleRegion`](@ref). 
+W function of an [`AdmissibleRegion`](@ref).
 
 !!! reference
     See equation (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_W(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+function admsreg_W(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
     return coeffs[3] * ρ^2 + coeffs[4] * ρ + coeffs[5]
 end
 admsreg_W(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}  = admsreg_W(A.coeffs, ρ)
 
 @doc raw"""
-    admsreg_S(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+    admsreg_S(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
 
-S function of an [`AdmissibleRegion`](@ref). 
+S function of an [`AdmissibleRegion`](@ref).
 
 !!! reference
     See equation (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_S(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+function admsreg_S(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
     return ρ^2 + coeffs[6] * ρ + coeffs[1]
 end
 admsreg_S(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_S(A.coeffs, ρ)
 
 @doc raw"""
-    admsreg_U(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+    admsreg_U(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
 
-U function of an [`AdmissibleRegion`](@ref). 
+U function of an [`AdmissibleRegion`](@ref).
 
 !!! reference
     See second equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_U(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+function admsreg_U(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
     return coeffs[2]^2/4 - admsreg_W(coeffs, ρ) + 2*k_gauss^2/sqrt(admsreg_S(coeffs, ρ))
 end
 admsreg_U(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_U(A.coeffs, ρ)
 
 @doc raw"""
-    admsreg_V(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} 
+    admsreg_V(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
 
-V function of an [`AdmissibleRegion`](@ref). 
+V function of an [`AdmissibleRegion`](@ref).
 
 !!! reference
     See first equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_V(coeffs::Vector{T}, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <: Number} 
+function admsreg_V(coeffs::Vector{T}, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <: Number}
     return v_ρ^2 + coeffs[2] * v_ρ + admsreg_W(coeffs, ρ) - 2*k_gauss^2/sqrt(admsreg_S(coeffs, ρ))
 end
 admsreg_V(A::AdmissibleRegion{T}, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_V(A.coeffs, ρ, v_ρ)
@@ -237,7 +237,7 @@ function boundary(A::AdmissibleRegion{T}, t::S) where {T <: AbstractFloat, S <: 
     # ρ = x_min
     if 0.0 <= t <= 1.0
         return [x_min, y_min + t * (y_max - y_min)]
-    else 
+    else
         # Upper curve
         if 1.0 <= t <= 2.0
             ρ = x_min + (t-1)*(x_max - x_min)
@@ -247,7 +247,7 @@ function boundary(A::AdmissibleRegion{T}, t::S) where {T <: AbstractFloat, S <: 
             ρ = x_max - (t-2)*(x_max - x_min)
             v_ρ = range_rate(A, ρ)[1]
         end
-        return [ρ, v_ρ] 
+        return [ρ, v_ρ]
     end
 end
 
@@ -282,7 +282,7 @@ function in(P::Vector{T}, A::AdmissibleRegion{T}) where {T <: AbstractFloat}
         else
             return y_range[1] <= P[2] <= y_range[2]
         end
-    else 
+    else
         return false
     end
 end
@@ -297,7 +297,7 @@ function topo2bary(A::AdmissibleRegion{T}, ρ::U, v_ρ::U) where {T <: AbstractF
     # Barycentric position
     r = A.q[1:3] + ρ * A.ρ_unit + sseph(su, datetime2days(A.date))[1:3]
     # Barycentric velocity
-    v = A.q[4:6] + v_ρ * A.ρ_unit + ρ * A.v_α * A.ρ_α + ρ * A.v_δ * A.ρ_δ 
+    v = A.q[4:6] + v_ρ * A.ρ_unit + ρ * A.v_α * A.ρ_α + ρ * A.v_δ * A.ρ_δ
         + sseph(su, datetime2days(A.date))[4:6]
     # Barycentric state vector
     return vcat(r, v)
@@ -315,7 +315,7 @@ function bary2topo(A::AdmissibleRegion{T}, q0::Vector{U}) where {T <: AbstractFl
     # Topocentric range
     ρ = norm((r - A.q)[1:3])
     # Topocentric range rate
-    v_ρ = dot(r[4:6], A.ρ_unit) - dot(A.q[4:6], A.ρ_unit) - ρ * A.v_α * dot(A.ρ_α, A.ρ_unit) 
+    v_ρ = dot(r[4:6], A.ρ_unit) - dot(A.q[4:6], A.ρ_unit) - ρ * A.v_α * dot(A.ρ_α, A.ρ_unit)
           - ρ * A.v_δ * dot(A.ρ_δ, A.ρ_unit)
 
     return ρ, v_ρ
@@ -323,16 +323,16 @@ end
 
 # Propagate an orbit and compute residuals
 function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
-                 params::NEOParameters{T})  where {T <: AbstractFloat, U <: Number}
+                 params::NEOParameters{T}; dynamics::D=newtonian!)  where {D, T <: AbstractFloat, U <: Number}
     # Time of first (last) observation
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
     # Years in backward (forward) integration
     nyears_bwd = -(jd0 - t0 + params.bwdoffset) / yr
     nyears_fwd = (tf - jd0 + params.fwdoffset) / yr
     # Backward (forward) integration
-    bwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_bwd, q0, params)
-    fwd = propagate(RNp1BP_pN_A_J23E_J2S_eph_threads!, jd0, nyears_fwd, q0, params)
-    if !issuccessfulprop(bwd, t0 - jd0; tol = params.coeffstol) || 
+    bwd = propagate(dynamics, jd0, nyears_bwd, q0, params)
+    fwd = propagate(dynamics, jd0, nyears_fwd, q0, params)
+    if !issuccessfulprop(bwd, t0 - jd0; tol = params.coeffstol) ||
        !issuccessfulprop(fwd, tf - jd0; tol = params.coeffstol)
         return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
     end
@@ -341,7 +341,7 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
                     xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
                     xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
                     xva = et -> bwdfwdeph(et, bwd, fwd))
-    
+
     return bwd, fwd, res
 end
 
@@ -353,13 +353,13 @@ Adaptative moment estimation (ADAM) minimizer of normalized mean square
 residual over and admissible region `A`.
 
 !!! warning
-    This function will set the (global) `TaylorSeries` variables to `δρ δvρ`. 
+    This function will set the (global) `TaylorSeries` variables to `δρ δvρ`.
 
 !!! reference
     See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
 """
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, params::NEOParameters{T};
-              η::T = 25.0, μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001) where {T <: AbstractFloat}
+              η::T = 25.0, μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, dynamics::D=newtonian!) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
     # Center
@@ -391,7 +391,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, params::NEOPar
         # Current barycentric state vector
         q = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
         # Propagation and residuals
-        _, _, res = propres(radec, jd0, q, params)
+        _, _, res = propres(radec, jd0, q, params; dynamics)
         iszero(length(res)) && break
         # Current Q
         Q = nms(res)
@@ -426,7 +426,7 @@ end
 Monte Carlo sampling over the left boundary of `A`.
 """
 function ρminmontecarlo(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T},
-                        params::NEOParameters{T}; N_samples::Int = 25) where {T <: AbstractFloat}
+                        params::NEOParameters{T}; N_samples::Int = 25, dynamics::D=newtonian!) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
     # Range lower bound
@@ -440,10 +440,10 @@ function ρminmontecarlo(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T},
         # Barycentric initial conditions
         q = topo2bary(A, ρ, v_ρs[i])
         # Propagation & residuals
-        _, _, res = propres(radec, jd0, q, params)
+        _, _, res = propres(radec, jd0, q, params; dynamics)
         iszero(length(res)) && continue
         # NRMS
-        Qs[i] = nrms(res) 
+        Qs[i] = nrms(res)
     end
     # Find solution with smallest Q
     t = argmin(Qs)
@@ -459,10 +459,10 @@ Used within [`tooshortarc`](@ref) to compute an orbit from a point in an
 admissible region via least squares.
 
 !!! warning
-    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
+    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`.
 """
 function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-               i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5) where {T <: AbstractFloat}
+               i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5, dynamics::D=newtonian!) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     # (corrected for light-time)
     jd0 = datetime2julian(A.date) - ρ / c_au_per_day
@@ -488,7 +488,7 @@ function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Ve
         # Initial conditions
         q = q0 + dq
         # Propagation & residuals
-        bwd, fwd, res = propres(radec, jd0, q, params)
+        bwd, fwd, res = propres(radec, jd0, q, params; dynamics)
         iszero(length(res)) && break
         # Orbit fit
         fit = tryls(res[idxs], x0, params.niter)
@@ -502,7 +502,7 @@ function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Ve
                 idxs = vcat(idxs, extra)
                 sort!(idxs)
                 g_f = k
-            else 
+            else
                 break
             end
         end
@@ -515,7 +515,7 @@ function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Ve
                 idxs = vcat(idxs, extra)
                 sort!(idxs)
                 g_0 = k
-            else 
+            else
                 break
             end
         end
@@ -532,7 +532,7 @@ function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Ve
             flag && break
         else
             break
-        end 
+        end
         # Update values
         q0 = q(fit.x)
     end
@@ -540,7 +540,7 @@ function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Ve
     if isinf(best_Q)
         return zero(NEOSolution{T, T})
     # Case: at least one solution was succesful
-    else 
+    else
         return best_sol
     end
 end
@@ -568,10 +568,10 @@ over the admissible region.
 - `params::NEOParameters{T}`: see `Admissible Region Parameters` of [`NEOParameters`](@ref).
 
 !!! warning
-    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`. 
+    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`.
 """
 function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                     params::NEOParameters{T}) where {T <: AbstractFloat}
+                     params::NEOParameters{T}; dynamics::D=newtonian!) where {T <: AbstractFloat, D}
 
     # Allocate memory for output
     best_sol = zero(NEOSolution{T, T})
@@ -584,9 +584,9 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         A = AdmissibleRegion(tracklets[i], params)
         iszero(A) && continue
         # ADAM minimization over admissible region
-        ρ, v_ρ, _ = adam(radec, A, params)
+        ρ, v_ρ, _ = adam(radec, A, params; dynamics)
         # 6 variables least squares
-        sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5)
+        sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5, dynamics)
         # Update best solution
         if nrms(sol) < nrms(best_sol)
             best_sol = sol
@@ -597,7 +597,7 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         ρ, v_ρ, Q = ρminmontecarlo(radec, A, params)
         isinf(Q) && continue
         # 6 variables least squares
-        sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5)
+        sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5, dynamics)
         # Update best solution
         if nrms(sol) < nrms(best_sol)
             best_sol = sol
