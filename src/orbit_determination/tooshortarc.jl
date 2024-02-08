@@ -490,7 +490,7 @@ function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Ve
         iszero(length(res)) && break
         # Orbit fit
         fit = tryls(res[idxs], x0, params.niter)
-        !fit.success && continue
+        !fit.success && break
         # Right iteration
         for k in g_f+1:length(tracklets)
             extra = indices(tracklets[k])

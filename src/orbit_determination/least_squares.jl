@@ -171,13 +171,20 @@ end
 @doc raw"""
     nms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number}
     nms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+    nms(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::LeastSquaresFit{T}) where {T <: Real}
 
 Return the normalized chi square. See [`chi2`](@ref).
 """
 nms(res::Vector{U}, w::Vector{T}) where {T <: Real, U <: Number} = chi2(res, w) / length(res)
+
 function nms(res::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
     _res_, _w_ = unfold(res)
     return nms(_res_, _w_)
+end
+
+function nms(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::LeastSquaresFit{T}) where {T <: Real}
+    _res_, _w_ = unfold(res)
+    return nms(_res_(fit.x), _w_)
 end
 
 @doc raw"""

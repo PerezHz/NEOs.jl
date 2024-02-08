@@ -160,5 +160,13 @@ function nrms(sol::NEOSolution{T, T}) where {T <: Real}
         return nrms(sol.res)
     end
 end
+# Normalized Mean Square Error
+function nms(sol::NEOSolution{T, T}) where {T <: Real}
+    if iszero(sol)
+        return T(Inf)
+    else
+        return nms(sol.res)
+    end
+end
 
 sigmas(sol::NEOSolution{T, T}) where {T <: Real} = sqrt.(diag(sol.fit.Γ)) .* sol.scalings
