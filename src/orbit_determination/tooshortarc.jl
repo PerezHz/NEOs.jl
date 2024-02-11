@@ -344,29 +344,41 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
 end
 
 @doc raw"""
-    adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, params::NEOParameters{T};
-         η::T = 25.0, μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001) where {T <: AbstractFloat}
+    adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
+         params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
+         μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001,
+         dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
 Adaptative moment estimation (ADAM) minimizer of normalized mean square
 residual over and admissible region `A`.
 
 !!! warning
-    This function will set the (global) `TaylorSeries` variables to `δρ δvρ`.
+    This function will set the (global) `TaylorSeries` variables to `dx dy`.
 
 !!! reference
     See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
 """
-function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, params::NEOParameters{T};
-              η::T = 25.0, μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, dynamics::D=newtonian!) where {T <: AbstractFloat, D}
+function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
+              params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
+              μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001,
+              dynamics::D = newtonian!) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
-    # Center
-    ρ = sum(A.ρ_domain) / 2
-    v_ρ = sum(A.v_ρ_domain) / 2
     # Scaling factors
-    scalings = [A.ρ_domain[2] - A.ρ_domain[1], A.v_ρ_domain[2] - A.v_ρ_domain[1]] / 1_000
+    if scale == :linear
+        scalings = [
+            A.ρ_domain[2] - A.ρ_domain[1],
+            A.v_ρ_domain[2] - A.v_ρ_domain[1]
+        ] / 1_000
+    elseif scale == :log
+        x = log10(ρ)
+        scalings = [
+            log10(A.ρ_domain[2]) - log10(A.ρ_domain[1]),
+            A.v_ρ_domain[2] - A.v_ρ_domain[1]
+        ] / 1_000
+    end
     # Jet transport variables
-    dq = scaled_variables("dρ dvρ", scalings, order = 1)
+    dq = scaled_variables("dx dy", scalings, order = 1)
     # Maximum number of iterations
     maxiter = params.maxiter
     # Allocate memory
@@ -387,7 +399,11 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, params::NEOPar
         ρs[t] = ρ
         v_ρs[t] = v_ρ
         # Current barycentric state vector
-        q = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
+        if scale == :linear
+            q = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
+        elseif scale == :log
+            q = topo2bary(A, 10^(x + dq[1]), v_ρ + dq[2])
+        end
         # Propagation and residuals
         _, _, res = propres(radec, jd0, q, params; dynamics)
         iszero(length(res)) && break
@@ -410,6 +426,9 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, params::NEOPar
         ρ, v_ρ = bary2topo(A, q(x1))
         # Projection
         ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
+        if scale == :log
+            x = log10(ρ)
+        end
     end
     # Find point with smallest Q
     t = argmin(Qs)
@@ -457,7 +476,7 @@ Used within [`tooshortarc`](@ref) to compute an orbit from a point in an
 admissible region via least squares.
 
 !!! warning
-    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`.
+    This function will set the (global) `TaylorSeries` variables to `dx₁ dx₂ dx₃ dx₄ dx₅ dx₆`.
 """
 function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5, dynamics::D=newtonian!) where {T <: AbstractFloat, D}
@@ -554,7 +573,7 @@ end
 
 @doc raw"""
     tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                params::NEOParameters{T}) where {T <: AbstractFloat}
+                params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
 Return initial conditions by minimizing the normalized root mean square residual
 over the admissible region.
@@ -564,12 +583,13 @@ over the admissible region.
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
 - `params::NEOParameters{T}`: see `Admissible Region Parameters` of [`NEOParameters`](@ref).
+- `dynamics::D`: dynamical function.
 
 !!! warning
-    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`.
+    This function will set the (global) `TaylorSeries` variables to `dx₁ dx₂ dx₃ dx₄ dx₅ dx₆`.
 """
 function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                     params::NEOParameters{T}; dynamics::D=newtonian!) where {T <: AbstractFloat, D}
+                     params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
     # Allocate memory for output
     best_sol = zero(NEOSolution{T, T})
@@ -581,26 +601,35 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         # Admissible region
         A = AdmissibleRegion(tracklets[i], params)
         iszero(A) && continue
+        # Center
+        ρ = sum(A.ρ_domain) / 2
+        v_ρ = sum(A.v_ρ_domain) / 2
         # ADAM minimization over admissible region
-        ρ, v_ρ, _ = adam(radec, A, params; dynamics)
-        # 6 variables least squares
-        sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5, dynamics)
-        # Update best solution
-        if nrms(sol) < nrms(best_sol)
-            best_sol = sol
-            # Break condition
-            nrms(sol) < 1.5 && break
+        ρ, v_ρ, Q = adam(radec, A, ρ, v_ρ, params; scale = :linear, dynamics = dynamics)
+        if !isinf(Q)
+            # 6 variables least squares
+            sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5, dynamics)
+            # Update best solution
+            if nrms(sol) < nrms(best_sol)
+                best_sol = sol
+                # Break condition
+                nrms(sol) < 1.5 && break
+            end
         end
-        # Left boundary Monte Carlo
-        ρ, v_ρ, Q = ρminmontecarlo(radec, A, params)
-        isinf(Q) && continue
-        # 6 variables least squares
-        sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5, dynamics)
-        # Update best solution
-        if nrms(sol) < nrms(best_sol)
-            best_sol = sol
-            # Break condition
-            nrms(sol) < 1.5 && break
+        # Left boundary
+        ρ = A.ρ_domain[1]
+        v_ρ = sum(A.v_ρ_domain) / 2
+        # ADAM minimization over admissible region
+        ρ, v_ρ, Q = adam(radec, A, ρ, v_ρ, params; scale = :log, dynamics = dynamics)
+        if !isinf(Q)
+            # 6 variables least squares
+            sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5, dynamics)
+            # Update best solution
+            if nrms(sol) < nrms(best_sol)
+                best_sol = sol
+                # Break condition
+                nrms(sol) < 1.5 && break
+            end
         end
     end
 
