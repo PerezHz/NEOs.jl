@@ -110,6 +110,8 @@ using NEOs: NEOSolution, numberofdays
 
         # Orbit Determination
         sol = orbitdetermination(radec, params)
+        # Outlier rejection
+        sol = outlier_rejection(radec, sol, params)
 
         # Values by February 4, 2024
 
@@ -155,7 +157,8 @@ using NEOs: NEOSolution, numberofdays
 
         # Parameters
         params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
-                               bwdoffset = 0.007, fwdoffset = 0.007)
+                               coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+                               H_max = 34.0)
 
         # Orbit Determination
         sol = orbitdetermination(radec, params)

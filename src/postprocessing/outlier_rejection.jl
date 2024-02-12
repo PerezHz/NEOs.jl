@@ -1,3 +1,5 @@
+include("b_plane.jl")
+
 @doc raw"""
     residual_norm(x::OpticalResidual{T, T}) where {T <: Real}
 
@@ -7,7 +9,7 @@ residual_norm(x::OpticalResidual{T, T}) where {T <: Real} = x.w_α * x.ξ_α^2 /
 
 @doc raw"""
     outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
-                      params::NEOParameters{T}) where {T <: AbstractFloat}
+                      params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
 Refine an orbit, computed by [`tooshortarc`](@ref) or [`gaussinitcond`](@ref),
 via propagation and/or outlier rejection.
@@ -17,12 +19,13 @@ via propagation and/or outlier rejection.
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `sol::NEOSolution{T, T}`: orbit to be refined.
 - `params::NEOParameters{T}`: see `Outlier Rejection Parameters` of [`NEOParameters`](@ref).
+- `dynamics::D`: dynamical model.
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`.
 """
 function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
-                           params::NEOParameters{T}; dynamics::D=newtonian!) where {T <: AbstractFloat, D}
+                           params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
     # Origin
     x0 = zeros(T, 6)

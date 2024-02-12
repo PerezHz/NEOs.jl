@@ -583,7 +583,7 @@ over the admissible region.
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
 - `params::NEOParameters{T}`: see `Admissible Region Parameters` of [`NEOParameters`](@ref).
-- `dynamics::D`: dynamical function.
+- `dynamics::D`: dynamical model.
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `dx₁ dx₂ dx₃ dx₄ dx₅ dx₆`.

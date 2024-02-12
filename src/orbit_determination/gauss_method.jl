@@ -417,7 +417,7 @@ end
 
 @doc raw"""
     gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                  params::NEOParameters{T}) where {T <: AbstractFloat}
+                  params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
 Return initial conditions via Gauss Method.
 
@@ -428,12 +428,13 @@ See also [`gauss_method`](@ref).
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
 - `params::NEOParameters{T}`: see `Gauss Method Parameters` of [`NEOParameters`](@ref).
+- `dynamics::D`: dynamical model.
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`.
 """
 function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                       params::NEOParameters{T}; dynamics::D=newtonian!) where {T <: AbstractFloat, D}
+                       params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
     # Allocate memory for initial conditions
     best_sol = zero(NEOSolution{T, T})

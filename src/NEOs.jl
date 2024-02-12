@@ -77,8 +77,8 @@ export issinglearc, istsa, orbitdetermination
 include("constants.jl")
 include("observations/process_radar.jl")
 include("propagation/propagation.jl")
-include("postprocessing/b_plane.jl")
 include("orbit_determination/orbit_determination.jl")
+include("postprocessing/outlier_rejection.jl")
 include("init.jl")
 
 end

@@ -3,7 +3,6 @@ include("least_squares.jl")
 include("neosolution.jl")
 include("tooshortarc.jl")
 include("gauss_method.jl")
-include("outlier_rejection.jl")
 
 @doc raw"""
     issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <: AbstractFloat}
@@ -66,7 +65,8 @@ function adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFlo
 end
 
 @doc raw"""
-    orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: AbstractFloat}
+    orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
+                       dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
 Initial Orbit Determination (IOD) routine.
 
@@ -74,8 +74,10 @@ Initial Orbit Determination (IOD) routine.
 
 - `radec::Vector{RadecMPC{T}}`: vector of observations.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+- `dynamics::D`: dynamical model.
 """
-function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}; dynamics::D=newtonian!) where {T <: AbstractFloat, D}
+function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
+                            dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
     # Allocate memory for output
     sol = zero(NEOSolution{T, T})
@@ -95,10 +97,6 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}
     # Case 2: Gauss Method
     else
         sol = gaussinitcond(radec, tracklets, params; dynamics)
-    end
-    # Outlier rejection (if needed)
-    if nrms(sol) > 1 && !iszero(sol)
-        sol = outlier_rejection(radec, sol, params; dynamics)
     end
 
     return sol::NEOSolution{T, T}
