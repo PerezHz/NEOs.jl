@@ -527,7 +527,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
                                    res[idxs], fit, scalings))
             end
             # Break condition
-            if Q <= params.Q_max
+            if Q <= params.gaussQmax
                 flag = true
                 break
             end

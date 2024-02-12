@@ -613,7 +613,7 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
             if nrms(sol) < nrms(best_sol)
                 best_sol = sol
                 # Break condition
-                nrms(sol) < 1.5 && break
+                nrms(sol) < params.tsaQmax && break
             end
         end
         # Left boundary
@@ -628,7 +628,7 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
             if nrms(sol) < nrms(best_sol)
                 best_sol = sol
                 # Break condition
-                nrms(sol) < 1.5 && break
+                nrms(sol) < params.tsaQmax && break
             end
         end
     end
