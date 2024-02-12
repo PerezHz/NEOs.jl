@@ -4,7 +4,7 @@ module NEOs
 
 import Base: show, string, hash, isequal, ==, isless, convert, zero, iszero, isnan, in
 import Tables: istable, rowaccess, rows, schema, Schema
-import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef
+import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import JLD2: writeas
 import PlanetaryEphemeris as PE
 

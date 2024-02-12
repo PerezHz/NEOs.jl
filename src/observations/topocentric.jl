@@ -3,8 +3,8 @@
 
 Day/night at a particular timezone.
 
-# Fields 
-- `light::Symbol`: 
+# Fields
+- `light::Symbol`:
     - for ground observatories: `:day` or `:night`,
     - for space observatories: `:space`.
 - `start::DateTime`.
@@ -15,7 +15,7 @@ Day/night at a particular timezone.
     light::Symbol
     start::DateTime
     stop::DateTime
-    utc::Int 
+    utc::Int
     function TimeOfDay(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
         if issatellite(observatory)
             return new(:space, date, date, 0)
@@ -24,7 +24,7 @@ Day/night at a particular timezone.
         utc = hours_from_UTC(observatory)
         # Today's sunrise / sunset
         today = sunriseset(date, observatory)
-        # Yesterday's sunrise / sunset 
+        # Yesterday's sunrise / sunset
         yesterday = sunriseset(date - Day(1), observatory)
         # Tomorrow's sunrise / sunset
         tomorrow = sunriseset(date + Day(1), observatory)
@@ -60,7 +60,7 @@ end
 Return the naive hour difference between longitude `lon` [rad] and UTC.
 """
 hours_from_UTC(lon::T) where {T <: Real} = ceil(Int, 12*lon/π - 0.5)
-function hours_from_UTC(observatory::ObservatoryMPC{T}) where  {T <: AbstractFloat} 
+function hours_from_UTC(observatory::ObservatoryMPC{T}) where  {T <: AbstractFloat}
     lon, _ = lonlat(observatory)
     return hours_from_UTC(lon)
 end
@@ -79,7 +79,7 @@ function lonlat(observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
     lat_geocentric, _ = geodetic_to_geocentric(lat_geodetic, altitude)
 
     return lon, lat_geocentric
-end 
+end
 
 @doc raw"""
     sunriseset(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
@@ -112,7 +112,7 @@ function sunriseset(date::DateTime, observatory::ObservatoryMPC{T}) where {T <: 
     # UTC time of sunrise [DateTime]
     sunrise = day + Microsecond(round(Int, sunrise_min*6e7))
     # UTC time of sunset [min]
-    sunset_min = 720 - 4*(rad2deg(lon) + ha_sunset) - eqtime 
+    sunset_min = 720 - 4*(rad2deg(lon) + ha_sunset) - eqtime
     # UTC time of sunset [DateTime]
     sunset = day + Microsecond(round(Int, sunset_min*6e7))
 
@@ -156,9 +156,9 @@ function obsposECEF(observatory::ObservatoryMPC{T}; eop::Union{EopIau1980, EopIa
 
         # ECEF position
         pos_ECEF = convert(Vector{eltype(pv_ECEF.r)}, pv_ECEF.r)
-        
+
         return pos_ECEF
-    else 
+    else
         # λ_deg: longitude [degrees east of Greenwich]
         # u: distance from spin axis [km], u = ρ*cos(ϕ')
         # v: height above equatorial plane [km], v = ρ*sin(ϕ'),
@@ -254,7 +254,7 @@ models, such as the IAU1976/80 model, can be used by importing the
 `SatelliteToolboxTransformations.EopIau1980` type and passing it to the `eop` keyword
 argument in the function call.
 
-See also [`SatelliteToolboxBase.OrbitStateVector`](@ref) and 
+See also [`SatelliteToolboxBase.OrbitStateVector`](@ref) and
 [`SatelliteToolboxTransformations.sv_ecef_to_eci`](@ref).
 
 # Arguments
@@ -269,7 +269,7 @@ See also [`SatelliteToolboxBase.OrbitStateVector`](@ref) and
 """
 function obsposvelECI(observatory::ObservatoryMPC{T}, et::U;
         eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat, U <: Number}
-    
+
     # Make sure observatory has coordinates
     @assert hascoord(observatory) "Cannot compute position for observatory [$(observatory.code)] without coordinates"
     # One with correct type
@@ -279,7 +279,7 @@ function obsposvelECI(observatory::ObservatoryMPC{T}, et::U;
         # @assert datetime2et(observatory.date) == cte(et)
         return [observatory.long * oneU, observatory.cos * oneU, observatory.sin * oneU,
                 zero(et), zero(et), zero(et)]
-    else 
+    else
         # Earth-Centered Earth-Fixed position position of observer
         pos_ECEF = obsposECEF(observatory)
 
@@ -305,7 +305,7 @@ function obsposvelECI(observatory::ObservatoryMPC{T}, et::U;
         for i in eachindex(pv_ECI.v)
             r_ECI[i+3] = pv_ECI.v[i] * oneU
         end
-        
+
         return r_ECI
     end
 end
@@ -315,4 +315,23 @@ function obsposvelECI(x::RadecMPC{T}; eop::Union{EopIau1980, EopIau2000A} = eop_
 end
 function obsposvelECI(x::RadarJPL{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
     return obsposvelECI(x.rcvr, datetime2et(x.date); eop)
+end
+
+# Special method of SatelliteToolboxTransformations.ecef_to_geocentric for Vector{TaylorN{T}}
+# See https://github.com/JuliaSpace/SatelliteToolboxTransformations.jl/blob/b7790389407a207499d343aa6d546ef54990baa2/src/reference_frames/geodetic_geocentric.jl#L31-L60
+function ecef_to_geocentric(r_e::Vector{TaylorN{T}}) where {T<:AbstractFloat}
+
+    # Auxiliary variables.
+    x  = r_e[1]
+    y  = r_e[2]
+    z  = r_e[3]
+    x² = x^2
+    y² = y^2
+    z² = z^2
+
+    lat = atan(z, √(x² + y²))
+    lon = atan(y, x)
+    r   = √(x² + y² + z²)
+
+    return lat, lon, r
 end
