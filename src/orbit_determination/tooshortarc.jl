@@ -207,7 +207,7 @@ with coefficients `coeffs`.
 """
 function max_range(coeffs::Vector{T}) where {T <: AbstractFloat}
     # Initial guess
-    sol = find_zeros(s -> admsreg_U(coeffs, s), R_EA, 10.0)
+    sol = find_zeros(s -> admsreg_U(coeffs, s), R_EA, 100.0)
     iszero(length(sol)) && return zero(T)
     ρ_max = sol[1]
     # Make sure U(ρ) ≥ 0 and there is at least one range_rate solution

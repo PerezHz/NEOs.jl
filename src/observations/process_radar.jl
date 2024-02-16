@@ -86,7 +86,7 @@ the solar latitude, and ``A``, ``a``, ``b`` are the solar corona parameters.
 !!! reference
     See (Explanatory Supplement to the Astronomical Almanac 2014, p. 323, Sec. 8.7.5, Eq. 8.22).
     ESAA 2014 in turn refers to Muhleman and Anderson (1981). Ostro (1993) gives a reference to
-    Anderson (1978), where this model is fitted to Mariner 9 ranging data. Reading 
+    Anderson (1978), where this model is fitted to Mariner 9 ranging data. Reading
     https://gssc.esa.int/navipedia/index.php/Ionospheric_Delay helped a lot to clarify things,
     especially the 40.3, although they talk about Earth's ionosphere. Another valuable source is
     Standish, E.M., Astron. Astrophys. 233, 252-271 (1990).
@@ -264,7 +264,7 @@ motion.
 - `observatory::ObservatoryMPC{T}`: observing station.
 - `t_r_utc::DateTime`: UTC time of echo reception.
 
-# Keyword arguments 
+# Keyword arguments
 
 - `tord::Int = 5`: order of Taylor expansions.
 - `niter::Int = 10`: number of light-time solution iterations.
@@ -480,7 +480,7 @@ end
     radar_astrometry(observatory::ObservatoryMPC{T}, t_r_utc::DateTime, F_tx::Real; kwargs...) where {T <: AbstractFloat}
     radar_astrometry(radar::RadarJPL{T}; kwargs...) where {T <: AbstractFloat}
     radar_astrometry(astradarfile::String; kwargs...)
-    radar_astrometry(astradardata::Vector{RadarJPL}; kwargs...) where {T <: AbstractFloat} 
+    radar_astrometry(astradardata::Vector{RadarJPL}; kwargs...) where {T <: AbstractFloat}
 
 Return time-delay and Doppler shift.
 
