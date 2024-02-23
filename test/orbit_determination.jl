@@ -13,8 +13,9 @@ using NEOs: NEOSolution, numberofdays
         # Load observations
         radec = read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
         # Parameters
-        params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
+        params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = false,
                                bwdoffset = 0.007, fwdoffset = 0.007)
+        params = NEOParameters(params, parse_eqs=true)
 
         # Orbit Determination
         sol = orbitdetermination(radec, params)
