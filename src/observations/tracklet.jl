@@ -113,7 +113,7 @@ function Tracklet(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) where {T <:
         mag = df.mag[1]
         return Tracklet{T}(radec, observatory, night, date, α,
                                    δ, v_α, v_δ, mag, nobs, indices)
-    end 
+    end
 
     # Make sure there are no repeated dates
     gdf = groupby(df, :date)
@@ -141,7 +141,7 @@ function Tracklet(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) where {T <:
     α_coef = polyfit(df.t_rel, df.α)
     δ_coef = polyfit(df.t_rel, df.δ)
 
-    # Evaluate polynomials at mean date 
+    # Evaluate polynomials at mean date
     α = mod2pi(polymodel(t_mean, α_coef))
     δ = polymodel(t_mean, δ_coef)
     v_α = polymodel(t_mean, diffcoeffs(α_coef))
@@ -152,21 +152,21 @@ function Tracklet(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) where {T <:
 
     return Tracklet{T}(radec, observatory, night, date, α, δ, v_α,
                                v_δ, mag, nobs, indices)
-end 
+end
 
 @doc raw"""
     reduce_tracklets(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
 
 Return a `Vector{Tracklet{T}}` where each element corresponds to a batch of
 observations taken by the same observatory on the same night. The reduction
-is performed via polynomial regression. 
+is performed via polynomial regression.
 """
 function reduce_tracklets(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
-    # Convert to DataFrame 
+    # Convert to DataFrame
     df = DataFrame(radec)
     # Compute TimeOfDay
     df.TimeOfDay = TimeOfDay.(radec)
-    # Group by observatory and TimeOfDay 
+    # Group by observatory and TimeOfDay
     gdf = groupby(df, [:observatory, :TimeOfDay])
     # Allocate memmory for tracklets vector
     tracklets = Vector{Tracklet{T}}(undef, gdf.ngroups)
@@ -177,6 +177,6 @@ function reduce_tracklets(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
     end
     # Sort by date
     sort!(tracklets)
-    
+
     return tracklets
 end

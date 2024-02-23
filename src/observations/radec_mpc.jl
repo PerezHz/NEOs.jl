@@ -7,7 +7,7 @@ struct Declination <: AbstractAstrometry end
 @doc raw"""
     RadecMPC{T <: AbstractFloat} <: AbstractAstrometry
 
-An optical (right ascension, declination) measurement in MPC format. 
+An optical (right ascension, declination) measurement in MPC format.
 
 # Fields
 
@@ -113,7 +113,7 @@ function neoparse(x::RegexMatch, i::Int, ::Type{DateTime})
 end
 
 function neoparse(x::RegexMatch, i::Int, ::Type{RightAscension})
-    # Unfold 
+    # Unfold
     hrs = parse(Int, x[i][1:2])
     min = parse(Int, x[i][4:5])
     sec = parse(Float64, x[i][7:end])
@@ -127,7 +127,7 @@ function neoparse(x::RegexMatch, i::Int, ::Type{RightAscension})
 end
 
 function neoparse(x::RegexMatch, i::Int, ::Type{Declination})
-    # Unfold 
+    # Unfold
     sgn = Char(x[i][1])
     deg = parse(Int, x[i][2:3])
     min = parse(Int, x[i][5:6])
@@ -150,7 +150,7 @@ function neoparse(m::RegexMatch, i::Int, ::Type{ObservatoryMPC{Float64}})
     _observatory_ = search_obs_code(String(m[i]))
     if isnothing(m["optional"])
         return _observatory_
-    else 
+    else
         units = neoparse(m, 22, Int64)
         x = neoparse(m, 23, Float64)
         y = neoparse(m, 24, Float64)
@@ -181,7 +181,7 @@ function RadecMPC(m::RegexMatch)
             neoparse(m, i, RightAscension)
         elseif i == 8
             neoparse(m, i, Declination)
-        else 
+        else
             neoparse(m, i, types[i])
         end
     end, 1:length(types))
@@ -310,7 +310,7 @@ end
 
 # Convert `obs` to a string according to MPC format.
 function string(obs::RadecMPC{T}) where {T <: AbstractFloat}
-    # Number string 
+    # Number string
     num_s = rpad(obs.num, 5)
     # Temporary designation string
     tmpdesig_s = rpad(obs.tmpdesig, 7)
@@ -327,13 +327,13 @@ function string(obs::RadecMPC{T}) where {T <: AbstractFloat}
     # Declination string
     δ_s = mpc_δ_str(obs.δ)
     # Info 1 string
-    info1_s = rpad(obs.info1, 9)    
+    info1_s = rpad(obs.info1, 9)
     # Magnitude string
     mag_s = isnan(obs.mag) ? repeat(" ", 5) : @sprintf("%.2f", obs.mag)
-    # Band string 
+    # Band string
     band_s = rpad(obs.band, 1)
-    # Info 2 string 
-    info2_s = rpad(obs.info2, 5)    
+    # Info 2 string
+    info2_s = rpad(obs.info2, 5)
     # Catalogue string
     catalogue_s = isunknown(obs.catalogue) ? " " : obs.catalogue.code
     # Observatory string
@@ -343,10 +343,10 @@ function string(obs::RadecMPC{T}) where {T <: AbstractFloat}
                    info1_s, mag_s, band_s, catalogue_s, info2_s, obscode_s)
 
     if issatellite(obs.observatory)
-        # Units string 
+        # Units string
         units = obs.observatory.units
         units_s = rpad(units, 1)
-        
+
         x = obs.observatory.long
         y = obs.observatory.cos
         z = obs.observatory.sin
@@ -356,11 +356,11 @@ function string(obs::RadecMPC{T}) where {T <: AbstractFloat}
             z /= au
         end
 
-        # X component string 
+        # X component string
         x_s = mpc_x_str(x)
-        # Y component string 
+        # Y component string
         y_s = mpc_x_str(y)
-        # Z component string 
+        # Z component string
         z_s = mpc_x_str(z)
         obs_s = string(obs_s, "\n", num_s, tmpdesig_s, " ", publishnote_s, "s", date_s,
                        units_s, " ", x_s, y_s, z_s, "  ", info2_s, obscode_s)
@@ -386,7 +386,7 @@ end
 @doc raw"""
     get_radec_mpc(id::Pair{String, String}, filename::String = replace(id[2], " " => "_") * ".txt")
 
-Download MPC optical astrometry of NEO `id` and save the output to `filename`. 
+Download MPC optical astrometry of NEO `id` and save the output to `filename`.
 """
 function get_radec_mpc(id::Pair{String, String}, filename::String = replace(id[2], " " => "_") * ".txt")
     # HTTP query
@@ -409,12 +409,12 @@ function get_radec_mpc(id::Pair{String, String}, filename::String = replace(id[2
     write_radec_mpc(radec, filename)
 
     return filename
-end 
+end
 
 @doc raw"""
     fetch_radec_mpc(id::Pair{String, String})
 
-Download MPC optical astrometry of NEO `id` and return the output as `Vector{RadecMPC{Float64}}`. 
+Download MPC optical astrometry of NEO `id` and return the output as `Vector{RadecMPC{Float64}}`.
 """
 function fetch_radec_mpc(id::Pair{String, String})
     # Temporary file
@@ -439,11 +439,11 @@ schema(::Vector{T}) where {T <: AbstractAstrometry} = Schema(fieldnames(T), Tupl
 function Vector{T}(df::AbstractDataFrame) where {T <: AbstractAstrometry}
     @assert all(String.(fieldnames(T)) .== names(df)) "`DataFrame` column names don't match `$T` fieldnames"
     @assert all(fieldtypes(T) .== eltype.(eachcol(df))) "`DataFrame` column types don't match `$T` fieldtypes"
-    obs = Vector{T}(undef, nrow(df)) 
+    obs = Vector{T}(undef, nrow(df))
     for (i, row) in zip(eachindex(obs), eachrow(df))
         obs[i] = T(values(row)...)
-    end 
-    return obs 
-end 
+    end
+    return obs
+end
 
 convert(::Type{Vector{T}}, df::DataFrame) where {T <: AbstractAstrometry} = Vector{T}(df)

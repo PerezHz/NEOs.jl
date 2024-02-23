@@ -42,17 +42,17 @@ that one or both of the measurements (time delay or Doppler shift) are missing.
     xmit::ObservatoryMPC{T}
     bouncepoint::String
     # Inner constructor
-    function RadarJPL{T}(id::String, date::DateTime, Δτ::T, Δτ_σ::T, Δτ_units::String, 
+    function RadarJPL{T}(id::String, date::DateTime, Δτ::T, Δτ_σ::T, Δτ_units::String,
                          Δν::T, Δν_σ::T, Δν_units::String, freq::T, rcvr::ObservatoryMPC{T},
                          xmit::ObservatoryMPC{T}, bouncepoint::String) where {T <: AbstractFloat}
-        return new{T}(id, date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr, 
+        return new{T}(id, date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr,
                       xmit, bouncepoint)
     end
 end
 
 # Outer constructor
 function RadarJPL(id::String, date::DateTime, Δτ::T, Δτ_σ::T, Δτ_units::String, Δν::T,
-                  Δν_σ::T, Δν_units::String, freq::T, rcvr::ObservatoryMPC{T}, 
+                  Δν_σ::T, Δν_units::String, freq::T, rcvr::ObservatoryMPC{T},
                   xmit::ObservatoryMPC{T}, bouncepoint::String) where {T <: AbstractFloat}
     return RadarJPL{T}(id, date, Δτ, Δτ_σ, Δτ_units, Δν, Δν_σ, Δν_units, freq, rcvr,
                        xmit, bouncepoint)
