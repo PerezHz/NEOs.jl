@@ -104,7 +104,7 @@ function NEOParameters(params::NEOParameters{T}; kwargs...) where {T <: Abstract
     vals = Vector{Any}(undef, length(fields))
     for i in eachindex(vals)
         if fields[i] in keys(kwargs)
-            vals[i] = kwargs[i]
+            vals[i] = kwargs[fields[i]]
         else
             vals[i] = getfield(params, i)
         end
