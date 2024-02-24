@@ -328,6 +328,25 @@ function bary2topo(A::AdmissibleRegion{T}, q0::Vector{U}) where {T <: AbstractFl
     return ρ, v_ρ
 end
 
+@doc raw"""
+    attr2bary(A::AdmissibleRegion{T}, a::Vector{U}) where {T <: AbstractFloat, U <: Number}
+
+Convert attributable elements `a` to to barycentric cartesian coordinates.
+`A` fixes the observer.
+"""
+function attr2bary(A::AdmissibleRegion{T}, a::Vector{U}) where {T <: AbstractFloat, U <: Number}
+    # Unfold
+    α, δ, v_α, v_δ, ρ, v_ρ = a
+    ρ_unit, ρ_α, ρ_δ = topounitpdv(α, δ)
+    # Barycentric position
+    r = A.q[1:3] + ρ * ρ_unit + sseph(su, datetime2days(A.date))[1:3]
+    # Barycentric velocity
+    v = A.q[4:6] + v_ρ * ρ_unit + ρ * v_α * ρ_α + ρ * v_δ * ρ_δ
+        + sseph(su, datetime2days(A.date))[4:6]
+    # Barycentric state vector
+    return vcat(r, v)
+end
+
 # Propagate an orbit and compute residuals
 function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
                  params::NEOParameters{T}; dynamics::D=newtonian!)  where {D, T <: AbstractFloat, U <: Number}
@@ -373,21 +392,20 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
               dynamics::D = newtonian!) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
+    # Nominal Line-Of-Sight
+    LOS = [A.α, A.δ, A.v_α, A.v_δ]
     # Scaling factors
+    scalings = Vector{T}(undef, 6)
+    scalings[1:4] .= LOS ./ 1e6
     if scale == :linear
-        scalings = [
-            A.ρ_domain[2] - A.ρ_domain[1],
-            A.v_ρ_domain[2] - A.v_ρ_domain[1]
-        ] / 1_000
+        scalings[5] = (A.ρ_domain[2] - A.ρ_domain[1]) / 1_000
     elseif scale == :log
         x = log10(ρ)
-        scalings = [
-            log10(A.ρ_domain[2]) - log10(A.ρ_domain[1]),
-            A.v_ρ_domain[2] - A.v_ρ_domain[1]
-        ] / 1_000
+        scalings[5] = (log10(A.ρ_domain[2]) - log10(A.ρ_domain[1])) / 1_000
     end
+    scalings[6] = (A.v_ρ_domain[2] - A.v_ρ_domain[1]) / 1_000
     # Jet transport variables
-    dq = scaled_variables("dx dy", scalings, order = 1)
+    dq = scaled_variables("dx", scalings, order = 2)
     # Maximum number of iterations
     maxiter = params.maxiter
     # Allocate memory
@@ -395,7 +413,8 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     v_ρs = Vector{T}(undef, maxiter+1)
     Qs = fill(T(Inf), maxiter+1)
     # Origin
-    x0 = zeros(T, 2)
+    x0 = zeros(T, 6)
+    x1 = zeros(T, 6)
     # First momentum
     m = zeros(T, 2)
     _m_ = zeros(T, 2)
@@ -407,12 +426,24 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         # Current position in admissible region
         ρs[t] = ρ
         v_ρs[t] = v_ρ
-        # Current barycentric state vector
+        # Attributable elements
+        a = vcat(LOS + dq[1:4], ρ, v_ρ)
+        # Barycentric state vector
+        q = attr2bary(A, a)
+        # Propagation and residuals
+        _, _, res = propres(radec, jd0 - ρ/c_au_per_day, q, params; dynamics)
+        # Least squares fit
+        fit = tryls(res, x0, 5, 1:4)
+        # Minimized attributable elements
+        a0 = a(fit.x)
+        # Attributable elements
         if scale == :linear
-            q = topo2bary(A, ρ + dq[1], v_ρ + dq[2])
+            a = vcat(a0[1:4], ρ + dq[5], v_ρ + dq[6])
         elseif scale == :log
-            q = topo2bary(A, 10^(x + dq[1]), v_ρ + dq[2])
+            a = vcat(a0[1:4], 10^(x + dq[5]), v_ρ + dq[6])
         end
+        # Barycentric state vector
+        q = attr2bary(A, a)
         # Propagation and residuals
         _, _, res = propres(radec, jd0 - ρ/c_au_per_day, q, params; dynamics)
         iszero(length(res)) && break
@@ -422,7 +453,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         # Convergence condition
         t > 1 && abs(Qs[t] - Qs[t-1]) / Qs[t] < Qtol && break
         # Gradient of objective function
-        g_t = TaylorSeries.gradient(Q)(x0)
+        g_t = TaylorSeries.gradient(Q)(x0)[5:6]
         # First momentum
         m .= μ * m + (1 - μ) * g_t
         _m_ .= m / (1 - μ^t)
@@ -430,7 +461,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         n .= ν * n + (1 - ν) * g_t .^ 2
         _n_ .= n / (1 - ν^t)
         # Step
-        x1 = x0 - η * _m_ ./ (sqrt.(_n_) .+ ϵ)
+        x1[5:6] = x0[5:6] - η * _m_ ./ (sqrt.(_n_) .+ ϵ)
         # Update values
         ρ, v_ρ = bary2topo(A, q(x1))
         # Projection
@@ -580,6 +611,27 @@ function tsatrackletorder(x::Tracklet{T}, y::Tracklet{T}) where {T <: AbstractFl
     end
 end
 
+# Point in admissible region -> NEOSolution{T, T}
+function _tooshortarc(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}},
+                      tracklets::Vector{Tracklet{T}}, i::Int, params::NEOParameters{T};
+                      dynamics::D = newtonian!, scale::Symbol = :log) where {T <: AbstractFloat, D}
+    # Center
+    if scale == :linear
+        ρ = sum(A.ρ_domain) / 2
+    elseif scale == :log
+        ρ = 10^sum(log10.(A.ρ_domain)) / 2
+    end
+    v_ρ = sum(A.v_ρ_domain) / 2
+    # ADAM minimization over admissible region
+    ρ, v_ρ, Q = adam(radec, A, ρ, v_ρ, params; scale = :linear, dynamics = dynamics)
+    if isinf(Q)
+        return zero(NEOSolution{T, T})
+    else
+        # 6 variables least squares
+        return tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5, dynamics)
+    end
+end
+
 @doc raw"""
     tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                 params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
@@ -610,35 +662,31 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         # Admissible region
         A = AdmissibleRegion(tracklets[i], params)
         iszero(A) && continue
-        # Center
-        ρ = sum(A.ρ_domain) / 2
-        v_ρ = sum(A.v_ρ_domain) / 2
-        # ADAM minimization over admissible region
-        ρ, v_ρ, Q = adam(radec, A, ρ, v_ρ, params; scale = :linear, dynamics = dynamics)
-        if !isinf(Q)
-            # 6 variables least squares
-            sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5, dynamics)
-            # Update best solution
-            if nrms(sol) < nrms(best_sol)
-                best_sol = sol
-                # Break condition
-                nrms(sol) < params.tsaQmax && break
-            end
+        # See Table 1 of https://doi.org/10.1051/0004-6361/201732104
+        if A.ρ_domain[2] < sqrt(10)
+            sol1 = _tooshortarc(A, radec, tracklets, i, params;
+                                dynamics = dynamics, scale = :log)
+            # Break condition
+            nrms(sol1) < params.tsaQmax && break
+            sol2 = _tooshortarc(A, radec, tracklets, i, params;
+                                dynamics = dynamics, scale = :linear)
+            # Break condition
+            nrms(sol2) < params.tsaQmax && break
+        else
+            sol1 = _tooshortarc(A, radec, tracklets, i, params;
+                                dynamics = dynamics, scale = :linear)
+            # Break condition
+            nrms(sol1) < params.tsaQmax && break
+            sol2 = _tooshortarc(A, radec, tracklets, i, params;
+                                dynamics = dynamics, scale = :log)
+            # Break condition
+            nrms(sol2) < params.tsaQmax && break
         end
-        # Left boundary
-        ρ = A.ρ_domain[1]
-        v_ρ = sum(A.v_ρ_domain) / 2
-        # ADAM minimization over admissible region
-        ρ, v_ρ, Q = adam(radec, A, ρ, v_ρ, params; scale = :log, dynamics = dynamics)
-        if !isinf(Q)
-            # 6 variables least squares
-            sol = tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5, dynamics)
-            # Update best solution
-            if nrms(sol) < nrms(best_sol)
-                best_sol = sol
-                # Break condition
-                nrms(sol) < params.tsaQmax && break
-            end
+        # Update best solution
+        if nrms(sol1) < nrms(best_sol)
+            best_sol = sol1
+        elseif nrms(sol2) < nrms(best_sol)
+            best_sol = sol2
         end
     end
 

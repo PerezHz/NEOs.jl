@@ -26,6 +26,11 @@ function LeastSquaresFit(success::Bool, x::Vector{T}, Γ::Matrix{T},
     return LeastSquaresFit{T}(success, x, Γ, routine)
 end
 
+# Definition of zero LeastSquaresFit{T}
+function zero(::Type{LeastSquaresFit{T}}) where {T <: Real}
+    return LeastSquaresFit{T}(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), :zero)
+end
+
 # Print method for LeastSquaresFit
 # Examples:
 # Succesful Newton
@@ -35,9 +40,11 @@ function show(io::IO, fit::LeastSquaresFit{T}) where {T <: Real}
     if fit.routine == :newton
         routine_s = "Newton"
     elseif fit.routine == :diffcorr
-        routine_s = "Differential corrections"
-    elseif fit.routine == :levmar
+        routine_s = "Differential Corrections"
+    elseif fit.routine == :lm
         routine_s = "Levenberg-Marquardt"
+    else
+        routine_s = "Least Squares"
     end
     print(io, success_s, " ", routine_s)
 end
@@ -445,7 +452,7 @@ See also [`chi2`](@ref).
     See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
 """
 function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
-                  niters::Int = 5) where {T <: Real}
+                  niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
     # Number of observations
     nobs = length(res)
     # Degrees of freedom
@@ -453,7 +460,7 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     # Mean square residual
     Q = chi2(res, w)/nobs
     # Vector of x
-    x = Matrix{T}(undef, npar, niters + 1)
+    x = zeros(T, npar, niters + 1)
     # First guess
     x[:, 1] = x0
     # Vector of errors
@@ -465,13 +472,13 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
         # Current x
         xi = x[:, i]
         # Gradient of Q with respect to x
-        dQ = TaylorSeries.gradient(Q)(xi)
+        dQ = TaylorSeries.gradient(Q)(xi)[idxs]
         # Hessian of Q with respect to x
-        d2Q = TaylorSeries.hessian(Q, xi)
+        d2Q = TaylorSeries.hessian(Q, xi)[idxs, idxs]
         # Newton update rule
         Δx = - inv(d2Q)*dQ
         # New x
-        x[:, i+1] = xi + Δx
+        x[idxs, i+1] = xi[idxs] + Δx
         # Normal matrix
         C = d2Q/(2/nobs) # C = d2Q/(2/m)
         # Error
@@ -494,7 +501,7 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     # Normal matrix
     C = TaylorSeries.hessian(Q, x_new)/(2/nobs) # C = d2Q/(2/m)
     # Covariance matrix
-    Γ = inv(C)
+    Γ = inv(C[idxs, idxs])
 
     if any(diag(Γ) .< 0)
         return LeastSquaresFit(false, x_new, Γ, :newton)
@@ -504,11 +511,126 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
 end
 
 function newtonls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
-                  niters::Int = 5) where {T <: Real}
+                  niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
     # Unfold residuals and weights
     _res_, _w_ = unfold(res)
 
-    return newtonls(_res_, _w_, x0, niters)
+    return newtonls(_res_, _w_, x0, niters, idxs)
+end
+
+# In-place Levenberg-Marquardt hessian
+function lmhessian!(_d2Q_::AbstractMatrix{T}, d2Q::AbstractMatrix{T}, λ::T) where {T <: AbstractFloat}
+    k = 1 + λ
+    for j in axes(d2Q, 2)
+        for i in axes(d2Q, 1)
+            if i == j
+                _d2Q_[i, j] = k * d2Q[i, j]
+            else
+                _d2Q_[i, j] = d2Q[i, j]
+            end
+        end
+    end
+    return nothing
+end
+
+@doc raw"""
+    levenbergmarquardt(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
+                       niters::Int = 500) where {T <: Real}
+    levenbergmarquardt(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+                       niters::Int = 500) where {T <: Real}
+
+Levenberg-Marquardt method subroutine for least-squares fitting. Returns an `LeastSquaresFit`
+with the best iteration of `niters` iterations.
+
+See also [`chi2`](@ref).
+
+# Arguments
+
+- `res::Vector{TaylorN{T}/Vector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
+- `w::Vector{T}`: vector of weights.
+- `x_0::Vector{T}`: first guess.
+- `niters::Int`: number of iterations.
+
+!!! reference
+    See section 15.5.2 of https://books.google.com.mx/books?id=1aAOdzK3FegC&lpg=PP1&pg=PP1#v=onepage&q&f=false.
+"""
+function levenbergmarquardt(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
+                            niters::Int = 500, idxs::AbstractVector{Int} = eachindex(x0),
+                            λ::T = 0.001) where {T <: Real}
+    # Number of observations
+    nobs = length(res)
+    # Degrees of freedom
+    npar = length(x0)
+    # Normalized mean square residual
+    Q = chi2(res, w)/nobs
+    # Vector of Qs
+    Qs = fill(T(Inf), niters + 1)
+    # Gradient of Q with respect to x
+    dQ = TaylorSeries.gradient(Q)
+    # Pre-allocate memory
+    _dQ_ = zeros(T, npar)
+    _d2Q_ = zeros(T, npar, npar)
+    x = zeros(T, npar, niters + 1)
+    # First guess
+    x[:, 1] = x0
+    # Iteration
+    for i in 1:niters
+        # Current x
+        xi = x[:, i]
+        # Current Q
+        Qs[i] = Q(xi)
+        # Convergence condition
+        i > 1 && abs(Qs[i] - Qs[i-1]) / Qs[i-1] < 0.001 && break
+        # Gradient of Q with respect to x
+        _dQ_ .= dQ(xi)
+        # Hessian of Q with respect to x
+        d2Q = TaylorSeries.hessian(Q, xi)
+        # Choose λ
+        for _ in 1:niters
+            # Modified Hessian
+            lmhessian!(_d2Q_, d2Q, λ)
+            # Levenberg-Marquardt step
+            Δx = - inv(_d2Q_[idxs, idxs]) * _dQ_[idxs]
+
+            if 0 < Q(xi[idxs] + Δx) < Qs[i] && isposdef(_d2Q_[idxs, idxs])
+                λ /= 10
+                x[idxs, i+1] = xi[idxs] + Δx
+                break
+            else
+                λ *= 10
+            end
+        end
+    end
+    # Index with the lowest error
+    i = argmin(Qs)
+    # x with the lowest error
+    x_new = x[:, i]
+    # Hessian of Q with respect to x
+    d2Q = TaylorSeries.hessian(Q, x_new)
+    # Normal matrix
+    if isposdef(d2Q)
+        C = d2Q/(2/nobs)
+    else
+        lmhessian!(_d2Q_, d2Q, λ)
+        C = _d2Q_/(2/nobs) # C = d2Q/(2/m)
+    end
+    # Covariance matrix
+    Γ = inv(C[idxs, idxs])
+
+    if any(diag(Γ) .< 0)
+        return LeastSquaresFit(false, x_new, Γ, :lm)
+    else
+        return LeastSquaresFit(true, x_new, Γ, :lm)
+    end
+end
+
+function levenbergmarquardt(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+                            niters::Int = 500, idxs::AbstractVector{Int} = eachindex(x0),
+                            λ::T = 0.001) where {T <: Real}
+    # Unfold residuals and weights
+    _res_, _w_ = unfold(res)
+
+    return levenbergmarquardt(_res_, _w_, x0, niters, idxs, λ)
 end
 
 @doc raw"""
@@ -525,27 +647,23 @@ Return the best least squares fit between two routines: [`newtonls`](@ref) and
 - `niters::Int`: number of iterations.
 """
 function tryls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
-               niters::Int = 5) where {T <: Real}
-    # Newton's method
-    fit_1 = newtonls(res, x0, niters)
-    # Differential corrections
-    fit_2 = diffcorr(res, x0, niters)
-    if fit_1.success && fit_2.success
-        Q_1 = nrms(res, fit_1)
-        Q_2 = nrms(res, fit_2)
-        if Q_1 <= Q_2
-            return fit_1
-        else
-            return fit_2
+               niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0),
+               order::Vector{Symbol} = [:newton, :lm, :diffcorr]) where {T <: Real}
+    # Allocate memory
+    fit = zero(LeastSquaresFit{T})
+    # Least squares methods in order
+    for i in eachindex(order)
+        if order[i] == :newton
+            fit = newtonls(res, x0, niters, idxs)
+        elseif order[i] == :lm
+            fit = levenbergmarquardt(res, x0, niters, idxs)
+        elseif order[i] == :diffcorr
+            fit = diffcorr(res, x0, niters, idxs)
         end
-    elseif fit_1.success
-        return fit_1
-    elseif fit_2.success
-        return fit_2
-    else
-        return fit_1
+        fit.success && break
     end
 
+    return fit
 end
 
 # TO DO: update / deprecate the following three functions
