@@ -32,7 +32,13 @@ end
 # Succesful differential corrections
 function show(io::IO, fit::LeastSquaresFit{T}) where {T <: Real}
     success_s = fit.success ? "Succesful" : "Unsuccesful"
-    routine_s = fit.routine == :newton ? "Newton" : "differential corrections"
+    if fit.routine == :newton
+        routine_s = "Newton"
+    elseif fit.routine == :diffcorr
+        routine_s = "Differential corrections"
+    elseif fit.routine == :levmar
+        routine_s = "Levenberg-Marquardt"
+    end
     print(io, success_s, " ", routine_s)
 end
 

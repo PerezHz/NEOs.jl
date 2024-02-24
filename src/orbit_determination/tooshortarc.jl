@@ -11,6 +11,8 @@ some dynamical constrainits on a too short arc.
 - `δ::T`: declination.
 - `v_α::T`: right ascension velocity.
 - `v_δ::T`: declination velocity.
+- `H_max::T`: maximum absolute magnitude.
+- `a_max::T`: maximum semimajor axis.
 - `ρ_unit, ρ_α, ρ_δ::Vector{T}`: topocentric unit vector and its partials.
 - `q::Vector{T}`: heliocentric position of observer.
 - `coeffs::Vector{T}`: polynomial coefficients.
@@ -28,6 +30,8 @@ some dynamical constrainits on a too short arc.
     δ::T
     v_α::T
     v_δ::T
+    H_max::T
+    a_max::T
     ρ_unit::Vector{T}
     ρ_α::Vector{T}
     ρ_δ::Vector{T}
@@ -42,9 +46,10 @@ end
 # Definition of zero AdmissibleRegion{T}
 function zero(::Type{AdmissibleRegion{T}}) where {T <: AbstractFloat}
     return AdmissibleRegion{T}(
-        DateTime(2000), zero(T), zero(T), zero(T), zero(T), Vector{T}(undef, 0),
-        Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
-        Vector{T}(undef, 0), Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs()
+        DateTime(2000), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
+        Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
+        Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
+        Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs()
     )
 end
 
@@ -55,6 +60,7 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     # Unfold
     obs, t_datetime, α, δ = observatory(tracklet), date(tracklet), ra(tracklet), dec(tracklet)
     v_α, v_δ, h = vra(tracklet), vdec(tracklet), mag(tracklet)
+    H_max, a_max = params.H_max, params.a_max
     # Topocentric unit vector and partials
     ρ, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Time of observation [days since J2000]
@@ -66,7 +72,7 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     # Admissible region coefficients
     coeffs = admsreg_coeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
     # Maximum range (heliocentric constraint)
-    ρ_max = max_range(coeffs)
+    ρ_max = max_range(coeffs, a_max)
     iszero(ρ_max) && return zero(AdmissibleRegion{T})
     # Minimum range
     if isnan(h)
@@ -79,7 +85,7 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
         end
     else
         # Tiny object boundary
-        ρ_min = 10^((h - params.H_max)/5)
+        ρ_min = 10^((h - H_max)/5)
     end
     ρ_min > ρ_max && return zero(AdmissibleRegion{T})
     # Range domain
@@ -95,8 +101,9 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     Fs[2, :] .= [ρ_min, v_ρ_max]
     Fs[3, :] .= [ρ_max, v_ρ_mid]
 
-    return AdmissibleRegion{T}(t_datetime, α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q,
-                               coeffs, ρ_domain, v_ρ_domain, Fs, obs)
+    return AdmissibleRegion{T}(t_datetime, α, δ, v_α, v_δ, H_max, a_max,
+                               ρ, ρ_α, ρ_δ, q, coeffs, ρ_domain, v_ρ_domain,
+                               Fs, obs)
 end
 
 @doc raw"""
@@ -171,10 +178,11 @@ U function of an [`AdmissibleRegion`](@ref).
 !!! reference
     See second equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_U(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+function admsreg_U(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: AbstractFloat, S <: Number}
     return coeffs[2]^2/4 - admsreg_W(coeffs, ρ) + 2*k_gauss^2/sqrt(admsreg_S(coeffs, ρ))
+           - k_gauss^2/a_max
 end
-admsreg_U(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_U(A.coeffs, ρ)
+admsreg_U(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_U(A.coeffs, A.a_max, ρ)
 
 @doc raw"""
     admsreg_V(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
@@ -184,30 +192,31 @@ V function of an [`AdmissibleRegion`](@ref).
 !!! reference
     See first equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_V(coeffs::Vector{T}, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <: Number}
+function admsreg_V(coeffs::Vector{T}, a_max::T, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <: Number}
     return v_ρ^2 + coeffs[2] * v_ρ + admsreg_W(coeffs, ρ) - 2*k_gauss^2/sqrt(admsreg_S(coeffs, ρ))
+           + k_gauss^2/a_max
 end
-admsreg_V(A::AdmissibleRegion{T}, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_V(A.coeffs, ρ, v_ρ)
+admsreg_V(A::AdmissibleRegion{T}, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_V(A.coeffs, A.a_max, ρ, v_ρ)
 
 @doc raw"""
     range_rate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat}
 
 Return the two possible range rates in the boundary of `A` for a given range `ρ`.
 """
-function range_rate(coeffs::Vector{T}, ρ::S) where {T, S <: AbstractFloat}
-    return find_zeros(s -> admsreg_V(coeffs, ρ, s), -10.0, 10.0)
+function range_rate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: AbstractFloat}
+    return find_zeros(s -> admsreg_V(coeffs, a_max, ρ, s), -10.0, 10.0)
 end
-range_rate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat} = range_rate(A.coeffs, ρ)
+range_rate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat} = range_rate(A.coeffs, A.a_max, ρ)
 
 @doc raw"""
-    max_range(coeffs::Vector{T}) where {T <: AbstractFloat}
+    max_range(coeffs::Vector{T}, a_max::T) where {T <: AbstractFloat}
 
 Return the maximum possible range in the boundary of an admissible region
-with coefficients `coeffs`.
+with coefficients `coeffs` and maximum semimajor axis `a_max`.
 """
-function max_range(coeffs::Vector{T}) where {T <: AbstractFloat}
+function max_range(coeffs::Vector{T}, a_max::T) where {T <: AbstractFloat}
     # Initial guess
-    sol = find_zeros(s -> admsreg_U(coeffs, s), R_EA, 100.0)
+    sol = find_zeros(s -> admsreg_U(coeffs, a_max, s), R_EA, 100.0)
     iszero(length(sol)) && return zero(T)
     ρ_max = sol[1]
     # Make sure U(ρ) ≥ 0 and there is at least one range_rate solution
@@ -276,7 +285,7 @@ function in(P::Vector{T}, A::AdmissibleRegion{T}) where {T <: AbstractFloat}
     if A.ρ_domain[1] <= P[1] <= A.ρ_domain[2]
         y_range = range_rate(A, P[1])
         if length(y_range) == 1
-            return P[2] == y_range
+            return P[2] == y_range[1]
         else
             return y_range[1] <= P[2] <= y_range[2]
         end
@@ -311,10 +320,10 @@ function bary2topo(A::AdmissibleRegion{T}, q0::Vector{U}) where {T <: AbstractFl
     # Heliocentric state vector
     r = q0 - sseph(su, datetime2days(A.date))
     # Topocentric range
-    ρ = norm((r - A.q)[1:3])
+    ρ = euclid3D(r - A.q)
     # Topocentric range rate
-    v_ρ = dot(r[4:6], A.ρ_unit) - dot(A.q[4:6], A.ρ_unit) - ρ * A.v_α * dot(A.ρ_α, A.ρ_unit)
-          - ρ * A.v_δ * dot(A.ρ_δ, A.ρ_unit)
+    v_ρ = dot3D(r[4:6], A.ρ_unit) - dot3D(A.q[4:6], A.ρ_unit) - ρ * A.v_α * dot3D(A.ρ_α, A.ρ_unit)
+          - ρ * A.v_δ * dot3D(A.ρ_δ, A.ρ_unit)
 
     return ρ, v_ρ
 end
@@ -405,7 +414,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
             q = topo2bary(A, 10^(x + dq[1]), v_ρ + dq[2])
         end
         # Propagation and residuals
-        _, _, res = propres(radec, jd0, q, params; dynamics)
+        _, _, res = propres(radec, jd0 - ρ/c_au_per_day, q, params; dynamics)
         iszero(length(res)) && break
         # Current Q
         Q = nms(res)

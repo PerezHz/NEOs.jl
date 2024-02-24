@@ -1,7 +1,7 @@
 @doc raw"""
     OpticalResidual{T <: Real, U <: Number}
 
-An astrometric optical observed minus computed residual. 
+An astrometric optical observed minus computed residual.
 
 # Fields
 
@@ -120,7 +120,7 @@ computations.
 - `xvs::SunEph = sunposvel`: Sun ephemeris.
 - `xva::AstEph`: asteroid ephemeris.
 
-All ephemeris must take [et seconds since J2000] and return [barycentric position in km 
+All ephemeris must take [et seconds since J2000] and return [barycentric position in km
 and velocity in km/sec].
 """
 function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
@@ -142,7 +142,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
     R_r = RV_r[1:3]
     # Receiver barycentric position and velocity at receive time
     r_r_t_r = r_e_t_r + R_r
-    
+
     # Down-leg iteration
     # τ_D first approximation
     # See equation (1) of https://doi.org/10.1086/116062
@@ -488,12 +488,12 @@ observations taken on the same night by the same observatory.
     See https://doi.org/10.1016/j.icarus.2017.05.021.
 """
 function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
-    # Convert to DataFrame 
+    # Convert to DataFrame
     df = DataFrame(radec)
-    # Group by observatory and TimeOfDay 
+    # Group by observatory and TimeOfDay
     df.TimeOfDay = TimeOfDay.(radec)
     gdf = groupby(df, [:observatory, :TimeOfDay])
-    # Number of observations per tracklet 
+    # Number of observations per tracklet
     cdf = combine(gdf, nrow)
     # Count observations in each group
     Nv = cdf[gdf.groups, :nrow]
@@ -506,12 +506,12 @@ end
 function anglediff(x::T, y::S) where {T, S <: Number}
     # Signed difference
     Δ = x - y
-    # Absolute difference 
+    # Absolute difference
     Δ_abs = abs(Δ)
     # Reflection
     if Δ_abs > 648_000 # Half circle in arcsec
-        return -sign(cte(Δ)) * (1_296_000 - Δ_abs)    
-    else 
+        return -sign(cte(Δ)) * (1_296_000 - Δ_abs)
+    else
         return Δ
     end
 end
@@ -540,7 +540,7 @@ See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and
 - `xvs::SunEph = sunposvel`: Sun ephemeris.
 - `xva::AstEph`: asteroid ephemeris.
 
-All ephemeris must take [et seconds since J2000] and return [barycentric position in km 
+All ephemeris must take [et seconds since J2000] and return [barycentric position in km
 and velocity in km/sec].
 """
 function residuals(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph,
@@ -563,7 +563,7 @@ function residuals(obs::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{St
     # Type of asteroid ephemeris
     S = typeof(a1_et1)
 
-    # Relax factors 
+    # Relax factors
     rex = relax_factor(obs)
 
     # Vector of residuals
