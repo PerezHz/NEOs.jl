@@ -221,7 +221,7 @@ function max_range(coeffs::Vector{T}, a_max::T) where {T <: AbstractFloat}
     ρ_max = sol[1]
     # Make sure U(ρ) ≥ 0 and there is at least one range_rate solution
     niter = 0
-    while admsreg_U(coeffs, a_max, ρ_max) < 0 || length(range_rate(coeffs, ρ_max)) == 0
+    while admsreg_U(coeffs, a_max, ρ_max) < 0 || length(range_rate(coeffs, a_max, ρ_max)) == 0
         niter += 1
         ρ_max = prevfloat(ρ_max)
         niter > 1_000 && break
