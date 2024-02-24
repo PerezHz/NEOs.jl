@@ -91,10 +91,10 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     # Range domain
     ρ_domain = [ρ_min, ρ_max]
     # Range rate domain
-    v_ρ_min, v_ρ_max = range_rate(coeffs, ρ_min)[1:2]
+    v_ρ_min, v_ρ_max = range_rate(coeffs, a_max, ρ_min)[1:2]
     v_ρ_domain = [v_ρ_min, v_ρ_max]
     # Range rate symmetry level
-    v_ρ_mid = range_rate(coeffs, ρ_max)[1]
+    v_ρ_mid = range_rate(coeffs, a_max, ρ_max)[1]
     # Boundary points
     Fs = Matrix{T}(undef, 3, 2)
     Fs[1, :] .= [ρ_min, v_ρ_min]
