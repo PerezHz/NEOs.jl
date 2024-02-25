@@ -592,8 +592,10 @@ function levenbergmarquardt(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}
             lmhessian!(_d2Q_, d2Q, λ)
             # Levenberg-Marquardt step
             Δx = - inv(_d2Q_[idxs, idxs]) * _dQ_[idxs]
-
-            if 0 < Q(xi[idxs] + Δx) < Qs[i] && isposdef(_d2Q_[idxs, idxs])
+            # Update point
+            x[idxs, i+1] = xi[idxs] + Δx
+            # Choose λ
+            if 0 < Q(x[:, i+1]) < Qs[i] && isposdef(_d2Q_[idxs, idxs])
                 λ /= 10
                 x[idxs, i+1] = xi[idxs] + Δx
                 break
