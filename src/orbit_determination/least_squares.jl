@@ -358,6 +358,7 @@ See also [`BHC`](@ref).
 """
 function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
                   niters::Int = 5) where {T <: Real}
+    # TO DO: Adapt diffcorr for idxs
     # Degrees of freedom
     npar = length(x0)
     # Design matrix B, H array and normal matrix C
@@ -648,7 +649,7 @@ Return the best least squares fit between two routines: [`newtonls`](@ref) and
 """
 function tryls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
                niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0),
-               order::Vector{Symbol} = [:newton, :lm, :diffcorr]) where {T <: Real}
+               order::Vector{Symbol} = [:newton, :lm]) where {T <: Real}
     # Allocate memory
     fit = zero(LeastSquaresFit{T})
     # Least squares methods in order

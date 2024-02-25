@@ -432,6 +432,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         q = attr2bary(A, a)
         # Propagation and residuals
         _, _, res = propres(radec, jd0 - ρ/c_au_per_day, q, params; dynamics)
+        iszero(length(res)) && break
         # Least squares fit
         fit = tryls(res, x0, 5, 1:4)
         # Minimized attributable elements
@@ -614,16 +615,16 @@ end
 # Point in admissible region -> NEOSolution{T, T}
 function _tooshortarc(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}},
                       tracklets::Vector{Tracklet{T}}, i::Int, params::NEOParameters{T};
-                      dynamics::D = newtonian!, scale::Symbol = :log) where {T <: AbstractFloat, D}
+                      scale::Symbol = :log, dynamics::D = newtonian!) where {T <: AbstractFloat, D}
     # Center
     if scale == :linear
         ρ = sum(A.ρ_domain) / 2
     elseif scale == :log
-        ρ = 10^sum(log10.(A.ρ_domain)) / 2
+        ρ = A.ρ_domain[1]
     end
     v_ρ = sum(A.v_ρ_domain) / 2
     # ADAM minimization over admissible region
-    ρ, v_ρ, Q = adam(radec, A, ρ, v_ρ, params; scale = :linear, dynamics = dynamics)
+    ρ, v_ρ, Q = adam(radec, A, ρ, v_ρ, params; scale, dynamics)
     if isinf(Q)
         return zero(NEOSolution{T, T})
     else
@@ -665,22 +666,22 @@ function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         # See Table 1 of https://doi.org/10.1051/0004-6361/201732104
         if A.ρ_domain[2] < sqrt(10)
             sol1 = _tooshortarc(A, radec, tracklets, i, params;
-                                dynamics = dynamics, scale = :log)
+                                scale = :log, dynamics)
             # Break condition
-            nrms(sol1) < params.tsaQmax && break
+            nrms(sol1) < params.tsaQmax && return sol1
             sol2 = _tooshortarc(A, radec, tracklets, i, params;
-                                dynamics = dynamics, scale = :linear)
+                                scale = :linear, dynamics)
             # Break condition
-            nrms(sol2) < params.tsaQmax && break
+            nrms(sol2) < params.tsaQmax && return sol2
         else
             sol1 = _tooshortarc(A, radec, tracklets, i, params;
-                                dynamics = dynamics, scale = :linear)
+                                scale = :linear, dynamics)
             # Break condition
-            nrms(sol1) < params.tsaQmax && break
+            nrms(sol1) < params.tsaQmax && return sol1
             sol2 = _tooshortarc(A, radec, tracklets, i, params;
-                                dynamics = dynamics, scale = :log)
+                                scale = :log, dynamics)
             # Break condition
-            nrms(sol2) < params.tsaQmax && break
+            nrms(sol2) < params.tsaQmax && return sol2
         end
         # Update best solution
         if nrms(sol1) < nrms(best_sol)
