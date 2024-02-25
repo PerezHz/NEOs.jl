@@ -1,14 +1,14 @@
 @doc raw"""
     CatalogueMPC
 
-An astrometric reference catalogue in MPC format. 
+An astrometric reference catalogue in MPC format.
 
 # Fields
 
 - `code::String`: catalogue's single character identifier.
 - `name::String`: catalogue's name.
 
-!!! reference 
+!!! reference
     The format is described in https://minorplanetcenter.net/iau/info/CatalogueCodes.html.
 """
 @auto_hash_equals struct CatalogueMPC
@@ -71,7 +71,7 @@ end
 @doc raw"""
     read_catalogues_mpc(s::String)
 
-Return the matches of `NEOs.CATALOGUE_MPC_REGEX` in `s` as `Vector{CatalogueMPC}`. 
+Return the matches of `NEOs.CATALOGUE_MPC_REGEX` in `s` as `Vector{CatalogueMPC}`.
 `s` can be either a filename or a text.
 """
 function read_catalogues_mpc(s::String)

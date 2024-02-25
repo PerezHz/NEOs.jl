@@ -1,14 +1,14 @@
 @doc raw"""
-    ObservatoryMPC{T <: AbstractFloat} 
+    ObservatoryMPC{T <: AbstractFloat}
 
-An observatory in MPC format. 
+An observatory in MPC format.
 
 # Fields
 
-- `code::String`: observatory's three character identifier. 
+- `code::String`: observatory's three character identifier.
 - `long::T`, `cos::T`,  `sin::T`:
     - For ground-based observatories: longitude [degrees east of Greenwich],
-      `ρ*cos(ϕ')` and `ρ*sin(ϕ')`, where `ϕ'` is the geocentric latitude and 
+      `ρ*cos(ϕ')` and `ρ*sin(ϕ')`, where `ϕ'` is the geocentric latitude and
       `ρ` is the geocentric distance in earth radii.
     - For space-based observatories: `x`, `y` and `z` geocentric coordinates.
 - `name::String`: observatory's name.
@@ -16,7 +16,7 @@ An observatory in MPC format.
 - `type::Symbol`: `:ground`, `:satellite` or `:occultation`.
 - `units::Int`: whether position is encrypted in AU (1) or KM (2).
 
-!!! reference 
+!!! reference
     The format is described in https://minorplanetcenter.net/iau/lists/ObsCodesF.html.
 """
 struct ObservatoryMPC{T <: AbstractFloat}
@@ -65,7 +65,7 @@ end
 @doc raw"""
     unknownobs()
 
-Return a `ObservatoryMPC` with no code, coordinates or name. 
+Return a `ObservatoryMPC` with no code, coordinates or name.
 """
 unknownobs() = ObservatoryMPC("", NaN, NaN, NaN, "")
 
@@ -76,7 +76,7 @@ Check whether `m` equals `unknownobs()`.
 """
 function isunknown(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
     return m == unknownobs()
-end 
+end
 
 isground(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :ground
 issatellite(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :satellite
@@ -85,18 +85,18 @@ isoccultation(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :occu
 @doc raw"""
     hascoord(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
 
-Check whether `m` has non `NaN` coordinates. 
+Check whether `m` has non `NaN` coordinates.
 """
 function hascoord(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
     return !isnan(m.long) && !isnan(m.cos) && !isnan(m.sin)
 end
 
 # Print method for ObservatoryMPC
-# Examples: 
+# Examples:
 # Unknown observatory
 # Spitzer Space Telescope [245]
 # Greenwich [000] long: 0.0 cos: 0.62411 sin: 0.77873
-function show(io::IO, m::ObservatoryMPC{T}) where {T <: AbstractFloat} 
+function show(io::IO, m::ObservatoryMPC{T}) where {T <: AbstractFloat}
     if isunknown(m)
         print(io, "Unknown observatory")
     elseif isground(m)
@@ -130,9 +130,9 @@ function ObservatoryMPC(m::RegexMatch)
 
     if isnan(args[2]) && isnan(args[3]) && isnan(args[4])
         return ObservatoryMPC(args..., DateTime(2000, 1, 1), :satellite, 0)
-    else 
+    else
         return ObservatoryMPC(args...)
-    end 
+    end
 end
 
 @doc raw"""
@@ -166,10 +166,10 @@ end
 Convert `x` to a string according to the `long` field in MPC format.
 """
 function mpc_long_str(x::T) where {T <: AbstractFloat}
-    # NaN => empty string 
+    # NaN => empty string
     if isnan(x)
         long_s = repeat(" ", 10)
-    else 
+    else
         long_s = @sprintf("%3.5f", x)
         long_s = lpad(long_s, 10)
     end
@@ -182,7 +182,7 @@ end
 Convert `x` to a string according to the `cos` field in MPC format.
 """
 function mpc_cos_str(x::T) where {T <: AbstractFloat}
-    # NaN => empty string 
+    # NaN => empty string
     if isnan(x)
         cos_s = repeat(" ", 8)
     else
@@ -209,7 +209,7 @@ function mpc_sin_str(x::T) where {T <: AbstractFloat}
         end
     end
 
-    return sin_s 
+    return sin_s
 end
 
 # Convert `obs` to a string according to MPC format.
@@ -217,15 +217,15 @@ function string(obs::ObservatoryMPC{T}) where {T <: AbstractFloat}
     if isunknown(obs)
         return ""
     else
-        # Longitude string 
+        # Longitude string
         long_s = mpc_long_str(obs.long)
-        # Cosine string 
+        # Cosine string
         cos_s = mpc_cos_str(obs.cos)
-        # Sine string  string 
+        # Sine string  string
         sin_s = mpc_sin_str(obs.sin)
         # Join everything
         obs_s = string(obs.code, long_s, cos_s, sin_s, obs.name)
-    end 
+    end
 
     return obs_s
 end
@@ -233,17 +233,17 @@ end
 @doc raw"""
     write_observatories_mpc(obs::Vector{ObservatoryMPC{T}}, filename::String) where {T <: AbstractFloat}
 
-Write `obs` to `filename` in MPC format. 
+Write `obs` to `filename` in MPC format.
 """
 function write_observatories_mpc(obs::Vector{ObservatoryMPC{T}}, filename::String) where {T <: AbstractFloat}
     open(filename, "w") do file
-        # Header 
+        # Header
         write(file, OBSERVATORIES_MPC_HEADER, "\n")
-        # Write observatories 
+        # Write observatories
         for i in eachindex(obs)
             line = string(obs[i])
             write(file, line, "\n")
-        end 
+        end
     end
 end
 
@@ -253,16 +253,16 @@ end
 Update the local observatories file.
 """
 function update_observatories_mpc()
-    # Download and read observatories file 
+    # Download and read observatories file
     ObsCodes_path, txt = download_scratch(OBSERVATORIES_MPC_URL, "ObsCodes.txt")
-    # Parse observatories 
+    # Parse observatories
     obs = read_observatories_mpc(txt)
-    # Write observatories to local file 
+    # Write observatories to local file
     write_observatories_mpc(obs, ObsCodes_path)
-    # Update global variable 
+    # Update global variable
     global OBSERVATORIES_MPC[] = read_observatories_mpc(ObsCodes_path)
 
-    return nothing 
+    return nothing
 end
 
 @doc raw"""
@@ -271,7 +271,7 @@ end
 Return the observatory in `NEOs.OBSERVATORIES_MPC` that matches `obscode`.
 """
 function search_obs_code(obscode::String)
-    
+
     # Find indexes in OBSERVATORIES_MPC that match obscode
     idxs = findall(x -> x.code == obscode, OBSERVATORIES_MPC[])
     L_i = length(idxs)
@@ -284,11 +284,11 @@ function search_obs_code(obscode::String)
         observatory = OBSERVATORIES_MPC[][idxs[1]]
         # More than one observatory matches obscode
         if L_i > 1
-            @warn("""More than one observatory $(OBSERVATORIES_MPC[][idxs]) has code $obscode, 
+            @warn("""More than one observatory $(OBSERVATORIES_MPC[][idxs]) has code $obscode,
             selecting first: $(observatory.name)""")
         end
     end
-    
-    return observatory 
-    
+
+    return observatory
+
 end

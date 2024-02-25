@@ -5,10 +5,10 @@ Returns the "critical" ``B``, derived from conservation of energy and angular mo
 ```math
 B = \sqrt{1 + \frac{2\mu_P}{R_P v_\infty^2}},
 ```
-i.e., what impact parameter ``B`` corresponds to a grazing impact in hyperbolic close 
-encounter. ``\mu_P`` is the planet's gravitational parameter, ``R_P`` is the planet's 
-radius and ``v_\infty`` is the asymptotic inbound velocity. If actual ``B`` is equal or 
-less to this, then impact happens. Output is in planet radii. 
+i.e., what impact parameter ``B`` corresponds to a grazing impact in hyperbolic close
+encounter. ``\mu_P`` is the planet's gravitational parameter, ``R_P`` is the planet's
+radius and ``v_\infty`` is the asymptotic inbound velocity. If actual ``B`` is equal or
+less to this, then impact happens. Output is in planet radii.
 
 # Arguments
 
@@ -131,8 +131,8 @@ U_y = \sqrt{a(1-e^2)}\cos i - 1 \quad \text{and} \quad
 U = ||\mathbf{U}|| = \sqrt{3 - \frac{1}{a} - 2\sqrt{a(1-e^2)}\cos i},
 ```
 and then substitutes into `valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6, a_pl=1.0)`.
-`a `, `e` and `i` are the asteroid heliocentric semimajor axis (au), eccentricity and 
-inclination (rad) respectively. 
+`a `, `e` and `i` are the asteroid heliocentric semimajor axis (au), eccentricity and
+inclination (rad) respectively.
 
 # Arguments
 
@@ -169,7 +169,7 @@ D = \frac{c\sin\theta}{\cos\theta_0' - \cos\theta},
 ```
 where ``c = m/U^2`` with ``m`` the mass of the planet and ``U = ||\mathbf{U}||`` the norm of
 the planetocentric velocity vector; and ``\theta``, ``\theta_0'`` are the angles between Y-axis
-and ``\mathbf{U}`` pre and post encounter respectively. 
+and ``\mathbf{U}`` pre and post encounter respectively.
 
 # Arguments
 - `U_y`: Y-component of unperturbed planetocentric velocity (Y-axis coincides with the direction of motion of the planet).

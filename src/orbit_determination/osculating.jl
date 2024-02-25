@@ -89,7 +89,7 @@ end
     pv2kep(xas::Vector{U}; μ::T = μ_S, jd::T = JD_J2000,
            frame::Symbol = :equatorial) where {T <: Real, U <: Number}
 
-Compute the orbital elements of the NEO with state vector `xas`. 
+Compute the orbital elements of the NEO with state vector `xas`.
 Return an `OsculatingElements` object.
 
 See also [`equatorial2ecliptic`](@ref), [`eccentricity`](@ref), [`semimajoraxis`](@ref),

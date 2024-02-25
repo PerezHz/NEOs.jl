@@ -31,7 +31,7 @@ using InteractiveUtils: methodswith
         dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
         # Initial time [Julian date]
         jd0 = datetime2julian(DateTime(2023, 2, 25, 0, 0, 0))
-        # Time of integration [years]  
+        # Time of integration [years]
         nyears = 0.2
         # Unperturbed initial condition
         q0 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01,
@@ -39,7 +39,7 @@ using InteractiveUtils: methodswith
         # Propagation parameters
         params = NEOParameters(maxsteps = 1, order = 25, abstol = 1e-20,
                             parse_eqs = true)
-        
+
         # Initial time [days since J2000]
         t0 = jd0 - PE.J2000
         # Solar System ephemeris
@@ -160,12 +160,12 @@ using InteractiveUtils: methodswith
         nyears = 9.0
         # JPL #199 solution for Apophis at June 1st, 2004
         q0 = [-1.0506628055913627, -0.06064314196134998, -0.04997102228887035,
-              0.0029591421121582077, -0.01423233538611057, -0.005218412537773594, 
+              0.0029591421121582077, -0.01423233538611057, -0.005218412537773594,
               -5.592839897872e-14, 0.0]
         # Propagation parameters
         params = NEOParameters(maxsteps = 1, order = 25, abstol = 1e-20,
                             parse_eqs = true)
-        
+
         # Initial time [days since J2000]
         t0 = jd0 - PE.J2000
         # Solar System ephemeris
@@ -276,7 +276,7 @@ using InteractiveUtils: methodswith
               0.009701519087787077, -0.012766026792868212, -0.0043488589639194275] .+ dq
         # Propagation parameters
         params = NEOParameters(maxsteps = 10, order = 25, abstol = 1e-20, parse_eqs = true)
-        
+
         # Propagate orbit
         sol = NEOs.propagate(dynamics, jd0, nyears, q0, params)
         jldsave("test.jld2"; sol)
@@ -315,7 +315,7 @@ using InteractiveUtils: methodswith
         # Dynamical function
         dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
         # Initial date of integration [julian days]
-        jd0::Float64 = datetime2julian(DateTime(2004, 6, 1)) 
+        jd0::Float64 = datetime2julian(DateTime(2004, 6, 1))
         # Time of integration [years]
         nyears::Float64 = 10.0
         # JPL #199 solution for Apophis at June 1st, 2004
@@ -325,7 +325,7 @@ using InteractiveUtils: methodswith
         q0::Vector{TaylorN{Float64}} = q00 .+ vcat(dq, 0dq[1])
         # Propagation parameters
         params = NEOParameters(maxsteps = 2_000, order = 25, abstol = 1e-20, parse_eqs = true)
-        
+
         # Propagate orbit
         sol = NEOs.propagate(
             dynamics,

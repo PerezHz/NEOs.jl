@@ -161,7 +161,7 @@ using NEOs: src_path
         # Get RadecMPC
         source_file = joinpath("data", "99942.txt")
         get_radec_mpc("number" => "99942", source_file)
-        
+
         @test isfile(source_file)
 
         source_radec = read_radec_mpc(source_file)
@@ -221,7 +221,7 @@ using NEOs: src_path
     @testset "Topocentric" begin
         using NEOs: TimeOfDay, sunriseset, obsposECEF, obsposvelECI
 
-        # Ground observation 
+        # Ground observation
         radec_1 = read_radec_mpc("""
         99942        |C2012 12 12.33230011 28 40.300-26 29 32.10         17.70Vu~0mfl807
         99942        |C2012 12 12.33730011 28 38.970-26 29 34.80         17.60Vu~0mfl807
@@ -246,7 +246,7 @@ using NEOs: src_path
         @test all( map(x -> x.observatory.code, radec_1) .== "807")
         @test length(radec_2) == 4
         @test all( map(x -> x.observatory.code, radec_2) .== "C51")
-        
+
         # TimeOfDay
         tod_1 = TimeOfDay.(radec_1)
         tod_2 = TimeOfDay.(radec_2)
@@ -261,7 +261,7 @@ using NEOs: src_path
         @test all( date.(radec_2) .== getfield.(tod_2, :start) .== getfield.(tod_2, :start) )
         @test all( getfield.(tod_2, :utc) .== 0 )
 
-        # Sunrise and sunset 
+        # Sunrise and sunset
         radec = read_radec_mpc("99942        8C2020 12 08.15001011 20 07.510-08 02 54.20         18.50GV~4ROF094")
         sun = sunriseset(radec[1])
         @test datetime2julian(sun[1]) ≈ datetime2julian(DateTime("2020-12-08T05:05:59.384"))

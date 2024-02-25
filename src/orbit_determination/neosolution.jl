@@ -38,9 +38,9 @@ The outcome of the orbit determination process for a NEO.
         _bwd_ = TaylorInterpolant(bwd.t0, bwd.t, collect(bwd.x))
         _fwd_ = TaylorInterpolant(fwd.t0, fwd.t, collect(fwd.x))
         new{T, U}(
-            tracklets, 
-            _bwd_, t_bwd, x_bwd, g_bwd, 
-            _fwd_, t_fwd, x_fwd, g_fwd, 
+            tracklets,
+            _bwd_, t_bwd, x_bwd, g_bwd,
+            _fwd_, t_fwd, x_fwd, g_fwd,
             res, fit, scalings
         )
     end
@@ -53,9 +53,9 @@ function NEOSolution(
     res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
 ) where {T <: Real, U <: Number, VT <: AbstractVector{T}, X <: AbstractMatrix{Taylor1{U}}}
     NEOSolution{T, U}(
-        tracklets, 
-        bwd, t_bwd, x_bwd, g_bwd, 
-        fwd, t_fwd, x_fwd, g_fwd, 
+        tracklets,
+        bwd, t_bwd, x_bwd, g_bwd,
+        fwd, t_fwd, x_fwd, g_fwd,
         res, fit, scalings
     )
 end
@@ -75,9 +75,9 @@ function NEOSolution(
     g_fwd = Vector{U}(undef, 0)
 
     NEOSolution{T, U}(
-        tracklets, 
-        bwd, t_bwd, x_bwd, g_bwd, 
-        fwd, t_fwd, x_fwd, g_fwd, 
+        tracklets,
+        bwd, t_bwd, x_bwd, g_bwd,
+        fwd, t_fwd, x_fwd, g_fwd,
         res, fit, scalings
     )
 end
@@ -116,11 +116,11 @@ function evalfit(sol::NEOSolution{T, TaylorN{T}}) where {T <: Real}
     new_t_fwd = sol.t_fwd(δs)
     new_x_fwd = sol.x_fwd(δs)
     new_g_fwd = sol.g_fwd(δs)
-    # Evaluate residuals 
+    # Evaluate residuals
     new_res = sol.res(δs)
 
     NEOSolution{T, T}(
-        sol.tracklets,    
+        sol.tracklets,
         new_bwd, new_t_bwd, new_x_bwd, new_g_bwd,
         new_fwd, new_t_fwd, new_x_fwd, new_g_fwd,
         new_res, sol.fit, sol.scalings
@@ -144,7 +144,7 @@ function zero(::Type{NEOSolution{T, U}}) where {T <: Real, U <: Number}
 
     NEOSolution{T, U}(
         tracklets,
-        bwd, t_bwd, x_bwd, g_bwd, 
+        bwd, t_bwd, x_bwd, g_bwd,
         fwd, t_fwd, x_fwd, g_fwd,
         res, fit, scalings
     )

@@ -142,7 +142,7 @@ end
 @doc raw"""
     bwdfwdeph(et::U, bwd::TaylorInterpolant, fwd::TaylorInterpolant) where {U <: Number}
 
-Paste a backward and a forward integration, evaluate at `et` and convert from 
+Paste a backward and a forward integration, evaluate at `et` and convert from
 [au, au/day] -> [km, km/sec].
 """
 function bwdfwdeph(et::U, bwd::TaylorInterpolant, fwd::TaylorInterpolant) where {U <: Number}
