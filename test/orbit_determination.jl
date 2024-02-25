@@ -13,14 +13,13 @@ using NEOs: NEOSolution, numberofdays
         # Load observations
         radec = read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
         # Parameters
-        params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = false,
-                               bwdoffset = 0.007, fwdoffset = 0.007)
+        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007, parse_eqs = false)
         params = NEOParameters(params, parse_eqs=true)
 
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by February 4, 2024
+        # Values by February 24, 2024
 
         # Vector of observations
         @test length(radec) == 123
@@ -50,9 +49,9 @@ using NEOs: NEOSolution, numberofdays
         # Scalig factors
         @test all(sol.scalings .== 1e-6)
         # Compatibility with JPL
-        JPL = [-1.100331943890894E+00, 2.077277940539948E-01, 4.202679172087372E-02,
-               -4.735673360137306E-03, -1.062665933519790E-02, -6.016253165957075E-03]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 27)
+        JPL = [-1.1003339484439327, 0.20772201506095814, 0.04202338912370205,
+               -0.004735538686138557, -0.010626685053348663, -0.006016258344003866]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 6)
     end
 
     @testset "Too Short Arc" begin
@@ -60,13 +59,12 @@ using NEOs: NEOSolution, numberofdays
         radec = fetch_radec_mpc("designation" => "2008 EK68")
 
         # Parameters
-        params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
-                               bwdoffset = 0.007, fwdoffset = 0.007)
+        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by February 4, 2024
+        # Values by February 24, 2024
 
         # Vector of observations
         @test length(radec) == 10
@@ -96,9 +94,9 @@ using NEOs: NEOSolution, numberofdays
         # Scalig factors
         @test all(sol.scalings .< 1e-5)
         # Compatibility with JPL
-        JPL = [-9.698293924982635E-01, 2.403718659163320E-01, 1.028928812918412E-01,
-               -9.512665381191419E-03, -1.532539714362475E-02,  -8.094608965098163E-03]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1)
+        JPL = [-0.9698333701500199, 0.24036461256880043, 0.10288887522619743,
+               -0.009512521373861719, -0.015325432152904881, -0.008094623534198382]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.1)
     end
 
     @testset "Outlier Rejection" begin
@@ -106,15 +104,14 @@ using NEOs: NEOSolution, numberofdays
         radec = fetch_radec_mpc("designation" => "2007 VV7")
 
         # Parameters
-        params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
-                               bwdoffset = 0.007, fwdoffset = 0.007)
+        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Orbit Determination
         sol = orbitdetermination(radec, params)
         # Outlier rejection
         sol = outlier_rejection(radec, sol, params)
 
-        # Values by February 4, 2024
+        # Values by February 24, 2024
 
         # Vector of observations
         @test length(radec) == 21
@@ -144,9 +141,9 @@ using NEOs: NEOSolution, numberofdays
         # Scalig factors
         @test all(sol.scalings .< 8e-7)
         # Compatibility with JPL
-        JPL = [7.673391189462907E-01, 6.484845064680100E-01, 2.932307930882956E-01,
-               -1.102328578432002E-02, 1.539274577937339E-02, 6.528864069204219E-03]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1)
+        JPL = [0.7673358221902306, 0.6484904294813807, 0.2932331617634889,
+               -0.011023358761553661, 0.015392684491034429, 0.006528836324700449]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.1)
     end
 
     @testset "Interesting NEOs" begin
@@ -157,14 +154,12 @@ using NEOs: NEOSolution, numberofdays
         radec = fetch_radec_mpc("designation" => "2014 AA")
 
         # Parameters
-        params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
-                               coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-                               H_max = 34.0)
+        params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by February 4, 2024
+        # Values by February 24, 2024
 
         # Vector of observations
         @test length(radec) == 7
@@ -194,9 +189,9 @@ using NEOs: NEOSolution, numberofdays
         # Scalig factors
         @test all(sol.scalings .< 1e-5)
         # Compatibility with JPL
-        JPL = [-1.793234664811157E-01, 8.874182631964184E-01, 3.841456198855505E-01,
-               -1.755789723380711E-02, -5.781199629059458E-03, -2.007345498817972E-03]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1)
+        JPL = [-0.17932853771087842, 0.8874166708545763, 0.38414497114153867,
+               -0.01755788350351527, -0.005781328974619869, -0.0020073946363600814]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
 
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
@@ -204,15 +199,14 @@ using NEOs: NEOSolution, numberofdays
         radec = fetch_radec_mpc("designation" => "2008 TC3")
 
         # Parameters
-        params = NEOParameters(abstol = 1e-20, order = 25, parse_eqs = true,
-                               coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
+        params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Observations with <1" weight
         idxs = findall(x -> x < 1, w8sveres17.(radec))
         # Restricted Orbit Determination
         sol = orbitdetermination(radec[idxs], params)
 
-        # Values by February 4, 2024
+        # Values by February 24, 2024
 
         # Vector of observations
         @test length(radec) == 883
@@ -242,9 +236,9 @@ using NEOs: NEOSolution, numberofdays
         # Scalig factors
         @test all(sol.scalings .< 1e-5)
         # Compatibility with JPL
-        JPL = [9.741084137931751E-01, 2.151459813682736E-01, 9.390733559030655E-02,
-               -7.890343235423515E-03, 1.606273839327320E-02, 6.136052979678407E-03]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 9)
+        JPL = [0.9741070119227359, 0.21515061351517384, 0.09390897837680391,
+               -0.007890445009307178, 0.016062726197198392, 0.006136042043681892]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
     end
 
 end
