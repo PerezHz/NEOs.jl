@@ -155,10 +155,8 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     eph_su::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph, su)
     eph_ea::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph, ea)
 
-    # NEO
+    # Apophis
     # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
-    xva_bwd(et) = auday2kmsec(sol_bwd(et/daysec)[1:6])
-    xva_fwd(et) = auday2kmsec(sol_fwd(et/daysec)[1:6])
     xva(et) = bwdfwdeph(et, sol_bwd, sol_fwd)
     # Earth
     # Change x, v units, resp., from au, au/day to km, km/sec
