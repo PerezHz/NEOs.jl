@@ -134,6 +134,9 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     V = Array{S}(undef, N)         # Y-axis component
     W = Array{S}(undef, N)         # Z-axis component
 
+    # 4 * Velocity of the asteroid
+    _4dq = Array{S}(undef, 3)  # (X,Y,Z) components
+
     # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
     _4U_m_3X = Array{S}(undef, N)  # X-axis component
     _4V_m_3Y = Array{S}(undef, N)  # Y-axis component
@@ -306,8 +309,8 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
 
     # Rotations to and from Earth, Sun and Moon pole-oriented frames
     local M_ = Array{S}(undef, 3, 3, N)
-    local M_ .= zero_q_1
-    local M_[:, :, ea] .= t2c_jpl_de430(dsj2k)[:, :] .+ zero_q_1
+
+    local M_[:, :, ea] = t2c_jpl_de430(dsj2k) .+ zero_q_1
 
     # Fill first 3 elements of dq with velocities
     dq[1] = q[4]
@@ -321,6 +324,9 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     Compute point-mass Newtonian accelerations, all bodies
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
+    _4dq[1] = 4dq[1]
+    _4dq[2] = 4dq[2]
+    _4dq[3] = 4dq[3]
     Threads.@threads for i in 1:Nm1
         # Velocity of the i-th body
         ui[i] = ss16asteph_t[3(N-1+i)-2]    # X-axis component
@@ -338,9 +344,9 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
         W[i] = wi[i]-dq[3]                  # Z-axis component
 
         # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
-        _4U_m_3X[i] = (4dq[1]) - (3ui[i])   # X-axis component
-        _4V_m_3Y[i] = (4dq[2]) - (3vi[i])   # Y-axis component
-        _4W_m_3Z[i] = (4dq[3]) - (3wi[i])   # Z-axis component
+        _4U_m_3X[i] = (-3ui[i]) + (_4dq[1])  # X-axis component
+        _4V_m_3Y[i] = (-3vi[i]) + (_4dq[2])  # Y-axis component
+        _4W_m_3Z[i] = (-3wi[i]) + (_4dq[3])  # Z-axis component
 
         # Dot product inside the [] in the second term
         pn2x = X[i]*_4U_m_3X[i]
@@ -639,8 +645,9 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     dq[4] = ( postNewtonX + accX ) + NGAx
     dq[5] = ( postNewtonY + accY ) + NGAy
     dq[6] = ( postNewtonZ + accZ ) + NGAz
-    # Yarkovsky coefficient does not change in time
+    # Nongrav acceleration coefficients do not change in time
     dq[7] = zero_q_1
+    dq[8] = zero_q_1
 
     nothing
 end
@@ -700,6 +707,9 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     U = Array{S}(undef, N)         # X-axis component
     V = Array{S}(undef, N)         # Y-axis component
     W = Array{S}(undef, N)         # Z-axis component
+
+    # 4 * Velocity of the asteroid
+    _4dq = Array{S}(undef, 3)  # (X,Y,Z) components
 
     # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
     _4U_m_3X = Array{S}(undef, N)  # X-axis component
@@ -873,8 +883,8 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
 
     # Rotations to and from Earth, Sun and Moon pole-oriented frames
     local M_ = Array{S}(undef, 3, 3, N)
-    local M_ .= zero_q_1
-    local M_[:, :, ea] .= t2c_jpl_de430(dsj2k)[:, :] .+ zero_q_1
+
+    local M_[:, :, ea] = t2c_jpl_de430(dsj2k) .+ zero_q_1
 
     # Fill first 3 elements of dq with velocities
     dq[1] = q[4]
@@ -888,6 +898,9 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     Compute point-mass Newtonian accelerations, all bodies
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
+    _4dq[1] = 4dq[1]
+    _4dq[2] = 4dq[2]
+    _4dq[3] = 4dq[3]
     Threads.@threads for i in 1:Nm1
         # Velocity of the i-th body
         ui[i] = ss16asteph_t[3(N-1+i)-2]    # X-axis component
@@ -905,9 +918,9 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
         W[i] = wi[i]-dq[3]                  # Z-axis component
 
         # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
-        _4U_m_3X[i] = (4dq[1]) - (3ui[i])   # X-axis component
-        _4V_m_3Y[i] = (4dq[2]) - (3vi[i])   # Y-axis component
-        _4W_m_3Z[i] = (4dq[3]) - (3wi[i])   # Z-axis component
+        _4U_m_3X[i] = (-3ui[i]) + (_4dq[1])  # X-axis component
+        _4V_m_3Y[i] = (-3vi[i]) + (_4dq[2])  # Y-axis component
+        _4W_m_3Z[i] = (-3wi[i]) + (_4dq[3])  # Z-axis component
 
         # Dot product inside the [] in the second term
         pn2x = X[i]*_4U_m_3X[i]

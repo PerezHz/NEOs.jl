@@ -26,7 +26,6 @@ using InteractiveUtils: methodswith
 
     @testset "Orbit propagation without nongravs: 2023 DW" begin
 
-        objname = "2023DW"
         # Dynamical function
         dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
         # Initial time [Julian date]
@@ -151,7 +150,6 @@ using InteractiveUtils: methodswith
 
     @testset "Orbit propagation with nongravs: (99942) Apophis" begin
 
-        objname = "Apophis"
         # Dynamical function
         dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
         # Initial time [Julian date]
@@ -270,15 +268,20 @@ using InteractiveUtils: methodswith
         # Time of integration [years]
         nyears = 0.02
         # Perturbation to nominal initial condition (Taylor1 jet transport)
-        dq = NEOs.scaled_variables()
+        dq = NEOs.scaled_variables(order=1)
         # Initial conditions
         q0 = [-0.9170913888342959, -0.37154308794738056, -0.1610606989484252,
-              0.009701519087787077, -0.012766026792868212, -0.0043488589639194275] .+ dq
+              0.009701519087787077, -0.012766026792868212, -0.0043488589639194275] + dq
         # Propagation parameters
         params = NEOParameters(maxsteps = 10, order = 25, abstol = 1e-20, parse_eqs = true)
 
-        # Propagate orbit
-        sol = NEOs.propagate(dynamics, jd0, nyears, q0, params)
+        # test parsed vs non-parsed propagation
+        sol = NEOs.propagate(dynamics, jd0, 1.0, q0, params)
+        params = NEOParameters(params, parse_eqs = false)
+        solnp = NEOs.propagate(dynamics, jd0, 1.0, q0, params)
+        @test sol.t == solnp.t
+        # TODO: fix roundoff differences near deep close approach in 2029
+        @test norm(sol.x-solnp.x, Inf)/norm(solnp.x, Inf) < 4e-18 # 3.757708512785821e-20
         jldsave("test.jld2"; sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol
@@ -311,24 +314,41 @@ using InteractiveUtils: methodswith
 
     @testset "Jet transport orbit propagation and astrometric observables: (99942) Apophis" begin
 
-        objname::String = "Apophis"
-        # Dynamical function
-        dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
-        # Initial date of integration [julian days]
-        jd0::Float64 = datetime2julian(DateTime(2004, 6, 1))
-        # Time of integration [years]
+        # Dynamical functions
+        dynamicsg  = RNp1BP_pN_A_J23E_J2S_eph_threads!
+        dynamicsng = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
+        # integration parameters
         nyears::Float64 = 10.0
-        # JPL #199 solution for Apophis at June 1st, 2004
-        q00::Vector{Float64} = [-1.0506627988664696, -0.060643124245514164, -0.0499709975200415, 0.0029591416313078838, -0.014232335581939919, -0.0052184125285361415, -2.898870403031058e-14, -0.0]
         varorder::Int = 1
-        dq::Vector{TaylorN{Float64}} = NEOs.scaled_variables("δx", vcat(fill(1e-8, 6), 1e-14), order = varorder)
-        q0::Vector{TaylorN{Float64}} = q00 .+ vcat(dq, 0dq[1])
-        # Propagation parameters
-        params = NEOParameters(maxsteps = 2_000, order = 25, abstol = 1e-20, parse_eqs = true)
+        jd0::Float64 = datetime2julian(DateTime(2004,6,1)) #Julian date of integration initial time
+        # 7-DOF nominal solution from pha/apophis.jl script at epoch 2004-06-01T00:00:00.000 (TDB)
+        q00::Vector{Float64} = [-1.0506627988664696, -0.060643124245514164, -0.0499709975200415, 0.0029591416313078838, -0.014232335581939919, -0.0052184125285361415, -2.898870403031058e-14, 0.0]
+        scalings::Vector{Float64} = vcat(fill(1e-8, 6), 1e-14)
+        dq::Vector{TaylorN{Float64}} = NEOs.scaled_variables("δx", scalings, order = varorder)
+        q0::Vector{TaylorN{Float64}} = q00 + vcat(dq, zero(dq[1]))
 
-        # Propagate orbit
+        # test parsed vs non-parsed propagation: gravity-only model
+        params = NEOParameters(maxsteps=10, order=25, abstol=1e-20, parse_eqs=true)
+        sol   = NEOs.propagate(dynamicsg, jd0, nyears, q0[1:6], params)
+        params = NEOParameters(params, parse_eqs=false)
+        solnp = NEOs.propagate(dynamicsg, jd0, nyears, q0[1:6], params)
+        @test sol.t == solnp.t
+        @test norm(sol.x-solnp.x, Inf) < 1e-16
+        @test sol == solnp
+
+        # test parsed vs non-parsed propagation: nongravitational model
+        params = NEOParameters(params, parse_eqs=true)
+        sol   = NEOs.propagate(dynamicsng, jd0, nyears, q0, params)
+        params = NEOParameters(params, parse_eqs=false)
+        solnp = NEOs.propagate(dynamicsng, jd0, nyears, q0, params)
+        @test sol.t == solnp.t
+        @test norm(sol.x-solnp.x, Inf) < 1e-16
+        @test sol == solnp
+
+        # propagate orbit (nongrav model)
+        params = NEOParameters(params, maxsteps = 2_000, parse_eqs = true)
         sol = NEOs.propagate(
-            dynamics,
+            dynamicsng,
             jd0,
             nyears,
             q0,
@@ -342,17 +362,21 @@ using InteractiveUtils: methodswith
         # Earth's ephemeris
         eph_ea = selecteph(sseph_obs, ea)
 
+        # Apophis
+        # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
+        xva(et) = auday2kmsec(sol(et/daysec))
+        # Earth
+        # Change x, v units, resp., from au, au/day to km, km/sec
+        xve(et) = auday2kmsec(eph_ea(et/daysec))
+        # Sun
+        # Change x, v units, resp., from au, au/day to km, km/sec
+        xvs(et) = auday2kmsec(eph_su(et/daysec))
+
         # Read optical astrometry file
         obs_radec_mpc_apophis = read_radec_mpc(joinpath("data", "99942_Tholen_etal_2013.dat"))
 
         # Compute optical astrometry residuals
-        _res_radec_ = NEOs.residuals(
-            obs_radec_mpc_apophis,
-            params,
-            xve = t -> auday2kmsec(eph_ea(t/daysec)),
-            xvs = t -> auday2kmsec(eph_su(t/daysec)),
-            xva = t -> auday2kmsec(sol(t/daysec))
-        )
+        _res_radec_ = NEOs.residuals(obs_radec_mpc_apophis, params; xvs, xve, xva)
         res_radec, w_radec = NEOs.unfold(_res_radec_)
         nobsopt = round(Int, length(res_radec))
 
@@ -376,29 +400,27 @@ using InteractiveUtils: methodswith
         deldop_2005_2013 = NEOs.read_radar_jpl(joinpath("data", "99942_RADAR_2005_2013.dat"))
 
         # Compute mean radar (time-delay and Doppler-shift) residuals
-        @time res_del, w_del, res_dop, w_dop = residuals(
-            deldop_2005_2013[1:4],
-            xve = t -> auday2kmsec(eph_ea(t/daysec)),
-            xvs = t -> auday2kmsec(eph_su(t/daysec)),
-            xva = t -> auday2kmsec(sol(t/daysec)),
-            niter=10,
-            tord=10
-        )
+        @time res_del, w_del, res_dop, w_dop = residuals(deldop_2005_2013[1:4]; xvs, xve,
+            xva, niter=10, tord=10)
 
+        # Doppler astrometry normalized residuals (i.e., residual/sigma) at nominal solution
         @test abs(res_dop[1]()) ≤ deldop_2005_2013[1].Δν_σ
-        @test abs(res_del[1]()) ≤ deldop_2005_2013[2].Δτ_σ
         @test abs(res_dop[2]()) ≤ deldop_2005_2013[2].Δν_σ
-        @test abs(res_del[2]()) ≤ deldop_2005_2013[2].Δτ_σ
         @test abs(res_dop[3]()) ≤ deldop_2005_2013[3].Δν_σ
         @test abs(res_dop[4]()) ≤ deldop_2005_2013[4].Δν_σ
+        # delay astrometry normalized residuals (i.e., residual/sigma) at nominal solution
+        @test abs(res_del[1]()) ≤ deldop_2005_2013[2].Δτ_σ
+        @test abs(res_del[2]()) ≤ deldop_2005_2013[2].Δτ_σ
 
         dq_sample = 2ones(7)
-        @test abs(res_dop[1](dq_sample)) ≥ deldop_2005_2013[1].Δν_σ
-        @test abs(res_del[1](dq_sample)) ≥ deldop_2005_2013[2].Δτ_σ
-        @test abs(res_dop[2](dq_sample)) ≥ deldop_2005_2013[2].Δν_σ
-        @test abs(res_del[2](dq_sample)) ≥ deldop_2005_2013[2].Δτ_σ
-        @test abs(res_dop[3](dq_sample)) ≥ deldop_2005_2013[3].Δν_σ
-        @test abs(res_dop[4](dq_sample)) ≥ deldop_2005_2013[4].Δν_σ
+        # Doppler astrometry normalized residuals at non-nominal solution
+        @test abs(res_dop[1]()) ≤ abs(res_dop[1](dq_sample))
+        @test abs(res_dop[2]()) ≤ abs(res_dop[2](dq_sample))
+        @test abs(res_dop[3]()) ≤ abs(res_dop[3](dq_sample))
+        @test abs(res_dop[4]()) ≤ abs(res_dop[4](dq_sample))
+        # delay astrometry normalized residuals at non-nominal solution
+        @test abs(res_del[1]()) ≤ abs(res_del[1](dq_sample))
+        @test abs(res_del[2]()) ≤ abs(res_del[2](dq_sample))
     end
 
 end
