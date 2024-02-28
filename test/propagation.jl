@@ -41,12 +41,10 @@ using InteractiveUtils: methodswith
 
         # Initial time [days since J2000]
         t0 = jd0 - PE.J2000
-        # Solar System ephemeris
-        sseph = loadpeeph(NEOs.sseph, t0 - nyears*yr, t0 + nyears*yr)
         # Sun's ephemeris
-        eph_su = selecteph(sseph, su)
+        eph_su = selecteph(NEOs.sseph, su, t0 - nyears*yr, t0 + nyears*yr)
         # Earth's ephemeris
-        eph_ea = selecteph(sseph, ea)
+        eph_ea = selecteph(NEOs.sseph, ea, t0 - nyears*yr, t0 + nyears*yr)
 
         # Warmup propagation (forward)
         NEOs.propagate(
@@ -166,12 +164,10 @@ using InteractiveUtils: methodswith
 
         # Initial time [days since J2000]
         t0 = jd0 - PE.J2000
-        # Solar System ephemeris
-        sseph = loadpeeph(NEOs.sseph, t0, t0 + nyears*yr)
         # Sun's ephemeris
-        eph_su = selecteph(sseph, su)
+        eph_su = selecteph(NEOs.sseph, su, t0, t0 + nyears*yr)
         # Earth's ephemeris
-        eph_ea = selecteph(sseph, ea)
+        eph_ea = selecteph(NEOs.sseph, ea, t0, t0 + nyears*yr)
 
         # Warmup propagation
         sol = NEOs.propagate(
@@ -355,12 +351,10 @@ using InteractiveUtils: methodswith
             params
         )
 
-        # Solar System ephemeris
-        sseph_obs = loadpeeph(NEOs.sseph, sol.t0, sol.t0 + sol.t[end])
         # Sun's ephemeris
-        eph_su = selecteph(sseph_obs, su)
+        eph_su = selecteph(NEOs.sseph, su, sol.t0, sol.t0 + sol.t[end])
         # Earth's ephemeris
-        eph_ea = selecteph(sseph_obs, ea)
+        eph_ea = selecteph(NEOs.sseph, ea, sol.t0, sol.t0 + sol.t[end])
 
         # Apophis
         # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
