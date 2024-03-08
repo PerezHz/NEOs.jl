@@ -55,6 +55,20 @@ end
 
 iszero(x::AdmissibleRegion{T}) where {T <: AbstractFloat} = x == zero(AdmissibleRegion{T})
 
+# Print method for AdmissibleRegion
+# Examples:
+# AE: [11.55523, 13.29296, -1.01625, -0.55432] t: 2019-10-23T05:23:27.384 obs: Palomar Mountain--ZTF
+# AE: [358.56604, 1.25546, -2.05305, -1.91538] t: 2019-11-01T09:03:26.280 obs: Pan-STARRS 1, Haleakala
+function show(io::IO, A::AdmissibleRegion{T}) where {T <: Real}
+    v = string(
+        @sprintf("%.5f", rad2deg(A.α)), ", ",
+        @sprintf("%.5f", rad2deg(A.δ)), ", ",
+        @sprintf("%.5f", rad2deg(A.v_α)), ", ",
+        @sprintf("%.5f", rad2deg(A.v_δ)), "",
+    )
+    print(io, "AE: [", v, "]", " t: ", A.date, " obs: ", A.observatory.name)
+end
+
 # Outer constructor
 function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where {T <: AbstractFloat}
     # Unfold
