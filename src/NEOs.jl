@@ -26,8 +26,8 @@ using StatsBase: mean, std
 using LsqFit: curve_fit
 using Roots: find_zeros
 using Clustering: kmeans
-
 using Downloads: download
+using HORIZONS: smb_spk
 
 # Constants
 export d_EM_km, d_EM_au
@@ -72,7 +72,7 @@ export gauss_method, gaussinitcond, gauss_refinement
 # Outlier rejection
 export outlier_rejection
 # Orbit determination
-export issinglearc, isgauss, orbitdetermination
+export jplcompare, issinglearc, isgauss, orbitdetermination
 
 include("constants.jl")
 include("observations/process_radar.jl")

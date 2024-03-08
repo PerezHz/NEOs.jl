@@ -170,3 +170,28 @@ function nms(sol::NEOSolution{T, T}) where {T <: Real}
 end
 
 sigmas(sol::NEOSolution{T, T}) where {T <: Real} = sqrt.(diag(sol.fit.Γ)) .* sol.scalings
+
+@doc raw"""
+    jplcompare(des::String, sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
+
+Return `abs.(sol() - R) ./ sigmas(sol)`, where `R` is JPL's state vector of object
+`des` at `sol`'s  initial epoch.
+"""
+function jplcompare(des::String, sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
+    # NEOs barycentric state vector
+    q1 = cte.(sol())
+    # Time of first (last) observation
+    t0, tf = date(sol.tracklets[1].radec[1]), date(sol.tracklets[end].radec[end])
+    # Download JPL ephemerides
+    bsp = smb_spk("DES = $(des);", t0, tf)
+    # Object ID
+    id = parse(Int, bsp[1:end-4])
+    # Load JPL ephemerides
+    furnsh(bsp)
+    # Delete ephemerides file
+    rm(bsp)
+    # JPL barycentric state vector
+    q2 = kmsec2auday(spkgeo(id, julian2etsecs(sol.bwd.t0 + PE.J2000), "J2000", 0)[1])
+    # Absolute difference in sigma units
+    return abs.(q1 - q2) ./ sigmas(sol)
+end
