@@ -72,7 +72,7 @@ export gauss_method, gaussinitcond, gauss_refinement
 # Outlier rejection
 export outlier_rejection
 # Orbit determination
-export issinglearc, istsa, orbitdetermination
+export issinglearc, isgauss, orbitdetermination
 
 include("constants.jl")
 include("observations/process_radar.jl")

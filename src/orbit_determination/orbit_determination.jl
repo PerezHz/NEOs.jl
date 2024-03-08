@@ -20,28 +20,25 @@ function issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <:
 end
 
 @doc raw"""
-    istsa(tracklets::Vector{Tracklet{T}}) where {T <: AbstractFloat}
-    istsa(sol::NEOSolution{T, T}) where {T <: AbstractFloat}
+    isgauss(sol::NEOSolution{T, T}) where {T <: AbstractFloat}
 
-Check whether `sol` was computed via [`tooshortarc`](@ref) (`true`) or
-via [`gaussinitcond`](@ref) (`false`).
+Check whether `sol` was computed via [`gaussinitcond`](@ref) (`true`) or
+via [`tooshortarc`](@ref) (`false`).
 """
-function istsa(tracklets::Vector{Tracklet{T}}) where {T <: AbstractFloat}
+function isgauss(tracklets::Vector{Tracklet{T}}) where {T <: AbstractFloat}
     # Observing stations
     obs = observatory.(tracklets)
-    # Satellite observatories can only be handled by Gauss
-    any(issatellite.(obs)) && return false
+    # TSA is not well suited for satellite observatories
+    any(issatellite.(obs)) && return true
     # Gauss cannot handle less than 3 tracklets
-    length(tracklets) < 3 && return true
+    length(tracklets) < 3 && return false
     # Time span
     Δ = numberofdays(tracklets)
     # Gauss aproximation do not work with less than 1 day
-    Δ < 1 && return true
-    # All observations come from the same observatory
-    return allequal(obs) && Δ < 5
+    return Δ > 1
 end
 
-istsa(sol::NEOSolution{T, T}) where {T <: AbstractFloat} = istsa(sol.tracklets)
+isgauss(sol::NEOSolution{T, T}) where {T <: AbstractFloat} = isgauss(sol.tracklets)
 
 @doc raw"""
     adaptative_maxsteps(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
@@ -91,12 +88,13 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}
     end
     # Reduce tracklets by polynomial regression
     tracklets = reduce_tracklets(radec)
-    # Case 1: Too Short Arc (TSA)
-    if istsa(tracklets)
-        sol = tooshortarc(radec, tracklets, params; dynamics)
-    # Case 2: Gauss Method
-    else
+    # Case 1: Gauss Method
+    if isgauss(tracklets)
         sol = gaussinitcond(radec, tracklets, params; dynamics)
+    end
+    # Case 2: Too Short Arc (TSA)
+    if iszero(sol) || nrms(sol) > params.gaussQmax
+        sol = tooshortarc(radec, tracklets, params; dynamics)
     end
 
     return sol::NEOSolution{T, T}
