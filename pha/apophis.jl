@@ -124,10 +124,9 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     jd0 = datetime2julian(jd0_datetime)
 
     print_header("Integrator warmup", 2)
-    _ = NEOs.propagate(dynamics, 1, jd0, nyears_fwd, q0, Val(true);
-                       order, abstol, parse_eqs)
-    _ = NEOs.propagate_root(dynamics, 1, jd0, nyears_fwd, q0, Val(true);
-                       order, abstol, parse_eqs)
+    params = NEOParameters(;maxsteps=1, order, abstol, parse_eqs)
+    _ = NEOs.propagate(dynamics, jd0, nyears_fwd, q0, params)
+    _ = NEOs.propagate_root(dynamics, jd0, nyears_fwd, q0, params)
     println()
 
     print_header("Main integration", 2)
@@ -135,8 +134,8 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     println("• Initial time of integration: ", string(jd0_datetime))
     println("• Final time of integration: ", julian2datetime(jd0 + tmax))
 
-    sol_bwd = NEOs.propagate(dynamics, maxsteps, jd0, nyears_bwd, q0, Val(true);
-                             order, abstol, parse_eqs)
+    params = NEOParameters(;maxsteps, order, abstol, parse_eqs)
+    sol_bwd = NEOs.propagate(dynamics, jd0, nyears_bwd, q0, params)
     jldsave("Apophis_bwd.jld2"; sol_bwd)
     # sol_bwd = JLD2.load("Apophis_bwd.jld2", "sol_bwd")
 
@@ -144,16 +143,15 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     println("• Initial time of integration: ", string(jd0_datetime))
     println("• Final time of integration: ", julian2datetime(jd0 + tmax))
 
-    sol_fwd, tvS, xvS, gvS = NEOs.propagate_root(dynamics, maxsteps, jd0, nyears_fwd, q0, Val(true);
-                             order, abstol, parse_eqs)
+    sol_fwd, tvS, xvS, gvS = NEOs.propagate_root(dynamics, jd0, nyears_fwd, q0, params)
     jldsave("Apophis_fwd.jld2"; sol_fwd, tvS, xvS, gvS)
     # sol_fwd = JLD2.load("Apophis_fwd.jld2", "sol_bwd")
     println()
 
-    # load Solar System ephemeris
-    sseph::TaylorInterpolant{Float64,Float64,2} = loadpeeph(NEOs.sseph, sol_bwd.t0+sol_bwd.t[end], sol_fwd.t0+sol_fwd.t[end])
-    eph_su::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph, su)
-    eph_ea::TaylorInterpolant{Float64,Float64,2} = selecteph(sseph, ea)
+    # Load Sun ephemeris
+    eph_su = selecteph(NEOs.sseph, su, sol_bwd.t0+sol_bwd.t[end], sol_fwd.t0+sol_fwd.t[end])
+    # Load Earth ephemeris
+    eph_ea = selecteph(NEOs.sseph, ea, sol_bwd.t0+sol_bwd.t[end], sol_fwd.t0+sol_fwd.t[end])
 
     # Apophis
     # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
@@ -175,7 +173,8 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     deldop = vcat(deldop_2005_2013,deldop_2021)
 
     # Compute optical residuals
-    res_radec_all, w_radec_all = NEOs.residuals(radec; xvs, xve, xva)
+    _res_radec_all_ = NEOs.residuals(radec; xvs, xve, xva)
+    res_radec_all, w_radec_all = NEOs.unfold(_res_radec_all_)
     jldsave("Apophis_res_w_radec.jld2"; res_radec_all, w_radec_all)
     # JLD2.@load "Apophis_res_w_radec.jld2"
 

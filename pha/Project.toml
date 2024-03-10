@@ -14,4 +14,4 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 TaylorIntegration = "92b13dbe-c966-51a2-8445-caca9f8a7d42"
 
 [compat]
-NEOs = "0.7"
+NEOs = "0.8"
