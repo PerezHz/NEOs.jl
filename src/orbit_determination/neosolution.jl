@@ -178,6 +178,8 @@ Return `abs.(sol() - R) ./ sigmas(sol)`, where `R` is JPL's state vector of obje
 `des` at `sol`'s  initial epoch.
 """
 function jplcompare(des::String, sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
+    # Load Solar System ephemerides
+    loadjpleph()
     # NEOs barycentric state vector
     q1 = cte.(sol())
     # Time of first (last) observation
