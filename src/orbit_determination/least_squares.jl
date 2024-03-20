@@ -463,7 +463,7 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     # Vector of x
     x = Matrix{T}(undef, npar, niters + 1)
     # First guess
-    for i in size(x, 2)
+    for i in axes(x, 2)
         x[:, i] .= x0
     end
     # Vector of errors
@@ -575,7 +575,7 @@ function levenbergmarquardt(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}
     _d2Q_ = zeros(T, npar, npar)
     x = Matrix{T}(undef, npar, niters + 1)
     # First guess
-    for i in size(x, 2)
+    for i in axes(x, 2)
         x[:, i] .= x0
     end
     # Iteration
