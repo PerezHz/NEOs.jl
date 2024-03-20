@@ -8,7 +8,7 @@ include("gauss_method.jl")
     issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <: AbstractFloat}
 
 Check whether `radec` is a single observational arc, i.e. no two consecutive observations
-are more than `arc` days appart. The function assumes `radec` is sorted.
+are more than `arc` days apart. The function assumes `radec` is sorted.
 """
 function issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <: AbstractFloat}
     for i in 2:length(radec)
@@ -34,7 +34,7 @@ function isgauss(tracklets::Vector{Tracklet{T}}) where {T <: AbstractFloat}
     length(tracklets) < 3 && return false
     # Time span
     Δ = numberofdays(tracklets)
-    # Gauss aproximation do not work with less than 1 day
+    # Gauss approximation does not work with less than 1 day
     return Δ > 1
 end
 
@@ -76,7 +76,7 @@ Initial Orbit Determination (IOD) routine.
 function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
                             dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
-    # Allocate memory for output
+    # Allocate NEOSolution for output
     sol = zero(NEOSolution{T, T})
     # Maximum number of steps
     params = NEOParameters(params; maxsteps = adaptative_maxsteps(radec))

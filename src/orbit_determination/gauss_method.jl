@@ -537,10 +537,10 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         end
     end
 
-    # Case: all solutions were unsuccesful
+    # Case: all solutions were unsuccessful
     if isinf(best_Q)
         return zero(NEOSolution{T, T})
-    # Case: at least one solution was succesful
+    # Case: at least one solution was successful
     else
         return best_sol
     end
