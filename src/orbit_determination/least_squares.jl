@@ -461,9 +461,11 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     # Mean square residual
     Q = chi2(res, w)/nobs
     # Vector of x
-    x = zeros(T, npar, niters + 1)
+    x = Matrix{T}(undef, npar, niters + 1)
     # First guess
-    x[:, 1] = x0
+    for i in size(x, 2)
+        x[:, i] .= x0
+    end
     # Vector of errors
     error = Vector{T}(undef, niters + 1)
     # Error of first guess
@@ -571,9 +573,11 @@ function levenbergmarquardt(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}
     # Pre-allocate memory
     _dQ_ = zeros(T, npar)
     _d2Q_ = zeros(T, npar, npar)
-    x = zeros(T, npar, niters + 1)
+    x = Matrix{T}(undef, npar, niters + 1)
     # First guess
-    x[:, 1] = x0
+    for i in size(x, 2)
+        x[:, i] .= x0
+    end
     # Iteration
     for i in 1:niters
         # Current x
