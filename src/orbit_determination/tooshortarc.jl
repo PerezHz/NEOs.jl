@@ -343,37 +343,46 @@ function bary2topo(A::AdmissibleRegion{T}, q0::Vector{U}) where {T <: AbstractFl
 end
 
 @doc raw"""
-    attr2bary(A::AdmissibleRegion{T}, a::Vector{U}) where {T <: AbstractFloat, U <: Number}
+    attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
+              params::NEOParameters{T}) where {T <: AbstractFloat, U <: Number}
 
-Convert attributable elements `a` to to barycentric cartesian coordinates.
-`A` fixes the observer.
+Convert attributable elements `a` to barycentric cartesian coordinates.
 """
-function attr2bary(A::AdmissibleRegion{T}, a::Vector{U}) where {T <: AbstractFloat, U <: Number}
+function attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
+                   params::NEOParameters{T}) where {T <: AbstractFloat, U <: Number}
     # Unfold
     α, δ, v_α, v_δ, ρ, v_ρ = a
+    # Light-time correction to epoch
+    t = datetime2days(A.date) - ρ/c_au_per_day
+    et = julian2etsecs(datetime2julian(A.date) - cte(cte(ρ))/c_au_per_day)
+    # Line of sight vectors
     ρ_unit, ρ_α, ρ_δ = topounitpdv(α, δ)
+    # Heliocentric position of the observer
+    q = params.eph_ea(t) + kmsec2auday(obsposvelECI(A.observatory, et)) - params.eph_su(t)
     # Barycentric position
-    r = A.q[1:3] + ρ * ρ_unit + sseph(su, datetime2days(A.date))[1:3]
+    r = q[1:3] + ρ * ρ_unit + params.eph_su(t)[1:3]
     # Barycentric velocity
-    v = A.q[4:6] + v_ρ * ρ_unit + ρ * v_α * ρ_α + ρ * v_δ * ρ_δ
-        + sseph(su, datetime2days(A.date))[4:6]
+    v = q[4:6] + v_ρ * ρ_unit + ρ * v_α * ρ_α + ρ * v_δ * ρ_δ
+        + params.eph_su(t)[4:6]
     # Barycentric state vector
     return vcat(r, v)
 end
 
 # Propagate an orbit and compute residuals
-function propres(radec::Vector{RadecMPC{T}}, jd0::T, q0::Vector{U},
-                 params::NEOParameters{T}; dynamics::D=newtonian!)  where {D, T <: AbstractFloat, U <: Number}
+function propres(radec::Vector{RadecMPC{T}}, jd0::U, q0::Vector{V}, params::NEOParameters{T};
+                 dynamics::D = newtonian!)  where {D, T <: AbstractFloat, U <: Number, V <: Number}
     # Time of first (last) observation
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
+    # Epoch (plain)
+    _jd0_ = cte(cte(jd0))
     # Years in backward (forward) integration
-    nyears_bwd = -(jd0 - t0 + params.bwdoffset) / yr
-    nyears_fwd = (tf - jd0 + params.fwdoffset) / yr
+    nyears_bwd = -(_jd0_ - t0 + params.bwdoffset) / yr
+    nyears_fwd = (tf - _jd0_ + params.fwdoffset) / yr
     # Backward (forward) integration
     bwd = propagate(dynamics, jd0, nyears_bwd, q0, params)
     fwd = propagate(dynamics, jd0, nyears_fwd, q0, params)
-    if !issuccessfulprop(bwd, t0 - jd0; tol = params.coeffstol) ||
-       !issuccessfulprop(fwd, tf - jd0; tol = params.coeffstol)
+    if !issuccessfulprop(bwd, t0 - _jd0_; tol = params.coeffstol) ||
+       !issuccessfulprop(fwd, tf - _jd0_; tol = params.coeffstol)
         return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
     end
     # O-C residuals
@@ -443,7 +452,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         # Attributable elements
         a = vcat(LOS + dq[1:4], ρ, v_ρ)
         # Barycentric state vector
-        q = attr2bary(A, a)
+        q = attr2bary(A, a, params)
         # Propagation and residuals
         _, _, res = propres(radec, jd0 - ρ/c_au_per_day, q, params; dynamics)
         iszero(length(res)) && break
@@ -458,7 +467,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
             a = vcat(a0[1:4], 10^(x + dq[5]), v_ρ + dq[6])
         end
         # Barycentric state vector
-        q = attr2bary(A, a)
+        q = attr2bary(A, a, params)
         # Propagation and residuals
         _, _, res = propres(radec, jd0 - ρ/c_au_per_day, q, params; dynamics)
         iszero(length(res)) && break
