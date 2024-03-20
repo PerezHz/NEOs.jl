@@ -66,25 +66,26 @@ function issuccessfulprop(sol::TaylorInterpolant, t::T; tol::T = 10.0) where {T 
 end
 
 @doc raw"""
-    propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order,
-                     abstol::T = abstol) where {T <: Real, U <: Number}
+    propagate_params(jd0::U, tspan::T, q0::Vector{V}; μ_ast::Vector = μ_ast343_DE430[1:end],
+                     order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, V <: Number}
 
 Return the parameters needed for `propagate`, `propagate_root` and `propagate_lyap`.
 
 # Arguments
 
-- `jd0::T`: initial Julian date.
+- `jd0::U`: initial Julian date.
 - `tspan::T`: time span of the integration [in years].
-- `q0::Vector{U}`: vector of initial conditions.
+- `q0::Vector{V}`: vector of initial conditions.
 - `μ_ast::Vector`: vector of gravitational parameters.
 - `order::Int`: order of the Taylor expansions to be used in the integration.
 - `abstol::T`: absolute tolerance.
 """
-function propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order,
-                          abstol::T = abstol) where {T <: Real, U <: Number}
-
+function propagate_params(jd0::U, tspan::T, q0::Vector{V}; μ_ast::Vector = μ_ast343_DE430[1:end],
+                          order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, V <: Number}
+    # Epoch (plain)
+    _jd0_ = cte(cte(jd0))
     # Time limits [days since J2000]
-    days_0, days_f = minmax(jd0, jd0 + tspan*yr) .- JD_J2000
+    days_0, days_f = minmax(_jd0_, _jd0_ + tspan*yr) .- JD_J2000
 
     # Load Solar System ephemeris [au, au/day]
     _sseph = convert(T, loadpeeph(sseph, days_0, days_f))
@@ -130,21 +131,21 @@ function propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_a
 end
 
 @doc raw"""
-    propagate(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
-              params::NEOParameters{T}) where {T <: Real, U <: Number, D}
+    propagate(dynamics::D, jd0::U, tspan::T, q0::Vector{V},
+              params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number, D}
 
 Integrate the orbit of a NEO via the Taylor method.
 
 # Arguments
 
 - `dynamics::D`: dynamical model function.
-- `jd0::T`: initial Julian date.
+- `jd0::U`: initial Julian date.
 - `tspan::T`: time span of the integration [in years].
-- `q0::Vector{U}`: vector of initial conditions.
+- `q0::Vector{V}`: vector of initial conditions.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
 """
-function propagate(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
-                   params::NEOParameters{T}) where {T <: Real, U <: Number, D}
+function propagate(dynamics::D, jd0::U, tspan::T, q0::Vector{V},
+                   params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number, D}
 
     # Unfold
     maxsteps, μ_ast, order, abstol, parse_eqs = params.maxsteps, params.μ_ast, params.order,
@@ -162,7 +163,9 @@ function propagate(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
                                      maxsteps = maxsteps, parse_eqs = parse_eqs)
 
     if issorted(tv) || issorted(tv, rev = true)
-        return TaylorInterpolant(jd0 - JD_J2000, tv, psol)
+        # Epoch (plain)
+        _jd0_ = cte(cte(jd0))
+        return TaylorInterpolant(_jd0_ - JD_J2000, tv, psol)
     else
         return zero(TaylorInterpolant{T, U, 2, SubArray{T, 1}, SubArray{Taylor1{U}, 2}})
     end
