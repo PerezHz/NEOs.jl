@@ -11,6 +11,7 @@ const sseph::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Tayl
 const acceph::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Taylor1{Float64}}} = JLD2.load(sseph_artifact_path, "acc_eph")
 const poteph::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Taylor1{Float64}}} = JLD2.load(sseph_artifact_path, "pot_eph")
 const ttmtdb::TaylorInterpolant{Float64, Float64, 1, Vector{Float64}, Vector{Taylor1{Float64}}} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
+const SSEPHORDER::Int = get_order(sseph.x[1])
 
 # Earth orientation parameters (eop) 2000
 const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))

@@ -66,8 +66,8 @@ function issuccessfulprop(sol::TaylorInterpolant, t::T; tol::T = 10.0) where {T 
 end
 
 @doc raw"""
-    propagate_params(jd0::U, tspan::T, q0::Vector{V}; μ_ast::Vector = μ_ast343_DE430[1:end],
-                     order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, V <: Number}
+    propagate_params(jd0::U, tspan::T, q0::Vector{V},
+                     params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number}
 
 Return the parameters needed for `propagate`, `propagate_root` and `propagate_lyap`.
 
@@ -76,12 +76,10 @@ Return the parameters needed for `propagate`, `propagate_root` and `propagate_ly
 - `jd0::U`: initial Julian date.
 - `tspan::T`: time span of the integration [in years].
 - `q0::Vector{V}`: vector of initial conditions.
-- `μ_ast::Vector`: vector of gravitational parameters.
-- `order::Int`: order of the Taylor expansions to be used in the integration.
-- `abstol::T`: absolute tolerance.
+- `params::NEOParameters{T}`: see `Propagation Parameters` of [`NEOParameters`](@ref).
 """
-function propagate_params(jd0::U, tspan::T, q0::Vector{V}; μ_ast::Vector = μ_ast343_DE430[1:end],
-                          order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, V <: Number}
+function propagate_params(jd0::U, tspan::T, q0::Vector{V},
+                          params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number}
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Time limits [days since J2000]
@@ -103,7 +101,7 @@ function propagate_params(jd0::U, tspan::T, q0::Vector{V}; μ_ast::Vector = μ_a
     N = Nm1 + 1
 
     # Vector of G*m values
-    μ = convert(Vector{T}, vcat( μ_DE430[1:11], μ_ast[1:Nm1-11], zero(T) ) )
+    μ = convert(Vector{T}, vcat( μ_DE430[1:11], params.μ_ast[1:Nm1-11], zero(T) ) )
 
     # Check: number of SS bodies (N) in ephemeris must be equal to length of GM vector (μ)
     @assert N == length(μ) "Total number of bodies in ephemeris must be equal to length of GM vector μ"
@@ -148,14 +146,13 @@ function propagate(dynamics::D, jd0::U, tspan::T, q0::Vector{V},
                    params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number, D}
 
     # Unfold
-    maxsteps, μ_ast, order, abstol, parse_eqs = params.maxsteps, params.μ_ast, params.order,
-                                                params.abstol, params.parse_eqs
+    maxsteps, order, abstol, parse_eqs = params.maxsteps, params.order, params.abstol, params.parse_eqs
 
     # Check order
-    @assert order <= get_order(sseph.x[1]) "order ($(order)) must be less or equal than SS ephemeris order ($(get_order(sseph.x[1])))"
+    @assert order <= SSEPHORDER "order ($order) must be less or equal than SS ephemeris order ($SSEPHORDER)"
 
     # Parameters for taylorinteg
-    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
+    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0, params)
 
     # Propagate orbit
 
@@ -198,14 +195,13 @@ function propagate_root(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
                         nrabstol::T = eps(T)) where {T <: Real, U <: Number, D}
 
     # Unfold
-    maxsteps, μ_ast, order, abstol, parse_eqs = params.maxsteps, params.μ_ast, params.order,
-                                                params.abstol, params.parse_eqs
+    maxsteps, order, abstol, parse_eqs = params.maxsteps, params.order, params.abstol, params.parse_eqs
 
     # Check order
-    @assert order <= get_order(sseph.x[1]) "order ($(order)) must be less or equal than SS ephemeris order ($(get_order(sseph.x[1])))"
+    @assert order <= SSEPHORDER "order ($order) must be less or equal than SS ephemeris order ($SSEPHORDER)"
 
     # Parameters for neosinteg
-    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
+    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0, params)
 
     # Propagate orbit
     @time tv, xv, psol, tvS, xvS, gvS = taylorinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, Val(true), _params;
@@ -233,14 +229,13 @@ function propagate_lyap(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
                         params::NEOParameters{T}) where {T <: Real, U <: Number, D}
 
     # Unfold
-    maxsteps, μ_ast, order, abstol, parse_eqs = params.maxsteps, params.μ_ast, params.order,
-                                                params.abstol, params.parse_eqs
+    maxsteps, order, abstol, parse_eqs = params.maxsteps, params.order, params.abstol, params.parse_eqs
 
     # Check order
-    @assert order <= get_order(sseph.x[1]) "order ($(order)) must be less or equal than SS ephemeris order ($(get_order(sseph.x[1])))"
+    @assert order <= SSEPHORDER "order ($order) must be less or equal than SS ephemeris order ($SSEPHORDER)"
 
     # Parameters for taylorinteg
-    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
+    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0, params)
 
     # Propagate orbit
     @time sol = lyap_taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, _params;
