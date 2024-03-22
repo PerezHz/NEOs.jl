@@ -149,8 +149,8 @@ Solve Lagrange polynomial.
 
 See also [`lagrange`](@ref).
 """
-function solve_lagrange(a::T, b::T, c::T; niter::Int = 5) where {T <: Real}
-    return find_zeros(x -> lagrange(x, a, b, c), 0.00465047, 40.0)
+function solve_lagrange(a::T, b::T, c::T; niter::Int = 5, rmin = 0.00465047, rmax = 40.0) where {T <: Real}
+    return find_zeros(x -> lagrange(x, a, b, c), rmin, rmax)
 end
 
 function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T}; niter::Int = 5) where {T <: Real}
@@ -393,9 +393,8 @@ function gauss_triplets(dates::Vector{DateTime}, Δ_min::Period, Δ_max::Period,
     return triplets[1:n]
 end
 
-function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_iter::Int = 100)
-    Δ_min = Hour(20)
-    Δ_max = Day(7)
+function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_iter::Int = 100;
+                        Δ_min = Hour(20), Δ_max = Day(7))
 
     triplets = Vector{Vector{Int}}(undef, 0)
 

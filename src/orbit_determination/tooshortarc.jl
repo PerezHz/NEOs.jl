@@ -411,7 +411,7 @@ residual over and admissible region `A`.
 """
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
               params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
-              μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001,
+              μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, order::Int = 2,
               dynamics::D = newtonian!) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
@@ -428,7 +428,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     end
     scalings[6] = (A.v_ρ_domain[2] - A.v_ρ_domain[1]) / 1_000
     # Jet transport variables
-    dq = scaled_variables("dx", scalings, order = 2)
+    dq = scaled_variables("dx", scalings; order)
     # Maximum number of iterations
     maxiter = params.maxiter
     # Allocate memory
@@ -543,7 +543,8 @@ admissible region via least squares.
     This function will set the (global) `TaylorSeries` variables to `dx₁ dx₂ dx₃ dx₄ dx₅ dx₆`.
 """
 function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-               i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5, dynamics::D=newtonian!) where {T <: AbstractFloat, D}
+               i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5, dynamics::D = newtonian!,
+               order = 6) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     # (corrected for light-time)
     jd0 = datetime2julian(A.date) - ρ / c_au_per_day
@@ -552,7 +553,7 @@ function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Ve
     # Scaling factors
     scalings = abs.(q0) ./ 10^5
     # Jet transport variables
-    dq = scaled_variables("dx", scalings, order = 6)
+    dq = scaled_variables("dx", scalings; order)
     # Origin
     x0 = zeros(T, 6)
     # Subset of radec for orbit fit
