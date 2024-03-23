@@ -354,7 +354,9 @@ function attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
     α, δ, v_α, v_δ, ρ, v_ρ = a
     # Light-time correction to epoch
     t = datetime2days(A.date) - ρ/c_au_per_day
-    et = julian2etsecs(datetime2julian(A.date) - cte(cte(ρ))/c_au_per_day)
+    # TO DO: `et::TaylorN` is too slow for `adam` due to
+    # SatelliteToolboxTransformations overloads in src/observations/topocentric.jl
+    et = datetime2et(A.date) - cte(cte(ρ))/c_au_per_sec
     # Line of sight vectors
     ρ_unit, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Heliocentric position of the observer
@@ -397,14 +399,14 @@ end
 @doc raw"""
     adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
          params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
-         μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001,
+         μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, order::Int = 2,
          dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
 Adaptative moment estimation (ADAM) minimizer of normalized mean square
 residual over and admissible region `A`.
 
 !!! warning
-    This function will set the (global) `TaylorSeries` variables to `dx dy`.
+    This function will set the (global) `TaylorSeries` variables to `dx₁ dx₂ dx₃ dx₄ dx₅ dx₆`.
 
 !!! reference
     See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
@@ -415,11 +417,11 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
               dynamics::D = newtonian!) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
-    # Nominal Line-Of-Sight
-    LOS = [A.α, A.δ, A.v_α, A.v_δ]
+    # Attributable elements
+    ae = [A.α, A.δ, A.v_α, A.v_δ, zero(T), zero(T)]
     # Scaling factors
     scalings = Vector{T}(undef, 6)
-    scalings[1:4] .= LOS ./ 1e6
+    scalings[1:4] .= abs.(ae[1:4]) ./ 1e6
     if scale == :linear
         scalings[5] = (A.ρ_domain[2] - A.ρ_domain[1]) / 1_000
     elseif scale == :log
@@ -428,7 +430,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     end
     scalings[6] = (A.v_ρ_domain[2] - A.v_ρ_domain[1]) / 1_000
     # Jet transport variables
-    dq = scaled_variables("dx", scalings; order)
+    dae = scaled_variables("dx", scalings; order)
     # Maximum number of iterations
     maxiter = params.maxiter
     # Allocate memory
@@ -450,34 +452,31 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         ρs[t] = ρ
         v_ρs[t] = v_ρ
         # Attributable elements
-        a = vcat(LOS + dq[1:4], ρ, v_ρ)
+        if scale == :linear
+            ae[5], ae[6] = ρ, v_ρ
+            AE = ae + dae
+        elseif scale == :log
+            ae[5], ae[6] = x, v_ρ
+            AE = [ae[1] + dae[1], ae[2] + dae[2], ae[3] + dae[3],
+                  ae[4] + dae[4], 10^(ae[5] + dae[5]), ae[6] + dae[6]]
+        end
         # Barycentric state vector
-        q = attr2bary(A, a, params)
+        q = attr2bary(A, AE, params)
         # Propagation and residuals
+        # TO DO: `ρ::TaylorN` is too slow for `adam` due to evaluations
+        # within the dynamical model
         _, _, res = propres(radec, jd0 - ρ/c_au_per_day, q, params; dynamics)
         iszero(length(res)) && break
         # Least squares fit
         fit = tryls(res, x0, 5, 1:4)
-        # Minimized attributable elements
-        a0 = a(fit.x)
-        # Attributable elements
-        if scale == :linear
-            a = vcat(a0[1:4], ρ + dq[5], v_ρ + dq[6])
-        elseif scale == :log
-            a = vcat(a0[1:4], 10^(x + dq[5]), v_ρ + dq[6])
-        end
-        # Barycentric state vector
-        q = attr2bary(A, a, params)
-        # Propagation and residuals
-        _, _, res = propres(radec, jd0 - ρ/c_au_per_day, q, params; dynamics)
-        iszero(length(res)) && break
+        x1 .= fit.x
         # Current Q
         Q = nms(res)
-        Qs[t] = Q(x0)
+        Qs[t] = Q(x1)
         # Convergence condition
         t > 1 && abs(Qs[t] - Qs[t-1]) / Qs[t] < Qtol && break
         # Gradient of objective function
-        g_t = TaylorSeries.gradient(Q)(x0)[5:6]
+        g_t = TaylorSeries.gradient(Q)(x1)[5:6]
         # First momentum
         m .= μ * m + (1 - μ) * g_t
         _m_ .= m / (1 - μ^t)
@@ -485,11 +484,11 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         n .= ν * n + (1 - ν) * g_t .^ 2
         _n_ .= n / (1 - ν^t)
         # Step
-        x1[5:6] = x0[5:6] - η * _m_ ./ (sqrt.(_n_) .+ ϵ)
+        x1[5:6] = x1[5:6] - η * _m_ ./ (sqrt.(_n_) .+ ϵ)
         # Update values
-        ρ, v_ρ = bary2topo(A, q(x1))
+        ae .= AE(x1)
         # Projection
-        ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
+        ρ, v_ρ = boundary_projection(A, ae[5], ae[6])
         if scale == :log
             x = log10(ρ)
         end
