@@ -274,7 +274,7 @@ using NEOs: NEOSolution, numberofdays
         @test isa(sol1, NEOSolution{Float64, Float64})
         # Tracklets
         @test length(sol1.tracklets) == 5
-        @test sol1.tracklets[1].radec[1] == radec[idxs[1]]
+        @test sol1.tracklets[1].radec[1] == radec[1]
         @test sol1.tracklets[end].radec[end] == radec[30]
         @test issorted(sol1.tracklets)
         # Backward integration
