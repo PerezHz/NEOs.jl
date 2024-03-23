@@ -44,14 +44,41 @@ using NEOs: NEOSolution, numberofdays
         @test iszero(count(outlier.(sol.res)))
         # Least squares fit
         @test sol.fit.success
-        @test all( sigmas(sol) .< 1e-4 )
-        @test nrms(sol) < 0.38
+        @test all( sigmas(sol) .< 4e-7 )
+        @test nrms(sol) < 0.36
         # Scalig factors
         @test all(sol.scalings .== 1e-6)
         # Compatibility with JPL
         JPL = [-1.1003339484439327, 0.20772201506095814, 0.04202338912370205,
                -0.004735538686138557, -0.010626685053348663, -0.006016258344003866]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 6)
+
+        # Refine orbit
+        sol1 = orbitdetermination(radec, sol, params)
+
+        # Orbit solution
+        @test isa(sol1, NEOSolution{Float64, Float64})
+        # Tracklets
+        @test sol1.tracklets == sol.tracklets
+        # Backward integration
+        @test datetime2days(date(radec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
+        @test all( norm.(sol1.bwd.x, Inf) .< 1.2 )
+        @test isempty(sol1.t_bwd) && isempty(sol1.x_bwd) && isempty(sol1.g_bwd)
+        # Forward integration
+        @test datetime2days(date(radec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
+        @test all( norm.(sol1.fwd.x, Inf) .< 1.2 )
+        @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
+        # Vector of residuals
+        @test length(sol1.res) == 123
+        @test iszero(count(outlier.(sol1.res)))
+        # Least squares fit
+        @test sol1.fit.success
+        @test all( sigmas(sol1) .< 5e-5 )
+        @test nrms(sol1) < 0.36
+        # Scalig factors
+        @test all(sol1.scalings .< 2e-6)
+        # Compatibility with JPL
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.3)
     end
 
     @testset "Too Short Arc" begin
@@ -239,6 +266,36 @@ using NEOs: NEOSolution, numberofdays
         JPL = [0.9741070119227359, 0.21515061351517384, 0.09390897837680391,
                -0.007890445009307178, 0.016062726197198392, 0.006136042043681892]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
+
+        # Update orbit with more observations
+        sol1 = orbitdetermination(radec[1:30], sol, params)
+
+        # Orbit solution
+        @test isa(sol1, NEOSolution{Float64, Float64})
+        # Tracklets
+        @test length(sol1.tracklets) == 5
+        @test sol1.tracklets[1].radec[1] == radec[idxs[1]]
+        @test sol1.tracklets[end].radec[end] == radec[30]
+        @test issorted(sol1.tracklets)
+        # Backward integration
+        @test datetime2days(date(radec[idxs[1]])) > sol1.bwd.t0 + sol1.bwd.t[end]
+        @test all( norm.(sol1.bwd.x, Inf) .< 1 )
+        @test isempty(sol1.t_bwd) && isempty(sol1.x_bwd) && isempty(sol1.g_bwd)
+        # Forward integration
+        @test datetime2days(date(radec[idxs[end]])) < sol1.fwd.t0 + sol1.fwd.t[end]
+        @test all( norm.(sol1.fwd.x, Inf) .< 1e4 )
+        @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
+        # Vector of residuals
+        @test length(sol1.res) == 30
+        @test iszero(count(outlier.(sol1.res)))
+        # Least squares fit
+        @test sol1.fit.success
+        @test all( sigmas(sol1) .< 2e-6 )
+        @test nrms(sol1) < 0.37
+        # Scalig factors
+        @test all(sol1.scalings .< 1e-6)
+        # Compatibility with JPL
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.6)
     end
 
 end
