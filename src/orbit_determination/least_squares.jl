@@ -357,8 +357,7 @@ See also [`BHC`](@ref).
     See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
 """
 function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
-                  niters::Int = 5) where {T <: Real}
-    # TO DO: Adapt diffcorr for idxs
+                  niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
     # Degrees of freedom
     npar = length(x0)
     # Design matrix B, H array and normal matrix C
@@ -369,7 +368,9 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     # Vector of x
     x = Matrix{T}(undef, npar, niters + 1)
     # First guess
-    x[:, 1] = x0
+    for i in axes(x, 2)
+        x[:, i] .= x0
+    end
     # Vector of errors
     error = Vector{T}(undef, niters + 1)
     # Error of first guess
@@ -379,13 +380,13 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
         # Current x
         xi = x[:, i]
         # D matrix evaluated in xi
-        D = D_mat(xi)
+        D = D_mat(xi)[idxs]
         # C matrix evaluated in xi
-        C = C_mat(xi) #.+ ξTH_mat(xi)
+        C = C_mat(xi)[idxs, idxs] #.+ ξTH_mat(xi)
         # Update rule
         Δx = - inv(C)*D
         # New x
-        x[:, i+1] = xi + Δx
+        x[idxs, i+1] = xi[idxs] + Δx
         # Error
         error2 = ( (Δx') * (C*Δx) ) / npar
         if error2 ≥ 0
@@ -402,7 +403,7 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     # Normal C matrix evaluated in x_new
     C = C_mat(x_new)
     # Covariance matrix
-    Γ = inv(C)
+    Γ = inv(C[idxs, idxs])
 
     if any(diag(Γ) .< 0)
         return LeastSquaresFit(false, x_new, Γ, :diffcorr)
@@ -412,11 +413,11 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
 end
 
 function diffcorr(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
-                  niters::Int = 5) where {T <: Real}
+                  niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
     # Unfold residuals and weights
     _res_, _w_ = unfold(res)
 
-    return diffcorr(_res_, _w_, x0, niters)
+    return diffcorr(_res_, _w_, x0, niters, idxs)
 end
 
 @doc raw"""
@@ -644,8 +645,8 @@ end
     tryls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
           niters::Int = 5) where {T <: Real}
 
-Return the best least squares fit between two routines: [`newtonls`](@ref) and
-[`diffcorr`](@ref).
+Return the best least squares fit between three routines: [`newtonls`](@ref),
+[`diffcorr`](@ref) and [`levenbergmarquardt`](@ref).
 
 # Arguments
 
@@ -655,17 +656,17 @@ Return the best least squares fit between two routines: [`newtonls`](@ref) and
 """
 function tryls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
                niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0),
-               order::Vector{Symbol} = [:newton, :lm]) where {T <: Real}
+               order::Vector{Symbol} = [:newton, :diffcorr, :lm]) where {T <: Real}
     # Allocate memory
     fit = zero(LeastSquaresFit{T})
     # Least squares methods in order
     for i in eachindex(order)
         if order[i] == :newton
             fit = newtonls(res, x0, niters, idxs)
-        elseif order[i] == :lm
-            fit = levenbergmarquardt(res, x0, niters, idxs)
         elseif order[i] == :diffcorr
             fit = diffcorr(res, x0, niters, idxs)
+        elseif order[i] == :lm
+            fit = levenbergmarquardt(res, x0, niters, idxs)
         end
         fit.success && break
     end
