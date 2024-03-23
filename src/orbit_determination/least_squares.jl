@@ -656,7 +656,7 @@ Return the best least squares fit between three routines: [`newtonls`](@ref),
 """
 function tryls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
                niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0),
-               order::Vector{Symbol} = [:newton, :diffcorr]) where {T <: Real}
+               order::Vector{Symbol} = [:newton, :diffcorr, :lm]) where {T <: Real}
     # Allocate memory
     fit = zero(LeastSquaresFit{T})
     # Least squares methods in order
