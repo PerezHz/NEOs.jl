@@ -1,5 +1,5 @@
 using NEOs
-using Dates 
+using Dates
 using Tables
 using DataFrames
 using Query
@@ -7,7 +7,7 @@ using Test
 
 using NEOs: read_radec_mpc, RadecMPC, read_radar_jpl, RadarJPL
 
-@testset "DataFramesExt" begin
+@testset "DataFrame(::AbstractAstrometry)" begin
 
     # RadecMPC
     radec_2023DW = read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
