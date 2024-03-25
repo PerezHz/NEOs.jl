@@ -46,7 +46,7 @@ using NEOs: NEOSolution, numberofdays
         @test sol.fit.success
         @test all( sigmas(sol) .< 4e-7 )
         @test nrms(sol) < 0.36
-        # Scalig factors
+        # Scaling factors
         @test all(sol.scalings .== 1e-6)
         # Compatibility with JPL
         JPL = [-1.1003339484439327, 0.20772201506095814, 0.04202338912370205,
@@ -75,7 +75,7 @@ using NEOs: NEOSolution, numberofdays
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 5e-5 )
         @test nrms(sol1) < 0.36
-        # Scalig factors
+        # Scaling factors
         @test all(sol1.scalings .< 2e-6)
         # Compatibility with JPL
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.3)
@@ -118,7 +118,7 @@ using NEOs: NEOSolution, numberofdays
         @test sol.fit.success
         @test all( sigmas(sol) .< 6e-3 )
         @test nrms(sol) < 0.85
-        # Scalig factors
+        # Scaling factors
         @test all(sol.scalings .< 1e-5)
         # Compatibility with JPL
         JPL = [-0.9698333701500199, 0.24036461256880043, 0.10288887522619743,
@@ -165,7 +165,7 @@ using NEOs: NEOSolution, numberofdays
         @test sol.fit.success
         @test all( sigmas(sol) .< 5e-4 )
         @test nrms(sol) < 0.25
-        # Scalig factors
+        # Scaling factors
         @test all(sol.scalings .< 8e-7)
         # Compatibility with JPL
         JPL = [0.7673358221902306, 0.6484904294813807, 0.2932331617634889,
@@ -213,7 +213,7 @@ using NEOs: NEOSolution, numberofdays
         @test sol.fit.success
         @test all( sigmas(sol) .< 1e-3 )
         @test nrms(sol) < 0.13
-        # Scalig factors
+        # Scaling factors
         @test all(sol.scalings .< 1e-5)
         # Compatibility with JPL
         JPL = [-0.17932853771087842, 0.8874166708545763, 0.38414497114153867,
@@ -229,7 +229,7 @@ using NEOs: NEOSolution, numberofdays
         params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Observations with <1" weight
-        idxs = findall(x -> x < 1, w8sveres17.(radec))
+        idxs = findall(x -> w8sveres17(x) < 1, radec)
         # Restricted Orbit Determination
         sol = orbitdetermination(radec[idxs], params)
 
@@ -260,7 +260,7 @@ using NEOs: NEOSolution, numberofdays
         @test sol.fit.success
         @test all( sigmas(sol) .< 2e-5 )
         @test nrms(sol) < 0.30
-        # Scalig factors
+        # Scaling factors
         @test all(sol.scalings .< 1e-5)
         # Compatibility with JPL
         JPL = [0.9741070119227359, 0.21515061351517384, 0.09390897837680391,
@@ -292,7 +292,7 @@ using NEOs: NEOSolution, numberofdays
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 2e-6 )
         @test nrms(sol1) < 0.37
-        # Scalig factors
+        # Scaling factors
         @test all(sol1.scalings .< 1e-6)
         # Compatibility with JPL
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.6)
