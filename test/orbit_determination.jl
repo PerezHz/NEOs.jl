@@ -296,6 +296,8 @@ using NEOs: NEOSolution, numberofdays
         @test all(sol1.scalings .< 1e-6)
         # Compatibility with JPL
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.6)
+        # Parameters uncertainty
+        @test all(sigmas(sol1) .< sigmas(sol))
     end
 
 end
