@@ -40,7 +40,8 @@ end
 
 # A OsculatingElements is NaN if all its fields are NaN
 function isnan(osc::OsculatingElements{T}) where {T <: Number}
-    return isnan(osc.e) && isnan(osc.q) && isnan(osc.tp) && isnan(osc.Ω) && isnan(osc.ω) && isnan(osc.i) && isnan(osc.M) && isnan(osc.a)
+    return isnan(osc.e) && isnan(osc.q) && isnan(osc.tp) && isnan(osc.Ω) && isnan(osc.ω) &&
+           isnan(osc.i) && isnan(osc.M) && isnan(osc.a)
 end
 
 # Print method for OsculatingElements
@@ -55,18 +56,18 @@ end
 # Semimajor axis (a):                 0.8717319220347314 au
 function show(io::IO, m::OsculatingElements{T}) where {T <: Number}
 
-    print(io, rpad("Eccentricity (e): ", 36), cte(m.e), "\n")
-    print(io, rpad("Pericenter distance (q): ", 36), cte(m.q), " au\n")
+    print(io, rpad("Eccentricity (e): ", 36), @sprintf("%.5f", cte(m.e)), "\n")
+    print(io, rpad("Pericenter distance (q): ", 36), @sprintf("%.5f", cte(m.q)), " au\n")
     if isnan(m.tp)
         print(io, rpad("Time of pericenter passage (tp): ", 36), "NaN JDTDB\n")
     else
         print(io, rpad("Time of pericenter passage (tp): ", 36), julian2datetime(cte(m.tp)), " JDTDB\n")
     end
-    print(io, rpad("Longitude of Ascending Node (Ω): ", 36), cte(m.Ω), " deg\n")
-    print(io, rpad("Argument of pericenter (ω): ", 36), cte(m.ω), " deg\n")
-    print(io, rpad("Inclination (i): ", 36), cte(m.i), " deg\n")
-    print(io, rpad("Mean anomaly (M): ", 36), cte(m.M), " deg\n")
-    print(io, rpad("Semimajor axis (a): ", 36), cte(m.a), " au\n")
+    print(io, rpad("Longitude of Ascending Node (Ω): ", 36), @sprintf("%.5f", cte(m.Ω)), " deg\n")
+    print(io, rpad("Argument of pericenter (ω): ", 36), @sprintf("%.5f", cte(m.ω)), " deg\n")
+    print(io, rpad("Inclination (i): ", 36), @sprintf("%.5f", cte(m.i)), " deg\n")
+    print(io, rpad("Mean anomaly (M): ", 36), @sprintf("%.5f", cte(m.M)), " deg\n")
+    print(io, rpad("Semimajor axis (a): ", 36), @sprintf("%.5f", cte(m.a)), " au\n")
 
 end
 
@@ -85,21 +86,24 @@ function equatorial2ecliptic(xas::Vector{T}) where {T <: Number}
 end
 
 @doc raw"""
-    pv2kep(xas, μ = μ_S, jd = JD_J2000, frame::Symbol = :equatorial)
+    pv2kep(xas::Vector{U}; μ::T = μ_S, jd::T = JD_J2000,
+           frame::Symbol = :equatorial) where {T <: Real, U <: Number}
 
-Compute the orbital elements of the NEO with state vector `xas`. Return a `OsculatingElements` object.
+Compute the orbital elements of the NEO with state vector `xas`.
+Return an `OsculatingElements` object.
 
-See also [`equatorial2ecliptic`](@ref), [`eccentricity`](@ref), [`semimajoraxis`](@ref), [`timeperipass`](@ref),
-[`longascnode`](@ref), [`argperi`](@ref) and [`inclination`](@ref).
+See also [`equatorial2ecliptic`](@ref), [`eccentricity`](@ref), [`semimajoraxis`](@ref),
+[`timeperipass`](@ref), [`longascnode`](@ref), [`argperi`](@ref) and [`inclination`](@ref).
 
 # Arguments
 
-- `xas`: State vector of the asteroid `[x, y, z, v_x, v_y, v_z]`.
-- `μ_S`: Mass parameter of the central body (Sun).
-- `jd`: Orbit epoch of reference in julian days.
+- `xas::Vector{U}`: state vector of the asteroid `[x, y, z, v_x, v_y, v_z]`.
+- `μ_S::T`: mass parameter of the central body (Sun).
+- `jd::T`: orbit epoch of reference in julian days.
 - `frame::Symbol`: plane of reference (`:equatorial` or `:ecliptic`).
 """
-function pv2kep(xas; μ = μ_S, jd = JD_J2000, frame::Symbol = :equatorial)
+function pv2kep(xas::Vector{U}; μ::T = μ_S, jd::T = JD_J2000,
+                frame::Symbol = :equatorial) where {T <: Real, U <: Number}
     if frame == :ecliptic
         xas = equatorial2ecliptic(xas)
     end
@@ -167,14 +171,15 @@ where ``A_2`` is the Yarkovsky parameter, ``\mu_\odot = GM_\odot`` is the Sun's 
 ``e`` is the eccentricity, ``n = \sqrt{\mu/a^3}`` is the mean motion, ``p = a(1-e^2)`` is the
 semilatus rectum, and ``a`` is the semimajor axis.
 
-See https://doi.org/10.1016/j.icarus.2013.02.004.
-
 # Arguments
 
 - `A2`: Yarkovsky parameter.
 - `a`: semimajor axis.
 - `e`: eccentricity.
 - `μ_S`: mass parameter of the Sun.
+
+!!! reference
+    See https://doi.org/10.1016/j.icarus.2013.02.004.
 """
 function yarkp2adot(A2, a, e; μ = μ_S)
     return 2A2/(sqrt(a)*(1-e^2)*sqrt(μ))

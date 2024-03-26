@@ -1,10 +1,13 @@
+# Abstract type of RadecMPC and RadarJPL
 abstract type AbstractAstrometry end
+# Dummy types to parse right ascension and declination
+struct RightAscension <: AbstractAstrometry end
+struct Declination <: AbstractAstrometry end
 
 @doc raw"""
     RadecMPC{T <: AbstractFloat} <: AbstractAstrometry
 
-An optical (α, δ) measurement in MPC format. The format is described in https://minorplanetcenter.net/iau/info/OpticalObs.html
-and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.2010.06.003.
+An optical (right ascension, declination) measurement in MPC format.
 
 # Fields
 
@@ -17,11 +20,15 @@ and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.20
 - `α::T`: right ascension [rad].
 - `δ::T`: declination [rad].
 - `info1::String`: additional information.
-- `mag::String`: observed magnitude.
+- `mag::T`: observed magnitude.
 - `band::String`: magnitude band.
 - `catalogue::CatalogueMPC`: catalogue.
 - `info2::String`: additional information.
 - `observatory::ObservatoryMPC{T}`: observatory.
+
+!!! reference
+    The format is described in https://minorplanetcenter.net/iau/info/OpticalObs.html
+    and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.2010.06.003.
 """
 @auto_hash_equals struct RadecMPC{T <: AbstractFloat} <: AbstractAstrometry
     num::String
@@ -33,14 +40,14 @@ and discussed thoroughly in pages 158-181 of https://doi.org/10.1016/j.icarus.20
     α::T
     δ::T
     info1::String
-    mag::String
+    mag::T
     band::String
     catalogue::CatalogueMPC
     info2::String
     observatory::ObservatoryMPC{T}
     # Inner constructor
     function RadecMPC{T}(num::String, tmpdesig::String, discovery::String, publishnote::String,
-                         obstech::String, date::DateTime, α::T, δ::T, info1::String, mag::String,
+                         obstech::String, date::DateTime, α::T, δ::T, info1::String, mag::T,
                          band::String, catalogue::CatalogueMPC, info2::String, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
         new{T}(num, tmpdesig, discovery, publishnote, obstech, date, α, δ, info1, mag, band,
                catalogue, info2, observatory)
@@ -49,7 +56,7 @@ end
 
 # Outer constructor
 function RadecMPC(num::String, tmpdesig::String, discovery::String, publishnote::String,
-                  obstech::String, date::DateTime, α::T, δ::T, info1::String, mag::String,
+                  obstech::String, date::DateTime, α::T, δ::T, info1::String, mag::T,
                   band::String, catalogue::CatalogueMPC, info2::String, observatory::ObservatoryMPC{T}) where {T <: AbstractFloat}
     RadecMPC{T}(num, tmpdesig, discovery, publishnote, obstech, date, α, δ, info1, mag, band,
                 catalogue, info2, observatory)
@@ -61,8 +68,8 @@ end
 
 # Print method for RadecMPC
 # Examples:
-# N00hp15 α: 608995.65 δ: -25653.3 t: 2020-12-04T10:41:43.209 obs: 703
-# 99942 α: 422475.3 δ: 97289.49 t: 2021-05-12T06:28:35.904 obs: F51
+# K08E68K α: 166.27754° δ: -0.66325° t: 2008-03-05T10:34:27.840 obs: Mt. Lemmon Survey
+# 99942 α: 146.12752° δ: 13.31300° t: 2004-06-19T04:11:47.990 obs: Kitt Peak
 function show(io::IO, m::RadecMPC{T}) where {T <: AbstractFloat}
     # If there is no number, use temporary designation
     id_str = filter(!isspace, m.num) == "" ? m.tmpdesig : m.num
@@ -77,6 +84,7 @@ tmpdesig(r::RadecMPC{T}) where {T <: AbstractFloat} = r.tmpdesig
 discovery(r::RadecMPC{T}) where {T <: AbstractFloat} = r.discovery
 publishnote(r::RadecMPC{T}) where {T <: AbstractFloat} = r.publishnote
 obstech(r::RadecMPC{T}) where {T <: AbstractFloat} = r.obstech
+date(r::T) where {T <: AbstractAstrometry} = r.date
 ra(r::RadecMPC{T}) where {T <: AbstractFloat} = r.α
 dec(r::RadecMPC{T}) where {T <: AbstractFloat} = r.δ
 info1(r::RadecMPC{T}) where {T <: AbstractFloat} = r.info1
@@ -86,72 +94,29 @@ catalogue(r::RadecMPC{T}) where {T <: AbstractFloat} = r.catalogue
 info2(r::RadecMPC{T}) where {T <: AbstractFloat} = r.info2
 observatory(r::RadecMPC{T}) where {T <: AbstractFloat} = r.observatory
 
-# Regular expression to parse an optical measurement in MPC format
-const mpc_radec_regex = Regex(join(
-    [
-        # Number regex (columns 1-5)
-        raw"(?P<num>.{5})",
-        # Temporary designation regex (columns 6-12)
-        raw"(?P<tmpdesig>.{7})",
-        # Discovery asterisk regex (column 13)
-        raw"(?P<discovery>.{1})",
-        # Publishable note regex (column 14)
-        raw"(?P<publishnote>.{1})",
-        # Observation technique regex (column 15)
-        raw"(?P<obstech>.{1})",
-        # Year regex + space (columns 16-20)
-        raw"(?P<year>\d{4}) ",
-        # Month regex + space (columns 21-23)
-        raw"(?P<month>\d{2}) ",
-        # Day regex (columns 24-25)
-        raw"(?P<day>\d{2})",
-        # Fraction of days regex (columns 26-32)
-        raw"(?P<utc>\.[\d\s]{6})",
-        # α hours regex + space (columns 33-35)
-        raw"(?P<α_hrs>\d{2}) ",
-        # α minutes regex + space (columns 36-38)
-        raw"(?P<α_min>\d{2}) ",
-        # α seconds regex (columns 39-44)
-        raw"(?P<α_sec>\d{2}\.[\d\s]{3})",
-        # δ sign regex (column 45)
-        raw"(?P<δ_sgn>\+|\-)",
-        # δ degrees regex + space (columns 46-48)
-        raw"(?P<δ_deg>\d{2}) ",
-        # δ minutes regex + space (columns 49-51)
-        raw"(?P<δ_min>\d{2}) ",
-        # δ seconds regex (columns 52-56)
-        raw"(?P<δ_sec>\d{2}\.[\d\s]{2})",
-        # Info 1 regex (columns 57-65)
-        raw"(?P<info1>.{9})",
-        # Magnitude regex (columns 66-70)
-        raw"(?P<mag>.{5})",
-        # Band regex (column 71)
-        raw"(?P<band>.{1})",
-        # Catalogue regex (column 72)
-        raw"(?P<catalogue>.{1})",
-        # Info 2 regex (columns 73-77)
-        raw"(?P<info2>.{5})",
-        # Observatory code regex (columns 78-80)
-        raw"(?P<obscode>.{3})"
-    ]
-))
+# Order in AbstractAstrometry is given by date
+isless(a::T, b::T) where {T <: AbstractAstrometry} = a.date < b.date
 
-@doc raw"""
-    datetime(year::Int, month::Int, day::Int, utc::T) where {T <: Real}
-
-Construct a `DateTime` type by parts. `utc` is the fraction of day.
-"""
-function datetime(year::Int, month::Int, day::Int, utc::T) where {T <: Real}
-    return DateTime(year, month, day) + Microsecond( round(1e6*86_400*utc) )
+function neoparse(x::RegexMatch, i::Int, ::Type{Int64})
+    y = tryparse(Int64, x[i])
+    if isnothing(y)
+        return 0
+    else
+        return y
+    end
 end
 
-@doc raw"""
-    ra(hrs::Int, min::Int, sec::T) where {T <: Real}
-    ra(obs::RadecMPC{T}) where {T <: AbstractFloat}
+function neoparse(x::RegexMatch, i::Int, ::Type{DateTime})
+    date = DateTime(x[i][1:10], "yyyy mm dd")
+    utc = parse(Float64, x[i][11:end])
+    return date + Microsecond( round(1e6*86_400*utc) )
+end
 
-Return the right ascension in rad.
-"""
-function ra(hrs::Int, min::Int, sec::T) where {T <: Real}
+function neoparse(x::RegexMatch, i::Int, ::Type{RightAscension})
+    # Unfold
+    hrs = parse(Int, x[i][1:2])
+    min = parse(Int, x[i][4:5])
+    sec = parse(Float64, x[i][7:end])
     # Convert hours minutes seconds to deg
     α_deg =  15*(hrs + min/60 + sec/3_600)
     # Convert deg to rad
@@ -161,17 +126,16 @@ function ra(hrs::Int, min::Int, sec::T) where {T <: Real}
 
 end
 
-@doc raw"""
-    dec(sgn::String, deg::Int, min::Int, sec::T) where {T <: Real}
-    dec(obs::RadecMPC{T}) where {T <: AbstractFloat}
-
-Return the declination in rad.
-"""
-function dec(sgn::String, deg::Int, min::Int, sec::T) where {T <: Real}
+function neoparse(x::RegexMatch, i::Int, ::Type{Declination})
+    # Unfold
+    sgn = Char(x[i][1])
+    deg = parse(Int, x[i][2:3])
+    min = parse(Int, x[i][5:6])
+    sec = parse(Float64, x[i][8:end])
     # Convert degrees minutes seconds to degrees
-    if sgn == "+"
+    if sgn == '+'
         δ_deg = +(deg + min/60 + sec/3_600)
-    elseif sgn == "-"
+    elseif sgn == '-'
         δ_deg = -(deg + min/60 + sec/3_600)
     end
 
@@ -180,163 +144,75 @@ function dec(sgn::String, deg::Int, min::Int, sec::T) where {T <: Real}
     return δ_rad
 end
 
+neoparse(x::RegexMatch, i::Int, ::Type{CatalogueMPC}) = search_cat_code(String(x[i]))
+
+function neoparse(m::RegexMatch, i::Int, ::Type{ObservatoryMPC{Float64}})
+    _observatory_ = search_obs_code(String(m[i]))
+    if isnothing(m["optional"])
+        return _observatory_
+    else
+        units = neoparse(m, 22, Int64)
+        x = neoparse(m, 23, Float64)
+        y = neoparse(m, 24, Float64)
+        z = neoparse(m, 25, Float64)
+        date = neoparse(m, 6, DateTime)
+        if units == 2
+            x *= au
+            y *= au
+            z *= au
+        end
+        return ObservatoryMPC(_observatory_.code, x, y, z, _observatory_.name, date, :satellite, units)
+    end
+end
+
 @doc raw"""
     RadecMPC(m::RegexMatch)
 
-Convert a match of `NEOs.mpc_radec_regex` to `RadecMPC`.
+Convert a match of `NEOs.RADEC_MPC_REGEX` to `RadecMPC`.
 """
 function RadecMPC(m::RegexMatch)
-    date = datetime(
-        Meta.parse(m["year"]),
-        Meta.parse(m["month"]),
-        Meta.parse(m["day"]),
-        Meta.parse(m["utc"])
-    )
-    α = ra(
-        Meta.parse(m["α_hrs"]),
-        Meta.parse(m["α_min"]),
-        Meta.parse(m["α_sec"])
-    )
-    δ = dec(
-        string(m["δ_sgn"]),
-        Meta.parse(m["δ_deg"]),
-        Meta.parse(m["δ_min"]),
-        Meta.parse(m["δ_sec"])
-    )
-    # Find catalogue in mpc_catalogues[] that matches catalogue
-    catalogue = search_cat_code(string(m["catalogue"]))
-    # Find observatory in mpc_observatories[] that matches obscode
-    observatory = search_obs_code(string(m["obscode"]))
+    # Check that matched regex is correct
+    @assert m.regex == RADEC_MPC_REGEX "Only matches of `NEOs.RADEC_MPC_REGEX` can be converted to `RadecMPC`."
+    # Field types
+    types = fieldtypes(RadecMPC{Float64})
+    # RadecMPC{Float64} fields
+    args = map(i -> begin
+        if i == 7
+            neoparse(m, i, RightAscension)
+        elseif i == 8
+            neoparse(m, i, Declination)
+        else
+            neoparse(m, i, types[i])
+        end
+    end, 1:length(types))
 
-    return RadecMPC(
-        string(m["num"]),
-        string(m["tmpdesig"]),
-        string(m["discovery"]),
-        string(m["publishnote"]),
-        string(m["obstech"]),
-        date,
-        α,
-        δ,
-        string(m["info1"]),
-        string(m["mag"]),
-        string(m["band"]),
-        catalogue,
-        string(m["info2"]),
-        observatory
-    )
+    return RadecMPC(args...)
 end
 
 @doc raw"""
-    read_radec_mpc(filename::String)
+    read_radec_mpc(s::String)
 
-Return the matches of `NEOs.mpc_radec_regex` in `filename` as `RadecMPC`.
+Return the matches of `NEOs.RADEC_MPC_REGEX` in `s` as `Vector{RadecMPC{Float64}}`.
+`s` can be either a filename or a text.
 """
-function read_radec_mpc(filename::String)
-    # Check that filename is a file
-    @assert isfile(filename) "Cannot open file: $filename"
-    # Read lines of mpc formatted file
-    lines = readlines(filename)
-    # Apply regular expressions
-    matches = match.(mpc_radec_regex, lines)
-    # Eliminate nothings
-    filter!(!isnothing, matches)
-    # Convert matches to RadecMPC
-    obs = RadecMPC.(matches)
-    # Sort observations by date
-    sort!(obs)
-    # Eliminate repeated observations
-    unique!(obs)
-
-    return obs
-end
-
-@doc raw"""
-    parse_radec_mpc(text::String)
-    parse_radec_mpc(f::F, text::String) where F
-
-Return the matches of `NEOs.mpc_radec_regex` in `text`. A function `f(m::RegexMatch) -> Bool`
-can be passed to filter the matches.
-"""
-function parse_radec_mpc(f::F, text::String) where F
-
+function read_radec_mpc(s::String)
+    if !contains(s, "\n") && isfile(s)
+        # Read MPC formatted file
+        s = String(read(s))
+    end
     # Vector of observations
-    radecs = Vector{RadecMPC{Float64}}(undef, 0)
+    radec = Vector{RadecMPC{Float64}}(undef, 0)
     # Iterate over the matches
-    for m in eachmatch(mpc_radec_regex, text)
-        # Filter by f
-        if f(m)
-            push!(radecs, RadecMPC(m))
-        end
+    for m in eachmatch(RADEC_MPC_REGEX, s)
+        push!(radec, RadecMPC(m))
     end
-    # If there is at least one observation
-    if length(radecs) > 0
-        # Sort observations by date
-        sort!(radecs)
-        # Eliminate repeated observations
-        unique!(radecs)
-    end
+    # Eliminate repeated entries
+    unique!(radec)
+    # Sort observations by date
+    sort!(radec)
 
-    return radecs
+    return radec
 end
-parse_radec_mpc(text::String) = parse_radec_mpc(t -> true, text)
-
-# MPC main page url
-const mpc_url = "https://minorplanetcenter.net"
-
-# Regex for next circular url
-const next_circular_regex = r"<a href=\"(?P<next>.*)\"><img src=\"/iau/figs/RArrow.gif\""
-
-@doc raw"""
-    search_circulars_mpc(url1::String, url2::String; max_iter::Int = 10_000)
-    search_circulars_mpc(f::F, url1::String, url2::String; max_iter::Int = 10_000) where F
-
-Iterate MPC circulars from `url1` to `url2` and return the matches of `NEOs.mpc_radec_regex`.
-A function `f(m::RegexMatch) -> Bool` can be passed to filter the observations. If `url2` is not
-reached before `max_iter` iterations, the function will print a warning and return the
-matches found so far.
-"""
-function search_circulars_mpc(f::F, url1::String, url2::String; max_iter::Int = 10_000) where F
-
-    # Vector of observations
-    obs = Vector{RadecMPC{Float64}}(undef, 0)
-
-    # Number of urls checked
-    n = 0
-    # First url
-    u = url1
-
-    while true
-        n += 1
-        if n > max_iter
-            @warn("$n pages checked before getting to $url2")
-            break
-        end
-        # Raw html text of webpage u
-        text = get_raw_html(u)
-        # Observations found in text
-        obs_ = parse_radec_mpc(f, text)
-        # Add new observations
-        obs = vcat(obs, obs_)
-        # Final url
-        if u == url2
-            break
-        end
-        # Next circular url
-        next = match(next_circular_regex, text)["next"]
-        u = mpc_url * next
-    end
-    # If there is at least one observation
-    if length(obs) > 0
-        # Sort observations by date
-        sort!(obs)
-        # Eliminate repeated observations
-        unique!(obs)
-    end
-
-    return obs
-end
-
-search_circulars_mpc(url1::String, url2::String; max_iter::Int = 10_000) = search_circulars_mpc(t -> true, url1, url2; max_iter = max_iter)
 
 @doc raw"""
     mpc_date_str(date::DateTime)
@@ -362,13 +238,7 @@ function mpc_date_str(date::DateTime)
     # Days string
     day_s = @sprintf("%09.6f", day_val)
     # Join everything
-    date_s = join([
-        year_s,
-        " ",
-        month_s,
-        " ",
-        day_s,
-    ])
+    date_s = string(year_s, " ", month_s, " ", day_s)
 
     return date_s
 end
@@ -396,13 +266,7 @@ function mpc_α_str(α::T) where {T <: Number}
     # Seconds string
     sec_s = @sprintf("%06.3f", sec)
     # Join everything
-    α_s = join([
-        hrs_s,
-        " ",
-        min_s,
-        " ",
-        sec_s,
-    ])
+    α_s = string(hrs_s, " ", min_s, " ", sec_s)
 
     return α_s
 end
@@ -432,52 +296,75 @@ function mpc_δ_str(δ::T) where {T <: Number}
     # Seconds string
     sec_s = @sprintf("%05.2f", sec)
     # Join everything
-    δ_s = join([
-        sgn_s,
-        deg_s,
-        " ",
-        min_s,
-        " ",
-        sec_s,
-    ])
+    δ_s = string(sgn_s, deg_s, " ", min_s, " ", sec_s)
 
     return δ_s
 end
 
-@doc raw"""
-    mpc_radec_str(obs::RadecMPC{T}) where {T <: AbstractFloat}
+function mpc_x_str(x::T) where {T <: AbstractFloat}
+    sgn = x > 0 ? "+" : "-"
+    y = string(abs(x))
+    y = lpad(y, 10)
+    return string(sgn, y, " ")
+end
 
-Return an observation in MPC format.
-"""
-function mpc_radec_str(obs::RadecMPC{T}) where {T <: AbstractFloat}
+# Convert `obs` to a string according to MPC format.
+function string(obs::RadecMPC{T}) where {T <: AbstractFloat}
+    # Number string
+    num_s = rpad(obs.num, 5)
+    # Temporary designation string
+    tmpdesig_s = rpad(obs.tmpdesig, 7)
+    # Discovery asterisk string
+    discovery_s = rpad(obs.discovery, 1)
+    # Publishable note string
+    publishnote_s = rpad(obs.publishnote, 1)
+    # Observation technique string
+    obstech_s = rpad(obs.obstech, 1)
     # Date string
     date_s = mpc_date_str(obs.date)
     # Right ascension string
     α_s = mpc_α_str(obs.α)
     # Declination string
     δ_s = mpc_δ_str(obs.δ)
+    # Info 1 string
+    info1_s = rpad(obs.info1, 9)
+    # Magnitude string
+    mag_s = isnan(obs.mag) ? repeat(" ", 5) : @sprintf("%.2f", obs.mag)
+    # Band string
+    band_s = rpad(obs.band, 1)
+    # Info 2 string
+    info2_s = rpad(obs.info2, 5)
     # Catalogue string
     catalogue_s = isunknown(obs.catalogue) ? " " : obs.catalogue.code
     # Observatory string
     obscode_s = isunknown(obs.observatory) ? "   " : obs.observatory.code
     # Join everything
-    obs_s = join([
-        obs.num,
-        obs.tmpdesig,
-        obs.discovery,
-        obs.publishnote,
-        obs.obstech,
-        date_s,
-        α_s,
-        δ_s,
-        obs.info1,
-        obs.mag,
-        obs.band,
-        catalogue_s,
-        obs.info2,
-        obscode_s,
-        "\n"
-    ])
+    obs_s = string(num_s, tmpdesig_s, discovery_s, publishnote_s, obstech_s, date_s, α_s, δ_s,
+                   info1_s, mag_s, band_s, catalogue_s, info2_s, obscode_s)
+
+    if issatellite(obs.observatory)
+        # Units string
+        units = obs.observatory.units
+        units_s = rpad(units, 1)
+
+        x = obs.observatory.long
+        y = obs.observatory.cos
+        z = obs.observatory.sin
+        if units == 2
+            x /= au
+            y /= au
+            z /= au
+        end
+
+        # X component string
+        x_s = mpc_x_str(x)
+        # Y component string
+        y_s = mpc_x_str(y)
+        # Z component string
+        z_s = mpc_x_str(z)
+        obs_s = string(obs_s, "\n", num_s, tmpdesig_s, " ", publishnote_s, "s", date_s,
+                       units_s, " ", x_s, y_s, z_s, "  ", info2_s, obscode_s)
+    end
 
     return obs_s
 end
@@ -490,25 +377,73 @@ Write `obs` to `filename` in MPC format.
 function write_radec_mpc(obs::Vector{RadecMPC{T}}, filename::String) where {T <: AbstractFloat}
     open(filename, "w") do file
         for i in eachindex(obs)
-            line = mpc_radec_str(obs[i])
-            write(file, line)
+            line = string(obs[i])
+            write(file, line, "\n")
         end
     end
 end
 
 @doc raw"""
-    get_radec_mpc(id::AbstractString, filename::AbstractString)
+    get_radec_mpc(id::Pair{String, String}, filename::String = replace(id[2], " " => "_") * ".txt")
 
-Download MPC optical astrometry of NEO `id` and save the output to `filename`. 
+Download MPC optical astrometry of NEO `id` and save the output to `filename`.
 """
-function get_radec_mpc(id::AbstractString, filename::AbstractString)
-    # MPC search url 
-    search_url = search_mpc_url *  replace(id, " " => "+")
-    # MPC observations file url 
-    obs_url = obs_mpc_url * replace(id, " " => "_") * ".txt"
-    # Download database search 
-    download(search_url, filename)
-    # Download observations file 
-    download(obs_url, filename)
-    return nothing
-end 
+function get_radec_mpc(id::Pair{String, String}, filename::String = replace(id[2], " " => "_") * ".txt")
+    # HTTP query
+    query = ["table" => "observations", id]
+    resp = get("http://minorplanetcenter.net/search_db"; query = query)
+    # Converty to String
+    text = String(resp.body)
+    # Parse JSON
+    obs = JSON.parse(text)
+    # Find matches
+    matches = Vector{Union{RegexMatch, Nothing}}(undef, length(obs))
+    for i in eachindex(obs)
+        s = obs[i]["original_record"]
+        matches[i] = match(RADEC_MPC_REGEX, s)
+    end
+    filter!(!isnothing, matches)
+    # Parse RadecMPC
+    radec = RadecMPC.(matches)
+    # Write observations to file
+    write_radec_mpc(radec, filename)
+
+    return filename
+end
+
+@doc raw"""
+    fetch_radec_mpc(id::Pair{String, String})
+
+Download MPC optical astrometry of NEO `id` and return the output as `Vector{RadecMPC{Float64}}`.
+"""
+function fetch_radec_mpc(id::Pair{String, String})
+    # Temporary file
+    f = tempname()
+    # Download optical astrometry
+    get_radec_mpc(id, f)
+    # Parse optical astrometry
+    radec = read_radec_mpc(f)
+    # Delete temporary file
+    rm(f)
+
+    return radec
+end
+
+# Methods to convert a Vector{<:AbstractAstrometry} to a DataFrame
+istable(::Type{Vector{<:AbstractAstrometry}}) = true
+rowaccess(::Type{Vector{<:AbstractAstrometry}}) = true
+rows(x::Vector{<:AbstractAstrometry}) = x
+schema(::Vector{T}) where {T <: AbstractAstrometry} = Schema(fieldnames(T), Tuple{fieldtypes(T)...})
+
+# Methods to convert a DataFrame to a Vector{<:AbstractAstrometry}
+function Vector{T}(df::AbstractDataFrame) where {T <: AbstractAstrometry}
+    @assert all(String.(fieldnames(T)) .== names(df)) "`DataFrame` column names don't match `$T` fieldnames"
+    @assert all(fieldtypes(T) .== eltype.(eachcol(df))) "`DataFrame` column types don't match `$T` fieldtypes"
+    obs = Vector{T}(undef, nrow(df))
+    for (i, row) in zip(eachindex(obs), eachrow(df))
+        obs[i] = T(values(row)...)
+    end
+    return obs
+end
+
+convert(::Type{Vector{T}}, df::DataFrame) where {T <: AbstractAstrometry} = Vector{T}(df)

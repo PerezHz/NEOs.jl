@@ -1,47 +1,153 @@
 @doc raw"""
-    compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
-    xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
-    compute_radec(obs::RadecMPC{T}; niter::Int = 5, xve::EarthEph = earthposvel, xvs::SunEph = sunposvel,
-                  xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
-    compute_radec(obs::Vector{RadecMPC{T}}; niter::Int=5, xve::EarthEph=earthposvel, xvs::SunEph=sunposvel,
-                  xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
+    OpticalResidual{T <: Real, U <: Number}
 
-Compute astrometric right ascension and declination (both in arcsec) for a set of MPC-formatted observations.
-Corrections due to Earth orientation, LOD, polar motion are considered in computations.
+An astrometric optical observed minus computed residual.
+
+# Fields
+
+- `ξ_α::U`: right ascension residual.
+- `ξ_δ::U`: declination residual.
+- `w_α::T`: right ascension weight.
+- `w_δ::T`: declination weight.
+- `relax_factor::T`: relaxation factor.
+- `outlier::Bool`: whether the residual is an outlier or not.
+"""
+@auto_hash_equals struct OpticalResidual{T <: Real, U <: Number}
+    ξ_α::U
+    ξ_δ::U
+    w_α::T
+    w_δ::T
+    relax_factor::T
+    outlier::Bool
+    # Inner constructor
+    function OpticalResidual{T, U}(ξ_α::U, ξ_δ::U, w_α::T, w_δ::T, relax_factor::T = one(T),
+                                   outlier::Bool = false) where {T <: Real, U <:  Number}
+        new{T, U}(ξ_α, ξ_δ, w_α, w_δ, relax_factor, outlier)
+    end
+end
+# Outer constructor
+function OpticalResidual(ξ_α::U, ξ_δ::U, w_α::T, w_δ::T, relax_factor::T = one(T),
+                         outlier::Bool = false) where {T <: Real, U <: Number}
+    return OpticalResidual{T, U}(ξ_α, ξ_δ, w_α, w_δ, relax_factor, outlier)
+end
+
+# Evaluate methods
+function evaluate(res::OpticalResidual{T, TaylorN{T}}, x::Vector{T}) where {T <: Real}
+    return OpticalResidual(res.ξ_α(x), res.ξ_δ(x), res.w_α, res.w_δ, res.relax_factor, res.outlier)
+end
+(res::OpticalResidual{T, TaylorN{T}})(x::Vector{T}) where {T <: Real} = evaluate(res, x)
+
+function evaluate(res::AbstractVector{OpticalResidual{T, TaylorN{T}}}, x::Vector{T}) where {T <: Real}
+    res_new = Vector{OpticalResidual{T, T}}(undef, length(res))
+    for i in eachindex(res)
+        res_new[i] = evaluate(res[i], x)
+    end
+    return res_new
+end
+(res::AbstractVector{OpticalResidual{T, TaylorN{T}}})(x::Vector{T}) where {T <: Real} = evaluate(res, x)
+
+# Print method for OpticalResidual
+# Examples:
+# α: -138.79801 δ: -89.80025
+# α: -134.79450 δ: -91.42509 (outlier)
+function show(io::IO, x::OpticalResidual{T, U}) where {T <: Real, U <: Number}
+    outlier_flag = outlier(x) ? " (outlier)" : ""
+    print(io, "α: ", @sprintf("%+.5f", cte(x.ξ_α)), " δ: ",
+          @sprintf("%+.5f", cte(x.ξ_δ)), outlier_flag)
+end
+
+@doc raw"""
+    unfold(ξs::Vector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+
+Concatenate right ascension and declination residuals for an orbit fit.
+"""
+function unfold(ξs::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+    # Number of non outliers
+    L = count(x -> !x.outlier, ξs)
+    # Vector of residuals
+    res = Vector{U}(undef, 2*L)
+    # Vector of weights
+    w = Vector{T}(undef, 2*L)
+    # Global counter
+    k = 1
+    # Fill residuals and weights
+    for i in eachindex(ξs)
+        if !ξs[i].outlier
+            # Right ascension
+            res[k] = ξs[i].ξ_α
+            w[k] = ξs[i].w_α / ξs[i].relax_factor
+            # Declination
+            res[k+L] = ξs[i].ξ_δ
+            w[k+L] = ξs[i].w_δ / ξs[i].relax_factor
+            # Update global counter
+            k += 1
+        end
+    end
+
+    return res, w
+end
+
+# Functions to get specific fields of a OpticalResidual object
+ra(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.ξ_α
+dec(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.ξ_δ
+weight_ra(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.w_α
+weight_dec(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.w_δ
+relax_factor(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.relax_factor
+outlier(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.outlier
+
+euclid3D(x::Vector{U}) where {U <: Number} = sqrt(x[1]*x[1] + x[2]*x[2] + x[3]*x[3])
+dot3D(x::Vector{U}, y::Vector{V}) where {U, V <: Number} = x[1]*y[1] + x[2]*y[2] + x[3]*y[3]
+
+@doc raw"""
+    compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; kwargs...) where {T <: AbstractFloat}
+    compute_radec(obs::RadecMPC{T}; kwargs...) where {T <: AbstractFloat}
+    compute_radec(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloat}
+
+Compute astrometric right ascension and declination (both in arcsec) for a set of MPC-formatted
+observations. Corrections due to Earth orientation, LOD, polar motion are considered in
+computations.
 
 # Arguments
 
 - `observatory::ObservatoryMPC{T}`: observation site.
 - `t_r_utc::DateTime`: UTC time of astrometric observation.
-- `niter::Int`: number of light-time solution iterations.
-- `xve`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xvs`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `obs::Vector{RadecMPC{T}}`: optical observation(s).
+
+# Keyword arguments
+
+- `niter::Int = 5`: number of light-time solution iterations.
+- `xve::EarthEph = earthposvel`: Earth ephemeris.
+- `xvs::SunEph = sunposvel`: Sun ephemeris.
+- `xva::AstEph`: asteroid ephemeris.
+
+All ephemeris must take [et seconds since J2000] and return [barycentric position in km
+and velocity in km/sec].
 """
 function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
-                       xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
+                       xvs::SunEph = sunposvel, xve::EarthEph = earthposvel,
+                       xva::AstEph) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
     # Transform receiving time from UTC to TDB seconds since J2000
     et_r_secs = datetime2et(t_r_utc)
-    # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
-    RV_r = obsposvelECI(observatory, et_r_secs)
-    R_r = RV_r[1:3]
-    # Earth's barycentric position and velocity at receive time
-    rv_e_t_r = xve(et_r_secs)
-    r_e_t_r = rv_e_t_r[1:3]
-    # Receiver barycentric position and velocity at receive time
-    r_r_t_r = r_e_t_r + R_r
-    # Asteroid barycentric position and velocity at receive time
-    rv_a_t_r = xva(et_r_secs)
-    r_a_t_r = rv_a_t_r[1:3]
     # Sun barycentric position and velocity at receive time
     rv_s_t_r = xvs(et_r_secs)
     r_s_t_r = rv_s_t_r[1:3]
+    # Earth's barycentric position and velocity at receive time
+    rv_e_t_r = xve(et_r_secs)
+    r_e_t_r = rv_e_t_r[1:3]
+    # Asteroid barycentric position and velocity at receive time
+    rv_a_t_r = xva(et_r_secs)
+    r_a_t_r = rv_a_t_r[1:3]
+    # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
+    RV_r = obsposvelECI(observatory, et_r_secs)
+    R_r = RV_r[1:3]
+    # Receiver barycentric position and velocity at receive time
+    r_r_t_r = r_e_t_r + R_r
 
     # Down-leg iteration
     # τ_D first approximation
     # See equation (1) of https://doi.org/10.1086/116062
     ρ_vec_r = r_a_t_r - r_r_t_r
-    ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
+    ρ_r = euclid3D(ρ_vec_r)
     # -R_b/c, but delay is wrt asteroid Center (Brozovic et al., 2018)
     τ_D = ρ_r/clightkms # (seconds)
     # Bounce time, new estimate
@@ -64,7 +170,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
         ρ_vec_r = r_a_t_b - r_r_t_r
         # Magnitude of ρ_vec_r
         # See equation (4) of https://doi.org/10.1086/116062
-        ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
+        ρ_r = euclid3D(ρ_vec_r)
 
         # Compute down-leg Shapiro delay
         # NOTE: when using PPN, substitute 2 -> 1+γ in expressions for Shapiro delay,
@@ -73,14 +179,14 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
         # Earth's position at t_r
         e_D_vec  = r_r_t_r - r_s_t_r
         # Heliocentric distance of Earth at t_r
-        e_D = sqrt(e_D_vec[1]^2 + e_D_vec[2]^2 + e_D_vec[3]^2)
+        e_D = euclid3D(e_D_vec)
         # Barycentric position of Sun at estimated bounce time
         rv_s_t_b = xvs(et_b_secs)
         r_s_t_b = rv_s_t_b[1:3]
         # Heliocentric position of asteroid at t_b
         p_D_vec  = r_a_t_b - r_s_t_b
         # Heliocentric distance of asteroid at t_b
-        p_D = sqrt(p_D_vec[1]^2 + p_D_vec[2]^2 + p_D_vec[3]^2)
+        p_D = euclid3D(p_D_vec)
         # Signal path distance (down-leg)
         q_D = ρ_r
 
@@ -94,7 +200,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
         Δτ_D = Δτ_rel_D # + Δτ_tropo_D #+ Δτ_corona_D # seconds
 
         # New estimate
-        p_dot_23 = dot(ρ_vec_r, v_a_t_b)/ρ_r
+        p_dot_23 = dot3D(ρ_vec_r, v_a_t_b)/ρ_r
         # Time delay correction
         Δt_2 = (τ_D - ρ_r/clightkms - Δτ_rel_D)/(1.0-p_dot_23/clightkms)
         # Time delay new estimate
@@ -103,6 +209,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
         # See equation (2) of https://doi.org/10.1086/116062
         et_b_secs = et_r_secs - τ_D
     end
+
     # Asteroid barycentric position (in km) and velocity (in km/s) at bounce time (TDB)
     rv_a_t_b = xva(et_b_secs)
     r_a_t_b = rv_a_t_b[1:3]
@@ -112,7 +219,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
     ρ_vec_r = r_a_t_b - r_r_t_r
     # Magnitude of ρ_vec_r
     # See equation (4) of https://doi.org/10.1086/116062
-    ρ_r = sqrt(ρ_vec_r[1]^2 + ρ_vec_r[2]^2 + ρ_vec_r[3]^2)
+    ρ_r = euclid3D(ρ_vec_r)
 
     # TODO: add aberration and atmospheric refraction corrections
 
@@ -126,15 +233,15 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
     rv_s_t_b = xvs(et_b_secs)
     r_s_t_b = rv_s_t_b[1:3]
     Q_vec = r_a_t_b - r_s_t_b     # ESAA 2014, equation (7.113)
-    q_vec = Q_vec/sqrt(Q_vec[1]^2 + Q_vec[2]^2 + Q_vec[3]^2)
-    E_H = sqrt(E_H_vec[1]^2 + E_H_vec[2]^2 + E_H_vec[3]^2)
+    q_vec = Q_vec/ euclid3D(Q_vec)
+    E_H = euclid3D(E_H_vec)
     e_vec = E_H_vec/E_H
     # See ESAA 2014, equation (7.115)
     g1 = (2μ_DE430[su]/(c_au_per_day^2))/(E_H/au)
-    g2 = 1 + dot(q_vec, e_vec)
+    g2 = 1 + dot3D(q_vec, e_vec)
     # See ESAA 2014, equation (7.116)
-    u1_vec = U_norm*(  u_vec + (g1/g2)*( dot(u_vec,q_vec)*e_vec - dot(e_vec,u_vec)*q_vec )  )
-    u1_norm = sqrt(u1_vec[1]^2 + u1_vec[2]^2 + u1_vec[3]^2)
+    u1_vec = U_norm*(  u_vec + (g1/g2)*( dot3D(u_vec,q_vec)*e_vec - dot3D(e_vec,u_vec)*q_vec )  )
+    u1_norm = euclid3D(u1_vec)
 
     # Compute right ascension, declination angles
     α_rad_ = mod2pi(atan(u1_vec[2], u1_vec[1]))
@@ -171,25 +278,17 @@ function compute_radec(obs::Vector{RadecMPC{T}}; xva::AstEph, kwargs...) where {
 
     # Iterate over the number of observations
     for i in 1:n_optical_obs
-        vra[i], vdec[i] = compute_radec(obs[i]; kwargs...)
+        vra[i], vdec[i] = compute_radec(obs[i]; xva = xva, kwargs...)
     end
 
     return vra, vdec # arcsec, arcsec
 end
 
-# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2014.07.033
-const mpc_catalogue_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "o", "p", "q", "r",
-                                  "u", "v", "w", "L", "N"]
-
-# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2019.113596
-const mpc_catalogue_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "n", "o", "p", "q",
-                                  "r", "t", "u", "v", "w", "L", "N", "Q", "R", "S", "U", "W"]
-
 @doc raw"""
     select_debiasing_table(debias_table::String = "2018")
 
-Return the catalogue codes, truth catalogue, resolution and bias matrix of the corresponding debias table. The possible values
-for `debias_table` are:
+Return the catalogue codes, truth catalogue, resolution and bias matrix of the corresponding
+debias table. The possible values for `debias_table` are:
 - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
 - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
 - `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596.
@@ -234,8 +333,8 @@ function select_debiasing_table(debias_table::String = "2018")
 end
 
 @doc raw"""
-    debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, truth::String, resol::Resolution,
-              bias_matrix::Matrix{T}) where {T <: AbstractFloat}
+    debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, truth::String,
+              resol::Resolution, bias_matrix::Matrix{T}) where {T <: AbstractFloat}
 
 Return total debiasing correction in right ascension and declination (both in arcsec).
 
@@ -247,8 +346,8 @@ Return total debiasing correction in right ascension and declination (both in ar
 - `resol::Resolution`: resolution.
 - `bias_matrix::Matrix{T}`: debiasing table.
 """
-function debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, truth::String, resol::Resolution,
-                   bias_matrix::Matrix{T}) where {T <: AbstractFloat}
+function debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, truth::String,
+                   resol::Resolution, bias_matrix::Matrix{T}) where {T <: AbstractFloat}
 
     # Catalogue code
     catcode = obs.catalogue.code
@@ -380,13 +479,51 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
 end
 
 @doc raw"""
-    radec_astrometry(obs::Vector{RadecMPC{T}}; niter::Int = 5, debias_table::String = "2018",
-                     xve::EarthEph = earthposvel, xvs::SunEph = sunposvel, xva::AstEph) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
+    relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
 
-Compute optical astrometry, i.e. dates of observation plus observed, computed, debiasing corrections and statistical weights for
-right ascension and declination (in arcsec). Corrections to Earth orientation parameters provided by IERS are computed by default.
+Return a relax factor for each element of `radec` quantifying the correlation between
+observations taken on the same night by the same observatory.
 
-See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and [`Healpix.ang2pixRing`](@ref).
+!!! reference
+    See https://doi.org/10.1016/j.icarus.2017.05.021.
+"""
+function relax_factor(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+    # Convert to DataFrame
+    df = DataFrame(radec)
+    # Group by observatory and TimeOfDay
+    df.TimeOfDay = TimeOfDay.(radec)
+    gdf = groupby(df, [:observatory, :TimeOfDay])
+    # Number of observations per tracklet
+    cdf = combine(gdf, nrow)
+    # Count observations in each group
+    Nv = cdf[gdf.groups, :nrow]
+    # Relaxation factor
+    return map(x -> x > 4.0 ? x/4.0 : 1.0, Nv)
+end
+
+# Angle difference taking into account the discontinuity in [0, 2π] -> [0, 2π]
+# x and y must be in arcsec
+function anglediff(x::T, y::S) where {T, S <: Number}
+    # Signed difference
+    Δ = x - y
+    # Absolute difference
+    Δ_abs = abs(Δ)
+    # Reflection
+    if Δ_abs > 648_000 # Half circle in arcsec
+        return -sign(cte(Δ)) * (1_296_000 - Δ_abs)
+    else
+        return Δ
+    end
+end
+
+@doc raw"""
+    residuals(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloat, AstEph}
+
+Compute O-C residuals for optical astrometry. Corrections due to Earth orientation, LOD,
+polar motion are computed by default.
+
+See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and
+[`Healpix.ang2pixRing`](@ref).
 
 # Arguments
 
@@ -394,22 +531,31 @@ See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and 
 
 # Keyword arguments
 
-- `niter::Int`: number of light-time solution iterations.
-- `debias_table::String`: possible values are:
+- `niter::Int = 5`: number of light-time solution iterations.
+- `debias_table::String = "2018"`: possible values are:
     - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
     - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
     - `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596.
-- `xve`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xvs`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xva`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
+- `xve::EarthEph = earthposvel`: Earth ephemeris.
+- `xvs::SunEph = sunposvel`: Sun ephemeris.
+- `xva::AstEph`: asteroid ephemeris.
+
+All ephemeris must take [et seconds since J2000] and return [barycentric position in km
+and velocity in km/sec].
 """
-function radec_astrometry(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
+function residuals(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph,
+                   kwargs...) where {T <: AbstractFloat, AstEph}
+    mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
+    return residuals(obs, mpc_catalogue_codes_201X, truth, resol, bias_matrix; xva, kwargs...)
+end
+function residuals(obs::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String}, truth::String,
+                   resol::Resolution, bias_matrix::Matrix{T}; xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
 
     # Number of observations
-    n_optical_obs = length(obs)
+    N_obs = length(obs)
 
     # UTC time of first astrometric observation
-    utc1 = obs[1].date
+    utc1 = date(obs[1])
     # TDB seconds since J2000.0 for first astrometric observation
     et1 = datetime2et(utc1)
     # Asteroid ephemeris at et1
@@ -417,93 +563,40 @@ function radec_astrometry(obs::Vector{RadecMPC{T}}; debias_table::String = "2018
     # Type of asteroid ephemeris
     S = typeof(a1_et1)
 
-    # Observed right ascension
-    α_obs = Array{Float64}(undef, n_optical_obs)
-    # Observed declination
-    δ_obs = Array{Float64}(undef, n_optical_obs)
+    # Relax factors
+    rex = relax_factor(obs)
 
-    # Computed right ascension
-    α_comp = Array{S}(undef, n_optical_obs)
-    # Computed declination
-    δ_comp = Array{S}(undef, n_optical_obs)
-
-    # Total debiasing correction in right ascension (arcsec)
-    α_corr = Array{Float64}(undef, n_optical_obs)
-    # Total debiasing correction in declination (arcsec)
-    δ_corr = Array{Float64}(undef, n_optical_obs)
-
-    # Times of observations
-    datetime_obs = Array{DateTime}(undef, n_optical_obs)
-    # Statistical weights
-    w8s = Array{Float64}(undef, n_optical_obs)
-
-    # Select debias table
-    mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
+    # Vector of residuals
+    res = Vector{OpticalResidual{T, S}}(undef, N_obs)
 
     # Iterate over the observations
-    Threads.@threads for i in 1:n_optical_obs
-
-        # Time of observation
-        datetime_obs[i] = obs[i].date
+    Threads.@threads for i in 1:N_obs
 
         # Observed ra/dec
-        # Note: ra is multiplied by a metric factor cos(dec) to match the format of debiasing corrections
-        δ_obs[i] = rad2arcsec(obs[i].δ)                 # arcsec
-        α_obs[i] = rad2arcsec(obs[i].α) * cos(obs[i].δ) # arcsec
+        α_obs = rad2arcsec(ra(obs[i]))   # arcsec
+        δ_obs = rad2arcsec(dec(obs[i]))  # arcsec
 
         # Computed ra/dec
-        α_comp_as, δ_comp_as = compute_radec(obs[i]; xva, kwargs...)
-        # Multiply by metric factor cos(dec)
-        α_comp[i] = α_comp_as * cos(obs[i].δ)  # arcsec
-        δ_comp[i] = δ_comp_as                  # arcsec
+        α_comp, δ_comp = compute_radec(obs[i]; xva = xva, kwargs...)   # arcsec
 
         # Debiasing corrections
-        α_corr[i], δ_corr[i] = debiasing(obs[i], mpc_catalogue_codes_201X, truth, resol, bias_matrix)
+        α_corr, δ_corr = debiasing(obs[i], mpc_catalogue_codes_201X, truth, resol, bias_matrix)
 
         # Statistical weights from Veres et al. (2017)
-        w8s[i] = w8sveres17(obs[i])
+        w8 = w8sveres17(obs[i])
+
+        # O-C residual ra/dec
+        # Note: ra is multiplied by a metric factor cos(dec) to match the format of debiasing corrections
+        res[i] = OpticalResidual(
+            anglediff(α_obs, α_comp) * cos(dec(obs[i])) - α_corr,
+            δ_obs - δ_comp - δ_corr,
+            1 / w8^2,
+            1 / w8^2,
+            rex[i],
+            false
+        )
 
     end
 
-    # Return time of observation, observed ra/dec, computed ra/dec, total debiasing correction in ra/dec and statistical weights
-    return datetime_obs, α_obs, δ_obs, α_comp, δ_comp, α_corr, δ_corr, w8s
-end
-
-@doc raw"""
-    residuals(obs::Vector{RadecMPC{T}}; niter::Int = 5, debias_table::String = "2018",
-    xvs::SunEph = sunposvel, xve::EarthEph = earthposvel, xva::AstEph) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
-
-Compute O-C residuals for optical astrometry. Corrections due to Earth orientation, LOD, polar motion are computed by default.
-
-See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and [`radec_astrometry`](@ref).
-
-# Arguments
-
-- `obs::Vector{RadecMPC{T}}`: vector of observations.
-
-# Keyword arguments
-
-- `niter::Int`: number of light-time solution iterations.
-- `debias_table::String`: possible values are:
-    - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
-    - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
-    - `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596.
-- `xvs::EarthEph`: Sun ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xve::SunEph`: Earth ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-- `xva::AstEph`: asteroid ephemeris [et seconds since J2000] -> [barycentric position in km and velocity in km/sec].
-"""
-function residuals(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloat}
-
-    # Optical astrometry (dates + observed + computed + debiasing + weights)
-    x_jt = radec_astrometry(obs; kwargs...)
-    # Right ascension residuals
-    res_α = x_jt[2] .- x_jt[6] .- x_jt[4]
-    # Declination residuals
-    res_δ = x_jt[3] .- x_jt[7] .- x_jt[5]
-    # Total residuals
-    res = vcat(res_α, res_δ)
-    # Weights
-    w = repeat(1 ./ x_jt[end].^2, 2)
-
-    return res, w
+    return res
 end

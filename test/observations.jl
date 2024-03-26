@@ -1,6 +1,7 @@
 # This file is part of the NEOs.jl package; MIT licensed
 
 using NEOs
+using Dates
 using Test
 
 using NEOs: src_path
@@ -9,15 +10,15 @@ using NEOs: src_path
 
     @testset "CatalogueMPC" begin
 
-        using NEOs: mpc_catalogue_regex, CatalogueMPC
+        using NEOs: CATALOGUE_MPC_REGEX, CatalogueMPC, isunknown
 
-        # Check global variable NEOs.mpc_catalogues[]
-        @test allunique(NEOs.mpc_catalogues[])
-        @test isa(NEOs.mpc_catalogues[], Vector{CatalogueMPC})
+        # Check global variable NEOs.CATALOGUES_MPC[]
+        @test allunique(NEOs.CATALOGUES_MPC[])
+        @test isa(NEOs.CATALOGUES_MPC[], Vector{CatalogueMPC})
 
         # Parse CatalogueMPC
         gaia_s = "  6    Gaia2016"
-        gaia_m = match(mpc_catalogue_regex, gaia_s)
+        gaia_m = match(CATALOGUE_MPC_REGEX, gaia_s)
         gaia = CatalogueMPC(gaia_m)
         @test gaia.code == "6"
         @test gaia.name == "Gaia2016"
@@ -34,15 +35,15 @@ using NEOs: src_path
 
         # Read/write catalogues file
         check_file = joinpath(dirname(src_path), "test", "data", "CatalogueCodes.txt")
-        write_catalogues_mpc(NEOs.mpc_catalogues[], check_file)
+        write_catalogues_mpc(NEOs.CATALOGUES_MPC[], check_file)
         check_cat = read_catalogues_mpc(check_file)
         rm(check_file)
-        @test NEOs.mpc_catalogues[] == check_cat
+        @test NEOs.CATALOGUES_MPC[] == check_cat
 
         # Update catalogues file
         update_catalogues_mpc()
-        @test allunique(NEOs.mpc_catalogues[])
-        @test isa(NEOs.mpc_catalogues[], Vector{CatalogueMPC})
+        @test allunique(NEOs.CATALOGUES_MPC[])
+        @test isa(NEOs.CATALOGUES_MPC[], Vector{CatalogueMPC})
 
         # Search catalogue code
         cat = search_cat_code("6")
@@ -51,15 +52,15 @@ using NEOs: src_path
 
     @testset "ObservatoryMPC" begin
 
-        using NEOs: mpc_observatory_regex, ObservatoryMPC
+        using NEOs: OBSERVATORY_MPC_REGEX, ObservatoryMPC, isunknown
 
-        # Check global variable NEOs.mpc_observatories[]
-        @test allunique(NEOs.mpc_observatories[])
-        @test isa(NEOs.mpc_observatories[], Vector{ObservatoryMPC{Float64}})
+        # Check global variable NEOs.OBSERVATORIES_MPC[]
+        @test allunique(NEOs.OBSERVATORIES_MPC[])
+        @test isa(NEOs.OBSERVATORIES_MPC[], Vector{ObservatoryMPC{Float64}})
 
         # Parse ObservatoryMPC
         arecibo_s = "251 293.246920.949577+0.312734Arecibo"
-        arecibo_m = match(mpc_observatory_regex, arecibo_s)
+        arecibo_m = match(OBSERVATORY_MPC_REGEX, arecibo_s)
         arecibo = ObservatoryMPC(arecibo_m)
         @test arecibo.code == "251"
         @test arecibo.long == 293.24692
@@ -68,7 +69,7 @@ using NEOs: src_path
         @test arecibo.name == "Arecibo"
 
         hubble_s = "250                           Hubble Space Telescope"
-        hubble_m = match(mpc_observatory_regex, hubble_s)
+        hubble_m = match(OBSERVATORY_MPC_REGEX, hubble_s)
         hubble = ObservatoryMPC(hubble_m)
         @test hubble.code == "250"
         @test isnan(hubble.long)
@@ -97,15 +98,15 @@ using NEOs: src_path
 
         # Read/write observatories file
         check_file = joinpath(dirname(src_path), "test", "data", "ObsCodes.txt")
-        write_observatories_mpc(NEOs.mpc_observatories[], check_file)
+        write_observatories_mpc(NEOs.OBSERVATORIES_MPC[], check_file)
         check_obs = read_observatories_mpc(check_file)
         rm(check_file)
-        @test NEOs.mpc_observatories[] == check_obs
+        @test NEOs.OBSERVATORIES_MPC[] == check_obs
 
         # Update observatories file
         update_observatories_mpc()
-        @test allunique(NEOs.mpc_observatories[])
-        @test isa(NEOs.mpc_observatories[], Vector{ObservatoryMPC{Float64}})
+        @test allunique(NEOs.OBSERVATORIES_MPC[])
+        @test isa(NEOs.OBSERVATORIES_MPC[], Vector{ObservatoryMPC{Float64}})
 
         # Search observatory code
         obs = search_obs_code("250")
@@ -116,24 +117,24 @@ using NEOs: src_path
 
     @testset "RadecMPC" begin
 
-        using NEOs: mpc_radec_regex, RadecMPC, mpc_radec_str
+        using NEOs: RADEC_MPC_REGEX, RadecMPC
         using Dates
 
         # Parse RadecMPC
         apophis_s = "99942K04M04N  C2004 03 15.10789 04 06 08.08 +16 55 04.6                om6394691"
-        apophis_m = match(mpc_radec_regex, apophis_s)
+        apophis_m = match(RADEC_MPC_REGEX, apophis_s)
         apophis = RadecMPC(apophis_m)
         @test apophis.num == "99942"
         @test apophis.tmpdesig == "K04M04N"
-        @test apophis.discovery == " "
-        @test apophis.publishnote == " "
+        @test apophis.discovery == ""
+        @test apophis.publishnote == ""
         @test apophis.obstech == "C"
         @test apophis.date == DateTime("2004-03-15T02:35:21.696")
         @test apophis.α == 1.0739650841580173
         @test apophis.δ == 0.2952738332250385
-        @test apophis.info1 == "         "
-        @test apophis.mag == "     "
-        @test apophis.band == " "
+        @test apophis.info1 == ""
+        @test isnan(apophis.mag)
+        @test apophis.band == ""
         @test apophis.catalogue == search_cat_code("o")
         @test apophis.info2 == "m6394"
         @test apophis.observatory == search_obs_code("691")
@@ -148,7 +149,7 @@ using NEOs: src_path
         @test isa(source_radec, Vector{RadecMPC{Float64}})
         @test issorted(source_radec)
         @test allunique(source_radec)
-        @test all( length.(mpc_radec_str.(source_radec)) .== 81)
+        @test all( length.(string.(source_radec)) .== 80)
 
         check_file = joinpath("data", "RADEC_2023_DW_.dat")
         write_radec_mpc(source_radec, check_file)
@@ -157,31 +158,10 @@ using NEOs: src_path
 
         @test source_radec == check_radec
 
-        # Search MPC circulars
-        function search_apophis(m::RegexMatch)
-            if (m["num"] == "99942") || (m["tmpdesig"] == "N00hp15")
-                return true
-            else
-                return false
-            end
-        end
-
-        obs = search_circulars_mpc(
-            search_apophis,
-            "https://minorplanetcenter.net/mpec/K20/K20YA9.html",
-            "https://minorplanetcenter.net/mpec/K21/K21JL0.html";
-            max_iter = 10
-        )
-
-        @test isa(obs, Vector{RadecMPC{Float64}})
-        @test issorted(obs)
-        @test allunique(obs)
-        @test all( (getfield.(obs, :num) .== "99942") .| (getfield.(obs, :tmpdesig) .== "N00hp15") )
-
         # Get RadecMPC
         source_file = joinpath("data", "99942.txt")
-        get_radec_mpc("99942", source_file)
-        
+        get_radec_mpc("number" => "99942", source_file)
+
         @test isfile(source_file)
 
         source_radec = read_radec_mpc(source_file)
@@ -190,7 +170,7 @@ using NEOs: src_path
         @test isa(source_radec, Vector{RadecMPC{Float64}})
         @test issorted(source_radec)
         @test allunique(source_radec)
-        @test all( length.(mpc_radec_str.(source_radec)) .== 81)
+        @test all( map(x -> length(string(x)) ∈ [80, 161], source_radec))
 
         check_file = joinpath("data", "99942_.txt")
         write_radec_mpc(source_radec, check_file)
@@ -202,14 +182,14 @@ using NEOs: src_path
 
     @testset "RadarJPL" begin
 
-        using NEOs: jpl_radar_regex, RadarJPL, jpl_radar_dateformat
+        using NEOs: RADAR_JPL_REGEX, RadarJPL, RADAR_JPL_DATEFORMAT, ismonostatic
 
         # Parse RadarJPL
         apophis_s = "99942 Apophis (2004 MN4)	2005-01-27 23:31:00	-100849.1434	0.250	Hz	2380	251	251	C"
-        apophis_m = match(jpl_radar_regex, apophis_s)
+        apophis_m = match(RADAR_JPL_REGEX, apophis_s)
         apophis = RadarJPL(Val(false), apophis_m)
         @test apophis.id == "99942 Apophis (2004 MN4)"
-        @test apophis.date == DateTime("2005-01-27 23:31:00", jpl_radar_dateformat)
+        @test apophis.date == DateTime("2005-01-27 23:31:00", RADAR_JPL_DATEFORMAT)
         @test isnan(apophis.Δτ)
         @test isnan(apophis.Δτ_σ)
         @test apophis.Δτ_units == ""
@@ -236,6 +216,89 @@ using NEOs: src_path
         rm(check_file)
 
         @test source_radar == check_radar
+    end
+
+    @testset "Topocentric" begin
+        using NEOs: TimeOfDay, sunriseset, obsposECEF, obsposvelECI
+
+        # Ground observation
+        radec_1 = read_radec_mpc("""
+        99942        |C2012 12 12.33230011 28 40.300-26 29 32.10         17.70Vu~0mfl807
+        99942        |C2012 12 12.33730011 28 38.970-26 29 34.80         17.60Vu~0mfl807
+        99942        |C2012 12 12.34221011 28 37.640-26 29 37.50         17.50Vu~0mfl807
+        99942        |C2012 12 12.34712011 28 36.330-26 29 40.00         17.50Vu~0mfl807
+        99942        |C2012 12 12.35054011 28 35.400-26 29 41.80         17.50Vu~0mfl807
+        """)
+        # Sattellite observation
+        radec_2 = read_radec_mpc("""
+        99942         S2020 12 18.97667011 30 15.530-10 46 20.20         19.00RL~4ROFC51
+        99942         s2020 12 18.9766701 - 5634.1734 - 2466.2657 - 3038.3924   ~4ROFC51
+        99942         S2020 12 19.10732011 30 22.510-10 48 20.00               L~4ROFC51
+        99942         s2020 12 19.1073201 - 5654.1816 - 2501.9465 - 2971.1902   ~4ROFC51
+        99942         S2020 12 19.23810011 30 29.500-10 50 19.60               L~4ROFC51
+        99942         s2020 12 19.2381001 - 5645.7831 - 2512.1036 - 2978.6411   ~4ROFC51
+        99942         S2020 12 19.23822011 30 29.570-10 50 19.20               L~4ROFC51
+        99942         s2020 12 19.2382201 - 5617.3465 - 2486.4031 - 3053.2209   ~4ROFC51
+        """)
+
+        # Check parsing
+        @test length(radec_1) == 5
+        @test all( map(x -> x.observatory.code, radec_1) .== "807")
+        @test length(radec_2) == 4
+        @test all( map(x -> x.observatory.code, radec_2) .== "C51")
+
+        # TimeOfDay
+        tod_1 = TimeOfDay.(radec_1)
+        tod_2 = TimeOfDay.(radec_2)
+        # Check
+        @test allequal(tod_1)
+        @test tod_1[1].light == :night
+        @test tod_1[1].start == Date(2012, 12, 11)
+        @test tod_1[1].stop == Date(2012, 12, 12)
+        @test tod_1[1].utc == -5
+        @test allunique(tod_2)
+        @test all( getfield.(tod_2, :light) .== :space )
+        @test all( date.(radec_2) .== getfield.(tod_2, :start) .== getfield.(tod_2, :start) )
+        @test all( getfield.(tod_2, :utc) .== 0 )
+
+        # Sunrise and sunset
+        radec = read_radec_mpc("99942        8C2020 12 08.15001011 20 07.510-08 02 54.20         18.50GV~4ROF094")
+        sun = sunriseset(radec[1])
+        @test datetime2julian(sun[1]) ≈ datetime2julian(DateTime("2020-12-08T05:05:59.384"))
+        @test datetime2julian(sun[2]) ≈ datetime2julian(DateTime("2020-12-08T14:05:49.386"))
+
+        # obsposECEF
+        ecef_2 = obsposECEF.(radec_2)
+        @test ecef_2[1] ≈ [-3462.643557087632, 5076.197661798687, -3049.6756672719907]
+        @test ecef_2[2] ≈ [1351.315736765706, 6027.937408384214, -2982.5146167937583]
+        @test ecef_2[3] ≈ [5332.067839021762, 3112.403799578623, -2989.9547254809945]
+        @test ecef_2[4] ≈ [5308.786202404402, 3079.725220466387, -3064.4773721684687]
+
+        # obsposvelECI
+        eci_2 = obsposvelECI.(radec_2)
+        @test eci_2[1] == [-5634.1734, -2466.2657, -3038.3924, 0.0, 0.0, 0.0]
+        @test eci_2[2] == [-5654.1816, -2501.9465, -2971.1902, 0.0, 0.0, 0.0]
+        @test eci_2[3] == [-5645.7831, -2512.1036, -2978.6411, 0.0, 0.0, 0.0]
+        @test eci_2[4] == [-5617.3465, -2486.4031, -3053.2209, 0.0, 0.0, 0.0]
+
+    end
+
+    @testset "Tracklet" begin
+        using NEOs: reduce_tracklets
+
+        # Choose this example because of the discontinuity in α
+
+        # Fetch optical astrometry
+        radec = fetch_radec_mpc("designation" => "2020 TJ6")
+        # Reduce tracklets
+        tracklets = reduce_tracklets(radec)
+
+        # Values by December 19, 2023
+        @test length(tracklets) == 5
+        @test getfield.(tracklets, :nobs) == [4, 4, 3, 4, 3]
+        @test tracklets[3].α ≈ 6.2831 atol = 1e-4
+        @test tracklets[3].observatory == search_obs_code("J04")
+        @test tracklets[3].night.utc == -1
     end
 
 end

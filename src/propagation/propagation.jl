@@ -1,10 +1,7 @@
 include("asteroid_dynamical_models.jl")
 include("jetcoeffs.jl")
 include("serialization.jl")
-
-const V_true = :(Val{true})
-const V_false = :(Val{false})
-const V_true_false = (V_true, V_false)
+include("parameters.jl")
 
 @doc raw"""
     rvelea(dx, x, params, t)
@@ -30,7 +27,8 @@ function rvelea(dx, x, params, t)
 end
 
 @doc raw"""
-    scaled_variables(c::Vector{T} = fill(1e-6, 6), names::String = "δx"; order::Int = 5) where {T <: Real}
+    scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6);
+                     order::Int = 5) where {T <: Real}
 
 Equivalent to `TaylorSeries.set_variables` times a scaling given by `c`.
 """
@@ -44,26 +42,48 @@ function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6); o
     return dq
 end
 
+function issuccessfulprop(sol::TaylorInterpolant, t::T; tol::T = 10.0) where {T <: Real}
+    # Zero TaylorInterpolant
+    iszero(sol) && return false
+    # Forward integration
+    if issorted(sol.t)
+        # Insufficient steps
+        sol.t[end] < t && return false
+        # Step that covers t
+        i = searchsortedfirst(sol.t, t) - 1
+    # Backward integration
+    elseif issorted(sol.t, rev = true)
+        # Insufficient steps
+        sol.t[end] > t && return false
+        # Step that covers t
+        i = searchsortedfirst(sol.t, t, lt = !isless) - 1
+    # This case should never happen
+    else
+        return false
+    end
+    # All coefficients are below tol
+    return all( norm.(view(sol.x, 1:i, :), Inf) .< tol )
+end
+
 @doc raw"""
-    propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order,
-                     abstol::T = abstol) where {T <: Real, U <: Number}
+    propagate_params(jd0::U, tspan::T, q0::Vector{V},
+                     params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number}
 
 Return the parameters needed for `propagate`, `propagate_root` and `propagate_lyap`.
 
 # Arguments
 
-- `jd0::T`: initial Julian date.
+- `jd0::U`: initial Julian date.
 - `tspan::T`: time span of the integration [in years].
-- `q0::Vector{U}`: vector of initial conditions.
-- `μ_ast::Vector`: vector of gravitational parameters.
-- `order::Int`: order of the Taylor expansions to be used in the integration.
-- `abstol::T`: absolute tolerance.
+- `q0::Vector{V}`: vector of initial conditions.
+- `params::NEOParameters{T}`: see `Propagation Parameters` of [`NEOParameters`](@ref).
 """
-function propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order,
-                          abstol::T = abstol) where {T <: Real, U <: Number}
-
+function propagate_params(jd0::U, tspan::T, q0::Vector{V},
+                          params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number}
+    # Epoch (plain)
+    _jd0_ = cte(cte(jd0))
     # Time limits [days since J2000]
-    days_0, days_f = minmax(jd0, jd0 + tspan*yr) .- JD_J2000
+    days_0, days_f = minmax(_jd0_, _jd0_ + tspan*yr) .- JD_J2000
 
     # Load Solar System ephemeris [au, au/day]
     _sseph = convert(T, loadpeeph(sseph, days_0, days_f))
@@ -81,7 +101,7 @@ function propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_a
     N = Nm1 + 1
 
     # Vector of G*m values
-    μ = convert(Vector{T}, vcat( μ_DE430[1:11], μ_ast[1:Nm1-11], zero(T) ) )
+    μ = convert(Vector{T}, vcat( μ_DE430[1:11], params.μ_ast[1:Nm1-11], zero(T) ) )
 
     # Check: number of SS bodies (N) in ephemeris must be equal to length of GM vector (μ)
     @assert N == length(μ) "Total number of bodies in ephemeris must be equal to length of GM vector μ"
@@ -109,178 +129,113 @@ function propagate_params(jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_a
 end
 
 @doc raw"""
-    propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, Val(true/false);
-              μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
-              parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
+    propagate(dynamics::D, jd0::U, tspan::T, q0::Vector{V},
+              params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number, D}
 
 Integrate the orbit of a NEO via the Taylor method.
 
 # Arguments
 
 - `dynamics::D`: dynamical model function.
-- `maxsteps::Int`: maximum number of steps for the integration.
-- `jd0::T`: initial Julian date.
+- `jd0::U`: initial Julian date.
 - `tspan::T`: time span of the integration [in years].
-- `q0::Vector{U}`: vector of initial conditions.
-- `Val(true/false)`: whether to output the Taylor polynomials generated at each time step (`true`) or not.
-- `μ_ast::Vector`: vector of gravitational parameters.
-- `order::Int=order`: order of the Taylor expansions to be used in the integration.
-- `abstol::T`: absolute tolerance.
-- `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` (`true`) or not.
-""" propagate
+- `q0::Vector{V}`: vector of initial conditions.
+- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+"""
+function propagate(dynamics::D, jd0::U, tspan::T, q0::Vector{V},
+                   params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number, D}
 
-@doc raw"""
-    propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, Val(true/false); parse_eqs::Bool = true,
-                   eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end],
-                   order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
+    # Unfold
+    maxsteps, order, abstol, parse_eqs = params.maxsteps, params.order, params.abstol, params.parse_eqs
 
-Integrate the orbit of a NEO via the Taylor method while finding the zeros of `rvelea`.
+    # Check order
+    @assert order <= SSEPHORDER "order ($order) must be less or equal than SS ephemeris order ($SSEPHORDER)"
 
-# Arguments
+    # Parameters for taylorinteg
+    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0, params)
 
-- `dynamics::D`: dynamical model function.
-- `maxsteps::Int`: maximum number of steps for the integration.
-- `jd0::T`: initial Julian date.
-- `tspan::T`: time span of the integration [in years].
-- `q0::Vector{U}`: vector of initial conditions.
-- `Val(true/false)`: whether to output the Taylor polynomials generated at each time step (`true`) or not.
-- `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` (`true`) or not.
-- `eventorder::Int`: order of the derivative of `rvelea` whose roots are computed.
-- `newtoniter::Int`: maximum Newton-Raphson iterations per detected root.
-- `nrabstol::T`: allowed tolerance for the Newton-Raphson process.
-- `μ_ast::Vector`: vector of gravitational parameters.
-- `order::Int`: order of the Taylor expansions to be used in the integration.
-- `abstol::T`: absolute tolerance.
-""" propagate_root
+    # Propagate orbit
 
-for V_dense in V_true_false
+    @time tv, xv, psol = taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, Val(true), _params;
+                                     maxsteps = maxsteps, parse_eqs = parse_eqs)
 
-    @eval begin
-
-        function propagate(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense;
-                           μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
-                           parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
-
-            # Parameters for taylorinteg
-            _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast, order, abstol)
-
-            # Propagate orbit
-
-            @time sol = taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, $V_dense(), _params;
-                                    maxsteps, parse_eqs)
-
-            # Dense output (save Taylor polynomials in each step)
-            if $V_dense == Val{true}
-                tv, xv, psol = sol
-                return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], psol)
-            # Point output
-            elseif $V_dense == Val{false}
-                return sol
-            end
-
-        end
-
-        function propagate(dynamics::D, maxsteps::Int, jd0::T1, tspan::T2, q0::Vector{U}, ::$V_dense;
-                           μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T3 = abstol,
-                           parse_eqs::Bool = true) where {T1, T2, T3 <: Real, U <: Number, D}
-
-            _jd0, _tspan, _abstol = promote(jd0, tspan, abstol)
-
-            return propagate(dynamics, maxsteps, _jd0, _tspan, q0, $V_dense(); μ_ast, order,
-                             abstol = _abstol, parse_eqs)
-        end
-
-        function propagate(dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, q0::Vector{U}, ::$V_dense;
-                           μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol,
-                           parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
-
-            # Backward integration
-            bwd = propagate(dynamics, maxsteps, jd0, nyears_bwd, q0, $V_dense(); μ_ast, order,
-                            abstol, parse_eqs)
-            # Forward integration
-            fwd = propagate(dynamics, maxsteps, jd0, nyears_fwd, q0, $V_dense(); μ_ast, order,
-                            abstol, parse_eqs)
-
-            return bwd, fwd
-
-        end
-
-        function propagate_root(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true,
-                                eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end],
-                                order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
-
-            # Parameters for neosinteg
-            _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast, order, abstol)
-
-            # Propagate orbit
-            @time sol = taylorinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, $V_dense(), _params;
-                                  maxsteps, parse_eqs, eventorder, newtoniter, nrabstol)
-
-            # Dense output (save Taylor polynomials in each step)
-            if $V_dense == Val{true}
-                tv, xv, psol, tvS, xvS, gvS = sol
-                return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], psol), tvS, xvS, gvS
-            # Point output
-            elseif $V_dense == Val{false}
-                return sol
-            end
-
-        end
-
-        function propagate_root(dynamics::D, maxsteps::Int, jd0::T1, tspan::T2, q0::Vector{U}, ::$V_dense; parse_eqs::Bool = true,
-                                eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T3 = eps(T), μ_ast::Vector = μ_ast343_DE430[1:end],
-                                order::Int = order, abstol::T4 = abstol) where {T1, T2, T3, T4 <: Real, U <: Number, D}
-
-            _jd0, _tspan, _nrabstol, _abstol = promote(jd0, tspan, nrabstol, abstol)
-
-            return propagate_root(dynamics, maxsteps, _jd0, _tspan, q0, $V_dense(); parse_eqs = parse_eqs,
-                                  eventorder = eventorder, newtoniter = newtoniter, nrabstol = _nrabstol, μ_ast = μ_ast,
-                                  order = order, abstol = _abstol)
-        end
-
-        function propagate_root(dynamics::D, maxsteps::Int, jd0::T, nyears_bwd::T, nyears_fwd::T, q0::Vector{U}, ::$V_dense;
-                                parse_eqs::Bool = true, eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T),
-                                μ_ast::Vector = μ_ast343_DE430[1:end], order::Int = order, abstol::T = abstol) where {T <: Real, U <: Number, D}
-
-            # Backward integration
-            bwd, tvS_bwd, xvS_bwd, gvS_bwd = propagate_root(dynamics, maxsteps, jd0, nyears_bwd, q0, $V_dense(); parse_eqs = parse_eqs,
-                                                            eventorder = eventorder, newtoniter = newtoniter, nrabstol = nrabstol,
-                                                            μ_ast = μ_ast, order = order, abstol = abstol)
-            # Forward integration
-            fwd, tvS_fwd, xvS_fwd, gvS_fwd = propagate_root(dynamics, maxsteps, jd0, nyears_fwd, q0, $V_dense(); parse_eqs = parse_eqs,
-                                                            eventorder = eventorder, newtoniter = newtoniter, nrabstol = nrabstol,
-                                                            μ_ast = μ_ast, order = order, abstol = abstol)
-
-            return bwd, tvS_bwd, xvS_bwd, gvS_bwd, fwd, tvS_fwd, xvS_fwd, gvS_fwd
-
-        end
-
+    if issorted(tv) || issorted(tv, rev = true)
+        # Epoch (plain)
+        _jd0_ = cte(cte(jd0))
+        return TaylorInterpolant(_jd0_ - JD_J2000, tv, psol)
+    else
+        return zero(TaylorInterpolant{T, U, 2, SubArray{T, 1}, SubArray{Taylor1{U}, 2}})
     end
 end
 
 @doc raw"""
-    propagate_lyap(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end],
-                   order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number}
+    propagate_root(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
+                   params::NEOParameters{T}; eventorder::Int = 0, newtoniter::Int = 10,
+                   nrabstol::T = eps(T)) where {T <: Real, U <: Number, D}
+
+Integrate the orbit of a NEO via the Taylor method while finding the zeros of
+`NEOs.rvelea`.
+
+# Arguments
+
+- `dynamics::D`: dynamical model function.
+- `jd0::T`: initial Julian date.
+- `tspan::T`: time span of the integration [in years].
+- `q0::Vector{U}`: vector of initial conditions.
+- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+
+# Keyword arguments
+
+- `eventorder::Int`: order of the derivative of `rvelea` whose roots are computed.
+- `newtoniter::Int`: maximum Newton-Raphson iterations per detected root.
+- `nrabstol::T`: allowed tolerance for the Newton-Raphson process.
+"""
+function propagate_root(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
+                        params::NEOParameters{T}; eventorder::Int = 0, newtoniter::Int = 10,
+                        nrabstol::T = eps(T)) where {T <: Real, U <: Number, D}
+
+    # Unfold
+    maxsteps, order, abstol, parse_eqs = params.maxsteps, params.order, params.abstol, params.parse_eqs
+
+    # Check order
+    @assert order <= SSEPHORDER "order ($order) must be less or equal than SS ephemeris order ($SSEPHORDER)"
+
+    # Parameters for neosinteg
+    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0, params)
+
+    # Propagate orbit
+    @time tv, xv, psol, tvS, xvS, gvS = taylorinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, Val(true), _params;
+                                                    maxsteps, parse_eqs, eventorder, newtoniter, nrabstol)
+
+    return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], psol), tvS, xvS, gvS
+
+end
+
+@doc raw"""
+    propagate_lyap(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
+                   params::NEOParameters{T}) where {T <: Real, U <: Number}
 
 Compute the Lyapunov spectrum of a NEO.
 
 # Arguments
 
 - `dynamics::D`: dynamical model function.
-- `maxsteps::Int`: maximum number of steps for the integration.
 - `jd0::T`: initial Julian date.
 - `tspan::T`: time span of the integration [in Julian days].
 - `q0::Vector{U}`: vector of initial conditions.
-- `μ_ast::Vector`: vector of gravitational parameters.
-- `order::Int=order`: order of the Taylor expansions to be used in the integration.
-- `abstol::T`: absolute tolerance.
-- `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` (`true`) or not.
-""" propagate_lyap
-function propagate_lyap(dynamics::D, maxsteps::Int, jd0::T, tspan::T, q0::Vector{U}; μ_ast::Vector = μ_ast343_DE430[1:end],
-                        order::Int = order, abstol::T = abstol, parse_eqs::Bool = true) where {T <: Real, U <: Number, D}
+- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+"""
+function propagate_lyap(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
+                        params::NEOParameters{T}) where {T <: Real, U <: Number, D}
+
+    # Unfold
+    maxsteps, order, abstol, parse_eqs = params.maxsteps, params.order, params.abstol, params.parse_eqs
+
+    # Check order
+    @assert order <= SSEPHORDER "order ($order) must be less or equal than SS ephemeris order ($SSEPHORDER)"
 
     # Parameters for taylorinteg
-    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0; μ_ast = μ_ast, order = order, abstol = abstol)
+    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0, params)
 
     # Propagate orbit
     @time sol = lyap_taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, _params;
