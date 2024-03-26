@@ -298,6 +298,8 @@ using NEOs: NEOSolution, numberofdays
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.6)
         # Parameters uncertainty
         @test all(sigmas(sol1) .< sigmas(sol))
+        # TODO: understand better differences wrt JPL solutions
+        # @test nrms(sol1) < nrms(sol)
     end
 
 end
