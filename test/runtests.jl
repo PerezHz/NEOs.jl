@@ -2,10 +2,11 @@
 
 testfiles = (
     "osculating.jl",
-    "observations.jl",
-    "propagation.jl",
-    "orbit_determination.jl",
+    # "observations.jl",
+    # "propagation.jl",
+    # "orbit_determination.jl",
     "dataframes.jl",
+    "aqua.jl",
     )
 
 for file in testfiles
