@@ -8,25 +8,25 @@ import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to
 import JLD2: writeas
 import PlanetaryEphemeris as PE
 
-import Downloads
+using Dates, InteractiveUtils, LazyArtifacts, LinearAlgebra, Printf
+using Downloads: download
 
-using AutoHashEquals, Dates, Printf, JSON, SatelliteToolboxTransformations, TaylorSeries,
-      TaylorIntegration, SPICE, JLD2, LazyArtifacts, LinearAlgebra, LinearAlgebra,
-      DelimitedFiles, Scratch, Quadmath, Test, InteractiveUtils, Distributed
+using AutoHashEquals, JSON, TaylorSeries, SatelliteToolboxTransformations,
+        TaylorIntegration, SPICE, JLD2, Scratch
+using DelimitedFiles: readdlm
 using HTTP: get
 using DataFrames: DataFrame, nrow, eachcol, eachrow, groupby, combine, AbstractDataFrame,
-                  DataFrameRow, GroupedDataFrame
+        DataFrameRow, GroupedDataFrame
 using PlanetaryEphemeris: daysec, yr, TaylorInterpolant, auday2kmsec, su, ea, au,
-      c_au_per_day, α_p_sun, δ_p_sun, pole_rotation, c_cm_per_sec, c_au_per_sec,
-      t2c_jpl_de430, R_sun, RE, Rx, Ry, Rz, semimajoraxis, eccentricity, inclination,
-      longascnode, argperi, timeperipass, nbodyind, numberofbodies, kmsec2auday,
-      meanmotion, meananomaly, selecteph
+        c_au_per_day, α_p_sun, δ_p_sun, pole_rotation, c_cm_per_sec, c_au_per_sec,
+        t2c_jpl_de430, R_sun, RE, Rx, Ry, Rz, semimajoraxis, eccentricity, inclination,
+        longascnode, argperi, timeperipass, nbodyind, numberofbodies, kmsec2auday,
+        meanmotion, meananomaly, selecteph
 using Healpix: ang2pixRing, Resolution
 using StatsBase: mean, std
 using LsqFit: curve_fit
 using Roots: find_zeros
 using Clustering: kmeans
-using Downloads: download
 using HORIZONS: smb_spk
 
 # Constants
@@ -45,19 +45,20 @@ export hasdelay, hasdoppler, delay, doppler, rcvr, xmit, read_radar_jpl, write_r
 # Units
 export julian2etsecs, etsecs2julian, datetime2et, et_to_200X, days_to_200X, datetime_to_200X,
        datetime2days, days2datetime, rad2arcsec, arcsec2rad, mas2rad
-# JPL Ephemerides
-export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199,
-       loadpeeph, bwdfwdeph
-# Topocentric
+# JPL ephemerides
+export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199
+# PE and NEOs ephemerides
+export loadpeeph, bwdfwdeph
+# Observer position in ECEF and ECI frames
 export obsposECEF, obsposvelECI
-# Process radec
+# Optical astrometry processing
 export compute_radec, select_debiasing_table, debiasing, w8sveres17, residuals, unfold,
        relax_factor, outlier
-# Process radar
+# Radar astrometry processing
 export compute_delay, radar_astrometry
 # Asteroid dynamical models
 export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!, newtonian!
-# Propagate
+# Propagation
 export NEOParameters, propagate, propagate_lyap, propagate_root
 # B plane
 export valsecchi_circle, bopik
