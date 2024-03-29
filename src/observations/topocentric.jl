@@ -188,7 +188,7 @@ obsposECEF(x::RadarJPL{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) w
 # TODO: avoid sv_ecef_to_ecef overload by defining proper product between DCMs and Taylor1/TaylorN
 # method below has been adapted from SatelliteToolboxTransformations.jl, MIT-licensed
 #   https://github.com/JuliaSpace/SatelliteToolboxTransformations.jl
-function sv_ecef_to_ecef(
+function SatelliteToolboxTransformations.sv_ecef_to_ecef(
     sv::OrbitStateVector,
     T_ECEF1::Val{:ITRF},
     T_ECEF2::Val{:TIRS},
@@ -208,7 +208,7 @@ end
 # TODO: avoid sv_ecef_to_eci overload by defining proper product between DCMs and Taylor1/TaylorN
 # method below has been adapted from SatelliteToolboxTransformations.jl, MIT-licensed
 #   https://github.com/JuliaSpace/SatelliteToolboxTransformations.jl
-function sv_ecef_to_eci(
+function SatelliteToolboxTransformations.sv_ecef_to_eci(
     sv::OrbitStateVector,
     T_ECEF::Union{Val{:PEF}, Val{:TIRS}},
     T_ECI::Union{T_ECIs, T_ECIs_IAU_2006},
@@ -317,9 +317,9 @@ function obsposvelECI(x::RadarJPL{T}; eop::Union{EopIau1980, EopIau2000A} = eop_
     return obsposvelECI(x.rcvr, datetime2et(x.date); eop)
 end
 
-# Special method of SatelliteToolboxTransformations.ecef_to_geocentric for Vector{TaylorN{T}}
+# SatelliteToolboxTransformations.ecef_to_geocentric specialization for Vector{TaylorN{T}}
 # See https://github.com/JuliaSpace/SatelliteToolboxTransformations.jl/blob/b7790389407a207499d343aa6d546ef54990baa2/src/reference_frames/geodetic_geocentric.jl#L31-L60
-function ecef_to_geocentric(r_e::Vector{TaylorN{T}}) where {T<:AbstractFloat}
+function SatelliteToolboxTransformations.ecef_to_geocentric(r_e::Vector{TaylorN{T}}) where {T<:AbstractFloat}
 
     # Auxiliary variables.
     x  = r_e[1]
