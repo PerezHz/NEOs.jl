@@ -44,7 +44,7 @@ function evaluate(res::AbstractVector{OpticalResidual{T, TaylorN{T}}}, x::Vector
     end
     return res_new
 end
-(res::AbstractVector{OpticalResidual{T, TaylorN{T}}})(x::Vector{T}) where {T <: Real} = evaluate(res, x)
+(res::Vector{OpticalResidual{T, TaylorN{T}}})(x::Vector{T}) where {T <: Real} = evaluate(res, x)
 
 # Print method for OpticalResidual
 # Examples:

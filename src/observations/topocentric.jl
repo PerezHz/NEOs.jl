@@ -316,22 +316,3 @@ end
 function obsposvelECI(x::RadarJPL{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
     return obsposvelECI(x.rcvr, datetime2et(x.date); eop)
 end
-
-# SatelliteToolboxTransformations.ecef_to_geocentric specialization for Vector{TaylorN{T}}
-# See https://github.com/JuliaSpace/SatelliteToolboxTransformations.jl/blob/b7790389407a207499d343aa6d546ef54990baa2/src/reference_frames/geodetic_geocentric.jl#L31-L60
-function SatelliteToolboxTransformations.ecef_to_geocentric(r_e::Vector{TaylorN{T}}) where {T<:AbstractFloat}
-
-    # Auxiliary variables.
-    x  = r_e[1]
-    y  = r_e[2]
-    z  = r_e[3]
-    x² = x^2
-    y² = y^2
-    z² = z^2
-
-    lat = atan(z, √(x² + y²))
-    lon = atan(y, x)
-    r   = √(x² + y² + z²)
-
-    return lat, lon, r
-end
