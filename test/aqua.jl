@@ -24,12 +24,8 @@ using Aqua
 end
 
 @testset "Aqua tests (additional)" begin
-    Aqua.test_ambiguities(NEOs)
-    Aqua.test_undefined_exports(NEOs)
-    Aqua.test_deps_compat(NEOs)
-    Aqua.test_stale_deps(NEOs)
-    Aqua.test_piracies(NEOs; broken=true)
-    Aqua.test_unbound_args(NEOs)
-    Aqua.test_project_extras(NEOs)
-    Aqua.test_persistent_tasks(NEOs)
+    Aqua.test_all(
+    NEOs;
+    piracies=(broken=true,)
+    )
 end
