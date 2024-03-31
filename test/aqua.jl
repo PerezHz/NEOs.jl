@@ -24,8 +24,10 @@ using Aqua
 end
 
 @testset "Aqua tests (additional)" begin
+    Aqua.test_ambiguities(NEOs)
     Aqua.test_all(
     NEOs;
+    ambiguities=false,
     piracies=(broken=true,)
     )
 end
