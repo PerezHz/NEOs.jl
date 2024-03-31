@@ -44,11 +44,7 @@ function evaluate(res::AbstractVector{OpticalResidual{T, TaylorN{T}}}, x::Vector
     end
     return res_new
 end
-if VERSION < v"1.10"
-    (res::Vector{OpticalResidual{T, TaylorN{T}}})(x::Vector{T}) where {T <: Real} = evaluate(res, x)
-else
-    (res::AbstractVector{OpticalResidual{T, TaylorN{T}}})(x::Vector{T}) where {T <: Real} = evaluate(res, x)
-end
+(res::Vector{OpticalResidual{T, TaylorN{T}}})(x::Vector{T}) where {T <: Real} = evaluate(res, x)
 
 # Print method for OpticalResidual
 # Examples:
