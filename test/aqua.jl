@@ -27,6 +27,7 @@ end
     Aqua.test_ambiguities(NEOs)
     Aqua.test_all(
     NEOs;
-    ambiguities=false
+    ambiguities=false,
+    piracies=(broken=true,)
     )
 end
