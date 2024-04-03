@@ -69,7 +69,7 @@ export pv2kep, yarkp2adot
 # Too Short Arc
 export tooshortarc
 # Gauss method
-export gauss_method, gaussinitcond, gauss_refinement
+export gauss_method, gaussinitcond
 # Outlier rejection
 export outlier_rejection
 # Orbit determination

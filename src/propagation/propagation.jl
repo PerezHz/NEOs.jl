@@ -1,6 +1,5 @@
 include("asteroid_dynamical_models.jl")
 include("jetcoeffs.jl")
-include("serialization.jl")
 include("parameters.jl")
 
 @doc raw"""
@@ -162,7 +161,7 @@ function propagate(dynamics::D, jd0::U, tspan::T, q0::Vector{V},
     if issorted(tv) || issorted(tv, rev = true)
         # Epoch (plain)
         _jd0_ = cte(cte(jd0))
-        return TaylorInterpolant(_jd0_ - JD_J2000, tv, psol)
+        return TaylorInterpolant{T, V, 2}(_jd0_ - JD_J2000, tv, psol)
     else
         return zero(TaylorInterpolant{T, U, 2, SubArray{T, 1}, SubArray{Taylor1{U}, 2}})
     end
@@ -207,7 +206,7 @@ function propagate_root(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
     @time tv, xv, psol, tvS, xvS, gvS = taylorinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, Val(true), _params;
                                                     maxsteps, parse_eqs, eventorder, newtoniter, nrabstol)
 
-    return TaylorInterpolant(jd0 - JD_J2000, tv .- tv[1], psol), tvS, xvS, gvS
+    return TaylorInterpolant{T, U, 2}(jd0 - JD_J2000, tv .- tv[1], psol), tvS, xvS, gvS
 
 end
 

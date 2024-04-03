@@ -72,6 +72,7 @@ using InteractiveUtils: methodswith
         )
 
         # Check that solution saves correctly
+        @test JLD2.writeas(typeof(sol)) == PlanetaryEphemeris.PlanetaryEphemerisSerialization{Float64}
         jldsave("test.jld2"; sol_bwd, sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
         recovered_sol_bwd = JLD2.load("test.jld2", "sol_bwd")
@@ -188,6 +189,7 @@ using InteractiveUtils: methodswith
         )
 
         # Check that solution saves correctly
+        @test JLD2.writeas(typeof(sol)) == PlanetaryEphemeris.PlanetaryEphemerisSerialization{Float64}
         jldsave("test.jld2"; sol = sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol
@@ -278,6 +280,7 @@ using InteractiveUtils: methodswith
         @test sol.t == solnp.t
         # TODO: fix roundoff differences near deep close approach in 2029
         @test norm(sol.x-solnp.x, Inf)/norm(solnp.x, Inf) < 4e-18 # 3.757708512785821e-20
+        @test JLD2.writeas(typeof(sol)) == PlanetaryEphemeris.TaylorInterpolantNSerialization{Float64}
         jldsave("test.jld2"; sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol
@@ -286,6 +289,7 @@ using InteractiveUtils: methodswith
         params = NEOParameters(params; maxsteps = 1)
         sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, jd0, nyears, q0, params)
 
+        @test JLD2.writeas(typeof(sol)) == PlanetaryEphemeris.TaylorInterpolantNSerialization{Float64}
         jldsave("test.jld2"; sol, tvS, xvS, gvS)
         recovered_sol = JLD2.load("test.jld2", "sol")
         recovered_tvS = JLD2.load("test.jld2", "tvS")

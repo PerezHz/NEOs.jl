@@ -6,6 +6,7 @@ testfiles = (
     "propagation.jl",
     "orbit_determination.jl",
     "dataframes.jl",
+    "aqua.jl",
     )
 
 for file in testfiles
