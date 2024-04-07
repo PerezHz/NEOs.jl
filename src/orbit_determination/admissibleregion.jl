@@ -1,8 +1,8 @@
 @doc raw"""
     AdmissibleRegion{T <: AbstractFloat}
 
-Subset of `topocentric distance` × `topocentric velocity` space defined by
-some dynamical constrainits on a too short arc.
+Subset of topocentric range × range-rate space defined by
+the constraint heliocentric energy ≤ `k_gauss^2/(2a_max)`.
 
 # Fields
 
@@ -84,9 +84,9 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     # Heliocentric position of the observer
     q = params.eph_ea(t_days) + kmsec2auday(obsposvelECI(obs, t_et)) - params.eph_su(t_days)
     # Admissible region coefficients
-    coeffs = admsreg_coeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
-    # Maximum range (heliocentric constraint)
-    ρ_max = max_range(coeffs, a_max)
+    coeffs = arcoeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
+    # Maximum range (heliocentric energy constraint)
+    ρ_max = maxrange(coeffs, a_max)
     iszero(ρ_max) && return zero(AdmissibleRegion{T})
     # Minimum range
     if isnan(h)
@@ -104,11 +104,11 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     ρ_min > ρ_max && return zero(AdmissibleRegion{T})
     # Range domain
     ρ_domain = [ρ_min, ρ_max]
-    # Range rate domain
-    v_ρ_min, v_ρ_max = range_rate(coeffs, a_max, ρ_min)[1:2]
+    # Range-rate domain
+    v_ρ_min, v_ρ_max = rangerate(coeffs, a_max, ρ_min)[1:2]
     v_ρ_domain = [v_ρ_min, v_ρ_max]
     # Range rate symmetry level
-    v_ρ_mid = range_rate(coeffs, a_max, ρ_max)[1]
+    v_ρ_mid = rangerate(coeffs, a_max, ρ_max)[1]
     # Boundary points
     Fs = Matrix{T}(undef, 3, 2)
     Fs[1, :] .= [ρ_min, v_ρ_min]
@@ -121,16 +121,16 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
 end
 
 @doc raw"""
-    admsreg_coeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
-                   ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
+    arcoeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
+             ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
 
 Return the polynomial coefficients for an [`AdmissibleRegion`](@ref).
 
 !!! reference
     See equation (8.8) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_coeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
-                        ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
+function arcoeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
+                  ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
     coeffs = Vector{T}(undef, 6)
     coeffs[1] = dot(q[1:3], q[1:3])
     coeffs[2] = 2 *  dot(q[4:6], ρ)
@@ -159,73 +159,75 @@ function topounitpdv(α::T, δ::T) where {T <: Number}
 end
 
 @doc raw"""
-    admsreg_W(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+    arW(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
 
 W function of an [`AdmissibleRegion`](@ref).
 
 !!! reference
     See equation (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_W(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+function arW(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
     return coeffs[3] * ρ^2 + coeffs[4] * ρ + coeffs[5]
 end
-admsreg_W(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}  = admsreg_W(A.coeffs, ρ)
+arW(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}  = arW(A.coeffs, ρ)
 
 @doc raw"""
-    admsreg_S(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+    arS(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
 
 S function of an [`AdmissibleRegion`](@ref).
 
 !!! reference
     See equation (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_S(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+function arS(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
     return ρ^2 + coeffs[6] * ρ + coeffs[1]
 end
-admsreg_S(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_S(A.coeffs, ρ)
+arS(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = arS(A.coeffs, ρ)
 
 @doc raw"""
-    admsreg_U(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+    arenergycoeffs(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
 
-U function of an [`AdmissibleRegion`](@ref).
-
-!!! reference
-    See second equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
-"""
-function admsreg_U(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: AbstractFloat, S <: Number}
-    a = one(T)
-    b = coeffs[2]
-    c = admsreg_W(coeffs, ρ) + k_gauss^2 * (1/a_max - 2/sqrt(admsreg_S(coeffs, ρ)))
-    return b^2 - 4*a*c
-end
-admsreg_U(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_U(A.coeffs, A.a_max, ρ)
-
-@doc raw"""
-    admsreg_V(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
-
-V function of an [`AdmissibleRegion`](@ref).
+Return the coefficients of the heliocentric energy as a quadratic function
+of the topocentric range-rate.
 
 !!! reference
     See first equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function admsreg_V(coeffs::Vector{T}, a_max::T, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <: Number}
-    return v_ρ^2 + coeffs[2] * v_ρ + admsreg_W(coeffs, ρ) - 2*k_gauss^2/sqrt(admsreg_S(coeffs, ρ))
-           + k_gauss^2/a_max
-end
-admsreg_V(A::AdmissibleRegion{T}, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_V(A.coeffs, A.a_max, ρ, v_ρ)
-
-@doc raw"""
-    range_rate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat}
-
-Return the two possible range rates in the boundary of `A` for a given range `ρ`.
-"""
-function range_rate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: AbstractFloat}
-    # Cuadratic coefficients
+function arenergycoeffs(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: AbstractFloat, S <: Number}
     a = one(T)
     b = coeffs[2]
-    c = admsreg_W(coeffs, ρ) + k_gauss^2 * (1/a_max - 2/sqrt(admsreg_S(coeffs, ρ)))
+    c = arW(coeffs, ρ) + k_gauss^2 * (1/a_max - 2/sqrt(arS(coeffs, ρ)))
+    return a, b, c
+end
+arenergycoeffs(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = arenergycoeffs(A.coeffs, A.a_max, ρ)
+
+@doc raw"""
+    arenergydis(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+
+Return the discriminant of the heliocentric energy as a quadratic function
+of the topocentric range-rate.
+
+!!! reference
+    See first equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
+"""
+function arenergydis(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: AbstractFloat, S <: Number}
+    a, b, c = arenergycoeffs(coeffs, a_max, ρ)
+    return b^2 - 4*a*c
+end
+arenergydis(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = arenergydis(A.coeffs, A.a_max, ρ)
+
+@doc raw"""
+    rangerate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat}
+    rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol) where {T <: AbstractFloat}
+
+Return the range-rate(s) in the boundary of `A` for a given range `ρ`.
+If no `m` is given, return a vector with all the solutions. Otherwise,
+`m = :min/:max` chooses which rate to return.
+"""
+function rangerate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: AbstractFloat}
+    a, b, c = arenergycoeffs(coeffs, a_max, ρ)
     d = b^2 - 4*a*c
-    # Choose min or max solution
+    # The number of solutions depends on the discriminant
     if d > 0
         return [(-b - sqrt(d))/(2a), (-b + sqrt(d))/(2a)]
     elseif d == 0
@@ -234,26 +236,34 @@ function range_rate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: AbstractF
         return Vector{T}(undef, 0)
     end
 end
-range_rate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat} = range_rate(A.coeffs, A.a_max, ρ)
+rangerate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat} = rangerate(A.coeffs, A.a_max, ρ)
 
 function rangerate(coeffs::Vector{T}, a_max::T, ρ::T, m::Symbol) where {T <: AbstractFloat}
-    # Cuadratic coefficients
-    a = one(T)
-    b = coeffs[2]
-    c = admsreg_W(coeffs, ρ) + k_gauss^2 * (1/a_max - 2/sqrt(admsreg_S(coeffs, ρ)))
-    d = sqrt(b^2 - 4*a*c)
+    a, b, c = arenergycoeffs(coeffs, a_max, ρ)
+    d = b^2 - 4*a*c
+    @assert d > 0 "Less than two solutions, use rangerate(::AdmissibleRegion, ::AbstractFloat) instead"
     # Choose min or max solution
     if m == :min
-        return (-b - d)/(2a)
+        return (-b - sqrt(d))/(2a)
     elseif m == :max
-        return (-b + d)/(2a)
+        return (-b + sqrt(d))/(2a)
     else
         return T(NaN)
     end
 end
-
 rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol) where {T <: AbstractFloat} = rangerate(A.coeffs, A.a_max, ρ, m)
 
+@doc raw"""
+    argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
+                   tol::T = 1e-5) where {T <: AbstractFloat}
+
+Use golden section search to find the `m = :min/:max` range-rate in the
+boundary of `A` in the interval `[ρmin, ρmax]` with tolerance `tol`.
+
+
+!!! reference
+    Adapted from https://en.wikipedia.org/wiki/Golden-section_search.
+"""
 function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
                         tol::T = 1e-5) where {T <: AbstractFloat}
     # 1 / φ
@@ -305,19 +315,19 @@ function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
 end
 
 @doc raw"""
-    max_range(coeffs::Vector{T}, a_max::T) where {T <: AbstractFloat}
+    maxrange(coeffs::Vector{T}, a_max::T) where {T <: AbstractFloat}
 
 Return the maximum possible range in the boundary of an admissible region
 with coefficients `coeffs` and maximum semimajor axis `a_max`.
 """
-function max_range(coeffs::Vector{T}, a_max::T) where {T <: AbstractFloat}
+function maxrange(coeffs::Vector{T}, a_max::T) where {T <: AbstractFloat}
     # Initial guess
-    sol = find_zeros(s -> admsreg_U(coeffs, a_max, s), R_EA, 100.0)
+    sol = find_zeros(s -> arenergydis(coeffs, a_max, s), R_EA, 100.0)
     iszero(length(sol)) && return zero(T)
     ρ_max = sol[1]
-    # Make sure U(ρ) ≥ 0 and there is at least one range_rate solution
+    # Make sure U(ρ) ≥ 0 and there is at least one rangerate solution
     niter = 0
-    while admsreg_U(coeffs, a_max, ρ_max) < 0 || length(range_rate(coeffs, a_max, ρ_max)) == 0
+    while arenergydis(coeffs, a_max, ρ_max) < 0 || length(rangerate(coeffs, a_max, ρ_max)) == 0
         niter += 1
         ρ_max = prevfloat(ρ_max)
         niter > 1_000 && break
@@ -329,7 +339,7 @@ end
 @doc raw"""
     boundary(A::AdmissibleRegion{T}, t::S) where {T <: AbstractFloat, S <: Number}
 
-Parametrization of `A` boundary with `t ∈ [0, 3]`.
+Parametrization of `A`'s boundary with `t ∈ [0, 3]`.
 """
 function boundary(A::AdmissibleRegion{T}, t::S) where {T <: AbstractFloat, S <: Number}
     # Parametrization domain
@@ -344,11 +354,11 @@ function boundary(A::AdmissibleRegion{T}, t::S) where {T <: AbstractFloat, S <: 
         # Upper curve
         if 1.0 <= t <= 2.0
             ρ = x_min + (t-1)*(x_max - x_min)
-            v_ρ = range_rate(A, ρ)[end]
+            v_ρ = rangerate(A, ρ)[end]
         # Lower curve
         elseif 2.0 <= t <= 3.0
             ρ = x_max - (t-2)*(x_max - x_min)
-            v_ρ = range_rate(A, ρ)[1]
+            v_ρ = rangerate(A, ρ)[1]
         end
         return [ρ, v_ρ]
     end
@@ -363,7 +373,7 @@ function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <:
     # Project range
     ρ = clamp(ρ,  A.ρ_domain[1], A.ρ_domain[2])
     # Project range-rate
-    y_domain = range_rate(A, ρ)
+    y_domain = rangerate(A, ρ)
     if iszero(length(y_domain))
         v_ρ = sum(A.v_ρ_domain) / 2
     elseif isone(length(y_domain))
@@ -379,7 +389,7 @@ end
 function in(P::Vector{T}, A::AdmissibleRegion{T}) where {T <: AbstractFloat}
     @assert length(P) == 2 "Points in admissible region are of dimension 2"
     if A.ρ_domain[1] <= P[1] <= A.ρ_domain[2]
-        y_range = range_rate(A, P[1])
+        y_range = rangerate(A, P[1])
         if length(y_range) == 1
             return P[2] == y_range[1]
         else
