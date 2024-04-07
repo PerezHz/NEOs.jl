@@ -193,8 +193,10 @@ U function of an [`AdmissibleRegion`](@ref).
     See second equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
 function admsreg_U(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: AbstractFloat, S <: Number}
-    return coeffs[2]^2/4 - admsreg_W(coeffs, ρ) + 2*k_gauss^2/sqrt(admsreg_S(coeffs, ρ))
-           - k_gauss^2/a_max
+    a = one(T)
+    b = coeffs[2]
+    c = admsreg_W(coeffs, ρ) + k_gauss^2 * (1/a_max - 2/sqrt(admsreg_S(coeffs, ρ)))
+    return b^2 - 4*a*c
 end
 admsreg_U(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = admsreg_U(A.coeffs, A.a_max, ρ)
 
@@ -218,9 +220,89 @@ admsreg_V(A::AdmissibleRegion{T}, ρ::S, v_ρ::S) where {T <: AbstractFloat, S <
 Return the two possible range rates in the boundary of `A` for a given range `ρ`.
 """
 function range_rate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: AbstractFloat}
-    return find_zeros(s -> admsreg_V(coeffs, a_max, ρ, s), -10.0, 10.0)
+    # Cuadratic coefficients
+    a = one(T)
+    b = coeffs[2]
+    c = admsreg_W(coeffs, ρ) + k_gauss^2 * (1/a_max - 2/sqrt(admsreg_S(coeffs, ρ)))
+    d = b^2 - 4*a*c
+    # Choose min or max solution
+    if d > 0
+        return [(-b - sqrt(d))/(2a), (-b + sqrt(d))/(2a)]
+    elseif d == 0
+        return [-b/(2a)]
+    else
+        return Vector{T}(undef, 0)
+    end
 end
 range_rate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat} = range_rate(A.coeffs, A.a_max, ρ)
+
+function rangerate(coeffs::Vector{T}, a_max::T, ρ::T, m::Symbol) where {T <: AbstractFloat}
+    # Cuadratic coefficients
+    a = one(T)
+    b = coeffs[2]
+    c = admsreg_W(coeffs, ρ) + k_gauss^2 * (1/a_max - 2/sqrt(admsreg_S(coeffs, ρ)))
+    d = sqrt(b^2 - 4*a*c)
+    # Choose min or max solution
+    if m == :min
+        return (-b - d)/(2a)
+    elseif m == :max
+        return (-b + d)/(2a)
+    else
+        return T(NaN)
+    end
+end
+
+rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol) where {T <: AbstractFloat} = rangerate(A.coeffs, A.a_max, ρ, m)
+
+function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
+                        tol::T = 1e-5) where {T <: AbstractFloat}
+    # 1 / φ
+    invphi = (sqrt(5) - 1) / 2
+    # 1 / φ^2
+    invphi2 = (3 - sqrt(5)) / 2
+    # Interval bounds
+    a, b = ρmin, ρmax
+    # Interval width
+    h = b - a
+    # Termination condition
+    if h <= tol
+        ρ = (a + b) / 2
+        return ρ, rangerate(A, ρ, m)
+    end
+    # Required steps to achieve tolerance
+    n = ceil(Int, log(tol/h) / log(invphi))
+    # Initialize center points
+    c = a + invphi2 * h
+    d = a + invphi * h
+    yc = rangerate(A, c, m)
+    yd = rangerate(A, d, m)
+    # Main loop
+    for _ in 1:n
+        if (m == :min && yc < yd) || (m == :max && yc > yd)
+            b = d
+            d = c
+            yd = yc
+            h = invphi * h
+            c = a + invphi2 * h
+            yc = rangerate(A, c, m)
+        else
+            a = c
+            c = d
+            yc = yd
+            h = invphi * h
+            d = a + invphi * h
+            yd = rangerate(A, d, m)
+        end
+    end
+
+    if (m == :min && yc < yd) || (m == :max && yc > yd)
+        ρ = (a + d) / 2
+    else
+        ρ = (c + b) / 2
+    end
+
+    return ρ, rangerate(A, ρ, m)
+end
 
 @doc raw"""
     max_range(coeffs::Vector{T}, a_max::T) where {T <: AbstractFloat}
