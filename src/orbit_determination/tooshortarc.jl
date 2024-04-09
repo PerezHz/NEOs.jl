@@ -100,6 +100,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         x1 .= fit.x
         # Current Q
         Q = nms(res)
+        Q(x1) < 0 && break
         Qs[t] = Q(x1)
         # Convergence condition
         t > 1 && abs(Qs[t] - Qs[t-1]) / Qs[t] < Qtol && break
