@@ -129,38 +129,6 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
 end
 
 @doc raw"""
-    ρminmontecarlo(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T},
-                   params::NEOParameters{T}; N_samples::Int = 25) where {T <: AbstractFloat}
-
-Monte Carlo sampling over the left boundary of `A`.
-"""
-function ρminmontecarlo(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T},
-                        params::NEOParameters{T}; N_samples::Int = 25, dynamics::D=newtonian!) where {T <: AbstractFloat, D}
-    # Initial time of integration [julian days]
-    jd0 = datetime2julian(A.date)
-    # Range lower bound
-    ρ = A.ρ_domain[1]
-    # Sample range rate
-    v_ρs = LinRange(A.v_ρ_domain[1], A.v_ρ_domain[2], N_samples)
-    # Allocate memory
-    Qs = fill(Inf, N_samples)
-    # Monte Carlo
-    for i in eachindex(Qs)
-        # Barycentric initial conditions
-        q = topo2bary(A, ρ, v_ρs[i])
-        # Propagation & residuals
-        _, _, res = propres(radec, jd0, q, params; dynamics)
-        iszero(length(res)) && continue
-        # NRMS
-        Qs[i] = nrms(res)
-    end
-    # Find solution with smallest Q
-    t = argmin(Qs)
-
-    return T(ρ), T(v_ρs[t]), T(Qs[t])
-end
-
-@doc raw"""
     tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
           i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5) where {T <: AbstractFloat}
 
