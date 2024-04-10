@@ -81,6 +81,53 @@ using NEOs: NEOSolution, numberofdays
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.3)
     end
 
+    @testset "Admissible region" begin
+        using NEOs: AdmissibleRegion, reduce_tracklets, arenergydis, rangerate,
+                    argoldensearch, boundary
+
+        # Fetch optical astrometry
+        radec = fetch_radec_mpc("designation" => "2024 BX1")
+        # Parameters
+        params = NEOParameters()
+        # First tracklet
+        radec = radec[1:3]
+        tracklet = reduce_tracklets(radec)[1]
+        # Admissible region
+        A = AdmissibleRegion(tracklet, params)
+
+        # Values by April 9, 2024
+
+        # Custom print
+        @test string(A) == "AE: [116.61547, 45.39840, -3.21667, 5.76667] t: 2024-01-20T21:50:15.360 obs: GINOP-KHK, Piszkesteto"
+        # Energy discriminant
+        @test arenergydis(A, A.ρ_domain[1]) > 0
+        @test arenergydis(A, A.ρ_domain[2]) ≈ 0 atol = 1e-18
+        @test arenergydis(A, A.ρ_domain[2] + 1.0) < 0
+        # Range-rate
+        @test rangerate(A, A.ρ_domain[1]) == A.v_ρ_domain
+        @test minimum(rangerate(A, A.ρ_domain[2])) == A.Fs[3, 2]
+        @test length(rangerate(A, A.ρ_domain[2] + 1.0)) == 0
+        @test rangerate(A, A.ρ_domain[1], :min) == A.v_ρ_domain[1]
+        @test rangerate(A, A.ρ_domain[1], :max) == A.v_ρ_domain[2]
+        # Golden section search
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :min, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test v_ρ ≤ A.v_ρ_domain[1]
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :max, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test v_ρ ≥ A.v_ρ_domain[2]
+        # Boundary
+        @test norm(boundary(A, 0.0) - A.Fs[1, :]) == 0.0
+        @test norm(boundary(A, 1.0) - A.Fs[2, :]) == 0.0
+        @test norm(boundary(A, 2.0) - A.Fs[3, :]) < 1e-9
+        @test norm(boundary(A, 3.0) - A.Fs[1, :]) < 1e-17
+        # In
+        @test A.Fs[1, :] in A
+        @test A.Fs[2, :] in A
+        @test A.Fs[3, :] in A
+        @test [sum(A.ρ_domain), sum(A.v_ρ_domain)] / 2 in A
+    end
+
     @testset "Too Short Arc" begin
         # Fetch optical astrometry
         radec = fetch_radec_mpc("designation" => "2008 EK68")
