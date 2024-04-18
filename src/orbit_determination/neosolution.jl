@@ -169,7 +169,19 @@ function nms(sol::NEOSolution{T, T}) where {T <: Real}
     end
 end
 
+@doc raw"""
+    sigmas(sol::NEOSolution{T, T}) where {T <: Real}
+
+Return `sol`'s initial condition uncertainties in barycentric cartesian coordinates.
+"""
 sigmas(sol::NEOSolution{T, T}) where {T <: Real} = sqrt.(diag(sol.fit.Γ)) .* sol.scalings
+
+@doc raw"""
+    snr(sol::NEOSolution{T, T}) where {T <: Real}
+
+Return `sol`'s initial condition signal-to-noise ratios in barycentric cartesian coordinates.
+"""
+snr(sol::NEOSolution{T, T}) where {T <: Real} = abs.(sol()) ./ sigmas(sol)
 
 @doc raw"""
     jplcompare(des::String, sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
