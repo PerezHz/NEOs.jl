@@ -86,7 +86,7 @@ Parameters for all orbit determination functions.
 
 - `H_max::T`: maximum absolute magnitude (default: `34.5`).
 - `a_max::T`: maximum semimajor axis (default: `100.0`).
-- `maxiter::Int`: maximum number of iterations for admissible region `ADAM` optimizer (default: `100`).
+- `maxiter::Int`: maximum number of iterations for admissible region `ADAM` optimizer (default: `200`).
 - `tsaQmax::T`: nrms threshold (default: `1.5`).
 
 # Outlier Rejection Parameters
@@ -98,7 +98,7 @@ function NEOParameters(;
     abstol::T = 1e-20, parse_eqs::Bool = true, bwdoffset::T = 0.5, fwdoffset::T = 0.5,
     coeffstol::T = 10.0, debias_table::String = "2018", niter::Int = 5,
     max_triplets::Int = 10, varorder::Int = 5, gaussQmax::T = 5.0, H_max::T = 34.5,
-    a_max::T = 100.0, maxiter::Int = 100, tsaQmax::T = 1.5, max_per::T = 18.0
+    a_max::T = 100.0, maxiter::Int = 200, tsaQmax::T = 1.5, max_per::T = 18.0
     ) where {T <: AbstractFloat}
     # Unfold debiasing matrix
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
