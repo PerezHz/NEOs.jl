@@ -45,6 +45,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 4e-7 )
+        @test all( snr(sol) .> 21_000)
         @test nrms(sol) < 0.36
         # Scaling factors
         @test all(sol.scalings .== 1e-6)
@@ -74,6 +75,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 5e-5 )
+        @test all( snr(sol1) .> 4_500 )
         @test nrms(sol1) < 0.36
         # Scaling factors
         @test all(sol1.scalings .< 2e-6)
@@ -126,6 +128,12 @@ using NEOs: NEOSolution, numberofdays
         @test A.Fs[2, :] in A
         @test A.Fs[3, :] in A
         @test [sum(A.ρ_domain), sum(A.v_ρ_domain)] / 2 in A
+        # Curvature
+        C, Γ_C = curvature(radec)
+        σ_C = sqrt.(diag(Γ_C))
+        @test all( abs.(C) ./ σ_C .> 0.02)
+        χ2 = C' * inv(Γ_C) * C
+        @test χ2 > 2.7
     end
 
     @testset "Too Short Arc" begin
@@ -143,6 +151,12 @@ using NEOs: NEOSolution, numberofdays
         # Vector of observations
         @test length(radec) == 10
         @test numberofdays(radec) < 0.05
+        # Curvature
+        C, Γ_C = curvature(radec)
+        σ_C = sqrt.(diag(Γ_C))
+        @test all( abs.(C) ./ σ_C .> 5.5)
+        χ2 = C' * inv(Γ_C) * C
+        @test χ2 > 2_517
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
         # Tracklets
@@ -164,6 +178,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 6e-3 )
+        @test all( snr(sol) .> 4.1)
         @test nrms(sol) < 0.85
         # Scaling factors
         @test all(sol.scalings .< 1e-5)
@@ -211,6 +226,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 5e-4 )
+        @test all( snr(sol) .> 575)
         @test nrms(sol) < 0.25
         # Scaling factors
         @test all(sol.scalings .< 8e-7)
@@ -238,6 +254,12 @@ using NEOs: NEOSolution, numberofdays
         # Vector of observations
         @test length(radec) == 7
         @test numberofdays(radec) < 0.05
+        # Curvature
+        C, Γ_C = curvature(radec)
+        σ_C = sqrt.(diag(Γ_C))
+        @test all( abs.(C) ./ σ_C .> 7.5)
+        χ2 = C' * inv(Γ_C) * C
+        @test χ2 > 1.03e6
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
         # Tracklets
@@ -259,6 +281,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 1e-3 )
+        @test all( snr(sol) .> 20.5)
         @test nrms(sol) < 0.13
         # Scaling factors
         @test all(sol.scalings .< 1e-5)
@@ -306,6 +329,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 2e-5 )
+        @test all( snr(sol) .> 732)
         @test nrms(sol) < 0.30
         # Scaling factors
         @test all(sol.scalings .< 1e-5)
@@ -338,6 +362,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 2e-6 )
+        @test all( snr(sol1) .> 4_281)
         @test nrms(sol1) < 0.37
         # Scaling factors
         @test all(sol1.scalings .< 1e-6)

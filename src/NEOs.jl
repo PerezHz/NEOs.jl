@@ -73,7 +73,7 @@ export gauss_method, gaussinitcond
 # Outlier rejection
 export outlier_rejection
 # Orbit determination
-export jplcompare, issinglearc, isgauss, orbitdetermination
+export curvature, jplcompare, issinglearc, isgauss, orbitdetermination
 
 include("constants.jl")
 include("observations/process_radar.jl")
