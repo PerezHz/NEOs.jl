@@ -193,6 +193,8 @@ Return:
 """
 function curvature(ts::AbstractVector{T}, αs::AbstractVector{T}, δs::AbstractVector{T},
                    σs::AbstractVector{T}) where {T <: Real}
+    @assert length(ts) == length(αs) == length(δs) == length(σs) ≥ 3 """
+    At least three observations needed for significant curvature computation."""
     # Days of observation [relative to first observation]
     ts = ts .- ts[1]
     # Weights
