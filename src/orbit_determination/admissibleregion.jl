@@ -386,17 +386,21 @@ function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <:
 end
 
 # Check whether P is inside A's boundary
-function in(P::Vector{T}, A::AdmissibleRegion{T}) where {T <: AbstractFloat}
-    @assert length(P) == 2 "Points in admissible region are of dimension 2"
-    if A.ρ_domain[1] <= P[1] <= A.ρ_domain[2]
-        y_range = rangerate(A, P[1])
-        if length(y_range) == 1
-            return P[2] == y_range[1]
-        else
-            return y_range[1] <= P[2] <= y_range[2]
+for U in (:(AbstractVector{T}), :(Tuple{T, T}))
+    @eval begin
+        function in(P::$U, A::AdmissibleRegion{T}) where {T <: AbstractFloat}
+            @assert length(P) == 2 "Points in admissible region are of dimension 2"
+            if A.ρ_domain[1] <= P[1] <= A.ρ_domain[2]
+                y_range = rangerate(A, P[1])
+                if length(y_range) == 1
+                    return P[2] == y_range[1]
+                else
+                    return y_range[1] <= P[2] <= y_range[2]
+                end
+            else
+                return false
+            end
         end
-    else
-        return false
     end
 end
 
