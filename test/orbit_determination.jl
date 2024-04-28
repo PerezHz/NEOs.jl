@@ -81,6 +81,8 @@ using NEOs: NEOSolution, numberofdays
         @test all(sol1.scalings .< 2e-6)
         # Compatibility with JPL
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.3)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec, sol1, params) == 6
     end
 
     @testset "Admissible region" begin
@@ -186,6 +188,8 @@ using NEOs: NEOSolution, numberofdays
         JPL = [-0.9698333701500199, 0.24036461256880043, 0.10288887522619743,
                -0.009512521373861719, -0.015325432152904881, -0.008094623534198382]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.1)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec, sol, params) == 11
     end
 
     @testset "Outlier Rejection" begin
@@ -234,6 +238,8 @@ using NEOs: NEOSolution, numberofdays
         JPL = [0.7673358221902306, 0.6484904294813807, 0.2932331617634889,
                -0.011023358761553661, 0.015392684491034429, 0.006528836324700449]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.1)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec, sol, params) == 8
     end
 
     @testset "Interesting NEOs" begin
@@ -289,6 +295,8 @@ using NEOs: NEOSolution, numberofdays
         JPL = [-0.17932853771087842, 0.8874166708545763, 0.38414497114153867,
                -0.01755788350351527, -0.005781328974619869, -0.0020073946363600814]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec, sol, params) == 10
 
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
@@ -372,6 +380,8 @@ using NEOs: NEOSolution, numberofdays
         @test all(sigmas(sol1) .< sigmas(sol))
         # TODO: understand better differences wrt JPL solutions
         # @test nrms(sol1) < nrms(sol)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec[1:30], sol1, params) == 6
     end
 
 end
