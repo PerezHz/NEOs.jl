@@ -27,11 +27,11 @@ end
 @doc raw"""
     adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
          params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
-         μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, order::Int = 2,
+         μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, varorder::Int = 2,
          dynamics::D = newtonian!) where {T <: AbstractFloat, D}
 
 Adaptative moment estimation (ADAM) minimizer of normalized mean square
-residual over and admissible region `A`.
+residual over the manifold of variations of `A`.
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `dx₁ dx₂ dx₃ dx₄ dx₅ dx₆`.
@@ -41,30 +41,28 @@ residual over and admissible region `A`.
 """
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
               params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
-              μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, order::Int = 2,
+              μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, varorder::Int = 2,
               dynamics::D = newtonian!) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
-    # Attributable elements
-    ae = [A.α, A.δ, A.v_α, A.v_δ, zero(T), zero(T)]
+    # Maximum number of iterations
+    maxiter = params.maxiter
+    # Allocate memory
+    aes = Matrix{T}(undef, 6, maxiter+1)
+    Qs = fill(T(Inf), maxiter+1)
+    # Initial attributable elements
+    aes[:, 1] .= [A.α, A.δ, A.v_α, A.v_δ, ρ, v_ρ]
     # Scaling factors
     scalings = Vector{T}(undef, 6)
-    scalings[1:4] .= abs.(ae[1:4]) ./ 1e6
+    scalings[1:4] .= abs.(aes[1:4, 1]) ./ 1e6
     if scale == :linear
         scalings[5] = (A.ρ_domain[2] - A.ρ_domain[1]) / 1_000
     elseif scale == :log
-        x = log10(ρ)
         scalings[5] = (log10(A.ρ_domain[2]) - log10(A.ρ_domain[1])) / 1_000
     end
     scalings[6] = (A.v_ρ_domain[2] - A.v_ρ_domain[1]) / 1_000
     # Jet transport variables
-    dae = scaled_variables("dx", scalings; order)
-    # Maximum number of iterations
-    maxiter = params.maxiter
-    # Allocate memory
-    ρs = Vector{T}(undef, maxiter+1)
-    v_ρs = Vector{T}(undef, maxiter+1)
-    Qs = fill(T(Inf), maxiter+1)
+    dae = scaled_variables("dx", scalings; order = varorder)
     # Origin
     x0 = zeros(T, 6)
     x1 = zeros(T, 6)
@@ -75,25 +73,22 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     n = zeros(T, 2)
     _n_ = zeros(T, 2)
     # Gradient descent
-    for t in 1:maxiter+1
-        # Current position in admissible region
-        ρs[t] = ρ
-        v_ρs[t] = v_ρ
-        # Attributable elements
+    for t in 1:maxiter
+        # Current attributable elements (plain)
+        ae = aes[:, t]
+        # Attributable elements (JT)
         if scale == :linear
-            ae[5], ae[6] = ρ, v_ρ
             AE = ae + dae
         elseif scale == :log
-            ae[5], ae[6] = x, v_ρ
             AE = [ae[1] + dae[1], ae[2] + dae[2], ae[3] + dae[3],
-                  ae[4] + dae[4], 10^(ae[5] + dae[5]), ae[6] + dae[6]]
+                  ae[4] + dae[4], 10^(log10(ae[5]) + dae[5]), ae[6] + dae[6]]
         end
         # Barycentric state vector
         q = attr2bary(A, AE, params)
         # Propagation and residuals
         # TO DO: `ρ::TaylorN` is too slow for `adam` due to evaluations
         # within the dynamical model
-        _, _, res = propres(radec, jd0 - ρ/c_au_per_day, q, params; dynamics)
+        _, _, res = propres(radec, jd0 - ae[5]/c_au_per_day, q, params; dynamics)
         iszero(length(res)) && break
         # Least squares fit
         fit = tryls(res, x0, 5, 1:4)
@@ -104,7 +99,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         Qs[t] = Q(x1)
         # Convergence condition
         t > 1 && abs(Qs[t] - Qs[t-1]) / Qs[t] < Qtol && break
-        # Gradient of objective function
+        # Gradient of objective function wrt (ρ, v_ρ)
         g_t = TaylorSeries.gradient(Q)(x1)[5:6]
         # First momentum
         m .= μ * m + (1 - μ) * g_t
@@ -114,42 +109,40 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         _n_ .= n / (1 - ν^t)
         # Step
         x1[5:6] = x1[5:6] - η * _m_ ./ (sqrt.(_n_) .+ ϵ)
-        # Update values
-        ae .= AE(x1)
+        # Update attributable elements
+        aes[:, t+1] .= AE(x1)
         # Projection
-        ρ, v_ρ = boundary_projection(A, ae[5], ae[6])
-        if scale == :log
-            x = log10(ρ)
-        end
+        aes[5:6, t+1] .= boundary_projection(A, aes[5, t+1], aes[6, t+1])
     end
-    # Find point with smallest Q
+    # Find attributable elements with smallest Q
     t = argmin(Qs)
 
-    return T(ρs[t]), T(v_ρs[t]), T(Qs[t])
+    return aes[:, t], Qs[t]
 end
 
 @doc raw"""
-    tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-          i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5) where {T <: AbstractFloat}
+    tsals(A::AdmissibleRegion{T}, ae::Vector{T}, radec::Vector{RadecMPC{T}},
+          tracklets::Vector{Tracklet{T}}, i::Int, params::NEOParameters{T};
+          maxiter::Int = 5, dynamics::D = newtonian!, varorder = 6) where {T <: AbstractFloat, D}
 
-Used within [`tooshortarc`](@ref) to compute an orbit from a point in an
-admissible region via least squares.
+Used within [`tooshortarc`](@ref) to compute an orbit from a point in the manifold of
+varations of `A` via least squares.
 
 !!! warning
     This function will set the (global) `TaylorSeries` variables to `dx₁ dx₂ dx₃ dx₄ dx₅ dx₆`.
 """
-function tsals(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-               i::Int, ρ::T, v_ρ::T, params::NEOParameters{T}; maxiter::Int = 5, dynamics::D = newtonian!,
-               order = 6) where {T <: AbstractFloat, D}
+function tsals(A::AdmissibleRegion{T}, ae::Vector{T}, radec::Vector{RadecMPC{T}},
+               tracklets::Vector{Tracklet{T}}, i::Int, params::NEOParameters{T};
+               maxiter::Int = 5, dynamics::D = newtonian!, varorder = 6) where {T <: AbstractFloat, D}
     # Initial time of integration [julian days]
     # (corrected for light-time)
-    jd0 = datetime2julian(A.date) - ρ / c_au_per_day
+    jd0 = datetime2julian(A.date) - ae[5] / c_au_per_day
     # Barycentric initial conditions
-    q0 = topo2bary(A, ρ, v_ρ)
+    q0 = attr2bary(A, ae, params)
     # Scaling factors
     scalings = abs.(q0) ./ 10^5
     # Jet transport variables
-    dq = scaled_variables("dx", scalings; order)
+    dq = scaled_variables("dx", scalings; order = varorder)
     # Origin
     x0 = zeros(T, 6)
     # Subset of radec for orbit fit
@@ -244,12 +237,12 @@ function _tooshortarc(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}},
     end
     v_ρ = sum(A.v_ρ_domain) / 2
     # ADAM minimization over admissible region
-    ρ, v_ρ, Q = adam(radec, A, ρ, v_ρ, params; scale, dynamics)
+    ae, Q = adam(tracklets[i].radec, A, ρ, v_ρ, params; scale, dynamics)
     if isinf(Q)
         return zero(NEOSolution{T, T})
     else
         # 6 variables least squares
-        return tsals(A, radec, tracklets, i, ρ, v_ρ, params; maxiter = 5, dynamics)
+        return tsals(A, ae, radec, tracklets, i, params; maxiter = 5, dynamics)
     end
 end
 

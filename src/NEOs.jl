@@ -24,7 +24,7 @@ using PlanetaryEphemeris: daysec, yr, TaylorInterpolant, auday2kmsec, su, ea, au
         meanmotion, meananomaly, selecteph
 using Healpix: ang2pixRing, Resolution
 using StatsBase: mean, std
-using LsqFit: curve_fit
+using LsqFit: curve_fit, vcov
 using Roots: find_zeros
 using Clustering: kmeans
 using HORIZONS: smb_spk
@@ -63,7 +63,7 @@ export NEOParameters, propagate, propagate_lyap, propagate_root
 # B plane
 export valsecchi_circle, bopik
 # Least squares
-export project, chi2, nms, nrms, diffcorr, newtonls, levenbergmarquardt, tryls, sigmas
+export project, chi2, nms, nrms, diffcorr, newtonls, levenbergmarquardt, tryls, sigmas, snr
 # Osculating
 export pv2kep, yarkp2adot
 # Too Short Arc
@@ -73,7 +73,7 @@ export gauss_method, gaussinitcond
 # Outlier rejection
 export outlier_rejection
 # Orbit determination
-export jplcompare, issinglearc, isgauss, orbitdetermination
+export curvature, jplcompare, uncertaintyparameter, issinglearc, isgauss, orbitdetermination
 
 include("constants.jl")
 include("observations/process_radar.jl")

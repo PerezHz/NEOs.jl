@@ -169,7 +169,19 @@ function nms(sol::NEOSolution{T, T}) where {T <: Real}
     end
 end
 
+@doc raw"""
+    sigmas(sol::NEOSolution{T, T}) where {T <: Real}
+
+Return `sol`'s initial condition uncertainties in barycentric cartesian coordinates.
+"""
 sigmas(sol::NEOSolution{T, T}) where {T <: Real} = sqrt.(diag(sol.fit.Γ)) .* sol.scalings
+
+@doc raw"""
+    snr(sol::NEOSolution{T, T}) where {T <: Real}
+
+Return `sol`'s initial condition signal-to-noise ratios in barycentric cartesian coordinates.
+"""
+snr(sol::NEOSolution{T, T}) where {T <: Real} = abs.(sol()) ./ sigmas(sol)
 
 @doc raw"""
     jplcompare(des::String, sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
@@ -196,4 +208,67 @@ function jplcompare(des::String, sol::NEOSolution{T, U}) where {T <: Real, U <: 
     q2 = kmsec2auday(spkgeo(id, julian2etsecs(sol.bwd.t0 + PE.J2000), "J2000", 0)[1])
     # Absolute difference in sigma units
     return abs.(q1 - q2) ./ sigmas(sol)
+end
+
+@doc raw"""
+    uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::NEOParameters{T};
+                         dynamics::D = newtonian!) where {T <: Real, D}
+
+Return the Minor Planet Center Uncertainty Parameter.
+
+# Arguments
+
+- `radec::Vector{RadecMPC{T}}`: vector of observations.
+- `sol::NEOSolution{T, T}:` least squares orbit.
+- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+- `dynamics::D`: dynamical model.
+
+!!! reference
+    https://www.minorplanetcenter.net/iau/info/UValue.html
+"""
+function uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::NEOParameters{T};
+                              dynamics::D = newtonian!) where {T <: Real, D}
+    # Reduce tracklets by polynomial regression
+    tracklets = reduce_tracklets(radec)
+    # Epoch [julian days]
+    jd0 = sol.bwd.t0 + PE.J2000
+    # Barycentric initial conditions
+    q0 = sol(sol.bwd.t0)
+    # Scaling factors
+    scalings = abs.(q0) ./ 10^6
+    # Jet transport variables
+    dq = scaled_variables("δx", scalings; order = params.varorder)
+    # Origin
+    x0 = zeros(T, 6)
+    # Initial conditions
+    q = q0 + dq
+    # Propagation and residuals
+    bwd, fwd, res = propres(radec, jd0, q, params; dynamics)
+    # Orbit fit
+    fit = tryls(res, x0, params.niter)
+    # Update solution
+    _sol_ = NEOSolution(tracklets, bwd, fwd, res, fit, scalings)
+    # Osculating keplerian elements
+    osc = pv2kep(_sol_() - params.eph_su(sol.bwd.t0); jd = jd0, frame = :ecliptic)
+    # Eccentricity
+    e = osc.e
+    # Gauss gravitational constant [deg]
+    k_0 = 180 * k_gauss / π
+    # Time of perihelion passage [julian days]
+    Tp = osc.tp
+    # Orbital period [days]
+    P = 2π * sqrt(osc.a^3 / μ_S)
+    # Covariance matrix
+    Γ = project([Tp, P], fit)
+    # Uncertainties
+    dTp, dP = sqrt.(diag(Γ))
+    # Convert orbital period to years
+    P = P/yr
+    # In-orbit longitude runoff [arcsec / decade]
+    runoff = (dTp * e(fit.x) + 10 * dP / P(fit.x)) * (k_0 / P(fit.x)) * 3_600 * 3
+    # Uncertainty parameter
+    C = log(648_000) / 9
+    U = floor(Int, log(runoff)/C) + 1
+
+    return U
 end

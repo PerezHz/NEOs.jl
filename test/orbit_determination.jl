@@ -45,6 +45,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 4e-7 )
+        @test all( snr(sol) .> 21_000)
         @test nrms(sol) < 0.36
         # Scaling factors
         @test all(sol.scalings .== 1e-6)
@@ -74,11 +75,14 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 5e-5 )
+        @test all( snr(sol1) .> 4_500 )
         @test nrms(sol1) < 0.36
         # Scaling factors
         @test all(sol1.scalings .< 2e-6)
         # Compatibility with JPL
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.3)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec, sol1, params) == 6
     end
 
     @testset "Admissible region" begin
@@ -126,6 +130,12 @@ using NEOs: NEOSolution, numberofdays
         @test A.Fs[2, :] in A
         @test A.Fs[3, :] in A
         @test [sum(A.ρ_domain), sum(A.v_ρ_domain)] / 2 in A
+        # Curvature
+        C, Γ_C = curvature(radec)
+        σ_C = sqrt.(diag(Γ_C))
+        @test all( abs.(C) ./ σ_C .> 0.02)
+        χ2 = C' * inv(Γ_C) * C
+        @test χ2 > 2.7
     end
 
     @testset "Too Short Arc" begin
@@ -143,6 +153,12 @@ using NEOs: NEOSolution, numberofdays
         # Vector of observations
         @test length(radec) == 10
         @test numberofdays(radec) < 0.05
+        # Curvature
+        C, Γ_C = curvature(radec)
+        σ_C = sqrt.(diag(Γ_C))
+        @test all( abs.(C) ./ σ_C .> 5.5)
+        χ2 = C' * inv(Γ_C) * C
+        @test χ2 > 2_517
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
         # Tracklets
@@ -164,6 +180,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 6e-3 )
+        @test all( snr(sol) .> 4.1)
         @test nrms(sol) < 0.85
         # Scaling factors
         @test all(sol.scalings .< 1e-5)
@@ -171,6 +188,8 @@ using NEOs: NEOSolution, numberofdays
         JPL = [-0.9698333701500199, 0.24036461256880043, 0.10288887522619743,
                -0.009512521373861719, -0.015325432152904881, -0.008094623534198382]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.1)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec, sol, params) == 11
     end
 
     @testset "Outlier Rejection" begin
@@ -211,6 +230,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 5e-4 )
+        @test all( snr(sol) .> 575)
         @test nrms(sol) < 0.25
         # Scaling factors
         @test all(sol.scalings .< 8e-7)
@@ -218,6 +238,8 @@ using NEOs: NEOSolution, numberofdays
         JPL = [0.7673358221902306, 0.6484904294813807, 0.2932331617634889,
                -0.011023358761553661, 0.015392684491034429, 0.006528836324700449]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.1)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec, sol, params) == 8
     end
 
     @testset "Interesting NEOs" begin
@@ -238,6 +260,12 @@ using NEOs: NEOSolution, numberofdays
         # Vector of observations
         @test length(radec) == 7
         @test numberofdays(radec) < 0.05
+        # Curvature
+        C, Γ_C = curvature(radec)
+        σ_C = sqrt.(diag(Γ_C))
+        @test all( abs.(C) ./ σ_C .> 7.5)
+        χ2 = C' * inv(Γ_C) * C
+        @test χ2 > 1.03e6
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
         # Tracklets
@@ -259,6 +287,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 1e-3 )
+        @test all( snr(sol) .> 20.5)
         @test nrms(sol) < 0.13
         # Scaling factors
         @test all(sol.scalings .< 1e-5)
@@ -266,6 +295,8 @@ using NEOs: NEOSolution, numberofdays
         JPL = [-0.17932853771087842, 0.8874166708545763, 0.38414497114153867,
                -0.01755788350351527, -0.005781328974619869, -0.0020073946363600814]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec, sol, params) == 10
 
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
@@ -306,6 +337,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 2e-5 )
+        @test all( snr(sol) .> 732)
         @test nrms(sol) < 0.30
         # Scaling factors
         @test all(sol.scalings .< 1e-5)
@@ -338,6 +370,7 @@ using NEOs: NEOSolution, numberofdays
         # Least squares fit
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 2e-6 )
+        @test all( snr(sol1) .> 4_281)
         @test nrms(sol1) < 0.37
         # Scaling factors
         @test all(sol1.scalings .< 1e-6)
@@ -347,6 +380,8 @@ using NEOs: NEOSolution, numberofdays
         @test all(sigmas(sol1) .< sigmas(sol))
         # TODO: understand better differences wrt JPL solutions
         # @test nrms(sol1) < nrms(sol)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec[1:30], sol1, params) == 6
     end
 
 end
