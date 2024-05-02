@@ -1,3 +1,13 @@
+using OhMyThreads: tmap
+using PlanetaryEphemeris: TaylorInterpCallingArgs, getinterpindex
+
+function tpeeval(tinterp::TaylorInterpolant{T, U, 2}, t::TT) where {T, U, TT<:TaylorInterpCallingArgs{T,U}}
+    # Get index of tinterp.x that interpolates at time t
+    ind::Int, δt::TT = getinterpindex(tinterp, t)
+    # Evaluate tinterp.x[ind] at δt
+    return tmap(x -> x(δt), TT, view(tinterp.x, ind, :))
+end
+
 @doc raw"""
     evaleph(eph::TaylorInterpolant, t::Taylor1, q::Taylor1{U}) where {U}
     evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T<:Real}
@@ -5,7 +15,7 @@
 Evaluate planetary ephemeris with type given by `q`.
 """
 function evaleph(eph::TaylorInterpolant, t::Taylor1, q::Taylor1{U}) where {U}
-    return map(x -> Taylor1( x.coeffs*one(q[0]) ), eph(t))
+    return map(x -> Taylor1( x.coeffs*one(q[0]) ), tpeeval(eph, t))
 end
 
 function evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T<:Real}
