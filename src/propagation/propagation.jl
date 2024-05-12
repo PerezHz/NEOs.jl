@@ -155,8 +155,9 @@ function propagate(dynamics::D, jd0::U, tspan::T, q0::Vector{V},
 
     # Propagate orbit
 
-    @time tv, xv, psol = taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, Val(true), _params;
-                                     maxsteps = maxsteps, parse_eqs = parse_eqs)
+    @time sol = taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, _params;
+                                     maxsteps = maxsteps, parse_eqs = parse_eqs, dense = true)
+    tv, xv, psol = sol.t, sol.x, sol.p
 
     if issorted(tv) || issorted(tv, rev = true)
         # Epoch (plain)
@@ -203,8 +204,9 @@ function propagate_root(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
     _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0, params)
 
     # Propagate orbit
-    @time tv, xv, psol, tvS, xvS, gvS = taylorinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, Val(true), _params;
-                                                    maxsteps, parse_eqs, eventorder, newtoniter, nrabstol)
+    @time sol = taylorinteg(dynamics, rvelea, _q0, _t0, _tmax, order, abstol, _params;
+                                                    maxsteps, parse_eqs, eventorder, newtoniter, nrabstol, dense = true)
+    tv, xv, psol, tvS, xvS, gvS = sol.t, sol.x, sol.p, sol.tevents, sol.xevents, sol.gresids
 
     return TaylorInterpolant{T, U, 2}(jd0 - JD_J2000, tv .- tv[1], psol), tvS, xvS, gvS
 
