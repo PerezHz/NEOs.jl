@@ -155,9 +155,16 @@ function propagate(dynamics::D, jd0::U, tspan::T, q0::Vector{V},
 
     # Propagate orbit
 
+    prob = OrdinaryDiffEq.ODEProblem(dynamics, _q0, (_t0, _tmax), _params)
+    @show "TI"
     @time sol = taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, _params;
-                                     maxsteps = maxsteps, parse_eqs = parse_eqs, dense = true)
+        maxsteps = maxsteps, parse_eqs = parse_eqs, dense = true)
+    @show "DE"
+    @time solde = OrdinaryDiffEq.solve(prob, TaylorMethod(order), abstol=abstol, dense=true,
+        maxiters=maxsteps, parse_eqs=parse_eqs)
     tv, xv, psol = sol.t, sol.x, sol.p
+    @show sol.t == solde.t
+    @show Array(solde) == sol.x'
 
     if issorted(tv) || issorted(tv, rev = true)
         # Epoch (plain)

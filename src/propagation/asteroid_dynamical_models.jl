@@ -12,6 +12,8 @@ function evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) whe
     return one(q)*eph(t)
 end
 
+evaleph(eph::TaylorInterpolant, t, q) = eph(t)
+
 @doc raw"""
     auxzero(a::AbstractSeries)
 
@@ -29,6 +31,8 @@ Return a `TaylorN` with zero coefficients of the same type as `a.coeffs`.
 function auxzero(a::TaylorN{Taylor1{T}}) where {T<:Number}
     return TaylorN(zero.(a.coeffs))
 end
+
+auxzero(a) = zero(a)
 
 # Nearth-Earth asteroid dynamical model (d=2.0)
 # Bodies considered in the model are: the Sun, the eight planets, the Moon and Ceres,
@@ -78,7 +82,7 @@ To improve performance, some internal loops are multi-threaded via `Threads.thre
 See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
 """ RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
 
-function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
+@taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     # Julian date of start time
     local jd0 = params[4]
     # Days since J2000.0 = 2.451545e6
@@ -652,7 +656,7 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     nothing
 end
 
-function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
+@taylorize function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     # Julian date of start time
     local jd0 = params[4]
     # Days since J2000.0 = 2.451545e6

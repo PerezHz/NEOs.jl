@@ -137,15 +137,13 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     params = NEOParameters(;maxsteps, order, abstol, parse_eqs)
     sol_bwd = NEOs.propagate(dynamics, jd0, nyears_bwd, q0, params)
     jldsave("Apophis_bwd.jld2"; sol_bwd)
-    # sol_bwd = JLD2.load("Apophis_bwd.jld2", "sol_bwd")
 
     tmax = nyears_fwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
     println("• Final time of integration: ", julian2datetime(jd0 + tmax))
 
-    sol_fwd, tvS, xvS, gvS = NEOs.propagate_root(dynamics, jd0, nyears_fwd, q0, params)
-    jldsave("Apophis_fwd.jld2"; sol_fwd, tvS, xvS, gvS)
-    # sol_fwd = JLD2.load("Apophis_fwd.jld2", "sol_bwd")
+    sol_fwd = NEOs.propagate(dynamics, jd0, nyears_fwd, q0, params)
+    jldsave("Apophis_fwd.jld2"; sol_fwd)
     println()
 
     # Load Sun ephemeris

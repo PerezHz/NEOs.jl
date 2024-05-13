@@ -28,6 +28,7 @@ using LsqFit: curve_fit, vcov
 using Roots: find_zeros
 using Clustering: kmeans
 using HORIZONS: smb_spk
+import OrdinaryDiffEq
 
 # Constants
 export d_EM_km, d_EM_au
