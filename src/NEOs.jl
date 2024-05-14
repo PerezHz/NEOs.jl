@@ -17,17 +17,18 @@ using DelimitedFiles: readdlm
 using HTTP: get
 using DataFrames: DataFrame, nrow, eachcol, eachrow, groupby, combine, AbstractDataFrame,
         DataFrameRow, GroupedDataFrame
-using PlanetaryEphemeris: daysec, yr, TaylorInterpolant, auday2kmsec, su, ea, au,
-        c_au_per_day, α_p_sun, δ_p_sun, pole_rotation, c_cm_per_sec, c_au_per_sec,
-        t2c_jpl_de430, R_sun, RE, Rx, Ry, Rz, semimajoraxis, eccentricity, inclination,
-        longascnode, argperi, timeperipass, nbodyind, numberofbodies, kmsec2auday,
-        meanmotion, meananomaly, selecteph
+using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, daysec, yr,
+        auday2kmsec, su, ea, au, c_au_per_day, α_p_sun, δ_p_sun, pole_rotation,
+        c_cm_per_sec, c_au_per_sec, t2c_jpl_de430, R_sun, RE, Rx, Ry, Rz, semimajoraxis,
+        eccentricity, inclination, longascnode, argperi, timeperipass, nbodyind,
+        numberofbodies, kmsec2auday, meanmotion, meananomaly, selecteph, getinterpindex
 using Healpix: ang2pixRing, Resolution
 using StatsBase: mean, std
 using LsqFit: curve_fit, vcov
 using Roots: find_zeros
 using Clustering: kmeans
 using HORIZONS: smb_spk
+using OhMyThreads: tmap
 
 # Constants
 export d_EM_km, d_EM_au
