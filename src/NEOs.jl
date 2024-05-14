@@ -2,7 +2,8 @@ module NEOs
 
 # __precompile__(false)
 
-import Base: show, string, hash, isequal, ==, isless, convert, zero, iszero, isnan, in
+import Base: show, string, hash, isequal, ==, isless, convert, zero, iszero, isnan, in,
+             getindex, setindex!
 import Tables: istable, rowaccess, rows, schema, Schema
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import JLD2: writeas
@@ -29,6 +30,7 @@ using Roots: find_zeros
 using Clustering: kmeans
 using HORIZONS: smb_spk
 using OhMyThreads: tmap
+using TaylorIntegration: RetAlloc, _determine_parsing!, _taylorinteg!
 
 # Constants
 export d_EM_km, d_EM_au
