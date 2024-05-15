@@ -90,25 +90,25 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
 
 function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     # Julian date of start time
-    local jd0 = params[4]
+    local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = evaleph(params[1], dsj2k, q[1])
+    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
     # Accelerations at dsj2k
-    local acceph_t = evaleph(params[2], dsj2k, q[1])
+    local acceph_t = evaleph(params.acceph, dsj2k, q[1])
     # Newtonian potentials at dsj2k
-    local newtonianNb_Potential_t = evaleph(params[3], dsj2k, q[1])
+    local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
-    local UJ_interaction = params[5]
+    local UJ_interaction = params.UJ_interaction
     # Number of bodies, including NEA
-    local N = params[6]
+    local N = params.N
     # Number of bodies, except the asteroid
     local Nm1 = N-1
     # Vector of mass parameters GM's
-    local μ = params[7]
+    local μ = params.μ
 
     # zero(q[1])
     local zero_q_1 = auxzero(q[1])
@@ -664,25 +664,25 @@ end
 
 function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     # Julian date of start time
-    local jd0 = params[4]
+    local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = evaleph(params[1], dsj2k, q[1])
+    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
     # Accelerations at dsj2k
-    local acceph_t = evaleph(params[2], dsj2k, q[1])
+    local acceph_t = evaleph(params.acceph, dsj2k, q[1])
     # Newtonian potentials at dsj2k
-    local newtonianNb_Potential_t = evaleph(params[3], dsj2k, q[1])
+    local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
-    local UJ_interaction = params[5]
+    local UJ_interaction = params.UJ_interaction
     # Number of bodies, including NEA
-    local N = params[6]
+    local N = params.N
     # Number of bodies, except the asteroid
     local Nm1 = N-1
     # Vector of mass parameters GM's
-    local μ = params[7]
+    local μ = params.μ
 
     # zero(q[1])
     local zero_q_1 = auxzero(q[1])
@@ -1208,7 +1208,7 @@ end
     # Type of position / velocity components
     local S = eltype(q)
     # Number of bodies, including NEA
-    local N = 10 # Sun, Moon and planets # params[6]
+    local N = 10 # Sun, Moon and planets # params.N
     # Number of bodies, except the asteroid
     local Nm1 = N-1
     # Vector of mass parameters GM's
