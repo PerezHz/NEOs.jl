@@ -1198,7 +1198,7 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     nothing
 end
 
-@taylorize function newtonian!(dq, q, params, t)
+function newtonian!(dq, q, params, t)
     # Julian date of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
