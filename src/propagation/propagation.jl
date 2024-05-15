@@ -2,19 +2,24 @@ include("asteroid_dynamical_models.jl")
 include("jetcoeffs.jl")
 include("parameters.jl")
 
+mutable struct DynamicalParameters{T <: Real, V <: Number}
+    sseph::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}
+    acceph::Union{Nothing, TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}}
+    poteph::Union{Nothing, TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}}
+    jd0::V
+    UJ_interaction::Union{Nothing, Vector{Bool}}
+    N::Int
+    μ::Vector{T}
+end
+
 struct PropagationBuffer{T <: Real, U <: Number, V <: Number}
     t::Taylor1{T}
     x::Vector{Taylor1{U}}
     dx::Vector{Taylor1{U}}
     q0::Vector{U}
     rv::RetAlloc{Taylor1{U}}
-    params::Vector{Any}
+    params::DynamicalParameters{T, V}
 end
-
-# Override Base.getindex and Base.setindex! for PropagationBuffer,
-# used within the dynamical functions in asteroid_dynamical_models.jl
-getindex(B::PropagationBuffer, i::Int) = getindex(B.params, i)
-setindex!(B::PropagationBuffer, x, i::Int) = setindex!(B.params, x, i)
 
 @doc raw"""
     PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U},
@@ -49,10 +54,6 @@ function PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U}
     days_0, days_f = minmax(tlim[1], tlim[2])
     # Load Solar System ephemeris [au, au/day]
     _sseph = convert(T, loadpeeph(sseph, days_0, days_f))
-    # Load accelerations
-    _acceph = convert(T, loadpeeph(acceph, days_0, days_f))
-    # Load Newtonian potentials
-    _poteph = convert(T, loadpeeph(poteph, days_0, days_f))
     # Number of massive bodies
     Nm1 = numberofbodies(_sseph)
     # Number of bodies, including NEA
@@ -61,12 +62,20 @@ function PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U}
     μ = convert(Vector{T}, vcat( μ_DE430[1:11], params.μ_ast[1:Nm1-11], zero(T) ) )
     # Check: number of SS bodies (N) in ephemeris must be equal to length of GM vector (μ)
     @assert N == length(μ) "Total number of bodies in ephemeris must be equal to length of GM vector μ"
-    # Interaction matrix with flattened bodies
-    UJ_interaction = fill(false, N)
-    # Turn on Earth interaction
-    UJ_interaction[ea] = true
-    # Vector of parameters for neosinteg
-    _params = [_sseph, _acceph, _poteph, jd0, UJ_interaction, N, μ]
+    # Accelerations, Newtonian potentials and interaction matrix with flattened bodies
+    if dynamics == newtonian!
+        _acceph = nothing
+        _poteph = nothing
+        UJ_interaction = nothing
+    else
+        _acceph = convert(T, loadpeeph(acceph, days_0, days_f))
+        _poteph = convert(T, loadpeeph(poteph, days_0, days_f))
+        UJ_interaction = fill(false, N)
+        # Turn on Earth interaction
+        UJ_interaction[ea] = true
+    end
+    # Dynamical parameters for `propagate`
+    _params = DynamicalParameters{T, V}(_sseph, _acceph, _poteph, jd0, UJ_interaction, N, μ)
     # Determine if specialized jetcoeffs! method exists
     _, rv = _determine_parsing!(true, dynamics, t, x, dx, _params)
 
@@ -231,10 +240,10 @@ function _propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, buffer::Propag
     buffer.t[1] = one(T)
     buffer.x .= Taylor1.( q0, order )
     buffer.dx .= Taylor1.( zero.(q0), order)
-    buffer[4] = jd0
+    buffer.params.jd0 = jd0
     # Propagate orbit
     @time tv, xv, psol = _taylorinteg!(dynamics, buffer.t, buffer.x, buffer.dx, buffer.q0, zero(T),
-                                       tspan * yr, params.abstol, buffer.rv, Val(true), buffer;
+                                       tspan * yr, params.abstol, buffer.rv, Val(true), buffer.params;
                                        maxsteps = params.maxsteps)
     # Output
     if issorted(tv) || issorted(tv, rev = true)
@@ -291,10 +300,10 @@ function _propagate_root(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, buffer::P
     buffer.t[1] = one(T)
     buffer.x .= Taylor1.( q0, order )
     buffer.dx .= Taylor1.( zero.(q0), order)
-    buffer[4] = jd0
+    buffer.params.jd0 = jd0
     # Propagate orbit
     @time tv, xv, psol, tvS, xvS, gvS = _taylorinteg!(dynamics, rvelea, buffer.t, buffer.x, buffer.dx,
-          buffer.q0, zero(T), tspan * yr, params.abstol, buffer.rv, Val(true), buffer;
+          buffer.q0, zero(T), tspan * yr, params.abstol, buffer.rv, Val(true), buffer.params;
           maxsteps = params.maxsteps, eventorder = eventorder, newtoniter = newtoniter,
           nrabstol = nrabstol)
     # Epoch (plain)

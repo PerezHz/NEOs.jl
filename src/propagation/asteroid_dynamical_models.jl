@@ -1200,21 +1200,19 @@ end
 
 @taylorize function newtonian!(dq, q, params, t)
     # Julian date of start time
-    local jd0 = params[4]
+    local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = evaleph(params[1], dsj2k, q[1])
+    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
     # Type of position / velocity components
     local S = eltype(q)
-    # Interaction matrix with flattened bodies
-    local UJ_interaction = params[5]
     # Number of bodies, including NEA
     local N = 10 # Sun, Moon and planets # params[6]
     # Number of bodies, except the asteroid
     local Nm1 = N-1
     # Vector of mass parameters GM's
-    local μ = params[7][1:10]
+    local μ = params.μ[1:10]
 
     # zero(q[1])
     local zero_q_1 = auxzero(q[1])

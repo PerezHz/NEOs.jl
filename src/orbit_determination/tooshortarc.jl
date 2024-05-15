@@ -96,6 +96,8 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     # Origin
     x0 = zeros(T, 6)
     x1 = zeros(T, 6)
+    # Gradient of objective function wrt (ρ, v_ρ)
+    g_t = Vector{T}(undef, 2)
     # First momentum
     m = zeros(T, 2)
     _m_ = zeros(T, 2)
@@ -130,7 +132,8 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         # Convergence condition
         t > 1 && abs(Qs[t] - Qs[t-1]) / Qs[t] < Qtol && break
         # Gradient of objective function wrt (ρ, v_ρ)
-        g_t = TaylorSeries.gradient(Q)(x1)[5:6]
+        g_t[1] = differentiate(Q, 5)(x1)
+        g_t[2] = differentiate(Q, 6)(x1)
         # First momentum
         m .= μ * m + (1 - μ) * g_t
         _m_ .= m / (1 - μ^t)
