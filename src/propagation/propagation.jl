@@ -145,19 +145,19 @@ function issuccessfulprop(sol::TaylorInterpolant, t::T; tol::T = 10.0) where {T 
 end
 
 @doc raw"""
-    propagate_params(jd0::U, tspan::T, q0::Vector{V},
+    propagate_params(jd0::V, tspan::T, q0::Vector{U},
                      params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number}
 
 Return the parameters needed for `propagate`, `propagate_root` and `propagate_lyap`.
 
 # Arguments
 
-- `jd0::U`: initial Julian date.
+- `jd0::V`: initial Julian date.
 - `tspan::T`: time span of the integration [in years].
-- `q0::Vector{V}`: vector of initial conditions.
+- `q0::Vector{U}`: vector of initial conditions.
 - `params::NEOParameters{T}`: see `Propagation Parameters` of [`NEOParameters`](@ref).
 """
-function propagate_params(jd0::U, tspan::T, q0::Vector{V},
+function propagate_params(jd0::V, tspan::T, q0::Vector{U},
                           params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number}
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
@@ -312,37 +312,29 @@ function _propagate_root(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, buffer::P
     return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, tv, psol), tvS, xvS, gvS
 end
 
-# TO DO: Adapt propagate_lyap to PropagationBuffer
 @doc raw"""
-    propagate_lyap(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
-                   params::NEOParameters{T}) where {T <: Real, U <: Number}
+    propagate_lyap(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
+                   params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number, D}
 
 Compute the Lyapunov spectrum of a NEO.
 
 # Arguments
 
 - `dynamics::D`: dynamical model function.
-- `jd0::T`: initial Julian date.
+- `jd0::V`: initial Julian date.
 - `tspan::T`: time span of the integration [in Julian days].
 - `q0::Vector{U}`: vector of initial conditions.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
 """
-function propagate_lyap(dynamics::D, jd0::T, tspan::T, q0::Vector{U},
-                        params::NEOParameters{T}) where {T <: Real, U <: Number, D}
-
-    # Unfold
-    maxsteps, order, abstol, parse_eqs = params.maxsteps, params.order, params.abstol, params.parse_eqs
-
-    # Check order
-    @assert order <= SSEPHORDER "order ($order) must be less or equal than SS ephemeris order ($SSEPHORDER)"
-
-    # Parameters for taylorinteg
-    _q0, _t0, _tmax, _params = propagate_params(jd0, tspan, q0, params)
-
+function propagate_lyap(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
+                        params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number, D}
+    # Pre-allocate memory
+    _jd0_ = cte(cte(jd0))
+    tlim = minmax(_jd0_, _jd0_ + tspan * yr) .- JD_J2000
+    buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
     # Propagate orbit
-    @time sol = lyap_taylorinteg(dynamics, _q0, _t0, _tmax, order, abstol, _params;
-                                 maxsteps = maxsteps, parse_eqs = parse_eqs)
+    @time tv, xv, λv = lyap_taylorinteg(dynamics, q0, zero(T), tspan * yr, params.order,
+          params.abstol, buffer.params; maxsteps = params.maxsteps, parse_eqs = params.parse_eqs)
 
-    return sol
-
+    return tv, xv, λv
 end
