@@ -143,7 +143,7 @@ using NEOs: src_path
         @test apophis == apophis
 
         # Read/write radec file
-        source_file = joinpath("data", "RADEC_2023_DW.dat")
+        source_file = joinpath(pkgdir(NEOs), "test", "data", "RADEC_2023_DW.dat")
         source_radec = read_radec_mpc(source_file)
 
         @test isa(source_radec, Vector{RadecMPC{Float64}})
@@ -151,7 +151,7 @@ using NEOs: src_path
         @test allunique(source_radec)
         @test all( length.(string.(source_radec)) .== 80)
 
-        check_file = joinpath("data", "RADEC_2023_DW_.dat")
+        check_file = joinpath(pkgdir(NEOs), "test", "data", "RADEC_2023_DW_.dat")
         write_radec_mpc(source_radec, check_file)
         check_radec = read_radec_mpc(check_file)
         rm(check_file)
@@ -159,7 +159,7 @@ using NEOs: src_path
         @test source_radec == check_radec
 
         # Get RadecMPC
-        source_file = joinpath("data", "99942.txt")
+        source_file = joinpath(pkgdir(NEOs), "test", "data", "99942.txt")
         get_radec_mpc("number" => "99942", source_file)
 
         @test isfile(source_file)
@@ -172,7 +172,7 @@ using NEOs: src_path
         @test allunique(source_radec)
         @test all( map(x -> length(string(x)) ∈ [80, 161], source_radec))
 
-        check_file = joinpath("data", "99942_.txt")
+        check_file = joinpath(pkgdir(NEOs), "test", "data", "99942_.txt")
         write_radec_mpc(source_radec, check_file)
         check_radec = read_radec_mpc(check_file)
         rm(check_file)
