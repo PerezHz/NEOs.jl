@@ -78,7 +78,7 @@ export outlier_rejection
 export curvature, jplcompare, uncertaintyparameter, issinglearc, isgauss, orbitdetermination
 
 include("constants.jl")
-include("observations/process_radar.jl")
+include("observations/observations.jl")
 include("propagation/propagation.jl")
 include("orbit_determination/orbit_determination.jl")
 include("postprocessing/outlier_rejection.jl")
