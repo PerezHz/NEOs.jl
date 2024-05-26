@@ -96,11 +96,11 @@ Return `true` and the asteroid's radial velocity with respect to the Earth.
 """
 function rvelea(dx, x, params, t)
 
-    jd0 = params[4]                                 # Julian date of start time
-    dsj2k = t + (jd0 - JD_J2000)                    # Days since J2000
-    ss16asteph_t = evaleph(params[1], dsj2k, x[1])  # Evaluate ephemeris at dsj2k
-    N = params[6]                                   # Total number of bodies
-    xe = ss16asteph_t[nbodyind(N-1,ea)]             # Earth's ephemeris
+    jd0 = params.jd0                                  # Julian date of start time
+    dsj2k = t + (jd0 - JD_J2000)                      # Days since J2000
+    ss16asteph_t = evaleph(params.sseph, dsj2k, x[1]) # Evaluate ephemeris at dsj2k
+    N = params.N                                      # Total number of bodies
+    xe = ss16asteph_t[nbodyind(N-1, ea)]              # Earth's ephemeris
 
     return true, (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) + (x[3]-xe[3])*(x[6]-xe[6])
 end
