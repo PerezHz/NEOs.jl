@@ -165,7 +165,7 @@ function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T}; niter::Int 
         # Newton's method
         r_0::TaylorN{T} = sol_0[i] * oneN
         r_2::TaylorN{T} = sol_0[i] * oneN
-        for j in 1:niter
+        for _ in 1:niter
             r_2 = r_0 - lagrange(r_0, a, b, c) / lagrange_derivative(r_0, a, b)
             r_0 = r_2
         end
@@ -463,8 +463,10 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         # Gauss method solution
         sol = gauss_method(observatories[triplet], dates[triplet], α[triplet] .+ dq[1:3],
                            δ[triplet] .+ dq[4:6], params)
+        # Filter non-physical (negative) rho solutions
+        filter!(x -> cte(cte(getindex(getproperty(x, :ρ), 2))) > 0, sol)
         # Filter Gauss solutions by heliocentric energy
-        filter!(x -> heliocentric_energy(x.statevect) <= 0, sol)
+        filter!(x -> cte(cte(heliocentric_energy(x.statevect))) <= 0, sol)
 
         # Iterate over Gauss solutions
         for i in eachindex(sol)

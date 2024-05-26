@@ -9,7 +9,7 @@ using NEOs: read_radec_mpc, RadecMPC, read_radar_jpl, RadarJPL
 @testset "DataFrame(::AbstractAstrometry)" begin
 
     # RadecMPC
-    radec_2023DW = read_radec_mpc(joinpath("data", "RADEC_2023_DW.dat"))
+    radec_2023DW = read_radec_mpc(joinpath(pkgdir(NEOs), "test", "data", "RADEC_2023_DW.dat"))
 
     df_2023DW = DataFrame(radec_2023DW)
 
