@@ -130,7 +130,13 @@ function NEOParameters(params::NEOParameters{T}; kwargs...) where {T <: Abstract
     return NEOParameters{T}(vals...)
 end
 
-function residuals(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}; kwargs...) where {T <: AbstractFloat}
-    return residuals(obs, params.mpc_catalogue_codes_201X, params.truth, params.resol,
+function residuals(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}; kwargs...) where {T <: Real}
+    return residuals(radec, params.mpc_catalogue_codes_201X, params.truth, params.resol,
+                     params.bias_matrix; kwargs...)
+end
+
+function residuals!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}},
+                    params::NEOParameters{T}; kwargs...) where {T <: Real, U <: Number}
+    return residuals!(res, radec, params.mpc_catalogue_codes_201X, params.truth, params.resol,
                      params.bias_matrix; kwargs...)
 end

@@ -1,6 +1,5 @@
-# Propagate an orbit and compute residuals
-function propres(radec::Vector{RadecMPC{T}}, jd0::U, q0::Vector{V}, params::NEOParameters{T};
-                 dynamics::D = newtonian!)  where {D, T <: AbstractFloat, U <: Number, V <: Number}
+# Times used within propres
+function _proprestimes(radec::Vector{RadecMPC{T}}, jd0::U, params::NEOParameters{T}) where {T <: Real, U <: Number}
     # Time of first (last) observation
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
     # Epoch (plain)
@@ -8,32 +7,21 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::U, q0::Vector{V}, params::NEOP
     # Years in backward (forward) integration
     nyears_bwd = -(_jd0_ - t0 + params.bwdoffset) / yr
     nyears_fwd = (tf - _jd0_ + params.fwdoffset) / yr
-    # Backward (forward) integration
-    bwd = propagate(dynamics, jd0, nyears_bwd, q0, params)
-    fwd = propagate(dynamics, jd0, nyears_fwd, q0, params)
-    if !issuccessfulprop(bwd, t0 - _jd0_; tol = params.coeffstol) ||
-       !issuccessfulprop(fwd, tf - _jd0_; tol = params.coeffstol)
-        return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
-    end
-    # O-C residuals
-    res = residuals(radec, params;
-                    xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
-                    xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
-                    xva = et -> bwdfwdeph(et, bwd, fwd))
 
-    return bwd, fwd, res
+    return t0, tf, _jd0_, nyears_bwd, nyears_fwd
 end
 
-# TO DO: avoid code repetition between the two methods of propres
-function propres(radec::Vector{RadecMPC{T}}, jd0::V, q0::Vector{U}, buffer::PropagationBuffer{T, U, V},
-                 params::NEOParameters{T}; dynamics::D = newtonian!)  where {D, T <: AbstractFloat, U <: Number, V <: Number}
-    # Time of first (last) observation
-    t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
-    # Epoch (plain)
-    _jd0_ = cte(cte(jd0))
-    # Years in backward (forward) integration
-    nyears_bwd = -(_jd0_ - t0 + params.bwdoffset) / yr
-    nyears_fwd = (tf - _jd0_ + params.fwdoffset) / yr
+# Propagate an orbit and compute residuals
+function propres(radec::Vector{RadecMPC{T}}, jd0::U, q0::Vector{V}, params::NEOParameters{T};
+                 buffer::Union{Nothing, PropagationBuffer{T, U, V}} = nothing,
+                 dynamics::D = newtonian!)  where {D, T <: Real, U <: Number, V <: Number}
+    # Times of first/last observation, epoch and years in backward/forward propagation
+    t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(radec, jd0, params)
+    # Propagation buffer
+    if isnothing(buffer)
+        tlim = (t0 - J2000 - params.bwdoffset, tf - J2000 + params.fwdoffset)
+        buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
+    end
     # Backward (forward) integration
     bwd = _propagate(dynamics, jd0, nyears_bwd, q0, buffer, params)
     fwd = _propagate(dynamics, jd0, nyears_fwd, q0, buffer, params)
@@ -48,6 +36,34 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::V, q0::Vector{U}, buffer::Prop
                     xva = et -> bwdfwdeph(et, bwd, fwd))
 
     return bwd, fwd, res
+end
+
+# In-place method of propres
+function propres!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}}, jd0::V, q0::Vector{U},
+    params::NEOParameters{T}; buffer::Union{Nothing, PropagationBuffer{T, U, V}} = nothing,
+    dynamics::D = newtonian!)  where {D, T <: Real, U <: Number, V <: Number}
+    # Times of first/last observation, epoch and years in backward/forward propagation
+    t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(radec, jd0, params)
+    # Propagation buffer
+    if isnothing(buffer)
+        tlim = (t0 - J2000 - params.bwdoffset, tf - J2000 + params.fwdoffset)
+        buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
+    end
+    # Backward (forward) integration
+    bwd = _propagate(dynamics, jd0, nyears_bwd, q0, buffer, params)
+    fwd = _propagate(dynamics, jd0, nyears_fwd, q0, buffer, params)
+    if !issuccessfulprop(bwd, t0 - _jd0_; tol = params.coeffstol) ||
+       !issuccessfulprop(fwd, tf - _jd0_; tol = params.coeffstol)
+        res = Vector{OpticalResidual{T, U}}(undef, 0)
+        return bwd, fwd
+    end
+    # O-C residuals
+    residuals!(res, radec, params;
+        xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
+        xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
+        xva = et -> bwdfwdeph(et, bwd, fwd))
+
+    return bwd, fwd
 end
 
 @doc raw"""
@@ -93,6 +109,8 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     t0, tf = datetime2days(date(radec[1])), datetime2days(date(radec[end]))
     tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
     buffer = PropagationBuffer(dynamics, jd0, tlim, aes[:, 1] .+ dae, params)
+    # Vector of O-C residuals
+    res = Vector{OpticalResidual{T, TaylorN{T}}}(undef, length(radec))
     # Origin
     x0 = zeros(T, 6)
     x1 = zeros(T, 6)
@@ -120,7 +138,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
         # Propagation and residuals
         # TO DO: `ρ::TaylorN` is too slow for `adam` due to evaluations
         # within the dynamical model
-        _, _, res = propres(radec, jd0 - ae[5]/c_au_per_day, q, buffer, params; dynamics)
+        propres!(res, radec, jd0 - ae[5]/c_au_per_day, q, params; buffer, dynamics)
         iszero(length(res)) && break
         # Least squares fit
         fit = tryls(res, x0, 5, 1:4)
@@ -180,6 +198,8 @@ function tsals(A::AdmissibleRegion{T}, ae::Vector{T}, radec::Vector{RadecMPC{T}}
     t0, tf = datetime2days(date(radec[1])), datetime2days(date(radec[end]))
     tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
     buffer = PropagationBuffer(dynamics, jd0, tlim, q0 .+ dq, params)
+    # Vector of O-C residuals
+    res = Vector{OpticalResidual{T, TaylorN{T}}}(undef, length(radec))
     # Origin
     x0 = zeros(T, 6)
     # Subset of radec for orbit fit
@@ -196,7 +216,7 @@ function tsals(A::AdmissibleRegion{T}, ae::Vector{T}, radec::Vector{RadecMPC{T}}
         # Initial conditions
         q = q0 + dq
         # Propagation & residuals
-        bwd, fwd, res = propres(radec, jd0, q, buffer, params; dynamics)
+        bwd, fwd = propres!(res, radec, jd0, q, params; buffer, dynamics)
         iszero(length(res)) && break
         # Orbit fit
         fit = tryls(res[idxs], x0, params.niter)

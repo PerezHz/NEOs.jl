@@ -28,7 +28,7 @@ using LsqFit: curve_fit, vcov
 using Roots: find_zeros
 using Clustering: kmeans
 using HORIZONS: smb_spk
-using OhMyThreads: tmap
+using OhMyThreads: tmap, tmap!
 using TaylorIntegration: RetAlloc, _determine_parsing!, _taylorinteg!
 
 # Constants
