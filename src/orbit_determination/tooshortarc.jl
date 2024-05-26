@@ -19,7 +19,7 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::U, q0::Vector{V}, params::NEOP
     t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(radec, jd0, params)
     # Propagation buffer
     if isnothing(buffer)
-        tlim = (t0 - J2000 - params.bwdoffset, tf - J2000 + params.fwdoffset)
+        tlim = (t0 - JD_J2000 - params.bwdoffset, tf - JD_J2000 + params.fwdoffset)
         buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
     end
     # Backward (forward) integration
@@ -46,7 +46,7 @@ function propres!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}}
     t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(radec, jd0, params)
     # Propagation buffer
     if isnothing(buffer)
-        tlim = (t0 - J2000 - params.bwdoffset, tf - J2000 + params.fwdoffset)
+        tlim = (t0 - JD_J2000 - params.bwdoffset, tf - JD_J2000 + params.fwdoffset)
         buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
     end
     # Backward (forward) integration
