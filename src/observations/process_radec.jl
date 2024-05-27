@@ -563,7 +563,7 @@ function residuals(radec::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{
     # Vector of residuals
     res = Vector{OpticalResidual{T, U}}(undef, length(radec))
 
-    return residuals!(res, radec, mpc_catalogue_codes_2014, truth, resol,
+    return residuals!(res, radec, mpc_catalogue_codes_201X, truth, resol,
                       bias_matrix; xva, kwargs...)
 end
 
