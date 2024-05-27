@@ -91,46 +91,16 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
                             dynamics::D = newtonian!, maxiter::Int = 5) where {T <: AbstractFloat, D}
     # Reduce tracklets by polynomial regression
     tracklets = reduce_tracklets(radec)
-    # Epoch [julian days]
+    # Reference epoch [julian days]
     jd0 = sol.bwd.t0 + PE.J2000
-    # Barycentric initial conditions
+    # Plain barycentric initial condition
     q0 = sol(sol.bwd.t0)
     # Scaling factors
     scalings = abs.(q0) ./ 10^6
     # Jet transport variables
     dq = scaled_variables("δx", scalings; order = params.varorder)
-    # Origin
-    x0 = zeros(T, 6)
-    # Allocate memory
-    best_Q = nrms(sol)
-    # Least squares
-    for _ in 1:maxiter
-        # Initial conditions
-        q = q0 + dq
-        # Propagation and residuals
-        bwd, fwd, res = propres(radec, jd0, q, params; dynamics)
-        iszero(length(res)) && break
-        # Orbit fit
-        fit = tryls(res, x0, params.niter)
-        !fit.success && break
-        # Update solution
-        sol = evalfit(NEOSolution(tracklets, bwd, fwd, res, fit, scalings))
-        # NRMS
-        Q = nrms(res, fit)
-        # Convergence condition
-        if abs(best_Q - Q) < 0.1
-            break
-        else
-            best_Q = Q
-        end
-        # Update initial conditions
-        q0 = q(fit.x)
-    end
-    # Case: all solutions were unsuccesful
-    if isinf(best_Q)
-        return zero(NEOSolution{T, T})
-    # Case: at least one solution was succesful
-    else
-        return sol
-    end
+    # Jet Transport initial condition
+    q = q0 + dq
+    # Jet Transport Least Squares
+    return jtls(radec, tracklets, jd0, q, 1, length(tracklets), params; maxiter, dynamics)
 end

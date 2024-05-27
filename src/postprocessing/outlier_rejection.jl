@@ -46,12 +46,14 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
 
     # Orbit fit
     fit = tryls(res, x0, params.niter)
+    # Residuals space to barycentric coordinates jacobian
+    J = Matrix(TS.jacobian(dq))
 
     # NRMS (with 0 outliers)
     Q_0 = nrms(res, fit)
 
     if Q_0 < 1
-        return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, scalings))
+        return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, J))
     end
 
     # Number of observations
@@ -125,7 +127,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
         # Update fit
         fit = tryls(res, x0, params.niter)
 
-        return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, scalings))
+        return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, J))
     end
 
     if max_drop > 1
@@ -155,5 +157,5 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     # Update fit
     fit = tryls(res, x0, params.niter)
 
-    return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, scalings))
+    return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, J))
 end

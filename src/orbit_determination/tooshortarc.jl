@@ -86,7 +86,7 @@ Compute an orbit via Jet Transport Least Squares.
 """
 function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V, q::Vector{TaylorN{T}},
               g0::Int, gf::Int, params::NEOParameters{T}; maxiter::Int = 5,
-              dynamics::D = newtonian!) where {D, T <: Real, U <: Number, V <: Number}
+              dynamics::D = newtonian!) where {D, T <: Real, V <: Number}
     # Plain initial condition
     q0 = constant_term.(q)
     # JT tail
@@ -290,7 +290,7 @@ end
 # Point in manifold of variations -> NEOSolution{T, T}
 function _tooshortarc(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}},
                       tracklets::Vector{Tracklet{T}}, i::Int, params::NEOParameters{T};
-                      scale::Symbol = :log, dynamics::D = newtonian!) where {T <: AbstractFloat, D}
+                      scale::Symbol = :log, maxiter::Int = 5, dynamics::D = newtonian!) where {T <: Real, D}
     # Center
     if scale == :linear
         ρ = sum(A.ρ_domain) / 2
@@ -313,7 +313,7 @@ function _tooshortarc(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}},
         # Scaling factors
         scalings = abs.(q0) ./ 10^5
         # Jet Transport initial condition
-        q = [q0[i] + scalings[i] * TaylorN(i, order = varorder) for i in 1:6]
+        q = [q0[i] + scalings[i] * TaylorN(i, order = 6) for i in 1:6]
         # Jet Transport Least Squares
         return jtls(radec, tracklets, jd0, q, i, i, params; maxiter, dynamics)
     end
