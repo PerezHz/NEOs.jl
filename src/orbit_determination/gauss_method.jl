@@ -445,30 +445,23 @@ See also [`gauss_method`](@ref).
 """
 function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                        params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
-
-    # Best orbit
-    best_sol = zero(NEOSolution{T, T})
     # gauss_method input
     observatories = Vector{ObservatoryMPC{T}}(undef, 3)
     dates = Vector{DateTime}(undef, 3)
     α = Vector{T}(undef, 3)
     δ = Vector{T}(undef, 3)
-    # Vector of O-C residuals
-    res = Vector{OpticalResidual{T, TaylorN{T}}}(undef, length(radec))
     # Observations triplets
     triplets, _ = _gausstriplets1(tracklets, params.max_triplets)
-    # Start point of LS fits
-    x0 = zeros(T, 6)
     # Jet transport scaling factors
     scalings = fill(1e-6, 6)
     # Jet transport perturbation (ra/dec)
     dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃", scalings,
                           order = params.varorder)
-    # Normalized root mean square error (NRMS)
+    # Best orbit
+    best_sol = zero(NEOSolution{T, T})
     best_Q = T(Inf)
-    # Break flag
+    # Convergence flag
     flag = false
-
     # Iterate over triplets
     for triplet in eachcol(triplets)
         # Find best triplet of observations
@@ -481,83 +474,30 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         filter!(x -> cte(cte(getindex(getproperty(x, :ρ), 2))) > 0, sol)
         # Filter Gauss solutions by heliocentric energy
         filter!(x -> cte(cte(heliocentric_energy(x.statevect))) <= 0, sol)
-
         # Iterate over Gauss solutions
         for i in eachindex(sol)
-
             # Light-time correction
             jd0 = _jd0_ - cte(sol[i].ρ[2]) / c_au_per_day
             # Initial conditions (jet transport)
-            q0 = sol[i].statevect .+ params.eph_su(jd0 - PE.J2000)
-
-            # Propagation and residuals
-            bwd, fwd = propres!(res, radec, jd0, q0, params; dynamics)
-            iszero(length(res)) && continue
-
-            # Subset of radec for orbit fit
-            g_0 = triplet[1]
-            g_f = triplet[3]
-            idxs = reduce(vcat, indices.(tracklets[g_0:g_f]))
-            sort!(idxs)
-            # Orbit fit
-            fit = tryls(res[idxs], x0, params.niter)
-            !fit.success && continue
-
-            # Right iteration
-            for k in g_f+1:length(tracklets)
-                extra = indices(tracklets[k])
-                fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
-                if fit_new.success
-                    fit = fit_new
-                    idxs = vcat(idxs, extra)
-                    sort!(idxs)
-                    g_f = k
-                else
-                    break
-                end
-            end
-
-            # Left iteration
-            for k in g_0-1:-1:1
-                extra = indices(tracklets[k])
-                fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
-                if fit_new.success
-                    fit = fit_new
-                    idxs = vcat(idxs, extra)
-                    sort!(idxs)
-                    g_0 = k
-                else
-                    break
-                end
-            end
-
+            q = sol[i].statevect .+ params.eph_su(jd0 - PE.J2000)
+            # Jet transport least squares
+            _sol_ = jtls(radec, tracklets, jd0, q, triplet[1], triplet[3], params;
+                         maxiter = 5, dynamics = dynamics)
             # NRMS
-            Q = nrms(res, fit)
-
-            # TO DO: check cases where newton converges but diffcorr no
-            # Update NRMS and initial conditions
+            Q = nrms(_sol_)
+            # Update best orbit
             if Q < best_Q
+                best_sol = _sol_
                 best_Q = Q
-                best_sol = evalfit(NEOSolution(tracklets[g_0:g_f], bwd, fwd,
-                                   res[idxs], fit, scalings))
-            end
-            # Break condition
-            if Q <= params.gaussQmax
-                flag = true
-                break
+                # Break condition
+                if Q <= params.gaussQmax
+                    flag = true
+                    break
+                end
             end
         end
-        if flag
-            break
-        end
+        flag && break
     end
 
-    # Case: all solutions were unsuccessful
-    if isinf(best_Q)
-        return zero(NEOSolution{T, T})
-    # Case: at least one solution was successful
-    else
-        return best_sol
-    end
-
+    return best_sol
 end
