@@ -218,13 +218,16 @@ Return the Minor Planet Center Uncertainty Parameter.
 
 # Arguments
 
-- `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `sol::NEOSolution{T, T}:` least squares orbit.
+- `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
+- `sol::NEOSolution{T, T}:` reference orbit.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
 - `dynamics::D`: dynamical model.
 
 !!! reference
     https://www.minorplanetcenter.net/iau/info/UValue.html
+
+!!! warning
+    This function will change the (global) `TaylorSeries` variables.
 """
 function uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::NEOParameters{T};
                               dynamics::D = newtonian!) where {T <: Real, D}
@@ -237,7 +240,7 @@ function uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}
     # Scaling factors
     scalings = abs.(q0) ./ 10^6
     # Jet transport variables
-    dq = scaled_variables("δx", scalings; order = params.varorder)
+    dq = scaled_variables("dx", scalings; order = params.jtlsorder)
     # Origin
     x0 = zeros(T, 6)
     # Initial conditions
@@ -245,7 +248,7 @@ function uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}
     # Propagation and residuals
     bwd, fwd, res = propres(radec, jd0, q, params; dynamics)
     # Orbit fit
-    fit = tryls(res, x0, params.niter)
+    fit = tryls(res, x0, params.newtoniter)
     # Residuals space to barycentric coordinates jacobian.
     J = Matrix(TS.jacobian(dq))
     # Update solution

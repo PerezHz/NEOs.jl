@@ -1,201 +1,23 @@
-# Times used within propres
-function _proprestimes(radec::Vector{RadecMPC{T}}, jd0::U, params::NEOParameters{T}) where {T <: Real, U <: Number}
-    # Time of first (last) observation
-    t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
-    # Epoch (plain)
-    _jd0_ = cte(cte(jd0))
-    # Years in backward (forward) integration
-    nyears_bwd = -(_jd0_ - t0 + params.bwdoffset) / yr
-    nyears_fwd = (tf - _jd0_ + params.fwdoffset) / yr
-
-    return t0, tf, _jd0_, nyears_bwd, nyears_fwd
-end
-
-# Propagate an orbit and compute residuals
-function propres(radec::Vector{RadecMPC{T}}, jd0::U, q0::Vector{V}, params::NEOParameters{T};
-                 buffer::Union{Nothing, PropagationBuffer{T, U, V}} = nothing,
-                 dynamics::D = newtonian!)  where {D, T <: Real, U <: Number, V <: Number}
-    # Times of first/last observation, epoch and years in backward/forward propagation
-    t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(radec, jd0, params)
-    # Propagation buffer
-    if isnothing(buffer)
-        tlim = (t0 - JD_J2000 - params.bwdoffset, tf - JD_J2000 + params.fwdoffset)
-        buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
-    end
-    # Backward (forward) integration
-    bwd = _propagate(dynamics, jd0, nyears_bwd, q0, buffer, params)
-    fwd = _propagate(dynamics, jd0, nyears_fwd, q0, buffer, params)
-    if !issuccessfulprop(bwd, t0 - _jd0_; tol = params.coeffstol) ||
-       !issuccessfulprop(fwd, tf - _jd0_; tol = params.coeffstol)
-        return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
-    end
-    # O-C residuals
-    res = residuals(radec, params;
-                    xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
-                    xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
-                    xva = et -> bwdfwdeph(et, bwd, fwd))
-
-    return bwd, fwd, res
-end
-
-# In-place method of propres
-function propres!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}}, jd0::V, q0::Vector{U},
-    params::NEOParameters{T}; buffer::Union{Nothing, PropagationBuffer{T, U, V}} = nothing,
-    dynamics::D = newtonian!)  where {D, T <: Real, U <: Number, V <: Number}
-    # Times of first/last observation, epoch and years in backward/forward propagation
-    t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(radec, jd0, params)
-    # Propagation buffer
-    if isnothing(buffer)
-        tlim = (t0 - JD_J2000 - params.bwdoffset, tf - JD_J2000 + params.fwdoffset)
-        buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
-    end
-    # Backward (forward) integration
-    bwd = _propagate(dynamics, jd0, nyears_bwd, q0, buffer, params)
-    fwd = _propagate(dynamics, jd0, nyears_fwd, q0, buffer, params)
-    if !issuccessfulprop(bwd, t0 - _jd0_; tol = params.coeffstol) ||
-       !issuccessfulprop(fwd, tf - _jd0_; tol = params.coeffstol)
-        res = Vector{OpticalResidual{T, U}}(undef, 0)
-        return bwd, fwd
-    end
-    # O-C residuals
-    residuals!(res, radec, params;
-        xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
-        xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
-        xva = et -> bwdfwdeph(et, bwd, fwd))
-
-    return bwd, fwd
-end
-
-@doc raw"""
-    jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V, q::Vector{U},
-         g0::Int, gf::Int, params::NEOParameters{T}; maxiter::Int = 5,
-         dynamics::D = newtonian!) where {D, T <: Real, U <: Number, V <: Number}
-
-Compute an orbit via Jet Transport Least Squares.
-
-# Arguments
-
-- `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
-- `jd0::V`: reference epoch [julian days].
-- `q::Vector{TaylorN{T}}`: jet transport initial condition.
-- `g0/gf::Int`: indices of `tracklets` to start least squares fit.
-- `params::NEOParameters{T}`: see ` Least Squares Fit Parameters` of [`NEOParameters`](@ref).
-- `maxiter::Int`: maximum number of iterations.
-- `dynamics::D`: dynamical model.
-"""
-function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V, q::Vector{TaylorN{T}},
-              g0::Int, gf::Int, params::NEOParameters{T}; maxiter::Int = 5,
-              dynamics::D = newtonian!) where {D, T <: Real, V <: Number}
-    # Plain initial condition
-    q0 = constant_term.(q)
-    # JT tail
-    dq = q - q0
-    # Vector of O-C residuals
-    res = Vector{OpticalResidual{T, TaylorN{T}}}(undef, length(radec))
-    # Propagation buffer
-    t0, tf = datetime2days(date(radec[1])), datetime2days(date(radec[end]))
-    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
-    buffer = PropagationBuffer(dynamics, jd0, tlim, q, params)
-    # Origin
-    x0 = zeros(T, 6)
-    # Subset of radec for orbit fit
-    idxs = reduce(vcat, indices.(tracklets[g0:gf]))
-    sort!(idxs)
-    # Residuals space to barycentric coordinates jacobian
-    J = Matrix(TS.jacobian(dq))
-    # Best orbit
-    best_sol = zero(NEOSolution{T, T})
-    best_Q = T(Inf)
-    # Convergence flag
-    flag = false
-    # Jet transport least squares
-    for _ in 1:maxiter
-        # Initial conditions
-        q = q0 + dq
-        # Propagation & residuals
-        bwd, fwd = propres!(res, radec, jd0, q, params; buffer, dynamics)
-        iszero(length(res)) && break
-        # Orbit fit
-        fit = tryls(res[idxs], x0, params.niter)
-        !fit.success && break
-        # Right iteration
-        for k in gf+1:length(tracklets)
-            extra = indices(tracklets[k])
-            fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
-            if fit_new.success
-                fit = fit_new
-                idxs = vcat(idxs, extra)
-                sort!(idxs)
-                gf = k
-            else
-                break
-            end
-        end
-        # Left iteration
-        for k in g0-1:-1:1
-            extra = indices(tracklets[k])
-            fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
-            if fit_new.success
-                fit = fit_new
-                idxs = vcat(idxs, extra)
-                sort!(idxs)
-                g0 = k
-            else
-                break
-            end
-        end
-        # NRMS
-        Q = nrms(res, fit)
-        if length(idxs) == length(radec) && abs(best_Q - Q) < 0.1
-            flag = true
-        end
-        # Update NRMS and initial conditions
-        if Q < best_Q
-            best_Q = Q
-            J .= TS.jacobian(dq, fit.x)
-            best_sol = evalfit(NEOSolution(tracklets[g0:gf], bwd, fwd,
-                               res[idxs], fit, J))
-            flag && break
-        else
-            break
-        end
-        # Update initial condition
-        q0 .= q(fit.x)
-    end
-
-    # Case: all solutions were unsuccesful
-    if isinf(best_Q)
-        return zero(NEOSolution{T, T})
-    # Case: at least one solution was succesful
-    else
-        return best_sol
-    end
-end
-
 @doc raw"""
     adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
          params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
-         μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, varorder::Int = 2,
-         dynamics::D = newtonian!) where {T <: AbstractFloat, D}
+         μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, adamorder::Int = 2,
+         dynamics::D = newtonian!) where {T <: Real, D}
 
 Adaptative moment estimation (ADAM) minimizer of normalized mean square
 residual over the manifold of variations of `A`.
-
-!!! warning
-    This function will set the (global) `TaylorSeries` variables to `dx₁ dx₂ dx₃ dx₄ dx₅ dx₆`.
 
 !!! reference
     See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
 """
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
               params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
-              μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, varorder::Int = 2,
-              dynamics::D = newtonian!) where {T <: AbstractFloat, D}
+              μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, adamorder::Int = 2,
+              dynamics::D = newtonian!) where {T <: Real, D}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
     # Maximum number of iterations
-    maxiter = params.maxiter
+    maxiter = params.adamiter
     # Allocate memory
     aes = Matrix{T}(undef, 6, maxiter+1)
     Qs = fill(T(Inf), maxiter+1)
@@ -211,7 +33,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     end
     scalings[6] = (A.v_ρ_domain[2] - A.v_ρ_domain[1]) / 1_000
     # Jet transport variables
-    dae = [scalings[i] * TaylorN(i, order = varorder) for i in 1:6]
+    dae = [scalings[i] * TaylorN(i, order = adamorder) for i in 1:6]
     # Propagation buffer
     t0, tf = datetime2days(date(radec[1])), datetime2days(date(radec[end]))
     tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
@@ -279,7 +101,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
 end
 
 # Order in which to check tracklets in tooshortarc
-function tsatrackletorder(x::Tracklet{T}, y::Tracklet{T}) where {T <: AbstractFloat}
+function tsatrackletorder(x::Tracklet{T}, y::Tracklet{T}) where {T <: Real}
     if x.nobs == y.nobs
         return x.date > y.date
     else
@@ -290,7 +112,7 @@ end
 # Point in manifold of variations -> NEOSolution{T, T}
 function _tooshortarc(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}},
                       tracklets::Vector{Tracklet{T}}, i::Int, params::NEOParameters{T};
-                      scale::Symbol = :log, maxiter::Int = 5, dynamics::D = newtonian!) where {T <: Real, D}
+                      scale::Symbol = :log, dynamics::D = newtonian!) where {T <: Real, D}
     # Center
     if scale == :linear
         ρ = sum(A.ρ_domain) / 2
@@ -313,38 +135,33 @@ function _tooshortarc(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}},
         # Scaling factors
         scalings = abs.(q0) ./ 10^5
         # Jet Transport initial condition
-        q = [q0[i] + scalings[i] * TaylorN(i, order = 6) for i in 1:6]
+        q = [q0[i] + scalings[i] * TaylorN(i, order = params.tsaorder) for i in 1:6]
         # Jet Transport Least Squares
-        return jtls(radec, tracklets, jd0, q, i, i, params; maxiter, dynamics)
+        return jtls(radec, tracklets, jd0, q, i, i, params; dynamics)
     end
 end
 
 @doc raw"""
     tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
+                params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
 
-Return initial conditions by minimizing the normalized root mean square residual
+Compute an orbit by minimizing the normalized root mean square residual
 over the manifold of variations.
 
 # Arguments
 
-- `radec::Vector{RadecMPC{T}}`: vector of observations.
+- `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
-- `params::NEOParameters{T}`: see `Admissible Region Parameters` of [`NEOParameters`](@ref).
+- `params::NEOParameters{T}`: see `Too Short Arc Parameters` of [`NEOParameters`](@ref).
 - `dynamics::D`: dynamical model.
-
-!!! warning
-    This function will set the (global) `TaylorSeries` variables to `dx₁ dx₂ dx₃ dx₄ dx₅ dx₆`.
 """
 function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                     params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
+                     params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
 
     # Allocate memory for output
     best_sol = zero(NEOSolution{T, T})
     # Sort tracklets by tsatrackletorder
     idxs = sortperm(tracklets, lt = tsatrackletorder)
-    # Declare jet transport variables
-    _ = scaled_variables("dx", ones(T, 6); order = 6)
 
     # Iterate tracklets
     for i in idxs

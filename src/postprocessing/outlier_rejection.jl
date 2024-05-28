@@ -9,10 +9,9 @@ residual_norm(x::OpticalResidual{T, T}) where {T <: Real} = x.w_α * x.ξ_α^2 /
 
 @doc raw"""
     outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
-                      params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
+                      params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
 
-Refine an orbit, computed by [`tooshortarc`](@ref) or [`gaussinitcond`](@ref),
-via propagation and/or outlier rejection.
+Refine an orbit, computed by [`orbitdetermination`](@ref), via propagation and/or outlier rejection.
 
 # Arguments
 
@@ -22,13 +21,10 @@ via propagation and/or outlier rejection.
 - `dynamics::D`: dynamical model.
 
 !!! warning
-    This function will set the (global) `TaylorSeries` variables to `δx₁ δx₂ δx₃ δx₄ δx₅ δx₆`.
+    This function will change the (global) `TaylorSeries` variables.
 """
 function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
-                           params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
-
-    # Origin
-    x0 = zeros(T, 6)
+                           params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
     # Julian day to start propagation
     jd0 = sol.bwd.t0 + PE.J2000
     # Initial conditions (T)
@@ -36,19 +32,18 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     # Scaling factors
     scalings = abs.(q0) ./ 10^6
     # Jet transport perturbation
-    dq = scaled_variables("δx", scalings; order = params.varorder)
+    dq = scaled_variables("δx", scalings; order = params.jtlsorder)
     # Initial conditions (jet transport)
     q = q0 .+ dq
-
     # Propagation and residuals
     bwd, fwd, res = propres(radec, jd0, q, params; dynamics)
     iszero(length(res)) && return zero(NEOSolution{T, T})
-
+    # Origin
+    x0 = zeros(T, 6)
     # Orbit fit
-    fit = tryls(res, x0, params.niter)
+    fit = tryls(res, x0, params.newtoniter)
     # Residuals space to barycentric coordinates jacobian
     J = Matrix(TS.jacobian(dq))
-
     # NRMS (with 0 outliers)
     Q_0 = nrms(res, fit)
 
@@ -78,7 +73,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
                 res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
                                        relax_factor.(res), new_outliers)
                 # Update fit
-                fit = tryls(res, x0, params.niter)
+                fit = tryls(res, x0, params.newtoniter)
                 break
             end
         end
@@ -111,7 +106,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
         res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
                                relax_factor.(res), new_outliers)
         # Update fit
-        fit = tryls(res, x0, params.niter)
+        fit = tryls(res, x0, params.newtoniter)
     end
     # Add 0 outliers fit
     Qs[end] = Q_0
@@ -125,7 +120,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
         res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
                                relax_factor.(res), new_outliers)
         # Update fit
-        fit = tryls(res, x0, params.niter)
+        fit = tryls(res, x0, params.newtoniter)
 
         return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, J))
     end
@@ -155,7 +150,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
                            relax_factor.(res), new_outliers)
     # Update fit
-    fit = tryls(res, x0, params.niter)
+    fit = tryls(res, x0, params.newtoniter)
 
     return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, J))
 end

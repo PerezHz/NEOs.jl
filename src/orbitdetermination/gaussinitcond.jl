@@ -55,7 +55,7 @@ end
 
 @doc raw"""
     topounit(α::T, δ::T) where {T <: Number}
-    topounit(obs::RadecMPC{T}) where {T <: AbstractFloat}
+    topounit(obs::RadecMPC{T}) where {T <: Real}
 
 Return the topocentric unit vector.
 """
@@ -69,7 +69,7 @@ function topounit(α::T, δ::T) where {T <: Number}
     return pos
 end
 
-topounit(obs::RadecMPC{T}) where {T <: AbstractFloat} = topounit(obs.α, obs.δ)
+topounit(obs::RadecMPC{T}) where {T <: Real} = topounit(obs.α, obs.δ)
 
 # TO DO: Should we allow to use other μ?
 
@@ -101,11 +101,11 @@ Convert a vector of vectors `x` to a matrix.
 vectors2matrix(x::T) where {T <: AbstractVector} = permutedims(reduce(hcat, x))
 
 @doc raw"""
-    _format_Lagrange_equation(a::T, b::T, c::T) where {T <: AbstractFloat}
+    _format_Lagrange_equation(a::T, b::T, c::T) where {T <: Real}
 
 Format Lagrange equation as `r⁸ + a r⁶ + b r³ + c = 0`.
 """
-function _format_Lagrange_equation(a::T, b::T, c::T) where {T <: AbstractFloat}
+function _format_Lagrange_equation(a::T, b::T, c::T) where {T <: Real}
     a_sgn = a ≥ 0 ? "+" : "-"
     b_sgn = b ≥ 0 ? "+" : "-"
     c_sgn = c ≥ 0 ? "+" : "-"
@@ -188,7 +188,7 @@ function heliocentric_energy(r::Vector{T}) where {T <: Number}
 end
 
 @doc raw"""
-    gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: AbstractFloat}
+    gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: Real}
     gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime},
                  α::Vector{U}, δ::Vector{U}, params::NEOParameters{T}) where {T <: Real, U <: Number}
 
@@ -206,7 +206,7 @@ Core Gauss method of Initial Orbit determination (IOD).
 !!! reference
     See Algorithm 5.5 in page 274 https://doi.org/10.1016/C2016-0-02107-1.
 """
-function gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: AbstractFloat}
+function gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: Real}
 
     # Make sure observations are in temporal order
     sort!(obs)
@@ -280,7 +280,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     c = -(μ_S^2)*(B*B)
 
     # Solve Lagrange equation
-    sol = solve_lagrange(a, b, c; niter = params.niter)
+    sol = solve_lagrange(a, b, c; niter = params.newtoniter)
 
     # Number of solutions
     n_sol = length(sol)
@@ -427,24 +427,21 @@ end
 
 @doc raw"""
     gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                  params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
+                  params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
 
-Return initial conditions via Gauss Method.
+Compute an orbit via Jet Transport Gauss Method.
 
 See also [`gauss_method`](@ref).
 
 # Arguments
 
-- `radec::Vector{RadecMPC{T}}`: vector of observations.
+- `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
 - `params::NEOParameters{T}`: see `Gauss Method Parameters` of [`NEOParameters`](@ref).
 - `dynamics::D`: dynamical model.
-
-!!! warning
-    This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`.
 """
 function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                       params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
+                       params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
     # gauss_method input
     observatories = Vector{ObservatoryMPC{T}}(undef, 3)
     dates = Vector{DateTime}(undef, 3)
@@ -455,8 +452,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
     # Jet transport scaling factors
     scalings = fill(1e-6, 6)
     # Jet transport perturbation (ra/dec)
-    dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃", scalings,
-                          order = params.varorder)
+    dq = [scalings[i] * TaylorN(i, order = params.gaussorder) for i in 1:6]
     # Best orbit
     best_sol = zero(NEOSolution{T, T})
     best_Q = T(Inf)
@@ -481,8 +477,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
             # Initial conditions (jet transport)
             q = sol[i].statevect .+ params.eph_su(jd0 - PE.J2000)
             # Jet transport least squares
-            _sol_ = jtls(radec, tracklets, jd0, q, triplet[1], triplet[3], params;
-                         maxiter = 5, dynamics = dynamics)
+            _sol_ = jtls(radec, tracklets, jd0, q, triplet[1], triplet[3], params; dynamics)
             # NRMS
             Q = nrms(_sol_)
             # Update best orbit
