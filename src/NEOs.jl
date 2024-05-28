@@ -80,7 +80,7 @@ export curvature, jplcompare, uncertaintyparameter, issinglearc, isgauss, orbitd
 include("constants.jl")
 include("observations/observations.jl")
 include("propagation/propagation.jl")
-include("orbit_determination/orbitdetermination.jl")
+include("orbitdetermination/orbitdetermination.jl")
 include("postprocessing/outlier_rejection.jl")
 include("init.jl")
 
