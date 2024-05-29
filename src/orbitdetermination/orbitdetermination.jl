@@ -59,7 +59,7 @@ function propres!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}}
     fwd = _propagate(dynamics, jd0, nyears_fwd, q0, buffer, params)
     if !issuccessfulprop(bwd, t0 - _jd0_; tol = params.coeffstol) ||
        !issuccessfulprop(fwd, tf - _jd0_; tol = params.coeffstol)
-        res = Vector{OpticalResidual{T, U}}(undef, 0)
+        empty!(res)
         return bwd, fwd
     end
     # O-C residuals

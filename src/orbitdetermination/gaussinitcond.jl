@@ -467,7 +467,7 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         # Gauss method solution
         sol = gauss_method(observatories, dates, α .+ dq[1:3], δ .+ dq[4:6], params)
         # Filter non-physical (negative) rho solutions
-        filter!(x -> cte(cte(getindex(getproperty(x, :ρ), 2))) > 0, sol)
+        filter!(x -> all(cte.(x.ρ) .> 0), sol)
         # Filter Gauss solutions by heliocentric energy
         filter!(x -> cte(cte(heliocentric_energy(x.statevect))) <= 0, sol)
         # Iterate over Gauss solutions
