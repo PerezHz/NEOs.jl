@@ -83,12 +83,12 @@ Compute an orbit via Jet Transport Least Squares.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
 - `jd0::V`: reference epoch [julian days].
 - `q::Vector{TaylorN{T}}`: jet transport initial condition.
-- `g0/gf::Int`: indices of `tracklets` to start least squares fit.
+- `i::Int`: index of `tracklets` to start least squares fit.
 - `params::NEOParameters{T}`: see `Jet Transport Least Squares Parameters` of [`NEOParameters`](@ref).
 - `dynamics::D`: dynamical model.
 """
 function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V, q::Vector{TaylorN{T}},
-              g0::Int, gf::Int, params::NEOParameters{T}; dynamics::D = newtonian!) where {D, T <: Real, V <: Number}
+              i::Int, params::NEOParameters{T}; dynamics::D = newtonian!) where {D, T <: Real, V <: Number}
     # Plain initial condition
     q0 = constant_term.(q)
     # JT tail
@@ -102,8 +102,9 @@ function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V
     # Origin
     x0 = zeros(T, 6)
     # Subset of radec for orbit fit
-    idxs = reduce(vcat, indices.(tracklets[g0:gf]))
-    sort!(idxs)
+    tin = [tracklets[i]]
+    tout = sort(tracklets, by = x -> abs( (x.date - tracklets[i].date).value ))[2:end]
+    rin = sort!(indices(tracklets[i]))
     # Residuals space to barycentric coordinates jacobian
     J = Matrix(TS.jacobian(dq))
     # Best orbit
@@ -119,43 +120,30 @@ function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V
         bwd, fwd = propres!(res, radec, jd0, q, params; buffer, dynamics)
         iszero(length(res)) && break
         # Orbit fit
-        fit = tryls(res[idxs], x0, params.newtoniter)
+        fit = tryls(res[rin], x0, params.newtoniter)
         !fit.success && break
-        # Right iteration
-        for k in gf+1:length(tracklets)
-            extra = indices(tracklets[k])
-            fit_new = tryls(res[idxs ∪ extra], x0, params.newtoniter)
+        # Incrementally add observations to fit
+        while !isempty(tout)
+            extra = indices(tout[1])
+            fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter)
             !fit_new.success && break
             fit = fit_new
-            idxs = vcat(idxs, extra)
-            sort!(idxs)
-            gf = k
-        end
-        # Left iteration
-        for k in g0-1:-1:1
-            extra = indices(tracklets[k])
-            fit_new = tryls(res[idxs ∪ extra], x0, params.newtoniter)
-            !fit_new.success && break
-            fit = fit_new
-            idxs = vcat(idxs, extra)
-            sort!(idxs)
-            g0 = k
+            tracklet = popfirst!(tout)
+            push!(tin, tracklet)
+            sort!(tin)
+            rin = vcat(rin, extra)
+            sort!(rin)
         end
         # NRMS
         Q = nrms(res, fit)
-        if length(idxs) == length(radec) && abs(best_Q - Q) < 0.1
+        if length(rin) == length(radec) && abs(best_Q - Q) < 0.1
             flag = true
         end
         # Update NRMS and initial conditions
-        if Q < best_Q
-            best_Q = Q
-            J .= TS.jacobian(dq, fit.x)
-            best_sol = evalfit(NEOSolution(tracklets[g0:gf], bwd, fwd,
-                               res[idxs], fit, J))
-            flag && break
-        else
-            break
-        end
+        best_Q = Q
+        J .= TS.jacobian(dq, fit.x)
+        best_sol = evalfit(NEOSolution(tin, bwd, fwd, res[rin], fit, J))
+        flag && break
         # Update initial condition
         q0 .= q(fit.x)
     end
@@ -231,8 +219,8 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}
     # Reduce tracklets by polynomial regression
     tracklets = reduce_tracklets(radec)
     # Set jet transport variables
-    varoder = max(params.tsaorder, params.gaussorder)
-    scaled_variables("dx", ones(T, 6); order = varoder)
+    varorder = max(params.tsaorder, params.gaussorder)
+    scaled_variables("dx", ones(T, 6); order = varorder)
     # Case 1: Gauss Method
     if isgauss(tracklets)
         sol = gaussinitcond(radec, tracklets, params; dynamics)
@@ -276,5 +264,6 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
     # Jet Transport initial condition
     q = q0 + dq
     # Jet Transport Least Squares
-    return jtls(radec, tracklets, jd0, q, 1, length(tracklets), params; dynamics)
+    _, i = findmin(tracklet -> abs(datetime2days(tracklet.date) - sol.bwd.t0), tracklets)
+    return jtls(radec, tracklets, jd0, q, i, params; dynamics)
 end

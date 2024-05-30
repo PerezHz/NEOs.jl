@@ -465,24 +465,24 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         # Julian day of middle observation
         _jd0_ = datetime2julian(dates[2])
         # Gauss method solution
-        sol = gauss_method(observatories, dates, α .+ dq[1:3], δ .+ dq[4:6], params)
+        solG = gauss_method(observatories, dates, α .+ dq[1:3], δ .+ dq[4:6], params)
         # Filter non-physical (negative) rho solutions
-        filter!(x -> all(cte.(x.ρ) .> 0), sol)
+        filter!(x -> all(cte.(x.ρ) .> 0), solG)
         # Filter Gauss solutions by heliocentric energy
-        filter!(x -> cte(cte(heliocentric_energy(x.statevect))) <= 0, sol)
+        filter!(x -> cte(cte(heliocentric_energy(x.statevect))) <= 0, solG)
         # Iterate over Gauss solutions
-        for i in eachindex(sol)
+        for i in eachindex(solG)
             # Light-time correction
-            jd0 = _jd0_ - cte(sol[i].ρ[2]) / c_au_per_day
+            jd0 = _jd0_ - cte(solG[i].ρ[2]) / c_au_per_day
             # Initial conditions (jet transport)
-            q = sol[i].statevect .+ params.eph_su(jd0 - PE.J2000)
+            q = solG[i].statevect .+ params.eph_su(jd0 - PE.J2000)
             # Jet transport least squares
-            _sol_ = jtls(radec, tracklets, jd0, q, triplet[1], triplet[3], params; dynamics)
+            sol = jtls(radec, tracklets, jd0, q, triplet[2], params; dynamics)
             # NRMS
-            Q = nrms(_sol_)
+            Q = nrms(sol)
             # Update best orbit
             if Q < best_Q
-                best_sol = _sol_
+                best_sol = sol
                 best_Q = Q
                 # Break condition
                 if Q <= params.gaussQmax

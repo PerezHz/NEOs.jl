@@ -137,7 +137,7 @@ function _tooshortarc(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}},
         # Jet Transport initial condition
         q = [q0[i] + scalings[i] * TaylorN(i, order = params.tsaorder) for i in 1:6]
         # Jet Transport Least Squares
-        return jtls(radec, tracklets, jd0, q, i, i, params; dynamics)
+        return jtls(radec, tracklets, jd0, q, i, params; dynamics)
     end
 end
 
