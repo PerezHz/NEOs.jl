@@ -425,6 +425,38 @@ function _gausstriplets2!(observatories::Vector{ObservatoryMPC{T}}, dates::Vecto
     return nothing
 end
 
+function _adam!(q::Vector{TaylorN{T}}, jd0::T, tracklet::Tracklet, params::NEOParameters{T};
+                dynamics::D = newtonian!) where {T <: Real, D}
+    # Exploratory propagation
+    bwd, fwd, res = propres(tracklet.radec, jd0, q(), params)
+    # ADAM is not needed
+    if nrms(res) <= 100
+        return jd0
+    end
+    # Admissible region
+    A = AdmissibleRegion(tracklet, params)
+    # Epoch [days since J2000]
+    At0 = datetime2days(A.date)
+    # Barycentric cartesian initial condition
+    if At0 <= jd0 - JD_J2000
+        q0 = bwd(At0)
+    else
+        q0 = fwd(At0)
+    end
+    # Range and range rate
+    ρ, v_ρ = bary2topo(A, q0)
+    # ADAM
+    ae, _ = adam(tracklet.radec, A, ρ, v_ρ, params; scale = :log, dynamics = dynamics)
+    # Epoch [julian days] (corrected for light-time)
+    jd0 = datetime2julian(A.date) - ae[5] / c_au_per_day
+    # Convert attributable elements to barycentric cartesian coordinates
+    q0 = attr2bary(A, ae, params)
+    # Jet Transport initial condition
+    q .= [q0[i] + (q0[i] / 10^5) * TaylorN(i, order = params.tsaorder) for i in 1:6]
+
+    return jd0
+end
+
 @doc raw"""
     gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                   params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
@@ -472,10 +504,12 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
         filter!(x -> cte(cte(heliocentric_energy(x.statevect))) <= 0, solG)
         # Iterate over Gauss solutions
         for i in eachindex(solG)
-            # Light-time correction
+            # Epoch (corrected for light-time)
             jd0 = _jd0_ - cte(solG[i].ρ[2]) / c_au_per_day
-            # Initial conditions (jet transport)
-            q = solG[i].statevect .+ params.eph_su(jd0 - PE.J2000)
+            # Jet transport initial conditions
+            q = solG[i].statevect .+ params.eph_su(jd0 - JD_J2000)
+            # ADAM (if needed)
+            jd0 = _adam!(q, jd0, tracklets[triplet[2]], params; dynamics)
             # Jet transport least squares
             sol = jtls(radec, tracklets, jd0, q, triplet[2], params; dynamics)
             # NRMS
