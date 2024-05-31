@@ -19,7 +19,7 @@ using NEOs: NEOSolution, numberofdays
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by May 27, 2024
+        # Values by May 31, 2024
 
         # Vector of observations
         @test length(radec) == 123
@@ -52,7 +52,9 @@ using NEOs: NEOSolution, numberofdays
         @test !isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 8e-4
         # Compatibility with JPL
-        @test all(jplcompare("2023 DW", sol) .< 0.3)
+        JPL = [-1.1003236797145037, 0.20774505704014837, 0.04203643429323372,
+               -0.004736048200346307, -0.010626587751050683, -0.006016238714906758]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.27)
 
         # Refine orbit
         sol1 = orbitdetermination(radec, sol, params)
@@ -82,7 +84,7 @@ using NEOs: NEOSolution, numberofdays
         @test isdiag(sol1.jacobian)
         @test maximum(sol1.jacobian) < 2e-6
         # Compatibility with JPL
-        @test all(jplcompare("2023 DW", sol1) .< 0.3)
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.27)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol1, params) == 6
     end
@@ -150,7 +152,7 @@ using NEOs: NEOSolution, numberofdays
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by May 27, 2024
+        # Values by May 31, 2024
 
         # Vector of observations
         @test length(radec) == 10
@@ -189,9 +191,9 @@ using NEOs: NEOSolution, numberofdays
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 1e-5
         # Compatibility with JPL
-        JPL = [-0.9698333701500199, 0.24036461256880043, 0.10288887522619743,
-               -0.009512521373861719, -0.015325432152904881, -0.008094623534198382]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.02)
+        JPL = [-0.9698333704468041, 0.2403646120906576, 0.10288887497365079,
+               -0.009512521364762891, -0.015325432155116774, -0.008094623535119534]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.015)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 11
     end
@@ -208,7 +210,7 @@ using NEOs: NEOSolution, numberofdays
         # Outlier rejection
         sol = outlier_rejection(radec, sol, params)
 
-        # Values by May 27, 2024
+        # Values by May 31, 2024
 
         # Vector of observations
         @test length(radec) == 21
@@ -241,7 +243,9 @@ using NEOs: NEOSolution, numberofdays
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 8e-7
         # Compatibility with JPL
-        @test all(jplcompare("2007 VV7", sol) .< 0.12)
+        JPL = [0.7673449629397204, 0.6484776654615118, 0.2932277478785896,
+               -0.011023192686652665, 0.015392823966811551, 0.0065288994881745974]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 7e-4)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 8
     end
@@ -259,7 +263,7 @@ using NEOs: NEOSolution, numberofdays
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by May 27, 2024
+        # Values by May 31 2024
 
         # Vector of observations
         @test length(radec) == 7
@@ -298,7 +302,9 @@ using NEOs: NEOSolution, numberofdays
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 9e-6
         # Compatibility with JPL
-        @test all(jplcompare("2014 AA", sol) .< 0.3)
+        JPL = [-0.17932853781716676, 0.8874166708195785, 0.38414497112938667,
+               -0.017557883503263098, -0.005781328976995571, -0.0020073946372627465]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 10
 
@@ -315,7 +321,7 @@ using NEOs: NEOSolution, numberofdays
         # Restricted Orbit Determination
         sol = orbitdetermination(radec[idxs], params)
 
-        # Values by May 27, 2024
+        # Values by May 31, 2024
 
         # Vector of observations
         @test length(radec) == 883
@@ -348,7 +354,9 @@ using NEOs: NEOSolution, numberofdays
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 1e-5
         # Compatibility with JPL
-        @test all(jplcompare("2008 TC3", sol) .< 0.2)
+        JPL = [0.9741070120439872, 0.2151506132683409, 0.0939089782825125,
+               -0.007890445003489774, 0.016062726197895585, 0.006136042044307594]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.2)
 
         # Update orbit with more observations
         sol1 = orbitdetermination(radec[1:30], sol, params)
@@ -381,7 +389,7 @@ using NEOs: NEOSolution, numberofdays
         @test isdiag(sol1.jacobian)
         @test maximum(sol1.jacobian) < 1e-6
         # Compatibility with JPL
-        @test all(jplcompare("2008 TC3", sol1) .< 1.3)
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.21)
         # Parameters uncertainty
         @test all(sigmas(sol1) .< sigmas(sol))
         # TODO: understand better differences wrt JPL solutions
