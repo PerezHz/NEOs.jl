@@ -62,20 +62,22 @@ export compute_delay, radar_astrometry
 export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!, newtonian!
 # Propagation
 export NEOParameters, propagate, propagate_lyap, propagate_root
-# B plane
-export valsecchi_circle, bopik
-# Least squares
-export project, chi2, nms, nrms, diffcorr, newtonls, levenbergmarquardt, tryls, sigmas, snr
 # Osculating
 export pv2kep, yarkp2adot
+# Least squares
+export project, chi2, nms, nrms, diffcorr, newtonls, levenbergmarquardt, tryls
+# NEOSolution
+export epoch, sigmas, snr, jplcompare, uncertaintyparameter
 # Too Short Arc
 export tooshortarc
 # Gauss method
 export gauss_method, gaussinitcond
+# Orbit determination
+export curvature, issinglearc, isgauss, orbitdetermination
+# B plane
+export valsecchi_circle, bopik
 # Outlier rejection
 export outlier_rejection
-# Orbit determination
-export curvature, jplcompare, uncertaintyparameter, issinglearc, isgauss, orbitdetermination
 
 include("constants.jl")
 include("observations/observations.jl")

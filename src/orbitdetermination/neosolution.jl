@@ -170,6 +170,13 @@ function nms(sol::NEOSolution{T, T}) where {T <: Real}
 end
 
 @doc raw"""
+    epoch(sol::NEOSolution{T, T}) where {T <: Real}
+
+Return the reference epoch of orbit `sol` in days since J2000.
+"""
+epoch(sol::NEOSolution{T, T}) where {T <: Real} = sol.bwd.t0
+
+@doc raw"""
     sigmas(sol::NEOSolution{T, T}) where {T <: Real}
 
 Return `sol`'s initial condition uncertainties in barycentric cartesian coordinates.
