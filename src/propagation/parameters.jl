@@ -18,6 +18,7 @@ struct NEOParameters{T <: Real}
     # Gauss Method Parameters
     max_triplets::Int
     gaussorder::Int
+    adamhelp::Bool
     gaussQmax::T
     # Too Short Arc Parameters
     H_max::T
@@ -39,8 +40,9 @@ function show(io::IO, p::NEOParameters{T}) where {T <: Real}
     params = [
         :maxsteps, :order, :abstol, :parse_eqs, :bwdoffset,
         :fwdoffset, :coeffstol, :max_triplets, :gaussorder,
-        :gaussQmax, :H_max, :a_max, :adamiter, :tsaorder,
-        :tsaQmax, :jtlsiter, :newtoniter, :jtlsorder, :max_per
+        :adamhelp, :gaussQmax, :H_max, :a_max, :adamiter,
+        :tsaorder, :tsaQmax, :jtlsiter, :newtoniter, :jtlsorder,
+        :max_per
     ]
     s = Vector{String}(undef, length(params)+1)
     s[1] = "NEOParameters{$T}:\n"
@@ -80,6 +82,7 @@ Parameters for all orbit determination functions.
 
 - `max_triplets::Int`: maximum number of triplets to check for a solution (default: `10`).
 - `gaussorder::Int`: order of the jet transport perturbation (default: `5`).
+- `adamhelp::Bool`: whether to refine Gauss' preliminary orbit via ADAM (default: `false`).
 - `gaussQmax::T`: nrms threshold (default: `5.0`).
 
 # Too Short Arc Parameters
@@ -104,9 +107,9 @@ function NEOParameters(;
     maxsteps::Int = 500, μ_ast::Vector{T} = μ_ast343_DE430[1:end], order::Int = 25,
     abstol::T = 1e-20, parse_eqs::Bool = true, bwdoffset::T = 0.5, fwdoffset::T = 0.5,
     coeffstol::T = 10.0, debias_table::String = "2018", max_triplets::Int = 10,
-    gaussorder::Int = 5, gaussQmax::T = 5.0, H_max::T = 34.5, a_max::T = 100.0,
-    adamiter::Int = 200, tsaorder::Int = 6, tsaQmax::T = 1.5, jtlsiter::Int = 5,
-    newtoniter::Int = 5, jtlsorder::Int = 5, max_per::T = 18.0
+    gaussorder::Int = 5, adamhelp::Bool = false, gaussQmax::T = 5.0, H_max::T = 34.5,
+    a_max::T = 100.0, adamiter::Int = 200, tsaorder::Int = 6, tsaQmax::T = 1.5,
+    jtlsiter::Int = 5, newtoniter::Int = 5, jtlsorder::Int = 5, max_per::T = 18.0
     ) where {T <: Real}
 
     # Unfold debiasing matrix
@@ -120,7 +123,7 @@ function NEOParameters(;
     return NEOParameters{T}(
         maxsteps, μ_ast, order, abstol, parse_eqs, bwdoffset, fwdoffset,
         coeffstol, mpc_catalogue_codes_201X, truth, resol, bias_matrix,
-        eph_su, eph_ea, max_triplets, gaussorder, gaussQmax, H_max,
+        eph_su, eph_ea, max_triplets, gaussorder, adamhelp, gaussQmax, H_max,
         a_max, adamiter, tsaorder, tsaQmax, jtlsiter, newtoniter, jtlsorder,
         max_per
     )

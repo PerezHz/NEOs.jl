@@ -9,7 +9,7 @@ using Test
 using NEOs: NEOSolution, numberofdays
 
 @testset "Orbit Determination" begin
-    @testset "Gauss Method" begin
+    @testset "Gauss Method (without ADAM)" begin
         # Load observations
         radec = read_radec_mpc(joinpath(pkgdir(NEOs), "test", "data", "RADEC_2023_DW.dat"))
         # Parameters
@@ -87,6 +87,56 @@ using NEOs: NEOSolution, numberofdays
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.27)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol1, params) == 6
+    end
+
+    @testset "Gauss Method (with ADAM)" begin
+        # Load observations
+        radec = fetch_radec_mpc("designation" => "2016 TU93")
+
+        # Parameters
+        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007, adamhelp = true)
+
+        # Orbit Determination
+        sol = orbitdetermination(radec, params)
+
+        # Values by June 1, 2024
+
+        # Vector of observations
+        @test length(radec) == 9
+        @test numberofdays(radec) < 13.1
+        # Orbit solution
+        @test isa(sol, NEOSolution{Float64, Float64})
+        # Tracklets
+        @test length(sol.tracklets) == 3
+        @test sol.tracklets[1].radec[1] == radec[1]
+        @test sol.tracklets[end].radec[end] == radec[end]
+        @test issorted(sol.tracklets)
+        # Backward integration
+        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test all( norm.(sol.bwd.x, Inf) .< 2 )
+        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
+        # Forward integration
+        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test all( norm.(sol.fwd.x, Inf) .< 2 )
+        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
+        # Vector of residuals
+        @test length(sol.res) == 9
+        @test iszero(count(outlier.(sol.res)))
+        # Least squares fit
+        @test sol.fit.success
+        @test all( sigmas(sol) .< 8e-5 )
+        @test all( snr(sol) .> 36)
+        @test nrms(sol) < 0.46
+        # Jacobian
+        @test size(sol.jacobian) == (6, 6)
+        @test isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 1e-5
+        # Compatibility with JPL
+        JPL = [1.0102564188486982, 0.2934743828145318, 0.10467187893161536,
+               -0.0002634434601757652, 0.01837381321202214, 0.007208485181422459]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 4.8e-2)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec, sol, params) == 8
     end
 
     @testset "Admissible region" begin

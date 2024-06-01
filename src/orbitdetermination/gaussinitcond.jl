@@ -428,11 +428,7 @@ end
 function _adam!(q::Vector{TaylorN{T}}, jd0::T, tracklet::Tracklet, params::NEOParameters{T};
                 dynamics::D = newtonian!) where {T <: Real, D}
     # Exploratory propagation
-    bwd, fwd, res = propres(tracklet.radec, jd0, q(), params)
-    # ADAM is not needed
-    if nrms(res) <= 100
-        return jd0
-    end
+    bwd, fwd, _ = propres(tracklet.radec, jd0, q(), params)
     # Admissible region
     A = AdmissibleRegion(tracklet, params)
     # Epoch [days since J2000]
@@ -445,6 +441,8 @@ function _adam!(q::Vector{TaylorN{T}}, jd0::T, tracklet::Tracklet, params::NEOPa
     end
     # Range and range rate
     ρ, v_ρ = bary2topo(A, q0)
+    # Boundary projection
+    ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
     # ADAM
     ae, _ = adam(tracklet.radec, A, ρ, v_ρ, params; scale = :log, dynamics = dynamics)
     # Epoch [julian days] (corrected for light-time)
@@ -508,8 +506,10 @@ function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}
             jd0 = _jd0_ - cte(solG[i].ρ[2]) / c_au_per_day
             # Jet transport initial conditions
             q = solG[i].statevect .+ params.eph_su(jd0 - JD_J2000)
-            # ADAM (if needed)
-            jd0 = _adam!(q, jd0, tracklets[triplet[2]], params; dynamics)
+            # ADAM (if requested by the user)
+            if params.adamhelp
+                jd0 = _adam!(q, jd0, tracklets[triplet[2]], params; dynamics)
+            end
             # Jet transport least squares
             sol = jtls(radec, tracklets, jd0, q, triplet[2], params; dynamics)
             # NRMS
