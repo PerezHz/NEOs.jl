@@ -1,4 +1,4 @@
-using ArgParse, Downloads, Random, NEOs
+using ArgParse, Downloads, Random, HORIZONS, NEOs
 using NEOs: numberofdays
 
 # Potentially Hazardous Asteroids MPC list
@@ -53,7 +53,7 @@ function main()
     outfile::String = parsed_args["output"]
 
     # Parse PHAs, Atens, Apollos and Amors
-    provdesig = Vector{String}(undef, 0)
+    provdesig = Vector{SubString{String}}(undef, 0)
 
     for url in [PHAS_URL, ATENS_URL, APOLLOS_URL, AMORS_URL]
         # Download MPC file
@@ -61,6 +61,7 @@ function main()
         # Parse lines
         lines = readlines("tmp.txt")[3:end]
         filter!(!isempty, lines)
+        filter!(l -> isempty(strip(l[1:27])), lines)
         # Parse provisional designations
         provdesig = vcat(provdesig, map(l -> strip(l[28:40]), lines))
         # Delete MPC file
@@ -77,10 +78,12 @@ function main()
     names = Vector{String}(undef, N)
 
     for i in eachindex(names)
-        while true
+        while !isempty(provdesig)
             neo = String(pop!(provdesig))
             radec = fetch_radec_mpc("designation" => neo)
-            if numberofdays(radec) <= 30.0
+            jplorbit = sbdb("des" => neo)["orbit"]
+            if (numberofdays(radec) <= 30.0) &&  (jplorbit["n_obs_used"] == length(radec)) &&
+                isnothing(jplorbit["n_del_obs_used"]) && isnothing(jplorbit["n_dop_obs_used"])
                 names[i] = neo
                 break
             end

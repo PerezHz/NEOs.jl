@@ -43,8 +43,13 @@ end
         try
             # Download optical astrometry
             radec = fetch_radec_mpc("designation" => neo)
+            if length(radec) < 3
+                jldsave(filename; radec = radec)
+                return nothing
+            end
             # Parameters
-            params = NEOParameters(coeffstol = Inf, bwdoffset = 0.5, fwdoffset = 0.5)
+            params = NEOParameters(coeffstol = Inf, bwdoffset = 0.5, fwdoffset = 0.5,
+                                   max_triplets = 3)
             # Start of computation
             init_time = now()
             # Orbit determination
