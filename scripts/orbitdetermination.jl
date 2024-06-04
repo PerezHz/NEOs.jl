@@ -57,7 +57,11 @@ end
             # Time of computation
             Δ = (now() - init_time).value
             # Save orbit
-            jldsave(filename; sol = sol, Δ = Δ)
+            if iszero(sol)
+                jldsave(filename; Δ = Δ)
+            else
+                jldsave(filename; sol = sol, Δ = Δ)
+            end
         catch error
             # Save error
             jldsave(filename; error = error)
