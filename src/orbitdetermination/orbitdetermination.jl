@@ -17,7 +17,7 @@ function _proprestimes(radec::Vector{RadecMPC{T}}, jd0::U, params::NEOParameters
 end
 
 # Propagate an orbit and compute residuals
-function propres(radec::Vector{RadecMPC{T}}, jd0::U, q0::Vector{V}, params::NEOParameters{T};
+function propres(radec::Vector{RadecMPC{T}}, jd0::V, q0::Vector{U}, params::NEOParameters{T};
                  buffer::Union{Nothing, PropagationBuffer{T, U, V}} = nothing,
                  dynamics::D = newtonian!)  where {D, T <: Real, U <: Number, V <: Number}
     # Times of first/last observation, epoch and years in backward/forward propagation
