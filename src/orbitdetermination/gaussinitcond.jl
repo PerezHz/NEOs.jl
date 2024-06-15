@@ -55,7 +55,7 @@ end
 
 @doc raw"""
     topounit(α::T, δ::T) where {T <: Number}
-    topounit(obs::RadecMPC{T}) where {T <: AbstractFloat}
+    topounit(obs::RadecMPC{T}) where {T <: Real}
 
 Return the topocentric unit vector.
 """
@@ -69,7 +69,7 @@ function topounit(α::T, δ::T) where {T <: Number}
     return pos
 end
 
-topounit(obs::RadecMPC{T}) where {T <: AbstractFloat} = topounit(obs.α, obs.δ)
+topounit(obs::RadecMPC{T}) where {T <: Real} = topounit(obs.α, obs.δ)
 
 # TO DO: Should we allow to use other μ?
 
@@ -101,11 +101,11 @@ Convert a vector of vectors `x` to a matrix.
 vectors2matrix(x::T) where {T <: AbstractVector} = permutedims(reduce(hcat, x))
 
 @doc raw"""
-    _format_Lagrange_equation(a::T, b::T, c::T) where {T <: AbstractFloat}
+    _format_Lagrange_equation(a::T, b::T, c::T) where {T <: Real}
 
 Format Lagrange equation as `r⁸ + a r⁶ + b r³ + c = 0`.
 """
-function _format_Lagrange_equation(a::T, b::T, c::T) where {T <: AbstractFloat}
+function _format_Lagrange_equation(a::T, b::T, c::T) where {T <: Real}
     a_sgn = a ≥ 0 ? "+" : "-"
     b_sgn = b ≥ 0 ? "+" : "-"
     c_sgn = c ≥ 0 ? "+" : "-"
@@ -188,7 +188,7 @@ function heliocentric_energy(r::Vector{T}) where {T <: Number}
 end
 
 @doc raw"""
-    gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: AbstractFloat}
+    gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: Real}
     gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime},
                  α::Vector{U}, δ::Vector{U}, params::NEOParameters{T}) where {T <: Real, U <: Number}
 
@@ -206,7 +206,7 @@ Core Gauss method of Initial Orbit determination (IOD).
 !!! reference
     See Algorithm 5.5 in page 274 https://doi.org/10.1016/C2016-0-02107-1.
 """
-function gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: AbstractFloat}
+function gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: Real}
 
     # Make sure observations are in temporal order
     sort!(obs)
@@ -280,7 +280,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     c = -(μ_S^2)*(B*B)
 
     # Solve Lagrange equation
-    sol = solve_lagrange(a, b, c; niter = params.niter)
+    sol = solve_lagrange(a, b, c; niter = params.newtoniter)
 
     # Number of solutions
     n_sol = length(sol)
@@ -340,210 +340,216 @@ end
 
 @doc raw"""
     numberofdays(dates::Vector{DateTime})
-    numberofdays(dates::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
-    numberofdays(dates::Vector{Tracklet{T}}) where {T <: AbstractFloat}
+    numberofdays(dates::Vector{RadecMPC{T}}) where {T <: Real}
+    numberofdays(dates::Vector{Tracklet{T}}) where {T <: Real}
 
-Return the time span of `dates` in days. The function assumes `dates` is sorted.
+Return the timespan of `dates` in days. The function assumes `dates` is sorted.
 """
 numberofdays(dates::Vector{DateTime}) = (dates[end] - dates[1]).value / 86_400_000
 
-function numberofdays(dates::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+function numberofdays(dates::Vector{RadecMPC{T}}) where {T <: Real}
     return (dates[end].date - dates[1].date).value / 86_400_000
 end
 
-function numberofdays(dates::Vector{Tracklet{T}}) where {T <: AbstractFloat}
+function numberofdays(dates::Vector{Tracklet{T}}) where {T <: Real}
     return (dates[end].radec[end].date - dates[1].radec[1].date).value / 86_400_000
 end
 
-@doc raw"""
-    gauss_norm(dates::Vector{DateTime})
-
-Return a measure of how evenly distributed in time a triplet is;
-used within [`gauss_triplets`](@ref) to sort triplets for Gauss method.
-The function assumes `dates` is sorted.
-"""
-gauss_norm(dates::Vector{DateTime}) = abs( (dates[2] - dates[1]).value - (dates[3] - dates[2]).value ) / 86_400_000
-
-@doc raw"""
-    gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_iter::Int = 100)
-
-Return a vector of `max_triplets` triplets to be used within [`gaussinitcond`](@ref)
-to select the best observations for Gauss method. The triplets are sorted by [`gauss_norm`](@ref).
-"""
-function gauss_triplets(dates::Vector{DateTime}, Δ_min::Period, Δ_max::Period,
-                        avoid::Vector{Vector{Int}}, max_triplets::Int)
-
-    triplets = Vector{Vector{Int}}(undef, 0)
-    L = length(dates)
-    for i_1 in 1:L-2
-        for i_2 in i_1+1:L-1
-            for i_3 in i_2+1:L
-                tmp = [i_1, i_2, i_3]
-                if (Δ_min <= dates[i_3] - dates[i_1] <= Δ_max) && !(tmp in avoid)
-                    push!(triplets, tmp)
-                end
-            end
+# Return the `maxtriplets` best combinations of three `tracklets`
+# for Gauss' method. See the line after equation (27) of
+# https://doi.org/10.1016/j.icarus.2007.11.033
+function _gausstriplets1(tracklets::Vector{Tracklet{T}}, maxtriplets::Int) where {T <: Real}
+    # Number of tracklets
+    L = length(tracklets)
+    # All possible triplets of indices
+    CI = CartesianIndices((1:L-2, 2:L-1, 3:L))
+    # Allocate memory
+    triplets = zeros(Int, 3, maxtriplets)
+    τ = fill(T(Inf), maxtriplets)
+    # Check all possible triplets of indices
+    for ci in CI
+        # Indices cannot repeat
+        !allunique(ci.I) && continue
+        # Unfold indices
+        i, j, k = ci.I
+        # Timespan must be at least one day
+        Δ = (tracklets[k].date - tracklets[i].date).value
+        Δ < 86_400_000 && continue
+        # Absolute difference between τ1 and τ3
+        τ1 = (tracklets[j].date - tracklets[i].date).value
+        τ3 = (tracklets[k].date - tracklets[j].date).value
+        _τ_ = abs(τ3 - τ1)
+        # Current max τ
+        τmax, n = findmax(τ)
+        # Update triplets and τ
+        if _τ_ < τmax
+            triplets[:, n] .= i, j, k
+            τ[n] = _τ_
         end
     end
+    # Remove Infs and sort
+    idxs = findall(!isinf, τ)
+    perm = sortperm(view(τ, idxs))
 
-    sort!(triplets, by = x -> gauss_norm(dates[x]))
-
-    n = min(length(triplets), max_triplets)
-
-    return triplets[1:n]
+    return triplets[:, perm], τ[perm]
 end
 
-function gauss_triplets(dates::Vector{DateTime}, max_triplets::Int = 10, max_iter::Int = 100;
-                        Δ_min = Hour(20), Δ_max = Day(7))
-
-    triplets = Vector{Vector{Int}}(undef, 0)
-
-    niter = 0
-
-    while length(triplets) < max_triplets && niter < max_iter
-        triplets = vcat(triplets, gauss_triplets(dates, Δ_min, Δ_max, triplets, max_triplets))
-        if Δ_min >= Hour(1)
-            Δ_min -= Hour(1)
+# Given a vector of three `tracklets`, update `observatories`, `dates`,
+# `α` and `δ` with the best combination of three observations for Gauss'
+# method. See the line after equation (27) of
+# https://doi.org/10.1016/j.icarus.2007.11.033
+function _gausstriplets2!(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime}, α::Vector{T},
+                          δ::Vector{T}, tracklets::AbstractVector{Tracklet{T}}) where {T <: Real}
+    # Unfold tracklets
+    a, b, c = tracklets
+    # All possible triplets of indices
+    CI = CartesianIndices((a.nobs, b.nobs, c.nobs))
+    # Allocate memory
+    triplet = [0, 0, 0]
+    τ = Inf
+    # Check all possible triplets of indices
+    for ci in CI
+        # Unfold indices
+        i, j, k = ci.I
+        # Absolute difference between τ1 and τ3
+        τ1 = (b.radec[j].date - a.radec[i].date).value
+        τ3 = (c.radec[k].date - b.radec[j].date).value
+        _τ_ = abs(τ3 - τ1)
+        # Update triplet and τ
+        if _τ_ < τ
+            triplet .= i, j, k
+            τ = _τ_
         end
-        Δ_max += Day(1)
-        niter += 1
     end
+    # Unfold triplet
+    i, j, k = triplet
+    # Update observatories, dates, α and δ
+    observatories .= a.observatory, b.observatory, c.observatory
+    dates .= a.radec[i].date, b.radec[j].date, c.radec[k].date
+    α .= a.radec[i].α, b.radec[j].α, c.radec[k].α
+    δ .= a.radec[i].δ, b.radec[j].δ, c.radec[k].δ
 
-    n = min(length(triplets), max_triplets)
+    return nothing
+end
 
-    return triplets[1:n]
+# Update an initial condition `q`, obtained by Gauss' method, via ADAM
+# minimization over the middle tracklet's manifold of variations.
+function _adam!(q::Vector{TaylorN{T}}, jd0::T, tracklet::Tracklet, params::NEOParameters{T};
+                dynamics::D = newtonian!) where {T <: Real, D}
+    # Exploratory propagation
+    bwd, fwd, _ = propres(tracklet.radec, jd0, q(), params)
+    # Admissible region
+    A = AdmissibleRegion(tracklet, params)
+    # Epoch [days since J2000]
+    At0 = datetime2days(A.date)
+    # Barycentric cartesian initial condition
+    if At0 <= jd0 - JD_J2000
+        q0 = bwd(At0)
+    else
+        q0 = fwd(At0)
+    end
+    # Range and range rate
+    ρ, v_ρ = bary2topo(A, q0)
+    # Boundary projection
+    ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
+    # ADAM
+    ae, _ = adam(tracklet.radec, A, ρ, v_ρ, params; scale = :log, dynamics = dynamics)
+    # Epoch [julian days] (corrected for light-time)
+    jd0 = datetime2julian(A.date) - ae[5] / c_au_per_day
+    # Convert attributable elements to barycentric cartesian coordinates
+    q0 = attr2bary(A, ae, params)
+    # Jet Transport initial condition
+    q .= [q0[i] + (q0[i] / 10^5) * TaylorN(i, order = params.tsaorder) for i in 1:6]
+
+    return jd0
 end
 
 @doc raw"""
-    gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                  params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
+    gaussinitcond(radec::Vector{RadecMPC{T}}, [tracklets::Vector{Tracklet{T}},]
+                  params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
 
-Return initial conditions via Gauss Method.
+Compute an orbit via Jet Transport Gauss' Method.
 
 See also [`gauss_method`](@ref).
 
 # Arguments
 
-- `radec::Vector{RadecMPC{T}}`: vector of observations.
+- `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
-- `params::NEOParameters{T}`: see `Gauss Method Parameters` of [`NEOParameters`](@ref).
+- `params::NEOParameters{T}`: see `Gauss' Method Parameters` of [`NEOParameters`](@ref).
 - `dynamics::D`: dynamical model.
 
 !!! warning
-    This function will set the (global) `TaylorSeries` variables to `δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃`.
+    This function will change the (global) `TaylorSeries` variables.
 """
-function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                       params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: AbstractFloat, D}
+function gaussinitcond(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
+                       dynamics::D = newtonian!) where {T <: Real, D}
+    # Reduce tracklets by polynomial regression
+    tracklets = reduce_tracklets(radec)
+    # Set jet transport variables
+    varorder = max(params.tsaorder, params.gaussorder)
+    scaled_variables("dx", ones(T, 6); order = varorder)
+    # Gauss' Method
+    return gaussinitcond(radec, tracklets, params; dynamics)
+end
 
-    # Allocate memory for initial conditions
-    best_sol = zero(NEOSolution{T, T})
-    # Unfold
-    observatories, dates, α, δ = observatory.(tracklets), date.(tracklets), ra.(tracklets), dec.(tracklets)
+function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
+                       params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
+    # gauss_method input
+    observatories = Vector{ObservatoryMPC{T}}(undef, 3)
+    dates = Vector{DateTime}(undef, 3)
+    α = Vector{T}(undef, 3)
+    δ = Vector{T}(undef, 3)
     # Observations triplets
-    triplets = gauss_triplets(dates, params.max_triplets)
-    # Start point of LS fits
-    x0 = zeros(T, 6)
+    triplets, _ = _gausstriplets1(tracklets, params.max_triplets)
     # Jet transport scaling factors
     scalings = fill(1e-6, 6)
     # Jet transport perturbation (ra/dec)
-    dq = scaled_variables("δα₁ δα₂ δα₃ δδ₁ δδ₂ δδ₃", scalings,
-                          order = params.varorder)
-    # Normalized root mean square error (NRMS)
+    dq = [scalings[i] * TaylorN(i, order = params.gaussorder) for i in 1:6]
+    # Best orbit
+    best_sol = zero(NEOSolution{T, T})
     best_Q = T(Inf)
-    # Break flag
+    # Convergence flag
     flag = false
-
     # Iterate over triplets
-    for j in eachindex(triplets)
-
-        # Current triplet
-        triplet = triplets[j]
+    for triplet in eachcol(triplets)
+        # Find best triplet of observations
+        _gausstriplets2!(observatories, dates, α, δ, view(tracklets, triplet))
         # Julian day of middle observation
-        _jd0_ = datetime2julian(dates[triplet[2]])
+        _jd0_ = datetime2julian(dates[2])
         # Gauss method solution
-        sol = gauss_method(observatories[triplet], dates[triplet], α[triplet] .+ dq[1:3],
-                           δ[triplet] .+ dq[4:6], params)
+        solG = gauss_method(observatories, dates, α .+ dq[1:3], δ .+ dq[4:6], params)
         # Filter non-physical (negative) rho solutions
-        filter!(x -> cte(cte(getindex(getproperty(x, :ρ), 2))) > 0, sol)
+        filter!(x -> all(cte.(x.ρ) .> 0), solG)
         # Filter Gauss solutions by heliocentric energy
-        filter!(x -> cte(cte(heliocentric_energy(x.statevect))) <= 0, sol)
-
+        filter!(x -> cte(cte(heliocentric_energy(x.statevect))) <= 0, solG)
         # Iterate over Gauss solutions
-        for i in eachindex(sol)
-
-            # Light-time correction
-            jd0 = _jd0_ - cte(sol[i].ρ[2]) / c_au_per_day
-            # Initial conditions (jet transport)
-            q0 = sol[i].statevect .+ params.eph_su(jd0 - PE.J2000)
-
-            # Propagation and residuals
-            bwd, fwd, res = propres(radec, jd0, q0, params; dynamics)
-            iszero(length(res)) && continue
-
-            # Subset of radec for orbit fit
-            g_0 = triplet[1]
-            g_f = triplet[3]
-            idxs = reduce(vcat, indices.(tracklets[g_0:g_f]))
-            sort!(idxs)
-            # Orbit fit
-            fit = tryls(res[idxs], x0, params.niter)
-            !fit.success && continue
-
-            # Right iteration
-            for k in g_f+1:length(tracklets)
-                extra = indices(tracklets[k])
-                fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
-                if fit_new.success
-                    fit = fit_new
-                    idxs = vcat(idxs, extra)
-                    sort!(idxs)
-                    g_f = k
-                else
-                    break
-                end
+        for i in eachindex(solG)
+            # Epoch (corrected for light-time)
+            jd0 = _jd0_ - cte(solG[i].ρ[2]) / c_au_per_day
+            # Jet transport initial conditions
+            q = solG[i].statevect .+ params.eph_su(jd0 - JD_J2000)
+            # ADAM (if requested by the user)
+            if params.adamhelp
+                jd0 = _adam!(q, jd0, tracklets[triplet[2]], params; dynamics)
             end
-
-            # Left iteration
-            for k in g_0-1:-1:1
-                extra = indices(tracklets[k])
-                fit_new = tryls(res[idxs ∪ extra], x0, params.niter)
-                if fit_new.success
-                    fit = fit_new
-                    idxs = vcat(idxs, extra)
-                    sort!(idxs)
-                    g_0 = k
-                else
-                    break
-                end
-            end
-
+            # Jet transport least squares
+            sol = jtls(radec, tracklets, jd0, q, triplet[2], params; dynamics)
             # NRMS
-            Q = nrms(res, fit)
-
-            # TO DO: check cases where newton converges but diffcorr no
-            # Update NRMS and initial conditions
+            Q = nrms(sol)
+            # Update best orbit
             if Q < best_Q
+                best_sol = sol
                 best_Q = Q
-                best_sol = evalfit(NEOSolution(tracklets[g_0:g_f], bwd, fwd,
-                                   res[idxs], fit, scalings))
-            end
-            # Break condition
-            if Q <= params.gaussQmax
-                flag = true
-                break
+                # Break condition
+                if Q <= params.gaussQmax
+                    flag = true
+                    break
+                end
             end
         end
-        if flag
-            break
-        end
+        flag && break
     end
 
-    # Case: all solutions were unsuccessful
-    if isinf(best_Q)
-        return zero(NEOSolution{T, T})
-    # Case: at least one solution was successful
-    else
-        return best_sol
-    end
-
+    return best_sol
 end

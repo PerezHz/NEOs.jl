@@ -17,17 +17,19 @@ using DelimitedFiles: readdlm
 using HTTP: get
 using DataFrames: DataFrame, nrow, eachcol, eachrow, groupby, combine, AbstractDataFrame,
         DataFrameRow, GroupedDataFrame
-using PlanetaryEphemeris: daysec, yr, TaylorInterpolant, auday2kmsec, su, ea, au,
-        c_au_per_day, α_p_sun, δ_p_sun, pole_rotation, c_cm_per_sec, c_au_per_sec,
-        t2c_jpl_de430, R_sun, RE, Rx, Ry, Rz, semimajoraxis, eccentricity, inclination,
-        longascnode, argperi, timeperipass, nbodyind, numberofbodies, kmsec2auday,
-        meanmotion, meananomaly, selecteph
+using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, daysec, yr,
+        auday2kmsec, su, ea, au, c_au_per_day, α_p_sun, δ_p_sun, pole_rotation,
+        c_cm_per_sec, c_au_per_sec, t2c_jpl_de430, R_sun, RE, Rx, Ry, Rz, semimajoraxis,
+        eccentricity, inclination, longascnode, argperi, timeperipass, nbodyind,
+        numberofbodies, kmsec2auday, meanmotion, meananomaly, selecteph, getinterpindex
 using Healpix: ang2pixRing, Resolution
 using StatsBase: mean, std
 using LsqFit: curve_fit, vcov
 using Roots: find_zeros
 using Clustering: kmeans
 using HORIZONS: smb_spk
+using OhMyThreads: tmap, tmap!
+using TaylorIntegration: RetAlloc, _determine_parsing!, _taylorinteg!
 
 # Constants
 export d_EM_km, d_EM_au
@@ -60,25 +62,27 @@ export compute_delay, radar_astrometry
 export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!, newtonian!
 # Propagation
 export NEOParameters, propagate, propagate_lyap, propagate_root
-# B plane
-export valsecchi_circle, bopik
-# Least squares
-export project, chi2, nms, nrms, diffcorr, newtonls, levenbergmarquardt, tryls, sigmas, snr
 # Osculating
 export pv2kep, yarkp2adot
+# Least squares
+export project, chi2, nms, nrms, diffcorr, newtonls, levenbergmarquardt, tryls
+# NEOSolution
+export epoch, sigmas, snr, jplcompare, uncertaintyparameter
 # Too Short Arc
 export tooshortarc
 # Gauss method
 export gauss_method, gaussinitcond
+# Orbit determination
+export curvature, issinglearc, isgauss, orbitdetermination
+# B plane
+export valsecchi_circle, bopik
 # Outlier rejection
 export outlier_rejection
-# Orbit determination
-export curvature, jplcompare, uncertaintyparameter, issinglearc, isgauss, orbitdetermination
 
 include("constants.jl")
 include("observations/observations.jl")
 include("propagation/propagation.jl")
-include("orbit_determination/orbit_determination.jl")
+include("orbitdetermination/orbitdetermination.jl")
 include("postprocessing/outlier_rejection.jl")
 include("init.jl")
 

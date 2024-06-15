@@ -1,7 +1,7 @@
 @doc raw"""
     NEOSolution{T <: Real, U <: Number}
 
-The outcome of the orbit determination process for a NEO.
+A least squares orbit for a NEO.
 
 # Fields
 
@@ -12,7 +12,7 @@ The outcome of the orbit determination process for a NEO.
 - `g_bwd/g_fwd::Vector{U}`: geocentric distance at close approach.
 - `res::Vector{OpticalResidual{T, U}}`: vector of optical residuals.
 - `fit::LeastSquaresFit{T}`: least squares fit.
-- `scalings::Vector{T}`: jet transport scaling factors.
+- `jacobian::Matrix{T}`: residuals space to barycentric coordinates jacobian.
 """
 @auto_hash_equals struct NEOSolution{T <: Real, U <: Number}
     tracklets::Vector{Tracklet{T}}
@@ -26,13 +26,13 @@ The outcome of the orbit determination process for a NEO.
     g_fwd::Vector{U}
     res::Vector{OpticalResidual{T, U}}
     fit::LeastSquaresFit{T}
-    scalings::Vector{T}
+    jacobian::Matrix{T}
     # Inner constructor
     function NEOSolution{T, U}(
         tracklets::Vector{Tracklet{T}},
         bwd::TaylorInterpolant{T, U, 2, VT, X}, t_bwd::Vector{U}, x_bwd::Matrix{U}, g_bwd::Vector{U},
         fwd::TaylorInterpolant{T, U, 2, VT, X}, t_fwd::Vector{U}, x_fwd::Matrix{U}, g_fwd::Vector{U},
-        res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
+        res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, jacobian::Matrix{T}
     ) where {T <: Real, U <: Number, VT <: AbstractVector{T}, X <: AbstractMatrix{Taylor1{U}}}
         @assert bwd.t0 == fwd.t0 "Backward and forward propagation initial times must match"
         _bwd_ = TaylorInterpolant(bwd.t0, bwd.t, collect(bwd.x))
@@ -41,7 +41,7 @@ The outcome of the orbit determination process for a NEO.
             tracklets,
             _bwd_, t_bwd, x_bwd, g_bwd,
             _fwd_, t_fwd, x_fwd, g_fwd,
-            res, fit, scalings
+            res, fit, jacobian
         )
     end
 end
@@ -50,20 +50,20 @@ function NEOSolution(
     tracklets::Vector{Tracklet{T}},
     bwd::TaylorInterpolant{T, U, 2, VT, X}, t_bwd::Vector{U}, x_bwd::Matrix{U}, g_bwd::Vector{U},
     fwd::TaylorInterpolant{T, U, 2, VT, X}, t_fwd::Vector{U}, x_fwd::Matrix{U}, g_fwd::Vector{U},
-    res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
+    res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, jacobian::Matrix{T}
 ) where {T <: Real, U <: Number, VT <: AbstractVector{T}, X <: AbstractMatrix{Taylor1{U}}}
     NEOSolution{T, U}(
         tracklets,
         bwd, t_bwd, x_bwd, g_bwd,
         fwd, t_fwd, x_fwd, g_fwd,
-        res, fit, scalings
+        res, fit, jacobian
     )
 end
 
 function NEOSolution(
     tracklets::Vector{Tracklet{T}},
     bwd::TaylorInterpolant{T, U, 2, VT, X}, fwd::TaylorInterpolant{T, U, 2, VT, X},
-    res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, scalings::Vector{T}
+    res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T}, jacobian::Matrix{T}
 ) where {T <: Real, U <: Number, VT <: AbstractVector{T}, X <: AbstractMatrix{Taylor1{U}}}
     # Backward roots
     t_bwd = Vector{U}(undef, 0)
@@ -78,7 +78,7 @@ function NEOSolution(
         tracklets,
         bwd, t_bwd, x_bwd, g_bwd,
         fwd, t_fwd, x_fwd, g_fwd,
-        res, fit, scalings
+        res, fit, jacobian
     )
 end
 
@@ -123,7 +123,7 @@ function evalfit(sol::NEOSolution{T, TaylorN{T}}) where {T <: Real}
         sol.tracklets,
         new_bwd, new_t_bwd, new_x_bwd, new_g_bwd,
         new_fwd, new_t_fwd, new_x_fwd, new_g_fwd,
-        new_res, sol.fit, sol.scalings
+        new_res, sol.fit, sol.jacobian
     )
 end
 
@@ -140,13 +140,13 @@ function zero(::Type{NEOSolution{T, U}}) where {T <: Real, U <: Number}
     g_fwd = Vector{U}(undef, 0)
     res = Vector{OpticalResidual{T, U}}(undef, 0)
     fit = LeastSquaresFit{T}(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), :newton)
-    scalings = Vector{T}(undef, 0)
+    jacobian = Matrix{T}(undef, 0, 0)
 
     NEOSolution{T, U}(
         tracklets,
         bwd, t_bwd, x_bwd, g_bwd,
         fwd, t_fwd, x_fwd, g_fwd,
-        res, fit, scalings
+        res, fit, jacobian
     )
 end
 
@@ -170,11 +170,18 @@ function nms(sol::NEOSolution{T, T}) where {T <: Real}
 end
 
 @doc raw"""
+    epoch(sol::NEOSolution{T, T}) where {T <: Real}
+
+Return the reference epoch of orbit `sol` in days since J2000.
+"""
+epoch(sol::NEOSolution{T, T}) where {T <: Real} = sol.bwd.t0
+
+@doc raw"""
     sigmas(sol::NEOSolution{T, T}) where {T <: Real}
 
 Return `sol`'s initial condition uncertainties in barycentric cartesian coordinates.
 """
-sigmas(sol::NEOSolution{T, T}) where {T <: Real} = sqrt.(diag(sol.fit.Γ)) .* sol.scalings
+sigmas(sol::NEOSolution{T, T}) where {T <: Real} = sqrt.(diag(sol.jacobian * sol.fit.Γ * sol.jacobian'))
 
 @doc raw"""
     snr(sol::NEOSolution{T, T}) where {T <: Real}
@@ -218,13 +225,16 @@ Return the Minor Planet Center Uncertainty Parameter.
 
 # Arguments
 
-- `radec::Vector{RadecMPC{T}}`: vector of observations.
-- `sol::NEOSolution{T, T}:` least squares orbit.
+- `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
+- `sol::NEOSolution{T, T}:` reference orbit.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
 - `dynamics::D`: dynamical model.
 
 !!! reference
     https://www.minorplanetcenter.net/iau/info/UValue.html
+
+!!! warning
+    This function will change the (global) `TaylorSeries` variables.
 """
 function uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::NEOParameters{T};
                               dynamics::D = newtonian!) where {T <: Real, D}
@@ -237,7 +247,7 @@ function uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}
     # Scaling factors
     scalings = abs.(q0) ./ 10^6
     # Jet transport variables
-    dq = scaled_variables("δx", scalings; order = params.varorder)
+    dq = scaled_variables("dx", scalings; order = params.jtlsorder)
     # Origin
     x0 = zeros(T, 6)
     # Initial conditions
@@ -245,9 +255,11 @@ function uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}
     # Propagation and residuals
     bwd, fwd, res = propres(radec, jd0, q, params; dynamics)
     # Orbit fit
-    fit = tryls(res, x0, params.niter)
+    fit = tryls(res, x0, params.newtoniter)
+    # Residuals space to barycentric coordinates jacobian.
+    J = Matrix(TS.jacobian(dq))
     # Update solution
-    _sol_ = NEOSolution(tracklets, bwd, fwd, res, fit, scalings)
+    _sol_ = NEOSolution(tracklets, bwd, fwd, res, fit, J)
     # Osculating keplerian elements
     osc = pv2kep(_sol_() - params.eph_su(sol.bwd.t0); jd = jd0, frame = :ecliptic)
     # Eccentricity

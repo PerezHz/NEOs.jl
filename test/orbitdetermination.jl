@@ -9,7 +9,7 @@ using Test
 using NEOs: NEOSolution, numberofdays
 
 @testset "Orbit Determination" begin
-    @testset "Gauss Method" begin
+    @testset "Gauss Method (without ADAM)" begin
         # Load observations
         radec = read_radec_mpc(joinpath(pkgdir(NEOs), "test", "data", "RADEC_2023_DW.dat"))
         # Parameters
@@ -19,7 +19,7 @@ using NEOs: NEOSolution, numberofdays
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by February 24, 2024
+        # Values by May 31, 2024
 
         # Vector of observations
         @test length(radec) == 123
@@ -44,15 +44,17 @@ using NEOs: NEOSolution, numberofdays
         @test iszero(count(outlier.(sol.res)))
         # Least squares fit
         @test sol.fit.success
-        @test all( sigmas(sol) .< 4e-7 )
-        @test all( snr(sol) .> 21_000)
+        @test all( sigmas(sol) .< 5e-5 )
+        @test all( snr(sol) .> 4_500)
         @test nrms(sol) < 0.36
-        # Scaling factors
-        @test all(sol.scalings .== 1e-6)
+        # Jacobian
+        @test size(sol.jacobian) == (6, 6)
+        @test !isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 8e-4
         # Compatibility with JPL
-        JPL = [-1.1003339484439327, 0.20772201506095814, 0.04202338912370205,
-               -0.004735538686138557, -0.010626685053348663, -0.006016258344003866]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 6.2)
+        JPL = [-1.1003236797145037, 0.20774505704014837, 0.04203643429323372,
+               -0.004736048200346307, -0.010626587751050683, -0.006016238714906758]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.27)
 
         # Refine orbit
         sol1 = orbitdetermination(radec, sol, params)
@@ -77,12 +79,64 @@ using NEOs: NEOSolution, numberofdays
         @test all( sigmas(sol1) .< 5e-5 )
         @test all( snr(sol1) .> 4_500 )
         @test nrms(sol1) < 0.36
-        # Scaling factors
-        @test all(sol1.scalings .< 2e-6)
+        # Jacobian
+        @test size(sol1.jacobian) == (6, 6)
+        @test isdiag(sol1.jacobian)
+        @test maximum(sol1.jacobian) < 2e-6
         # Compatibility with JPL
-        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.3)
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.27)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol1, params) == 6
+    end
+
+    @testset "Gauss Method (with ADAM)" begin
+        # Load observations
+        radec = fetch_radec_mpc("designation" => "2016 TU93")
+
+        # Parameters
+        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007, adamhelp = true)
+
+        # Orbit Determination
+        sol = orbitdetermination(radec, params)
+
+        # Values by June 1, 2024
+
+        # Vector of observations
+        @test length(radec) == 9
+        @test numberofdays(radec) < 13.1
+        # Orbit solution
+        @test isa(sol, NEOSolution{Float64, Float64})
+        # Tracklets
+        @test length(sol.tracklets) == 3
+        @test sol.tracklets[1].radec[1] == radec[1]
+        @test sol.tracklets[end].radec[end] == radec[end]
+        @test issorted(sol.tracklets)
+        # Backward integration
+        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test all( norm.(sol.bwd.x, Inf) .< 2 )
+        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
+        # Forward integration
+        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test all( norm.(sol.fwd.x, Inf) .< 2 )
+        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
+        # Vector of residuals
+        @test length(sol.res) == 9
+        @test iszero(count(outlier.(sol.res)))
+        # Least squares fit
+        @test sol.fit.success
+        @test all( sigmas(sol) .< 8e-5 )
+        @test all( snr(sol) .> 36)
+        @test nrms(sol) < 0.46
+        # Jacobian
+        @test size(sol.jacobian) == (6, 6)
+        @test isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 1e-5
+        # Compatibility with JPL
+        JPL = [1.0102564188486982, 0.2934743828145318, 0.10467187893161536,
+               -0.0002634434601757652, 0.01837381321202214, 0.007208485181422459]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 4.8e-2)
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(radec, sol, params) == 8
     end
 
     @testset "Admissible region" begin
@@ -99,7 +153,7 @@ using NEOs: NEOSolution, numberofdays
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by April 9, 2024
+        # Values by May 27, 2024
 
         # Custom print
         @test string(A) == "AE: [116.61547, 45.39840, -3.21667, 5.76667] t: 2024-01-20T21:50:15.360 obs: GINOP-KHK, Piszkesteto"
@@ -148,7 +202,7 @@ using NEOs: NEOSolution, numberofdays
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by February 24, 2024
+        # Values by May 31, 2024
 
         # Vector of observations
         @test length(radec) == 10
@@ -182,12 +236,14 @@ using NEOs: NEOSolution, numberofdays
         @test all( sigmas(sol) .< 6e-3 )
         @test all( snr(sol) .> 4.1)
         @test nrms(sol) < 0.85
-        # Scaling factors
-        @test all(sol.scalings .< 1e-5)
+        # Jacobian
+        @test size(sol.jacobian) == (6, 6)
+        @test isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 1e-5
         # Compatibility with JPL
-        JPL = [-0.9698333701500199, 0.24036461256880043, 0.10288887522619743,
-               -0.009512521373861719, -0.015325432152904881, -0.008094623534198382]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.1)
+        JPL = [-0.9698333704468041, 0.2403646120906576, 0.10288887497365079,
+               -0.009512521364762891, -0.015325432155116774, -0.008094623535119534]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.015)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 11
     end
@@ -204,7 +260,7 @@ using NEOs: NEOSolution, numberofdays
         # Outlier rejection
         sol = outlier_rejection(radec, sol, params)
 
-        # Values by February 24, 2024
+        # Values by May 31, 2024
 
         # Vector of observations
         @test length(radec) == 21
@@ -229,15 +285,17 @@ using NEOs: NEOSolution, numberofdays
         @test count(outlier.(sol.res)) == 2
         # Least squares fit
         @test sol.fit.success
-        @test all( sigmas(sol) .< 5e-4 )
-        @test all( snr(sol) .> 575)
+        @test all( sigmas(sol) .< 3e-4 )
+        @test all( snr(sol) .> 574)
         @test nrms(sol) < 0.25
-        # Scaling factors
-        @test all(sol.scalings .< 8e-7)
+        # Jacobian
+        @test size(sol.jacobian) == (6, 6)
+        @test isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 8e-7
         # Compatibility with JPL
-        JPL = [0.7673358221902306, 0.6484904294813807, 0.2932331617634889,
-               -0.011023358761553661, 0.015392684491034429, 0.006528836324700449]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.1)
+        JPL = [0.7673449629397204, 0.6484776654615118, 0.2932277478785896,
+               -0.011023192686652665, 0.015392823966811551, 0.0065288994881745974]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 7e-4)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 8
     end
@@ -255,7 +313,7 @@ using NEOs: NEOSolution, numberofdays
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by February 24, 2024
+        # Values by May 31 2024
 
         # Vector of observations
         @test length(radec) == 7
@@ -286,14 +344,16 @@ using NEOs: NEOSolution, numberofdays
         @test iszero(count(outlier.(sol.res)))
         # Least squares fit
         @test sol.fit.success
-        @test all( sigmas(sol) .< 1e-3 )
+        @test all( sigmas(sol) .< 3e-4 )
         @test all( snr(sol) .> 20.5)
         @test nrms(sol) < 0.13
-        # Scaling factors
-        @test all(sol.scalings .< 1e-5)
+        # Jacobian
+        @test size(sol.jacobian) == (6, 6)
+        @test isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 9e-6
         # Compatibility with JPL
-        JPL = [-0.17932853771087842, 0.8874166708545763, 0.38414497114153867,
-               -0.01755788350351527, -0.005781328974619869, -0.0020073946363600814]
+        JPL = [-0.17932853781716676, 0.8874166708195785, 0.38414497112938667,
+               -0.017557883503263098, -0.005781328976995571, -0.0020073946372627465]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 10
@@ -311,7 +371,7 @@ using NEOs: NEOSolution, numberofdays
         # Restricted Orbit Determination
         sol = orbitdetermination(radec[idxs], params)
 
-        # Values by February 24, 2024
+        # Values by May 31, 2024
 
         # Vector of observations
         @test length(radec) == 883
@@ -339,12 +399,14 @@ using NEOs: NEOSolution, numberofdays
         @test all( sigmas(sol) .< 2e-5 )
         @test all( snr(sol) .> 732)
         @test nrms(sol) < 0.30
-        # Scaling factors
-        @test all(sol.scalings .< 1e-5)
+        # Jacobian
+        @test size(sol.jacobian) == (6, 6)
+        @test isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 1e-5
         # Compatibility with JPL
-        JPL = [0.9741070119227359, 0.21515061351517384, 0.09390897837680391,
-               -0.007890445009307178, 0.016062726197198392, 0.006136042043681892]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
+        JPL = [0.9741070120439872, 0.2151506132683409, 0.0939089782825125,
+               -0.007890445003489774, 0.016062726197895585, 0.006136042044307594]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.2)
 
         # Update orbit with more observations
         sol1 = orbitdetermination(radec[1:30], sol, params)
@@ -372,10 +434,12 @@ using NEOs: NEOSolution, numberofdays
         @test all( sigmas(sol1) .< 2e-6 )
         @test all( snr(sol1) .> 4_281)
         @test nrms(sol1) < 0.37
-        # Scaling factors
-        @test all(sol1.scalings .< 1e-6)
+        # Jacobian
+        @test size(sol1.jacobian) == (6, 6)
+        @test isdiag(sol1.jacobian)
+        @test maximum(sol1.jacobian) < 1e-6
         # Compatibility with JPL
-        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.6)
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.21)
         # Parameters uncertainty
         @test all(sigmas(sol1) .< sigmas(sol))
         # TODO: understand better differences wrt JPL solutions

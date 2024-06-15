@@ -4,7 +4,7 @@ testfiles = (
     "osculating.jl",
     "observations.jl",
     "propagation.jl",
-    "orbit_determination.jl",
+    "orbitdetermination.jl",
     "dataframes.jl",
     "aqua.jl",
     )

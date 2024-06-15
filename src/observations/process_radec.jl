@@ -517,7 +517,7 @@ function anglediff(x::T, y::S) where {T, S <: Number}
 end
 
 @doc raw"""
-    residuals(obs::Vector{RadecMPC{T}}; kwargs...) where {T <: AbstractFloat, AstEph}
+    residuals(radec::Vector{RadecMPC{T}}; kwargs...) where {T <: Real, AstEph}
 
 Compute O-C residuals for optical astrometry. Corrections due to Earth orientation, LOD,
 polar motion are computed by default.
@@ -527,7 +527,7 @@ See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and
 
 # Arguments
 
-- `obs::Vector{RadecMPC{T}}`: vector of observations.
+- `radec::Vector{RadecMPC{T}}`: vector of observations.
 
 # Keyword arguments
 
@@ -543,59 +543,57 @@ See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and
 All ephemeris must take [et seconds since J2000] and return [barycentric position in km
 and velocity in km/sec].
 """
-function residuals(obs::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph,
-                   kwargs...) where {T <: AbstractFloat, AstEph}
+function residuals(radec::Vector{RadecMPC{T}}; debias_table::String = "2018", xva::AstEph,
+                   kwargs...) where {T <: Real, AstEph}
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
-    return residuals(obs, mpc_catalogue_codes_201X, truth, resol, bias_matrix; xva, kwargs...)
+    return residuals(radec, mpc_catalogue_codes_201X, truth, resol, bias_matrix; xva, kwargs...)
 end
-function residuals(obs::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String}, truth::String,
-                   resol::Resolution, bias_matrix::Matrix{T}; xva::AstEph, kwargs...) where {T <: AbstractFloat, AstEph}
 
-    # Number of observations
-    N_obs = length(obs)
+function residuals(radec::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String}, truth::String,
+                   resol::Resolution, bias_matrix::Matrix{T}; xva::AstEph, kwargs...) where {T <: Real, AstEph}
 
     # UTC time of first astrometric observation
-    utc1 = date(obs[1])
+    utc1 = date(radec[1])
     # TDB seconds since J2000.0 for first astrometric observation
     et1 = datetime2et(utc1)
     # Asteroid ephemeris at et1
     a1_et1 = xva(et1)[1]
     # Type of asteroid ephemeris
-    S = typeof(a1_et1)
+    U = typeof(a1_et1)
+    # Vector of residuals
+    res = Vector{OpticalResidual{T, U}}(undef, length(radec))
+
+    return residuals!(res, radec, mpc_catalogue_codes_201X, truth, resol,
+                      bias_matrix; xva, kwargs...)
+end
+
+function residuals!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}},
+    mpc_catalogue_codes_201X::Vector{String}, truth::String, resol::Resolution,
+    bias_matrix::Matrix{T}; xva::AstEph, kwargs...) where {T <: Real, U <: Number, AstEph}
 
     # Relax factors
-    rex = relax_factor(obs)
+    rex = relax_factor(radec)
 
-    # Vector of residuals
-    res = Vector{OpticalResidual{T, S}}(undef, N_obs)
-
-    # Iterate over the observations
-    Threads.@threads for i in 1:N_obs
-
+    tmap!(res, radec, rex) do obs, r
         # Observed ra/dec
-        α_obs = rad2arcsec(ra(obs[i]))   # arcsec
-        δ_obs = rad2arcsec(dec(obs[i]))  # arcsec
-
+        α_obs = rad2arcsec(ra(obs))   # arcsec
+        δ_obs = rad2arcsec(dec(obs))  # arcsec
         # Computed ra/dec
-        α_comp, δ_comp = compute_radec(obs[i]; xva = xva, kwargs...)   # arcsec
-
+        α_comp, δ_comp = compute_radec(obs; xva = xva, kwargs...)   # arcsec
         # Debiasing corrections
-        α_corr, δ_corr = debiasing(obs[i], mpc_catalogue_codes_201X, truth, resol, bias_matrix)
-
+        α_corr, δ_corr = debiasing(obs, mpc_catalogue_codes_201X, truth, resol, bias_matrix)
         # Statistical weights from Veres et al. (2017)
-        w8 = w8sveres17(obs[i])
-
+        w8 = w8sveres17(obs)
         # O-C residual ra/dec
         # Note: ra is multiplied by a metric factor cos(dec) to match the format of debiasing corrections
-        res[i] = OpticalResidual(
-            anglediff(α_obs, α_comp) * cos(dec(obs[i])) - α_corr,
+        return OpticalResidual(
+            anglediff(α_obs, α_comp) * cos(dec(obs)) - α_corr,
             δ_obs - δ_comp - δ_corr,
             1 / w8^2,
             1 / w8^2,
-            rex[i],
+            r,
             false
         )
-
     end
 
     return res

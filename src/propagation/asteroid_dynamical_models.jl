@@ -1,3 +1,14 @@
+# Evaluate `tinterp` at time `t` using `OhMyThreads.tmap`
+# This function is a multithreaded version of
+# https://github.com/PerezHz/PlanetaryEphemeris.jl/blob/ed36a2f6e34567a14887cf2811ec7787f124f062/src/interpolation/TaylorInterpolant.jl#L147
+# TO DO: move this to PlanetaryEphemeris.jl
+function tpeeval(tinterp::TaylorInterpolant{T, U, 2}, t::TT) where {T, U, TT <: TaylorInterpCallingArgs{T, U}}
+    # Get index of tinterp.x that interpolates at time t
+    ind::Int, δt::TT = getinterpindex(tinterp, t)
+    # Evaluate tinterp.x[ind] at δt
+    return tmap(x -> x(δt), TT, view(tinterp.x, ind, :))
+end
+
 @doc raw"""
     evaleph(eph::TaylorInterpolant, t::Taylor1, q::Taylor1{U}) where {U}
     evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T<:Real}
@@ -5,7 +16,7 @@
 Evaluate planetary ephemeris with type given by `q`.
 """
 function evaleph(eph::TaylorInterpolant, t::Taylor1, q::Taylor1{U}) where {U}
-    return map(x -> Taylor1( x.coeffs*one(q[0]) ), eph(t))
+    return map(x -> Taylor1( x.coeffs*one(q[0]) ), tpeeval(eph, t))
 end
 
 function evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T<:Real}
@@ -80,25 +91,25 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
 
 function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     # Julian date of start time
-    local jd0 = params[4]
+    local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = evaleph(params[1], dsj2k, q[1])
+    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
     # Accelerations at dsj2k
-    local acceph_t = evaleph(params[2], dsj2k, q[1])
+    local acceph_t = evaleph(params.acceph, dsj2k, q[1])
     # Newtonian potentials at dsj2k
-    local newtonianNb_Potential_t = evaleph(params[3], dsj2k, q[1])
+    local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
-    local UJ_interaction = params[5]
+    local UJ_interaction = params.UJ_interaction
     # Number of bodies, including NEA
-    local N = params[6]
+    local N = params.N
     # Number of bodies, except the asteroid
     local Nm1 = N-1
     # Vector of mass parameters GM's
-    local μ = params[7]
+    local μ = params.μ
 
     # zero(q[1])
     local zero_q_1 = auxzero(q[1])
@@ -654,25 +665,25 @@ end
 
 function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     # Julian date of start time
-    local jd0 = params[4]
+    local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = evaleph(params[1], dsj2k, q[1])
+    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
     # Accelerations at dsj2k
-    local acceph_t = evaleph(params[2], dsj2k, q[1])
+    local acceph_t = evaleph(params.acceph, dsj2k, q[1])
     # Newtonian potentials at dsj2k
-    local newtonianNb_Potential_t = evaleph(params[3], dsj2k, q[1])
+    local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
-    local UJ_interaction = params[5]
+    local UJ_interaction = params.UJ_interaction
     # Number of bodies, including NEA
-    local N = params[6]
+    local N = params.N
     # Number of bodies, except the asteroid
     local Nm1 = N-1
     # Vector of mass parameters GM's
-    local μ = params[7]
+    local μ = params.μ
 
     # zero(q[1])
     local zero_q_1 = auxzero(q[1])
@@ -1188,23 +1199,21 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     nothing
 end
 
-@taylorize function newtonian!(dq, q, params, t)
+function newtonian!(dq, q, params, t)
     # Julian date of start time
-    local jd0 = params[4]
+    local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = evaleph(params[1], dsj2k, q[1])
+    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
     # Type of position / velocity components
     local S = eltype(q)
-    # Interaction matrix with flattened bodies
-    local UJ_interaction = params[5]
     # Number of bodies, including NEA
-    local N = 10 # Sun, Moon and planets # params[6]
+    local N = 10 # Sun, Moon and planets # params.N
     # Number of bodies, except the asteroid
     local Nm1 = N-1
     # Vector of mass parameters GM's
-    local μ = params[7][1:10]
+    local μ = params.μ[1:10]
 
     # zero(q[1])
     local zero_q_1 = auxzero(q[1])
