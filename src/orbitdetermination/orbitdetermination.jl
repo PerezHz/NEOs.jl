@@ -221,7 +221,7 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T}
     # Set jet transport variables
     varorder = max(params.tsaorder, params.gaussorder)
     scaled_variables("dx", ones(T, 6); order = varorder)
-    # Case 1: Gauss Method
+    # Case 1: Gauss' Method
     if isgauss(tracklets)
         sol = gaussinitcond(radec, tracklets, params; dynamics)
     end

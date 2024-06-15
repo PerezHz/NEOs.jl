@@ -15,7 +15,7 @@ struct NEOParameters{T <: Real}
     bias_matrix::Matrix{T}
     eph_su::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}
     eph_ea::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}
-    # Gauss Method Parameters
+    # Gauss' Method Parameters
     max_triplets::Int
     gaussorder::Int
     adamhelp::Bool
@@ -78,7 +78,7 @@ Parameters for all orbit determination functions.
     - `"2018"` corresponds to https://doi.org/10.1016/j.icarus.2019.113596,
     - `"hires2018"` corresponds to https://doi.org/10.1016/j.icarus.2019.113596.
 
-# Gauss Method Parameters
+# Gauss' Method Parameters
 
 - `max_triplets::Int`: maximum number of triplets to check for a solution (default: `10`).
 - `gaussorder::Int`: order of the jet transport perturbation (default: `5`).

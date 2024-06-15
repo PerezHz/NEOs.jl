@@ -355,6 +355,9 @@ function numberofdays(dates::Vector{Tracklet{T}}) where {T <: Real}
     return (dates[end].radec[end].date - dates[1].radec[1].date).value / 86_400_000
 end
 
+# Return the `maxtriplets` best combinations of three `tracklets`
+# for Gauss' method. See the line after equation (27) of
+# https://doi.org/10.1016/j.icarus.2007.11.033
 function _gausstriplets1(tracklets::Vector{Tracklet{T}}, maxtriplets::Int) where {T <: Real}
     # Number of tracklets
     L = length(tracklets)
@@ -391,6 +394,10 @@ function _gausstriplets1(tracklets::Vector{Tracklet{T}}, maxtriplets::Int) where
     return triplets[:, perm], τ[perm]
 end
 
+# Given a vector of three `tracklets`, update `observatories`, `dates`,
+# `α` and `δ` with the best combination of three observations for Gauss'
+# method. See the line after equation (27) of
+# https://doi.org/10.1016/j.icarus.2007.11.033
 function _gausstriplets2!(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime}, α::Vector{T},
                           δ::Vector{T}, tracklets::AbstractVector{Tracklet{T}}) where {T <: Real}
     # Unfold tracklets
@@ -425,6 +432,8 @@ function _gausstriplets2!(observatories::Vector{ObservatoryMPC{T}}, dates::Vecto
     return nothing
 end
 
+# Update an initial condition `q`, obtained by Gauss' method, via ADAM
+# minimization over the middle tracklet's manifold of variations.
 function _adam!(q::Vector{TaylorN{T}}, jd0::T, tracklet::Tracklet, params::NEOParameters{T};
                 dynamics::D = newtonian!) where {T <: Real, D}
     # Exploratory propagation
@@ -456,10 +465,10 @@ function _adam!(q::Vector{TaylorN{T}}, jd0::T, tracklet::Tracklet, params::NEOPa
 end
 
 @doc raw"""
-    gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
+    gaussinitcond(radec::Vector{RadecMPC{T}}, [tracklets::Vector{Tracklet{T}},]
                   params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
 
-Compute an orbit via Jet Transport Gauss Method.
+Compute an orbit via Jet Transport Gauss' Method.
 
 See also [`gauss_method`](@ref).
 
@@ -467,9 +476,23 @@ See also [`gauss_method`](@ref).
 
 - `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
-- `params::NEOParameters{T}`: see `Gauss Method Parameters` of [`NEOParameters`](@ref).
+- `params::NEOParameters{T}`: see `Gauss' Method Parameters` of [`NEOParameters`](@ref).
 - `dynamics::D`: dynamical model.
+
+!!! warning
+    This function will change the (global) `TaylorSeries` variables.
 """
+function gaussinitcond(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
+                       dynamics::D = newtonian!) where {T <: Real, D}
+    # Reduce tracklets by polynomial regression
+    tracklets = reduce_tracklets(radec)
+    # Set jet transport variables
+    varorder = max(params.tsaorder, params.gaussorder)
+    scaled_variables("dx", ones(T, 6); order = varorder)
+    # Gauss' Method
+    return gaussinitcond(radec, tracklets, params; dynamics)
+end
+
 function gaussinitcond(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                        params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
     # gauss_method input

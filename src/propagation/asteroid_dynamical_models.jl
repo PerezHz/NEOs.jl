@@ -1,4 +1,5 @@
-# Multithreaded version of
+# Evaluate `tinterp` at time `t` using `OhMyThreads.tmap`
+# This function is a multithreaded version of
 # https://github.com/PerezHz/PlanetaryEphemeris.jl/blob/ed36a2f6e34567a14887cf2811ec7787f124f062/src/interpolation/TaylorInterpolant.jl#L147
 # TO DO: move this to PlanetaryEphemeris.jl
 function tpeeval(tinterp::TaylorInterpolant{T, U, 2}, t::TT) where {T, U, TT <: TaylorInterpCallingArgs{T, U}}

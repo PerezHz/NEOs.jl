@@ -139,7 +139,8 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_ng_ep
     accY = Taylor1(identity(constant_term(zero_q_1)), order)
     accZ = Taylor1(identity(constant_term(zero_q_1)), order)
     local M_ = Array{S}(undef, 3, 3, N)
-    local M_[:, :, ea] = t2c_jpl_de430(dsj2k) .+ zero_q_1
+    local M_ .= zero_q_1
+    local M_[:, :, ea] .= (t2c_jpl_de430(dsj2k))[:, :] .+ zero_q_1
     dq[1] = Taylor1(identity(constant_term(q[4])), order)
     dq[2] = Taylor1(identity(constant_term(q[5])), order)
     dq[3] = Taylor1(identity(constant_term(q[6])), order)
@@ -936,7 +937,8 @@ function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
     TaylorSeries.zero!(accZ)
     accZ.coeffs[1] = identity(constant_term(zero_q_1))
     local M_ = Array{S}(undef, 3, 3, N)
-    local M_[:, :, ea] = t2c_jpl_de430(dsj2k) .+ zero_q_1
+    local M_ .= zero_q_1
+    local M_[:, :, ea] .= (t2c_jpl_de430(dsj2k))[:, :] .+ zero_q_1
     TaylorSeries.zero!(dq[1])
     (dq[1]).coeffs[1] = identity(constant_term(q[4]))
     TaylorSeries.zero!(dq[2])
@@ -1879,7 +1881,8 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_t
     accY = Taylor1(identity(constant_term(zero_q_1)), order)
     accZ = Taylor1(identity(constant_term(zero_q_1)), order)
     local M_ = Array{S}(undef, 3, 3, N)
-    local M_[:, :, ea] = t2c_jpl_de430(dsj2k) .+ zero_q_1
+    local M_ .= zero_q_1
+    local M_[:, :, ea] .= (t2c_jpl_de430(dsj2k))[:, :] .+ zero_q_1
     dq[1] = Taylor1(identity(constant_term(q[4])), order)
     dq[2] = Taylor1(identity(constant_term(q[5])), order)
     dq[3] = Taylor1(identity(constant_term(q[6])), order)
@@ -2578,7 +2581,8 @@ function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, 
     TaylorSeries.zero!(accZ)
     accZ.coeffs[1] = identity(constant_term(zero_q_1))
     local M_ = Array{S}(undef, 3, 3, N)
-    local M_[:, :, ea] = t2c_jpl_de430(dsj2k) .+ zero_q_1
+    local M_ .= zero_q_1
+    local M_[:, :, ea] .= (t2c_jpl_de430(dsj2k))[:, :] .+ zero_q_1
     TaylorSeries.zero!(dq[1])
     (dq[1]).coeffs[1] = identity(constant_term(q[4]))
     TaylorSeries.zero!(dq[2])

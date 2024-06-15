@@ -142,7 +142,7 @@ function _tooshortarc(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}},
 end
 
 @doc raw"""
-    tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
+    tooshortarc(radec::Vector{RadecMPC{T}}, [tracklets::Vector{Tracklet{T}},]
                 params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
 
 Compute an orbit by minimizing the normalized root mean square residual
@@ -154,7 +154,21 @@ over the manifold of variations.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
 - `params::NEOParameters{T}`: see `Too Short Arc Parameters` of [`NEOParameters`](@ref).
 - `dynamics::D`: dynamical model.
+
+!!! warning
+    This function will change the (global) `TaylorSeries` variables.
 """
+function tooshortarc(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
+                     dynamics::D = newtonian!) where {T <: Real, D}
+    # Reduce tracklets by polynomial regression
+    tracklets = reduce_tracklets(radec)
+    # Set jet transport variables
+    varorder = max(params.tsaorder, params.gaussorder)
+    scaled_variables("dx", ones(T, 6); order = varorder)
+    # Too Short Arc (TSA)
+    return tooshortarc(radec, tracklets, params; dynamics)
+end
+
 function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
                      params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
 
