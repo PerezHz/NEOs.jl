@@ -2,7 +2,10 @@
     AdmissibleRegion{T <: Real}
 
 Subset of topocentric range × range-rate space defined by
-the constraint heliocentric energy ≤ `k_gauss^2/(2a_max)`.
+the following constraints:
+- heliocentric energy ≤ `k_gauss^2/(2a_max)`,
+- absolute magnitude ≤ `H_max`,
+- geocentric energy ≥ `0`.
 
 # Fields
 
@@ -22,7 +25,8 @@ the constraint heliocentric energy ≤ `k_gauss^2/(2a_max)`.
 - `observatory::ObservatoryMPC{T}`: observing station.
 
 !!! reference
-    See Chapter 8 of https://doi.org/10.1017/CBO9781139175371.
+    See Chapter 8 of https://doi.org/10.1017/CBO9781139175371, or
+    https://doi.org/10.1007/s10569-004-6593-5.
 """
 @auto_hash_equals struct AdmissibleRegion{T <: Real}
     date::DateTime
@@ -134,7 +138,7 @@ function arcoeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
     coeffs = Vector{T}(undef, 6)
     coeffs[1] = dot(q[1:3], q[1:3])
     coeffs[2] = 2 *  dot(q[4:6], ρ)
-    coeffs[3] = v_α^2 * cos(δ)^2 + v_δ^2
+    coeffs[3] = v_α^2 * cos(δ)^2 + v_δ^2  # proper motion squared
     coeffs[4] = 2 * v_α * dot(q[4:6], ρ_α) + 2 * v_δ * dot(q[4:6], ρ_δ)
     coeffs[5] = dot(q[4:6], q[4:6])
     coeffs[6] = 2*dot(q[1:3], ρ)
@@ -144,8 +148,12 @@ end
 @doc raw"""
     topounitpdv(α::T, δ::T) where {T <: Number}
 
-Return the topocentric unit vector and its partial derivatives with
-respect to `α` and `δ`.
+Return the topocentric line-of-sight unit vector and its
+partial derivatives with respect to `α` and `δ`.
+
+!!! reference
+    See between equations (8.5) and (8.6) of
+    https://doi.org/10.1017/CBO9781139175371.
 """
 function topounitpdv(α::T, δ::T) where {T <: Number}
     sin_α, cos_α = sincos(α)
@@ -183,6 +191,19 @@ function arS(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
     return ρ^2 + coeffs[6] * ρ + coeffs[1]
 end
 arS(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arS(A.coeffs, ρ)
+
+@doc raw"""
+    arG(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
+
+G function of an [`AdmissibleRegion`](@ref).
+
+!!! reference
+    See equation (8.13) of https://doi.org/10.1017/CBO9781139175371.
+"""
+function arG(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
+    return 2 * k_gauss^2 * μ_ES / ρ - coeffs[3] * ρ^2
+end
+arG(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arG(A.coeffs, ρ)
 
 @doc raw"""
     arenergycoeffs(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
