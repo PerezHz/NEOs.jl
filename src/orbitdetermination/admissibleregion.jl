@@ -1,5 +1,5 @@
 @doc raw"""
-    AdmissibleRegion{T <: AbstractFloat}
+    AdmissibleRegion{T <: Real}
 
 Subset of topocentric range × range-rate space defined by
 the constraint heliocentric energy ≤ `k_gauss^2/(2a_max)`.
@@ -24,7 +24,7 @@ the constraint heliocentric energy ≤ `k_gauss^2/(2a_max)`.
 !!! reference
     See Chapter 8 of https://doi.org/10.1017/CBO9781139175371.
 """
-@auto_hash_equals struct AdmissibleRegion{T <: AbstractFloat}
+@auto_hash_equals struct AdmissibleRegion{T <: Real}
     date::DateTime
     α::T
     δ::T
@@ -44,7 +44,7 @@ the constraint heliocentric energy ≤ `k_gauss^2/(2a_max)`.
 end
 
 # Definition of zero AdmissibleRegion{T}
-function zero(::Type{AdmissibleRegion{T}}) where {T <: AbstractFloat}
+function zero(::Type{AdmissibleRegion{T}}) where {T <: Real}
     return AdmissibleRegion{T}(
         DateTime(2000), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
         Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
@@ -53,7 +53,7 @@ function zero(::Type{AdmissibleRegion{T}}) where {T <: AbstractFloat}
     )
 end
 
-iszero(x::AdmissibleRegion{T}) where {T <: AbstractFloat} = x == zero(AdmissibleRegion{T})
+iszero(x::AdmissibleRegion{T}) where {T <: Real} = x == zero(AdmissibleRegion{T})
 
 # Print method for AdmissibleRegion
 # Examples:
@@ -70,7 +70,7 @@ function show(io::IO, A::AdmissibleRegion{T}) where {T <: Real}
 end
 
 # Outer constructor
-function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where {T <: AbstractFloat}
+function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where {T <: Real}
     # Unfold
     obs, t_datetime, α, δ = observatory(tracklet), date(tracklet), ra(tracklet), dec(tracklet)
     v_α, v_δ, h = vra(tracklet), vdec(tracklet), mag(tracklet)
@@ -159,33 +159,33 @@ function topounitpdv(α::T, δ::T) where {T <: Number}
 end
 
 @doc raw"""
-    arW(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+    arW(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
 
 W function of an [`AdmissibleRegion`](@ref).
 
 !!! reference
     See equation (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function arW(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+function arW(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
     return coeffs[3] * ρ^2 + coeffs[4] * ρ + coeffs[5]
 end
-arW(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}  = arW(A.coeffs, ρ)
+arW(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}  = arW(A.coeffs, ρ)
 
 @doc raw"""
-    arS(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+    arS(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
 
 S function of an [`AdmissibleRegion`](@ref).
 
 !!! reference
     See equation (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function arS(coeffs::Vector{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+function arS(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
     return ρ^2 + coeffs[6] * ρ + coeffs[1]
 end
-arS(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = arS(A.coeffs, ρ)
+arS(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arS(A.coeffs, ρ)
 
 @doc raw"""
-    arenergycoeffs(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+    arenergycoeffs(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
 
 Return the coefficients of the heliocentric energy as a quadratic function
 of the topocentric range-rate.
@@ -193,16 +193,16 @@ of the topocentric range-rate.
 !!! reference
     See first equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function arenergycoeffs(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: AbstractFloat, S <: Number}
+function arenergycoeffs(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: Real, S <: Number}
     a = one(T)
     b = coeffs[2]
     c = arW(coeffs, ρ) + k_gauss^2 * (1/a_max - 2/sqrt(arS(coeffs, ρ)))
     return a, b, c
 end
-arenergycoeffs(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = arenergycoeffs(A.coeffs, A.a_max, ρ)
+arenergycoeffs(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arenergycoeffs(A.coeffs, A.a_max, ρ)
 
 @doc raw"""
-    arenergydis(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number}
+    arenergydis(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
 
 Return the discriminant of the heliocentric energy as a quadratic function
 of the topocentric range-rate.
@@ -210,21 +210,21 @@ of the topocentric range-rate.
 !!! reference
     See first equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
 """
-function arenergydis(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: AbstractFloat, S <: Number}
+function arenergydis(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: Real, S <: Number}
     a, b, c = arenergycoeffs(coeffs, a_max, ρ)
     return b^2 - 4*a*c
 end
-arenergydis(A::AdmissibleRegion{T}, ρ::S) where {T <: AbstractFloat, S <: Number} = arenergydis(A.coeffs, A.a_max, ρ)
+arenergydis(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arenergydis(A.coeffs, A.a_max, ρ)
 
 @doc raw"""
-    rangerate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat}
-    rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol) where {T <: AbstractFloat}
+    rangerate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: Real}
+    rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol) where {T <: Real}
 
 Return the range-rate(s) in the boundary of `A` for a given range `ρ`.
 If no `m` is given, return a vector with all the solutions. Otherwise,
 `m = :min/:max` chooses which rate to return.
 """
-function rangerate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: AbstractFloat}
+function rangerate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: Real}
     a, b, c = arenergycoeffs(coeffs, a_max, ρ)
     d = b^2 - 4*a*c
     # The number of solutions depends on the discriminant
@@ -236,12 +236,12 @@ function rangerate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: AbstractFl
         return Vector{T}(undef, 0)
     end
 end
-rangerate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: AbstractFloat} = rangerate(A.coeffs, A.a_max, ρ)
+rangerate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: Real} = rangerate(A.coeffs, A.a_max, ρ)
 
-function rangerate(coeffs::Vector{T}, a_max::T, ρ::T, m::Symbol) where {T <: AbstractFloat}
+function rangerate(coeffs::Vector{T}, a_max::T, ρ::T, m::Symbol) where {T <: Real}
     a, b, c = arenergycoeffs(coeffs, a_max, ρ)
     d = b^2 - 4*a*c
-    @assert d > 0 "Less than two solutions, use rangerate(::AdmissibleRegion, ::AbstractFloat) instead"
+    @assert d > 0 "Less than two solutions, use rangerate(::AdmissibleRegion, ::Real) instead"
     # Choose min or max solution
     if m == :min
         return (-b - sqrt(d))/(2a)
@@ -251,11 +251,11 @@ function rangerate(coeffs::Vector{T}, a_max::T, ρ::T, m::Symbol) where {T <: Ab
         return T(NaN)
     end
 end
-rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol) where {T <: AbstractFloat} = rangerate(A.coeffs, A.a_max, ρ, m)
+rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol) where {T <: Real} = rangerate(A.coeffs, A.a_max, ρ, m)
 
 @doc raw"""
     argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
-                   tol::T = 1e-5) where {T <: AbstractFloat}
+                   tol::T = 1e-5) where {T <: Real}
 
 Use golden section search to find the `m = :min/:max` range-rate in the
 boundary of `A` in the interval `[ρmin, ρmax]` with tolerance `tol`.
@@ -265,7 +265,7 @@ boundary of `A` in the interval `[ρmin, ρmax]` with tolerance `tol`.
     Adapted from https://en.wikipedia.org/wiki/Golden-section_search.
 """
 function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
-                        tol::T = 1e-5) where {T <: AbstractFloat}
+                        tol::T = 1e-5) where {T <: Real}
     # 1 / φ
     invphi = (sqrt(5) - 1) / 2
     # 1 / φ^2
@@ -315,12 +315,12 @@ function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
 end
 
 @doc raw"""
-    maxrange(coeffs::Vector{T}, a_max::T) where {T <: AbstractFloat}
+    maxrange(coeffs::Vector{T}, a_max::T) where {T <: Real}
 
 Return the maximum possible range in the boundary of an admissible region
 with coefficients `coeffs` and maximum semimajor axis `a_max`.
 """
-function maxrange(coeffs::Vector{T}, a_max::T) where {T <: AbstractFloat}
+function maxrange(coeffs::Vector{T}, a_max::T) where {T <: Real}
     # Initial guess
     sol = find_zeros(s -> arenergydis(coeffs, a_max, s), R_EA, 100.0)
     iszero(length(sol)) && return zero(T)
@@ -337,11 +337,11 @@ function maxrange(coeffs::Vector{T}, a_max::T) where {T <: AbstractFloat}
 end
 
 @doc raw"""
-    boundary(A::AdmissibleRegion{T}, t::S) where {T <: AbstractFloat, S <: Number}
+    boundary(A::AdmissibleRegion{T}, t::S) where {T <: Real, S <: Number}
 
 Parametrization of `A`'s boundary with `t ∈ [0, 3]`.
 """
-function boundary(A::AdmissibleRegion{T}, t::S) where {T <: AbstractFloat, S <: Number}
+function boundary(A::AdmissibleRegion{T}, t::S) where {T <: Real, S <: Number}
     # Parametrization domain
     @assert 0.0 <= t <= 3.0
     # Lower (upper) bounds
@@ -365,11 +365,11 @@ function boundary(A::AdmissibleRegion{T}, t::S) where {T <: AbstractFloat, S <: 
 end
 
 @doc raw"""
-    boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <: AbstractFloat}
+    boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <: Real}
 
 Project `[ρ, v_ρ]` into `A`'s boundary.
 """
-function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <: AbstractFloat}
+function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <: Real}
     # Project range
     ρ = clamp(ρ,  A.ρ_domain[1], A.ρ_domain[2])
     # Project range-rate
@@ -388,7 +388,7 @@ end
 # Check whether P is inside A's boundary
 for U in (:(AbstractVector{T}), :(Tuple{T, T}))
     @eval begin
-        function in(P::$U, A::AdmissibleRegion{T}) where {T <: AbstractFloat}
+        function in(P::$U, A::AdmissibleRegion{T}) where {T <: Real}
             @assert length(P) == 2 "Points in admissible region are of dimension 2"
             if A.ρ_domain[1] <= P[1] <= A.ρ_domain[2]
                 y_range = rangerate(A, P[1])
@@ -405,12 +405,12 @@ for U in (:(AbstractVector{T}), :(Tuple{T, T}))
 end
 
 @doc raw"""
-    topo2bary(A::AdmissibleRegion{T}, ρ::U, v_ρ::U) where {T <: AbstractFloat, U <: Number}
+    topo2bary(A::AdmissibleRegion{T}, ρ::U, v_ρ::U) where {T <: Real, U <: Number}
 
 Convert topocentric range/range-rate `[ρ, v_ρ]` to barycentric cartesian coordinates.
 `A` fixes the line of sight.
 """
-function topo2bary(A::AdmissibleRegion{T}, ρ::U, v_ρ::U) where {T <: AbstractFloat, U <: Number}
+function topo2bary(A::AdmissibleRegion{T}, ρ::U, v_ρ::U) where {T <: Real, U <: Number}
     # Barycentric position
     r = A.q[1:3] + ρ * A.ρ_unit + sseph(su, datetime2days(A.date))[1:3]
     # Barycentric velocity
@@ -421,12 +421,12 @@ function topo2bary(A::AdmissibleRegion{T}, ρ::U, v_ρ::U) where {T <: AbstractF
 end
 
 @doc raw"""
-    bary2topo(A::AdmissibleRegion{T}, q0::Vector{U}) where {T <: AbstractFloat, U <: Number}
+    bary2topo(A::AdmissibleRegion{T}, q0::Vector{U}) where {T <: Real, U <: Number}
 
 Convert barycentric cartesian coordinates `q0` to topocentric range/range-rate.
 `A` fixes the line of sight.
 """
-function bary2topo(A::AdmissibleRegion{T}, q0::Vector{U}) where {T <: AbstractFloat, U <: Number}
+function bary2topo(A::AdmissibleRegion{T}, q0::Vector{U}) where {T <: Real, U <: Number}
     # Heliocentric state vector
     r = q0 - sseph(su, datetime2days(A.date))
     # Topocentric range
@@ -440,12 +440,12 @@ end
 
 @doc raw"""
     attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
-              params::NEOParameters{T}) where {T <: AbstractFloat, U <: Number}
+              params::NEOParameters{T}) where {T <: Real, U <: Number}
 
 Convert attributable elements `a` to barycentric cartesian coordinates.
 """
 function attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
-                   params::NEOParameters{T}) where {T <: AbstractFloat, U <: Number}
+                   params::NEOParameters{T}) where {T <: Real, U <: Number}
     # Unfold
     α, δ, v_α, v_δ, ρ, v_ρ = a
     # Light-time correction to epoch
