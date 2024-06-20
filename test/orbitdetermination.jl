@@ -141,7 +141,7 @@ using NEOs: NEOSolution, numberofdays
 
     @testset "Admissible region" begin
         using NEOs: AdmissibleRegion, reduce_tracklets, arenergydis, rangerate,
-                    argoldensearch, boundary
+                    argoldensearch, arboundary
 
         # Fetch optical astrometry
         radec = fetch_radec_mpc("designation" => "2024 BX1")
@@ -175,10 +175,10 @@ using NEOs: NEOSolution, numberofdays
         @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
         @test v_ρ ≥ A.v_ρ_domain[2]
         # Boundary
-        @test norm(boundary(A, 0.0) - A.Fs[1, :]) == 0.0
-        @test norm(boundary(A, 1.0) - A.Fs[2, :]) < 1.0e-17
-        @test norm(boundary(A, 2.0) - A.Fs[3, :]) < 1e-9
-        @test norm(boundary(A, 3.0) - A.Fs[1, :]) < 1e-17
+        @test norm(arboundary(A, 0.0) - A.Fs[1, :]) == 0.0
+        @test norm(arboundary(A, 1.0) - A.Fs[2, :]) < 1.0e-17
+        @test norm(arboundary(A, 2.0) - A.Fs[3, :]) < 1e-9
+        @test norm(arboundary(A, 3.0) - A.Fs[1, :]) < 1e-17
         # In
         @test A.Fs[1, :] in A
         @test A.Fs[2, :] in A

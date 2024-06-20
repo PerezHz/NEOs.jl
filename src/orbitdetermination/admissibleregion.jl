@@ -90,7 +90,7 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     # Admissible region coefficients
     coeffs = arcoeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
     # Maximum range (heliocentric energy constraint)
-    ρ_max = maxrange(coeffs, a_max)
+    ρ_max = _helmaxrange(coeffs, a_max)
     iszero(ρ_max) && return zero(AdmissibleRegion{T})
     # Minimum range
     if isnan(h)
@@ -463,11 +463,25 @@ function _geomaxrange(coeffs::Vector{T}) where {T <: Real}
 end
 
 @doc raw"""
-    boundary(A::AdmissibleRegion{T}, t::S) where {T <: Real, S <: Number}
+    arboundary(A::AdmissibleRegion{T}, t::S, [boundary::Symbol]) where {T <: Real, S <: Number}
 
-Parametrization of `A`'s boundary with `t ∈ [0, 3]`.
+Parametrization of `A`'s boundary. `boundary` chooses
+between
+- `:outer` (default) with `t ∈ [0, 3]`, or
+- `:inner` with `t ∈ [0, 2]`.
 """
-function boundary(A::AdmissibleRegion{T}, t::S) where {T <: Real, S <: Number}
+function arboundary(A::AdmissibleRegion{T}, t::S,
+                    boundary::Symbol = :outer) where {T <: Real, S <: Number}
+    if boundary == :outer
+        return _arhelboundary(A, t)
+    elseif boundary == :inner
+        return _argeoboundary(A, t)
+    else
+        throw(ArgumentError("Argument `boundary` must be either `:outer` or `:inner`"))
+    end
+end
+
+function _arhelboundary(A::AdmissibleRegion{T}, t::S) where {T <: Real, S <: Number}
     # Parametrization domain
     @assert 0.0 <= t <= 3.0
     # Lower (upper) bounds
@@ -480,26 +494,44 @@ function boundary(A::AdmissibleRegion{T}, t::S) where {T <: Real, S <: Number}
         # Upper curve
         if 1.0 <= t <= 2.0
             ρ = x_min + (t-1)*(x_max - x_min)
-            v_ρ = rangerate(A, ρ)[end]
+            v_ρ = rangerate(A, ρ, :outer)[end]
         # Lower curve
         elseif 2.0 <= t <= 3.0
             ρ = x_max - (t-2)*(x_max - x_min)
-            v_ρ = rangerate(A, ρ)[1]
+            v_ρ = rangerate(A, ρ, :outer)[1]
         end
         return [ρ, v_ρ]
     end
 end
 
+function _argeoboundary(A::AdmissibleRegion{T}, t::S) where {T <: Real, S <: Number}
+    # Parametrization domain
+    @assert 0.0 <= t <= 2.0
+    # Lower (upper) bounds
+    x_min, x_max = A.ρ_domain[1], _geomaxrange(A.coeffs)
+    # Upper curve
+    if 0.0 <= t <= 1.0
+        ρ = x_min + t*(x_max - x_min)
+        v_ρ = rangerate(A, ρ, :inner)[end]
+    # Lower curve
+    elseif 1.0 <= t <= 2.0
+        ρ = x_max - (t-1)*(x_max - x_min)
+        v_ρ = argeorate(A, ρ, :inner)[1]
+    end
+
+    return [ρ, v_ρ]
+end
+
 @doc raw"""
     boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <: Real}
 
-Project `[ρ, v_ρ]` into `A`'s boundary.
+Project `[ρ, v_ρ]` into `A`'s outer boundary.
 """
 function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <: Real}
     # Project range
     ρ = clamp(ρ,  A.ρ_domain[1], A.ρ_domain[2])
     # Project range-rate
-    y_domain = rangerate(A, ρ)
+    y_domain = rangerate(A, ρ, :outer)
     if iszero(length(y_domain))
         v_ρ = sum(A.v_ρ_domain) / 2
     elseif isone(length(y_domain))
@@ -517,7 +549,7 @@ for U in (:(AbstractVector{T}), :(Tuple{T, T}))
         function in(P::$U, A::AdmissibleRegion{T}) where {T <: Real}
             @assert length(P) == 2 "Points in admissible region are of dimension 2"
             if A.ρ_domain[1] <= P[1] <= A.ρ_domain[2]
-                y_range = rangerate(A, P[1])
+                y_range = rangerate(A, P[1], :outer)
                 if length(y_range) == 1
                     return P[2] == y_range[1]
                 else
