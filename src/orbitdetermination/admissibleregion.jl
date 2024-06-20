@@ -206,36 +206,59 @@ end
 arG(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arG(A.coeffs, ρ)
 
 @doc raw"""
-    arenergycoeffs(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
+    arenergycoeffs(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T <: Real, S <: Number}
 
-Return the coefficients of the heliocentric energy as a quadratic function
-of the topocentric range-rate.
+Return the coefficients of `A`'s energy as a quadratic function
+of the topocentric range-rate evaluated at range `ρ`. The keyword
+argument `boundary` allows to choose between the `:outer` (default)
+or `:inner` boundary.
 
 !!! reference
-    See first equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
+    See between equations (8.9)-(8.10) and (8.12)-(8.13)
+    of https://doi.org/10.1017/CBO9781139175371.
 """
-function arenergycoeffs(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: Real, S <: Number}
+function arenergycoeffs(A::AdmissibleRegion{T}, ρ::S,
+                        boundary::Symbol = :outer) where {T <: Real, S <: Number}
+    if boundary == :outer
+        return _arhelenergycoeffs(A.coeffs, A.a_max, ρ)
+    elseif boundary == :inner
+        return _argeoenergycoeffs(A.coeffs, ρ)
+    else
+        throw(ArgumentError("Keyword argument `boundary` must be either `:outer` or `:inner`"))
+    end
+end
+
+function _arhelenergycoeffs(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: Real, S <: Number}
     a = one(T)
     b = coeffs[2]
     c = arW(coeffs, ρ) + k_gauss^2 * (1/a_max - 2/sqrt(arS(coeffs, ρ)))
     return a, b, c
 end
-arenergycoeffs(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arenergycoeffs(A.coeffs, A.a_max, ρ)
+
+function _argeoenergycoeffs(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
+    a = one(T)
+    b = zero(T)
+    c = -arG(coeffs, ρ)
+    return a, b, c
+end
 
 @doc raw"""
-    arenergydis(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
+    arenergydis(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T <: Real, S <: Number}
 
-Return the discriminant of the heliocentric energy as a quadratic function
-of the topocentric range-rate.
+Return the discriminant of `A`'s energy as a quadratic function
+of the topocentric range-rate evaluated at range `ρ`. The keyword
+argument `boundary` allows to choose between the `:outer` (default)
+or `:inner` boundary.
 
 !!! reference
-    See first equation after (8.9) of https://doi.org/10.1017/CBO9781139175371.
+    See between equations (8.9)-(8.10) and (8.12)-(8.13)
+    of https://doi.org/10.1017/CBO9781139175371.
 """
-function arenergydis(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: Real, S <: Number}
-    a, b, c = arenergycoeffs(coeffs, a_max, ρ)
+function arenergydis(A::AdmissibleRegion{T}, ρ::S,
+                     boundary::Symbol = :outer) where {T <: Real, S <: Number}
+    a, b, c = arenergycoeffs(A, ρ, boundary)
     return b^2 - 4*a*c
 end
-arenergydis(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arenergydis(A.coeffs, A.a_max, ρ)
 
 @doc raw"""
     rangerate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: Real}
