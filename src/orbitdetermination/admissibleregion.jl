@@ -209,9 +209,8 @@ arG(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arG(A.coeffs
     arenergycoeffs(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T <: Real, S <: Number}
 
 Return the coefficients of `A`'s energy as a quadratic function
-of the topocentric range-rate evaluated at range `ρ`. The keyword
-argument `boundary` allows to choose between the `:outer` (default)
-or `:inner` boundary.
+of the topocentric range-rate evaluated at range `ρ`. `boundary`
+chooses between the `:outer` (default) or `:inner` boundary.
 
 !!! reference
     See between equations (8.9)-(8.10) and (8.12)-(8.13)
@@ -246,9 +245,8 @@ end
     arenergydis(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T <: Real, S <: Number}
 
 Return the discriminant of `A`'s energy as a quadratic function
-of the topocentric range-rate evaluated at range `ρ`. The keyword
-argument `boundary` allows to choose between the `:outer` (default)
-or `:inner` boundary.
+of the topocentric range-rate evaluated at range `ρ`. `boundary`
+chooses between the `:outer` (default) or `:inner` boundary.
 
 !!! reference
     See between equations (8.9)-(8.10) and (8.12)-(8.13)
@@ -265,10 +263,9 @@ end
     rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol, [boundary::Symbol]) where {T <: Real}
 
 Return the range-rate(s) in the boundary of `A` for a given range `ρ`.
-The keyword argument `boundary` allows to choose between the `:outer`
-(default) or `:inner` boundary. If no `m` is given, return a vector
-with all the solutions. Otherwise, `m = :min/:max` chooses which
-rate to return.
+If no `m` is given, return a vector with all the solutions. Otherwise,
+`m = :min/:max` chooses which rate to return. `boundary` chooses between
+the `:outer`(default) or `:inner` boundary.
 """
 function rangerate(A::AdmissibleRegion{T}, ρ::S,
                    boundary::Symbol = :outer) where {T, S <: Real}
@@ -352,17 +349,18 @@ end
 
 @doc raw"""
     argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
-                   tol::T = 1e-5) where {T <: Real}
+                   [boundary::Symbol,] [tol::T]) where {T <: Real}
 
 Use golden section search to find the `m = :min/:max` range-rate in the
-boundary of `A` in the interval `[ρmin, ρmax]` with tolerance `tol`.
-
+boundary of `A` in the interval `[ρmin, ρmax]`. `boundary` chooses
+between the `:outer`(default) or `:inner` boundary and `tol` is the
+absolute tolerance (default: `1e-5`).
 
 !!! reference
     Adapted from https://en.wikipedia.org/wiki/Golden-section_search.
 """
 function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
-                        tol::T = 1e-5) where {T <: Real}
+                        boundary::Symbol = :outer, tol::T = 1e-5) where {T <: Real}
     # 1 / φ
     invphi = (sqrt(5) - 1) / 2
     # 1 / φ^2
@@ -374,15 +372,15 @@ function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
     # Termination condition
     if h <= tol
         ρ = (a + b) / 2
-        return ρ, rangerate(A, ρ, m)
+        return ρ, rangerate(A, ρ, m, boundary)
     end
     # Required steps to achieve tolerance
     n = ceil(Int, log(tol/h) / log(invphi))
     # Initialize center points
     c = a + invphi2 * h
     d = a + invphi * h
-    yc = rangerate(A, c, m)
-    yd = rangerate(A, d, m)
+    yc = rangerate(A, c, m, boundary)
+    yd = rangerate(A, d, m, boundary)
     # Main loop
     for _ in 1:n
         if (m == :min && yc < yd) || (m == :max && yc > yd)
@@ -391,14 +389,14 @@ function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
             yd = yc
             h = invphi * h
             c = a + invphi2 * h
-            yc = rangerate(A, c, m)
+            yc = rangerate(A, c, m, boundary)
         else
             a = c
             c = d
             yc = yd
             h = invphi * h
             d = a + invphi * h
-            yd = rangerate(A, d, m)
+            yd = rangerate(A, d, m, boundary)
         end
     end
 
@@ -408,7 +406,7 @@ function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
         ρ = (c + b) / 2
     end
 
-    return ρ, rangerate(A, ρ, m)
+    return ρ, rangerate(A, ρ, m, boundary)
 end
 
 @doc raw"""
