@@ -258,6 +258,16 @@ function arenergydis(A::AdmissibleRegion{T}, ρ::S,
     return b^2 - 4*a*c
 end
 
+function _arhelenergydis(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: Real, S <: Number}
+    a, b, c = _arhelenergycoeffs(coeffs, a_max, ρ)
+    return b^2 - 4*a*c
+end
+
+function _argeoenergydis(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
+    a, b, c = _argeoenergycoeffs(coeffs, ρ)
+    return b^2 - 4*a*c
+end
+
 @doc raw"""
     rangerate(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T, S <: Real}
     rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol, [boundary::Symbol]) where {T <: Real}
@@ -410,19 +420,40 @@ function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
 end
 
 @doc raw"""
-    maxrange(coeffs::Vector{T}, a_max::T) where {T <: Real}
+    _helmaxrange(coeffs::Vector{T}, a_max::T) where {T <: Real}
 
-Return the maximum possible range in the boundary of an admissible region
-with coefficients `coeffs` and maximum semimajor axis `a_max`.
+Return the maximum possible range in the outer boundary of
+an admissible region with coefficients `coeffs` and maximum
+semimajor axis `a_max`.
 """
-function maxrange(coeffs::Vector{T}, a_max::T) where {T <: Real}
+function _helmaxrange(coeffs::Vector{T}, a_max::T) where {T <: Real}
     # Initial guess
-    sol = find_zeros(s -> arenergydis(coeffs, a_max, s), R_EA, 100.0)
+    sol = find_zeros(s -> _arhelenergydis(coeffs, a_max, s), R_EA, 100.0)
     iszero(length(sol)) && return zero(T)
     ρ_max = sol[1]
-    # Make sure U(ρ) ≥ 0 and there is at least one rangerate solution
+    # Make sure U(ρ) ≥ 0 and there is at least one _helrangerate solution
     niter = 0
-    while arenergydis(coeffs, a_max, ρ_max) < 0 || length(rangerate(coeffs, a_max, ρ_max)) == 0
+    while _arhelenergydis(coeffs, a_max, ρ_max) < 0 || length(_helrangerate(coeffs, a_max, ρ_max)) == 0
+        niter += 1
+        ρ_max = prevfloat(ρ_max)
+        niter > 1_000 && break
+    end
+
+    return ρ_max
+end
+
+@doc raw"""
+    _geomaxrange(coeffs::Vector{T}) where {T <: Real}
+
+Return the maximum possible range in the inner boundary of
+an admissible region with coefficients `coeffs`.
+"""
+function _geomaxrange(coeffs::Vector{T}) where {T <: Real}
+    # Initial guess
+    ρ_max = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / coeffs[3]))
+    # Make sure G(ρ) ≥ 0 and there is at least one _georangerate solution
+    niter = 0
+    while _argeoenergydis(coeffs, ρ_max) < 0 || length(_georangerate(coeffs, ρ_max)) == 0
         niter += 1
         ρ_max = prevfloat(ρ_max)
         niter > 1_000 && break
