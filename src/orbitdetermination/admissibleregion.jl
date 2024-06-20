@@ -109,10 +109,10 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     # Range domain
     ρ_domain = [ρ_min, ρ_max]
     # Range-rate domain
-    v_ρ_min, v_ρ_max = _helrangerate(coeffs, a_max, ρ_min)[1:2]
+    v_ρ_min, v_ρ_max = _helrangerates(coeffs, a_max, ρ_min)[1:2]
     v_ρ_domain = [v_ρ_min, v_ρ_max]
     # Range rate symmetry level
-    v_ρ_mid = _helrangerate(coeffs, a_max, ρ_max)[1]
+    v_ρ_mid = _helrangerates(coeffs, a_max, ρ_max)[1]
     # Boundary points
     Fs = Matrix{T}(undef, 3, 2)
     Fs[1, :] .= [ρ_min, v_ρ_min]
@@ -269,26 +269,24 @@ function _argeoenergydis(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number
 end
 
 @doc raw"""
-    rangerate(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T, S <: Real}
-    rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol, [boundary::Symbol]) where {T <: Real}
+    rangerates(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T, S <: Real}
 
-Return the range-rate(s) in the boundary of `A` for a given range `ρ`.
-If no `m` is given, return a vector with all the solutions. Otherwise,
-`m = :min/:max` chooses which rate to return. `boundary` chooses between
-the `:outer`(default) or `:inner` boundary.
+Return  a vector with the range-rates in the boundary of `A`
+for a given range `ρ`. `boundary` chooses between the `:outer`
+(default) or `:inner` boundary.
 """
-function rangerate(A::AdmissibleRegion{T}, ρ::S,
+function rangerates(A::AdmissibleRegion{T}, ρ::S,
                    boundary::Symbol = :outer) where {T, S <: Real}
     if boundary == :outer
-        return _helrangerate(A.coeffs, A.a_max, ρ)
+        return _helrangerates(A.coeffs, A.a_max, ρ)
     elseif boundary == :inner
-        return _georangerate(A.coeffs, ρ)
+        return _georangerates(A.coeffs, ρ)
     else
         throw(ArgumentError("Argument `boundary` must be either `:outer` or `:inner`"))
     end
 end
 
-function _helrangerate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: Real}
+function _helrangerates(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: Real}
     a, b, c = _arhelenergycoeffs(coeffs, a_max, ρ)
     d = b^2 - 4*a*c
     # The number of solutions depends on the discriminant
@@ -301,7 +299,7 @@ function _helrangerate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: Real}
     end
 end
 
-function _georangerate(coeffs::Vector{T}, ρ::S) where {T, S <: Real}
+function _georangerates(coeffs::Vector{T}, ρ::S) where {T, S <: Real}
     ρ0 = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / coeffs[3]))
     !(0 < ρ <= ρ0) && return Vector{T}(undef, 0)
     a, b, c = _argeoenergycoeffs(coeffs, ρ)
@@ -316,6 +314,13 @@ function _georangerate(coeffs::Vector{T}, ρ::S) where {T, S <: Real}
     end
 end
 
+@doc raw"""
+    rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol, [boundary::Symbol]) where {T <: Real}
+
+Return a range-rate in the boundary of `A` for a given range `ρ`.
+`m = :min/:max` chooses which rate to return, while `boundary`
+chooses between the `:outer`(default) or `:inner` boundary.
+"""
 function rangerate(A::AdmissibleRegion{T}, ρ::S, m::Symbol,
                    boundary::Symbol = :outer) where {T, S <: Real}
     if boundary == :outer
@@ -433,7 +438,7 @@ function _helmaxrange(coeffs::Vector{T}, a_max::T) where {T <: Real}
     ρ_max = sol[1]
     # Make sure U(ρ) ≥ 0 and there is at least one _helrangerate solution
     niter = 0
-    while _arhelenergydis(coeffs, a_max, ρ_max) < 0 || length(_helrangerate(coeffs, a_max, ρ_max)) == 0
+    while _arhelenergydis(coeffs, a_max, ρ_max) < 0 || length(_helrangerates(coeffs, a_max, ρ_max)) == 0
         niter += 1
         ρ_max = prevfloat(ρ_max)
         niter > 1_000 && break
@@ -453,7 +458,7 @@ function _geomaxrange(coeffs::Vector{T}) where {T <: Real}
     ρ_max = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / coeffs[3]))
     # Make sure G(ρ) ≥ 0 and there is at least one _georangerate solution
     niter = 0
-    while _argeoenergydis(coeffs, ρ_max) < 0 || length(_georangerate(coeffs, ρ_max)) == 0
+    while _argeoenergydis(coeffs, ρ_max) < 0 || length(_georangerates(coeffs, ρ_max)) == 0
         niter += 1
         ρ_max = prevfloat(ρ_max)
         niter > 1_000 && break
@@ -494,11 +499,11 @@ function _arhelboundary(A::AdmissibleRegion{T}, t::S) where {T <: Real, S <: Num
         # Upper curve
         if 1.0 <= t <= 2.0
             ρ = x_min + (t-1)*(x_max - x_min)
-            v_ρ = rangerate(A, ρ, :outer)[end]
+            v_ρ = rangerates(A, ρ, :outer)[end]
         # Lower curve
         elseif 2.0 <= t <= 3.0
             ρ = x_max - (t-2)*(x_max - x_min)
-            v_ρ = rangerate(A, ρ, :outer)[1]
+            v_ρ = rangerates(A, ρ, :outer)[1]
         end
         return [ρ, v_ρ]
     end
@@ -512,11 +517,11 @@ function _argeoboundary(A::AdmissibleRegion{T}, t::S) where {T <: Real, S <: Num
     # Upper curve
     if 0.0 <= t <= 1.0
         ρ = x_min + t*(x_max - x_min)
-        v_ρ = rangerate(A, ρ, :inner)[end]
+        v_ρ = rangerates(A, ρ, :inner)[end]
     # Lower curve
     elseif 1.0 <= t <= 2.0
         ρ = x_max - (t-1)*(x_max - x_min)
-        v_ρ = argeorate(A, ρ, :inner)[1]
+        v_ρ = rangerates(A, ρ, :inner)[1]
     end
 
     return [ρ, v_ρ]
@@ -531,7 +536,7 @@ function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <:
     # Project range
     ρ = clamp(ρ,  A.ρ_domain[1], A.ρ_domain[2])
     # Project range-rate
-    y_domain = rangerate(A, ρ, :outer)
+    y_domain = rangerates(A, ρ, :outer)
     if iszero(length(y_domain))
         v_ρ = sum(A.v_ρ_domain) / 2
     elseif isone(length(y_domain))
@@ -549,7 +554,7 @@ for U in (:(AbstractVector{T}), :(Tuple{T, T}))
         function in(P::$U, A::AdmissibleRegion{T}) where {T <: Real}
             @assert length(P) == 2 "Points in admissible region are of dimension 2"
             if A.ρ_domain[1] <= P[1] <= A.ρ_domain[2]
-                y_range = rangerate(A, P[1], :outer)
+                y_range = rangerates(A, P[1], :outer)
                 if length(y_range) == 1
                     return P[2] == y_range[1]
                 else

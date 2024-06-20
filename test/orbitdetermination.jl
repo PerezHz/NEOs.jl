@@ -141,7 +141,7 @@ using NEOs: NEOSolution, numberofdays
 
     @testset "Admissible region" begin
         using NEOs: AdmissibleRegion, reduce_tracklets, arenergydis, rangerate,
-                    argoldensearch, arboundary
+                    rangerates, argoldensearch, arboundary
 
         # Fetch optical astrometry
         radec = fetch_radec_mpc("designation" => "2024 BX1")
@@ -162,16 +162,16 @@ using NEOs: NEOSolution, numberofdays
         @test arenergydis(A, A.ρ_domain[2]) ≈ 0 atol = 1e-18
         @test arenergydis(A, A.ρ_domain[2] + 1.0) < 0
         # Range-rate
-        @test rangerate(A, A.ρ_domain[1]) == A.v_ρ_domain
-        @test minimum(rangerate(A, A.ρ_domain[2])) == A.Fs[3, 2]
-        @test length(rangerate(A, A.ρ_domain[2] + 1.0)) == 0
+        @test rangerates(A, A.ρ_domain[1]) == A.v_ρ_domain
+        @test minimum(rangerates(A, A.ρ_domain[2])) == A.Fs[3, 2]
+        @test length(rangerates(A, A.ρ_domain[2] + 1.0)) == 0
         @test rangerate(A, A.ρ_domain[1], :min) == A.v_ρ_domain[1]
         @test rangerate(A, A.ρ_domain[1], :max) == A.v_ρ_domain[2]
         # Golden section search
-        ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :min, 1e-20)
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :min, :outer, 1e-20)
         @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
         @test v_ρ ≤ A.v_ρ_domain[1]
-        ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :max, 1e-20)
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :max, :outer, 1e-20)
         @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
         @test v_ρ ≥ A.v_ρ_domain[2]
         # Boundary
