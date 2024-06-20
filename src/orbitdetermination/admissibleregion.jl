@@ -109,10 +109,10 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     # Range domain
     ρ_domain = [ρ_min, ρ_max]
     # Range-rate domain
-    v_ρ_min, v_ρ_max = rangerate(coeffs, a_max, ρ_min)[1:2]
+    v_ρ_min, v_ρ_max = _helrangerate(coeffs, a_max, ρ_min)[1:2]
     v_ρ_domain = [v_ρ_min, v_ρ_max]
     # Range rate symmetry level
-    v_ρ_mid = rangerate(coeffs, a_max, ρ_max)[1]
+    v_ρ_mid = _helrangerate(coeffs, a_max, ρ_max)[1]
     # Boundary points
     Fs = Matrix{T}(undef, 3, 2)
     Fs[1, :] .= [ρ_min, v_ρ_min]
@@ -224,7 +224,7 @@ function arenergycoeffs(A::AdmissibleRegion{T}, ρ::S,
     elseif boundary == :inner
         return _argeoenergycoeffs(A.coeffs, ρ)
     else
-        throw(ArgumentError("Keyword argument `boundary` must be either `:outer` or `:inner`"))
+        throw(ArgumentError("Argument `boundary` must be either `:outer` or `:inner`"))
     end
 end
 
@@ -261,15 +261,28 @@ function arenergydis(A::AdmissibleRegion{T}, ρ::S,
 end
 
 @doc raw"""
-    rangerate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: Real}
-    rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol) where {T <: Real}
+    rangerate(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T, S <: Real}
+    rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol, [boundary::Symbol]) where {T <: Real}
 
 Return the range-rate(s) in the boundary of `A` for a given range `ρ`.
-If no `m` is given, return a vector with all the solutions. Otherwise,
-`m = :min/:max` chooses which rate to return.
+The keyword argument `boundary` allows to choose between the `:outer`
+(default) or `:inner` boundary. If no `m` is given, return a vector
+with all the solutions. Otherwise, `m = :min/:max` chooses which
+rate to return.
 """
-function rangerate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: Real}
-    a, b, c = arenergycoeffs(coeffs, a_max, ρ)
+function rangerate(A::AdmissibleRegion{T}, ρ::S,
+                   boundary::Symbol = :outer) where {T, S <: Real}
+    if boundary == :outer
+        return _helrangerate(A.coeffs, A.a_max, ρ)
+    elseif boundary == :inner
+        return _georangerate(A.coeffs, ρ)
+    else
+        throw(ArgumentError("Argument `boundary` must be either `:outer` or `:inner`"))
+    end
+end
+
+function _helrangerate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: Real}
+    a, b, c = _arhelenergycoeffs(coeffs, a_max, ρ)
     d = b^2 - 4*a*c
     # The number of solutions depends on the discriminant
     if d > 0
@@ -280,22 +293,62 @@ function rangerate(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: Real}
         return Vector{T}(undef, 0)
     end
 end
-rangerate(A::AdmissibleRegion{T}, ρ::S) where {T, S <: Real} = rangerate(A.coeffs, A.a_max, ρ)
 
-function rangerate(coeffs::Vector{T}, a_max::T, ρ::T, m::Symbol) where {T <: Real}
-    a, b, c = arenergycoeffs(coeffs, a_max, ρ)
+function _georangerate(coeffs::Vector{T}, ρ::S) where {T, S <: Real}
+    ρ0 = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / coeffs[3]))
+    !(0 < ρ <= ρ0) && return Vector{T}(undef, 0)
+    a, b, c = _argeoenergycoeffs(coeffs, ρ)
     d = b^2 - 4*a*c
-    @assert d > 0 "Less than two solutions, use rangerate(::AdmissibleRegion, ::Real) instead"
+    # The number of solutions depends on the discriminant
+    if d > 0
+        return [-sqrt(arG(coeffs, ρ)), sqrt(arG(coeffs, ρ))]
+    elseif d == 0
+        return zero(T) * arG(coeffs, ρ)
+    else
+        return Vector{T}(undef, 0)
+    end
+end
+
+function rangerate(A::AdmissibleRegion{T}, ρ::S, m::Symbol,
+                   boundary::Symbol = :outer) where {T, S <: Real}
+    if boundary == :outer
+        return _helrangerate(A.coeffs, A.a_max, ρ, m)
+    elseif boundary == :inner
+        return _georangerate(A.coeffs, ρ, m)
+    else
+        throw(ArgumentError("Argument `boundary` must be either `:outer` or `:inner`"))
+    end
+end
+
+function _helrangerate(coeffs::Vector{T}, a_max::T, ρ::T, m::Symbol) where {T <: Real}
+    a, b, c = _arhelenergycoeffs(coeffs, a_max, ρ)
+    d = b^2 - 4*a*c
+    @assert d > 0 "Less than two solutions, use rangerate(::AdmissibleRegion, ::Real, :outer) instead"
     # Choose min or max solution
     if m == :min
         return (-b - sqrt(d))/(2a)
     elseif m == :max
         return (-b + sqrt(d))/(2a)
     else
-        return T(NaN)
+        throw(ArgumentError("Argument `m` must be either `:min` or `:max`"))
     end
 end
-rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol) where {T <: Real} = rangerate(A.coeffs, A.a_max, ρ, m)
+
+function _georangerate(coeffs::Vector{T}, ρ::T, m::Symbol) where {T <: Real}
+    ρ0 = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / coeffs[3]))
+    @assert 0 < ρ <= ρ0 "No solutions for geocentric energy outside 0 < ρ <= ρ0"
+    a, b, c = _argeoenergycoeffs(coeffs, ρ)
+    d = b^2 - 4*a*c
+    @assert d > 0 "Less than two solutions, use rangerate(::AdmissibleRegion, ::Real, :inner) instead"
+    # Choose min or max solution
+    if m == :min
+        return -sqrt(arG(coeffs, ρ))
+    elseif m == :max
+        return sqrt(arG(coeffs, ρ))
+    else
+        throw(ArgumentError("Argument `m` must be either `:min` or `:max`"))
+    end
+end
 
 @doc raw"""
     argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
