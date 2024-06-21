@@ -141,7 +141,8 @@ using NEOs: NEOSolution, numberofdays
 
     @testset "Admissible region" begin
         using NEOs: AdmissibleRegion, reduce_tracklets, arenergydis, rangerate,
-                    rangerates, argoldensearch, arboundary
+                    rangerates, argoldensearch, arboundary, R_SI, k_gauss, μ_ES,
+                    topo2bary, bary2topo
 
         # Fetch optical astrometry
         radec = fetch_radec_mpc("designation" => "2024 BX1")
@@ -153,20 +154,34 @@ using NEOs: NEOSolution, numberofdays
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by May 27, 2024
+        # Values by June 21, 2024
 
+        # Zero AdmissibleRegion
+        @test iszero(zero(AdmissibleRegion{Float64}))
         # Custom print
         @test string(A) == "AE: [116.61547, 45.39840, -3.21667, 5.76667] t: 2024-01-20T21:50:15.360 obs: GINOP-KHK, Piszkesteto"
+        # Coefficients
+        @test length(A.coeffs) == 6
+        @test A.coeffs[3] == A.v_α^2 * cos(A.δ)^2 + A.v_δ^2  # proper motion squared
         # Energy discriminant
-        @test arenergydis(A, A.ρ_domain[1]) > 0
-        @test arenergydis(A, A.ρ_domain[2]) ≈ 0 atol = 1e-18
-        @test arenergydis(A, A.ρ_domain[2] + 1.0) < 0
+        @test arenergydis(A, A.ρ_domain[1], :outer) > 0
+        @test arenergydis(A, A.ρ_domain[1], :inner) > 0
+        @test arenergydis(A, A.ρ_domain[2], :outer) ≈ 0 atol = 1e-18
+        ρ0 = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / A.coeffs[3]))
+        @test arenergydis(A, ρ0, :inner) ≈ 0 atol = 1e-18
+        @test arenergydis(A, A.ρ_domain[2] + 1.0, :outer) < 0
+        @test arenergydis(A, ρ0 + 1.0, :inner) < 0
         # Range-rate
-        @test rangerates(A, A.ρ_domain[1]) == A.v_ρ_domain
-        @test minimum(rangerates(A, A.ρ_domain[2])) == A.Fs[3, 2]
-        @test length(rangerates(A, A.ρ_domain[2] + 1.0)) == 0
-        @test rangerate(A, A.ρ_domain[1], :min) == A.v_ρ_domain[1]
-        @test rangerate(A, A.ρ_domain[1], :max) == A.v_ρ_domain[2]
+        @test rangerates(A, A.ρ_domain[1], :outer) == A.v_ρ_domain
+        a, b = rangerates(A, A.ρ_domain[1], :inner)
+        @test a ≈ -b atol = 1e-18
+        @test minimum(rangerates(A, A.ρ_domain[2], :outer)) == A.Fs[3, 2]
+        @test isempty(rangerates(A, ρ0, :inner))
+        @test isempty(rangerates(A, A.ρ_domain[2] + 1.0, :outer))
+        @test isempty(rangerates(A, ρ0 + 1.0, :inner))
+        @test rangerate(A, A.ρ_domain[1], :min, :outer) == A.v_ρ_domain[1]
+        @test rangerate(A, A.ρ_domain[1], :max, :outer) == A.v_ρ_domain[2]
+        @test rangerate(A, A.ρ_domain[1], :min, :inner) ≈ -rangerate(A, A.ρ_domain[1], :max, :inner) atol = 1e-18
         # Golden section search
         ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :min, :outer, 1e-20)
         @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
@@ -174,16 +189,31 @@ using NEOs: NEOSolution, numberofdays
         ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :max, :outer, 1e-20)
         @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
         @test v_ρ ≥ A.v_ρ_domain[2]
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain[1], ρ0, :min, :inner, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test A.v_ρ_domain[1] ≤ v_ρ ≤ A.v_ρ_domain[2]
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain[1], ρ0, :max, :inner, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test A.v_ρ_domain[1] ≤ v_ρ ≤ A.v_ρ_domain[2]
         # Boundary
-        @test norm(arboundary(A, 0.0) - A.Fs[1, :]) == 0.0
-        @test norm(arboundary(A, 1.0) - A.Fs[2, :]) < 1.0e-17
-        @test norm(arboundary(A, 2.0) - A.Fs[3, :]) < 1e-9
-        @test norm(arboundary(A, 3.0) - A.Fs[1, :]) < 1e-17
+        @test norm(arboundary(A, 0.0, :outer) - A.Fs[1, :]) == 0.0
+        @test norm(arboundary(A, 1.0, :outer) - A.Fs[2, :]) < 1.0e-17
+        @test norm(arboundary(A, 2.0, :outer) - A.Fs[3, :]) < 1e-9
+        @test norm(arboundary(A, 3.0, :outer) - A.Fs[1, :]) < 1e-17
+        I0 = arboundary(A, 0.0, :inner)
+        I1 = arboundary(A, 1.0, :inner)
+        I2 = arboundary(A, 2.0, :inner)
+        @test I0[1] ≈ I2[1] atol = 1e-18
+        @test I0[2] ≈ -I2[2] atol = 1e-18
+        @test I1[1] ≈ ρ0 atol = 1e-18
+        @test I1[2] ≈ 0.0 atol = 1e-10
         # In
         @test A.Fs[1, :] in A
         @test A.Fs[2, :] in A
         @test A.Fs[3, :] in A
         @test [sum(A.ρ_domain), sum(A.v_ρ_domain)] / 2 in A
+        # Topocentric to barycentric conversion
+        @test norm(bary2topo(A, topo2bary(A, A.Fs[3, :]...)) .- A.Fs[3, :]) < 8e-6
         # Curvature
         C, Γ_C = curvature(radec)
         σ_C = sqrt.(diag(Γ_C))
