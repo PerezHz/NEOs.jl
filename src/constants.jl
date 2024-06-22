@@ -203,4 +203,6 @@ const k_gauss = 0.017_202_098_95
 # Earth's sphere of influence radius [AU]
 const R_SI = 0.010044
 # Earth's physical radius [AU]
-const R_EA = 4.2e-5
+const R_EA = 4.24e-5
+# Ratio between the mass of the Earth and the mass of the Sun
+const μ_ES = PE.μ[ea] / PE.μ[su] # 1 / 328_900.5614
