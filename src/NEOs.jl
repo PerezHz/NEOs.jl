@@ -75,7 +75,7 @@ export gauss_method, gaussinitcond
 # Orbit determination
 export curvature, issinglearc, isgauss, orbitdetermination
 # B plane
-export valsecchi_circle, bopik
+export valsecchi_circle, bopik, mtp
 # Outlier rejection
 export outlier_rejection
 
