@@ -5,6 +5,7 @@ testfiles = (
     "observations.jl",
     "propagation.jl",
     "orbitdetermination.jl",
+    "bplane.jl",
     "dataframes.jl",
     "aqua.jl",
     )

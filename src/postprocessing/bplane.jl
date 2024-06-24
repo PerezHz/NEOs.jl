@@ -207,3 +207,34 @@ function valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6, a_pl=1.0
 
     return R0, D0
 end
+
+@doc raw"""
+    mtp(xae::Vector{U}) where {U <: Number}
+
+Return the cartesian coordinates [Earth radii] on the modified
+target plane of an asteroid's close approach with the Earth.
+
+# Arguments
+
+- `xae::Vector{U}`: asteroid's geocentric position/velocity
+   vector at close approach [au, au/day].
+
+!!! reference
+    See equations (43)-(44) in page 15 of https://doi.org/10.1007/s10569-019-9914-4.
+"""
+function mtp(xae::Vector{U}) where {U <: Number}
+    # Unfold geocentric position and velocity
+    r, v = xae[1:3], xae[4:6]
+    # Reference direction
+    V = [0, 0, -1]
+    # Unit vectors
+    ez = v ./ euclid3D(v)
+    _ey_ = cross(V, ez)
+    ey = _ey_ ./ euclid3D(_ey_)
+    ex = cross(ey, ez)
+    # Cartesian coordinates [Earth radii]
+    X = dot3D(r, ex)*au/RE
+    Y = dot3D(r, ey)*au/RE
+
+    return X, Y
+end

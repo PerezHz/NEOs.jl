@@ -1,4 +1,4 @@
-include("b_plane.jl")
+include("bplane.jl")
 
 @doc raw"""
     residual_norm(x::OpticalResidual{T, T}) where {T <: Real}
