@@ -88,7 +88,7 @@ Compute an orbit via Jet Transport Least Squares.
 - `dynamics::D`: dynamical model.
 """
 function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V, q::Vector{TaylorN{T}},
-              i::Int, params::NEOParameters{T}; dynamics::D = newtonian!) where {D, T <: Real, V <: Number}
+              i::Int, params::NEOParameters{T}; dynamics::D = newtonian!, outrej::Bool = false) where {D, T <: Real, V <: Number}
     # Plain initial condition
     q0 = constant_term.(q)
     # JT tail
@@ -120,12 +120,12 @@ function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V
         bwd, fwd = propres!(res, radec, jd0, q, params; buffer, dynamics)
         iszero(length(res)) && break
         # Orbit fit
-        fit = tryls(res[rin], x0, params.newtoniter)
+        fit = tryls(res[rin], x0, params.newtoniter; outrej)
         !fit.success && break
         # Incrementally add observations to fit
         while !isempty(tout)
             extra = indices(tout[1])
-            fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter)
+            fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter; outrej)
             !fit_new.success && break
             fit = fit_new
             tracklet = popfirst!(tout)
@@ -207,7 +207,7 @@ Initial Orbit Determination (IOD) routine.
     This function will change the (global) `TaylorSeries` variables.
 """
 function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
-                            dynamics::D = newtonian!) where {T <: Real, D}
+                            dynamics::D = newtonian!, outrej::Bool = false) where {T <: Real, D}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
     # Eliminate observatories without coordinates
@@ -250,7 +250,7 @@ Fit `sol` to `radec` via Jet Transport Least Squares.
     This function will change the (global) `TaylorSeries` variables.
 """
 function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::NEOParameters{T};
-                            dynamics::D = newtonian!) where {T <: Real, D}
+                            dynamics::D = newtonian!, outrej::Bool = false) where {T <: Real, D}
     # Reduce tracklets by polynomial regression
     tracklets = reduce_tracklets(radec)
     # Reference epoch [julian days]
@@ -265,5 +265,5 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
     q = q0 + dq
     # Jet Transport Least Squares
     _, i = findmin(tracklet -> abs(datetime2days(tracklet.date) - sol.bwd.t0), tracklets)
-    return jtls(radec, tracklets, jd0, q, i, params; dynamics)
+    return jtls(radec, tracklets, jd0, q, i, params; dynamics, outrej)
 end
