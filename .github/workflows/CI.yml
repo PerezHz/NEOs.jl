@@ -33,6 +33,8 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v1
+      - run: julia --project=. -e 'import Pkg; Pkg.add(url="https://github.com/PerezHz/TaylorSeries.jl", rev="jp/inplace-sqr!"); Pkg.instantiate()'
+      - run: julia --project=. -e 'import Pkg; Pkg.add(url="https://github.com/PerezHz/TaylorIntegration.jl", rev="jp/ts-pr-361"); Pkg.instantiate()'
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         env:
