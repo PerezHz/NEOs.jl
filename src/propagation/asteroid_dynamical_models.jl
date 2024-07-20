@@ -89,7 +89,7 @@ To improve performance, some internal loops are multi-threaded via `Threads.thre
 See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
 """ RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
 
-@taylorize function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
+function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     # Julian date of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
@@ -663,7 +663,7 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
     nothing
 end
 
-@taylorize function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
+function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     # Julian date of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
@@ -1199,7 +1199,7 @@ end
     nothing
 end
 
-@taylorize function newtonian!(dq, q, params, t)
+function newtonian!(dq, q, params, t)
     # Julian date of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
