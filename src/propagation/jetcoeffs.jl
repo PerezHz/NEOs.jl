@@ -1293,7 +1293,7 @@ function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
         TaylorSeries.identity!(dq[7], zero_q_1, ord)
         TaylorSeries.identity!(dq[8], zero_q_1, ord)
         for __idx = eachindex(q)
-            TaylorIntegration.diffeq!(q[__idx], dq[__idx], ordnext)
+            TaylorIntegration.solcoeff!(q[__idx], dq[__idx], ordnext)
         end
     end
     return nothing
@@ -2428,7 +2428,7 @@ function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, 
         TaylorSeries.add!(dq[5], postNewtonY, accY, ord)
         TaylorSeries.add!(dq[6], postNewtonZ, accZ, ord)
         for __idx = eachindex(q)
-            TaylorIntegration.diffeq!(q[__idx], dq[__idx], ordnext)
+            TaylorIntegration.solcoeff!(q[__idx], dq[__idx], ordnext)
         end
     end
     return nothing
@@ -2597,7 +2597,7 @@ function TaylorIntegration.jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T}, q::Abst
         TaylorSeries.identity!(dq[5], accY, ord)
         TaylorSeries.identity!(dq[6], accZ, ord)
         for __idx = eachindex(q)
-            TaylorIntegration.diffeq!(q[__idx], dq[__idx], ordnext)
+            TaylorIntegration.solcoeff!(q[__idx], dq[__idx], ordnext)
         end
     end
     return nothing
