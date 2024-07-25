@@ -228,7 +228,7 @@ using NEOs: src_path
         object = objects[1]
         # Check NEOCPObject fields
         @test 0 <= object.score <= 100
-        @test object.date >= Date(2024)
+        @test object.date >= today() - Month(3)
         @test 0 <= object.α <= 2π
         @test -π <= object.δ <= π
         @test object.nobs > 0
