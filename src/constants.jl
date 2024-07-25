@@ -143,6 +143,11 @@ const search_mpc_url = "https://www.minorplanetcenter.net/db_search/show_object?
 # MPC observations url
 const obs_mpc_url = "https://www.minorplanetcenter.net/tmp2/"
 
+# NEO Confirmation Page File URL
+const NEOCP_FILE_URL = "https://www.minorplanetcenter.net/Extended_Files/neocp.json"
+# NEO Confirmation Page Show Orbits URL
+const NEOCP_SHOWORBS_URL = "https://cgi.minorplanetcenter.net/cgi-bin/showobsorbs.cgi"
+
 # Abbreviations
 const cte = constant_term
 
