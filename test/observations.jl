@@ -218,6 +218,37 @@ using NEOs: src_path
         @test source_radar == check_radar
     end
 
+    @testset "NEOCPObject" begin
+        using NEOs: NEOCPObject
+
+        # Fetch current NEOCP list
+        objects = fetch_objects_neocp()
+        @test isa(objects, Vector{NEOCPObject{Float64}})
+        # Pick the first object
+        object = objects[1]
+        # Check NEOCPObject fields
+        @test 0 <= object.score <= 100
+        @test object.date >= Date(2024)
+        @test 0 <= object.α <= 2π
+        @test -π <= object.δ <= π
+        @test object.nobs > 0
+        @test object.arc > 0
+        @test object.notseen > 0
+        # Check optical astrometry
+        filename = get_radec_neocp(object.tmpdesig)
+        @test isfile(filename)
+        radec1 = read_radec_mpc(filename)
+        radec2 = fetch_radec_neocp(object.tmpdesig)
+        rm(filename)
+        @test length(radec1) == length(radec2) == object.nobs
+        @test radec1 == radec2
+        @test (now(UTC) - date(radec1[end])).value / 86_400_000 >= object.notseen
+        # Check orbits
+        filename = get_orbits_neocp(object.tmpdesig)
+        @test isfile(filename)
+        rm(filename)
+    end
+
     @testset "Topocentric" begin
         using NEOs: TimeOfDay, sunriseset, obsposECEF, obsposvelECI
 
