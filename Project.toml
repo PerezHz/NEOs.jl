@@ -41,7 +41,7 @@ NEOsRecipesBaseExt = "RecipesBase"
 
 [compat]
 Artifacts = "1"
-AutoHashEquals = "0.2"
+AutoHashEquals = "2"
 Clustering = "0.15"
 DataFrames = "1.5"
 Dates = "1"

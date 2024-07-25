@@ -8,11 +8,11 @@ import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to
 import JLD2: writeas
 import PlanetaryEphemeris as PE
 
-using Dates, InteractiveUtils, LazyArtifacts, LinearAlgebra, Printf
+using Dates, InteractiveUtils, LazyArtifacts, LinearAlgebra, Printf, JSON,
+      TaylorSeries, SatelliteToolboxTransformations, TaylorIntegration,
+      SPICE, JLD2, Scratch
+using AutoHashEquals.Compat
 using Downloads: download
-
-using AutoHashEquals, JSON, TaylorSeries, SatelliteToolboxTransformations,
-        TaylorIntegration, SPICE, JLD2, Scratch
 using DelimitedFiles: readdlm
 using HTTP: get
 using DataFrames: DataFrame, nrow, eachcol, eachrow, groupby, combine, AbstractDataFrame,
