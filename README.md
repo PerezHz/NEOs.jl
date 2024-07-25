@@ -50,8 +50,8 @@ The `--help` option can be passed to see a list of the customizable settings
 
 ## Acknowledgments
 
-We acknowledge financial support from UNAM-PAPIIT grant IG100819 and computing
-resources provided by LANCAD-UNAM-DGTIC-284.
+We acknowledge financial support from UNAM-PAPIIT grant IG100819 and IG-101122, as well as
+computing resources provided by LANCAD-UNAM-DGTIC-284.
 
 ## References
 

@@ -174,7 +174,8 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     # Compute optical residuals
     _res_radec_all_ = NEOs.residuals(radec; xvs, xve, xva)
-    res_radec_all, w_radec_all = NEOs.unfold(_res_radec_all_)
+    res_radec_all = vcat(ra.(_res_radec_all_), dec.(_res_radec_all_))
+    w_radec_all = vcat(NEOs.weight_ra.(_res_radec_all_), NEOs.weight_dec.(_res_radec_all_))
     jldsave("Apophis_res_w_radec.jld2"; res_radec_all, w_radec_all)
     # JLD2.@load "Apophis_res_w_radec.jld2"
 
@@ -315,34 +316,25 @@ end
 main()
 
 #=
--0.18034827489412805
-0.9406910783153754
-0.3457360118643932
--0.016265940057745887
-4.3915296805381036e-5
--0.0003952032399008921
--2.883842658925719e-14
--1.6977850502837174e-11
 
+-------------------------------------------
+Orbital fit (8-DOF) and post-fit statistics
+-------------------------------------------
+Success flag                                                      : true
 
-6.991681792970175e-9
-3.3210758500485412e-9
-8.763895947794195e-9
-5.485729074188412e-11
-9.846074910774499e-11
-1.3782767177665416e-10
-2.525644870489942e-16
-3.2193289354129716e-12
+Nominal solution             [au,au,au,au/d,au/d,au/d,au/d²,au/d²]: [-0.18034828622346125, 0.9406910608119038, 0.3457359932214514, -0.016265939805525164, 4.391544636410236e-5, -0.0003952039822339096, -2.896550687129415e-14, -1.5011319558647063e-12]
 
-Normalized RMS (optical-only)               [adimensional] : 0.4365429773707507
-Normalized RMS (radar-only)                 [adimensional] : 0.5421268387032326
-Normalized RMS (combined optical and radar) [adimensional] : 0.43685679642513925
+1-sigma formal uncertainties [au,au,au,au/d,au/d,au/d,au/d²,au/d²]: [7.522277360679153e-9, 3.7547259770966045e-9, 9.096743308039497e-9, 6.346434914996555e-11, 1.0762531180011292e-10, 1.580979737654542e-10, 2.544033371139113e-16, 3.725915388120534e-12]
 
-Mean weighted right-ascension residual      [arcseconds]   : -0.002787272519210798
-Mean weighted declination residual          [arcseconds]   : -0.003376099885054764
-Mean weighted time-delay residual           [micro-seconds]: -0.0007329351962194035
-Mean weighted Doppler-shift residual        [Hz]           : -0.03025601266756564
+Normalized RMS (optical-only)               [adimensional] : 0.30549172657075424
+Normalized RMS (radar-only)                 [adimensional] : 0.385277474183109
+Normalized RMS (combined optical and radar) [adimensional] : 0.3057761154935544
 
-Chi-squared statistic (χ²):                 [adimensional] : 3597.4067719864497
+Mean weighted right-ascension residual      [arcseconds]   : 0.005110153471993271
+Mean weighted declination residual          [arcseconds]   : 0.002302710631094392
+Mean weighted time-delay residual           [micro-seconds]: -0.0003549002632851624
+Mean weighted Doppler-shift residual        [Hz]           : -0.030969304310627062
+
+Chi-squared statistic (χ²):                 [adimensional] : 1482.1466680459037
 
 =#
