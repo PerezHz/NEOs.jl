@@ -179,9 +179,11 @@ function _propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, buffer::Propag
     buffer.dx .= Taylor1.( zero.(q0), order)
     buffer.params.jd0 = jd0
     # Propagate orbit
-    @time tv, xv, psol = _taylorinteg!(dynamics, buffer.t, buffer.x, buffer.dx, buffer.q0, zero(T),
-                                       tspan * yr, params.abstol, buffer.rv, Val(true), buffer.params;
+    @time sol = _taylorinteg!(Val(true), dynamics, buffer.t, buffer.x, buffer.dx, buffer.q0, zero(T),
+                                       tspan * yr, params.abstol, buffer.rv, buffer.params;
                                        maxsteps = params.maxsteps)
+    # de-struct TaylorSolution
+    tv, xv, psol = sol.t, sol.x, sol.p
     # Output
     if issorted(tv) || issorted(tv, rev = true)
         # Epoch (plain)
@@ -239,10 +241,12 @@ function _propagate_root(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, buffer::P
     buffer.dx .= Taylor1.( zero.(q0), order)
     buffer.params.jd0 = jd0
     # Propagate orbit
-    @time tv, xv, psol, tvS, xvS, gvS = _taylorinteg!(dynamics, rvelea, buffer.t, buffer.x, buffer.dx,
-          buffer.q0, zero(T), tspan * yr, params.abstol, buffer.rv, Val(true), buffer.params;
+    @time sol = _taylorinteg!(Val(true), dynamics, rvelea, buffer.t, buffer.x, buffer.dx,
+          buffer.q0, zero(T), tspan * yr, params.abstol, buffer.rv, buffer.params;
           maxsteps = params.maxsteps, eventorder = eventorder, newtoniter = newtoniter,
           nrabstol = nrabstol)
+    # de-struct TaylorSolution
+    tv, xv, psol, tvS, xvS, gvS = sol.t, sol.x, sol.p, sol.tevents, sol.xevents, sol.gresids
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
