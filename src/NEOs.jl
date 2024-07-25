@@ -44,6 +44,8 @@ export ra, dec, date, observatory, read_radec_mpc, write_radec_mpc, get_radec_mp
        fetch_radec_mpc
 # RadarJPL
 export hasdelay, hasdoppler, delay, doppler, rcvr, xmit, read_radar_jpl, write_radar_jpl
+# NEOCPObject
+export fetch_objects_neocp, get_radec_neocp, fetch_radec_neocp, get_orbits_neocp
 # Units
 export julian2etsecs, etsecs2julian, datetime2et, et_to_200X, days_to_200X, datetime_to_200X,
        datetime2days, days2datetime, rad2arcsec, arcsec2rad, mas2rad
