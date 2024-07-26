@@ -52,7 +52,7 @@ end
 @doc raw"""
     carpino_smoothing(n::T) where {T <: Real}
 
-Fudge term for rejection condition in [`outlier_rejection`](@ref).
+Fudge term for rejection condition in [`ls_outrej_carpino03`](@ref).
 
 !!! reference
     See page 253 of https://doi.org/10.1016/S0019-1035(03)00051-4.
@@ -60,10 +60,11 @@ Fudge term for rejection condition in [`outlier_rejection`](@ref).
 carpino_smoothing(n::T) where {T <: Real} = 400*(1.2)^(-n)
 
 @doc raw"""
-    outlier_rejection(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, fit::LeastSquaresFit{T};
+    ls_outrej_carpino03(ξs::Vector{OpticalResidual{T, TaylorN{T}}}, fit::LeastSquaresFit{T};
                       χ2_rec::T = 7.0, χ2_rej::T = 8.0, α::T = 0.25, max_per::T = 10.) where {T <: Real}
 
-Outlier rejection algorithm.
+Internal method to reject outliers during least-squares iterations. Returns
+a copy of vector of `OpticalResidual`s `ξs` with updated outlier flags (out-of-place operation).
 
 # Arguments
 
@@ -77,13 +78,13 @@ Outlier rejection algorithm.
 !!! reference
     See https://doi.org/10.1016/S0019-1035(03)00051-4.
 """
-function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::LeastSquaresFit{T};
+function ls_outrej_carpino03(res::Vector{OpticalResidual{T, TaylorN{T}}}, x::Vector{T}, Γ::Matrix{T};
                            χ2_rec::T = 7., χ2_rej::T = 8., α::T = 0.25, max_per::T = 10.) where {T <: Real}
 
     # Number of residuals
     L = length(res)
     # Evaluate residuals
-    eval_res = res(fit.x)
+    eval_res = res(x)
     # Vector of χ2
     χ2s = Vector{T}(undef, L)
     # Maximum χ2 (over non outliers)
@@ -96,13 +97,13 @@ function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::Lea
         # Weights of current residual
         w_α, w_δ = res[i].w_α / res[i].relax_factor, res[i].w_δ / res[i].relax_factor
         # Current observation covariance matrix
-        γ = [w_α zero(T); zero(T) w_δ]
+        γ = diagm([inv(w_α), inv(w_δ)])
         # Current model matrix
-        A = hcat(TS.gradient(res[i].ξ_α)(fit.x), TS.gradient(res[i].ξ_δ)(fit.x))
+        A = hcat(TS.gradient(res[i].ξ_α)(x), TS.gradient(res[i].ξ_δ)(x))
         # Outlier sign
         outlier_sign = res[i].outlier*2-1
         # Current residual covariance matrix
-        γ_ξ = γ + outlier_sign*(A')*fit.Γ*A
+        γ_ξ = γ + outlier_sign*(A')*Γ*A
         # Current residual
         ξ = [eval_res[i].ξ_α, eval_res[i].ξ_δ]
         # Current chi2
@@ -137,8 +138,9 @@ function outlier_rejection(res::Vector{OpticalResidual{T, TaylorN{T}}}, fit::Lea
         end
     end
 
-    return OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
-                            relax_factor.(res), new_outliers)
+    res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
+            relax_factor.(res), new_outliers)
+    return res
 end
 
 @doc raw"""
@@ -404,12 +406,10 @@ function diffcorr(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     C = C_mat(x_new)
     # Covariance matrix
     Γ = inv(C[idxs, idxs])
+    # success flag
+    success = all(diag(Γ) .≥ 0)
 
-    if any(diag(Γ) .< 0)
-        return LeastSquaresFit(false, x_new, Γ, :diffcorr)
-    else
-        return LeastSquaresFit(true, x_new, Γ, :diffcorr)
-    end
+    return LeastSquaresFit(success, x_new, Γ, :diffcorr)
 end
 
 function diffcorr(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
@@ -424,7 +424,7 @@ end
     newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
              niters::Int = 5) where {T <: Real}
     newtonls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
-             niters::Int = 5) where {T <: Real}
+             niters::Int = 5; outrej::Bool = false) where {T <: Real}
 
 Newton method subroutine for least-squares fitting. Returns an `LeastSquaresFit`
 with the `niters`-th iteration
@@ -454,13 +454,11 @@ See also [`chi2`](@ref).
     See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
 """
 function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
-                  niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
-    # Number of observations
-    nobs = length(res)
+        niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
     # Degrees of freedom
     npar = length(x0)
-    # Mean square residual
-    Q = chi2(res, w)/nobs
+    # target function
+    Q = chi2(res, w)
     # Vector of x
     x = Matrix{T}(undef, npar, niters + 1)
     # First guess
@@ -484,15 +482,15 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
         # New x
         x[idxs, i+1] = xi[idxs] + Δx
         # Normal matrix
-        C = d2Q/(2/nobs) # C = d2Q/(2/m)
-        # Error
+        C = d2Q/2
+        # Covariance matrix
+        Γ = inv(C[idxs, idxs])
+        # error^2
         error2 = ( (Δx') * (C*Δx) ) / npar
-        if error2 ≥ 0
-            error[i+1] = sqrt(error2)
-        # The method do not converge
-        else
-            return LeastSquaresFit(false, x[:, i+1], inv(C), :newton)
-        end
+        # Handle case: method did not converge
+        (error2 ≥ 0) || return LeastSquaresFit(false, x[:, i+1], Γ, :newton)
+        # error = sqrt(error^2)
+        error[i+1] = sqrt(error2)
     end
     # TO DO: study Gauss method solution dependence on jt order
     # TO DO: try even varorder
@@ -503,15 +501,13 @@ function newtonls(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T},
     # x with the lowest error
     x_new = x[:, i]
     # Normal matrix
-    C = TaylorSeries.hessian(Q, x_new)/(2/nobs) # C = d2Q/(2/m)
+    C = TaylorSeries.hessian(Q, x_new)/2 # C = d2Q/2
     # Covariance matrix
     Γ = inv(C[idxs, idxs])
+    # Success flag
+    success = all( diag(Γ) .≥ zero(T) )
 
-    if any(diag(Γ) .< 0)
-        return LeastSquaresFit(false, x_new, Γ, :newton)
-    else
-        return LeastSquaresFit(true, x_new, Γ, :newton)
-    end
+    return LeastSquaresFit(success, x_new, Γ, :newton)
 end
 
 function newtonls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
@@ -520,6 +516,76 @@ function newtonls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
     _res_, _w_ = unfold(res)
 
     return newtonls(_res_, _w_, x0, niters, idxs)
+end
+
+function newtonls_outrej(voptres::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+                  niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0); outrej::Bool = false) where {T <: Real}
+    # Unfold residuals and weights
+    res, w = unfold(voptres)
+    # a priori outliers
+    outliers = outlier.(voptres)
+
+    # Degrees of freedom
+    npar = length(x0)
+    # target function
+    Q = chi2(res, w)
+    # Vector of x
+    x = Matrix{T}(undef, npar, niters + 1)
+    # First guess
+    for i in axes(x, 2)
+        x[:, i] .= x0
+    end
+    # Vector of errors
+    error = Vector{T}(undef, niters + 1)
+    # Error of first guess
+    error[1] = T(Inf)
+    # Iteration
+    for i in 1:niters
+        # Current x
+        xi = x[:, i]
+        # Gradient of Q with respect to x
+        dQ = TaylorSeries.gradient(Q)(xi)[idxs]
+        # Hessian of Q with respect to x
+        d2Q = TaylorSeries.hessian(Q, xi)[idxs, idxs]
+        # Newton update rule
+        Δx = - inv(d2Q)*dQ
+        # New x
+        x[idxs, i+1] = xi[idxs] + Δx
+        # Normal matrix
+        C = d2Q/2
+        # Covariance matrix
+        Γ = inv(C[idxs, idxs])
+        # error^2
+        error2 = ( (Δx') * (C*Δx) ) / npar
+        # Handle case: method did not converge
+        (error2 ≥ 0) || return LeastSquaresFit(false, x[:, i+1], Γ, :newton), outliers
+        # error = sqrt(error^2)
+        error[i+1] = sqrt(error2)
+        # outlier rejection
+        if outrej
+            voptres = ls_outrej_carpino03(voptres, x[idxs, i+1], Γ)
+            outliers = outlier.(voptres)
+        end
+        # update target function
+        inliers = repeat((@. !outliers), 2)
+        Q = chi2(res[inliers], w[inliers])
+    end
+    # TO DO: study Gauss method solution dependence on jt order
+    # TO DO: try even varorder
+    # TO DO: study optimal number of iterations
+
+    # Index with the lowest error
+    i = argmin(error)
+    # x with the lowest error
+    x_new = x[:, i]
+    # Normal matrix
+    C = TaylorSeries.hessian(Q, x_new)/2 # C = d2Q/2
+    # Covariance matrix
+    Γ = inv(C[idxs, idxs])
+    # Success flag
+    success = all( diag(Γ) .≥ zero(T) )
+
+    return LeastSquaresFit(success, x_new, Γ, :newton), outliers
 end
 
 # In-place Levenberg-Marquardt hessian
@@ -624,12 +690,10 @@ function levenbergmarquardt(res::Vector{TaylorN{T}}, w::Vector{T}, x0::Vector{T}
     end
     # Covariance matrix
     Γ = inv(C[idxs, idxs])
+    # success flag
+    success = all(diag(Γ) .≥ zero(T))
 
-    if any(diag(Γ) .< 0)
-        return LeastSquaresFit(false, x_new, Γ, :lm)
-    else
-        return LeastSquaresFit(true, x_new, Γ, :lm)
-    end
+    return LeastSquaresFit(success, x_new, Γ, :lm)
 end
 
 function levenbergmarquardt(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
@@ -656,13 +720,18 @@ Return the best least squares fit between three routines: [`newtonls`](@ref),
 """
 function tryls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
                niters::Int = 5, idxs::AbstractVector{Int} = eachindex(x0),
-               order::Vector{Symbol} = [:newton, :diffcorr, :lm]) where {T <: Real}
+               order::Vector{Symbol} = [:newton, :diffcorr, :lm];
+               outrej::Bool = false) where {T <: Real}
     # Allocate memory
     fit = zero(LeastSquaresFit{T})
     # Least squares methods in order
     for i in eachindex(order)
         if order[i] == :newton
-            fit = newtonls(res, x0, niters, idxs)
+            if outrej
+                fit, _ = newtonls_outrej(res, x0, niters, idxs; outrej)
+            else
+                fit = newtonls(res, x0, niters, idxs)
+            end
         elseif order[i] == :diffcorr
             fit = diffcorr(res, x0, niters, idxs)
         elseif order[i] == :lm
@@ -672,149 +741,4 @@ function tryls(res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
     end
 
     return fit
-end
-
-# TO DO: update / deprecate the following three functions
-
-@doc raw"""
-    newtonls_Q(Q, nobs, x0, niters=5)
-
-Does the same as `newtonls`, but recives ``Q`` as an argument, instead of computing it.
-Returns the `niters`-th iteration and the covariance matrix ``\Gamma``.
-
-See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
-
-See also [`newtonls`](@ref).
-
-# Arguments
-
-- `Q`: Mean square residual.
-- `nobs`: Number of observations.
-- `x_0`: First guess for the initial conditions.
-- `niters`: Number of iterations.
-"""
-function newtonls_Q(Q, nobs, x0, niters=5)
-    # Number of observations
-    npar = length(x0)
-    # First guess
-    x_new = x0
-    # Iteration
-    for i in 1:niters
-        # Gradient of Q with respect to x_0
-        dQ = TaylorSeries.gradient(Q)(x_new)
-        # Hessian of Q with respect to x_0
-        d2Q = TaylorSeries.hessian(Q, x_new)
-        # Newton update rule
-        Δx = - inv(d2Q)*dQ
-        x_new = x_new + Δx
-        # Normal matrix
-        C = d2Q/(2/nobs) # C = d2Q/(2/m)
-        @show sqrt(((Δx')*(C*Δx))/npar)
-    end
-    # Normal matrix
-    C = TaylorSeries.hessian(Q, x_new)/(2/nobs) # C = d2Q/(2/m)
-    # Covariance matrix
-    Γ = inv(C)
-
-    return x_new, Γ
-end
-
-@doc raw"""
-    newtonls_6v(res, w, x0, niters=5)
-
-Specialized version of `newtonls` on 6 variables for parametrized orbit determination
-with respect to ``A_2`` Yarkovsky non-gravitational coefficient. Returns the `niters`-th
-iteration and the covariance matrix ``\Gamma``.
-
-See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
-
-See also [`newtonls`](@ref).
-
-# Arguments
-
-- `res`: Vector of residuals.
-- `w`: Vector of weights.
-- `x_0`: First guess for the initial conditions.
-- `niters`: Number of iterations.
-"""
-function newtonls_6v(res, w, x0, niters=5)
-    # Have as many residuals as weights
-    @assert length(res) == length(w)
-    # Number of observations
-    nobs = length(res)
-    # Degrees of freedom
-    npar = 6 # length(x0)
-    # Mean square residual
-    Q = chi2(res, w)/nobs
-    # First guess
-    x_new = x0
-    # Iteration
-    for i in 1:niters
-        # Gradient of Q with respect to x_0
-        dQ = TaylorSeries.gradient(Q)(x_new)[1:6]
-        # Hessian of Q with respect to x_0
-        d2Q = TaylorSeries.hessian(Q, x_new)[1:6,1:6]
-        # Newton update rule
-        Δx = - inv(d2Q)*dQ
-        x_new[1:6] = x_new[1:6] + Δx
-        # Normal matrix
-        C = d2Q/(2/nobs) # C = d2Q/(2/m)
-        @show sqrt(((Δx')*(C*Δx))/npar)
-    end
-    # Normal matrix
-    C = TaylorSeries.hessian(Q, x_new)/(2/nobs) # C = d2Q/(2/m)
-    # Covariance matrix
-    Γ = inv(C[1:6,1:6])
-
-    return x_new, Γ
-end
-
-@doc raw"""
-    newtonls_A2(res, w, x0, niters=5)
-
-Specialized version of `newtonls` with the Newton method only over the seventh degree of
-freedom, i.e., with respect to ``A_2`` Yarkovsky non-gravitational coefficient. Returns the
-`niters`-th iteration, the covariance matrix ``\Gamma`` and the normal matrix ``C``.
-
-See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
-
-See also [`newtonls`](@ref).
-
-# Arguments
-
-- `res`: Vector of residuals.
-- `w`: Vector of weights.
-- `x_0`: First guess for the initial conditions.
-- `niters`: Number of iterations.
-"""
-function newtonls_A2(res, w, x0, niters=5)
-    # Have as many residuals as weights
-    @assert length(res) == length(w)
-    # Number of observations
-    nobs = length(res)
-    # Degrees of freedom
-    npar = length(x0)
-    # Mean square residual
-    Q = chi2(res, w)/nobs
-    # First guess
-    x_new = x0
-    # Iteration
-    for i in 1:niters
-        # Gradient of Q with respect to x_0
-        dQ = TaylorSeries.gradient(Q)(x_new)
-        # Hessian of Q with respect to x_0
-        d2Q = TaylorSeries.hessian(Q, x_new)
-        # Newton update rule
-        Δx = - inv(d2Q)*dQ
-        x_new[7] = x_new[7] + Δx[7]
-        # Normal matrix
-        C = d2Q/(2/nobs) # C = d2Q/(2/m)
-        @show sqrt(((Δx')*(C*Δx))/npar)
-    end
-    # Normal matrix
-    C = TaylorSeries.hessian(Q, x_new)/(2/nobs) # C = d2Q/(2/m)
-    # Covariance matrix
-    Γ = inv(C)
-
-    return x_new, Γ, C
 end

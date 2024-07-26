@@ -176,7 +176,7 @@ using NEOs: NEOSolution, numberofdays
         a, b = rangerates(A, A.ρ_domain[1], :inner)
         @test a ≈ -b atol = 1e-18
         @test minimum(rangerates(A, A.ρ_domain[2], :outer)) == A.Fs[3, 2]
-        @test isempty(rangerates(A, ρ0, :inner))
+        @test isempty(rangerates(A, ρ0+100eps(ρ0), :inner))
         @test isempty(rangerates(A, A.ρ_domain[2] + 1.0, :outer))
         @test isempty(rangerates(A, ρ0 + 1.0, :inner))
         @test rangerate(A, A.ρ_domain[1], :min, :outer) == A.v_ρ_domain[1]
@@ -286,9 +286,11 @@ using NEOs: NEOSolution, numberofdays
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
 
         # Orbit Determination
-        sol = orbitdetermination(radec, params)
-        # Outlier rejection
-        sol = outlier_rejection(radec, sol, params)
+        _sol = orbitdetermination(radec, params)
+        # Outlier rejection: K-means clustering
+        sol = outlier_rejection(radec, _sol, params)
+        # Outlier rejection: Carpino et al. (2003)
+        sol_c03 = NEOs.outlier_rejection_carpino03(radec, _sol, params)
 
         # Values by May 31, 2024
 
@@ -297,37 +299,58 @@ using NEOs: NEOSolution, numberofdays
         @test numberofdays(radec) < 3.03
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
+        @test isa(sol_c03, NEOSolution{Float64, Float64})
         # Tracklets
         @test length(sol.tracklets) == 4
+        @test length(sol_c03.tracklets) == 4
         @test sol.tracklets[1].radec[1] == radec[1]
+        @test sol_c03.tracklets[1].radec[1] == radec[1]
         @test sol.tracklets[end].radec[end] == radec[end]
+        @test sol_c03.tracklets[end].radec[end] == radec[end]
         @test issorted(sol.tracklets)
+        @test issorted(sol_c03.tracklets)
         # Backward integration
         @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test datetime2days(date(radec[1])) > sol_c03.bwd.t0 + sol_c03.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
+        @test all( norm.(sol_c03.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
+        @test isempty(sol_c03.t_bwd) && isempty(sol_c03.x_bwd) && isempty(sol_c03.g_bwd)
         # Forward integration
         @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test datetime2days(date(radec[end])) < sol_c03.fwd.t0 + sol_c03.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
+        @test all( norm.(sol_c03.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
+        @test isempty(sol_c03.t_fwd) && isempty(sol_c03.x_fwd) && isempty(sol_c03.g_fwd)
         # Vector of residuals
-        @test length(sol.res) == 21
-        @test count(outlier.(sol.res)) == 2
+        @test length(sol.res) == length(sol_c03.res) == 21
+        @test count(outlier.(sol.res)) == count(outlier.(sol_c03.res)) == 2
+        @test findall(x->x, outlier.(sol.res)) == findall(x->x, outlier.(sol_c03.res)) == [17, 18]
         # Least squares fit
         @test sol.fit.success
+        @test sol_c03.fit.success
         @test all( sigmas(sol) .< 3e-4 )
+        @test all( sigmas(sol_c03) .< 3e-4 )
         @test all( snr(sol) .> 574)
+        @test all( snr(sol_c03) .> 574)
         @test nrms(sol) < 0.25
+        @test nrms(sol_c03) < 0.25
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
+        @test size(sol_c03.jacobian) == (6, 6)
         @test isdiag(sol.jacobian)
+        @test isdiag(sol_c03.jacobian)
         @test maximum(sol.jacobian) < 8e-7
+        @test maximum(sol_c03.jacobian) < 8e-7
         # Compatibility with JPL
         JPL = [0.7673449629397204, 0.6484776654615118, 0.2932277478785896,
                -0.011023192686652665, 0.015392823966811551, 0.0065288994881745974]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 7e-4)
+        @test all(abs.(sol_c03() - JPL) ./ sigmas(sol_c03) .< 7e-4)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 8
+        @test uncertaintyparameter(radec, sol_c03, params) == 8
     end
 
     @testset "Interesting NEOs" begin
@@ -398,6 +421,7 @@ using NEOs: NEOSolution, numberofdays
 
         # Observations with <1" weight
         idxs = findall(x -> w8sveres17(x) < 1, radec)
+        @test length(idxs) == 20
         # Restricted Orbit Determination
         sol = orbitdetermination(radec[idxs], params)
 

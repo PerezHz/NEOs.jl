@@ -154,3 +154,30 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
 
     return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, J))
 end
+
+function outlier_rejection_carpino03(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
+        params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
+    # Julian day to start propagation
+    jd0 = sol.bwd.t0 + PE.J2000
+    # Initial conditions (T)
+    q0 = sol(sol.bwd.t0)
+    # Scaling factors
+    scalings = abs.(q0) ./ 10^6
+    # Jet transport perturbation
+    dq = scaled_variables("δx", scalings; order = params.jtlsorder)
+    # Initial conditions (jet transport)
+    q = q0 .+ dq
+    # Propagation and residuals
+    bwd, fwd, res = propres(radec, jd0, q, params; dynamics)
+    # Origin
+    x0 = zeros(T, 6)
+    # Orbit fit
+    # fit = tryls(res, x0, params.newtoniter, outrej=true)
+    fit, new_outliers = newtonls_outrej(res, x0, params.newtoniter, outrej=true)
+    # Residuals space to barycentric coordinates jacobian
+    J = Matrix(TS.jacobian(dq))
+    # Update residuals
+    res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
+                           relax_factor.(res), new_outliers)
+    return evalfit(NEOSolution(sol.tracklets, bwd, fwd, res, fit, J))
+end

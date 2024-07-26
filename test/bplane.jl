@@ -8,7 +8,7 @@ using Test
 
 using NEOs: propres
 
-@testset "2018 LA" begin
+@testset "B-plane" begin
 
     # Fetch optical astrometry
     radec = fetch_radec_mpc("designation" => "2018 LA")
