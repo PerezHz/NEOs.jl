@@ -1,7 +1,7 @@
 name = "NEOs"
 uuid = "b41c07a2-2abb-11e9-070a-c3c1b239e7df"
 authors = ["Jorge A. Pérez Hernández", "Luis Benet", "Luis Eduardo Ramírez Montoya"]
-version = "0.8.9"
+version = "0.8.10"
 
 [deps]
 Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -41,7 +41,7 @@ NEOsRecipesBaseExt = "RecipesBase"
 
 [compat]
 Artifacts = "1"
-AutoHashEquals = "0.2"
+AutoHashEquals = "2"
 Clustering = "0.15"
 DataFrames = "1.5"
 Dates = "1"

@@ -19,7 +19,7 @@ An observatory in MPC format.
 !!! reference
     The format is described in https://minorplanetcenter.net/iau/lists/ObsCodesF.html.
 """
-struct ObservatoryMPC{T <: AbstractFloat}
+@auto_hash_equals fields = (code,) struct ObservatoryMPC{T <: AbstractFloat}
     code::String
     long::T
     cos::T
@@ -39,27 +39,6 @@ end
 function ObservatoryMPC(code::String, long::T, cos::T, sin::T, name::String, date::DateTime = DateTime(2000, 1, 1),
                         type::Symbol = :ground, units::Int = 0) where {T <: AbstractFloat}
     return ObservatoryMPC{T}(code, long, cos, sin, name, date, type, units)
-end
-
-# TO DO: This could be done with a more recent version of AutoHasEquals
-function Base.hash(x::ObservatoryMPC{T}, h::UInt) where {T <: AbstractFloat}
-    Base.hash(x.code, Base.hash(:(ObservatoryMPC{T}), h))
-end
-function Base.isequal(a::ObservatoryMPC{T}, b::ObservatoryMPC{T}) where {T <: AbstractFloat}
-    Base.isequal(a.code, b.code)
-end
-# Returns `false` if any two fields compare as false; otherwise, `missing` if at least
-# one comparison is missing. Otherwise `true`.
-# This matches the semantics of `==` for Tuple's and NamedTuple's.
-function Base.:(==)(a::ObservatoryMPC{T}, b::ObservatoryMPC{T}) where {T <: AbstractFloat}
-    found_missing = false
-    cmp = a.code == b.code
-    cmp === false && return false
-    if ismissing(cmp)
-        found_missing = true
-    end
-    found_missing && return missing
-    return true
 end
 
 @doc raw"""
