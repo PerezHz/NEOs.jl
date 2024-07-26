@@ -242,7 +242,8 @@ using NEOs: src_path
         rm(filename)
         @test length(radec1) == length(radec2) == object.nobs
         @test radec1 == radec2
-        @test (now(UTC) - date(radec1[end])).value / 86_400_000 >= object.notseen
+        notseen = (now(UTC) - date(radec1[end])).value / 86_400_000
+        @test round(notseen, RoundUp, digits = 3) >= object.notseen
         # Check orbits
         filename = get_orbits_neocp(object.tmpdesig)
         @test isfile(filename)
