@@ -145,69 +145,6 @@ function issuccessfulprop(sol::TaylorInterpolant, t::T; tol::T = 10.0) where {T 
 end
 
 @doc raw"""
-    propagate_params(jd0::V, tspan::T, q0::Vector{U},
-                     params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number}
-
-Return the parameters needed for `propagate`, `propagate_root` and `propagate_lyap`.
-
-# Arguments
-
-- `jd0::V`: initial Julian date.
-- `tspan::T`: time span of the integration [in years].
-- `q0::Vector{U}`: vector of initial conditions.
-- `params::NEOParameters{T}`: see `Propagation Parameters` of [`NEOParameters`](@ref).
-"""
-function propagate_params(jd0::V, tspan::T, q0::Vector{U},
-                          params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number}
-    # Epoch (plain)
-    _jd0_ = cte(cte(jd0))
-    # Time limits [days since J2000]
-    days_0, days_f = minmax(_jd0_, _jd0_ + tspan*yr) .- JD_J2000
-
-    # Load Solar System ephemeris [au, au/day]
-    _sseph = convert(T, loadpeeph(sseph, days_0, days_f))
-
-    # Load accelerations
-    _acceph = convert(T, loadpeeph(acceph, days_0, days_f))
-
-    # Load Newtonian potentials
-    _poteph = convert(T, loadpeeph(poteph, days_0, days_f))
-
-    # Number of massive bodies
-    Nm1 = numberofbodies(_sseph)
-
-    # Number of bodies, including NEA
-    N = Nm1 + 1
-
-    # Vector of G*m values
-    μ = convert(Vector{T}, vcat( μ_DE430[1:11], params.μ_ast[1:Nm1-11], zero(T) ) )
-
-    # Check: number of SS bodies (N) in ephemeris must be equal to length of GM vector (μ)
-    @assert N == length(μ) "Total number of bodies in ephemeris must be equal to length of GM vector μ"
-
-    # Interaction matrix with flattened bodies
-    UJ_interaction = fill(false, N)
-
-    # Turn on Earth interaction
-    UJ_interaction[ea] = true
-
-    # Initial time
-    _t0 = zero(T)
-
-    # Final time
-    _tmax = _t0 + tspan*yr
-
-    # Initial conditions
-    _q0 = one(T) * q0
-
-    # Vector of parameters for neosinteg
-    _params = (_sseph, _acceph, _poteph, jd0, UJ_interaction, N, μ)
-
-    return _q0, _t0, _tmax, _params
-
-end
-
-@doc raw"""
     propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
               params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number, D}
 
