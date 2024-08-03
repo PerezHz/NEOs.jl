@@ -179,14 +179,14 @@ function _propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, buffer::Propag
     buffer.dx .= Taylor1.( zero.(q0), order)
     buffer.params.jd0 = jd0
     # Propagate orbit
-    @time tv, xv, psol = _taylorinteg!(dynamics, buffer.t, buffer.x, buffer.dx, buffer.q0, zero(T),
-                                       tspan * yr, params.abstol, buffer.rv, Val(true), buffer.params;
+    @time sol = _taylorinteg!(Val(true), dynamics, buffer.t, buffer.x, buffer.dx, buffer.q0, zero(T),
+                                       tspan * yr, params.abstol, buffer.rv, buffer.params;
                                        maxsteps = params.maxsteps)
     # Output
-    if issorted(tv) || issorted(tv, rev = true)
+    if issorted(sol.t) || issorted(sol.t, rev = true)
         # Epoch (plain)
         _jd0_ = cte(cte(jd0))
-        return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, tv, psol)
+        return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, sol.t, sol.p)
     else
         return zero(TaylorInterpolant{T, U, 2, SubArray{T, 1}, SubArray{Taylor1{U}, 2}})
     end
@@ -239,14 +239,14 @@ function _propagate_root(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, buffer::P
     buffer.dx .= Taylor1.( zero.(q0), order)
     buffer.params.jd0 = jd0
     # Propagate orbit
-    @time tv, xv, psol, tvS, xvS, gvS = _taylorinteg!(dynamics, rvelea, buffer.t, buffer.x, buffer.dx,
-          buffer.q0, zero(T), tspan * yr, params.abstol, buffer.rv, Val(true), buffer.params;
+    @time sol = _taylorinteg!(Val(true), dynamics, rvelea, buffer.t, buffer.x, buffer.dx,
+          buffer.q0, zero(T), tspan * yr, params.abstol, buffer.rv, buffer.params;
           maxsteps = params.maxsteps, eventorder = eventorder, newtoniter = newtoniter,
           nrabstol = nrabstol)
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
-    return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, tv, psol), tvS, xvS, gvS
+    return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, sol.t, sol.p), sol.tevents, sol.xevents, sol.gresids
 end
 
 @doc raw"""
