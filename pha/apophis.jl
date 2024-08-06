@@ -174,8 +174,9 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     # Compute optical residuals
     _res_radec_all_ = NEOs.residuals(radec; xvs, xve, xva)
-    res_radec_all = vcat(ra.(_res_radec_all_), dec.(_res_radec_all_))
-    w_radec_all = vcat(NEOs.weight_ra.(_res_radec_all_), NEOs.weight_dec.(_res_radec_all_))
+    #res_radec_all = vcat(ra.(_res_radec_all_), dec.(_res_radec_all_))
+    #w_radec_all = vcat(NEOs.weight_ra.(_res_radec_all_), NEOs.weight_dec.(_res_radec_all_))
+    res_radec_all, w_radec_all = NEOs.unfold(_res_radec_all_)
     jldsave("Apophis_res_w_radec.jld2"; res_radec_all, w_radec_all)
     # JLD2.@load "Apophis_res_w_radec.jld2"
 
