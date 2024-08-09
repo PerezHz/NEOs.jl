@@ -270,8 +270,8 @@ function propagate_lyap(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
     tlim = minmax(_jd0_, _jd0_ + tspan * yr) .- JD_J2000
     buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
     # Propagate orbit
-    @time tv, xv, λv = lyap_taylorinteg(dynamics, q0, zero(T), tspan * yr, params.order,
+    @time sol = lyap_taylorinteg(dynamics, q0, zero(T), tspan * yr, params.order,
           params.abstol, buffer.params; maxsteps = params.maxsteps, parse_eqs = params.parse_eqs)
 
-    return tv, xv, λv
+    return sol.t, sol.x, sol.λ
 end
