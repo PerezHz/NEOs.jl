@@ -173,9 +173,9 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     deldop = vcat(deldop_2005_2013,deldop_2021)
 
     # Compute optical residuals
-    _res_radec_all_ = NEOs.residuals(radec; xvs, xve, xva)
-    res_radec_all = vcat(ra.(_res_radec_all_), dec.(_res_radec_all_))
-    w_radec_all = vcat(NEOs.weight_ra.(_res_radec_all_), NEOs.weight_dec.(_res_radec_all_))
+    opt_res_w_all = NEOs.residuals(radec; xvs, xve, xva)
+    res_radec_all = vcat(ra.(opt_res_w_all), dec.(opt_res_w_all))
+    w_radec_all = vcat(NEOs.weight_ra.(opt_res_w_all), NEOs.weight_dec.(opt_res_w_all))
     jldsave("Apophis_res_w_radec.jld2"; res_radec_all, w_radec_all)
     # JLD2.@load "Apophis_res_w_radec.jld2"
 
@@ -186,13 +186,14 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     ### Process optical astrometry (filter, weight, debias)
 
-    # filter out biased observations from observatory 217 on 28-Jan-2021
+    # construct DataFrame from optical astrometry
     df_radec = DataFrame(radec)
     # add residuals and weights to optical astrometry DataFrame
     df_radec[!, :res_α] .= res_radec_all[1:round(Int,length(res_radec_all)/2)]
     df_radec[!, :res_δ] .= res_radec_all[1+round(Int,length(res_radec_all)/2):end]
     df_radec[!, :w_α] .= w_radec_all[1:round(Int,length(res_radec_all)/2)]
     df_radec[!, :w_δ] .= w_radec_all[1+round(Int,length(res_radec_all)/2):end]
+    # filter out biased observations from observatory 217 on 28-Jan-2021
     filter!(
         x->(Date(x.date) != Date(2021, 1, 28)),
         df_radec
@@ -211,20 +212,29 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     df_radec[in.(df_radec.α, Ref(tho13_α)),:w_α] = w_α_tho13
     df_radec[in.(df_radec.α, Ref(tho13_α)),:w_δ] = w_δ_tho13
 
-    # Relaxation factor (account for correlations in optical astrometry data)
-    # for each observation batch, count the number of observations made in
-    # the same night by the same observatory
-    # Ref: Veres et al. (2017)
-    date_site_v = select(df_radec, :date => ByRow(Date), :observatory)
-    Nv = [count(x->x.date_Date==i.date_Date && x.observatory==i.observatory, eachrow(date_site_v)) for i in eachrow(date_site_v)]
-    relax_factor = map(x->x>4.0 ? x/4.0 : 1.0, Nv)
-    # inflate uncertainties (i.e., relax weights) by relaxation factor
-    df_radec[!, :w_α] .= (df_radec.w_α)./relax_factor
-    df_radec[!, :w_δ] .= (df_radec.w_δ)./relax_factor
+    # `opt_res_w_all_new` is a `Vector{OpticalResidual}` with the custom weights from Tholen et al. (2013) astrometry
+    # since time tags nor observation sites change, relax factors are the same
 
-    # update optical residuals and weights
-    res_radec = vcat(df_radec.res_α, df_radec.res_δ)
-    w_radec = vcat(df_radec.w_α, df_radec.w_δ)
+    # Relaxation factors `relax_factor` account for correlations in optical astrometry data
+    # for each observation batch, count the number of observations made in the same night by
+    # the same observatory. This is achieved via inflating uncertainties (i.e., relax weights)
+    # aprropriately for each residual.
+    # Ref: Veres et al. (2017)
+    opt_res_w_all_new = eltype(opt_res_w_all)[]
+    for i in 1:size(df_radec, 1)
+        push!(opt_res_w_all_new,
+            NEOs.OpticalResidual(
+                opt_res_w_all[i].ξ_α,
+                opt_res_w_all[i].ξ_δ,
+                df_radec[i,:w_α],
+                df_radec[i,:w_δ],
+                opt_res_w_all[i].relax_factor,
+                opt_res_w_all[i].outlier)
+        )
+    end
+
+    # update optical residuals and weights (relaxation factors on weights are actually applied here)
+    res_radec, w_radec = NEOs.unfold(opt_res_w_all_new)
 
     ### Perform orbital fit to optical and radar astrometry data
 
