@@ -231,7 +231,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     @assert issorted(dates) "Observations must be in temporal order"
 
     # Times of observation [et]
-    t_et = datetime2et.(dates)
+    t_et = dtutc2et.(dates)
     # Times of observation [days since J2000]
     t_days = t_et ./ daysec
 

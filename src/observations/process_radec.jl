@@ -127,7 +127,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
                        xvs::SunEph = sunposvel, xve::EarthEph = earthposvel,
                        xva::AstEph) where {T <: AbstractFloat, SunEph, EarthEph, AstEph}
     # Transform receiving time from UTC to TDB seconds since J2000
-    et_r_secs = datetime2et(t_r_utc)
+    et_r_secs = dtutc2et(t_r_utc)
     # Sun barycentric position and velocity at receive time
     rv_s_t_r = xvs(et_r_secs)
     r_s_t_r = rv_s_t_r[1:3]
@@ -265,7 +265,7 @@ function compute_radec(obs::Vector{RadecMPC{T}}; xva::AstEph, kwargs...) where {
     # UTC time of first astrometric observation
     utc1 = obs[1].date
     # TDB seconds since J2000.0 for first astrometric observation
-    et1 = datetime2et(utc1)
+    et1 = dtutc2et(utc1)
     # Asteroid ephemeris at et1
     a1_et1 = xva(et1)[1]
     # Type of asteroid ephemeris
@@ -391,7 +391,7 @@ function debiasing(obs::RadecMPC{T}, mpc_catalogue_codes_201X::Vector{String}, t
         # pmDEC: proper motion correction in DEC [mas/yr]
         dRA, dDEC, pmRA, pmDEC = bias_matrix[pix_ind, 4*cat_ind-3:4*cat_ind]
         # Seconds since J2000 (TDB)
-        et_secs_i = datetime2et(obs.date)
+        et_secs_i = dtutc2et(obs.date)
         # Seconds sinde J2000 (TT)
         tt_secs_i = et_secs_i - ttmtdb(et_secs_i/daysec)
         # Years since J2000
@@ -555,7 +555,7 @@ function residuals(radec::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{
     # UTC time of first astrometric observation
     utc1 = date(radec[1])
     # TDB seconds since J2000.0 for first astrometric observation
-    et1 = datetime2et(utc1)
+    et1 = dtutc2et(utc1)
     # Asteroid ephemeris at et1
     a1_et1 = xva(et1)[1]
     # Type of asteroid ephemeris

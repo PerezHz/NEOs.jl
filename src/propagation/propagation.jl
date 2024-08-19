@@ -30,7 +30,7 @@ Return a `PropagationBuffer` object with pre-allocated memory for `propagate`.
 # Arguments
 
 - `dynamics::D`: dynamical model function.
-- `jd0::V`: initial Julian date.
+- `jd0::V`: initial Julian date (TDB).
 - `tlim::Tuple{T, T}`: ephemeris timespan [in days since J2000].
 - `q0::Vector{U}`: vector of initial conditions.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
@@ -96,7 +96,7 @@ Return `true` and the asteroid's radial velocity with respect to the Earth.
 """
 function rvelea(dx, x, params, t)
 
-    jd0 = params.jd0                                  # Julian date of start time
+    jd0 = params.jd0                                  # Julian date (TDB) of start time
     dsj2k = t + (jd0 - JD_J2000)                      # Days since J2000
     ss16asteph_t = evaleph(params.sseph, dsj2k, x[1]) # Evaluate ephemeris at dsj2k
     N = params.N                                      # Total number of bodies
@@ -148,12 +148,13 @@ end
     propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
               params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number, D}
 
-Integrate the orbit of a NEO via the Taylor method.
+Integrate the a NEO orbit via the Taylor method. The initial Julian date `jd0` is assumed to
+be in TDB time scale.
 
 # Arguments
 
 - `dynamics::D`: dynamical model function.
-- `jd0::V`: initial Julian date.
+- `jd0::V`: initial Julian date (TDB).
 - `tspan::T`: time span of the integration [in years].
 - `q0::Vector{U}`: vector of initial conditions.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
@@ -203,7 +204,7 @@ Integrate the orbit of a NEO via the Taylor method while finding the zeros of
 # Arguments
 
 - `dynamics::D`: dynamical model function.
-- `jd0::V`: initial Julian date.
+- `jd0::V`: initial Julian date (TDB).
 - `tspan::T`: time span of the integration [in years].
 - `q0::Vector{U}`: vector of initial conditions.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
@@ -258,7 +259,7 @@ Compute the Lyapunov spectrum of a NEO.
 # Arguments
 
 - `dynamics::D`: dynamical model function.
-- `jd0::V`: initial Julian date.
+- `jd0::V`: initial Julian date (TDB).
 - `tspan::T`: time span of the integration [in Julian days].
 - `q0::Vector{U}`: vector of initial conditions.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).

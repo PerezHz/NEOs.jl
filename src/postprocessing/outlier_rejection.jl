@@ -25,7 +25,7 @@ Refine an orbit, computed by [`orbitdetermination`](@ref), via propagation and/o
 """
 function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
                            params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
-    # Julian day to start propagation
+    # Julian day (TDB) to start propagation
     jd0 = sol.bwd.t0 + PE.J2000
     # Initial conditions (T)
     q0 = sol(sol.bwd.t0)

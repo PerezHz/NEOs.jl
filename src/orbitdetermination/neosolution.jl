@@ -240,7 +240,7 @@ function uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}
                               dynamics::D = newtonian!) where {T <: Real, D}
     # Reduce tracklets by polynomial regression
     tracklets = reduce_tracklets(radec)
-    # Epoch [julian days]
+    # Epoch [Julian days TDB]
     jd0 = sol.bwd.t0 + PE.J2000
     # Barycentric initial conditions
     q0 = sol(sol.bwd.t0)

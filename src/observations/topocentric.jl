@@ -139,7 +139,7 @@ function obsposECEF(observatory::ObservatoryMPC{T}; eop::Union{EopIau1980, EopIa
 
     if issatellite(observatory) || isoccultation(observatory)
         # Ephemeris seconds since J2000
-        et = datetime2et(observatory.date)
+        et = dtutc2et(observatory.date)
         # Earth-Centered Inertial position position of observer
         posvel_ECI = obsposvelECI(observatory, et; eop)
         # UTC seconds
@@ -276,7 +276,7 @@ function obsposvelECI(observatory::ObservatoryMPC{T}, et::U;
     oneU = one(et)
 
     if issatellite(observatory) || isoccultation(observatory)
-        # @assert datetime2et(observatory.date) == cte(et)
+        # @assert dtutc2et(observatory.date) == cte(et)
         return [observatory.long * oneU, observatory.cos * oneU, observatory.sin * oneU,
                 zero(et), zero(et), zero(et)]
     else
@@ -311,8 +311,8 @@ function obsposvelECI(observatory::ObservatoryMPC{T}, et::U;
 end
 
 function obsposvelECI(x::RadecMPC{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
-    return obsposvelECI(x.observatory, datetime2et(x.date); eop)
+    return obsposvelECI(x.observatory, dtutc2et(x.date); eop)
 end
 function obsposvelECI(x::RadarJPL{T}; eop::Union{EopIau1980, EopIau2000A} = eop_IAU2000A) where {T <: AbstractFloat}
-    return obsposvelECI(x.rcvr, datetime2et(x.date); eop)
+    return obsposvelECI(x.rcvr, dtutc2et(x.date); eop)
 end

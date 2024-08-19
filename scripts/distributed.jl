@@ -20,7 +20,7 @@ end
     const apophisjlpath = pkgdir(Apophis)
     const radarobsfile = joinpath(apophisjlpath, "Apophis_JPL_data_2012_2013.dat")
     const dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
-    const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration
+    const t0 = datetime2julian(DateTime(2008,9,24,0,0,0)) #starting time of integration (TDB)
     const tmax = t0+365.25nyears #final time of integration
     @show t0 == 2454733.5
     @show tmax
