@@ -141,8 +141,8 @@ using NEOs: NEOSolution, numberofdays
 
     @testset "Admissible region" begin
         using NEOs: AdmissibleRegion, reduce_tracklets, arenergydis, rangerate,
-                    rangerates, argoldensearch, arboundary, R_SI, k_gauss, μ_ES,
-                    topo2bary, bary2topo
+                    rangerates, argoldensearch, arboundary, _helmaxrange, R_SI,
+                    k_gauss, μ_ES, topo2bary, bary2topo
 
         # Fetch optical astrometry
         radec = fetch_radec_mpc("designation" => "2024 BX1")
@@ -154,7 +154,7 @@ using NEOs: NEOSolution, numberofdays
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by June 21, 2024
+        # Values by August 19, 2024
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -195,18 +195,38 @@ using NEOs: NEOSolution, numberofdays
         ρ, v_ρ = argoldensearch(A, A.ρ_domain[1], ρ0, :max, :inner, 1e-20)
         @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
         @test A.v_ρ_domain[1] ≤ v_ρ ≤ A.v_ρ_domain[2]
-        # Boundary
-        @test norm(arboundary(A, 0.0, :outer) - A.Fs[1, :]) == 0.0
-        @test norm(arboundary(A, 1.0, :outer) - A.Fs[2, :]) < 1.0e-17
-        @test norm(arboundary(A, 2.0, :outer) - A.Fs[3, :]) < 1e-9
-        @test norm(arboundary(A, 3.0, :outer) - A.Fs[1, :]) < 1e-17
-        I0 = arboundary(A, 0.0, :inner)
-        I1 = arboundary(A, 1.0, :inner)
-        I2 = arboundary(A, 2.0, :inner)
+        # Outer boundary
+        O0 = arboundary(A, 0.0, :outer, :linear)
+        O1 = arboundary(A, 1.0, :outer, :linear)
+        O2 = arboundary(A, 2.0, :outer, :linear)
+        O3 = arboundary(A, 3.0, :outer, :linear)
+        @test O0[1] == O1[1] == A.ρ_domain[1]
+        @test [O0[2], O1[2]] == A.v_ρ_domain
+        @test O2[1] == _helmaxrange(A.coeffs, A.a_max) == A.ρ_domain[2]
+        @test norm(O0 - O3) < 8e-18
+        @test O0 == A.Fs[1, :]
+        @test O1 == A.Fs[2, :]
+        @test O2 == A.Fs[3, :]
+        @test norm(O3 - A.Fs[1, :]) < 8e-18
+        L0 = arboundary(A, 0.0, :outer, :log)
+        L1 = arboundary(A, 1.0, :outer, :log)
+        L2 = arboundary(A, 2.0, :outer, :log)
+        L3 = arboundary(A, 3.0, :outer, :log)
+        @test L0[1] == log10(O0[1])
+        @test L1[1] == log10(O1[1])
+        @test L2[1] == log10(O2[1])
+        @test L3[1] ≈ log10(O3[1]) atol = 6e-15
+        # Inner boundary
+        I0 = arboundary(A, 0.0, :inner, :linear)
+        I1 = arboundary(A, 1.0, :inner, :linear)
+        I2 = arboundary(A, 2.0, :inner, :linear)
         @test I0[1] ≈ I2[1] atol = 1e-18
         @test I0[2] ≈ -I2[2] atol = 1e-18
         @test I1[1] ≈ ρ0 atol = 1e-18
         @test I1[2] ≈ 0.0 atol = 1e-10
+        P0 = arboundary(A, 0.0, :inner, :log)
+        P2 = arboundary(A, 2.0, :inner, :log)
+        @test P0[1] == P2[1] == log10(I0[1]) == log10(I2[1])
         # In
         @test A.Fs[1, :] in A
         @test A.Fs[2, :] in A
