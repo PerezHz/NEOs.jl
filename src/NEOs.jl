@@ -87,5 +87,6 @@ include("propagation/propagation.jl")
 include("orbitdetermination/orbitdetermination.jl")
 include("postprocessing/outlier_rejection.jl")
 include("init.jl")
+include("deprecated.jl")
 
 end
