@@ -503,27 +503,20 @@ function _arhelboundary(A::AdmissibleRegion{T}, t::S,
     y_min, y_max = A.v_ρ_domain
     # ρ = x_min
     if 0.0 <= t < 1.0
-        return [x_min, y_min + t * (y_max - y_min)]
-    else
-        # Upper curve
-        if 1.0 <= t < 2.0
-            x = x_min + (t-1)*(x_max - x_min)
-            if ρscale == :linear
-                v_ρ = rangerates(A, x, :outer)[end]
-            else
-                v_ρ = rangerates(A, 10^x, :outer)[end]
-            end
-        # Lower curve
-        elseif 2.0 <= t <= 3.0
-            x = x_max - (t-2)*(x_max - x_min)
-            if ρscale == :linear
-                v_ρ = rangerates(A, x, :outer)[1]
-            else
-                v_ρ = rangerates(A, 10^x, :outer)[1]
-            end
-        end
-        return [x, v_ρ]
+        x, v_ρ = x_min, y_min + t * (y_max - y_min)
+    # Upper curve
+    elseif 1.0 <= t < 2.0
+        x = x_min + (t-1)*(x_max - x_min)
+        _x_ = ρscale == :linear ? x : clamp(10^x, A.ρ_domain[1], A.ρ_domain[2])
+        v_ρ = rangerates(A, _x_, :outer)[end]
+    # Lower curve
+    elseif 2.0 <= t <= 3.0
+        x = x_max - (t-2)*(x_max - x_min)
+        _x_ = ρscale == :linear ? x : clamp(10^x, A.ρ_domain[1], A.ρ_domain[2])
+        v_ρ = rangerates(A, _x_, :outer)[1]
     end
+
+    return [x, v_ρ]
 end
 
 function _argeoboundary(A::AdmissibleRegion{T}, t::S,
@@ -531,29 +524,24 @@ function _argeoboundary(A::AdmissibleRegion{T}, t::S,
     # Parametrization domain
     @assert 0.0 <= t <= 2.0
     # Lower (upper) bounds
+    ρ_max = _geomaxrange(A.coeffs)
     if ρscale == :linear
-        x_min, x_max = A.ρ_domain[1], _geomaxrange(A.coeffs)
+        x_min, x_max = A.ρ_domain[1], ρ_max
     elseif ρscale == :log
-        x_min, x_max = log10(A.ρ_domain[1]), log10(_geomaxrange(A.coeffs))
+        x_min, x_max = log10(A.ρ_domain[1]), log10(ρ_max)
     else
         throw(ArgumentError("Argument `ρscale` must be either `:linear` or `:log`"))
     end
     # Upper curve
     if 0.0 <= t < 1.0
         x = x_min + t*(x_max - x_min)
-        if ρscale == :linear
-            v_ρ = rangerates(A, x, :inner)[end]
-        else
-            v_ρ = rangerates(A, 10^x, :inner)[end]
-        end
+        _x_ = ρscale == :linear ? x : clamp(10^x, A.ρ_domain[1], ρ_max)
+        v_ρ = rangerates(A, _x_, :inner)[end]
     # Lower curve
     elseif 1.0 <= t <= 2.0
         x = x_max - (t-1)*(x_max - x_min)
-        if ρscale == :linear
-            v_ρ = rangerates(A, x, :inner)[1]
-        else
-            v_ρ = rangerates(A, 10^x, :inner)[1]
-        end
+        _x_ = ρscale == :linear ? x : clamp(10^x, A.ρ_domain[1], ρ_max)
+        v_ρ = rangerates(A, _x_, :inner)[1]
     end
 
     return [x, v_ρ]

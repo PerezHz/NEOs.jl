@@ -225,8 +225,10 @@ using NEOs: NEOSolution, numberofdays
         @test I1[1] ≈ ρ0 atol = 1e-18
         @test I1[2] ≈ 0.0 atol = 1e-10
         P0 = arboundary(A, 0.0, :inner, :log)
+        P1 = arboundary(A, 1.0, :inner, :log)
         P2 = arboundary(A, 2.0, :inner, :log)
         @test P0[1] == P2[1] == log10(I0[1]) == log10(I2[1])
+        @test P1[1] == log10(I1[1])
         # In
         @test A.Fs[1, :] in A
         @test A.Fs[2, :] in A
