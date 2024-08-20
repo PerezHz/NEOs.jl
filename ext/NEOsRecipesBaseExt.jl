@@ -13,11 +13,9 @@ end
                    N::Int = 100, ρscale::Symbol = :linear) where {T <: Real}
     seriestype --> :path
     tmax = boundary == :outer ? 3 : 2
-    ps = map(t -> arboundary(A, t, boundary), LinRange(0, tmax, N))
+    ps = map(t -> arboundary(A, t, boundary, ρscale), LinRange(0, tmax, N))
     xs, ys = first.(ps), last.(ps)
-    if ρscale == :log
-        xs .= log10.(xs)
-    end
+
     return xs, ys
 end
 

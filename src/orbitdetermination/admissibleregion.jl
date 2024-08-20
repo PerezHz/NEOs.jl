@@ -468,63 +468,83 @@ function _geomaxrange(coeffs::Vector{T}) where {T <: Real}
 end
 
 @doc raw"""
-    arboundary(A::AdmissibleRegion{T}, t::S, [boundary::Symbol]) where {T <: Real, S <: Number}
+    arboundary(A::AdmissibleRegion{T}, t::S, [boundary::Symbol,
+        ρscale::Symbol]) where {T <: Real, S <: Number}
 
-Parametrization of `A`'s boundary. `boundary` chooses
-between
-- `:outer` (default) with `t ∈ [0, 3]`, or
-- `:inner` with `t ∈ [0, 2]`.
+Parametrization of `A`'s
+- `:outer` boundary (default) with `t ∈ [0, 3]`, or
+- `:inner` boundary with `t ∈ [0, 2]`.
+`ρscale` sets the horizontal axis scale to `:linear` (default)
+or `:log`.
 """
-function arboundary(A::AdmissibleRegion{T}, t::S,
-                    boundary::Symbol = :outer) where {T <: Real, S <: Number}
+function arboundary(A::AdmissibleRegion{T}, t::S, boundary::Symbol = :outer,
+        ρscale = :linear) where {T <: Real, S <: Number}
     if boundary == :outer
-        return _arhelboundary(A, t)
+        return _arhelboundary(A, t, ρscale)
     elseif boundary == :inner
-        return _argeoboundary(A, t)
+        return _argeoboundary(A, t, ρscale)
     else
         throw(ArgumentError("Argument `boundary` must be either `:outer` or `:inner`"))
     end
 end
 
-function _arhelboundary(A::AdmissibleRegion{T}, t::S) where {T <: Real, S <: Number}
+function _arhelboundary(A::AdmissibleRegion{T}, t::S,
+        ρscale::Symbol = :linear) where {T <: Real, S <: Number}
     # Parametrization domain
     @assert 0.0 <= t <= 3.0
     # Lower (upper) bounds
-    x_min, x_max = A.ρ_domain
+    if ρscale == :linear
+        x_min, x_max = A.ρ_domain
+    elseif ρscale == :log
+        x_min, x_max = log10.(A.ρ_domain)
+    else
+        throw(ArgumentError("Argument `ρscale` must be either `:linear` or `:log`"))
+    end
     y_min, y_max = A.v_ρ_domain
     # ρ = x_min
-    if 0.0 <= t <= 1.0
-        return [x_min, y_min + t * (y_max - y_min)]
-    else
-        # Upper curve
-        if 1.0 <= t <= 2.0
-            ρ = x_min + (t-1)*(x_max - x_min)
-            v_ρ = rangerates(A, ρ, :outer)[end]
-        # Lower curve
-        elseif 2.0 <= t <= 3.0
-            ρ = x_max - (t-2)*(x_max - x_min)
-            v_ρ = rangerates(A, ρ, :outer)[1]
-        end
-        return [ρ, v_ρ]
+    if 0.0 <= t < 1.0
+        x, v_ρ = x_min, y_min + t * (y_max - y_min)
+    # Upper curve
+    elseif 1.0 <= t < 2.0
+        x = x_min + (t-1)*(x_max - x_min)
+        _x_ = ρscale == :linear ? x : clamp(10^x, A.ρ_domain[1], A.ρ_domain[2])
+        v_ρ = rangerates(A, _x_, :outer)[end]
+    # Lower curve
+    elseif 2.0 <= t <= 3.0
+        x = x_max - (t-2)*(x_max - x_min)
+        _x_ = ρscale == :linear ? x : clamp(10^x, A.ρ_domain[1], A.ρ_domain[2])
+        v_ρ = rangerates(A, _x_, :outer)[1]
     end
+
+    return [x, v_ρ]
 end
 
-function _argeoboundary(A::AdmissibleRegion{T}, t::S) where {T <: Real, S <: Number}
+function _argeoboundary(A::AdmissibleRegion{T}, t::S,
+        ρscale::Symbol = :linear) where {T <: Real, S <: Number}
     # Parametrization domain
     @assert 0.0 <= t <= 2.0
     # Lower (upper) bounds
-    x_min, x_max = A.ρ_domain[1], _geomaxrange(A.coeffs)
+    ρ_max = _geomaxrange(A.coeffs)
+    if ρscale == :linear
+        x_min, x_max = A.ρ_domain[1], ρ_max
+    elseif ρscale == :log
+        x_min, x_max = log10(A.ρ_domain[1]), log10(ρ_max)
+    else
+        throw(ArgumentError("Argument `ρscale` must be either `:linear` or `:log`"))
+    end
     # Upper curve
-    if 0.0 <= t <= 1.0
-        ρ = x_min + t*(x_max - x_min)
-        v_ρ = rangerates(A, ρ, :inner)[end]
+    if 0.0 <= t < 1.0
+        x = x_min + t*(x_max - x_min)
+        _x_ = ρscale == :linear ? x : clamp(10^x, A.ρ_domain[1], ρ_max)
+        v_ρ = rangerates(A, _x_, :inner)[end]
     # Lower curve
     elseif 1.0 <= t <= 2.0
-        ρ = x_max - (t-1)*(x_max - x_min)
-        v_ρ = rangerates(A, ρ, :inner)[1]
+        x = x_max - (t-1)*(x_max - x_min)
+        _x_ = ρscale == :linear ? x : clamp(10^x, A.ρ_domain[1], ρ_max)
+        v_ρ = rangerates(A, _x_, :inner)[1]
     end
 
-    return [ρ, v_ρ]
+    return [x, v_ρ]
 end
 
 @doc raw"""
