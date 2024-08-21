@@ -273,7 +273,7 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::
                        xva::AstEph) where {T <: AbstractFloat, EarthEph, SunEph, AstEph}
 
     # Transform receiving time from UTC to TDB seconds since j2000
-    et_r_secs_0 = datetime2et(t_r_utc)
+    et_r_secs_0 = dtutc2et(t_r_utc)
     # Auxiliary to evaluate JT ephemeris
     xva1et0 = xva(et_r_secs_0)[1]
     # et_r_secs_0 as a Taylor polynomial
@@ -532,7 +532,7 @@ function radar_astrometry(astradardata::Vector{RadarJPL{T}}; xva::AstEph, kwargs
     # UTC time of first radar observation
     utc1 = astradardata[1].date
     # TDB seconds since J2000.0 for first astrometric observation
-    et1 = datetime2et(utc1)
+    et1 = dtutc2et(utc1)
     # Asteroid ephemeris at et1
     a1_et1 = xva(et1)[1]
     # Type of asteroid ephemeris

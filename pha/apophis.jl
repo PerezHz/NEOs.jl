@@ -41,7 +41,7 @@ function parse_commandline()
 
     @add_arg_table! s begin
         "--jd0"
-            help = "Initial date"
+            help = "Initial epoch calendar date (TDB)"
             arg_type = DateTime
             default = DateTime(2020, 12, 17)
         "--varorder"
@@ -104,7 +104,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
               abstol::T, parse_eqs::Bool) where {T <: Real, D}
 
     # Initial conditions from Apophis JPL solution #197
-    q00 = kmsec2auday(apophisposvel197(datetime2et(jd0_datetime)))
+    q00 = kmsec2auday(apophisposvel197(dtutc2et(jd0_datetime)))
 
     # Perturbation to nominal initial condition (Taylor1 jet transport)
     # vcat(fill(1e-8, 6), 1e-14, 1e-15) are the scaling factors for jet transport perturbation,

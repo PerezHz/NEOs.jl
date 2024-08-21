@@ -84,7 +84,7 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     # Time of observation [days since J2000]
     t_days = datetime2days(t_datetime)
     # Time of observation [et seconds]
-    t_et = datetime2et(t_datetime)
+    t_et = dtutc2et(t_datetime)
     # Heliocentric position of the observer
     q = params.eph_ea(t_days) + kmsec2auday(obsposvelECI(obs, t_et)) - params.eph_su(t_days)
     # Admissible region coefficients
@@ -635,7 +635,7 @@ function attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
     t = datetime2days(A.date) - ρ/c_au_per_day
     # TO DO: `et::TaylorN` is too slow for `adam` due to
     # SatelliteToolboxTransformations overloads in src/observations/topocentric.jl
-    et = datetime2et(A.date) - cte(cte(ρ))/c_au_per_sec
+    et = dtutc2et(A.date) - cte(cte(ρ))/c_au_per_sec
     # Line of sight vectors
     ρ_unit, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Heliocentric position of the observer

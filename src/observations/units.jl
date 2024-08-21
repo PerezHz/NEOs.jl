@@ -1,18 +1,18 @@
 @doc raw"""
-    julian2etsecs(jd::T) where {T <: Number}
+    julian2etsecs(jdtdb::T) where {T <: Number}
 
-Convert the Julian date `jd` to ephemeris seconds since J2000.
+Convert `jdtdb`, a Julian date in TDB time scale, to TDB seconds since J2000.
 
 See also [`etsecs2julian`](@ref).
 """
-function julian2etsecs(jd::T) where {T <: Number}
-    return (jd - JD_J2000) * daysec
+function julian2etsecs(jdtdb::T) where {T <: Number}
+    return (jdtdb - JD_J2000) * daysec
 end
 
 @doc raw"""
     etsecs2julian(et::T) where {T <: Number}
 
-Convert `et` ephemeris seconds since J2000 to Julian date.
+Convert `et` TDB seconds since J2000 to Julian date (TDB).
 
 See also [`julian2etsecs`](@ref).
 """
@@ -21,16 +21,16 @@ function etsecs2julian(et::T) where {T <: Number}
 end
 
 @doc raw"""
-    datetime2et(x::DateTime)
-    datetime2et(x::T) where {T <: AbstractAstrometry}
+    dtutc2et(dtutc::DateTime)
+    dtutc2et(dtutc::T) where {T <: AbstractAstrometry}
 
 Convert a UTC `DateTime` to TDB seconds past the J2000 epoch.
 """
-function datetime2et(x::DateTime)
+function dtutc2et(dtutc::DateTime)
     # UTC seconds since J2000.0 epoch
-    utc_seconds = Millisecond(x - DateTime(2000,1,1,12)).value/1000
+    utc_seconds = Millisecond(dtutc - DateTime(2000,1,1,12)).value/1000
     # TAI - UTC
-    tai_utc = get_Δat(datetime2julian(x))
+    tai_utc = get_Δat(datetime2julian(dtutc))
     # TT - TAI
     tt_tai = 32.184
     # TT - UTC = (TT-TAI) + (TAI-UTC)
@@ -41,7 +41,17 @@ function datetime2et(x::DateTime)
     return tt_seconds - ttmtdb_tt(tt_seconds)
 end
 
-datetime2et(x::T) where {T <: AbstractAstrometry} = datetime2et(x.date)
+dtutc2et(astrometry::T) where {T <: AbstractAstrometry} = dtutc2et(astrometry.date)
+
+@doc raw"""
+    dtutc2jdtdb(dtutc::DateTime)
+
+Convert a UTC `DateTime` to Julian date in TDB time scale.
+"""
+function dtutc2jdtdb(dtutc::DateTime)
+    et = dtutc2et(dtutc) # TDB seconds since J2000.0
+    return etsecs2julian(et) # JDTDB
+end
 
 @doc raw"""
     et_to_200X(et::T) where {T <: Number}
@@ -62,7 +72,7 @@ days_to_200X(d::T) where {T <: Number} = 2000 + d/yr
 
 Convert `DateTime` `x` to years `200X`.
 """
-datetime_to_200X(x::DateTime) = et_to_200X(datetime2et(x))
+datetime_to_200X(x::DateTime) = et_to_200X(dtutc2et(x))
 
 @doc raw"""
     datetime2days(x::DateTime)

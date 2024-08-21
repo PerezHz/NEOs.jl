@@ -7,7 +7,7 @@ include("admissibleregion.jl")
 function _proprestimes(radec::Vector{RadecMPC{T}}, jd0::U, params::NEOParameters{T}) where {T <: Real, U <: Number}
     # Time of first (last) observation
     t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
-    # Epoch (plain)
+    # TDB epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Years in backward (forward) integration
     nyears_bwd = -(_jd0_ - t0 + params.bwdoffset) / yr
@@ -81,7 +81,7 @@ Compute an orbit via Jet Transport Least Squares.
 
 - `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
-- `jd0::V`: reference epoch [julian days].
+- `jd0::V`: reference epoch [Julian days TDB].
 - `q::Vector{TaylorN{T}}`: jet transport initial condition.
 - `i::Int`: index of `tracklets` to start least squares fit.
 - `params::NEOParameters{T}`: see `Jet Transport Least Squares Parameters` of [`NEOParameters`](@ref).
@@ -253,7 +253,7 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
                             dynamics::D = newtonian!) where {T <: Real, D}
     # Reduce tracklets by polynomial regression
     tracklets = reduce_tracklets(radec)
-    # Reference epoch [julian days]
+    # Reference epoch [Julian days TDB]
     jd0 = sol.bwd.t0 + PE.J2000
     # Plain barycentric initial condition
     q0 = sol(sol.bwd.t0)

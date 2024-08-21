@@ -90,7 +90,7 @@ See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
 """ RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
 
 function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
-    # Julian date of start time
+    # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
@@ -664,7 +664,7 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
 end
 
 function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
-    # Julian date of start time
+    # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
@@ -1200,7 +1200,7 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
 end
 
 function newtonian!(dq, q, params, t)
-    # Julian date of start time
+    # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
