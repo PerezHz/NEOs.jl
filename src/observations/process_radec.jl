@@ -577,8 +577,9 @@ function residuals(radec::Vector{RadecMPC{T}}; debias_table::String = "2018", xv
     return residuals(radec, mpc_catalogue_codes_201X, truth, resol, bias_matrix; xva, kwargs...)
 end
 
-function residuals(radec::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String}, truth::String,
-                   resol::Resolution, bias_matrix::Matrix{T}; xva::AstEph, kwargs...) where {T <: Real, AstEph}
+function residuals(radec::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String},
+        truth::String, resol::Resolution, bias_matrix::Matrix{T}; xva::AstEph,
+        kwargs...) where {T <: Real, AstEph}
 
     # UTC time of first astrometric observation
     utc1 = date(radec[1])
@@ -590,9 +591,10 @@ function residuals(radec::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{
     U = typeof(a1_et1)
     # Vector of residuals
     res = Vector{OpticalResidual{T, U}}(undef, length(radec))
+    residuals!(res, radec, mpc_catalogue_codes_201X, truth, resol,
+        bias_matrix; xva, kwargs...)
 
-    return residuals!(res, radec, mpc_catalogue_codes_201X, truth, resol,
-                      bias_matrix; xva, kwargs...)
+    return res
 end
 
 function residuals!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}},
@@ -613,7 +615,8 @@ function residuals!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T
         # Statistical weights from Veres et al. (2017)
         w8 = w8sveres17(obs)
         # O-C residual ra/dec
-        # Note: ra is multiplied by a metric factor cos(dec) to match the format of debiasing corrections
+        # Note: ra is multiplied by a metric factor cos(dec) to match the format of
+        # debiasing corrections
         return OpticalResidual{T, U}(
             anglediff(α_obs, α_comp) * cos(dec(obs)) - α_corr,
             δ_obs - δ_comp - δ_corr,
