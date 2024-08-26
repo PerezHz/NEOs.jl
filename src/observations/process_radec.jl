@@ -95,8 +95,36 @@ weight_dec(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.w_δ
 relax_factor(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.relax_factor
 outlier(res::OpticalResidual{T, U}) where {T <: Real, U <: Number} = res.outlier
 
-euclid3D(x::Vector{U}) where {U <: Number} = sqrt(x[1]*x[1] + x[2]*x[2] + x[3]*x[3])
-dot3D(x::Vector{U}, y::Vector{V}) where {U, V <: Number} = x[1]*y[1] + x[2]*y[2] + x[3]*y[3]
+euclid3D(x::Vector{T}) where {T <: Real} = sqrt(dot3D(x, x))
+function euclid3D(x::Vector{TaylorN{T}}) where {T <: Real}
+    z, w = zero(x[1]), zero(x[1])
+    @inbounds for i in eachindex(x)
+        TS.zero!(w)
+        for k in eachindex(x[i])
+            TS.mul!(w, x[i], x[i], k)
+            TS.add!(z, z, w, k)
+        end
+    end
+    TS.zero!(w)
+    for k in eachindex(z)
+        TS.sqrt!(w, z, k)
+    end
+    return w
+end
+
+dot3D(x::Vector{T}, y::Vector{T}) where {T <: Real} = x[1]*y[1] + x[2]*y[2] + x[3]*y[3]
+function dot3D(x::Vector{TaylorN{T}}, y::Vector{U}) where {T <: Real, U <: Number}
+    z, w = zero(x[1]), zero(x[1])
+    @inbounds for i in eachindex(x)
+        TS.zero!(w)
+        for k in eachindex(x[i])
+            TS.mul!(w, x[i], y[i], k)
+            TS.add!(z, z, w, k)
+        end
+    end
+    return z
+end
+dot3D(x::Vector{T}, y::Vector{TaylorN{T}}) where {T <: Real} = dot3D(y, x)
 
 @doc raw"""
     compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; kwargs...) where {T <: AbstractFloat}
@@ -158,9 +186,9 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
     Δτ_D = zero(τ_D)               # Total time delay
     Δτ_rel_D = zero(τ_D)           # Shapiro delay
     # Δτ_corona_D = zero(τ_D)      # Delay due to Solar corona
-    Δτ_tropo_D = zero(τ_D)         # Delay due to Earth's troposphere
+    # Δτ_tropo_D = zero(τ_D)       # Delay due to Earth's troposphere
 
-    for i in 1:niter
+    for _ in 1:niter
         # Asteroid barycentric position (in km) and velocity (in km/s) at bounce time (TDB)
         rv_a_t_b = xva(et_b_secs)
         r_a_t_b = rv_a_t_b[1:3]
@@ -549,8 +577,9 @@ function residuals(radec::Vector{RadecMPC{T}}; debias_table::String = "2018", xv
     return residuals(radec, mpc_catalogue_codes_201X, truth, resol, bias_matrix; xva, kwargs...)
 end
 
-function residuals(radec::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String}, truth::String,
-                   resol::Resolution, bias_matrix::Matrix{T}; xva::AstEph, kwargs...) where {T <: Real, AstEph}
+function residuals(radec::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{String},
+        truth::String, resol::Resolution, bias_matrix::Matrix{T}; xva::AstEph,
+        kwargs...) where {T <: Real, AstEph}
 
     # UTC time of first astrometric observation
     utc1 = date(radec[1])
@@ -562,9 +591,10 @@ function residuals(radec::Vector{RadecMPC{T}}, mpc_catalogue_codes_201X::Vector{
     U = typeof(a1_et1)
     # Vector of residuals
     res = Vector{OpticalResidual{T, U}}(undef, length(radec))
+    residuals!(res, radec, mpc_catalogue_codes_201X, truth, resol,
+        bias_matrix; xva, kwargs...)
 
-    return residuals!(res, radec, mpc_catalogue_codes_201X, truth, resol,
-                      bias_matrix; xva, kwargs...)
+    return res
 end
 
 function residuals!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}},
@@ -585,8 +615,9 @@ function residuals!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T
         # Statistical weights from Veres et al. (2017)
         w8 = w8sveres17(obs)
         # O-C residual ra/dec
-        # Note: ra is multiplied by a metric factor cos(dec) to match the format of debiasing corrections
-        return OpticalResidual(
+        # Note: ra is multiplied by a metric factor cos(dec) to match the format of
+        # debiasing corrections
+        return OpticalResidual{T, U}(
             anglediff(α_obs, α_comp) * cos(dec(obs)) - α_corr,
             δ_obs - δ_comp - δ_corr,
             1 / w8^2,
@@ -596,5 +627,5 @@ function residuals!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T
         )
     end
 
-    return res
+    return nothing
 end

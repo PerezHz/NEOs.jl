@@ -35,12 +35,15 @@ function propres(radec::Vector{RadecMPC{T}}, jd0::V, q0::Vector{U}, params::NEOP
         return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
     end
     # O-C residuals
-    res = residuals(radec, params;
-                    xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
-                    xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
-                    xva = et -> bwdfwdeph(et, bwd, fwd))
-
-    return bwd, fwd, res
+    try
+        res = residuals(radec, params;
+            xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
+            xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
+            xva = et -> bwdfwdeph(et, bwd, fwd))
+        return bwd, fwd, res
+    catch
+        return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
+    end
 end
 
 # In-place method of propres
@@ -63,12 +66,16 @@ function propres!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}}
         return bwd, fwd
     end
     # O-C residuals
-    residuals!(res, radec, params;
-        xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
-        xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
-        xva = et -> bwdfwdeph(et, bwd, fwd))
-
-    return bwd, fwd
+    try
+        residuals!(res, radec, params;
+            xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
+            xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
+            xva = et -> bwdfwdeph(et, bwd, fwd))
+        return bwd, fwd
+    catch
+        empty!(res)
+        return bwd, fwd
+    end
 end
 
 @doc raw"""

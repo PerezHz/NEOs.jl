@@ -1,11 +1,21 @@
 @doc raw"""
     adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
-         params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
-         μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, adamorder::Int = 2,
-         dynamics::D = newtonian!) where {T <: Real, D}
+         params::NEOParameters{T}; kwargs...) where {T <: Real, D}
 
 Adaptative moment estimation (ADAM) minimizer of normalized mean square
-residual over the manifold of variations of `A`.
+residual of `radec` over the manifold of variations of `A`, starting
+from `(ρ, v_ρ)`.
+
+## Keyword arguments
+
+- `scale::Symbol`: horizontal scale, either `:log` (default) or `:linear`.
+- `η::T`: learning rate (default: `25.0`).
+- `μ::T`: first moment (default: `0.75`).
+- `ν::T`: second moment (default: `0.9`).
+- `ϵ::T`: numerical stability constant (default: `1e-8`).
+- `Qtol::T`: target function relative tolerance (default: `1e-5`).
+- `adamorder::Int`: jet transport order (default: `2`).
+- `dynamics::D`: dynamical model (default: `newtonian!`).
 
 !!! reference
     See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
