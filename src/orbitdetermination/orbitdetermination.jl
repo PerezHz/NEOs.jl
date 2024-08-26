@@ -78,6 +78,25 @@ function propres!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}}
     end
 end
 
+# Incrementally add observations to fit
+function addradec!(rin::Vector{Int}, fit::LeastSquaresFit{T}, tin::Vector{Tracklet{T}},
+    tout::Vector{Tracklet{T}}, res::Vector{OpticalResidual{T, TaylorN{T}}},
+    x0::Vector{T}, params::NEOParameters{T}) where {T <: Real}
+    while !isempty(tout)
+        extra = indices(tout[1])
+        fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter)
+        !fit_new.success && break
+        fit = fit_new
+        tracklet = popfirst!(tout)
+        push!(tin, tracklet)
+        sort!(tin)
+        rin = vcat(rin, extra)
+        sort!(rin)
+    end
+
+    return rin, fit
+end
+
 @doc raw"""
     jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V, q::Vector{U},
          g0::Int, gf::Int, params::NEOParameters{T}; dynamics::D = newtonian!) where {D, T <: Real, U <: Number, V <: Number}
@@ -130,17 +149,7 @@ function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V
         fit = tryls(res[rin], x0, params.newtoniter)
         !fit.success && break
         # Incrementally add observations to fit
-        while !isempty(tout)
-            extra = indices(tout[1])
-            fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter)
-            !fit_new.success && break
-            fit = fit_new
-            tracklet = popfirst!(tout)
-            push!(tin, tracklet)
-            sort!(tin)
-            rin = vcat(rin, extra)
-            sort!(rin)
-        end
+        rin, fit = addradec!(rin, fit, tin, tout, res, x0, params)
         # NRMS
         Q = nrms(res, fit)
         if length(rin) == length(radec) && abs(best_Q - Q) < 0.1

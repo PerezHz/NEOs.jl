@@ -110,7 +110,7 @@ function NEOParameters(;
     abstol::T = 1e-20, parse_eqs::Bool = true, bwdoffset::T = 0.5, fwdoffset::T = 0.5,
     coeffstol::T = 10.0, debias_table::String = "2018", max_triplets::Int = 10,
     gaussorder::Int = 5, adamhelp::Bool = false, gaussQmax::T = 5.0, H_max::T = 34.5,
-    a_max::T = 100.0, adamiter::Int = 200, adamQtol::T = 1e-5, tsaorder::Int = 6,
+    a_max::T = 100.0, adamiter::Int = 200, adamQtol::T = 0.001, tsaorder::Int = 6,
     tsaQmax::T = 1.5, jtlsiter::Int = 5, newtoniter::Int = 5, jtlsorder::Int = 5,
     max_per::T = 18.0) where {T <: Real}
 
