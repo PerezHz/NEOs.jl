@@ -152,6 +152,12 @@ end
 
 iszero(x::NEOSolution{T, U}) where {T <: Real, U <: Number} = x == zero(NEOSolution{T, U})
 
+# Override Base.min
+function min(x::NEOSolution{T, T}, y::NEOSolution{T, T}) where {T <: Real}
+    nrms(x) <= nrms(y) && return x
+    return y
+end
+
 # Normalized Root Mean Square Error
 function nrms(sol::NEOSolution{T, T}) where {T <: Real}
     if iszero(sol)

@@ -313,3 +313,72 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
     _, i = findmin(tracklet -> abs(datetime2days(tracklet.date) - sol.bwd.t0), tracklets)
     return jtls(radec, tracklets, jd0, q, i, params; dynamics)
 end
+
+@doc raw"""
+    iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
+        kwargs...) where {T <: Real, D}
+
+Initial Orbit Determination (IOD) routine.
+
+## Arguments
+
+- `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
+- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+
+## Keyword arguments
+
+- `dynamics::D`: dynamical model (default: `newtonian!`).
+
+!!! warning
+    This function will change the (global) `TaylorSeries` variables.
+"""
+function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
+    dynamics::D = newtonian!) where {T <: Real, D}
+    # Allocate memory for orbit
+    sol = zero(NEOSolution{T, T})
+    # Eliminate observatories without coordinates
+    filter!(x -> hascoord(observatory(x)), radec)
+    # Cannot handle zero observations or multiple arcs
+    if iszero(length(radec)) || !issinglearc(radec)
+        return sol
+    end
+    # Reduce tracklets by polynomial regression
+    tracklets = reduce_tracklets(radec)
+    # Set jet transport variables
+    varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
+    scaled_variables("dx", ones(T, 6); order = varorder)
+    # Admissible region of first tracklet
+    A = AdmissibleRegion(tracklets[1], params)
+    # List of initial conditions
+    v_ρ = sum(A.v_ρ_domain) / 2
+    I0 = [
+        (A.ρ_domain[1], v_ρ),
+        (10^(sum(log10, A.ρ_domain) / 2), v_ρ),
+        (sum(A.ρ_domain) / 2, v_ρ),
+        (A.ρ_domain[2], v_ρ),
+    ]
+    # Initial orbit determination
+    for i in eachindex(I0)
+        # ADAM minimization over manifold of variations
+        ρ, v_ρ = I0[i]
+        ae, Q = adam(tracklets[1].radec, A, ρ, v_ρ, params;
+            scale = :log, dynamics = dynamics)
+        # ADAM failed to converge
+        isinf(Q) && continue
+        # Initial time of integration [julian days]
+        # (corrected for light-time)
+        jd0 = datetime2julian(A.date) - ae[5] / c_au_per_day
+        # Convert attributable elements to barycentric cartesian coordinates
+        q0 = attr2bary(A, ae, params)
+        # Scaling factors
+        scalings = abs.(q0) ./ 10^5
+        # Jet Transport initial condition
+        q = [q0[k] + scalings[k] * TaylorN(k, order = params.tsaorder) for k in 1:6]
+        # Jet Transport Least Squares
+        sol = min(sol, jtls(radec, tracklets, jd0, q, 1, params, false; dynamics))
+        # Termination condition
+        nrms(sol) <= params.tsaQmax && length(sol.res) == length(radec) && break
+    end
+
+    return sol
+end
