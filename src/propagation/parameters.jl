@@ -24,6 +24,7 @@ struct NEOParameters{T <: Real}
     H_max::T
     a_max::T
     adamiter::Int
+    adamQtol::T
     tsaorder::Int
     tsaQmax::T
     # Jet Transport Least Squares Parameters
@@ -41,8 +42,8 @@ function show(io::IO, p::NEOParameters{T}) where {T <: Real}
         :maxsteps, :order, :abstol, :parse_eqs, :bwdoffset,
         :fwdoffset, :coeffstol, :max_triplets, :gaussorder,
         :adamhelp, :gaussQmax, :H_max, :a_max, :adamiter,
-        :tsaorder, :tsaQmax, :jtlsiter, :newtoniter, :jtlsorder,
-        :max_per
+        :adamQtol, :tsaorder, :tsaQmax, :jtlsiter, :newtoniter,
+        :jtlsorder, :max_per
     ]
     s = Vector{String}(undef, length(params)+1)
     s[1] = "NEOParameters{$T}:\n"
@@ -90,6 +91,7 @@ Parameters for all orbit determination functions.
 - `H_max::T`: maximum absolute magnitude (default: `34.5`).
 - `a_max::T`: maximum semimajor axis (default: `100.0`).
 - `adamiter::Int`: maximum number of iterations for `ADAM` optimizer (default: `200`).
+- `Qtol::T`: target function relative tolerance (default: `0.001`).
 - `tsaorder::Int`: order of the jet transport perturbation (default: `6`).
 - `tsaQmax::T`: nrms threshold (default: `1.5`).
 
@@ -108,9 +110,9 @@ function NEOParameters(;
     abstol::T = 1e-20, parse_eqs::Bool = true, bwdoffset::T = 0.5, fwdoffset::T = 0.5,
     coeffstol::T = 10.0, debias_table::String = "2018", max_triplets::Int = 10,
     gaussorder::Int = 5, adamhelp::Bool = false, gaussQmax::T = 5.0, H_max::T = 34.5,
-    a_max::T = 100.0, adamiter::Int = 200, tsaorder::Int = 6, tsaQmax::T = 1.5,
-    jtlsiter::Int = 5, newtoniter::Int = 5, jtlsorder::Int = 5, max_per::T = 18.0
-    ) where {T <: Real}
+    a_max::T = 100.0, adamiter::Int = 200, adamQtol::T = 1e-5, tsaorder::Int = 6,
+    tsaQmax::T = 1.5, jtlsiter::Int = 5, newtoniter::Int = 5, jtlsorder::Int = 5,
+    max_per::T = 18.0) where {T <: Real}
 
     # Unfold debiasing matrix
     mpc_catalogue_codes_201X, truth, resol, bias_matrix = select_debiasing_table(debias_table)
@@ -124,8 +126,8 @@ function NEOParameters(;
         maxsteps, μ_ast, order, abstol, parse_eqs, bwdoffset, fwdoffset,
         coeffstol, mpc_catalogue_codes_201X, truth, resol, bias_matrix,
         eph_su, eph_ea, max_triplets, gaussorder, adamhelp, gaussQmax, H_max,
-        a_max, adamiter, tsaorder, tsaQmax, jtlsiter, newtoniter, jtlsorder,
-        max_per
+        a_max, adamiter, adamQtol, tsaorder, tsaQmax, jtlsiter, newtoniter,
+        jtlsorder, max_per
     )
 end
 

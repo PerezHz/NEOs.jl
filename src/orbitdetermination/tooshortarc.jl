@@ -13,7 +13,6 @@ from `(ρ, v_ρ)`.
 - `μ::T`: first moment (default: `0.75`).
 - `ν::T`: second moment (default: `0.9`).
 - `ϵ::T`: numerical stability constant (default: `1e-8`).
-- `Qtol::T`: target function relative tolerance (default: `1e-5`).
 - `adamorder::Int`: jet transport order (default: `2`).
 - `dynamics::D`: dynamical model (default: `newtonian!`).
 
@@ -22,12 +21,14 @@ from `(ρ, v_ρ)`.
 """
 function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
               params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
-              μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, adamorder::Int = 2,
+              μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2,
               dynamics::D = newtonian!) where {T <: Real, D}
     # Initial time of integration [julian days]
     jd0 = datetime2julian(A.date)
     # Maximum number of iterations
     maxiter = params.adamiter
+    # Target function relative tolerance
+    Qtol = params.adamQtol
     # Allocate memory
     aes = Matrix{T}(undef, 6, maxiter+1)
     Qs = fill(T(Inf), maxiter+1)
