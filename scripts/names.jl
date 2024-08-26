@@ -43,14 +43,14 @@ function main()
 
     # Parse arguments from commandline
     parsed_args = parse_commandline()
-
-    println("NEOs selector for orbitdetermination.jl")
-
     # Number of NEOs
     N::Int = parsed_args["N"]
-    println("• Number of NEOs: ", N)
     # Output file
     outfile::String = parsed_args["output"]
+    # Print header
+    println("NEOs selector for orbitdetermination.jl")
+    println("• Number of NEOs: ", N)
+    println("• Output file: ", outfile)
 
     # Parse PHAs, Atens, Apollos and Amors
     provdesig = Vector{SubString{String}}(undef, 0)
@@ -82,7 +82,7 @@ function main()
             neo = String(pop!(provdesig))
             radec = fetch_radec_mpc("designation" => neo)
             jplorbit = sbdb("des" => neo)["orbit"]
-            if (numberofdays(radec) <= 30.0) &&  (jplorbit["n_obs_used"] == length(radec)) &&
+            if (numberofdays(radec) <= 15.0) &&  (jplorbit["n_obs_used"] == length(radec)) &&
                 isnothing(jplorbit["n_del_obs_used"]) && isnothing(jplorbit["n_dop_obs_used"])
                 names[i] = neo
                 break
