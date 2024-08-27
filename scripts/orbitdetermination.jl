@@ -11,8 +11,8 @@ function parse_commandline()
     using Julia's interface for distributed computing."""
 
     @add_arg_table! s begin
-        "--names", "-n"
-            help = "File containing the names of the NEOs to be processed"
+        "--input", "-i"
+            help = "Input names file"
             arg_type = String
             default = "names.txt"
         "--output", "-o"
@@ -25,7 +25,7 @@ function parse_commandline()
         example:\n
         \n
         # Run orbitdetermination.jl with 10 workers and 5 threads each\n
-        julia -p 10 -t 5 --project scripts/orbitdetermination.jl -n names.txt -o orbits/\n
+        julia -p 10 -t 5 --project scripts/orbitdetermination.jl -i names.txt -o orbits/\n
         \n
     """
 
@@ -34,23 +34,22 @@ end
 
 @everywhere begin
     using NEOs, Dates, JLD2
-    using NEOs: Tracklet, reduce_tracklets, isgauss
+    using NEOs: Tracklet, reduce_tracklets
 
-    # Initial orbit determination routines
-
-    # First filter
-    function iod1(neo::String, outdir::String)
+    # Initial orbit determination routine
+    function iod(neo::String, output::String)
         # Output file
-        filename = joinpath(outdir, replace(neo, " " => "_") * ".jld2")
+        filename = joinpath(output, replace(neo, " " => "") * ".jld2")
         # Download optical astrometry
         radec = fetch_radec_mpc("designation" => neo)
         if length(radec) < 3
-            jldsave(filename; tracklets = Vector{Tracklet}(undef, 0))
+            jldsave(filename; error = "length(radec) < 3")
             return false
         end
         # Parameters
-        params = NEOParameters(coeffstol = 10.0, bwdoffset = 0.007,
-                 fwdoffset = 0.007, jtlsiter = 10, adamhelp = false)
+        params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007,
+            fwdoffset = 0.007, adamiter = 500, adamQtol = 1e-5,
+            jtlsiter = 10, newtoniter = 10)
         # Select at most three tracklets
         tracklets = reduce_tracklets(radec)
         if length(tracklets) > 3
@@ -58,120 +57,19 @@ end
             radec = reduce(vcat, getfield.(tracklets, :radec))
             sort!(radec)
         end
-
-        try
-            # Start of computation
-            init_time = now()
-            # Orbit determination
-            sol = orbitdetermination(radec, params)
-            # Time of computation
-            Δ = (now() - init_time).value
-            # Save orbit
-            if length(sol.res) != length(radec)
-                jldsave(filename; tracklets = tracklets, Δ = Δ)
-                return false
-            else
-                jldsave(filename; sol = sol, Δ = Δ)
-                return true
-            end
-        catch
-            # An error ocurred
-            jldsave(filename; tracklets = tracklets)
+        # Start of computation
+        init_time = now()
+        # Initial orbit determination
+        sol = NEOs.iod(radec, params)
+        # Time of computation
+        Δ = (now() - init_time).value
+        # Save orbit
+        if length(sol.res) != length(radec)
+            jldsave(filename; error = "length(sol.res) != length(radec)")
             return false
-        end
-    end
-
-    # Second filter
-    function iod2(neo::String, outdir::String)
-        # Output from last filter
-        filename = joinpath(outdir, replace(neo, " " => "_") * ".jld2")
-        dict = JLD2.load(filename)
-        # Previous filter already computed an orbit
-        "sol" in keys(dict) && return true
-        # Check tracklets are non empty
-        tracklets = dict["tracklets"]
-        isempty(tracklets) && return false
-        # Computation time so far
-        if "Δ" in keys(dict)
-            Δ = dict["Δ"]
         else
-            Δ = 0
-        end
-        # Optical astrometry
-        radec = reduce(vcat, getfield.(tracklets, :radec))
-        sort!(radec)
-        # Parameters
-        params = NEOParameters(coeffstol = Inf, bwdoffset = 0.5,
-                 fwdoffset = 0.5, jtlsiter = 10, adamhelp = true)
-
-        try
-            # Start of computation
-            init_time = now()
-            # Orbit determination
-            sol = orbitdetermination(radec, params)
-            # Time of computation
-            Δ += (now() - init_time).value
-            # Save orbit
-            if length(sol.res) != length(radec)
-                jldsave(filename; tracklets = tracklets, Δ = Δ)
-                return false
-            else
-                jldsave(filename; sol = sol, Δ = Δ)
-                return true
-            end
-        catch
-            # An error ocurred
-            jldsave(filename; tracklets = tracklets)
-            return false
-        end
-    end
-
-    # Third filter
-    function iod3(neo::String, outdir::String)
-        # Output from last filter
-        filename = joinpath(outdir, replace(neo, " " => "_") * ".jld2")
-        dict = JLD2.load(filename)
-        # Previous filter already computed an orbit
-        "sol" in keys(dict) && return true
-        # Check tracklets are non empty
-        tracklets = dict["tracklets"]
-        isempty(tracklets) && return false
-        # Computation time so far
-        if "Δ" in keys(dict)
-            Δ = dict["Δ"]
-        else
-            Δ = 0
-        end
-        # Optical astrometry
-        radec = reduce(vcat, getfield.(tracklets, :radec))
-        sort!(radec)
-        # Parameters
-        params = NEOParameters(coeffstol = Inf, bwdoffset = 0.5,
-                 fwdoffset = 0.5, jtlsiter = 10, adamhelp = true)
-
-        try
-            # Start of computation
-            init_time = now()
-            # Orbit determination
-            if isgauss(tracklets)
-                sol = tooshortarc(radec, tracklets, params)
-            else
-                sol = gaussinitcond(radec, tracklets, params)
-            end
-            # Time of computation
-            Δ += (now() - init_time).value
-            # Save orbit
-            if length(sol.res) != length(radec)
-                jldsave(filename; tracklets = tracklets, Δ = Δ)
-                return false
-            else
-                jldsave(filename; sol = sol, Δ = Δ)
-                return true
-            end
-        catch
-            # An error ocurred
-            jldsave(filename; tracklets = tracklets)
-            return false
+            jldsave(filename; sol = sol, Δ = Δ)
+            return true
         end
     end
 end
@@ -179,29 +77,24 @@ end
 function main()
     # Parse arguments from commandline
     parsed_args = parse_commandline()
-
-    println("Orbit determination for NEOs via jet transport")
-    println()
-
-    # NEOs to be processed
-    namesfile = parsed_args["names"]
-    neos = readlines(namesfile)
-    println(length(neos), " NEOs to be processed with ", nworkers(), " workers (",
-            Threads.nthreads(), " threads each)")
-    println()
+    # Input names file
+    input::String = parsed_args["input"]
     # Output directory
-    outdir = parsed_args["output"]
+    output::String = parsed_args["output"]
+    # Print header
+    println("Initial orbit determination for NEOs via jet transport")
+    println("• Input names file: ", input)
+    println("• Output directory: ", output)
+
+    # Parse NEOs' designations
+    neos = readlines(input)
+    println("• ", length(neos), " NEOs to be processed with ", nworkers(),
+        " workers (", Threads.nthreads(), " threads each)")
 
     # Distributed orbit determination
+    mask = pmap(neo -> iod(neo, output), neos)
+    println("• ", count(mask), " / ", length(neos), " successful NEOs")
 
-    # First filter
-    mask = pmap(neo -> iod1(neo, outdir), neos)
-    all(mask) && return nothing
-    # Second filter
-    mask = pmap(neo -> iod2(neo, outdir), neos)
-    all(mask) && return nothing
-    # Third filter
-    mask = pmap(neo -> iod3(neo, outdir), neos)
     return nothing
 end
 
