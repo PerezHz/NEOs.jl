@@ -347,37 +347,41 @@ function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
     # Set jet transport variables
     varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
     scaled_variables("dx", ones(T, 6); order = varorder)
-    # Admissible region of first tracklet
-    A = AdmissibleRegion(tracklets[1], params)
-    # List of initial conditions
-    v_ρ = sum(A.v_ρ_domain) / 2
-    I0 = [
-        (A.ρ_domain[1], v_ρ),
-        (10^(sum(log10, A.ρ_domain) / 2), v_ρ),
-        (sum(A.ρ_domain) / 2, v_ρ),
-        (A.ρ_domain[2], v_ρ),
-    ]
-    # Initial orbit determination
-    for i in eachindex(I0)
-        # ADAM minimization over manifold of variations
-        ρ, v_ρ = I0[i]
-        ae, Q = adam(tracklets[1].radec, A, ρ, v_ρ, params;
-            scale = :log, dynamics = dynamics)
-        # ADAM failed to converge
-        isinf(Q) && continue
-        # Initial time of integration [julian days]
-        # (corrected for light-time)
-        jd0 = datetime2julian(A.date) - ae[5] / c_au_per_day
-        # Convert attributable elements to barycentric cartesian coordinates
-        q0 = attr2bary(A, ae, params)
-        # Scaling factors
-        scalings = abs.(q0) ./ 10^5
-        # Jet Transport initial condition
-        q = [q0[k] + scalings[k] * TaylorN(k, order = params.tsaorder) for k in 1:6]
-        # Jet Transport Least Squares
-        sol = min(sol, jtls(radec, tracklets, jd0, q, 1, params, false; dynamics))
-        # Termination condition
-        nrms(sol) <= params.tsaQmax && length(sol.res) == length(radec) && break
+    # Iterate tracklets
+    for i in eachindex(tracklets)
+        # Admissible region
+        A = AdmissibleRegion(tracklets[i], params)
+        # List of naive initial conditions
+        v_ρ = sum(A.v_ρ_domain) / 2
+        I0 = [
+            (A.ρ_domain[1], v_ρ),
+            #(10^(sum(log10, A.ρ_domain) / 2), v_ρ),
+            (sum(A.ρ_domain) / 2, v_ρ),
+            #(A.ρ_domain[2], v_ρ),
+        ]
+        S0 = [:log, #=,=# #=,=# :linear]
+        # Iterate naive initial conditions
+        for j in eachindex(I0)
+            # ADAM minimization over manifold of variations
+            ρ, v_ρ = I0[j]
+            scale = S0[j]
+            ae, Q = adam(tracklets[i].radec, A, ρ, v_ρ, params; scale, dynamics)
+            # ADAM failed to converge
+            isinf(Q) && continue
+            # Initial time of integration [julian days]
+            # (corrected for light-time)
+            jd0 = datetime2julian(A.date) - ae[5] / c_au_per_day
+            # Convert attributable elements to barycentric cartesian coordinates
+            q0 = attr2bary(A, ae, params)
+            # Scaling factors
+            scalings = abs.(q0) ./ 10^5
+            # Jet Transport initial condition
+            q = [q0[k] + scalings[k] * TaylorN(k, order = params.tsaorder) for k in 1:6]
+            # Jet Transport Least Squares
+            sol = min(sol, jtls(radec, tracklets, jd0, q, i, params, false; dynamics))
+            # Termination condition
+            nrms(sol) <= params.tsaQmax && length(sol.res) == length(radec) && return sol
+        end
     end
 
     return sol

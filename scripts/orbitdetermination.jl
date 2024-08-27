@@ -49,7 +49,7 @@ end
         # Parameters
         params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007,
             fwdoffset = 0.007, adamiter = 500, adamQtol = 1e-5,
-            jtlsiter = 10, newtoniter = 10)
+            jtlsiter = 20, newtoniter = 10)
         # Select at most three tracklets
         tracklets = reduce_tracklets(radec)
         if length(tracklets) > 3
