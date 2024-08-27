@@ -37,9 +37,7 @@ end
     using NEOs: Tracklet, reduce_tracklets
 
     # Initial orbit determination routine
-    function iod(neo::String, output::String)
-        # Output file
-        filename = joinpath(output, replace(neo, " " => "") * ".jld2")
+    function iod(neo::String, filename::String)
         # Download optical astrometry
         radec = fetch_radec_mpc("designation" => neo)
         if length(radec) < 3
@@ -90,9 +88,13 @@ function main()
     neos = readlines(input)
     println("• ", length(neos), " NEOs to be processed with ", nworkers(),
         " workers (", Threads.nthreads(), " threads each)")
+    # Output files
+    filenames = map(neos) do neo
+        return joinpath(output, replace(neo, " " => "") * ".jld2")
+    end
 
     # Distributed orbit determination
-    mask = pmap(neo -> iod(neo, output), neos)
+    mask = pmap(iod, neos, filenames; on_error = ex -> false)
     println("• ", count(mask), " / ", length(neos), " successful NEOs")
 
     return nothing
