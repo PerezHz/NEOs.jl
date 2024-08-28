@@ -361,15 +361,15 @@ function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
     end
     # Reduce tracklets by polynomial regression
     tracklets = reduce_tracklets(radec)
+    # Set jet transport variables
+    varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
+    scaled_variables("dx", ones(T, 6); order = varorder)
     # Gauss method
     if gauss
         sol = min(sol, gaussinitcond(radec, tracklets, params; dynamics))
         # Termination condition
         nrms(sol) <= params.gaussQmax && length(sol.res) == length(radec) && return sol
     end
-    # Set jet transport variables
-    varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
-    scaled_variables("dx", ones(T, 6); order = varorder)
     # Iterate tracklets
     for i in eachindex(tracklets)
         # Admissible region
