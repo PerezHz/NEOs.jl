@@ -182,7 +182,7 @@ function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         rin, fit = addradec!(Val(mode), rin, fit, tin, tout, res, x0, params)
         # NRMS
         Q = nrms(res, fit)
-        if length(rin) == length(radec) && abs(best_Q - Q) < 0.1
+        if abs(best_Q - Q) < 0.1
             flag = true
         end
         # Update NRMS and initial conditions
@@ -314,9 +314,20 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
     return jtls(radec, tracklets, jd0, q, i, params; dynamics)
 end
 
+# Default naive initial conditions for iod
+function iodinitcond(A::AdmissibleRegion{T}) where {T <: Real}
+    v_ρ = sum(A.v_ρ_domain) / 2
+    return [
+        (A.ρ_domain[1], v_ρ, :log),
+        (10^(sum(log10, A.ρ_domain) / 2), v_ρ, :log),
+        (sum(A.ρ_domain) / 2, v_ρ, :log),
+        (A.ρ_domain[2], v_ρ, :log),
+    ]
+end
+
 @doc raw"""
     iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
-        kwargs...) where {T <: Real, D}
+        kwargs...) where {T <: Real, D1, D2}
 
 Initial Orbit Determination (IOD) routine.
 
@@ -327,13 +338,19 @@ Initial Orbit Determination (IOD) routine.
 
 ## Keyword arguments
 
-- `dynamics::D`: dynamical model (default: `newtonian!`).
+- `dynamics::D1`: dynamical model (default: `newtonian!`).
+- `gauss::Bool`: whether to try Gauss method before TSA (default: `true`).
+- `initcond::D2`: naive initial conditions function; takes as input an
+    `AdmissibleRegion` and outputs a `Vector{Tuple{T, T, Symbol}}`,
+    where each element has the form `(ρ, v_ρ, scale)`
+    (default: `iodinitcond`).
 
 !!! warning
     This function will change the (global) `TaylorSeries` variables.
 """
 function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
-    dynamics::D = newtonian!) where {T <: Real, D}
+    dynamics::D1 = newtonian!, gauss::Bool = true,
+    initcond::D2 = iodinitcond) where {T <: Real, D1, D2}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
     # Eliminate observatories without coordinates
@@ -344,6 +361,12 @@ function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
     end
     # Reduce tracklets by polynomial regression
     tracklets = reduce_tracklets(radec)
+    # Gauss method
+    if gauss
+        sol = min(sol, gaussinitcond(radec, tracklets, params; dynamics))
+        # Termination condition
+        nrms(sol) <= params.gaussQmax && length(sol.res) == length(radec) && return sol
+    end
     # Set jet transport variables
     varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
     scaled_variables("dx", ones(T, 6); order = varorder)
@@ -352,19 +375,11 @@ function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
         # Admissible region
         A = AdmissibleRegion(tracklets[i], params)
         # List of naive initial conditions
-        v_ρ = sum(A.v_ρ_domain) / 2
-        I0 = [
-            (A.ρ_domain[1], v_ρ),
-            #(10^(sum(log10, A.ρ_domain) / 2), v_ρ),
-            (sum(A.ρ_domain) / 2, v_ρ),
-            #(A.ρ_domain[2], v_ρ),
-        ]
-        S0 = [:log, #=,=# #=,=# :linear]
+        I0 = initcond(A)
         # Iterate naive initial conditions
         for j in eachindex(I0)
             # ADAM minimization over manifold of variations
-            ρ, v_ρ = I0[j]
-            scale = S0[j]
+            ρ, v_ρ, scale = I0[j]
             ae, Q = adam(tracklets[i].radec, A, ρ, v_ρ, params; scale, dynamics)
             # ADAM failed to converge
             isinf(Q) && continue

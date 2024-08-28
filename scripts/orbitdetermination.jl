@@ -36,18 +36,28 @@ end
     using NEOs, Dates, JLD2
     using NEOs: Tracklet, reduce_tracklets
 
+    # Default naive initial conditions for iod
+    function initcond(A::AdmissibleRegion{T}) where {T <: Real}
+        v_ρ = sum(A.v_ρ_domain) / 2
+        return [
+            (A.ρ_domain[1], v_ρ, :log),
+            (10^(sum(log10, A.ρ_domain) / 2), v_ρ, :log),
+            (sum(A.ρ_domain) / 2, v_ρ, :log),
+            (A.ρ_domain[2], v_ρ, :log),
+        ]
+    end
+
     # Initial orbit determination routine
     function iod(neo::String, filename::String)
         # Download optical astrometry
         radec = fetch_radec_mpc("designation" => neo)
-        if length(radec) < 3
-            jldsave(filename; error = "length(radec) < 3")
-            return false
-        end
+        length(radec) < 3 && return false
         # Parameters
         params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007,
             fwdoffset = 0.007, adamiter = 500, adamQtol = 1e-5,
             jtlsiter = 20, newtoniter = 10)
+        dynamics = newtonian!
+        gauss = true
         # Select at most three tracklets
         tracklets = reduce_tracklets(radec)
         if length(tracklets) > 3
@@ -58,17 +68,15 @@ end
         # Start of computation
         init_time = now()
         # Initial orbit determination
-        sol = NEOs.iod(radec, params)
+        sol = NEOs.iod(radec, params; dynamics, gauss, initcond)
         # Time of computation
         Δ = (now() - init_time).value
+        # Unsucessful orbit determination
+        length(sol.res) != length(radec) && return false
         # Save orbit
-        if length(sol.res) != length(radec)
-            jldsave(filename; error = "length(sol.res) != length(radec)")
-            return false
-        else
-            jldsave(filename; sol = sol, Δ = Δ)
-            return true
-        end
+        jldsave(filename; sol = sol, Δ = Δ)
+
+        return true
     end
 end
 
