@@ -338,8 +338,8 @@ Initial Orbit Determination (IOD) routine.
 
 ## Keyword arguments
 
-- `dynamics::D1`: dynamical model (default: `newtonian!`).
 - `gauss::Bool`: whether to try Gauss method before TSA (default: `true`).
+- `dynamics::D1`: dynamical model (default: `newtonian!`).
 - `initcond::D2`: naive initial conditions function; takes as input an
     `AdmissibleRegion` and outputs a `Vector{Tuple{T, T, Symbol}}`,
     where each element has the form `(ρ, v_ρ, scale)`
@@ -349,7 +349,7 @@ Initial Orbit Determination (IOD) routine.
     This function will change the (global) `TaylorSeries` variables.
 """
 function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
-    dynamics::D1 = newtonian!, gauss::Bool = true,
+    gauss::Bool = true, dynamics::D1 = newtonian!,
     initcond::D2 = iodinitcond) where {T <: Real, D1, D2}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})

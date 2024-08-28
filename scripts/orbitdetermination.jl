@@ -34,7 +34,7 @@ end
 
 @everywhere begin
     using NEOs, Dates, JLD2
-    using NEOs: Tracklet, reduce_tracklets
+    using NEOs: AdmissibleRegion, reduce_tracklets
 
     # Default naive initial conditions for iod
     function initcond(A::AdmissibleRegion{T}) where {T <: Real}
@@ -68,7 +68,7 @@ end
         # Start of computation
         init_time = now()
         # Initial orbit determination
-        sol = NEOs.iod(radec, params; dynamics, gauss, initcond)
+        sol = NEOs.iod(radec, params; gauss, dynamics, initcond)
         # Time of computation
         Δ = (now() - init_time).value
         # Unsucessful orbit determination
