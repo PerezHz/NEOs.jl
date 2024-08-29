@@ -325,6 +325,16 @@ function iodinitcond(A::AdmissibleRegion{T}) where {T <: Real}
     ]
 end
 
+# Update `sol` iff `_sol_` is complete and has a lower nrms
+function updatesol(sol::NEOSolution{T, T}, _sol_::NEOSolution{T, T},
+    radec::Vector{RadecMPC{T}}) where {T <: Real}
+    if length(_sol_.res) == length(radec)
+        return min(sol, _sol_)
+    else
+        return sol
+    end
+end
+
 @doc raw"""
     iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
         kwargs...) where {T <: Real, D1, D2}
@@ -356,9 +366,7 @@ function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
     # Eliminate observatories without coordinates
     filter!(x -> hascoord(observatory(x)), radec)
     # Cannot handle zero observations or multiple arcs
-    if iszero(length(radec)) || !issinglearc(radec)
-        return sol
-    end
+    (iszero(length(radec)) || !issinglearc(radec)) && return sol
     # Reduce tracklets by polynomial regression
     tracklets = reduce_tracklets(radec)
     # Set jet transport variables
@@ -366,9 +374,11 @@ function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
     scaled_variables("dx", ones(T, 6); order = varorder)
     # Gauss method
     if gauss
-        sol = min(sol, gaussinitcond(radec, tracklets, params; dynamics))
+        _sol_ = gaussinitcond(radec, tracklets, params; dynamics)
+        # Update solution
+        sol = updatesol(sol, _sol_, radec)
         # Termination condition
-        nrms(sol) <= params.gaussQmax && length(sol.res) == length(radec) && return sol
+        nrms(sol) <= params.gaussQmax && return sol
     end
     # Iterate tracklets
     for i in eachindex(tracklets)
@@ -393,9 +403,11 @@ function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
             # Jet Transport initial condition
             q = [q0[k] + scalings[k] * TaylorN(k, order = params.tsaorder) for k in 1:6]
             # Jet Transport Least Squares
-            sol = min(sol, jtls(radec, tracklets, jd0, q, i, params, false; dynamics))
+            _sol_ = jtls(radec, tracklets, jd0, q, i, params, false; dynamics)
+            # Update solution
+            sol = updatesol(sol, _sol_, radec)
             # Termination condition
-            nrms(sol) <= params.tsaQmax && length(sol.res) == length(radec) && return sol
+            nrms(sol) <= params.tsaQmax && return sol
         end
     end
 
