@@ -373,7 +373,7 @@ function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
     varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
     scaled_variables("dx", ones(T, 6); order = varorder)
     # Gauss method
-    if gauss
+    if gauss && length(tracklets) == 3 && tracklets[2].nobs >= 3
         _sol_ = gaussinitcond(radec, tracklets, params; dynamics)
         # Update solution
         sol = updatesol(sol, _sol_, radec)

@@ -458,10 +458,12 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
         return w
     elseif obscode == "G96"
         return 0.5w
-    elseif obscode == "F51"
+    elseif obscode ∈ ("F51", "F52") # F52 added manually
         return 0.2w
-    elseif obscode ∈ ("G45", "608")
+    elseif obscode ∈ ("G45", "608", "U68") # U68 added manually
         return 0.6w
+    elseif obscode == "L01" # L01 added manually
+        return 0.7w
     elseif obscode == "699"
         return 0.8w
     elseif obscode ∈ ("D29", "E12")
@@ -469,7 +471,8 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
     # Table 4:
     elseif obscode ∈ ("645", "673", "H01")
         return 0.3w
-    elseif obscode ∈ ("J04", "K92", "K93", "Q63", "Q64", "V37", "W85", "W86", "W87", "K91", "E10", "F65") #Tenerife + Las Cumbres
+    elseif obscode ∈ ("J04", "K92", "K93", "Q63", "Q64", "V37", "W85", "W86", "W87",
+        "K91", "E10", "F65") # Tenerife + Las Cumbres
         return 0.4w
     elseif obscode ∈ ("689", "950", "W84")
         return 0.5w
