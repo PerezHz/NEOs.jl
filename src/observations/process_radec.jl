@@ -456,7 +456,7 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
     # Table 3: most active CCD asteroid observers
     elseif obscode ∈ ("704", "C51", "J75")
         return w
-    elseif obscode == "G96"
+    elseif obscode ∈ ("G96", "291") # 291 added manually
         return 0.5w
     elseif obscode ∈ ("F51", "F52") # F52 added manually
         return 0.2w

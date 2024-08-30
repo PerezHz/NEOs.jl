@@ -161,6 +161,13 @@ function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
     tin = [tracklets[i]]
     tout = sort(tracklets, by = x -> abs( (x.date - tracklets[i].date).value ))[2:end]
     rin = sort!(indices(tracklets[i]))
+    while length(rin) < 3 && !isempty(tout)
+        tracklet = popfirst!(tout)
+        push!(tin, tracklet)
+        sort!(tin)
+        rin = vcat(rin, tracklet.indices)
+        sort!(rin)
+    end
     # Residuals space to barycentric coordinates jacobian
     J = Matrix(TS.jacobian(dq))
     # Best orbit
@@ -373,7 +380,7 @@ function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
     varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
     scaled_variables("dx", ones(T, 6); order = varorder)
     # Gauss method
-    if gauss && length(tracklets) == 3 && tracklets[2].nobs >= 3
+    if gauss && length(tracklets) == 3
         _sol_ = gaussinitcond(radec, tracklets, params; dynamics)
         # Update solution
         sol = updatesol(sol, _sol_, radec)
