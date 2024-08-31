@@ -54,10 +54,9 @@ end
         length(radec) < 3 && return false
         # Parameters
         params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007,
-            fwdoffset = 0.007, adamiter = 500, adamQtol = 1e-5,
-            jtlsiter = 20, newtoniter = 10)
+            fwdoffset = 0.007, gaussorder = 6, adamiter = 500,
+            adamQtol = 1e-5, jtlsiter = 20, newtoniter = 10)
         dynamics = newtonian!
-        gauss = true
         # Select at most three tracklets
         tracklets = reduce_tracklets(radec)
         if length(tracklets) > 3
@@ -68,7 +67,7 @@ end
         # Start of computation
         init_time = now()
         # Initial orbit determination
-        sol = NEOs.iod(radec, params; gauss, dynamics, initcond)
+        sol = NEOs.iod(radec, params; dynamics, initcond)
         # Time of computation
         Δ = (now() - init_time).value
         # Unsucessful orbit determination

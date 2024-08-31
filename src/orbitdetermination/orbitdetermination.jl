@@ -342,51 +342,63 @@ function updatesol(sol::NEOSolution{T, T}, _sol_::NEOSolution{T, T},
     end
 end
 
-@doc raw"""
-    iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
-        kwargs...) where {T <: Real, D1, D2}
-
-Initial Orbit Determination (IOD) routine.
-
-## Arguments
-
-- `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
-- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
-
-## Keyword arguments
-
-- `gauss::Bool`: whether to try Gauss method before TSA (default: `true`).
-- `dynamics::D1`: dynamical model (default: `newtonian!`).
-- `initcond::D2`: naive initial conditions function; takes as input an
-    `AdmissibleRegion` and outputs a `Vector{Tuple{T, T, Symbol}}`,
-    where each element has the form `(ρ, v_ρ, scale)`
-    (default: `iodinitcond`).
-
-!!! warning
-    This function will change the (global) `TaylorSeries` variables.
-"""
-function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
-    gauss::Bool = true, dynamics::D1 = newtonian!,
-    initcond::D2 = iodinitcond) where {T <: Real, D1, D2}
+# Gauss method initial orbit determination
+function _gaussiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
+    params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
-    # Eliminate observatories without coordinates
-    filter!(x -> hascoord(observatory(x)), radec)
-    # Cannot handle zero observations or multiple arcs
-    (iszero(length(radec)) || !issinglearc(radec)) && return sol
-    # Reduce tracklets by polynomial regression
-    tracklets = reduce_tracklets(radec)
-    # Set jet transport variables
-    varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
-    scaled_variables("dx", ones(T, 6); order = varorder)
-    # Gauss method
-    if gauss && length(tracklets) == 3
-        _sol_ = gaussinitcond(radec, tracklets, params; dynamics)
+    # This function requires exactly 3 tracklets
+    length(tracklets) != 3 && return sol
+    # Jet transport scaling factors
+    scalings = fill(1e-6, 6)
+    # Jet transport perturbation (ra/dec)
+    dq = [scalings[i] * TaylorN(i, order = params.gaussorder) for i in 1:6]
+    # gauss_method input
+    observatories = Vector{ObservatoryMPC{T}}(undef, 3)
+    dates = Vector{DateTime}(undef, 3)
+    α = Vector{T}(undef, 3)
+    δ = Vector{T}(undef, 3)
+    # Find best triplet of observations
+    _gausstriplets2!(observatories, dates, α, δ, tracklets)
+    # Julian day of middle observation
+    _jd0_ = datetime2julian(dates[2])
+    # Gauss method solution
+    solG = gauss_method(observatories, dates, α .+ dq[1:3], δ .+ dq[4:6], params)
+    # Filter non-physical (negative) rho solutions
+    filter!(x -> all(cte.(x.ρ) .> 0), solG)
+    # Filter Gauss solutions by heliocentric energy
+    filter!(x -> cte(cte(heliocentric_energy(x.statevect))) <= 0, solG)
+    # Iterate over Gauss solutions
+    for i in eachindex(solG)
+        # Epoch (corrected for light-time)
+        jd0 = _jd0_ - cte(solG[i].ρ[2]) / c_au_per_day
+        # Jet transport initial conditions
+        q = solG[i].statevect .+ params.eph_su(jd0 - JD_J2000)
+        # Jet Transport Least Squares
+        _sol_ = jtls(radec, tracklets, jd0, q, 2, params, true; dynamics)
+        # Update solution
+        sol = updatesol(sol, _sol_, radec)
+        # Termination condition
+        nrms(sol) <= params.gaussQmax && return sol
+        # ADAM help
+        jd0 = _adam!(q, jd0, tracklets[2], params; dynamics)
+        # Jet Transport Least Squares
+        _sol_ = jtls(radec, tracklets, jd0, q, 2, params, true; dynamics)
         # Update solution
         sol = updatesol(sol, _sol_, radec)
         # Termination condition
         nrms(sol) <= params.gaussQmax && return sol
     end
+
+    return sol
+end
+
+# Too short arc initial orbit determination
+function _tsaiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
+    params::NEOParameters{T}; dynamics::D1 = newtonian!,
+    initcond::D2 = iodinitcond) where {T <: Real, D1, D2}
+    # Allocate memory for orbit
+    sol = zero(NEOSolution{T, T})
     # Iterate tracklets
     for i in eachindex(tracklets)
         # ADAM requires a minimum of 2 observations
@@ -419,6 +431,55 @@ function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
             nrms(sol) <= params.tsaQmax && return sol
         end
     end
+
+    return sol
+end
+
+@doc raw"""
+    iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
+        kwargs...) where {T <: Real, D1, D2}
+
+Initial Orbit Determination (IOD) routine.
+
+## Arguments
+
+- `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
+- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+
+## Keyword arguments
+
+- `dynamics::D1`: dynamical model (default: `newtonian!`).
+- `initcond::D2`: naive initial conditions function; takes as input an
+    `AdmissibleRegion` and outputs a `Vector{Tuple{T, T, Symbol}}`,
+    where each element has the form `(ρ, v_ρ, scale)`
+    (default: `iodinitcond`).
+
+!!! warning
+    This function will change the (global) `TaylorSeries` variables.
+"""
+function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
+    dynamics::D1 = newtonian!, initcond::D2 = iodinitcond) where {T <: Real, D1, D2}
+    # Allocate memory for orbit
+    sol = zero(NEOSolution{T, T})
+    # Eliminate observatories without coordinates
+    filter!(x -> hascoord(observatory(x)), radec)
+    # Cannot handle zero observations or multiple arcs
+    (iszero(length(radec)) || !issinglearc(radec)) && return sol
+    # Reduce tracklets by polynomial regression
+    tracklets = reduce_tracklets(radec)
+    # Set jet transport variables
+    varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
+    scaled_variables("dx", ones(T, 6); order = varorder)
+    # Gauss method
+    _sol_ = _gaussiod(radec, tracklets, params; dynamics)
+    # Update solution
+    sol = updatesol(sol, _sol_, radec)
+    # Termination condition
+    nrms(sol) <= params.gaussQmax && return sol
+    # Too short arc
+    _sol_ = _tsaiod(radec, tracklets, params; dynamics, initcond)
+    # Update solution
+    sol = updatesol(sol, _sol_, radec)
 
     return sol
 end
