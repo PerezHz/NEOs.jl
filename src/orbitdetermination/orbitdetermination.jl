@@ -389,6 +389,8 @@ function iod(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
     end
     # Iterate tracklets
     for i in eachindex(tracklets)
+        # ADAM requires a minimum of 2 observations
+        tracklets[i].nobs < 2 && continue
         # Admissible region
         A = AdmissibleRegion(tracklets[i], params)
         # List of naive initial conditions

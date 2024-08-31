@@ -1,5 +1,5 @@
 using ArgParse, Downloads, Random, HORIZONS, NEOs
-using NEOs: numberofdays
+using NEOs: numberofdays, issatellite
 
 # Potentially Hazardous Asteroids MPC list
 const PHAS_URL = "https://cgi.minorplanetcenter.net/cgi-bin/textversion.cgi?f=lists/PHAs.html"
@@ -82,8 +82,11 @@ function main()
             neo = String(pop!(provdesig))
             radec = fetch_radec_mpc("designation" => neo)
             jplorbit = sbdb("des" => neo)["orbit"]
-            if (numberofdays(radec) <= 15.0) &&  (jplorbit["n_obs_used"] == length(radec)) &&
-                isnothing(jplorbit["n_del_obs_used"]) && isnothing(jplorbit["n_dop_obs_used"])
+            if numberofdays(radec) <= 15.0 &&
+                !any(map(r -> issatellite(r.observatory), radec)) &&
+                jplorbit["n_obs_used"] == length(radec) &&
+                isnothing(jplorbit["n_del_obs_used"]) &&
+                isnothing(jplorbit["n_dop_obs_used"])
                 names[i] = neo
                 break
             end
