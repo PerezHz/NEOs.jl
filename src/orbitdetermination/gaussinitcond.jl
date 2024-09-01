@@ -428,6 +428,12 @@ function _gausstriplets2!(observatories::Vector{ObservatoryMPC{T}}, dates::Vecto
     dates .= a.radec[i].date, b.radec[j].date, c.radec[k].date
     α .= a.radec[i].α, b.radec[j].α, c.radec[k].α
     δ .= a.radec[i].δ, b.radec[j].δ, c.radec[k].δ
+    # Sort triplet
+    idxs = sortperm(dates)
+    permute!(observatories, idxs)
+    permute!(dates, idxs)
+    permute!(α, idxs)
+    permute!(δ, idxs)
 
     return nothing
 end

@@ -381,6 +381,7 @@ function _gaussiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         # Termination condition
         nrms(sol) <= params.gaussQmax && return sol
         # ADAM help
+        tracklets[2].nobs < 2 && continue
         jd0 = _adam!(q, jd0, tracklets[2], params; dynamics)
         # Jet Transport Least Squares
         _sol_ = jtls(radec, tracklets, jd0, q, 2, params, true; dynamics)
