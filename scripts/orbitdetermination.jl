@@ -51,12 +51,8 @@ end
     function iod(neo::String, filename::String)
         # Download optical astrometry
         radec = fetch_radec_mpc("designation" => neo)
+        # At least 3 observations needed for OD
         length(radec) < 3 && return false
-        # Parameters
-        params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007,
-            fwdoffset = 0.007, gaussorder = 6, adamiter = 500,
-            adamQtol = 1e-5, jtlsiter = 20, newtoniter = 10)
-        dynamics = newtonian!
         # Select at most three tracklets
         tracklets = reduce_tracklets(radec)
         if length(tracklets) > 3
@@ -64,18 +60,48 @@ end
             radec = reduce(vcat, getfield.(tracklets, :radec))
             sort!(radec)
         end
+        # Dynamical function
+        dynamics = newtonian!
+        # Parameters
+        params = NEOParameters(
+            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+            gaussorder = 6, gaussQmax = 1.0,
+            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,
+            jtlsiter = 20, newtoniter = 10
+        )
         # Start of computation
         init_time = now()
         # Initial orbit determination
         sol = NEOs.iod(radec, params; dynamics, initcond)
-        # Time of computation
-        Δ = (now() - init_time).value
-        # Unsucessful orbit determination
-        length(sol.res) != length(radec) && return false
-        # Save orbit
-        jldsave(filename; sol = sol, Δ = Δ)
+        # Termination condition
+        if length(sol.res) == length(radec) && nrms(sol) < 1.5
+            # Time of computation
+            Δ = (now() - init_time).value
+            # Save orbit
+            jldsave(filename; sol = sol, Δ = Δ)
+            # Sucess flag
+            return true
+        end
+        # Parameters
+        params = NEOParameters(params;
+            coeffstol = 10.0, bwdoffset = 0.007, fwdoffset = 0.007,
+            gaussorder = 6, gaussQmax = 1.0,
+            adamiter = 200, adamQtol = 0.01, tsaQmax = 2.0,
+            jtlsiter = 20, newtoniter = 5
+        )
+        # Initial orbit determination
+        sol = NEOs.iod(radec, params; dynamics, initcond)
+        # Termination condition
+        if length(sol.res) == length(radec)
+            # Time of computation
+            Δ = (now() - init_time).value
+            # Save orbit
+            jldsave(filename; sol = sol, Δ = Δ)
+            # Sucess flag
+            return true
+        end
 
-        return true
+        return false
     end
 end
 
