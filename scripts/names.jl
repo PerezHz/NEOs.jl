@@ -81,12 +81,13 @@ function main()
         while !isempty(provdesig)
             neo = String(pop!(provdesig))
             radec = fetch_radec_mpc("designation" => neo)
+            filter!(radec) do r
+                hascoord(r.observatory) && !issatellite(r.observatory)
+            end
+            (length(radec) < 3 || numberofdays(radec) > 15.0) && continue
             jplorbit = sbdb("des" => neo)["orbit"]
-            if numberofdays(radec) <= 15.0 &&
-                !any(map(r -> issatellite(r.observatory), radec)) &&
-                jplorbit["n_obs_used"] == length(radec) &&
-                isnothing(jplorbit["n_del_obs_used"]) &&
-                isnothing(jplorbit["n_dop_obs_used"])
+            if isnothing(jplorbit["n_del_obs_used"]) &&
+               isnothing(jplorbit["n_dop_obs_used"])
                 names[i] = neo
                 break
             end
