@@ -34,7 +34,7 @@ end
 
 @everywhere begin
     using NEOs, Dates, JLD2
-    using NEOs: AdmissibleRegion, reduce_tracklets
+    using NEOs: AdmissibleRegion, reduce_tracklets, numberofdays, issatellite
 
     # Default naive initial conditions for iod
     function initcond(A::AdmissibleRegion{T}) where {T <: Real}
@@ -51,8 +51,15 @@ end
     function iod(neo::String, filename::String)
         # Download optical astrometry
         radec = fetch_radec_mpc("designation" => neo)
-        # At least 3 observations needed for OD
-        length(radec) < 3 && return false
+        # Find first observation with discovery asterisk
+        firstobs = findfirst(r -> !isempty(r.discovery), radec)
+        isnothing(firstobs) && return false
+        radec = radec[firstobs:end]
+        # Filter out satellite and non coordinate observatories
+        filter!(radec) do r
+            hascoord(r.observatory) && !issatellite(r.observatory)
+        end
+        (length(radec) < 3 || numberofdays(radec) > 15.0) && return false
         # Select at most three tracklets
         tracklets = reduce_tracklets(radec)
         if length(tracklets) > 3

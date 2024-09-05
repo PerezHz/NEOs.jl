@@ -81,6 +81,9 @@ function main()
         while !isempty(provdesig)
             neo = String(pop!(provdesig))
             radec = fetch_radec_mpc("designation" => neo)
+            firstobs = findfirst(r -> !isempty(r.discovery), radec)
+            isnothing(firstobs) && continue
+            radec = radec[firstobs:end]
             filter!(radec) do r
                 hascoord(r.observatory) && !issatellite(r.observatory)
             end
