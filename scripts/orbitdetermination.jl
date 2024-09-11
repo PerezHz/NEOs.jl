@@ -97,18 +97,23 @@ end
             jtlsiter = 20, newtoniter = 5
         )
         # Initial orbit determination
-        sol = NEOs.iod(radec, params; dynamics, initcond)
-        # Termination condition
-        if length(sol.res) == length(radec)
-            # Time of computation
-            Δ = (now() - init_time).value
-            # Save orbit
-            jldsave(filename; sol = sol, Δ = Δ)
-            # Sucess flag
-            return true
+        _sol_ = NEOs.iod(radec, params; dynamics, initcond)
+        # Time of computation
+        Δ = (now() - init_time).value
+        # Choose best orbit
+        if length(sol.res) == length(_sol_.res) == length(radec)
+            sol = min(sol, _sol_)
+        elseif length(sol.res) == length(radec)
+            sol = sol
+        elseif length(_sol_.res) == length(radec)
+            sol = _sol_
+        else
+            sol = zero(NEOSolution{Float64, Float64})
         end
-
-        return false
+        # Save orbit
+        iszero(sol) && return false
+        jldsave(filename; sol = sol, Δ = Δ)
+        return true
     end
 end
 
