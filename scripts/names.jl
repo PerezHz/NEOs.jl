@@ -109,7 +109,7 @@ function main()
     i = 1
     while i <= N && !isempty(provdesig)
         neo = String(popfirst!(provdesig))
-        radec = fetch_radec_mpc("designation" => neo)
+        radec = fetch_radec_mpc(neo)
         if isodcompatible(radec)
             names[i] = neo
             i += 1

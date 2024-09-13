@@ -384,49 +384,52 @@ function write_radec_mpc(obs::Vector{RadecMPC{T}}, filename::String) where {T <:
 end
 
 @doc raw"""
-    get_radec_mpc(id::Pair{String, String}, filename::String = replace(id[2], " " => "_") * ".txt")
+    fetch_radec_mpc(id::AbstractString)
 
-Download MPC optical astrometry of NEO `id` and save the output to `filename`.
+Download MPC optical astrometry of NEO `id` and return the output
+as `Vector{RadecMPC{Float64}}`.
+
+!!! reference
+    MPC Observations API documentation:
+
+    https://minorplanetcenter.net/mpcops/documentation/observations-api/.
 """
-function get_radec_mpc(id::Pair{String, String}, filename::String = replace(id[2], " " => "_") * ".txt")
-    # HTTP query
-    query = ["table" => "observations", id]
-    resp = get("http://minorplanetcenter.net/search_db"; query = query)
-    # Converty to String
+function fetch_radec_mpc(id::AbstractString)
+    # HTTP parameters
+    params = JSON.json(Dict("desigs" => [id], "output_format" => ["OBS80"]))
+    resp = get(MPC_OBS_API_URL, ("Content-Type" => "application/json",), params)
+    # Convert to String
     text = String(resp.body)
     # Parse JSON
-    obs = JSON.parse(text)
-    # Find matches
-    matches = Vector{Union{RegexMatch, Nothing}}(undef, length(obs))
-    for i in eachindex(obs)
-        s = obs[i]["original_record"]
-        matches[i] = match(RADEC_MPC_REGEX, s)
-    end
-    filter!(!isnothing, matches)
-    # Parse RadecMPC
-    radec = RadecMPC.(matches)
+    dict = JSON.parse(text)
+    # Parse observations
+    radec = RadecMPC.(eachmatch(RADEC_MPC_REGEX, dict[1]["OBS80"]))
+    # Eliminate unsuccessful matches and repeated entries
+    filter!(r -> isa(r, RadecMPC{Float64}), radec)
+    unique!(radec)
+
+    return radec
+end
+
+@doc raw"""
+    get_radec_mpc(id::AbstractString [, filename::AbstractString])
+
+Download MPC optical astrometry of NEO `id` and save the output to `filename`
+(default: `id.txt`).
+
+!!! reference
+    MPC Observations API documentation:
+
+    https://minorplanetcenter.net/mpcops/documentation/observations-api/.
+"""
+function get_radec_mpc(id::AbstractString, filename::AbstractString =
+    replace(id, " " => "_") * ".txt")
+    # Fetch optical astrometry
+    radec = fetch_radec_mpc(id)
     # Write observations to file
     write_radec_mpc(radec, filename)
 
     return filename
-end
-
-@doc raw"""
-    fetch_radec_mpc(id::Pair{String, String})
-
-Download MPC optical astrometry of NEO `id` and return the output as `Vector{RadecMPC{Float64}}`.
-"""
-function fetch_radec_mpc(id::Pair{String, String})
-    # Temporary file
-    f = tempname()
-    # Download optical astrometry
-    get_radec_mpc(id, f)
-    # Parse optical astrometry
-    radec = read_radec_mpc(f)
-    # Delete temporary file
-    rm(f)
-
-    return radec
 end
 
 # Methods to convert a Vector{<:AbstractAstrometry} to a DataFrame

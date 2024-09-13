@@ -138,11 +138,8 @@ const CATALOGUES_MPC_URL = "https://www.minorplanetcenter.net/iau/info/Catalogue
 # MPC observatories file url
 const OBSERVATORIES_MPC_URL = "https://www.minorplanetcenter.net/iau/lists/ObsCodes.html"
 
-# MPC database search url
-const search_mpc_url = "https://www.minorplanetcenter.net/db_search/show_object?utf8=%E2%9C%93&object_id="
-# MPC observations url
-const obs_mpc_url = "https://www.minorplanetcenter.net/tmp2/"
-
+# MPC Oservations API url
+const MPC_OBS_API_URL = "https://data.minorplanetcenter.net/api/get-obs"
 # NEO Confirmation Page File URL
 const NEOCP_FILE_URL = "https://www.minorplanetcenter.net/Extended_Files/neocp.json"
 # NEO Confirmation Page Show Orbits URL

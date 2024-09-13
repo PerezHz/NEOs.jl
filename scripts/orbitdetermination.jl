@@ -73,7 +73,7 @@ end
     # Initial orbit determination routine
     function iod(neo::String, filename::String)
         # Download optical astrometry
-        radec = fetch_radec_mpc("designation" => neo)
+        radec = fetch_radec_mpc(neo)
         # Get at most 3 tracklets for orbit determination
         flag, radec = radecfilter(radec)
         !flag && return false
