@@ -12,11 +12,11 @@ function parse_commandline()
 
     @add_arg_table! s begin
         "--input", "-i"
-            help = "Input names file"
+            help = "input names file"
             arg_type = String
             default = "names.txt"
         "--output", "-o"
-            help = "Output directory"
+            help = "output directory"
             arg_type = String
             default = pwd()
     end
@@ -34,7 +34,30 @@ end
 
 @everywhere begin
     using NEOs, Dates, JLD2
-    using NEOs: AdmissibleRegion, reduce_tracklets, numberofdays, issatellite
+    using NEOs: AdmissibleRegion, RadecMPC, reduce_tracklets, numberofdays,
+        issatellite
+
+    function radecfilter(radec::Vector{RadecMPC{T}}) where {T <: Real}
+        # Eliminate observations before oficial discovery
+        firstobs = findfirst(r -> !isempty(r.discovery), radec)
+        isnothing(firstobs) && return false, radec
+        radec = radec[firstobs:end]
+        # Filter out incompatible observatories
+        filter!(radec) do r
+            hascoord(r.observatory) && !issatellite(r.observatory)
+        end
+        length(radec) < 3 && return false, radec
+        # Find the first set of 3 tracklets with a < 15 days timespan
+        tracklets = reduce_tracklets(radec)
+        for i in 1:length(tracklets)-2
+            numberofdays(tracklets[i:i+2]) > 15.0 && continue
+            tracklets = tracklets[i:i+2]
+            radec = reduce(vcat, getfield.(tracklets, :radec))
+            sort!(radec)
+            break
+        end
+        return numberofdays(radec) <= 15.0, radec
+    end
 
     # Default naive initial conditions for iod
     function initcond(A::AdmissibleRegion{T}) where {T <: Real}
@@ -51,22 +74,9 @@ end
     function iod(neo::String, filename::String)
         # Download optical astrometry
         radec = fetch_radec_mpc("designation" => neo)
-        # Find first observation with discovery asterisk
-        firstobs = findfirst(r -> !isempty(r.discovery), radec)
-        isnothing(firstobs) && return false
-        radec = radec[firstobs:end]
-        # Filter out satellite and non coordinate observatories
-        filter!(radec) do r
-            hascoord(r.observatory) && !issatellite(r.observatory)
-        end
-        (length(radec) < 3 || numberofdays(radec) > 15.0) && return false
-        # Select at most three tracklets
-        tracklets = reduce_tracklets(radec)
-        if length(tracklets) > 3
-            tracklets = tracklets[1:3]
-            radec = reduce(vcat, getfield.(tracklets, :radec))
-            sort!(radec)
-        end
+        # Get at most 3 tracklets for orbit determination
+        flag, radec = radecfilter(radec)
+        !flag && return false
         # Dynamical function
         dynamics = newtonian!
         # Parameters

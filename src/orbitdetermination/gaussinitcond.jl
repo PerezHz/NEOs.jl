@@ -339,20 +339,25 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
 end
 
 @doc raw"""
-    numberofdays(dates::Vector{DateTime})
-    numberofdays(dates::Vector{RadecMPC{T}}) where {T <: Real}
-    numberofdays(dates::Vector{Tracklet{T}}) where {T <: Real}
+    numberofdays(x)
 
-Return the timespan of `dates` in days. The function assumes `dates` is sorted.
+Return the timespan of `x::AbstractVector{T}` in days, where
+`T` can be `DateTime`, `RadecMPC` or `Tracklet`.
 """
-numberofdays(dates::Vector{DateTime}) = (dates[end] - dates[1]).value / 86_400_000
-
-function numberofdays(dates::Vector{RadecMPC{T}}) where {T <: Real}
-    return (dates[end].date - dates[1].date).value / 86_400_000
+function numberofdays(dates::AbstractVector{DateTime})
+    t0, tf = extrema(dates)
+    return (tf - t0).value / 86_400_000
 end
 
-function numberofdays(dates::Vector{Tracklet{T}}) where {T <: Real}
-    return (dates[end].radec[end].date - dates[1].radec[1].date).value / 86_400_000
+function numberofdays(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+    t0, tf = extrema(date, radec)
+    return (tf - t0).value / 86_400_000
+end
+
+function numberofdays(tracklets::AbstractVector{Tracklet{T}}) where {T <: Real}
+    dates = map(t -> extrema(date, t.radec), tracklets)
+    t0, tf = minimum(first, dates), maximum(last, dates)
+    return (tf - t0).value / 86_400_000
 end
 
 # Return the `maxtriplets` best combinations of three `tracklets`

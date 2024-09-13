@@ -50,12 +50,16 @@ function isodcompatible(radec::Vector{RadecMPC{T}}) where {T <: Real}
         hascoord(r.observatory) && !issatellite(r.observatory)
     end
     length(radec) < 3 && return false
-    # There is at least one tracklet with a < 15 days timespan
+    # There is at least one set of 3 tracklets with a < 15 days timespan
     tracklets = reduce_tracklets(radec)
     for i in 1:length(tracklets)-2
-        numberofdays(tracklets[i:i+2]) <= 15.0 && return true
+        numberofdays(tracklets[i:i+2]) > 15.0 && continue
+        tracklets = tracklets[i:i+2]
+        radec = reduce(vcat, getfield.(tracklets, :radec))
+        sort!(radec)
+        break
     end
-    return false
+    return numberofdays(radec) <= 15.0
 end
 
 function main()
