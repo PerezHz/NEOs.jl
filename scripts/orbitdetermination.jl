@@ -42,9 +42,10 @@ end
         firstobs = findfirst(r -> !isempty(r.discovery), radec)
         isnothing(firstobs) && return false, radec
         radec = radec[firstobs:end]
-        # Filter out incompatible observatories
+        # Filter out incompatible observations
         filter!(radec) do r
-            hascoord(r.observatory) && !issatellite(r.observatory)
+            hascoord(r.observatory) && !issatellite(r.observatory) &&
+            date(r) >= Date(2000)
         end
         length(radec) < 3 && return false, radec
         # Find the first set of 3 tracklets with a < 15 days timespan

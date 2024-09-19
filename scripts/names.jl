@@ -1,4 +1,4 @@
-using ArgParse, Downloads, Random, NEOs
+using ArgParse, Downloads, Random, NEOs, Dates
 using NEOs: RadecMPC, numberofdays, issatellite, reduce_tracklets
 
 # Potentially Hazardous Asteroids MPC list
@@ -45,9 +45,10 @@ function isodcompatible(radec::Vector{RadecMPC{T}}) where {T <: Real}
     firstobs = findfirst(r -> !isempty(r.discovery), radec)
     isnothing(firstobs) && return false
     radec = radec[firstobs:end]
-    # Filter out incompatible observatories
+    # Filter out incompatible observations
     filter!(radec) do r
-        hascoord(r.observatory) && !issatellite(r.observatory)
+        hascoord(r.observatory) && !issatellite(r.observatory) &&
+        date(r) >= Date(2000)
     end
     length(radec) < 3 && return false
     # There is at least one set of 3 tracklets with a < 15 days timespan
