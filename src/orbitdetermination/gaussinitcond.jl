@@ -470,7 +470,7 @@ function _adam!(q::Vector{TaylorN{T}}, jd0::T, tracklet::Tracklet, params::NEOPa
     # Convert attributable elements to barycentric cartesian coordinates
     q0 = attr2bary(A, ae, params)
     # Jet Transport initial condition
-    q .= [q0[i] + (q0[i] / 10^5) * TaylorN(i, order = params.tsaorder) for i in 1:6]
+    q .= [q0[i] + (abs(q0[i]) / 10^5) * TaylorN(i, order = params.tsaorder) for i in 1:6]
 
     return jd0
 end

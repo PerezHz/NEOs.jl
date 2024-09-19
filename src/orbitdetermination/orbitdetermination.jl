@@ -78,6 +78,28 @@ function propres!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}}
     end
 end
 
+# Initial subset of radec for jtls
+function _initialtracklets(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
+    i::Int) where {T <: Real}
+    if iszero(i)
+        tin = deepcopy(tracklets)
+        tout = Vector{Tracklet{T}}(undef, 0)
+        rin = sort!(reduce(vcat, indices.(tracklets)))
+    else
+        tin = [tracklets[i]]
+        tout = sort(tracklets, by = x -> abs( (x.date - tracklets[i].date).value ))[2:end]
+        rin = sort!(indices(tracklets[i]))
+        while length(rin) < 3 && !isempty(tout)
+            tracklet = popfirst!(tout)
+            push!(tin, tracklet)
+            sort!(tin)
+            rin = vcat(rin, tracklet.indices)
+            sort!(rin)
+        end
+    end
+    return tin, tout, rin
+end
+
 # Incrementally add observations to fit
 
 # Add as much tracklets as possible per iteration
@@ -157,17 +179,8 @@ function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
     buffer = PropagationBuffer(dynamics, jd0, tlim, q, params)
     # Origin
     x0 = zeros(T, 6)
-    # Subset of radec for orbit fit
-    tin = [tracklets[i]]
-    tout = sort(tracklets, by = x -> abs( (x.date - tracklets[i].date).value ))[2:end]
-    rin = sort!(indices(tracklets[i]))
-    while length(rin) < 3 && !isempty(tout)
-        tracklet = popfirst!(tout)
-        push!(tin, tracklet)
-        sort!(tin)
-        rin = vcat(rin, tracklet.indices)
-        sort!(rin)
-    end
+    # Initial subset of radec for orbit fit
+    tin, tout, rin = _initialtracklets(radec, tracklets, i)
     # Residuals space to barycentric coordinates jacobian
     J = Matrix(TS.jacobian(dq))
     # Best orbit
@@ -375,7 +388,7 @@ function _gaussiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         # Jet transport initial conditions
         q = solG[i].statevect .+ params.eph_su(jd0 - JD_J2000)
         # Jet Transport Least Squares
-        _sol_ = jtls(radec, tracklets, jd0, q, 2, params, true; dynamics)
+        _sol_ = jtls(radec, tracklets, jd0, q, 0, params, true; dynamics)
         # Update solution
         sol = updatesol(sol, _sol_, radec)
         # Termination condition
@@ -384,7 +397,7 @@ function _gaussiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         tracklets[2].nobs < 2 && continue
         jd0 = _adam!(q, jd0, tracklets[2], params; dynamics)
         # Jet Transport Least Squares
-        _sol_ = jtls(radec, tracklets, jd0, q, 2, params, true; dynamics)
+        _sol_ = jtls(radec, tracklets, jd0, q, 0, params, true; dynamics)
         # Update solution
         sol = updatesol(sol, _sol_, radec)
         # Termination condition
