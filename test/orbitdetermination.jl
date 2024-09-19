@@ -91,7 +91,7 @@ using NEOs: NEOSolution, numberofdays
 
     @testset "Gauss Method (with ADAM)" begin
         # Load observations
-        radec = fetch_radec_mpc("designation" => "2016 TU93")
+        radec = fetch_radec_mpc("2016 TU93")
 
         # Parameters
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007, adamhelp = true)
@@ -145,7 +145,7 @@ using NEOs: NEOSolution, numberofdays
                     k_gauss, μ_ES, topo2bary, bary2topo
 
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2024 BX1")
+        radec = fetch_radec_mpc("2024 BX1")
         # Parameters
         params = NEOParameters()
         # First tracklet
@@ -246,7 +246,7 @@ using NEOs: NEOSolution, numberofdays
 
     @testset "Too Short Arc" begin
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2008 EK68")
+        radec = fetch_radec_mpc("2008 EK68")
 
         # Parameters
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
@@ -302,7 +302,7 @@ using NEOs: NEOSolution, numberofdays
 
     @testset "Outlier Rejection" begin
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2007 VV7")
+        radec = fetch_radec_mpc("2007 VV7")
 
         # Parameters
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
@@ -357,7 +357,7 @@ using NEOs: NEOSolution, numberofdays
         # 2014 AA hit the Earth around January 2, 2014, 02:49 UTC
 
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2014 AA")
+        radec = fetch_radec_mpc("2014 AA")
 
         # Parameters
         params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
@@ -413,7 +413,7 @@ using NEOs: NEOSolution, numberofdays
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2008 TC3")
+        radec = fetch_radec_mpc("2008 TC3")
 
         # Parameters
         params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)

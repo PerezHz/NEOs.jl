@@ -160,7 +160,7 @@ using NEOs: src_path
 
         # Get RadecMPC
         source_file = joinpath(pkgdir(NEOs), "test", "data", "99942.txt")
-        get_radec_mpc("number" => "99942", source_file)
+        get_radec_mpc("99942", source_file)
 
         @test isfile(source_file)
 
@@ -321,7 +321,7 @@ using NEOs: src_path
         # Choose this example because of the discontinuity in α
 
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2020 TJ6")
+        radec = fetch_radec_mpc("2020 TJ6")
         # Reduce tracklets
         tracklets = reduce_tracklets(radec)
 

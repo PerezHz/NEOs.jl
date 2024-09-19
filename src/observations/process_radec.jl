@@ -449,21 +449,19 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
     # Table 2: epoch-dependent astrometric residuals
     if obscode == "703"
         return Date(dt_utc_obs) < Date(2014,1,1) ? w : 0.8w
-    elseif obscode == "691"
+    elseif obscode ∈ ("691", "291") # Spacewatch, Kitt Peak, Arizona
         return Date(dt_utc_obs) < Date(2003,1,1) ? 0.6w : 0.5w
     elseif obscode == "644"
         return Date(dt_utc_obs) < Date(2003,9,1) ? 0.6w : 0.4w
     # Table 3: most active CCD asteroid observers
     elseif obscode ∈ ("704", "C51", "J75")
         return w
-    elseif obscode ∈ ("G96", "291") # 291 added manually
+    elseif obscode == "G96"
         return 0.5w
-    elseif obscode ∈ ("F51", "F52") # F52 added manually
+    elseif obscode ∈ ("F51", "F52") # Pan-STARRS 1 & 2, Haleakala, Hawaii
         return 0.2w
-    elseif obscode ∈ ("G45", "608", "U68") # U68 added manually
+    elseif obscode ∈ ("G45", "608")
         return 0.6w
-    elseif obscode == "L01" # L01 added manually
-        return 0.7w
     elseif obscode == "699"
         return 0.8w
     elseif obscode ∈ ("D29", "E12")
