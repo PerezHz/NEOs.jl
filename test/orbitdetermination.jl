@@ -588,7 +588,9 @@ using NEOs: NEOSolution, numberofdays
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 1e-5
         # Compatibility with JPL
-        @test all(jplcompare("2011 UE256", sol) .< 1.4)
+        JPL = [1.5278628625115747, 0.9328045030769134, 0.37557784083953694,
+            -0.01435645430893024, 0.0002883436308974054, 0.002280157717152364]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1.4)
     end
 
 end
