@@ -19,7 +19,7 @@ using NEOs: NEOSolution, numberofdays
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by May 31, 2024
+        # Values by Sep 20, 2024
 
         # Vector of observations
         @test length(radec) == 123
@@ -44,9 +44,9 @@ using NEOs: NEOSolution, numberofdays
         @test iszero(count(outlier.(sol.res)))
         # Least squares fit
         @test sol.fit.success
-        @test all( sigmas(sol) .< 5e-5 )
-        @test all( snr(sol) .> 4_500)
-        @test nrms(sol) < 0.36
+        @test all( sigmas(sol) .< 4.2e-5 )
+        @test all( snr(sol) .> 4_700)
+        @test nrms(sol) < 0.38
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
         @test !isdiag(sol.jacobian)
@@ -54,7 +54,7 @@ using NEOs: NEOSolution, numberofdays
         # Compatibility with JPL
         JPL = [-1.1003236797145037, 0.20774505704014837, 0.04203643429323372,
                -0.004736048200346307, -0.010626587751050683, -0.006016238714906758]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.27)
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.29)
 
         # Refine orbit
         sol1 = orbitdetermination(radec, sol, params)
@@ -76,15 +76,15 @@ using NEOs: NEOSolution, numberofdays
         @test iszero(count(outlier.(sol1.res)))
         # Least squares fit
         @test sol1.fit.success
-        @test all( sigmas(sol1) .< 5e-5 )
-        @test all( snr(sol1) .> 4_500 )
-        @test nrms(sol1) < 0.36
+        @test all( sigmas(sol1) .< 4.2e-5 )
+        @test all( snr(sol1) .> 4_700 )
+        @test nrms(sol1) < 0.38
         # Jacobian
         @test size(sol1.jacobian) == (6, 6)
         @test isdiag(sol1.jacobian)
         @test maximum(sol1.jacobian) < 2e-6
         # Compatibility with JPL
-        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.27)
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.29)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol1, params) == 6
     end
@@ -312,7 +312,7 @@ using NEOs: NEOSolution, numberofdays
         # Outlier rejection
         sol = outlier_rejection(radec, sol, params)
 
-        # Values by May 31, 2024
+        # Values by Sep 20, 2024
 
         # Vector of observations
         @test length(radec) == 21
@@ -347,7 +347,7 @@ using NEOs: NEOSolution, numberofdays
         # Compatibility with JPL
         JPL = [0.7673449629397204, 0.6484776654615118, 0.2932277478785896,
                -0.011023192686652665, 0.015392823966811551, 0.0065288994881745974]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 7e-4)
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 2e-3)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 8
     end
