@@ -111,115 +111,67 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
     return aes[:, t], Qs[t]
 end
 
-# Order in which to check tracklets in tooshortarc
-function tsatrackletorder(x::Tracklet{T}, y::Tracklet{T}) where {T <: Real}
-    if x.nobs == y.nobs
-        return x.date > y.date
-    else
-        return x.nobs > y.nobs
-    end
-end
-
-# Point in manifold of variations -> NEOSolution{T, T}
-function _tooshortarc(A::AdmissibleRegion{T}, radec::Vector{RadecMPC{T}},
-                      tracklets::Vector{Tracklet{T}}, i::Int, params::NEOParameters{T};
-                      scale::Symbol = :log, dynamics::D = newtonian!) where {T <: Real, D}
-    # Center
-    if scale == :linear
-        ρ = sum(A.ρ_domain) / 2
-    elseif scale == :log
-        ρ = A.ρ_domain[1]
-    end
-    v_ρ = sum(A.v_ρ_domain) / 2
-    # ADAM minimization over manifold of variations
-    ae, Q = adam(tracklets[i].radec, A, ρ, v_ρ, params; scale, dynamics)
-    # ADAM failed to converge
-    if isinf(Q)
-        return zero(NEOSolution{T, T})
-    # Jet Transport Least Squares
-    else
-        # Initial time of integration [julian days]
-        # (corrected for light-time)
-        jd0 = datetime2julian(A.date) - ae[5] / c_au_per_day
-        # Convert attributable elements to barycentric cartesian coordinates
-        q0 = attr2bary(A, ae, params)
-        # Scaling factors
-        scalings = abs.(q0) ./ 10^5
-        # Jet Transport initial condition
-        q = [q0[i] + scalings[i] * TaylorN(i, order = params.tsaorder) for i in 1:6]
-        # Jet Transport Least Squares
-        return jtls(radec, tracklets, jd0, q, i, params; dynamics)
-    end
-end
-
 @doc raw"""
-    tooshortarc(radec::Vector{RadecMPC{T}}, [tracklets::Vector{Tracklet{T}},]
-                params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
+    tsaiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
+        params::NEOParameters{T}; kwargs...) where {T <: Real, D1, D2}
+
+
 
 Compute an orbit by minimizing the normalized root mean square residual
 over the manifold of variations.
 
-# Arguments
+## Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
 - `params::NEOParameters{T}`: see `Too Short Arc Parameters` of [`NEOParameters`](@ref).
-- `dynamics::D`: dynamical model.
 
-!!! warning
-    This function will change the (global) `TaylorSeries` variables.
+## Keyword arguments
+
+- `dynamics::D1`: dynamical model (default: `newtonian!`).
+- `initcond::D2`: naive initial conditions function; takes as input an
+    `AdmissibleRegion` and outputs a `Vector{Tuple{T, T, Symbol}}`,
+    where each element has the form `(ρ, v_ρ, scale)`
+    (default: `iodinitcond`).
 """
-function tooshortarc(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
-                     dynamics::D = newtonian!) where {T <: Real, D}
-    # Reduce tracklets by polynomial regression
-    tracklets = reduce_tracklets(radec)
-    # Set jet transport variables
-    varorder = max(params.tsaorder, params.gaussorder)
-    scaled_variables("dx", ones(T, 6); order = varorder)
-    # Too Short Arc (TSA)
-    return tooshortarc(radec, tracklets, params; dynamics)
-end
-
-function tooshortarc(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-                     params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
-
-    # Allocate memory for output
-    best_sol = zero(NEOSolution{T, T})
-    # Sort tracklets by tsatrackletorder
-    idxs = sortperm(tracklets, lt = tsatrackletorder)
-
+# Too short arc initial orbit determination
+function tsaiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
+    params::NEOParameters{T}; dynamics::D1 = newtonian!,
+    initcond::D2 = iodinitcond) where {T <: Real, D1, D2}
+    # Allocate memory for orbit
+    sol = zero(NEOSolution{T, T})
     # Iterate tracklets
-    for i in idxs
+    for i in eachindex(tracklets)
+        # ADAM requires a minimum of 2 observations
+        tracklets[i].nobs < 2 && continue
         # Admissible region
         A = AdmissibleRegion(tracklets[i], params)
-        iszero(A) && continue
-        # See Table 1 of https://doi.org/10.1051/0004-6361/201732104
-        if A.ρ_domain[2] < sqrt(10)
-            sol1 = _tooshortarc(A, radec, tracklets, i, params;
-                                scale = :log, dynamics)
-            # Break condition
-            nrms(sol1) < params.tsaQmax && return sol1
-            sol2 = _tooshortarc(A, radec, tracklets, i, params;
-                                scale = :linear, dynamics)
-            # Break condition
-            nrms(sol2) < params.tsaQmax && return sol2
-        else
-            sol1 = _tooshortarc(A, radec, tracklets, i, params;
-                                scale = :linear, dynamics)
-            # Break condition
-            nrms(sol1) < params.tsaQmax && return sol1
-            sol2 = _tooshortarc(A, radec, tracklets, i, params;
-                                scale = :log, dynamics)
-            # Break condition
-            nrms(sol2) < params.tsaQmax && return sol2
-        end
-        # Update best solution
-        if nrms(sol1) < nrms(best_sol)
-            best_sol = sol1
-        elseif nrms(sol2) < nrms(best_sol)
-            best_sol = sol2
+        # List of naive initial conditions
+        I0 = initcond(A)
+        # Iterate naive initial conditions
+        for j in eachindex(I0)
+            # ADAM minimization over manifold of variations
+            ρ, v_ρ, scale = I0[j]
+            ae, Q = adam(tracklets[i].radec, A, ρ, v_ρ, params; scale, dynamics)
+            # ADAM failed to converge
+            isinf(Q) && continue
+            # Initial time of integration [julian days]
+            # (corrected for light-time)
+            jd0 = datetime2julian(A.date) - ae[5] / c_au_per_day
+            # Convert attributable elements to barycentric cartesian coordinates
+            q0 = attr2bary(A, ae, params)
+            # Scaling factors
+            scalings = abs.(q0) ./ 10^5
+            # Jet Transport initial condition
+            q = [q0[k] + scalings[k] * TaylorN(k, order = params.tsaorder) for k in 1:6]
+            # Jet Transport Least Squares
+            _sol_ = jtls(radec, tracklets, jd0, q, i, params, false; dynamics)
+            # Update solution
+            sol = updatesol(sol, _sol_, radec)
+            # Termination condition
+            nrms(sol) <= params.tsaQmax && return sol
         end
     end
 
-    return best_sol
+    return sol
 end

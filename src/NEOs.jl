@@ -71,11 +71,11 @@ export project, chi2, nms, nrms, diffcorr, newtonls, levenbergmarquardt, tryls
 # NEOSolution
 export epoch, sigmas, snr, jplcompare, uncertaintyparameter
 # Too Short Arc
-export tooshortarc
+export tsaiod
 # Gauss method
-export gauss_method, gaussinitcond
+export gauss_method, gaussiod
 # Orbit determination
-export curvature, issinglearc, isgauss, orbitdetermination, iod
+export curvature, issinglearc, orbitdetermination
 # B plane
 export valsecchi_circle, bopik, mtp
 # Outlier rejection
