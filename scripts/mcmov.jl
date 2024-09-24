@@ -61,7 +61,7 @@ end
         _, y_max = argoldensearch(A, 10^x_min, 10^x_max, :max, :outer, 1e-20)
         scalings[5:6] .= (x_max - x_min) / 100, (y_max - y_min) / 100
         # Propagation buffer
-        t0, tf = datetime2days(date(radec[1])), datetime2days(date(radec[end]))
+        t0, tf = dtutc2days(date(radec[1])), dtutc2days(date(radec[end]))
         tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
         buffer = PropagationBuffer(newtonian!, dtutc2jdtdb(A.date), tlim,
                                    ae .+ scalings .* dae, params)

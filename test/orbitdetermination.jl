@@ -43,11 +43,11 @@ end
         @test sol.tracklets[end].radec[end] == subradec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
@@ -84,11 +84,11 @@ end
         @test sol1.tracklets[end].radec[end] == subradec[end]
         @test issorted(sol1.tracklets)
         # Backward integration
-        @test datetime2days(date(subradec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
+        @test dtutc2days(date(subradec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
         @test all( norm.(sol1.bwd.x, Inf) .< 1.2 )
         @test isempty(sol1.t_bwd) && isempty(sol1.x_bwd) && isempty(sol1.g_bwd)
         # Forward integration
-        @test datetime2days(date(subradec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
+        @test dtutc2days(date(subradec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
         @test all( norm.(sol1.fwd.x, Inf) .< 1.2 )
         @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
@@ -135,11 +135,11 @@ end
         @test sol.tracklets[end].radec[end] == radec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
@@ -301,11 +301,11 @@ end
         @test sol.tracklets[end].radec[end] == radec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
@@ -353,11 +353,11 @@ end
         @test sol.tracklets[end].radec[end] == subradec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
@@ -390,11 +390,11 @@ end
         @test sol1.tracklets[end].radec[end] == radec[end]
         @test issorted(sol1.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
+        @test dtutc2days(date(radec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
         @test all( norm.(sol1.bwd.x, Inf) .< 2 )
         @test isempty(sol1.t_bwd) && isempty(sol1.x_bwd) && isempty(sol1.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
+        @test dtutc2days(date(radec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
         @test all( norm.(sol1.fwd.x, Inf) .< 2 )
         @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
@@ -450,11 +450,11 @@ end
         @test sol.tracklets[end].radec[end] == radec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 1e9 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
@@ -502,11 +502,11 @@ end
         @test sol.tracklets[end].radec[end] == subradec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 1e4 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
@@ -543,11 +543,11 @@ end
         @test sol1.tracklets[end].radec[end] == subradec[93]
         @test issorted(sol1.tracklets)
         # Backward integration
-        @test datetime2days(date(subradec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
+        @test dtutc2days(date(subradec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
         @test all( norm.(sol1.bwd.x, Inf) .< 1 )
         @test isempty(sol1.t_bwd) && isempty(sol1.x_bwd) && isempty(sol1.g_bwd)
         # Forward integration
-        @test datetime2days(date(subradec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
+        @test dtutc2days(date(subradec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
         @test all( norm.(sol1.fwd.x, Inf) .< 1e15 )
         @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
@@ -626,11 +626,11 @@ end
         @test sol.tracklets[end].radec[end] == radec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals

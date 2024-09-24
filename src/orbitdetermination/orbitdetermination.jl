@@ -173,7 +173,7 @@ function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
     # Vector of O-C residuals
     res = Vector{OpticalResidual{T, TaylorN{T}}}(undef, length(radec))
     # Propagation buffer
-    t0, tf = datetime2days(date(radec[1])), datetime2days(date(radec[end]))
+    t0, tf = dtutc2days(date(radec[1])), dtutc2days(date(radec[end]))
     tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
     buffer = PropagationBuffer(dynamics, jd0, tlim, q, params)
     # Origin
@@ -339,6 +339,6 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     # Jet Transport initial condition
     q = q0 + dq
     # Jet Transport Least Squares
-    _, i = findmin(tracklet -> abs(datetime2days(tracklet.date) - sol.bwd.t0), tracklets)
+    _, i = findmin(tracklet -> abs(dtutc2days(tracklet.date) - sol.bwd.t0), tracklets)
     return jtls(radec, tracklets, jd0, q, i, params; dynamics)
 end

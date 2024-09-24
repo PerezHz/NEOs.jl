@@ -49,7 +49,7 @@ export hasdelay, hasdoppler, delay, doppler, rcvr, xmit, read_radar_jpl, write_r
 export fetch_objects_neocp, get_radec_neocp, fetch_radec_neocp, get_orbits_neocp
 # Units
 export julian2etsecs, etsecs2julian, dtutc2et, dtutc2jdtdb, et2dtutc, jdtdb2dtutc,
-       et_to_200X, days_to_200X, datetime_to_200X, datetime2days, days2datetime,
+       et_to_200X, days_to_200X, dtutc_to_200X, dtutc2days, days2dtutc,
        rad2arcsec, arcsec2rad, mas2rad
 # JPL ephemerides
 export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199

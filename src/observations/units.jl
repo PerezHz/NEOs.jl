@@ -92,25 +92,25 @@ Convert `d` TDB days since J2000 to TDB years `200X`.
 days_to_200X(d::T) where {T <: Number} = 2000 + d/yr
 
 @doc raw"""
-    datetime_to_200X(x::DateTime)
+    dtutc_to_200X(x::DateTime)
 
 Convert `x`, a UTC `DateTime`, to TDB years `200X`.
 """
-datetime_to_200X(x::DateTime) = et_to_200X(dtutc2et(x))
+dtutc_to_200X(x::DateTime) = et_to_200X(dtutc2et(x))
 
 @doc raw"""
-    datetime2days(x::DateTime)
+    dtutc2days(x::DateTime)
 
 Convert `x`, a UTC `DateTime`, to TDB days since J2000.
 """
-datetime2days(x::DateTime) = dtutc2jdtdb(x) - JD_J2000
+dtutc2days(x::DateTime) = dtutc2jdtdb(x) - JD_J2000
 
 @doc raw"""
-    days2datetime(d::T) where {T <: Number}
+    days2dtutc(d::T) where {T <: Number}
 
 Convert `d` TDB days since J2000 to a UTC `DateTime`.
 """
-days2datetime(d::T) where {T <: Number} = jdtdb2dtutc(d + JD_J2000)
+days2dtutc(d::T) where {T <: Number} = jdtdb2dtutc(d + JD_J2000)
 
 @doc raw"""
     tdb_utc(et::T) where {T <: Number}

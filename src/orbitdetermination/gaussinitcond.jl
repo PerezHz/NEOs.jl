@@ -414,7 +414,7 @@ function _adam!(q::Vector{TaylorN{T}}, jd0::T, tracklet::Tracklet,
     # Admissible region
     A = AdmissibleRegion(tracklet, params)
     # Epoch [days since J2000]
-    At0 = datetime2days(A.date)
+    At0 = dtutc2days(A.date)
     # Barycentric cartesian initial condition
     if At0 <= jd0 - JD_J2000
         q0 = bwd(At0)

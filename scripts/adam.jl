@@ -71,7 +71,7 @@ end
         set_variables(Float64, "dx"; order = adamorder, numvars = 6)
         dae = [scalings[i] * TaylorN(i, order = adamorder) for i in 1:6]
         # Propagation buffer
-        t0, tf = datetime2days(date(radec[1])), datetime2days(date(radec[end]))
+        t0, tf = dtutc2days(date(radec[1])), dtutc2days(date(radec[end]))
         tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
         buffer = PropagationBuffer(dynamics, jd0, tlim, aes[:, 1] .+ dae, params)
         # Vector of O-C residuals

@@ -82,7 +82,7 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     # Topocentric unit vector and partials
     ρ, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Time of observation [days since J2000]
-    t_days = datetime2days(t_datetime)
+    t_days = dtutc2days(t_datetime)
     # Time of observation [et seconds]
     t_et = dtutc2et(t_datetime)
     # Heliocentric position of the observer
@@ -595,10 +595,10 @@ Convert topocentric range/range-rate `[ρ, v_ρ]` to barycentric cartesian coord
 """
 function topo2bary(A::AdmissibleRegion{T}, ρ::U, v_ρ::U) where {T <: Real, U <: Number}
     # Barycentric position
-    r = A.q[1:3] + ρ * A.ρ_unit + sseph(su, datetime2days(A.date))[1:3]
+    r = A.q[1:3] + ρ * A.ρ_unit + sseph(su, dtutc2days(A.date))[1:3]
     # Barycentric velocity
     v = A.q[4:6] + v_ρ * A.ρ_unit + ρ * A.v_α * A.ρ_α + ρ * A.v_δ * A.ρ_δ
-        + sseph(su, datetime2days(A.date))[4:6]
+        + sseph(su, dtutc2days(A.date))[4:6]
     # Barycentric state vector
     return vcat(r, v)
 end
@@ -611,7 +611,7 @@ Convert barycentric cartesian coordinates `q0` to topocentric range/range-rate.
 """
 function bary2topo(A::AdmissibleRegion{T}, q0::Vector{U}) where {T <: Real, U <: Number}
     # Heliocentric state vector
-    r = q0 - sseph(su, datetime2days(A.date))
+    r = q0 - sseph(su, dtutc2days(A.date))
     # Topocentric range
     ρ = euclid3D(r - A.q)
     # Topocentric range rate
@@ -632,7 +632,7 @@ function attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
     # Unfold
     α, δ, v_α, v_δ, ρ, v_ρ = a
     # Light-time correction to epoch
-    t = datetime2days(A.date) - ρ/c_au_per_day
+    t = dtutc2days(A.date) - ρ/c_au_per_day
     # TO DO: `et::TaylorN` is too slow for `adam` due to
     # SatelliteToolboxTransformations overloads in src/observations/topocentric.jl
     et = dtutc2et(A.date) - cte(cte(ρ))/c_au_per_sec
