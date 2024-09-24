@@ -50,7 +50,7 @@ end
         μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, adamorder::Int = 2,
         dynamics::D = newtonian!) where {T <: Real, D}
         # Initial time of integration [julian days]
-        jd0 = datetime2julian(A.date)
+        jd0 = dtutc2jdtdb(A.date)
         # Maximum number of iterations
         maxiter = params.adamiter
         # Allocate memory

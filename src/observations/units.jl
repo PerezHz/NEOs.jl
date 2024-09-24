@@ -12,7 +12,7 @@ end
 @doc raw"""
     etsecs2julian(et::T) where {T <: Number}
 
-Convert `et` TDB seconds since J2000 to Julian date (TDB).
+Convert `et` TDB seconds since J2000 to Julian date in TDB time scale.
 
 See also [`julian2etsecs`](@ref).
 """
@@ -54,39 +54,63 @@ function dtutc2jdtdb(dtutc::DateTime)
 end
 
 @doc raw"""
+    et2dtutc(et::T) where {T <: Number}
+
+Convert `et` TDB seconds past the J2000 epoch to a UTC `DateTime`.
+"""
+function et2dtutc(et::T) where {T <: Number}
+    # UTC seconds past J2000
+    utc = et - tdb_utc(et)
+    # UTC milliseconds past J2000
+    mill = Millisecond(round(Int, utc * 1_000)).value
+    # UTC DateTime
+    return epochms2datetime(EPOCHMSJ2000 + mill)
+end
+
+@doc raw"""
+    jdtdb2dtutc(jdtdb::T) where {T <: Number}
+
+Convert `jdtdb`, a Julian date in TDB time scale, to a UTC `DateTime`.
+"""
+function jdtdb2dtutc(jdtdb::T) where {T <: Number}
+    et = julian2etsecs(jdtdb) # TDB seconds since J2000.0
+    return et2dtutc(et) # UTC DateTime
+end
+
+@doc raw"""
     et_to_200X(et::T) where {T <: Number}
 
-Convert `et` ephemeris seconds since J2000 to years `200X`.
+Convert `et` TDB seconds since J2000 to TDB years `200X`.
 """
 et_to_200X(et::T) where {T <: Number} = 2000 + et/daysec/yr
 
 @doc raw"""
     days_to_200X(d::T) where {T <: Number}
 
-Convert `d` days since J2000 to years `200X`.
+Convert `d` TDB days since J2000 to TDB years `200X`.
 """
 days_to_200X(d::T) where {T <: Number} = 2000 + d/yr
 
 @doc raw"""
     datetime_to_200X(x::DateTime)
 
-Convert `DateTime` `x` to years `200X`.
+Convert `x`, a UTC `DateTime`, to TDB years `200X`.
 """
 datetime_to_200X(x::DateTime) = et_to_200X(dtutc2et(x))
 
 @doc raw"""
     datetime2days(x::DateTime)
 
-Convert `DateTime` `x` to days since J2000.
+Convert `x`, a UTC `DateTime`, to TDB days since J2000.
 """
-datetime2days(x::DateTime) = datetime2julian(x) - JD_J2000
+datetime2days(x::DateTime) = dtutc2jdtdb(x) - JD_J2000
 
 @doc raw"""
     days2datetime(d::T) where {T <: Number}
 
-Convert `d` days since J2000 to `DateTime`.
+Convert `d` TDB days since J2000 to a UTC `DateTime`.
 """
-days2datetime(d::T) where {T <: Number} = julian2datetime(d + JD_J2000)
+days2datetime(d::T) where {T <: Number} = jdtdb2dtutc(d + JD_J2000)
 
 @doc raw"""
     tdb_utc(et::T) where {T <: Number}
@@ -170,7 +194,7 @@ Convert radians to arcseconds.
 
 See also [`arcsec2rad`](@ref) and [`mas2rad`](@ref).
 """
-rad2arcsec(x::T) where {T <: Number} = 3600 * rad2deg(x) # rad2deg(rad) -> deg; 3600 * deg -> arcsec
+rad2arcsec(x::T) where {T <: Number} = 3600 * rad2deg(x)
 
 @doc raw"""
     arcsec2rad(x::T) where {T <: Number}
@@ -179,7 +203,7 @@ Convert arcseconds to radians.
 
 See also [`rad2arcsec`](@ref) and [`mas2rad`](@ref).
 """
-arcsec2rad(x::T) where {T <: Number} = deg2rad(x / 3600) # arcsec/3600 -> deg; deg2rad(deg) -> rad
+arcsec2rad(x::T) where {T <: Number} = deg2rad(x / 3600)
 
 @doc raw"""
     mas2rad(x::T) where {T <: Number}
@@ -188,4 +212,4 @@ Convert milli-arcseconds to radians.
 
 See also [`rad2arcsec`](@ref) and [`arcsec2rad`](@ref).
 """
-mas2rad(x::T) where {T <: Number} = arcsec2rad(x / 1000) # mas/1000 -> arcsec; arcsec2rad(arcsec) -> rad
+mas2rad(x::T) where {T <: Number} = arcsec2rad(x / 1000)

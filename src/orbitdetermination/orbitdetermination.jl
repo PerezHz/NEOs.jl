@@ -6,7 +6,7 @@ include("admissibleregion.jl")
 # Times used within propres
 function _proprestimes(radec::Vector{RadecMPC{T}}, jd0::U, params::NEOParameters{T}) where {T <: Real, U <: Number}
     # Time of first (last) observation
-    t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
+    t0, tf = dtutc2jdtdb(date(radec[1])), dtutc2jdtdb(date(radec[end]))
     # TDB epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Years in backward (forward) integration

@@ -428,7 +428,7 @@ function _adam!(q::Vector{TaylorN{T}}, jd0::T, tracklet::Tracklet,
     # ADAM
     ae, _ = adam(tracklet.radec, A, ρ, v_ρ, params; scale = :log, dynamics = dynamics)
     # Epoch [julian days] (corrected for light-time)
-    jd0 = datetime2julian(A.date) - ae[5] / c_au_per_day
+    jd0 = dtutc2jdtdb(A.date) - ae[5] / c_au_per_day
     # Convert attributable elements to barycentric cartesian coordinates
     q0 = attr2bary(A, ae, params)
     # Jet Transport initial condition
@@ -473,7 +473,7 @@ function gaussiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
     # Find best triplet of observations
     _gausstriplet!(observatories, dates, α, δ, tracklets)
     # Julian day of middle observation
-    _jd0_ = datetime2julian(dates[2])
+    _jd0_ = dtutc2jdtdb(dates[2])
     # Gauss method solution
     solG = gauss_method(observatories, dates, α .+ dq[1:3], δ .+ dq[4:6], params)
     # Filter non-physical (negative) rho solutions

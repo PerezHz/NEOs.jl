@@ -250,6 +250,12 @@ using NEOs: src_path
         rm(filename)
     end
 
+    @testset "Time conversions" begin
+        t0 = now()
+        @test et2dtutc(dtutc2et(t0)) == t0
+        @test jdtdb2dtutc(dtutc2jdtdb(t0)) == t0
+    end
+
     @testset "Topocentric" begin
         using NEOs: TimeOfDay, sunriseset, obsposECEF, obsposvelECI
 
@@ -296,8 +302,8 @@ using NEOs: src_path
         # Sunrise and sunset
         radec = read_radec_mpc("99942        8C2020 12 08.15001011 20 07.510-08 02 54.20         18.50GV~4ROF094")
         sun = sunriseset(radec[1])
-        @test datetime2julian(sun[1]) ≈ datetime2julian(DateTime("2020-12-08T05:05:59.384"))
-        @test datetime2julian(sun[2]) ≈ datetime2julian(DateTime("2020-12-08T14:05:49.386"))
+        @test dtutc2jdtdb(sun[1]) ≈ dtutc2jdtdb(DateTime("2020-12-08T05:05:59.384"))
+        @test dtutc2jdtdb(sun[2]) ≈ dtutc2jdtdb(DateTime("2020-12-08T14:05:49.386"))
 
         # obsposECEF
         ecef_2 = obsposECEF.(radec_2)

@@ -29,7 +29,7 @@ using InteractiveUtils: methodswith
         # Dynamical function
         dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
         # Initial time [Julian date TDB]
-        jd0 = datetime2julian(DateTime(2023, 2, 25, 0, 0, 0))
+        jd0 = dtutc2jdtdb(DateTime(2023, 2, 25, 0, 0, 0))
         # Time of integration [years]
         nyears = 0.2
         # Unperturbed initial condition
@@ -152,7 +152,7 @@ using InteractiveUtils: methodswith
         # Dynamical function
         dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
         # Initial time [Julian date TDB]
-        jd0 = datetime2julian(DateTime(2004, 6, 1))
+        jd0 = dtutc2jdtdb(DateTime(2004, 6, 1))
         # Time of integration [years]
         nyears = 9.0
         # JPL #199 solution for Apophis at June 1st, 2004
@@ -262,7 +262,7 @@ using InteractiveUtils: methodswith
         # Dynamical function
         dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
         # Initial date of integration [Julian date TDB]
-        jd0 = datetime2julian(DateTime(2029, 4, 13, 20))
+        jd0 = dtutc2jdtdb(DateTime(2029, 4, 13, 20))
         # Time of integration [years]
         nyears = 0.02
         # Perturbation to nominal initial condition (Taylor1 jet transport)
@@ -320,7 +320,7 @@ using InteractiveUtils: methodswith
         # integration parameters
         nyears::Float64 = 10.0
         varorder::Int = 1
-        jd0::Float64 = datetime2julian(DateTime(2004,6,1)) #Julian date (TDB) of integration initial time
+        jd0::Float64 = dtutc2jdtdb(DateTime(2004,6,1)) #Julian date (TDB) of integration initial time
         # 7-DOF nominal solution from pha/apophis.jl script at epoch 2004-06-01T00:00:00.000 (TDB)
         q00::Vector{Float64} = [-1.0506627988664696, -0.060643124245514164, -0.0499709975200415, 0.0029591416313078838, -0.014232335581939919, -0.0052184125285361415, -2.898870403031058e-14, 0.0]
         scalings::Vector{Float64} = vcat(fill(1e-8, 6), 1e-14)

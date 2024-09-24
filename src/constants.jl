@@ -13,6 +13,9 @@ const poteph::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Tay
 const ttmtdb::TaylorInterpolant{Float64, Float64, 1, Vector{Float64}, Vector{Taylor1{Float64}}} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
 const SSEPHORDER::Int = get_order(sseph.x[1])
 
+# Milliseconds between rounding epoch and J2000
+const EPOCHMSJ2000::Int = (DateTime(2000, 1, 1, 12) - DateTime(0)).value
+
 # Earth orientation parameters (eop) 2000
 const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
 

@@ -24,7 +24,7 @@ function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T
               μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2,
               dynamics::D = newtonian!) where {T <: Real, D}
     # Initial time of integration [julian days]
-    jd0 = datetime2julian(A.date)
+    jd0 = dtutc2jdtdb(A.date)
     # Maximum number of iterations
     maxiter = params.adamiter
     # Target function relative tolerance
@@ -157,7 +157,7 @@ function tsaiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
             isinf(Q) && continue
             # Initial time of integration [julian days]
             # (corrected for light-time)
-            jd0 = datetime2julian(A.date) - ae[5] / c_au_per_day
+            jd0 = dtutc2jdtdb(A.date) - ae[5] / c_au_per_day
             # Convert attributable elements to barycentric cartesian coordinates
             q0 = attr2bary(A, ae, params)
             # Scaling factors
