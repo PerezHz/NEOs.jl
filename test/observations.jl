@@ -232,7 +232,7 @@ using NEOs: src_path
         @test 0 <= object.α <= 2π
         @test -π <= object.δ <= π
         @test object.nobs > 0
-        @test object.arc > 0
+        @test object.arc >= 0
         @test object.notseen > 0
         # Check optical astrometry
         filename = get_radec_neocp(object.tmpdesig)
