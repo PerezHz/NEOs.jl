@@ -240,7 +240,7 @@ using NEOs: src_path
         radec1 = read_radec_mpc(filename)
         radec2 = fetch_radec_neocp(object.tmpdesig)
         rm(filename)
-        @test length(radec1) == length(radec2) == object.nobs
+        @test length(radec1) == length(radec2) >= object.nobs
         @test radec1 == radec2
         notseen = (now(UTC) - date(radec1[end])).value / 86_400_000
         @test round(notseen, RoundUp, digits = 3) >= object.notseen

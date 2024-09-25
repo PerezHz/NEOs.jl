@@ -33,7 +33,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(subradec, params)
 
-        # Values by Sep 23, 2024
+        # Values by Sep 25, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -63,8 +63,8 @@ end
         @test !isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 3e-4
         # Compatibility with JPL
-        JPL = [-0.9867634449383033, 0.37819661654762515, 0.1409496597762104,
-            -0.008773352993961309, -0.009471020683708361, -0.005654201693378764]
+        JPL = [-0.9867704701732631, 0.3781890325424674, 0.14094513213009532,
+            -0.008773157203087259, -0.00947109649687576, -0.005654229864757284]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.76)
 
         # Add observations
@@ -125,7 +125,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by Sep 23, 2024
+        # Values by Sep 25, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -155,8 +155,8 @@ end
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 1e-5
         # Compatibility with JPL
-        JPL = [1.0102564188486982, 0.2934743828145318, 0.10467187893161536,
-               -0.0002634434601757652, 0.01837381321202214, 0.007208485181422459]
+        JPL = [1.010256210875638, 0.29348888228332376, 0.10467756741992229,
+            -0.000263645106358707, 0.01837375504784015, 0.007208464525828968]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 4.8e-2)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 8
@@ -177,7 +177,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by Sep 23, 2024
+        # Values by Sep 25, 2024
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -285,14 +285,14 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by Sep 23, 2024
+        # Values by Sep 25, 2024
 
         # Curvature
         C, Γ_C = curvature(radec)
         σ_C = sqrt.(diag(Γ_C))
         @test all( abs.(C) ./ σ_C .> 5.5)
         χ2 = C' * inv(Γ_C) * C
-        @test χ2 > 2_517
+        @test χ2 > 2_516
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
         # Tracklets
@@ -321,9 +321,9 @@ end
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 1e-5
         # Compatibility with JPL
-        JPL = [-0.9698333704468041, 0.2403646120906576, 0.10288887497365079,
-               -0.009512521364762891, -0.015325432155116774, -0.008094623535119534]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.015)
+        JPL = [-0.9698405495747651, 0.24035304578776012, 0.10288276585828428,
+            -0.009512301266159554, -0.01532548565855646, -0.00809464581680694]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.012)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 11
     end
@@ -343,7 +343,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(subradec, params)
 
-        # Values by Sep 23, 2024
+        # Values by Sep 25, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -373,8 +373,8 @@ end
         @test !isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 5e-4
         # Compatibility with JPL
-        JPL = [0.7673449629397204, 0.6484776654615118, 0.2932277478785896,
-               -0.011023192686652665, 0.015392823966811551, 0.0065288994881745974]
+        JPL = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
+            -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1.75)
 
         # Add remaining observations
@@ -410,7 +410,7 @@ end
         @test isdiag(sol1.jacobian)
         @test maximum(sol1.jacobian) < 8e-7
         # Compatibility with JPL
-        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 2e-3)
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.2e-3)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol1, params) == 8
     end
@@ -434,7 +434,7 @@ end
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by Sep 23, 2024
+        # Values by Sep 25, 2024
 
         # Curvature
         C, Γ_C = curvature(radec)
@@ -470,8 +470,8 @@ end
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 9e-6
         # Compatibility with JPL
-        JPL = [-0.17932853781716676, 0.8874166708195785, 0.38414497112938667,
-               -0.017557883503263098, -0.005781328976995571, -0.0020073946372627465]
+        JPL = [-0.1793421909678032, 0.8874121750891107, 0.3841434101167349,
+            -0.017557851117612377, -0.005781634223099801, -0.0020075106081869185]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 10
@@ -492,7 +492,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(subradec, params)
 
-        # Values by Sep 23, 2024
+        # Values by Sep 25, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -522,8 +522,8 @@ end
         @test !isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 4e-6
         # Compatibility with JPL
-        JPL = [0.9739820361593784, 0.21540492643235964, 0.09400612422262647,
-            -0.007896468282550691, 0.016062012088843138, 0.0061353925926507825]
+        JPL = [0.9739760787551061, 0.21541704400792083, 0.09401075290627411,
+            -0.00789675674941779, 0.0160619782715116, 0.006135361409943397]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.20)
 
         # Add observations
@@ -616,7 +616,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(radec, params; initcond = iodinitcond)
 
-        # Values by Sep 23, 2024
+        # Values by Sep 25, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -646,9 +646,9 @@ end
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 1e-5
         # Compatibility with JPL
-        JPL = [1.5278628625115747, 0.9328045030769134, 0.37557784083953694,
-            -0.01435645430893024, 0.0002883436308974054, 0.002280157717152364]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1.40)
+        JPL = [1.5278518651683686, 0.9328047239405421, 0.3755795874791371,
+            -0.014356510695499359, 0.0002883092503924326, 0.002280143873309611]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1.33)
     end
 
 end

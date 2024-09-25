@@ -15,9 +15,11 @@ using NEOs: propres
     # Parameters
     params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
 
-    # Orbit Determination
+    # Initial Orbit Determination
     sol = orbitdetermination(radec[1:8], params)
+    # Update parameters
     params = NEOParameters(params; jtlsorder = 6)
+    # Refine orbit
     sol = orbitdetermination(radec, sol, params)
 
     # Radial velocity with respect to the Earth.
