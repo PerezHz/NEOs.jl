@@ -90,7 +90,7 @@ end
         # Start of computation
         init_time = now()
         # Initial orbit determination
-        sol = NEOs.iod(radec, params; dynamics, initcond)
+        sol = orbitdetermination(radec, params; dynamics, initcond)
         # Termination condition
         if length(sol.res) == length(radec) && nrms(sol) < 1.5
             # Time of computation
@@ -108,7 +108,7 @@ end
             jtlsiter = 20, newtoniter = 5
         )
         # Initial orbit determination
-        _sol_ = NEOs.iod(radec, params; dynamics, initcond)
+        _sol_ = orbitdetermination(radec, params; dynamics, initcond)
         # Time of computation
         Δ = (now() - init_time).value
         # Choose best orbit

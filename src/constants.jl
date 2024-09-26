@@ -145,6 +145,8 @@ const OBSERVATORIES_MPC_URL = "https://www.minorplanetcenter.net/iau/lists/ObsCo
 const MPC_OBS_API_URL = "https://data.minorplanetcenter.net/api/get-obs"
 # NEO Confirmation Page File URL
 const NEOCP_FILE_URL = "https://www.minorplanetcenter.net/Extended_Files/neocp.json"
+# MPC NEOCP Oservations API url
+const MPC_NEOCP_OBS_API_URL = "https://data.minorplanetcenter.net/api/get-obs-neocp"
 # NEO Confirmation Page Show Orbits URL
 const NEOCP_SHOWORBS_URL = "https://cgi.minorplanetcenter.net/cgi-bin/showobsorbs.cgi"
 
