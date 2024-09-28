@@ -6,7 +6,7 @@ include("admissibleregion.jl")
 # Times used within propres
 function _proprestimes(radec::Vector{RadecMPC{T}}, jd0::U, params::NEOParameters{T}) where {T <: Real, U <: Number}
     # Time of first (last) observation
-    t0, tf = datetime2julian(date(radec[1])), datetime2julian(date(radec[end]))
+    t0, tf = dtutc2jdtdb(date(radec[1])), dtutc2jdtdb(date(radec[end]))
     # TDB epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Years in backward (forward) integration
@@ -78,24 +78,94 @@ function propres!(res::Vector{OpticalResidual{T, U}}, radec::Vector{RadecMPC{T}}
     end
 end
 
+# Initial subset of radec for jtls
+function _initialtracklets(tracklets::Vector{Tracklet{T}}, i::Int) where {T <: Real}
+    if iszero(i)
+        tin = deepcopy(tracklets)
+        tout = Vector{Tracklet{T}}(undef, 0)
+        rin = sort!(reduce(vcat, indices.(tracklets)))
+    else
+        tin = [tracklets[i]]
+        tout = sort(tracklets, by = x -> abs( (x.date - tracklets[i].date).value ))[2:end]
+        rin = sort!(indices(tracklets[i]))
+        while length(rin) < 3 && !isempty(tout)
+            tracklet = popfirst!(tout)
+            push!(tin, tracklet)
+            sort!(tin)
+            rin = vcat(rin, tracklet.indices)
+            sort!(rin)
+        end
+    end
+    return tin, tout, rin
+end
+
+# Incrementally add observations to fit
+
+# Add as much tracklets as possible per iteration
+function addradec!(::Val{true}, rin::Vector{Int}, fit::LeastSquaresFit{T},
+    tin::Vector{Tracklet{T}}, tout::Vector{Tracklet{T}},
+    res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+    params::NEOParameters{T}) where {T <: Real}
+    while !isempty(tout)
+        extra = indices(tout[1])
+        fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter)
+        !fit_new.success && break
+        fit = fit_new
+        tracklet = popfirst!(tout)
+        push!(tin, tracklet)
+        sort!(tin)
+        rin = vcat(rin, extra)
+        sort!(rin)
+    end
+
+    return rin, fit
+end
+
+# Add at most one tracklet per iteration
+function addradec!(::Val{false}, rin::Vector{Int}, fit::LeastSquaresFit{T},
+    tin::Vector{Tracklet{T}}, tout::Vector{Tracklet{T}},
+    res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+    params::NEOParameters{T}) where {T <: Real}
+    if nrms(res[rin], fit) < params.tsaQmax && !isempty(tout)
+        extra = indices(tout[1])
+        fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter)
+        !fit_new.success && return rin, fit
+        fit = fit_new
+        tracklet = popfirst!(tout)
+        push!(tin, tracklet)
+        sort!(tin)
+        rin = vcat(rin, extra)
+        sort!(rin)
+    end
+
+    return rin, fit
+end
+
 @doc raw"""
-    jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V, q::Vector{U},
-         g0::Int, gf::Int, params::NEOParameters{T}; dynamics::D = newtonian!) where {D, T <: Real, U <: Number, V <: Number}
+    jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V,
+         q::Vector{TayloN{T}}, i::Int, params::NEOParameters{T}, mode::Bool;
+         kwargs...) where {D, T <: Real, V <: Number}
 
 Compute an orbit via Jet Transport Least Squares.
 
-# Arguments
+## Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
 - `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
 - `jd0::V`: reference epoch [Julian days TDB].
 - `q::Vector{TaylorN{T}}`: jet transport initial condition.
 - `i::Int`: index of `tracklets` to start least squares fit.
-- `params::NEOParameters{T}`: see `Jet Transport Least Squares Parameters` of [`NEOParameters`](@ref).
-- `dynamics::D`: dynamical model.
+- `params::NEOParameters{T}`: see `Jet Transport Least Squares Parameters`
+    of [`NEOParameters`](@ref).
+- `mode::Bool`: `addradec!` mode (default: `true`).
+
+## Keyword arguments
+
+- `dynamics::D`: dynamical model (default: `newtonian!`).
 """
-function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V, q::Vector{TaylorN{T}},
-              i::Int, params::NEOParameters{T}; dynamics::D = newtonian!) where {D, T <: Real, V <: Number}
+function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
+    jd0::V, q::Vector{TaylorN{T}}, i::Int, params::NEOParameters{T},
+    mode::Bool = true; dynamics::D = newtonian!) where {D, T <: Real, V <: Number}
     # Plain initial condition
     q0 = constant_term.(q)
     # JT tail
@@ -103,15 +173,13 @@ function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V
     # Vector of O-C residuals
     res = Vector{OpticalResidual{T, TaylorN{T}}}(undef, length(radec))
     # Propagation buffer
-    t0, tf = datetime2days(date(radec[1])), datetime2days(date(radec[end]))
+    t0, tf = dtutc2days(date(radec[1])), dtutc2days(date(radec[end]))
     tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
     buffer = PropagationBuffer(dynamics, jd0, tlim, q, params)
     # Origin
     x0 = zeros(T, 6)
-    # Subset of radec for orbit fit
-    tin = [tracklets[i]]
-    tout = sort(tracklets, by = x -> abs( (x.date - tracklets[i].date).value ))[2:end]
-    rin = sort!(indices(tracklets[i]))
+    # Initial subset of radec for orbit fit
+    tin, tout, rin = _initialtracklets(tracklets, i)
     # Residuals space to barycentric coordinates jacobian
     J = Matrix(TS.jacobian(dq))
     # Best orbit
@@ -130,20 +198,10 @@ function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V
         fit = tryls(res[rin], x0, params.newtoniter)
         !fit.success && break
         # Incrementally add observations to fit
-        while !isempty(tout)
-            extra = indices(tout[1])
-            fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter)
-            !fit_new.success && break
-            fit = fit_new
-            tracklet = popfirst!(tout)
-            push!(tin, tracklet)
-            sort!(tin)
-            rin = vcat(rin, extra)
-            sort!(rin)
-        end
+        rin, fit = addradec!(Val(mode), rin, fit, tin, tout, res, x0, params)
         # NRMS
         Q = nrms(res, fit)
-        if length(rin) == length(radec) && abs(best_Q - Q) < 0.1
+        if abs(best_Q - Q) < 0.1
             flag = true
         end
         # Update NRMS and initial conditions
@@ -164,6 +222,27 @@ function jtls(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}}, jd0::V
     end
 end
 
+# Default naive initial conditions for iod
+function iodinitcond(A::AdmissibleRegion{T}) where {T <: Real}
+    v_ρ = sum(A.v_ρ_domain) / 2
+    return [
+        (A.ρ_domain[1], v_ρ, :log),
+        (10^(sum(log10, A.ρ_domain) / 2), v_ρ, :log),
+        (sum(A.ρ_domain) / 2, v_ρ, :log),
+        (A.ρ_domain[2], v_ρ, :log),
+    ]
+end
+
+# Update `sol` iff `_sol_` is complete and has a lower nrms
+function updatesol(sol::NEOSolution{T, T}, _sol_::NEOSolution{T, T},
+    radec::Vector{RadecMPC{T}}) where {T <: Real}
+    if length(_sol_.res) == length(radec)
+        return min(sol, _sol_)
+    else
+        return sol
+    end
+end
+
 include("tooshortarc.jl")
 include("gaussinitcond.jl")
 
@@ -178,86 +257,75 @@ function issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <:
 end
 
 @doc raw"""
-    isgauss(sol::NEOSolution{T, T}) where {T <: Real}
-
-Check whether `sol` was computed via [`gaussinitcond`](@ref) (`true`) or
-via [`tooshortarc`](@ref) (`false`).
-"""
-function isgauss(tracklets::Vector{Tracklet{T}}) where {T <: Real}
-    # Observing stations
-    obs = observatory.(tracklets)
-    # TSA is not well suited for satellite observatories
-    any(issatellite.(obs)) && return true
-    # Gauss cannot handle less than 3 tracklets
-    length(tracklets) < 3 && return false
-    # Time span
-    Δ = numberofdays(tracklets)
-    # Gauss approximation does not work with less than 1 day
-    return Δ > 1
-end
-
-isgauss(sol::NEOSolution{T, T}) where {T <: Real} = isgauss(sol.tracklets)
-
-@doc raw"""
     orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
-                       dynamics::D = newtonian!) where {T <: Real, D}
+        kwargs...) where {T <: Real, D1, D2}
 
 Initial Orbit Determination (IOD) routine.
 
-# Arguments
+## Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
-- `dynamics::D`: dynamical model.
+
+## Keyword arguments
+
+- `dynamics::D1`: dynamical model (default: `newtonian!`).
+- `initcond::D2`: naive initial conditions function; takes as input an
+    `AdmissibleRegion` and outputs a `Vector{Tuple{T, T, Symbol}}`,
+    where each element has the form `(ρ, v_ρ, scale)`
+    (default: `iodinitcond`).
 
 !!! warning
     This function will change the (global) `TaylorSeries` variables.
 """
 function orbitdetermination(radec::Vector{RadecMPC{T}}, params::NEOParameters{T};
-                            dynamics::D = newtonian!) where {T <: Real, D}
+    dynamics::D1 = newtonian!, initcond::D2 = iodinitcond) where {T <: Real, D1, D2}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
     # Eliminate observatories without coordinates
     filter!(x -> hascoord(observatory(x)), radec)
     # Cannot handle zero observations or multiple arcs
-    if iszero(length(radec)) || !issinglearc(radec)
-        return sol
-    end
+    (isempty(radec) || !issinglearc(radec)) && return sol
     # Reduce tracklets by polynomial regression
     tracklets = reduce_tracklets(radec)
     # Set jet transport variables
-    varorder = max(params.tsaorder, params.gaussorder)
+    varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
     scaled_variables("dx", ones(T, 6); order = varorder)
-    # Case 1: Gauss' Method
-    if isgauss(tracklets)
-        sol = gaussinitcond(radec, tracklets, params; dynamics)
-    end
-    # Case 2: Too Short Arc (TSA)
-    if iszero(sol) || nrms(sol) > params.gaussQmax
-        sol = tooshortarc(radec, tracklets, params; dynamics)
-    end
+    # Gauss method
+    _sol_ = gaussiod(radec, tracklets, params; dynamics)
+    # Update solution
+    sol = updatesol(sol, _sol_, radec)
+    # Termination condition
+    nrms(sol) <= params.gaussQmax && return sol
+    # Too short arc
+    _sol_ = tsaiod(radec, tracklets, params; dynamics, initcond)
+    # Update solution
+    sol = updatesol(sol, _sol_, radec)
 
     return sol
 end
 
 @doc raw"""
-    orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::NEOParameters{T};
-                       dynamics::D = newtonian!) where {T <: Real, D}
+    orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
+        params::NEOParameters{T}; kwargs...) where {T <: Real, D}
 
-Fit `sol` to `radec` via Jet Transport Least Squares.
+Fit a least squares orbit to `radec` using `sol` as an initial condition.
 
-# Arguments
+## Arguments
 
 - `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
 - `sol::NEOSolution{T, T}:` preliminary orbit.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
-- `dynamics::D`: dynamical model.
+
+## Keyword arguments
+
+- `dynamics::D`: dynamical model (default: `newtonian!`).
 
 !!! warning
     This function will change the (global) `TaylorSeries` variables.
 """
-function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::NEOParameters{T};
-                            dynamics::D = newtonian!) where {T <: Real, D}
+function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
+    params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
     # Reduce tracklets by polynomial regression
     tracklets = reduce_tracklets(radec)
     # Reference epoch [Julian days TDB]
@@ -271,6 +339,6 @@ function orbitdetermination(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, 
     # Jet Transport initial condition
     q = q0 + dq
     # Jet Transport Least Squares
-    _, i = findmin(tracklet -> abs(datetime2days(tracklet.date) - sol.bwd.t0), tracklets)
+    _, i = findmin(tracklet -> abs(dtutc2days(tracklet.date) - sol.bwd.t0), tracklets)
     return jtls(radec, tracklets, jd0, q, i, params; dynamics)
 end

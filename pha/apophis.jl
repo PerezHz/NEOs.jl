@@ -41,7 +41,7 @@ function parse_commandline()
 
     @add_arg_table! s begin
         "--jd0"
-            help = "Initial epoch calendar date (TDB)"
+            help = "Initial epoch calendar date (UTC)"
             arg_type = DateTime
             default = DateTime(2020, 12, 17)
         "--varorder"
@@ -121,7 +121,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     q0 = vcat(q00, 0.0, 0.0) .+ dq
 
     # Initial date (in Julian days)
-    jd0 = datetime2julian(jd0_datetime)
+    jd0 = dtutc2jdtdb(jd0_datetime)
 
     print_header("Integrator warmup", 2)
     params = NEOParameters(;maxsteps=1, order, abstol, parse_eqs)
@@ -132,7 +132,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     print_header("Main integration", 2)
     tmax = nyears_bwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
-    println("• Final time of integration: ", julian2datetime(jd0 + tmax))
+    println("• Final time of integration: ", jdtdb2utc(jd0 + tmax))
 
     params = NEOParameters(;maxsteps, order, abstol, parse_eqs)
     sol_bwd = NEOs.propagate(dynamics, jd0, nyears_bwd, q0, params)
@@ -141,7 +141,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     tmax = nyears_fwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
-    println("• Final time of integration: ", julian2datetime(jd0 + tmax))
+    println("• Final time of integration: ", jdtdb2utc(jd0 + tmax))
 
     sol_fwd, tvS, xvS, gvS = NEOs.propagate_root(dynamics, jd0, nyears_fwd, q0, params)
     jldsave("Apophis_fwd.jld2"; sol_fwd, tvS, xvS, gvS)

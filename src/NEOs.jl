@@ -2,7 +2,7 @@ module NEOs
 
 # __precompile__(false)
 
-import Base: show, string, isless, convert, zero, iszero, isnan, in
+import Base: show, string, isless, convert, zero, iszero, isnan, in, min
 import Tables: istable, rowaccess, rows, schema, Schema
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import JLD2: writeas
@@ -12,6 +12,7 @@ using Dates, InteractiveUtils, LazyArtifacts, LinearAlgebra, Printf, JSON,
       TaylorSeries, SatelliteToolboxTransformations, TaylorIntegration,
       SPICE, JLD2, Scratch
 using AutoHashEquals.Compat
+using Dates: epochms2datetime
 using Downloads: download
 using DelimitedFiles: readdlm
 using HTTP: get
@@ -47,8 +48,9 @@ export hasdelay, hasdoppler, delay, doppler, rcvr, xmit, read_radar_jpl, write_r
 # NEOCPObject
 export fetch_objects_neocp, get_radec_neocp, fetch_radec_neocp, get_orbits_neocp
 # Units
-export julian2etsecs, etsecs2julian, dtutc2et, dtutc2jdtdb, et_to_200X, days_to_200X,
-       datetime_to_200X, datetime2days, days2datetime, rad2arcsec, arcsec2rad, mas2rad
+export julian2etsecs, etsecs2julian, dtutc2et, dtutc2jdtdb, et2dtutc, jdtdb2dtutc,
+       et_to_200X, days_to_200X, dtutc_to_200X, dtutc2days, days2dtutc,
+       rad2arcsec, arcsec2rad, mas2rad
 # JPL ephemerides
 export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199
 # PE and NEOs ephemerides
@@ -71,11 +73,11 @@ export project, chi2, nms, nrms, diffcorr, newtonls, levenbergmarquardt, tryls
 # NEOSolution
 export epoch, sigmas, snr, jplcompare, uncertaintyparameter
 # Too Short Arc
-export tooshortarc
+export tsaiod
 # Gauss method
-export gauss_method, gaussinitcond
+export gauss_method, gaussiod
 # Orbit determination
-export curvature, issinglearc, isgauss, orbitdetermination
+export curvature, issinglearc, orbitdetermination
 # B plane
 export valsecchi_circle, bopik, mtp
 # Outlier rejection

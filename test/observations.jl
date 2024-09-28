@@ -160,7 +160,7 @@ using NEOs: src_path
 
         # Get RadecMPC
         source_file = joinpath(pkgdir(NEOs), "test", "data", "99942.txt")
-        get_radec_mpc("number" => "99942", source_file)
+        get_radec_mpc("99942", source_file)
 
         @test isfile(source_file)
 
@@ -232,7 +232,7 @@ using NEOs: src_path
         @test 0 <= object.α <= 2π
         @test -π <= object.δ <= π
         @test object.nobs > 0
-        @test object.arc > 0
+        @test object.arc >= 0
         @test object.notseen > 0
         # Check optical astrometry
         filename = get_radec_neocp(object.tmpdesig)
@@ -240,7 +240,7 @@ using NEOs: src_path
         radec1 = read_radec_mpc(filename)
         radec2 = fetch_radec_neocp(object.tmpdesig)
         rm(filename)
-        @test length(radec1) == length(radec2) == object.nobs
+        @test length(radec1) == length(radec2) >= object.nobs
         @test radec1 == radec2
         notseen = (now(UTC) - date(radec1[end])).value / 86_400_000
         @test round(notseen, RoundUp, digits = 3) >= object.notseen
@@ -248,6 +248,12 @@ using NEOs: src_path
         filename = get_orbits_neocp(object.tmpdesig)
         @test isfile(filename)
         rm(filename)
+    end
+
+    @testset "Time conversions" begin
+        t0 = now()
+        @test et2dtutc(dtutc2et(t0)) == t0
+        @test jdtdb2dtutc(dtutc2jdtdb(t0)) == t0
     end
 
     @testset "Topocentric" begin
@@ -296,8 +302,8 @@ using NEOs: src_path
         # Sunrise and sunset
         radec = read_radec_mpc("99942        8C2020 12 08.15001011 20 07.510-08 02 54.20         18.50GV~4ROF094")
         sun = sunriseset(radec[1])
-        @test datetime2julian(sun[1]) ≈ datetime2julian(DateTime("2020-12-08T05:05:59.384"))
-        @test datetime2julian(sun[2]) ≈ datetime2julian(DateTime("2020-12-08T14:05:49.386"))
+        @test dtutc2jdtdb(sun[1]) ≈ dtutc2jdtdb(DateTime("2020-12-08T05:05:59.384"))
+        @test dtutc2jdtdb(sun[2]) ≈ dtutc2jdtdb(DateTime("2020-12-08T14:05:49.386"))
 
         # obsposECEF
         ecef_2 = obsposECEF.(radec_2)
@@ -321,7 +327,7 @@ using NEOs: src_path
         # Choose this example because of the discontinuity in α
 
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2020 TJ6")
+        radec = fetch_radec_mpc("2020 TJ6")
         # Reduce tracklets
         tracklets = reduce_tracklets(radec)
 

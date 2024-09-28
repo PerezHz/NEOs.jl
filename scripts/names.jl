@@ -1,5 +1,5 @@
-using ArgParse, Downloads, Random, HORIZONS, NEOs
-using NEOs: numberofdays
+using ArgParse, Downloads, Random, NEOs, Dates
+using NEOs: RadecMPC, numberofdays, issatellite, reduce_tracklets
 
 # Potentially Hazardous Asteroids MPC list
 const PHAS_URL = "https://cgi.minorplanetcenter.net/cgi-bin/textversion.cgi?f=lists/PHAs.html"
@@ -20,37 +20,61 @@ function parse_commandline()
 
     @add_arg_table! s begin
         "--N", "-N"
-            help = "Number of NEOs"
+            help = "number of NEOs"
             arg_type = Int
-            default = 100
+            default = 0
         "--output", "-o"
-            help = "Output file"
+            help = "output file"
             arg_type = String
             default = "names.txt"
     end
 
     s.epilog = """
+        note: if izero(N), then the script will save all compatible NEOs\n
+        \n
         examples:\n
-        \n
-        julia --project names.jl -N 250 -o names.txt\n
-        \n
+        # Save 1000 NEOs to names.txt\n
+        julia --project names.jl -N 1000 -o names.txt\n
     """
 
     return parse_args(s)
+end
+
+function isodcompatible(radec::Vector{RadecMPC{T}}) where {T <: Real}
+    # Eliminate observations before oficial discovery
+    firstobs = findfirst(r -> !isempty(r.discovery), radec)
+    isnothing(firstobs) && return false
+    radec = radec[firstobs:end]
+    # Filter out incompatible observations
+    filter!(radec) do r
+        hascoord(r.observatory) && !issatellite(r.observatory) &&
+        date(r) >= Date(2000)
+    end
+    length(radec) < 3 && return false
+    # There is at least one set of 3 tracklets with a < 15 days timespan
+    tracklets = reduce_tracklets(radec)
+    for i in 1:length(tracklets)-2
+        numberofdays(tracklets[i:i+2]) > 15.0 && continue
+        tracklets = tracklets[i:i+2]
+        radec = reduce(vcat, getfield.(tracklets, :radec))
+        sort!(radec)
+        break
+    end
+    return numberofdays(radec) <= 15.0
 end
 
 function main()
 
     # Parse arguments from commandline
     parsed_args = parse_commandline()
-
-    println("NEOs selector for orbitdetermination.jl")
-
     # Number of NEOs
     N::Int = parsed_args["N"]
-    println("• Number of NEOs: ", N)
     # Output file
-    outfile::String = parsed_args["output"]
+    output::String = parsed_args["output"]
+    # Print header
+    println("NEOs selector for orbitdetermination.jl")
+    println("• Number of NEOs: ", N)
+    println("• Output file: ", output)
 
     # Parse PHAs, Atens, Apollos and Amors
     provdesig = Vector{SubString{String}}(undef, 0)
@@ -71,34 +95,40 @@ function main()
     unique!(provdesig)
     # We can only process asteroids discovered between 2000 and 2024
     filter!(desig -> "2000" <= desig[1:4] <= "2024", provdesig)
-    # Shuffle the provisional designations list
-    shuffle!(provdesig)
+
+    if 0 < N < length(provdesig)
+        # Shuffle the provisional designations list
+        shuffle!(provdesig)
+    else
+        # Consider all compatible NEOs
+        N = length(provdesig)
+    end
 
     # Assemble a list with N NEOs
     names = Vector{String}(undef, N)
 
-    for i in eachindex(names)
-        while !isempty(provdesig)
-            neo = String(pop!(provdesig))
-            radec = fetch_radec_mpc("designation" => neo)
-            jplorbit = sbdb("des" => neo)["orbit"]
-            if (numberofdays(radec) <= 30.0) &&  (jplorbit["n_obs_used"] == length(radec)) &&
-                isnothing(jplorbit["n_del_obs_used"]) && isnothing(jplorbit["n_dop_obs_used"])
-                names[i] = neo
-                break
-            end
+    i = 1
+    while i <= N && !isempty(provdesig)
+        neo = String(popfirst!(provdesig))
+        radec = fetch_radec_mpc(neo)
+        if isodcompatible(radec)
+            names[i] = neo
+            i += 1
         end
     end
+    # Eliminate #undef elements
+    names = names[1:i-1]
+    # Sort provisional designations
     sort!(names)
 
     # Save names list
-    open(outfile, "w") do file
+    open(output, "w") do file
         for i in eachindex(names)
             write(file, names[i], i == N ? "" : "\n")
         end
     end
 
-    println("• Saved ", N, " names to ", outfile)
+    println("• Saved ", N, " names to ", output)
 
     nothing
 end

@@ -11,13 +11,15 @@ using NEOs: propres
 @testset "2018 LA" begin
 
     # Fetch optical astrometry
-    radec = fetch_radec_mpc("designation" => "2018 LA")
+    radec = fetch_radec_mpc("2018 LA")
     # Parameters
     params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
 
-    # Orbit Determination
+    # Initial Orbit Determination
     sol = orbitdetermination(radec[1:8], params)
+    # Update parameters
     params = NEOParameters(params; jtlsorder = 6)
+    # Refine orbit
     sol = orbitdetermination(radec, sol, params)
 
     # Radial velocity with respect to the Earth.

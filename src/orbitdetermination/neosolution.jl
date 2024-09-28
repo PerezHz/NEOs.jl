@@ -152,6 +152,12 @@ end
 
 iszero(x::NEOSolution{T, U}) where {T <: Real, U <: Number} = x == zero(NEOSolution{T, U})
 
+# Override Base.min
+function min(x::NEOSolution{T, T}, y::NEOSolution{T, T}) where {T <: Real}
+    nrms(x) <= nrms(y) && return x
+    return y
+end
+
 # Normalized Root Mean Square Error
 function nrms(sol::NEOSolution{T, T}) where {T <: Real}
     if iszero(sol)
@@ -191,6 +197,16 @@ Return `sol`'s initial condition signal-to-noise ratios in barycentric cartesian
 snr(sol::NEOSolution{T, T}) where {T <: Real} = abs.(sol()) ./ sigmas(sol)
 
 @doc raw"""
+    minmaxdates(sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
+
+Return the dates of the earliest and latest observation in `sol`.
+"""
+function minmaxdates(sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
+    dates = map(t -> extrema(date, t.radec), sol.tracklets)
+    return minimum(first, dates), maximum(last, dates)
+end
+
+@doc raw"""
     jplcompare(des::String, sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
 
 Return `abs.(sol() - R) ./ sigmas(sol)`, where `R` is JPL's state vector of object
@@ -202,7 +218,7 @@ function jplcompare(des::String, sol::NEOSolution{T, U}) where {T <: Real, U <: 
     # NEOs barycentric state vector
     q1 = cte.(sol())
     # Time of first (last) observation
-    t0, tf = date(sol.tracklets[1].radec[1]), date(sol.tracklets[end].radec[end])
+    t0, tf = minmaxdates(sol)
     # Download JPL ephemerides
     bsp = smb_spk("DES = $(des);", t0, tf)
     # Object ID

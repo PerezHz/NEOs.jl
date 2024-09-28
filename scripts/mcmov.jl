@@ -61,9 +61,9 @@ end
         _, y_max = argoldensearch(A, 10^x_min, 10^x_max, :max, :outer, 1e-20)
         scalings[5:6] .= (x_max - x_min) / 100, (y_max - y_min) / 100
         # Propagation buffer
-        t0, tf = datetime2days(date(radec[1])), datetime2days(date(radec[end]))
+        t0, tf = dtutc2days(date(radec[1])), dtutc2days(date(radec[end]))
         tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
-        buffer = PropagationBuffer(newtonian!, datetime2julian(A.date), tlim,
+        buffer = PropagationBuffer(newtonian!, dtutc2jdtdb(A.date), tlim,
                                    ae .+ scalings .* dae, params)
         # Vector of residuals
         res = Vector{OpticalResidual{T, TaylorN{T}}}(undef, length(radec))
@@ -82,7 +82,7 @@ end
             # Barycentric initial conditions (JT)
             q = attr2bary(A, AE, params)
             # Reference epoch in julian days (corrrected for light-time)
-            jd0 = datetime2julian(A.date) - constant_term(AE[5]) / c_au_per_day
+            jd0 = dtutc2jdtdb(A.date) - constant_term(AE[5]) / c_au_per_day
             # Propagation and residuals
             propres!(res, radec, jd0, q, params; buffer)
             # Least squares fit

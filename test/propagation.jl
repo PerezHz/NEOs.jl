@@ -262,7 +262,7 @@ using InteractiveUtils: methodswith
         # Dynamical function
         dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
         # Initial date of integration [Julian date TDB]
-        jd0 = datetime2julian(DateTime(2029, 4, 13, 20))
+        jd0 = dtutc2jdtdb(DateTime(2029, 4, 13, 20))
         # Time of integration [years]
         nyears = 0.02
         # Perturbation to nominal initial condition (Taylor1 jet transport)

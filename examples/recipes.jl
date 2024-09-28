@@ -3,7 +3,7 @@
 using NEOs, Plots
 
 # Download optical astrometry of asteroid 2023 DW
-radec = fetch_radec_mpc("designation" => "2023 DW")
+radec = fetch_radec_mpc("2023 DW")
 
 # Orbit determination
 params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)

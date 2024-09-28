@@ -6,104 +6,127 @@ using PlanetaryEphemeris
 using LinearAlgebra
 using Test
 
-using NEOs: NEOSolution, numberofdays
+using NEOs: NEOSolution, RadecMPC, reduce_tracklets,
+    indices, numberofdays
+
+function iodsubradec(radec::Vector{RadecMPC{T}}, N::Int = 3) where {T <: Real}
+    tracklets = reduce_tracklets(radec)
+    idxs = sort!(reduce(vcat, indices.(tracklets[1:N])))
+    subradec = radec[idxs]
+    return subradec
+end
 
 @testset "Orbit Determination" begin
     @testset "Gauss Method (without ADAM)" begin
         # Load observations
         radec = read_radec_mpc(joinpath(pkgdir(NEOs), "test", "data", "RADEC_2023_DW.dat"))
+        # Subset of radec for IOD
+        subradec = iodsubradec(radec, 3)
+
+        @test length(subradec) == 9
+        @test numberofdays(subradec) < 0.18
+
         # Parameters
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007, parse_eqs = false)
-        params = NEOParameters(params, parse_eqs=true)
+        params = NEOParameters(params, parse_eqs = true)
 
-        # Orbit Determination
-        sol = orbitdetermination(radec, params)
+        # Initial Orbit Determination
+        sol = orbitdetermination(subradec, params)
 
-        # Values by May 31, 2024
+        # Values by Sep 25, 2024
 
-        # Vector of observations
-        @test length(radec) == 123
-        @test numberofdays(radec) < 21.0
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
         # Tracklets
-        @test length(sol.tracklets) == 44
-        @test sol.tracklets[1].radec[1] == radec[1]
-        @test sol.tracklets[end].radec[end] == radec[end]
+        @test length(sol.tracklets) == 3
+        @test sol.tracklets[1].radec[1] == subradec[1]
+        @test sol.tracklets[end].radec[end] == subradec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
-        @test length(sol.res) == 123
+        @test length(sol.res) == 9
         @test iszero(count(outlier.(sol.res)))
         # Least squares fit
         @test sol.fit.success
-        @test all( sigmas(sol) .< 5e-5 )
-        @test all( snr(sol) .> 4_500)
-        @test nrms(sol) < 0.36
+        @test all( sigmas(sol) .< 9e-4 )
+        @test all( snr(sol) .> 14.5)
+        @test nrms(sol) < 0.18
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
         @test !isdiag(sol.jacobian)
-        @test maximum(sol.jacobian) < 8e-4
+        @test maximum(sol.jacobian) < 3e-4
         # Compatibility with JPL
-        JPL = [-1.1003236797145037, 0.20774505704014837, 0.04203643429323372,
-               -0.004736048200346307, -0.010626587751050683, -0.006016238714906758]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.27)
+        JPL = [-0.9867704701732631, 0.3781890325424674, 0.14094513213009532,
+            -0.008773157203087259, -0.00947109649687576, -0.005654229864757284]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.76)
+
+        # Add observations
+        subradec = iodsubradec(radec, 15)
+
+        @test length(subradec) == 43
+        @test numberofdays(subradec) < 2.76
 
         # Refine orbit
-        sol1 = orbitdetermination(radec, sol, params)
+        sol1 = orbitdetermination(subradec, sol, params)
 
         # Orbit solution
         @test isa(sol1, NEOSolution{Float64, Float64})
         # Tracklets
-        @test sol1.tracklets == sol.tracklets
+        @test length(sol1.tracklets) == 15
+        @test sol1.tracklets[1].radec[1] == subradec[1]
+        @test sol1.tracklets[end].radec[end] == subradec[end]
+        @test issorted(sol1.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
+        @test dtutc2days(date(subradec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
         @test all( norm.(sol1.bwd.x, Inf) .< 1.2 )
         @test isempty(sol1.t_bwd) && isempty(sol1.x_bwd) && isempty(sol1.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
+        @test dtutc2days(date(subradec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
         @test all( norm.(sol1.fwd.x, Inf) .< 1.2 )
         @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
-        @test length(sol1.res) == 123
+        @test length(sol1.res) == 43
         @test iszero(count(outlier.(sol1.res)))
         # Least squares fit
         @test sol1.fit.success
-        @test all( sigmas(sol1) .< 5e-5 )
-        @test all( snr(sol1) .> 4_500 )
-        @test nrms(sol1) < 0.36
+        @test all( sigmas(sol1) .< 2e-4 )
+        @test all( snr(sol1) .> 866 )
+        @test nrms(sol1) < 0.37
         # Jacobian
         @test size(sol1.jacobian) == (6, 6)
         @test isdiag(sol1.jacobian)
-        @test maximum(sol1.jacobian) < 2e-6
+        @test maximum(sol1.jacobian) < 1e-6
         # Compatibility with JPL
-        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.27)
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.31)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol1, params) == 6
     end
 
     @testset "Gauss Method (with ADAM)" begin
         # Load observations
-        radec = fetch_radec_mpc("designation" => "2016 TU93")
+        radec = fetch_radec_mpc("2016 TU93")
+        # Subset of radec for IOD
+        # subradec = iodsubradec(radec, 3)
+        # In this case: radec == subradec
+
+        @test length(radec) == 9
+        @test numberofdays(radec) < 13.1
 
         # Parameters
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007, adamhelp = true)
 
-        # Orbit Determination
+        # Initial Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by June 1, 2024
+        # Values by Sep 25, 2024
 
-        # Vector of observations
-        @test length(radec) == 9
-        @test numberofdays(radec) < 13.1
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
         # Tracklets
@@ -112,11 +135,11 @@ using NEOs: NEOSolution, numberofdays
         @test sol.tracklets[end].radec[end] == radec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
@@ -132,20 +155,20 @@ using NEOs: NEOSolution, numberofdays
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 1e-5
         # Compatibility with JPL
-        JPL = [1.0102564188486982, 0.2934743828145318, 0.10467187893161536,
-               -0.0002634434601757652, 0.01837381321202214, 0.007208485181422459]
+        JPL = [1.010256210875638, 0.29348888228332376, 0.10467756741992229,
+            -0.000263645106358707, 0.01837375504784015, 0.007208464525828968]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 4.8e-2)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 8
     end
 
     @testset "Admissible region" begin
-        using NEOs: AdmissibleRegion, reduce_tracklets, arenergydis, rangerate,
-                    rangerates, argoldensearch, arboundary, _helmaxrange, R_SI,
-                    k_gauss, μ_ES, topo2bary, bary2topo
+        using NEOs: AdmissibleRegion, arenergydis, rangerate, rangerates,
+            argoldensearch, arboundary, _helmaxrange, R_SI, k_gauss, μ_ES,
+            topo2bary, bary2topo
 
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2024 BX1")
+        radec = fetch_radec_mpc("2024 BX1")
         # Parameters
         params = NEOParameters()
         # First tracklet
@@ -154,12 +177,13 @@ using NEOs: NEOSolution, numberofdays
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by August 19, 2024
+        # Values by Sep 25, 2024
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
         # Custom print
-        @test string(A) == "AE: [116.61547, 45.39840, -3.21667, 5.76667] t: 2024-01-20T21:50:15.360 obs: GINOP-KHK, Piszkesteto"
+        @test string(A) == "AE: [116.61547, 45.39840, -3.21667, 5.76667] \
+            t: 2024-01-20T21:50:15.360 obs: GINOP-KHK, Piszkesteto"
         # Coefficients
         @test length(A.coeffs) == 6
         @test A.coeffs[3] == A.v_α^2 * cos(A.δ)^2 + A.v_δ^2  # proper motion squared
@@ -181,7 +205,8 @@ using NEOs: NEOSolution, numberofdays
         @test isempty(rangerates(A, ρ0 + 1.0, :inner))
         @test rangerate(A, A.ρ_domain[1], :min, :outer) == A.v_ρ_domain[1]
         @test rangerate(A, A.ρ_domain[1], :max, :outer) == A.v_ρ_domain[2]
-        @test rangerate(A, A.ρ_domain[1], :min, :inner) ≈ -rangerate(A, A.ρ_domain[1], :max, :inner) atol = 1e-18
+        @test rangerate(A, A.ρ_domain[1], :min, :inner) ≈
+            -rangerate(A, A.ρ_domain[1], :max, :inner) atol = 1e-18
         # Golden section search
         ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :min, :outer, 1e-20)
         @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
@@ -246,25 +271,28 @@ using NEOs: NEOSolution, numberofdays
 
     @testset "Too Short Arc" begin
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2008 EK68")
+        radec = fetch_radec_mpc("2008 EK68")
+        # Subset of radec for IOD
+        # subradec = iodsubradec(radec, 3)
+        # In this case: radec == subradec
+
+        @test length(radec) == 10
+        @test numberofdays(radec) < 0.05
 
         # Parameters
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
 
-        # Orbit Determination
+        # Initial Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by May 31, 2024
+        # Values by Sep 25, 2024
 
-        # Vector of observations
-        @test length(radec) == 10
-        @test numberofdays(radec) < 0.05
         # Curvature
         C, Γ_C = curvature(radec)
         σ_C = sqrt.(diag(Γ_C))
         @test all( abs.(C) ./ σ_C .> 5.5)
         χ2 = C' * inv(Γ_C) * C
-        @test χ2 > 2_517
+        @test χ2 > 2_516
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
         # Tracklets
@@ -273,11 +301,11 @@ using NEOs: NEOSolution, numberofdays
         @test sol.tracklets[end].radec[end] == radec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
@@ -293,63 +321,98 @@ using NEOs: NEOSolution, numberofdays
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 1e-5
         # Compatibility with JPL
-        JPL = [-0.9698333704468041, 0.2403646120906576, 0.10288887497365079,
-               -0.009512521364762891, -0.015325432155116774, -0.008094623535119534]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.015)
+        JPL = [-0.9698405495747651, 0.24035304578776012, 0.10288276585828428,
+            -0.009512301266159554, -0.01532548565855646, -0.00809464581680694]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.012)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 11
     end
 
     @testset "Outlier Rejection" begin
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2007 VV7")
+        radec = fetch_radec_mpc("2007 VV7")
+        # Subset of radec for IOD
+        subradec = iodsubradec(radec, 3)
+
+        @test length(subradec) == 18
+        @test numberofdays(subradec) < 2.16
 
         # Parameters
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
 
-        # Orbit Determination
-        sol = orbitdetermination(radec, params)
-        # Outlier rejection
-        sol = outlier_rejection(radec, sol, params)
+        # Initial Orbit Determination
+        sol = orbitdetermination(subradec, params)
 
-        # Values by May 31, 2024
+        # Values by Sep 25, 2024
 
-        # Vector of observations
-        @test length(radec) == 21
-        @test numberofdays(radec) < 3.03
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
         # Tracklets
-        @test length(sol.tracklets) == 4
-        @test sol.tracklets[1].radec[1] == radec[1]
-        @test sol.tracklets[end].radec[end] == radec[end]
+        @test length(sol.tracklets) == 3
+        @test sol.tracklets[1].radec[1] == subradec[1]
+        @test sol.tracklets[end].radec[end] == subradec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
-        @test length(sol.res) == 21
-        @test count(outlier.(sol.res)) == 2
+        @test length(sol.res) == 18
+        @test count(outlier.(sol.res)) == 0
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 3e-4 )
         @test all( snr(sol) .> 574)
-        @test nrms(sol) < 0.25
+        @test nrms(sol) < 0.46
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
-        @test isdiag(sol.jacobian)
-        @test maximum(sol.jacobian) < 8e-7
+        @test !isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 5e-4
         # Compatibility with JPL
-        JPL = [0.7673449629397204, 0.6484776654615118, 0.2932277478785896,
-               -0.011023192686652665, 0.015392823966811551, 0.0065288994881745974]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 7e-4)
+        JPL = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
+            -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1.75)
+
+        # Add remaining observations
+        sol1 = orbitdetermination(radec, sol, params)
+        # Outlier rejection
+        sol1 = outlier_rejection(radec, sol1, params)
+
+        # Orbit solution
+        @test isa(sol1, NEOSolution{Float64, Float64})
+        # Tracklets
+        @test length(sol1.tracklets) == 4
+        @test sol1.tracklets[1].radec[1] == radec[1]
+        @test sol1.tracklets[end].radec[end] == radec[end]
+        @test issorted(sol1.tracklets)
+        # Backward integration
+        @test dtutc2days(date(radec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
+        @test all( norm.(sol1.bwd.x, Inf) .< 2 )
+        @test isempty(sol1.t_bwd) && isempty(sol1.x_bwd) && isempty(sol1.g_bwd)
+        # Forward integration
+        @test dtutc2days(date(radec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
+        @test all( norm.(sol1.fwd.x, Inf) .< 2 )
+        @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
+        # Vector of residuals
+        @test length(sol1.res) == 21
+        @test count(outlier.(sol1.res)) == 2
+        # Least squares fit
+        @test sol1.fit.success
+        @test all( sigmas(sol1) .< 3e-4 )
+        @test all( snr(sol1) .> 574)
+        @test nrms(sol1) < 0.25
+        # Jacobian
+        @test size(sol1.jacobian) == (6, 6)
+        @test isdiag(sol1.jacobian)
+        @test maximum(sol1.jacobian) < 8e-7
+        # Compatibility with JPL
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.2e-3)
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(radec, sol, params) == 8
+        @test uncertaintyparameter(radec, sol1, params) == 8
     end
 
     @testset "Interesting NEOs" begin
@@ -357,7 +420,13 @@ using NEOs: NEOSolution, numberofdays
         # 2014 AA hit the Earth around January 2, 2014, 02:49 UTC
 
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2014 AA")
+        radec = fetch_radec_mpc("2014 AA")
+        # Subset of radec for IOD
+        # subradec = iodsubradec(radec, 3)
+        # In this case: radec == subradec
+
+        @test length(radec) == 7
+        @test numberofdays(radec) < 0.05
 
         # Parameters
         params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
@@ -365,11 +434,8 @@ using NEOs: NEOSolution, numberofdays
         # Orbit Determination
         sol = orbitdetermination(radec, params)
 
-        # Values by May 31 2024
+        # Values by Sep 25, 2024
 
-        # Vector of observations
-        @test length(radec) == 7
-        @test numberofdays(radec) < 0.05
         # Curvature
         C, Γ_C = curvature(radec)
         σ_C = sqrt.(diag(Γ_C))
@@ -384,11 +450,11 @@ using NEOs: NEOSolution, numberofdays
         @test sol.tracklets[end].radec[end] == radec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 1e9 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
@@ -404,8 +470,8 @@ using NEOs: NEOSolution, numberofdays
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 9e-6
         # Compatibility with JPL
-        JPL = [-0.17932853781716676, 0.8874166708195785, 0.38414497112938667,
-               -0.017557883503263098, -0.005781328976995571, -0.0020073946372627465]
+        JPL = [-0.1793421909678032, 0.8874121750891107, 0.3841434101167349,
+            -0.017557851117612377, -0.005781634223099801, -0.0020075106081869185]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(radec, sol, params) == 10
@@ -413,91 +479,176 @@ using NEOs: NEOSolution, numberofdays
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("designation" => "2008 TC3")
+        radec = fetch_radec_mpc("2008 TC3")
+        # Subset of radec for IOD
+        subradec = iodsubradec(radec, 3)
+
+        @test length(subradec) == 18
+        @test numberofdays(subradec) < 0.34
 
         # Parameters
         params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
 
-        # Observations with <1" weight
-        idxs = findall(x -> w8sveres17(x) < 1, radec)
-        # Restricted Orbit Determination
-        sol = orbitdetermination(radec[idxs], params)
+        # Initial Orbit Determination
+        sol = orbitdetermination(subradec, params)
 
-        # Values by May 31, 2024
+        # Values by Sep 25, 2024
 
-        # Vector of observations
-        @test length(radec) == 883
-        @test numberofdays(radec) < 0.80
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
         # Tracklets
-        @test length(sol.tracklets) == 2
-        @test sol.tracklets[1].radec[1] == radec[idxs[1]]
-        @test sol.tracklets[end].radec[end] == radec[idxs[end]]
+        @test length(sol.tracklets) == 3
+        @test sol.tracklets[1].radec[1] == subradec[1]
+        @test sol.tracklets[end].radec[end] == subradec[end]
         @test issorted(sol.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[idxs[1]])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test dtutc2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
         @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[idxs[end]])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test dtutc2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 1e4 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
-        @test length(sol.res) == 20
+        @test length(sol.res) == 18
         @test iszero(count(outlier.(sol.res)))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 2e-5 )
-        @test all( snr(sol) .> 732)
-        @test nrms(sol) < 0.30
+        @test all( snr(sol) .> 645)
+        @test nrms(sol) < 0.35
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
-        @test isdiag(sol.jacobian)
-        @test maximum(sol.jacobian) < 1e-5
+        @test !isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 4e-6
         # Compatibility with JPL
-        JPL = [0.9741070120439872, 0.2151506132683409, 0.0939089782825125,
-               -0.007890445003489774, 0.016062726197895585, 0.006136042044307594]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.2)
+        JPL = [0.9739760787551061, 0.21541704400792083, 0.09401075290627411,
+            -0.00789675674941779, 0.0160619782715116, 0.006135361409943397]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.20)
 
-        # Update orbit with more observations
-        sol1 = orbitdetermination(radec[1:30], sol, params)
+        # Add observations
+        subradec = iodsubradec(radec, 10)
+
+        @test length(subradec) == 97
+        @test numberofdays(subradec) < 0.70
+
+        # Refine orbit
+        sol1 = orbitdetermination(subradec, sol, params)
 
         # Orbit solution
         @test isa(sol1, NEOSolution{Float64, Float64})
         # Tracklets
-        @test length(sol1.tracklets) == 5
-        @test sol1.tracklets[1].radec[1] == radec[1]
-        @test sol1.tracklets[end].radec[end] == radec[30]
+        @test length(sol1.tracklets) == 10
+        @test sol1.tracklets[1].radec[1] == subradec[1]
+        @test sol1.tracklets[end].radec[end] == subradec[93]
         @test issorted(sol1.tracklets)
         # Backward integration
-        @test datetime2days(date(radec[idxs[1]])) > sol1.bwd.t0 + sol1.bwd.t[end]
+        @test dtutc2days(date(subradec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
         @test all( norm.(sol1.bwd.x, Inf) .< 1 )
         @test isempty(sol1.t_bwd) && isempty(sol1.x_bwd) && isempty(sol1.g_bwd)
         # Forward integration
-        @test datetime2days(date(radec[idxs[end]])) < sol1.fwd.t0 + sol1.fwd.t[end]
-        @test all( norm.(sol1.fwd.x, Inf) .< 1e4 )
+        @test dtutc2days(date(subradec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
+        @test all( norm.(sol1.fwd.x, Inf) .< 1e15 )
         @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
-        @test length(sol1.res) == 30
+        @test length(sol1.res) == 97
         @test iszero(count(outlier.(sol1.res)))
         # Least squares fit
         @test sol1.fit.success
-        @test all( sigmas(sol1) .< 2e-6 )
-        @test all( snr(sol1) .> 4_281)
-        @test nrms(sol1) < 0.37
+        @test all( sigmas(sol1) .< 4e-7 )
+        @test all( snr(sol1) .> 21_880)
+        @test nrms(sol1) < 0.53
         # Jacobian
         @test size(sol1.jacobian) == (6, 6)
         @test isdiag(sol1.jacobian)
         @test maximum(sol1.jacobian) < 1e-6
         # Compatibility with JPL
-        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.21)
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.17)
         # Parameters uncertainty
         @test all(sigmas(sol1) .< sigmas(sol))
         # TODO: understand better differences wrt JPL solutions
         # @test nrms(sol1) < nrms(sol)
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(radec[1:30], sol1, params) == 6
+        @test uncertaintyparameter(subradec, sol1, params) == 5
+    end
+
+    @testset "scripts/orbitdetermination.jl" begin
+        using NEOs: iodinitcond, issatellite
+
+        function radecfilter(radec::Vector{RadecMPC{T}}) where {T <: Real}
+            # Eliminate observations before oficial discovery
+            firstobs = findfirst(r -> !isempty(r.discovery), radec)
+            isnothing(firstobs) && return false, radec
+            radec = radec[firstobs:end]
+            # Filter out incompatible observations
+            filter!(radec) do r
+                hascoord(r.observatory) && !issatellite(r.observatory) &&
+                date(r) >= Date(2000)
+            end
+            length(radec) < 3 && return false, radec
+            # Find the first set of 3 tracklets with a < 15 days timespan
+            tracklets = reduce_tracklets(radec)
+            for i in 1:length(tracklets)-2
+                numberofdays(tracklets[i:i+2]) > 15.0 && continue
+                tracklets = tracklets[i:i+2]
+                radec = reduce(vcat, getfield.(tracklets, :radec))
+                sort!(radec)
+                break
+            end
+            return numberofdays(radec) <= 15.0, radec
+        end
+
+        # Fetch and filter optical astrometry
+        radec = fetch_radec_mpc("2011 UE256")
+        _, radec = radecfilter(radec)
+
+        @test length(radec) == 14
+        @test numberofdays(radec) < 0.85
+
+        # Parameters
+        params = NEOParameters(
+            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+            gaussorder = 6, gaussQmax = 1.0,
+            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,
+            jtlsiter = 20, newtoniter = 10
+        )
+
+        # Initial Orbit Determination
+        sol = orbitdetermination(radec, params; initcond = iodinitcond)
+
+        # Values by Sep 25, 2024
+
+        # Orbit solution
+        @test isa(sol, NEOSolution{Float64, Float64})
+        # Tracklets
+        @test length(sol.tracklets) == 3
+        @test sol.tracklets[1].radec[1] == radec[1]
+        @test sol.tracklets[end].radec[end] == radec[end]
+        @test issorted(sol.tracklets)
+        # Backward integration
+        @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
+        @test all( norm.(sol.bwd.x, Inf) .< 2 )
+        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
+        # Forward integration
+        @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
+        @test all( norm.(sol.fwd.x, Inf) .< 2 )
+        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
+        # Vector of residuals
+        @test length(sol.res) == 14
+        @test iszero(count(outlier.(sol.res)))
+        # Least squares fit
+        @test sol.fit.success
+        @test all( sigmas(sol) .< 0.24 )
+        @test all( snr(sol) .> 0.40)
+        @test nrms(sol) < 0.42
+        # Jacobian
+        @test size(sol.jacobian) == (6, 6)
+        @test isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 1e-5
+        # Compatibility with JPL
+        JPL = [1.5278518651683686, 0.9328047239405421, 0.3755795874791371,
+            -0.014356510695499359, 0.0002883092503924326, 0.002280143873309611]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1.33)
     end
 
 end

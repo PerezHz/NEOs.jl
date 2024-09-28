@@ -449,7 +449,7 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
     # Table 2: epoch-dependent astrometric residuals
     if obscode == "703"
         return Date(dt_utc_obs) < Date(2014,1,1) ? w : 0.8w
-    elseif obscode == "691"
+    elseif obscode ∈ ("691", "291") # Spacewatch, Kitt Peak, Arizona
         return Date(dt_utc_obs) < Date(2003,1,1) ? 0.6w : 0.5w
     elseif obscode == "644"
         return Date(dt_utc_obs) < Date(2003,9,1) ? 0.6w : 0.4w
@@ -458,7 +458,7 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
         return w
     elseif obscode == "G96"
         return 0.5w
-    elseif obscode == "F51"
+    elseif obscode ∈ ("F51", "F52") # Pan-STARRS 1 & 2, Haleakala, Hawaii
         return 0.2w
     elseif obscode ∈ ("G45", "608")
         return 0.6w
@@ -469,7 +469,8 @@ function w8sveres17(obs::RadecMPC{T}) where {T <: AbstractFloat}
     # Table 4:
     elseif obscode ∈ ("645", "673", "H01")
         return 0.3w
-    elseif obscode ∈ ("J04", "K92", "K93", "Q63", "Q64", "V37", "W85", "W86", "W87", "K91", "E10", "F65") #Tenerife + Las Cumbres
+    elseif obscode ∈ ("J04", "K92", "K93", "Q63", "Q64", "V37", "W85", "W86", "W87",
+        "K91", "E10", "F65") # Tenerife + Las Cumbres
         return 0.4w
     elseif obscode ∈ ("689", "950", "W84")
         return 0.5w

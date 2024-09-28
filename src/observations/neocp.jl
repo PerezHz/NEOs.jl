@@ -117,59 +117,65 @@ function fetch_objects_neocp()
 end
 
 @doc raw"""
-    get_radec_neocp(id::String, filename::String = id * ".txt")
+    fetch_radec_neocp(id::AbstractString)
 
-Download MPC optical astrometry of NEOCP [1] object `id` and save the output to `filename`.
+Download MPC optical astrometry of NEOCP object `id` and
+return the output as `Vector{RadecMPC{Float64}}`.
 
 !!! reference
-    [1] https://www.minorplanetcenter.net/iau/NEO/toconfirm_tabular.html.
+    MPC NEOCP Observations API documentation:
+
+    https://www.minorplanetcenter.net/mpcops/documentation/neocp-observations-api/.
 """
-function get_radec_neocp(id::String, filename::String = id * ".txt")
-    # Assemble URL
-    url = string(NEOCP_SHOWORBS_URL, "?Obj=", id, "&obs=y")
-    # HTTP response
-    resp = get(url)
-    # Parse response body as String
+function fetch_radec_neocp(id::AbstractString)
+    # HTTP parameters
+    params = JSON.json(Dict("trksubs" => [id], "output_format" => ["OBS80"]))
+    resp = get(MPC_NEOCP_OBS_API_URL, ("Content-Type" => "application/json",), params)
+    # Convert to String
     text = String(resp.body)
-    # Parse optical astrometry
-    radec = read_radec_mpc(text)
-    # Save result to filename
+    # Parse JSON
+    dict = JSON.parse(text)
+    # Parse observations
+    radec = RadecMPC.(eachmatch(RADEC_MPC_REGEX, dict[1]["OBS80"]))
+    # Eliminate unsuccessful matches and repeated entries
+    filter!(r -> isa(r, RadecMPC{Float64}), radec)
+    unique!(radec)
+
+    return radec
+end
+
+@doc raw"""
+    get_radec_neocp(id::AbstractString [, filename::AbstractString])
+
+Download MPC optical astrometry of NEOCP object `id` and save the output to `filename`
+(default: `id.txt`).
+
+!!! reference
+    MPC NEOCP Observations API documentation:
+
+    https://www.minorplanetcenter.net/mpcops/documentation/neocp-observations-api/.
+"""
+function get_radec_neocp(id::AbstractString, filename::AbstractString =
+    replace(id, " " => "_") * ".txt")
+    # Fetch optical astrometry
+    radec = fetch_radec_neocp(id)
+    # Write observations to file
     write_radec_mpc(radec, filename)
 
     return filename
 end
 
 @doc raw"""
-    fetch_radec_neocp(id::String)
+    get_orbits_neocp(id::AbstractString [, filename::AbstractString])
 
-Download MPC optical astrometry of NEOCP [1] object `id` and
-return the output as `Vector{RadecMPC{Float64}}`.
-
-!!! reference
-    [1] https://www.minorplanetcenter.net/iau/NEO/toconfirm_tabular.html.
-"""
-function fetch_radec_neocp(id::String)
-    # Temporary file
-    f = tempname()
-    # Download optical astrometry
-    get_radec_neocp(id, f)
-    # Parse optical astrometry
-    radec = read_radec_mpc(f)
-    # Delete temporary file
-    rm(f)
-
-    return radec
-end
-
-@doc raw"""
-    get_orbits_neocp(id::String, filename::String = id * ".txt")
-
-Download sample orbits of NEOCP [1] object `id` and save the output to `fiilename`.
+Download sample orbits of NEOCP [1] object `id` and save the output to `filename`
+(default: `id.txt`).
 
 !!! reference
     [1] https://www.minorplanetcenter.net/iau/NEO/toconfirm_tabular.html.
 """
-function get_orbits_neocp(id::String, filename::String = id * ".txt")
+function get_orbits_neocp(id::AbstractString, filename::AbstractString =
+    replace(id, " " => "_") * ".txt")
     # Assemble URL
     url = string(NEOCP_SHOWORBS_URL, "?Obj=", id, "&orb=y")
     # HTTP response

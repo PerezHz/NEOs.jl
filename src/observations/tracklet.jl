@@ -120,13 +120,13 @@ function Tracklet(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) where {T <:
     df = combine(gdf, [:α, :δ, :mag] .=> mean, renamecols = false)
 
     # Julian days of observation
-    df.t_julian = datetime2julian.(df.date)
+    df.t_julian = dtutc2jdtdb.(df.date)
     # Days of observation [relative to first observation]
     df.t_rel = df.t_julian .- df.t_julian[1]
     # Mean date [relative to first observation]
     t_mean = mean(df.t_rel)
     # Mean date [DateTime]
-    date = julian2datetime(df.t_julian[1] + t_mean)
+    date = jdtdb2dtutc(df.t_julian[1] + t_mean)
 
     # Points in top quarter
     N_top = count(x -> x > 3π/2, df.α)
@@ -255,7 +255,7 @@ end
 
 function curvature(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     # Days of observation [julian days]
-    ts = datetime2julian.(date.(radec))
+    ts = dtutc2jdtdb.(date.(radec))
     # Right ascension
     αs = ra.(radec)
     # Declination

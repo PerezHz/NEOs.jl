@@ -13,6 +13,9 @@ const poteph::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Tay
 const ttmtdb::TaylorInterpolant{Float64, Float64, 1, Vector{Float64}, Vector{Taylor1{Float64}}} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
 const SSEPHORDER::Int = get_order(sseph.x[1])
 
+# Milliseconds between rounding epoch and J2000
+const EPOCHMSJ2000::Int = (DateTime(2000, 1, 1, 12) - DateTime(0)).value
+
 # Earth orientation parameters (eop) 2000
 const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
 
@@ -138,13 +141,12 @@ const CATALOGUES_MPC_URL = "https://www.minorplanetcenter.net/iau/info/Catalogue
 # MPC observatories file url
 const OBSERVATORIES_MPC_URL = "https://www.minorplanetcenter.net/iau/lists/ObsCodes.html"
 
-# MPC database search url
-const search_mpc_url = "https://www.minorplanetcenter.net/db_search/show_object?utf8=%E2%9C%93&object_id="
-# MPC observations url
-const obs_mpc_url = "https://www.minorplanetcenter.net/tmp2/"
-
+# MPC Oservations API url
+const MPC_OBS_API_URL = "https://data.minorplanetcenter.net/api/get-obs"
 # NEO Confirmation Page File URL
 const NEOCP_FILE_URL = "https://www.minorplanetcenter.net/Extended_Files/neocp.json"
+# MPC NEOCP Oservations API url
+const MPC_NEOCP_OBS_API_URL = "https://data.minorplanetcenter.net/api/get-obs-neocp"
 # NEO Confirmation Page Show Orbits URL
 const NEOCP_SHOWORBS_URL = "https://cgi.minorplanetcenter.net/cgi-bin/showobsorbs.cgi"
 
