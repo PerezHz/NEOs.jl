@@ -12,6 +12,7 @@ using Dates, InteractiveUtils, LazyArtifacts, LinearAlgebra, Printf, JSON,
       TaylorSeries, SatelliteToolboxTransformations, TaylorIntegration,
       SPICE, JLD2, Scratch
 using AutoHashEquals.Compat
+using Base: RefValue
 using Dates: epochms2datetime
 using Downloads: download
 using DelimitedFiles: readdlm
@@ -58,8 +59,8 @@ export loadpeeph, bwdfwdeph
 # Observer position in ECEF and ECI frames
 export obsposECEF, obsposvelECI
 # Optical astrometry processing
-export compute_radec, select_debiasing_table, debiasing, w8sveres17, residuals, unfold,
-       relax_factor, outlier
+export UniformWeights, Veres17, Farnocchia15, Eggl20, compute_radec, unfold,
+       residuals, outlier
 # Radar astrometry processing
 export compute_delay, radar_astrometry
 # Asteroid dynamical models
