@@ -39,14 +39,15 @@ A set of optical observations taken by the same observatory on the same night.
 end
 
 # Functions to get specific fields of a Tracklet object
-date(x::Tracklet{T}) where {T <: AbstractFloat} = x.date
-ra(x::Tracklet{T}) where {T <: AbstractFloat} = x.α
-dec(x::Tracklet{T}) where {T <: AbstractFloat} = x.δ
-observatory(x::Tracklet{T}) where {T <: AbstractFloat} = x.observatory
-vra(x::Tracklet{T}) where {T <: AbstractFloat} = x.v_α
-vdec(x::Tracklet{T}) where {T <: AbstractFloat} = x.v_δ
-mag(x::Tracklet{T}) where {T <: AbstractFloat} = x.mag
-indices(x::Tracklet{T}) where {T <: AbstractFloat} = x.indices
+date(x::Tracklet) = x.date
+ra(x::Tracklet) = x.α
+dec(x::Tracklet) = x.δ
+observatory(x::Tracklet) = x.observatory
+vra(x::Tracklet) = x.v_α
+vdec(x::Tracklet) = x.v_δ
+mag(x::Tracklet) = x.mag
+nobs(x::Tracklet) = x.nobs
+indices(x::Tracklet) = x.indices
 
 # Print method for Tracklet{T}
 # Examples:

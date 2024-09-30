@@ -78,7 +78,7 @@ export tsaiod
 # Gauss method
 export gauss_method, gaussiod
 # Orbit determination
-export curvature, issinglearc, orbitdetermination
+export ODProblem, curvature, issinglearc, orbitdetermination
 # B plane
 export valsecchi_circle, bopik, mtp
 # Outlier rejection
