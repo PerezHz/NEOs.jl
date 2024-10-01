@@ -41,7 +41,8 @@ function propres(od::ODProblem{D, T}, jd0::V, q0::Vector{U}, params::NEOParamete
     end
     # O-C residuals
     try
-        res = residuals(radec, od.w8s, od.bias;
+        w8s, bias = view(od.w8s.w8s, idxs), view(od.bias.bias, idxs)
+        res = residuals(radec, w8s, bias;
             xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
             xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
             xva = et -> bwdfwdeph(et, bwd, fwd))
@@ -76,7 +77,8 @@ function propres!(res::Vector{OpticalResidual{T, U}}, od::ODProblem{D, T},
     end
     # O-C residuals
     try
-        residuals!(res, radec, od.w8s, od.bias;
+        w8s, bias = view(od.w8s.w8s, idxs), view(od.bias.bias, idxs)
+        residuals!(res, radec, w8s, bias;
             xvs = et -> auday2kmsec(params.eph_su(et/daysec)),
             xve = et -> auday2kmsec(params.eph_ea(et/daysec)),
             xva = et -> bwdfwdeph(et, bwd, fwd))

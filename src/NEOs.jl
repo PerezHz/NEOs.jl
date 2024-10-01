@@ -66,7 +66,7 @@ export compute_delay, radar_astrometry
 # Asteroid dynamical models
 export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!, newtonian!
 # Propagation
-export NEOParameters, propagate, propagate_lyap, propagate_root
+export propagate, propagate_lyap, propagate_root
 # Osculating
 export pv2kep, yarkp2adot
 # Least squares
@@ -78,7 +78,7 @@ export tsaiod
 # Gauss method
 export gauss_method, gaussiod
 # Orbit determination
-export ODProblem, curvature, issinglearc, orbitdetermination
+export NEOParameters, ODProblem, curvature, issinglearc, orbitdetermination
 # B plane
 export valsecchi_circle, bopik, mtp
 # Outlier rejection

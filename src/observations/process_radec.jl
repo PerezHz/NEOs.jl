@@ -328,21 +328,21 @@ function anglediff(x::T, y::S) where {T, S <: Number}
 end
 
 @doc raw"""
-    residuals(radec::AbstractVector{RadecMPC{T}}, w8s::WT, bias::DT;
-        xva::AstEph, kwargs...) where {AstEph, T <: Real,
-        WT <: AbstractWeightingScheme{T}, DT <: AbstractDebiasingScheme{T}}
+    residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
+        bias::AbstractVector{Tuple{T, T}}; xva::AstEph,
+        kwargs...) where {AstEph, T <: Real}
 
 Compute observed minus computed residuals for optical astrometry `radec`.
-Corrections due to Earth orientation, LOD and polar motion are computed by default.
+Corrections due to Earth orientation, LOD and polar motion are computed
+by default.
 
-See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and
-[`Healpix.ang2pixRing`](@ref).
+See also [`OpticalResidual`](@ref) and [`compute_radec`](@ref).
 
 ## Arguments
 
-- `radec::AbstractVector{RadecMPC{T}}`: vector of observations.
-- `w8s::WT`: weighting scheme.
-- `bias::DT`: debiasing scheme.
+- `radec::AbstractVector{RadecMPC{T}}`: optical astrometry.
+- `w8s::AbstractVector{T}`: statistical weights.
+- `bias::AbstractVector{Tuple{T, T}}`: debiasing corrections.
 
 ## Keyword arguments
 
@@ -354,11 +354,11 @@ See also [`compute_radec`](@ref), [`debiasing`](@ref), [`w8sveres17`](@ref) and
 All ephemeris must take [et seconds since J2000] and return [barycentric position in km
 and velocity in km/sec].
 """
+function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
+    bias::AbstractVector{Tuple{T, T}}; xva::AstEph, kwargs...) where {AstEph, T <: Real}
 
-function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::WT, bias::DT;
-    xva::AstEph, kwargs...) where {AstEph, T <: Real, WT <: AbstractWeightingScheme{T},
-    DT <: AbstractDebiasingScheme{T}}
-
+    # Check consistency between arrays
+    @assert length(radec) == length(w8s) == length(bias)
     # UTC time of first astrometric observation
     utc1 = date(radec[1])
     # TDB seconds since J2000.0 for first astrometric observation
@@ -375,11 +375,11 @@ function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::WT, bias::DT;
 end
 
 function residuals!(res::Vector{OpticalResidual{T, U}},
-    radec::AbstractVector{RadecMPC{T}}, w8s::WT, bias::DT;
-    xva::AstEph, kwargs...) where {AstEph, T <: Real, U <: Number,
-    WT <: AbstractWeightingScheme{T}, DT <: AbstractDebiasingScheme{T}}
+    radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
+    bias::AbstractVector{Tuple{T, T}}; xva::AstEph, kwargs...) where {AstEph,
+    T <: Real, U <: Number}
 
-    tmap!(res, radec, w8s.w8s, bias.bias) do obs, w8, bias
+    tmap!(res, radec, w8s, bias) do obs, w8, bias
         # Observed ra/dec
         α_obs = rad2arcsec(ra(obs))   # arcsec
         δ_obs = rad2arcsec(dec(obs))  # arcsec

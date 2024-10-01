@@ -193,7 +193,7 @@ Return:
     See section 5.1 of https://doi.org/10.1016/j.icarus.2007.11.033
 """
 function curvature(ts::AbstractVector{T}, αs::AbstractVector{T}, δs::AbstractVector{T},
-                   σs::AbstractVector{T}) where {T <: Real}
+    σs::AbstractVector{T}) where {T <: Real}
     @assert length(ts) == length(αs) == length(δs) == length(σs) ≥ 3 """
     At least three observations needed for significant curvature computation."""
     # Days of observation [relative to first observation]
@@ -262,7 +262,7 @@ function curvature(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     # Declination
     δs = dec.(radec)
     # Standard deviations [rad]
-    σs = arcsec2rad.(w8sveres17.(radec))
+    σs = arcsec2rad.(σsveres17.(radec))
 
     return curvature(ts, αs, δs, σs)
 end

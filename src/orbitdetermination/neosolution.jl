@@ -234,17 +234,16 @@ function jplcompare(des::String, sol::NEOSolution{T, U}) where {T <: Real, U <: 
 end
 
 @doc raw"""
-    uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::NEOParameters{T};
-                         dynamics::D = newtonian!) where {T <: Real, D}
+    uncertaintyparameter(od::ODProblem{D, T}, sol::NEOSolution{T, T},
+        params::NEOParameters{T}) where {D, T <: Real}
 
 Return the Minor Planet Center Uncertainty Parameter.
 
-# Arguments
+## Arguments
 
-- `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
+- `od::ODProblem{D, T}`: an orbit determination problem.
 - `sol::NEOSolution{T, T}:` reference orbit.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
-- `dynamics::D`: dynamical model.
 
 !!! reference
     https://www.minorplanetcenter.net/iau/info/UValue.html
@@ -252,10 +251,10 @@ Return the Minor Planet Center Uncertainty Parameter.
 !!! warning
     This function will change the (global) `TaylorSeries` variables.
 """
-function uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}, params::NEOParameters{T};
-                              dynamics::D = newtonian!) where {T <: Real, D}
-    # Reduce tracklets by polynomial regression
-    tracklets = reduce_tracklets(radec)
+function uncertaintyparameter(od::ODProblem{D, T}, sol::NEOSolution{T, T},
+    params::NEOParameters{T}) where {D, T <: Real}
+    # Check consistency between od and sol
+    @assert od.tracklets == sol.tracklets
     # Epoch [Julian days TDB]
     jd0 = sol.bwd.t0 + PE.J2000
     # Barycentric initial conditions
@@ -269,13 +268,13 @@ function uncertaintyparameter(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T}
     # Initial conditions
     q = q0 + dq
     # Propagation and residuals
-    bwd, fwd, res = propres(radec, jd0, q, params; dynamics)
+    bwd, fwd, res = propres(od, jd0, q, params)
     # Orbit fit
     fit = tryls(res, x0, params.newtoniter)
     # Residuals space to barycentric coordinates jacobian.
     J = Matrix(TS.jacobian(dq))
     # Update solution
-    _sol_ = NEOSolution(tracklets, bwd, fwd, res, fit, J)
+    _sol_ = NEOSolution(od.tracklets, bwd, fwd, res, fit, J)
     # Osculating keplerian elements
     osc = pv2kep(_sol_() - params.eph_su(sol.bwd.t0); jd = jd0, frame = :ecliptic)
     # Eccentricity
