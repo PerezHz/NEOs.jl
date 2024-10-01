@@ -329,8 +329,8 @@ end
 
 @doc raw"""
     residuals(radec::AbstractVector{RadecMPC{T}}, w8s::WT, bias::DT;
-        xva::AstEph, kwargs...) where {T <: Real, WT <: AbstractWeightingScheme{T},
-        DT <: AbstractDebiasingScheme{T}}
+        xva::AstEph, kwargs...) where {AstEph, T <: Real,
+        WT <: AbstractWeightingScheme{T}, DT <: AbstractDebiasingScheme{T}}
 
 Compute observed minus computed residuals for optical astrometry `radec`.
 Corrections due to Earth orientation, LOD and polar motion are computed by default.
@@ -356,7 +356,7 @@ and velocity in km/sec].
 """
 
 function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::WT, bias::DT;
-    xva::AstEph, kwargs...) where {T <: Real, WT <: AbstractWeightingScheme{T},
+    xva::AstEph, kwargs...) where {AstEph, T <: Real, WT <: AbstractWeightingScheme{T},
     DT <: AbstractDebiasingScheme{T}}
 
     # UTC time of first astrometric observation
@@ -376,7 +376,7 @@ end
 
 function residuals!(res::Vector{OpticalResidual{T, U}},
     radec::AbstractVector{RadecMPC{T}}, w8s::WT, bias::DT;
-    xva::AstEph, kwargs...) where {T <: Real, U <: Number,
+    xva::AstEph, kwargs...) where {AstEph, T <: Real, U <: Number,
     WT <: AbstractWeightingScheme{T}, DT <: AbstractDebiasingScheme{T}}
 
     tmap!(res, radec, w8s.w8s, bias.bias) do obs, w8, bias
