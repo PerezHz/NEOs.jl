@@ -1,8 +1,8 @@
 include("osculating.jl")
 include("least_squares.jl")
+include("odproblem.jl")
 include("neosolution.jl")
 include("admissibleregion.jl")
-include("odproblem.jl")
 
 # Times used within propres
 function _proprestimes(radec::AbstractVector{RadecMPC{T}}, jd0::U,
