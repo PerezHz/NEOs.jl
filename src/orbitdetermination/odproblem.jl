@@ -41,8 +41,8 @@ mutable struct ODProblem{D, T <: Real, WT <: AbstractWeightingScheme{T},
         # Build debiasing scheme
         _bias_ = bias(radec)
         # Consistency check
-        @assert length(radec) == sum(nobs, tracklets) == length(_w8s_.w8s) ==
-            length(_bias_.bias)
+        @assert length(radec) == sum(nobs, tracklets; init = 0) ==
+            length(_w8s_.w8s) == length(_bias_.bias)
         # Assemble orbit determination problem
         new{D, T, typeof(_w8s_), typeof(_bias_)}(dynamics, radec, tracklets,
             _w8s_, _bias_)
@@ -65,9 +65,13 @@ end
 
 # Override update!
 function update!(p::ODProblem{D, T}, radec::Vector{RadecMPC{T}}) where {D, T <: Real}
+    # Update ODProblem fields
     p.radec = radec
     p.tracklets = reduce_tracklets(radec)
     update!(p.w8s, radec)
     update!(p.bias, radec)
+    # Consistency check
+    @assert length(p.radec) == sum(nobs, p.tracklets; init = 0) ==
+        length(p.w8s.w8s) == length(p.bias.bias)
     return nothing
 end
