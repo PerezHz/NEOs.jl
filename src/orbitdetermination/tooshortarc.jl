@@ -41,11 +41,11 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     scalings[6] = (A.v_ρ_domain[2] - A.v_ρ_domain[1]) / 1_000
     # Jet transport variables and initial condition
     dae = [scalings[i] * TaylorN(i, order = adamorder) for i in 1:6]
-    q = aes[:, 1] .+ dae
+    AE = aes[:, 1] .+ dae
     # Subset of radec
     idxs = indices(od.tracklets[i])
     # Propagation buffer
-    buffer = PropagationBuffer(od, jd0, idxs[1], idxs[end], q, params)
+    buffer = PropagationBuffer(od, jd0, idxs[1], idxs[end], AE, params)
     # Vector of O-C residuals
     res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(idxs)]
     # Origin
@@ -62,13 +62,13 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         ae = aes[:, t]
         # Attributable elements (JT)
         if scale == :linear
-            AE = ae + dae
+            AE .= ae + dae
         elseif scale == :log
-            AE = [ae[1] + dae[1], ae[2] + dae[2], ae[3] + dae[3],
+            AE .= [ae[1] + dae[1], ae[2] + dae[2], ae[3] + dae[3],
                   ae[4] + dae[4], 10^(log10(ae[5]) + dae[5]), ae[6] + dae[6]]
         end
         # Barycentric state vector
-        q .= attr2bary(A, AE, params)
+        q = attr2bary(A, AE, params)
         # Propagation and residuals
         # TO DO: `ρ::TaylorN` is too slow for `adam` due to evaluations
         # within the dynamical model
