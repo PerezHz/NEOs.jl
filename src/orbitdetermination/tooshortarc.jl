@@ -80,6 +80,7 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         iszero(length(res)) && break
         # Least squares fit
         fit = tryls(res, x0, 5, 1:4)
+        !fit.success && break
         x1 .= fit.x
         # Current Q
         Q = nms(res)

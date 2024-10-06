@@ -139,7 +139,7 @@ function zero(::Type{NEOSolution{T, U}}) where {T <: Real, U <: Number}
     x_fwd = Matrix{U}(undef, 0, 0)
     g_fwd = Vector{U}(undef, 0)
     res = Vector{OpticalResidual{T, U}}(undef, 0)
-    fit = LeastSquaresFit{T}(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), :newton)
+    fit = zero(LeastSquaresFit{T})
     jacobian = Matrix{T}(undef, 0, 0)
 
     NEOSolution{T, U}(

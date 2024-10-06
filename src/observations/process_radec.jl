@@ -29,6 +29,9 @@ OpticalResidual(ξ_α::U, ξ_δ::U, w_α::T, w_δ::T,
     outlier::Bool = false) where {T <: Real, U <: Number} =
     OpticalResidual{T, U}(ξ_α, ξ_δ, w_α, w_δ, outlier)
 
+# Definition of zero OpticalResidual
+zero(::Type{OpticalResidual{T, U}}) where {T <: Real, U <: Number} =
+    OpticalResidual{T, U}(zero(U), zero(U), zero(T), zero(T), false)
 
 # Evaluate methods
 function evaluate(res::OpticalResidual{T, TaylorN{T}}, x::Vector{T}) where {T <: Real}
