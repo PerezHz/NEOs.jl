@@ -29,8 +29,7 @@ function propres(od::ODProblem{D, T}, jd0::V, q0::Vector{U}, params::NEOParamete
     t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(radec, jd0, params)
     # Propagation buffer
     if isnothing(buffer)
-        tlim = (t0 - JD_J2000 - params.bwdoffset, tf - JD_J2000 + params.fwdoffset)
-        buffer = PropagationBuffer(od.dynamics, jd0, tlim, q0, params)
+        buffer = PropagationBuffer(od, jd0, idxs[1], idxs[end], q0, params)
     end
     # Backward (forward) integration
     bwd = _propagate(od.dynamics, jd0, nyears_bwd, q0, buffer, params)
@@ -64,8 +63,7 @@ function propres!(res::Vector{OpticalResidual{T, U}}, od::ODProblem{D, T},
     t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(radec, jd0, params)
     # Propagation buffer
     if isnothing(buffer)
-        tlim = (t0 - JD_J2000 - params.bwdoffset, tf - JD_J2000 + params.fwdoffset)
-        buffer = PropagationBuffer(od.dynamics, jd0, tlim, q0, params)
+        buffer = PropagationBuffer(od, jd0, idxs[1], idxs[end], q0, params)
     end
     # Backward (forward) integration
     bwd = _propagate(od.dynamics, jd0, nyears_bwd, q0, buffer, params)
@@ -175,11 +173,9 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}}, i::Int,
     # JT tail
     dq = q - q0
     # Vector of O-C residuals
-    res = Vector{OpticalResidual{T, TaylorN{T}}}(undef, length(od.radec))
+    res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(od.radec)]
     # Propagation buffer
-    t0, tf = dtutc2days(date(od.radec[1])), dtutc2days(date(od.radec[end]))
-    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
-    buffer = PropagationBuffer(od.dynamics, jd0, tlim, q, params)
+    buffer = PropagationBuffer(od, jd0, 1, nobs(od), q, params)
     # Origin
     x0 = zeros(T, 6)
     # Initial subset of radec for orbit fit
@@ -187,8 +183,7 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}}, i::Int,
     # Residuals space to barycentric coordinates jacobian
     J = Matrix(TS.jacobian(dq))
     # Best orbit
-    best_sol = zero(NEOSolution{T, T})
-    best_Q = T(Inf)
+    best_sol, best_Q = zero(NEOSolution{T, T}), T(Inf)
     # Convergence flag
     flag = false
     # Jet transport least squares

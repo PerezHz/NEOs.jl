@@ -75,3 +75,17 @@ function update!(p::ODProblem{D, T}, radec::Vector{RadecMPC{T}}) where {D, T <: 
         length(p.w8s.w8s) == length(p.bias.bias)
     return nothing
 end
+
+# Override nobs
+nobs(od::ODProblem) = length(od.radec)
+
+# Special PropagationBuffer constructor
+function PropagationBuffer(od::ODProblem{D, T}, jd0::V, k0::Int, kf::Int, q0::Vector{U},
+    params::NEOParameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+    t0 = dtutc2days(date(od.radec[k0]))
+    tf = dtutc2days(date(od.radec[kf]))
+    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
+    buffer = PropagationBuffer(od.dynamics, jd0, tlim, q0, params)
+
+    return buffer
+end

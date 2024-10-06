@@ -21,17 +21,15 @@ starting from `(ρ, v_ρ)`.
 function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
     params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
     μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2) where {D, T <: Real}
-    # Initial time of integration [julian days]
+    # Initial time of integration [julian days TDB]
     jd0 = dtutc2jdtdb(A.date)
-    # Maximum number of iterations
-    maxiter = params.adamiter
-    # Target function relative tolerance
-    Qtol = params.adamQtol
+    # Unfold maximum number of iterations and relative tolerance
+    maxiter, Qtol = params.adamiter, params.adamQtol
     # Allocate memory
     aes = Matrix{T}(undef, 6, maxiter+1)
     Qs = fill(T(Inf), maxiter+1)
     # Initial attributable elements
-    aes[:, 1] .= [A.α, A.δ, A.v_α, A.v_δ, ρ, v_ρ]
+    aes[:, 1] .= A.α, A.δ, A.v_α, A.v_δ, ρ, v_ρ
     # Scaling factors
     scalings = Vector{T}(undef, 6)
     scalings[1:4] .= abs.(aes[1:4, 1]) ./ 1e6
@@ -41,17 +39,15 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         scalings[5] = (log10(A.ρ_domain[2]) - log10(A.ρ_domain[1])) / 1_000
     end
     scalings[6] = (A.v_ρ_domain[2] - A.v_ρ_domain[1]) / 1_000
-    # Jet transport variables
+    # Jet transport variables and initial condition
     dae = [scalings[i] * TaylorN(i, order = adamorder) for i in 1:6]
-    # Propagation buffer
-    t0 = dtutc2days(date(od.tracklets[i].radec[1]))
-    tf = dtutc2days(date(od.tracklets[i].radec[end]))
-    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
-    buffer = PropagationBuffer(od.dynamics, jd0, tlim, aes[:, 1] .+ dae, params)
-    # Vector of O-C residuals
-    res = Vector{OpticalResidual{T, TaylorN{T}}}(undef, length(od.tracklets[i].radec))
+    q = aes[:, 1] .+ dae
     # Subset of radec
     idxs = indices(od.tracklets[i])
+    # Propagation buffer
+    buffer = PropagationBuffer(od, jd0, idxs[1], idxs[end], q, params)
+    # Vector of O-C residuals
+    res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(idxs)]
     # Origin
     x0, x1 = zeros(T, 6), zeros(T, 6)
     # Gradient of objective function wrt (ρ, v_ρ)
@@ -72,7 +68,7 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
                   ae[4] + dae[4], 10^(log10(ae[5]) + dae[5]), ae[6] + dae[6]]
         end
         # Barycentric state vector
-        q = attr2bary(A, AE, params)
+        q .= attr2bary(A, AE, params)
         # Propagation and residuals
         # TO DO: `ρ::TaylorN` is too slow for `adam` due to evaluations
         # within the dynamical model
