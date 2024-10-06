@@ -43,7 +43,8 @@ end
 @everywhere begin
     using NEOs, Dates, TaylorSeries, PlanetaryEphemeris, JLD2
     using NEOs: RadecMPC, AdmissibleRegion, PropagationBuffer, OpticalResidual,
-        attr2bary, propres!, boundary_projection, reduce_tracklets, arboundary
+        attr2bary, propres!, boundary_projection, reduce_tracklets, arboundary,
+        indices
 
     function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
         params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
