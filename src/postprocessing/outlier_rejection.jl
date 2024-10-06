@@ -5,26 +5,30 @@ include("bplane.jl")
 
 Return the contribution of `x` to the nrms.
 """
-residual_norm(x::OpticalResidual{T, T}) where {T <: Real} = x.w_α * x.ξ_α^2 / x.relax_factor + x.w_δ * x.ξ_δ^2 / x.relax_factor
+residual_norm(x::OpticalResidual{T, T}) where {T <: Real} =
+    x.w_α * x.ξ_α^2 + x.w_δ * x.ξ_δ^2
 
 @doc raw"""
-    outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
-                      params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
+    outlier_rejection(od::ODProblem{D, T}, sol::NEOSolution{T, T},
+        params::NEOParameters{T}) where {D, T <: Real}
 
-Refine an orbit, computed by [`orbitdetermination`](@ref), via propagation and/or outlier rejection.
+Refine an orbit, computed by [`orbitdetermination`](@ref),
+via propagation and/or outlier rejection.
 
-# Arguments
+## Arguments
 
-- `radec::Vector{RadecMPC{T}}`: vector of observations.
+- `od::ODProblem{D, T}`: an orbit determination problem.
 - `sol::NEOSolution{T, T}`: orbit to be refined.
-- `params::NEOParameters{T}`: see `Outlier Rejection Parameters` of [`NEOParameters`](@ref).
-- `dynamics::D`: dynamical model.
+- `params::NEOParameters{T}`: see `Outlier Rejection Parameters`
+    of [`NEOParameters`](@ref).
 
 !!! warning
     This function will change the (global) `TaylorSeries` variables.
 """
-function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
-                           params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
+function outlier_rejection(od::ODProblem{D, T}, sol::NEOSolution{T, T},
+    params::NEOParameters{T}) where {D, T <: Real}
+    # Check consistency between od and sol
+    @assert od.tracklets == sol.tracklets
     # Julian day (TDB) to start propagation
     jd0 = sol.bwd.t0 + PE.J2000
     # Initial conditions (T)
@@ -36,7 +40,7 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     # Initial conditions (jet transport)
     q = q0 .+ dq
     # Propagation and residuals
-    bwd, fwd, res = propres(radec, jd0, q, params; dynamics)
+    bwd, fwd, res = propres(od, jd0, q, params)
     iszero(length(res)) && return zero(NEOSolution{T, T})
     # Origin
     x0 = zeros(T, 6)
@@ -52,14 +56,14 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     end
 
     # Number of observations
-    N_radec = length(radec)
+    N_radec = length(od.radec)
     # Maximum allowed outliers
     max_drop = ceil(Int, N_radec * params.max_per / 100)
     # Boolean mask (0: included in fit, 1: outlier)
     new_outliers = BitVector(zeros(Int, N_radec))
 
     # Drop loop
-    for i in 1:max_drop
+    for _ in 1:max_drop
         # Contribution of each residual to nrms
         norms = residual_norm.(res(fit.x))
         # Iterate norms from largest to smallest
@@ -70,8 +74,8 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
                 # Drop residual
                 new_outliers[j] = true
                 # Update residuals
-                res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
-                                       relax_factor.(res), new_outliers)
+                res = OpticalResidual.(ra.(res), dec.(res), wra.(res), wdec.(res),
+                    new_outliers)
                 # Update fit
                 fit = tryls(res, x0, params.newtoniter)
                 break
@@ -103,8 +107,8 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
         # Recover residual
         new_outliers[j] = false
         # Update residuals
-        res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
-                               relax_factor.(res), new_outliers)
+        res = OpticalResidual.(ra.(res), dec.(res), wra.(res), wdec.(res),
+            new_outliers)
         # Update fit
         fit = tryls(res, x0, params.newtoniter)
     end
@@ -117,8 +121,8 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
         # Reset boolean mask
         new_outliers[1:end] .= false
         # Update residuals
-        res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
-                               relax_factor.(res), new_outliers)
+        res = OpticalResidual.(ra.(res), dec.(res), wra.(res), wdec.(res),
+            new_outliers)
         # Update fit
         fit = tryls(res, x0, params.newtoniter)
 
@@ -147,8 +151,8 @@ function outlier_rejection(radec::Vector{RadecMPC{T}}, sol::NEOSolution{T, T},
     # Outliers
     new_outliers[idxs] .= true
     # Update residuals
-    res = OpticalResidual.(ra.(res), dec.(res), weight_ra.(res), weight_dec.(res),
-                           relax_factor.(res), new_outliers)
+    res = OpticalResidual.(ra.(res), dec.(res), wra.(res), wdec.(res),
+        new_outliers)
     # Update fit
     fit = tryls(res, x0, params.newtoniter)
 

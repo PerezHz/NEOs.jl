@@ -19,6 +19,8 @@ using InteractiveUtils: methodswith
         @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, TaylorIntegration.jetcoeffs!))
         @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, TaylorIntegration._allocate_jetcoeffs!))
 
+        @test !isempty(methodswith(Val{newtonian!}, TaylorIntegration.jetcoeffs!))
+        @test !isempty(methodswith(Val{newtonian!}, TaylorIntegration._allocate_jetcoeffs!))
     end
 
     using PlanetaryEphemeris: selecteph, ea, su, daysec, auday2kmsec
@@ -93,13 +95,15 @@ using InteractiveUtils: methodswith
         @test norm(sol_bwd(sol_bwd.t0 + sol_bwd.t[end])-q_bwd_end, Inf) < 1e-12
 
         # Read optical astrometry file
-
         obs_radec_mpc_2023DW = read_radec_mpc(joinpath(pkgdir(NEOs), "test", "data", "RADEC_2023_DW.dat"))
+        # Make weigths and debiasing corrections
+        w8s = Veres17(obs_radec_mpc_2023DW).w8s
+        bias = Eggl20(obs_radec_mpc_2023DW).bias
 
         # Compute residuals
         _res_ = NEOs.residuals(
             obs_radec_mpc_2023DW,
-            params,
+            w8s, bias,
             xve = t -> auday2kmsec(eph_ea(t/daysec)),
             xvs = t -> auday2kmsec(eph_su(t/daysec)),
             xva = t -> auday2kmsec(sol(t/daysec))
@@ -132,7 +136,7 @@ using InteractiveUtils: methodswith
         # Compute residuals for orbit with perturbed initial conditions
         _res1_ = NEOs.residuals(
             obs_radec_mpc_2023DW,
-            params,
+            w8s, bias,
             xve = t -> auday2kmsec(eph_ea(t/daysec)),
             xvs = t -> auday2kmsec(eph_su(t/daysec)),
             xva = t -> auday2kmsec(sol1(t/daysec))
@@ -197,11 +201,14 @@ using InteractiveUtils: methodswith
 
         # Read optical astrometry file
         obs_radec_mpc_apophis = read_radec_mpc(joinpath(pkgdir(NEOs), "test", "data", "99942_Tholen_etal_2013.dat"))
+        # Make weights and debiasing corrections
+        w8s = Veres17(obs_radec_mpc_apophis).w8s
+        bias = Eggl20(obs_radec_mpc_apophis).bias
 
         # Compute optical astrometry residuals
         _res_radec_ = NEOs.residuals(
             obs_radec_mpc_apophis,
-            params,
+            w8s, bias,
             xve = t -> auday2kmsec(eph_ea(t/daysec)),
             xvs = t -> auday2kmsec(eph_su(t/daysec)),
             xva = t -> auday2kmsec(sol(t/daysec))
@@ -372,9 +379,12 @@ using InteractiveUtils: methodswith
 
         # Read optical astrometry file
         obs_radec_mpc_apophis = read_radec_mpc(joinpath(pkgdir(NEOs), "test", "data", "99942_Tholen_etal_2013.dat"))
+        # Make weights and debiasing corrections
+        w8s = Veres17(obs_radec_mpc_apophis).w8s
+        bias = Eggl20(obs_radec_mpc_apophis).bias
 
         # Compute optical astrometry residuals
-        _res_radec_ = NEOs.residuals(obs_radec_mpc_apophis, params; xvs, xve, xva)
+        _res_radec_ = NEOs.residuals(obs_radec_mpc_apophis, w8s, bias; xvs, xve, xva)
         res_radec, w_radec = NEOs.unfold(_res_radec_)
         nobsopt = round(Int, length(res_radec))
 

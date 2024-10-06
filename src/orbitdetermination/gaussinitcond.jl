@@ -5,7 +5,7 @@ A preliminary orbit obtained from Gauss method of orbit determination.
 
 See also [`gauss_method`](@ref).
 
-# Fields
+## Fields
 
 - `statevect::Vector{U}`: state vector at middle observation.
 - `ρ::Vector{U}`: topocentric ranges.
@@ -32,19 +32,18 @@ See also [`gauss_method`](@ref).
     f_3::U
     g_3::U
     # Inner constructor
-    function GaussSolution{T, U}(
-        statevect::Vector{U}, ρ::Vector{U}, D::Matrix{U}, R_vec::Matrix{T},
-        ρ_vec::Matrix{U}, τ_1::T, τ_3::T, f_1::U, g_1::U, f_3::U, g_3::U) where {T <: Real, U <: Number}
+    function GaussSolution{T, U}(statevect::Vector{U}, ρ::Vector{U}, D::Matrix{U},
+        R_vec::Matrix{T}, ρ_vec::Matrix{U}, τ_1::T, τ_3::T, f_1::U, g_1::U, f_3::U,
+        g_3::U) where {T <: Real, U <: Number}
         return new{T, U}(statevect, ρ, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3)
     end
 end
 
 # Outer constructor
-function GaussSolution(
-    statevect::Vector{U}, ρ::Vector{U}, D::Matrix{U}, R_vec::Matrix{T},
-    ρ_vec::Matrix{U}, τ_1::T, τ_3::T, f_1::U, g_1::U, f_3::U, g_3::U) where {T <: Real, U <: Number}
-    return GaussSolution{T, U}(statevect, ρ, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3)
-end
+GaussSolution(statevect::Vector{U}, ρ::Vector{U}, D::Matrix{U},
+    R_vec::Matrix{T}, ρ_vec::Matrix{U}, τ_1::T, τ_3::T, f_1::U,
+    g_1::U, f_3::U, g_3::U) where {T <: Real, U <: Number} =
+    GaussSolution{T, U}(statevect, ρ, D, R_vec, ρ_vec, τ_1, τ_3, f_1, g_1, f_3, g_3)
 
 # Print method for GaussSolution
 # Examples:
@@ -110,7 +109,8 @@ function _format_Lagrange_equation(a::T, b::T, c::T) where {T <: Real}
     b_sgn = b ≥ 0 ? "+" : "-"
     c_sgn = c ≥ 0 ? "+" : "-"
 
-    return join(["r⁸ ", a_sgn, " ", abs(a), " r⁶ ", b_sgn, " ", abs(b), " r³ ", c_sgn, " ", abs(c), " = 0"])
+    return join(["r⁸ ", a_sgn, " ", abs(a), " r⁶ ", b_sgn, " ", abs(b), " r³ ", c_sgn,
+        " ", abs(c), " = 0"])
 end
 
 @doc raw"""
@@ -190,11 +190,11 @@ end
 @doc raw"""
     gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: Real}
     gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime},
-                 α::Vector{U}, δ::Vector{U}, params::NEOParameters{T}) where {T <: Real, U <: Number}
+        α::Vector{U}, δ::Vector{U}, params::NEOParameters{T}) where {T <: Real, U <: Number}
 
 Core Gauss method of Initial Orbit determination (IOD).
 
-# Arguments
+## Arguments
 
 - `obs::Vector{RadecMPC{T}}`: three observations.
 - `observatories::Vector{ObservatoryMPC{T}}`: sites of observation.
@@ -407,10 +407,12 @@ end
 
 # Update an initial condition `q`, obtained by Gauss' method, via ADAM
 # minimization over the middle tracklet's manifold of variations.
-function _adam!(q::Vector{TaylorN{T}}, jd0::T, tracklet::Tracklet,
-    params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
+function _adam!(od::ODProblem{D, T}, i::Int, q::Vector{TaylorN{T}}, jd0::T,
+    params::NEOParameters{T}) where {D, T <: Real}
+    # Middle tracklet
+    tracklet = od.tracklets[i]
     # Exploratory propagation
-    bwd, fwd, _ = propres(tracklet.radec, jd0, q(), params)
+    bwd, fwd, _ = propres(od, jd0, q(), params; idxs = indices(tracklet))
     # Admissible region
     A = AdmissibleRegion(tracklet, params)
     # Epoch [days since J2000]
@@ -426,41 +428,34 @@ function _adam!(q::Vector{TaylorN{T}}, jd0::T, tracklet::Tracklet,
     # Boundary projection
     ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
     # ADAM
-    ae, _ = adam(tracklet.radec, A, ρ, v_ρ, params; scale = :log, dynamics = dynamics)
+    ae, _ = adam(od, i, A, ρ, v_ρ, params; scale = :log)
     # Epoch [julian days] (corrected for light-time)
     jd0 = dtutc2jdtdb(A.date) - ae[5] / c_au_per_day
     # Convert attributable elements to barycentric cartesian coordinates
     q0 = attr2bary(A, ae, params)
     # Jet Transport initial condition
-    q .= [q0[i] + (abs(q0[i]) / 10^5) * TaylorN(i, order = params.tsaorder) for i in 1:6]
+    q .= [q0[j] + (abs(q0[j]) / 10^5) * TaylorN(j, order = params.tsaorder) for j in 1:6]
 
     return jd0
 end
 
 @doc raw"""
-    gaussiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-        params::NEOParameters{T}; kwargs...) where {T <: Real, D}
+    gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: Real}
 
-Fit a preliminary orbit to `radec` via jet transport Gauss method.
+Fit a preliminary orbit to `od` via jet transport Gauss method.
 
 See also [`gauss_method`](@ref).
 
 ## Arguments
 
-- `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
-- `tracklets::Vector{Tracklet{T}},`: vector of tracklets.
+- `od::ODProblem{D, T}`: an orbit determination problem.
 - `params::NEOParameters{T}`: see `Gauss' Method Parameters` of [`NEOParameters`](@ref).
-
-## Keyword arguments
-
-- `dynamics::D`: dynamical model (default: `newtonian!`).
 """
-function gaussiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
-    params::NEOParameters{T}; dynamics::D = newtonian!) where {T <: Real, D}
+function gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: Real}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
     # This function requires exactly 3 tracklets
-    length(tracklets) != 3 && return sol
+    length(od.tracklets) != 3 && return sol
     # Jet transport scaling factors
     scalings = fill(1e-6, 6)
     # Jet transport perturbation (ra/dec)
@@ -471,7 +466,7 @@ function gaussiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
     α = Vector{T}(undef, 3)
     δ = Vector{T}(undef, 3)
     # Find best triplet of observations
-    _gausstriplet!(observatories, dates, α, δ, tracklets)
+    _gausstriplet!(observatories, dates, α, δ, od.tracklets)
     # Julian day of middle observation
     _jd0_ = dtutc2jdtdb(dates[2])
     # Gauss method solution
@@ -487,18 +482,18 @@ function gaussiod(radec::Vector{RadecMPC{T}}, tracklets::Vector{Tracklet{T}},
         # Jet transport initial conditions
         q = solG[i].statevect .+ params.eph_su(jd0 - JD_J2000)
         # Jet Transport Least Squares
-        _sol_ = jtls(radec, tracklets, jd0, q, 0, params, true; dynamics)
+        _sol_ = jtls(od, jd0, q, 0, params, true)
         # Update solution
-        sol = updatesol(sol, _sol_, radec)
+        sol = updatesol(sol, _sol_, od.radec)
         # Termination condition
         nrms(sol) <= params.gaussQmax && return sol
         # ADAM help
-        tracklets[2].nobs < 2 && continue
-        jd0 = _adam!(q, jd0, tracklets[2], params; dynamics)
+        od.tracklets[2].nobs < 2 && continue
+        jd0 = _adam!(od, 2, q, jd0, params)
         # Jet Transport Least Squares
-        _sol_ = jtls(radec, tracklets, jd0, q, 0, params, true; dynamics)
+        _sol_ = jtls(od, jd0, q, 0, params, true)
         # Update solution
-        sol = updatesol(sol, _sol_, radec)
+        sol = updatesol(sol, _sol_, od.radec)
         # Termination condition
         nrms(sol) <= params.gaussQmax && return sol
     end
