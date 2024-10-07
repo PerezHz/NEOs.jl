@@ -308,7 +308,7 @@ function _georangerates(coeffs::Vector{T}, ρ::S) where {T, S <: Real}
     if d > 0
         return [-sqrt(arG(coeffs, ρ)), sqrt(arG(coeffs, ρ))]
     elseif d == 0
-        return zero(T) * arG(coeffs, ρ)
+        return zero(T) * [arG(coeffs, ρ)]
     else
         return Vector{T}(undef, 0)
     end

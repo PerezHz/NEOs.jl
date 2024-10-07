@@ -1,5 +1,5 @@
 include("osculating.jl")
-include("least_squares.jl")
+include("leastsquares/methods.jl")
 include("odproblem.jl")
 include("neosolution.jl")
 include("admissibleregion.jl")
@@ -117,7 +117,7 @@ function addradec!(::Val{true}, rin::Vector{Int}, fit::LeastSquaresFit{T},
     params::NEOParameters{T}) where {T <: Real}
     while !isempty(tout)
         extra = indices(tout[1])
-        fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter)
+        fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.newtoniter)
         !fit_new.success && break
         fit = fit_new
         tracklet = popfirst!(tout)
@@ -137,7 +137,7 @@ function addradec!(::Val{false}, rin::Vector{Int}, fit::LeastSquaresFit{T},
     params::NEOParameters{T}) where {T <: Real}
     if nrms(res[rin], fit) < params.tsaQmax && !isempty(tout)
         extra = indices(tout[1])
-        fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter)
+        fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.newtoniter)
         !fit_new.success && return rin, fit
         fit = fit_new
         tracklet = popfirst!(tout)
@@ -172,12 +172,15 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}}, i::Int,
     q0 = constant_term.(q)
     # JT tail
     dq = q - q0
-    # Vector of O-C residuals
-    res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(od.radec)]
     # Propagation buffer
     buffer = PropagationBuffer(od, jd0, 1, nobs(od), q, params)
     # Origin
     x0 = zeros(T, 6)
+    # Vector of O-C residuals
+    res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(od.radec)]
+    # Least squares cache and methods
+    cache = LeastSquaresCache(x0, 1:6, params.newtoniter)
+    methods = _lsmethods(res, x0, 1:6)
     # Initial subset of radec for orbit fit
     tin, tout, rin = _initialtracklets(od.tracklets, i)
     # Residuals space to barycentric coordinates jacobian
@@ -194,7 +197,7 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}}, i::Int,
         bwd, fwd = propres!(res, od, jd0, q, params; buffer)
         iszero(length(res)) && break
         # Orbit fit
-        fit = tryls(res[rin], x0, params.newtoniter)
+        fit = tryls(res[rin], x0, cache, methods)
         !fit.success && break
         # Incrementally add observations to fit
         rin, fit = addradec!(Val(mode), rin, fit, tin, tout, res, x0, params)
