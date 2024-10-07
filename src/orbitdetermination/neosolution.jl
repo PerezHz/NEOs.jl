@@ -270,7 +270,7 @@ function uncertaintyparameter(od::ODProblem{D, T}, sol::NEOSolution{T, T},
     # Propagation and residuals
     bwd, fwd, res = propres(od, jd0, q, params)
     # Orbit fit
-    fit = tryls(res, x0, params.newtoniter)
+    fit = tryls(res, x0; maxiter = params.newtoniter)
     # Residuals space to barycentric coordinates jacobian.
     J = Matrix(TS.jacobian(dq))
     # Update solution
