@@ -13,7 +13,7 @@ chi2(res::AbstractVector{U}, w::AbstractVector{T}) where {T <: Real, U <: Number
     sum(w .* (res .^ 2))
 
 chi2(x::OpticalResidual{T, U}) where {T <: Real, U <: Number} =
-    x.w_α * x.ξ_α^2 + x.w_δ * x.ξ_δ^2
+    !x.outlier * (x.w_α * x.ξ_α^2 + x.w_δ * x.ξ_δ^2)
 
 chi2(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number} =
     sum(chi2.(res))
@@ -31,7 +31,7 @@ nms(res::AbstractVector{U}, w::AbstractVector{T}) where {T <: Real, U <: Number}
     chi2(res, w) / length(res)
 
 nms(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number} =
-    chi2(res) / (2 * length(res))
+    chi2(res) / (2 * notout(res))
 
 @doc raw"""
     nrms(res::AbstractVector{OpticalResidual{T, U}} [,
