@@ -187,6 +187,9 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}}, i::Int,
     J = Matrix(TS.jacobian(dq))
     # Best orbit
     best_sol, best_Q = zero(NEOSolution{T, T}), T(Inf)
+    if params.outrej
+        best_out = notout(res)
+    end
     # Convergence flag
     flag = false
     # Jet transport least squares
@@ -201,13 +204,25 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}}, i::Int,
         !fit.success && break
         # Incrementally add observations to fit
         rin, fit = addradec!(Val(mode), rin, fit, tin, tout, res, x0, params)
+        # Outlier rejection
+        if params.outrej
+            outlier_rejection!(view(res, rin), fit.x, fit.Γ;
+                χ2_rec = params.χ2_rec, χ2_rej = params.χ2_rej,
+                fudge = params.fudge, max_per = params.max_per)
+        end
         # NRMS
         Q = nrms(res, fit)
-        if abs(best_Q - Q) < 0.1
+        # Break condition
+        C1 = abs(best_Q - Q) < 0.01
+        C2 = params.outrej ? (best_out == notout(res)) : true
+        if C1 && C2
             flag = true
         end
         # Update NRMS and initial conditions
         best_Q = Q
+        if params.outrej
+            best_out = notout(res)
+        end
         J .= TS.jacobian(dq, fit.x)
         best_sol = evalfit(NEOSolution(tin, bwd, fwd, res[rin], fit, J))
         flag && break

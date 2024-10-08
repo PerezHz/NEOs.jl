@@ -1,6 +1,6 @@
 include("targetfunctions.jl")
 include("fit.jl")
-# include("outlierrejection.jl")
+include("outlierrejection.jl")
 
 @doc raw"""
     AbstractLeastSquaresMethod{T} <: AbstractLeastSquares{T}
@@ -120,7 +120,7 @@ mutable struct Newton{T} <: AbstractLeastSquaresMethod{T}
     function Newton(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
         x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
         # Number of observations and degrees of freedom
-        nobs, npar = 2*length(res), length(idxs)
+        nobs, npar = 2*notout(res), length(idxs)
         # Mean square residual and its gradient
         Q = nms(res)
         GQ = TaylorSeries.gradient(Q)[idxs]
@@ -163,7 +163,7 @@ end
 function update!(ls::Newton{T}, res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
     # Number of observations and degrees of freedom
-    ls.nobs, ls.npar = 2*length(res), length(idxs)
+    ls.nobs, ls.npar = 2*notout(res), length(idxs)
     # Mean square residual and its gradient
     ls.Q = nms(res)
     TS.zero!.(ls.GQ)
@@ -210,7 +210,7 @@ mutable struct DifferentialCorrections{T} <: AbstractLeastSquaresMethod{T}
     function DifferentialCorrections(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
         x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
         # Number of observations and degrees of freedom
-        nobs, npar = 2*length(res), length(idxs)
+        nobs, npar = 2*notout(res), length(idxs)
         # Mean square residual and its gradient
         Q = nms(res)
         # D matrix and normal matrix C
@@ -248,7 +248,7 @@ function update!(ls::DifferentialCorrections{T},
     res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
     # Number of observations and degrees of freedom
-    ls.nobs, ls.npar = 2*length(res), length(idxs)
+    ls.nobs, ls.npar = 2*notout(res), length(idxs)
     # Mean square residual and its gradient
     ls.Q = nms(res)
     # D matrix and normal matrix C
@@ -267,7 +267,7 @@ end
 function DCVB(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     idxs::AbstractVector{Int}) where {T <: Real}
     # Number of observations and degrees of freedom
-    nobs, npar = 2*length(res), length(idxs)
+    nobs, npar = 2*notout(res), length(idxs)
     # Allocate memory
     V = Vector{TaylorN{T}}(undef, nobs)
     D = Vector{TaylorN{T}}(undef, npar)
@@ -301,7 +301,7 @@ end
 function ξTH(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     B::AbstractMatrix{TaylorN{T}}, idxs::AbstractVector{Int}) where {T <: Real}
     # Number of observations and degrees of freedom
-    nobs, npar = 2*length(res), length(idxs)
+    nobs, npar = 2*notout(res), length(idxs)
     # Allocate memory
     ξTHv = Array{T}(undef, npar, npar)
     A = Matrix{T}(undef, 1, nobs)
@@ -357,7 +357,7 @@ mutable struct LevenbergMarquardt{T} <: AbstractLeastSquaresMethod{T}
     function LevenbergMarquardt(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
         x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
         # Number of observations and degrees of freedom
-        nobs, npar = 2*length(res), length(idxs)
+        nobs, npar = 2*notout(res), length(idxs)
         # Damping factor
         λ = T(0.001)
         # Mean square residual and its gradient
@@ -412,7 +412,7 @@ function update!(ls::LevenbergMarquardt{T},
     res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
     # Number of observations and degrees of freedom
-    ls.nobs, ls.npar = 2*length(res), length(idxs)
+    ls.nobs, ls.npar = 2*notout(res), length(idxs)
     # Damping factor
     ls.λ = T(0.001)
     # Mean square residual and its gradient

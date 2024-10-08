@@ -45,7 +45,12 @@ Parameters for all orbit determination functions.
 
 ## Outlier Rejection Parameters
 
-- `max_per::T`: maximum allowed rejection percentage (default: `18.0`).
+- `outrej::Bool`: whether to perform outlier rejection during least squares
+    iterations (default: `false`).
+- `χ2_rec::T`: recovery threshold (default: `7.0`).
+- `χ2_rej::T`: rejection threshold (default: `8.0`).
+- `fudge::T`: rejection fudge term coefficient (default: `400.0`).
+- `max_per::T`: maximum allowed rejection percentage (default: `10.0`).
 """
 @kwdef struct NEOParameters{T <: Real}
     # Propagation Parameters
@@ -77,7 +82,11 @@ Parameters for all orbit determination functions.
     newtoniter::Int = 5
     jtlsorder::Int = 5
     # Outlier Rejection Parameters
-    max_per::T = 18.0
+    outrej::Bool = false
+    χ2_rec::T = 7.0
+    χ2_rej::T = 8.0
+    fudge::T = 400.0
+    max_per::T = 10.0
 end
 
 # Outer constructors
