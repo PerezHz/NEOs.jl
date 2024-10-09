@@ -1,15 +1,14 @@
 include("targetfunctions.jl")
 include("fit.jl")
-include("outlierrejection.jl")
 
 @doc raw"""
-    AbstractLeastSquaresMethod{T} <: AbstractLeastSquares{T}
+    AbstractLeastSquaresCache{T} <: AbstractLeastSquares{T}
 
-Supertype for the least squares methods API.
+Supertype for the least squares caches API.
 """
-abstract type AbstractLeastSquaresMethod{T} <: AbstractLeastSquares{T} end
+abstract type AbstractLeastSquaresCache{T} <: AbstractLeastSquares{T} end
 
-struct LeastSquaresCache{T} <: AbstractLeastSquares{T}
+struct LeastSquaresCache{T} <: AbstractLeastSquaresCache{T}
     x0::Vector{T}
     xs::Matrix{T}
     Qs::Vector{T}
@@ -23,6 +22,15 @@ struct LeastSquaresCache{T} <: AbstractLeastSquares{T}
         return new{T}(x0, xs, Qs, idxs, maxiter)
     end
 end
+
+include("outlierrejection.jl")
+
+@doc raw"""
+    AbstractLeastSquaresMethod{T} <: AbstractLeastSquares{T}
+
+Supertype for the least squares methods API.
+"""
+abstract type AbstractLeastSquaresMethod{T} <: AbstractLeastSquares{T} end
 
 # Least squares main loop
 function leastsquares!(ls::LS, cache::LeastSquaresCache{T}) where {T <: Real,

@@ -179,15 +179,17 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}}, i::Int,
     # Vector of O-C residuals
     res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(od.radec)]
     # Least squares cache and methods
-    cache = LeastSquaresCache(x0, 1:6, params.newtoniter)
-    methods = _lsmethods(res, x0, 1:6)
+    lscache = LeastSquaresCache(x0, 1:6, params.newtoniter)
+    lsmethods = _lsmethods(res, x0, 1:6)
     # Initial subset of radec for orbit fit
     tin, tout, rin = _initialtracklets(od.tracklets, i)
     # Residuals space to barycentric coordinates jacobian
     J = Matrix(TS.jacobian(dq))
     # Best orbit
     best_sol, best_Q = zero(NEOSolution{T, T}), T(Inf)
+    # Outlier rejection
     if params.outrej
+        orcache = OutlierRejectionCache(T, nobs(od))
         best_out = notout(res)
     end
     # Convergence flag
@@ -200,13 +202,13 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}}, i::Int,
         bwd, fwd = propres!(res, od, jd0, q, params; buffer)
         iszero(length(res)) && break
         # Orbit fit
-        fit = tryls(res[rin], x0, cache, methods)
+        fit = tryls(res[rin], x0, lscache, lsmethods)
         !fit.success && break
         # Incrementally add observations to fit
         rin, fit = addradec!(Val(mode), rin, fit, tin, tout, res, x0, params)
         # Outlier rejection
         if params.outrej
-            outlier_rejection!(view(res, rin), fit.x, fit.Γ;
+            outlier_rejection!(view(res, rin), fit.x, fit.Γ, orcache;
                 χ2_rec = params.χ2_rec, χ2_rej = params.χ2_rej,
                 fudge = params.fudge, max_per = params.max_per)
         end
