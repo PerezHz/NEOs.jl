@@ -275,10 +275,10 @@ function DCVB(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     BT = Matrix{TaylorN{T}}(undef, npar, nobs)
     C = Matrix{TaylorN{T}}(undef, npar, npar)
     # Tranpose of the normalized design matrix B
-    for j in eachindex(res)
+    for (j, k) in enumerate(findall(!isoutlier, res))
         # Normalized j-th ra and dec residuals
-        V[2j-1] = sqrt(res[j].w_α) * res[j].ξ_α
-        V[2j] = sqrt(res[j].w_δ) * res[j].ξ_δ
+        V[2j-1] = sqrt(res[k].w_α) * res[k].ξ_α
+        V[2j] = sqrt(res[k].w_δ) * res[k].ξ_δ
         # Gradient of the j-th ra and dec residuals with respect to
         # to the initial conditions x_0[idxs]
         for i in eachindex(idxs)
@@ -307,9 +307,9 @@ function ξTH(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     A = Matrix{T}(undef, 1, nobs)
     H = Array{TaylorN{T}}(undef, nobs, npar, npar)
     # H matrix and auxiliary array
-    for i in 1:nobs
-        A[1, 2i-1] = res[i].w_α * res[i].ξ_α
-        A[1, 2i] = res[i].w_δ * res[i].ξ_δ
+    for (i, k) in enumerate(findall(!isoutlier, res))
+        A[1, 2i-1] = res[k].w_α * res[k].ξ_α
+        A[1, 2i] = res[k].w_δ * res[k].ξ_δ
         for j in 1:npar
             # Gradient of the (i, j)-th element of B with respect to the initial
             # conditions x_0

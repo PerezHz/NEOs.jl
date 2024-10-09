@@ -55,7 +55,7 @@ end
 # α: -138.79801 δ: -89.80025
 # α: -134.79450 δ: -91.42509 (outlier)
 function show(io::IO, x::OpticalResidual)
-    outlier_flag = outlier(x) ? " (outlier)" : ""
+    outlier_flag = isoutlier(x) ? " (outlier)" : ""
     print(io, "α: ", @sprintf("%+.5f", cte(x.ξ_α)), " δ: ",
           @sprintf("%+.5f", cte(x.ξ_δ)), outlier_flag)
 end
@@ -97,8 +97,10 @@ dec(res::OpticalResidual) = res.ξ_δ
 wra(res::OpticalResidual) = res.w_α
 wdec(res::OpticalResidual) = res.w_δ
 isoutlier(res::OpticalResidual) = res.outlier
-nout(res::AbstractVector{OpticalResidual}) = count(isoutlier, res)
-notout(res::AbstractVector{OpticalResidual}) = count(!isoutlier, res)
+nout(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number} =
+    count(isoutlier, res)
+notout(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number} =
+    count(!isoutlier, res)
 
 euclid3D(x::Vector{T}) where {T <: Real} = sqrt(dot3D(x, x))
 function euclid3D(x::Vector{TaylorN{T}}) where {T <: Real}
