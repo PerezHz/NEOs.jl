@@ -60,7 +60,7 @@ export loadpeeph, bwdfwdeph
 export obsposECEF, obsposvelECI
 # Optical astrometry processing
 export UniformWeights, Veres17, Farnocchia15, Eggl20, compute_radec, unfold,
-       residuals, outlier
+       residuals, isoutlier
 # Radar astrometry processing
 export compute_delay, radar_astrometry
 # Asteroid dynamical models

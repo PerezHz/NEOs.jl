@@ -7,7 +7,7 @@ using LinearAlgebra
 using Test
 
 using NEOs: NEOSolution, RadecMPC, reduce_tracklets,
-    indices, numberofdays
+    indices, numberofdays, nout
 
 function iodsubradec(radec::Vector{RadecMPC{T}}, N::Int = 3) where {T <: Real}
     tracklets = reduce_tracklets(radec)
@@ -54,7 +54,7 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 9
-        @test iszero(count(outlier.(sol.res)))
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 9e-4 )
@@ -96,7 +96,7 @@ end
         @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
         @test length(sol1.res) == 43
-        @test iszero(count(outlier.(sol1.res)))
+        @test iszero(nout(sol1.res))
         # Least squares fit
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 2e-4 )
@@ -149,7 +149,7 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 9
-        @test iszero(count(outlier.(sol.res)))
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 8e-5 )
@@ -317,7 +317,7 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 10
-        @test iszero(count(outlier.(sol.res)))
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 6e-3 )
@@ -345,14 +345,15 @@ end
         @test numberofdays(subradec) < 2.16
 
         # Parameters
-        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
+        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007,
+            outrej = true, χ2_rec = 1.0, χ2_rej = 1.25, fudge = 0.0)
         # Orbit determination problem
         od = ODProblem(newtonian!, subradec)
 
-        # Initial Orbit Determination
+        # Initial Orbit Determination (with outlier rejection)
         sol = orbitdetermination(od, params)
 
-        # Values by Oct 1, 2024
+        # Values by Oct 11, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -371,12 +372,12 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 18
-        @test count(outlier.(sol.res)) == 0
+        @test nout(sol.res) == 2
         # Least squares fit
         @test sol.fit.success
-        @test all( sigmas(sol) .< 3e-4 )
-        @test all( snr(sol) .> 574)
-        @test nrms(sol) < 0.46
+        @test all( sigmas(sol) .< 4e-3 )
+        @test all( snr(sol) .> 50)
+        @test nrms(sol) < 0.22
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
         @test !isdiag(sol.jacobian)
@@ -384,7 +385,7 @@ end
         # Compatibility with JPL
         JPL = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
             -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1.75)
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.07)
 
         #=
         # Add remaining observations
@@ -410,7 +411,7 @@ end
         @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
         @test length(sol1.res) == 21
-        @test count(outlier.(sol1.res)) == 2
+        @test nout(sol1.res) == 2
         # Least squares fit
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 3e-4 )
@@ -473,7 +474,7 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 7
-        @test iszero(count(outlier.(sol.res)))
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 3e-4 )
@@ -527,7 +528,7 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 18
-        @test iszero(count(outlier.(sol.res)))
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 2e-5 )
@@ -569,7 +570,7 @@ end
         @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
         @test length(sol1.res) == 97
-        @test iszero(count(outlier.(sol1.res)))
+        @test iszero(nout(sol1.res))
         # Least squares fit
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 4e-7 )
@@ -654,7 +655,7 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 14
-        @test iszero(count(outlier.(sol.res)))
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 0.24 )
