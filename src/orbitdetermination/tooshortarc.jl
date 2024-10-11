@@ -157,7 +157,7 @@ function tsaiod(od::ODProblem{D, T}, params::NEOParameters{T};
             # Jet Transport initial condition
             q = [q0[k] + scalings[k] * TaylorN(k, order = params.tsaorder) for k in 1:6]
             # Jet Transport Least Squares
-            _sol_ = jtls(od, jd0, q, i, params, false)
+            _sol_ = jtls(od, jd0, q, od.tracklets[i:i], params, false)
             # Update solution
             sol = updatesol(sol, _sol_, od.radec)
             # Termination condition
