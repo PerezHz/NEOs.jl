@@ -93,7 +93,6 @@ function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     idxs = sortperm(χ2s, rev = true)
     # Rejection threshold
     χ2_rej = max(χ2_rej + carpino_smoothing(N_sel, fudge), α*χ2_max)
-    @show χ2s, χ2_rej
     # Rejection / recovery loop
     @inbounds for i in idxs
         # Reject
