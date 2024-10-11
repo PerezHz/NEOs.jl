@@ -387,12 +387,10 @@ end
             -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.07)
 
-        #=
         # Add remaining observations
         NEOs.update!(od, radec)
+        # Refine orbit (with outlier rejection)
         sol1 = orbitdetermination(od, sol, params)
-        # Outlier rejection
-        sol1 = outlier_rejection(od, sol1, params)
 
         # Orbit solution
         @test isa(sol1, NEOSolution{Float64, Float64})
@@ -422,10 +420,9 @@ end
         @test isdiag(sol1.jacobian)
         @test maximum(sol1.jacobian) < 8e-7
         # Compatibility with JPL
-        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.2e-3)
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 7e-4)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(od, sol1, params) == 8
-        =#
     end
 
     @testset "Interesting NEOs" begin
