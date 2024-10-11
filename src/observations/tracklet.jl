@@ -39,14 +39,15 @@ A set of optical observations taken by the same observatory on the same night.
 end
 
 # Functions to get specific fields of a Tracklet object
-date(x::Tracklet{T}) where {T <: AbstractFloat} = x.date
-ra(x::Tracklet{T}) where {T <: AbstractFloat} = x.α
-dec(x::Tracklet{T}) where {T <: AbstractFloat} = x.δ
-observatory(x::Tracklet{T}) where {T <: AbstractFloat} = x.observatory
-vra(x::Tracklet{T}) where {T <: AbstractFloat} = x.v_α
-vdec(x::Tracklet{T}) where {T <: AbstractFloat} = x.v_δ
-mag(x::Tracklet{T}) where {T <: AbstractFloat} = x.mag
-indices(x::Tracklet{T}) where {T <: AbstractFloat} = x.indices
+date(x::Tracklet) = x.date
+ra(x::Tracklet) = x.α
+dec(x::Tracklet) = x.δ
+observatory(x::Tracklet) = x.observatory
+vra(x::Tracklet) = x.v_α
+vdec(x::Tracklet) = x.v_δ
+mag(x::Tracklet) = x.mag
+nobs(x::Tracklet) = x.nobs
+indices(x::Tracklet) = x.indices
 
 # Print method for Tracklet{T}
 # Examples:
@@ -192,7 +193,7 @@ Return:
     See section 5.1 of https://doi.org/10.1016/j.icarus.2007.11.033
 """
 function curvature(ts::AbstractVector{T}, αs::AbstractVector{T}, δs::AbstractVector{T},
-                   σs::AbstractVector{T}) where {T <: Real}
+    σs::AbstractVector{T}) where {T <: Real}
     @assert length(ts) == length(αs) == length(δs) == length(σs) ≥ 3 """
     At least three observations needed for significant curvature computation."""
     # Days of observation [relative to first observation]
@@ -261,7 +262,7 @@ function curvature(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     # Declination
     δs = dec.(radec)
     # Standard deviations [rad]
-    σs = arcsec2rad.(w8sveres17.(radec))
+    σs = arcsec2rad.(σsveres17.(radec))
 
     return curvature(ts, αs, δs, σs)
 end

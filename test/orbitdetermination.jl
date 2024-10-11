@@ -29,11 +29,13 @@ end
         # Parameters
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007, parse_eqs = false)
         params = NEOParameters(params, parse_eqs = true)
+        # Orbit determination problem
+        od = ODProblem(newtonian!, subradec)
 
         # Initial Orbit Determination
-        sol = orbitdetermination(subradec, params)
+        sol = orbitdetermination(od, params)
 
-        # Values by Sep 25, 2024
+        # Values by Oct 1, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -74,7 +76,8 @@ end
         @test numberofdays(subradec) < 2.76
 
         # Refine orbit
-        sol1 = orbitdetermination(subradec, sol, params)
+        NEOs.update!(od, subradec)
+        sol1 = orbitdetermination(od, sol, params)
 
         # Orbit solution
         @test isa(sol1, NEOSolution{Float64, Float64})
@@ -106,7 +109,7 @@ end
         # Compatibility with JPL
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.31)
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(radec, sol1, params) == 6
+        @test uncertaintyparameter(od, sol1, params) == 7
     end
 
     @testset "Gauss Method (with ADAM)" begin
@@ -121,11 +124,13 @@ end
 
         # Parameters
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007, adamhelp = true)
+        # Orbit determination problem
+        od = ODProblem(newtonian!, radec)
 
         # Initial Orbit Determination
-        sol = orbitdetermination(radec, params)
+        sol = orbitdetermination(od, params)
 
-        # Values by Sep 25, 2024
+        # Values by Oct 1, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -159,7 +164,7 @@ end
             -0.000263645106358707, 0.01837375504784015, 0.007208464525828968]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 4.8e-2)
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(radec, sol, params) == 8
+        @test uncertaintyparameter(od, sol, params) == 8
     end
 
     @testset "Admissible region" begin
@@ -177,7 +182,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by Sep 25, 2024
+        # Values by Oct 1, 2024
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -281,11 +286,13 @@ end
 
         # Parameters
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
+        # Orbit determination problem
+        od = ODProblem(newtonian!, radec)
 
         # Initial Orbit Determination
-        sol = orbitdetermination(radec, params)
+        sol = orbitdetermination(od, params)
 
-        # Values by Sep 25, 2024
+        # Values by Oct 1, 2024
 
         # Curvature
         C, Γ_C = curvature(radec)
@@ -325,7 +332,7 @@ end
             -0.009512301266159554, -0.01532548565855646, -0.00809464581680694]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.012)
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(radec, sol, params) == 11
+        @test uncertaintyparameter(od, sol, params) == 11
     end
 
     @testset "Outlier Rejection" begin
@@ -339,11 +346,13 @@ end
 
         # Parameters
         params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
+        # Orbit determination problem
+        od = ODProblem(newtonian!, subradec)
 
         # Initial Orbit Determination
-        sol = orbitdetermination(subradec, params)
+        sol = orbitdetermination(od, params)
 
-        # Values by Sep 25, 2024
+        # Values by Oct 1, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -378,9 +387,10 @@ end
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1.75)
 
         # Add remaining observations
-        sol1 = orbitdetermination(radec, sol, params)
+        NEOs.update!(od, radec)
+        sol1 = orbitdetermination(od, sol, params)
         # Outlier rejection
-        sol1 = outlier_rejection(radec, sol1, params)
+        sol1 = outlier_rejection(od, sol1, params)
 
         # Orbit solution
         @test isa(sol1, NEOSolution{Float64, Float64})
@@ -412,7 +422,7 @@ end
         # Compatibility with JPL
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.2e-3)
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(radec, sol1, params) == 8
+        @test uncertaintyparameter(od, sol1, params) == 8
     end
 
     @testset "Interesting NEOs" begin
@@ -430,11 +440,13 @@ end
 
         # Parameters
         params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
+        # Orbit determination problem
+        od = ODProblem(newtonian!, radec)
 
-        # Orbit Determination
-        sol = orbitdetermination(radec, params)
+        # Initial Orbit Determination
+        sol = orbitdetermination(od, params)
 
-        # Values by Sep 25, 2024
+        # Values by Oct 1, 2024
 
         # Curvature
         C, Γ_C = curvature(radec)
@@ -474,7 +486,7 @@ end
             -0.017557851117612377, -0.005781634223099801, -0.0020075106081869185]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(radec, sol, params) == 10
+        @test uncertaintyparameter(od, sol, params) == 10
 
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
@@ -488,11 +500,13 @@ end
 
         # Parameters
         params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
+        # Orbit determination problem
+        od = ODProblem(newtonian!, subradec)
 
         # Initial Orbit Determination
-        sol = orbitdetermination(subradec, params)
+        sol = orbitdetermination(od, params)
 
-        # Values by Sep 25, 2024
+        # Values by Oct 1, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -533,7 +547,8 @@ end
         @test numberofdays(subradec) < 0.70
 
         # Refine orbit
-        sol1 = orbitdetermination(subradec, sol, params)
+        NEOs.update!(od, subradec)
+        sol1 = orbitdetermination(od, sol, params)
 
         # Orbit solution
         @test isa(sol1, NEOSolution{Float64, Float64})
@@ -569,7 +584,7 @@ end
         # TODO: understand better differences wrt JPL solutions
         # @test nrms(sol1) < nrms(sol)
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(subradec, sol1, params) == 5
+        @test uncertaintyparameter(od, sol1, params) == 5
     end
 
     @testset "scripts/orbitdetermination.jl" begin
@@ -612,11 +627,13 @@ end
             adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,
             jtlsiter = 20, newtoniter = 10
         )
+        # Orbit determination problem
+        od = ODProblem(newtonian!, radec)
 
         # Initial Orbit Determination
-        sol = orbitdetermination(radec, params; initcond = iodinitcond)
+        sol = orbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Sep 25, 2024
+        # Values by Oct 1, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})

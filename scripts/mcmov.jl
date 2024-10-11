@@ -42,17 +42,20 @@ end
 @everywhere begin
     using NEOs, Dates, TaylorSeries, PlanetaryEphemeris, JLD2
     using NEOs: AdmissibleRegion, OpticalResidual, RadecMPC, PropagationBuffer,
-                reduce_tracklets, argoldensearch, scaled_variables, attr2bary, propres!
+                reduce_tracklets, argoldensearch, scaled_variables, attr2bary,
+                propres!, nobs
 
     function mcmov(points::Vector{Tuple{T, T}}, A::AdmissibleRegion{T},
         radec::Vector{RadecMPC{T}}, params::NEOParameters{T},
         varorder::Int = 2) where {T <: Real}
+        # Orbit determination problem
+        od = ODProblem(newtonian!, radec)
         # JT variables
         dae = scaled_variables("dx", ones(T, 6), order = varorder)
-        # Attributable elements
+        # Attributable elements (plain)
         ae = Vector{T}(undef, 6)
-        AE = Vector{TaylorN{T}}(undef, 6)
         ae[1:4] .= A.α, A.δ, A.v_α, A.v_δ
+        ae[5:6] .= points[1]
         # Scaling factors
         scalings = Vector{T}(undef, 6)
         scalings[1:4] .= abs.(ae[1:4]) ./ 1e6
@@ -60,13 +63,14 @@ end
         _, y_min = argoldensearch(A, 10^x_min, 10^x_max, :min, :outer, 1e-20)
         _, y_max = argoldensearch(A, 10^x_min, 10^x_max, :max, :outer, 1e-20)
         scalings[5:6] .= (x_max - x_min) / 100, (y_max - y_min) / 100
+        # Attributable elements (jet transport)
+        AE = ae .+ scalings .* dae
+        # TDB epoch of admissible region
+        _jd0_ = dtutc2jdtdb(A.date)
         # Propagation buffer
-        t0, tf = dtutc2days(date(radec[1])), dtutc2days(date(radec[end]))
-        tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
-        buffer = PropagationBuffer(newtonian!, dtutc2jdtdb(A.date), tlim,
-                                   ae .+ scalings .* dae, params)
+        buffer = PropagationBuffer(od, _jd0_, 1, nobs(od), AE, params)
         # Vector of residuals
-        res = Vector{OpticalResidual{T, TaylorN{T}}}(undef, length(radec))
+        res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(radec)]
         # Origin
         x0 = zeros(T, 6)
         # Manifold of variations
@@ -82,9 +86,9 @@ end
             # Barycentric initial conditions (JT)
             q = attr2bary(A, AE, params)
             # Reference epoch in julian days (corrrected for light-time)
-            jd0 = dtutc2jdtdb(A.date) - constant_term(AE[5]) / c_au_per_day
+            jd0 = _jd0_ - constant_term(AE[5]) / c_au_per_day
             # Propagation and residuals
-            propres!(res, radec, jd0, q, params; buffer)
+            propres!(res, od, jd0, q, params; buffer)
             # Least squares fit
             fit = newtonls(res, x0, 10, 1:4)
             # Objective function

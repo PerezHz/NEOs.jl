@@ -43,21 +43,21 @@ end
 @everywhere begin
     using NEOs, Dates, TaylorSeries, PlanetaryEphemeris, JLD2
     using NEOs: RadecMPC, AdmissibleRegion, PropagationBuffer, OpticalResidual,
-        attr2bary, propres!, boundary_projection, reduce_tracklets, arboundary
+        attr2bary, propres!, boundary_projection, reduce_tracklets, arboundary,
+        indices
 
-    function adam(radec::Vector{RadecMPC{T}}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
+    function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
         params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
-        μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, Qtol::T = 0.001, adamorder::Int = 2,
-        dynamics::D = newtonian!) where {T <: Real, D}
-        # Initial time of integration [julian days]
+        μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2) where {D, T <: Real}
+        # Initial time of integration [julian days TDB]
         jd0 = dtutc2jdtdb(A.date)
-        # Maximum number of iterations
-        maxiter = params.adamiter
+        # Unfold maximum number of iterations and relative tolerance
+        maxiter, Qtol = params.adamiter, params.adamQtol
         # Allocate memory
         aes = Matrix{T}(undef, 6, maxiter+1)
         Qs = fill(T(Inf), maxiter+1)
         # Initial attributable elements
-        aes[:, 1] .= [A.α, A.δ, A.v_α, A.v_δ, ρ, v_ρ]
+        aes[:, 1] .= A.α, A.δ, A.v_α, A.v_δ, ρ, v_ρ
         # Scaling factors
         scalings = Vector{T}(undef, 6)
         scalings[1:4] .= abs.(aes[1:4, 1]) ./ 1e6
@@ -67,46 +67,44 @@ end
             scalings[5] = (log10(A.ρ_domain[2]) - log10(A.ρ_domain[1])) / 1_000
         end
         scalings[6] = (A.v_ρ_domain[2] - A.v_ρ_domain[1]) / 1_000
-        # Jet transport variables
-        set_variables(Float64, "dx"; order = adamorder, numvars = 6)
+        # Jet transport variables and initial condition
         dae = [scalings[i] * TaylorN(i, order = adamorder) for i in 1:6]
+        AE = aes[:, 1] .+ dae
+        # Subset of radec
+        idxs = indices(od.tracklets[i])
         # Propagation buffer
-        t0, tf = dtutc2days(date(radec[1])), dtutc2days(date(radec[end]))
-        tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
-        buffer = PropagationBuffer(dynamics, jd0, tlim, aes[:, 1] .+ dae, params)
+        buffer = PropagationBuffer(od, jd0, idxs[1], idxs[end], AE, params)
         # Vector of O-C residuals
-        res = Vector{OpticalResidual{T, TaylorN{T}}}(undef, length(radec))
+        res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(idxs)]
         # Origin
-        x0 = zeros(T, 6)
-        x1 = zeros(T, 6)
+        x0, x1 = zeros(T, 6), zeros(T, 6)
         # Gradient of objective function wrt (ρ, v_ρ)
         g_t = Vector{T}(undef, 2)
         # First momentum
-        m = zeros(T, 2)
-        _m_ = zeros(T, 2)
+        m, _m_ = zeros(T, 2), zeros(T, 2)
         # Second momentum
-        n = zeros(T, 2)
-        _n_ = zeros(T, 2)
+        n, _n_ = zeros(T, 2), zeros(T, 2)
         # Gradient descent
         for t in 1:maxiter
             # Current attributable elements (plain)
             ae = aes[:, t]
             # Attributable elements (JT)
             if scale == :linear
-                AE = ae + dae
+                AE .= ae + dae
             elseif scale == :log
-                AE = [ae[1] + dae[1], ae[2] + dae[2], ae[3] + dae[3],
-                    ae[4] + dae[4], 10^(log10(ae[5]) + dae[5]), ae[6] + dae[6]]
+                AE .= [ae[1] + dae[1], ae[2] + dae[2], ae[3] + dae[3],
+                      ae[4] + dae[4], 10^(log10(ae[5]) + dae[5]), ae[6] + dae[6]]
             end
             # Barycentric state vector
             q = attr2bary(A, AE, params)
             # Propagation and residuals
             # TO DO: `ρ::TaylorN` is too slow for `adam` due to evaluations
             # within the dynamical model
-            propres!(res, radec, jd0 - ae[5]/c_au_per_day, q, params; buffer, dynamics)
+            propres!(res, od, jd0 - ae[5]/c_au_per_day, q, params; buffer, idxs)
             iszero(length(res)) && break
             # Least squares fit
             fit = tryls(res, x0, 5, 1:4)
+            !fit.success && break
             x1 .= fit.x
             # Current Q
             Q = nms(res)
@@ -177,11 +175,15 @@ function main()
     points_per_worker = [points[i] for i in idxs]
     # Evaluate `NEOs.adam` in each point
     result = pmap(points_per_worker) do points
+        # Orbit determination problem
+        od = ODProblem(newtonian!, radec)
+        # Pre-allocate output
         aes = Vector{Matrix{Float64}}(undef, length(points))
         Qs = Vector{Vector{Float64}}(undef, length(points))
+        # Main loop
         for i in eachindex(points)
             x, v_ρ = points[i]
-            aes[i], Qs[i] = adam(radec, A, 10^x, v_ρ, params; scale = :log,
+            aes[i], Qs[i] = adam(od, 1, A, 10^x, v_ρ, params; scale = :log,
                 adamorder = varorder)
             j = findlast(!isinf, Qs[i])
             if isnothing(j)

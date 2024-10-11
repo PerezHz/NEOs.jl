@@ -78,8 +78,8 @@ end
         # Get at most 3 tracklets for orbit determination
         flag, radec = radecfilter(radec)
         !flag && return false
-        # Dynamical function
-        dynamics = newtonian!
+        # Orbit determination problem
+        od = ODProblem(newtonian!, radec)
         # Parameters
         params = NEOParameters(
             coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
@@ -90,7 +90,7 @@ end
         # Start of computation
         init_time = now()
         # Initial orbit determination
-        sol = orbitdetermination(radec, params; dynamics, initcond)
+        sol = orbitdetermination(od, params; initcond)
         # Termination condition
         if length(sol.res) == length(radec) && nrms(sol) < 1.5
             # Time of computation
@@ -108,7 +108,7 @@ end
             jtlsiter = 20, newtoniter = 5
         )
         # Initial orbit determination
-        _sol_ = orbitdetermination(radec, params; dynamics, initcond)
+        _sol_ = orbitdetermination(od, params; initcond)
         # Time of computation
         Δ = (now() - init_time).value
         # Choose best orbit

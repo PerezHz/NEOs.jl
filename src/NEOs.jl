@@ -12,6 +12,7 @@ using Dates, InteractiveUtils, LazyArtifacts, LinearAlgebra, Printf, JSON,
       TaylorSeries, SatelliteToolboxTransformations, TaylorIntegration,
       SPICE, JLD2, Scratch
 using AutoHashEquals.Compat
+using Base: RefValue
 using Dates: epochms2datetime
 using Downloads: download
 using DelimitedFiles: readdlm
@@ -58,14 +59,14 @@ export loadpeeph, bwdfwdeph
 # Observer position in ECEF and ECI frames
 export obsposECEF, obsposvelECI
 # Optical astrometry processing
-export compute_radec, select_debiasing_table, debiasing, w8sveres17, residuals, unfold,
-       relax_factor, outlier
+export UniformWeights, Veres17, Farnocchia15, Eggl20, compute_radec, unfold,
+       residuals, outlier
 # Radar astrometry processing
 export compute_delay, radar_astrometry
 # Asteroid dynamical models
 export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!, newtonian!
 # Propagation
-export NEOParameters, propagate, propagate_lyap, propagate_root
+export propagate, propagate_lyap, propagate_root
 # Osculating
 export pv2kep, yarkp2adot
 # Least squares
@@ -77,7 +78,7 @@ export tsaiod
 # Gauss method
 export gauss_method, gaussiod
 # Orbit determination
-export curvature, issinglearc, orbitdetermination
+export NEOParameters, ODProblem, curvature, issinglearc, orbitdetermination
 # B plane
 export valsecchi_circle, bopik, mtp
 # Outlier rejection

@@ -14,13 +14,16 @@ using NEOs: propres
     radec = fetch_radec_mpc("2018 LA")
     # Parameters
     params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
+    # Orbit determination problem
+    od = ODProblem(newtonian!, radec[1:8])
 
     # Initial Orbit Determination
-    sol = orbitdetermination(radec[1:8], params)
+    sol = orbitdetermination(od, params)
     # Update parameters
     params = NEOParameters(params; jtlsorder = 6)
     # Refine orbit
-    sol = orbitdetermination(radec, sol, params)
+    NEOs.update!(od, radec)
+    sol = orbitdetermination(od, sol, params)
 
     # Radial velocity with respect to the Earth.
     function rvelea(t, fwd, params)
@@ -34,7 +37,7 @@ using NEOs: propres
 
     # Time of close approach
     params = NEOParameters(params; fwdoffset = 0.3)
-    bwd, fwd, res = propres(radec, epoch(sol) + J2000, sol(), params)
+    bwd, fwd, res = propres(od, epoch(sol) + J2000, sol(), params)
     t_CA = find_zeros(t -> rvelea(t, fwd, params), fwd.t0, fwd.t0 + fwd.t[end-1])[1]
     # Asteroid's geocentric state vector
     xae = fwd(t_CA) - params.eph_ea(t_CA)
