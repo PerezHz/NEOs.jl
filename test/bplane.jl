@@ -15,15 +15,10 @@ using NEOs: propres
     # Parameters
     params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
     # Orbit determination problem
-    od = ODProblem(newtonian!, radec[1:8])
+    od = ODProblem(newtonian!, radec)
 
     # Initial Orbit Determination
     sol = orbitdetermination(od, params)
-    # Update parameters
-    params = NEOParameters(params; jtlsorder = 6)
-    # Refine orbit
-    NEOs.update!(od, radec)
-    sol = orbitdetermination(od, sol, params)
 
     # Radial velocity with respect to the Earth.
     function rvelea(t, fwd, params)
@@ -33,7 +28,7 @@ using NEOs: propres
         return dot(rv[1:3], rv[4:6])
     end
 
-    # Values by June 23, 2024
+    # Values by Oct 12, 2024
 
     # Time of close approach
     params = NEOParameters(params; fwdoffset = 0.3)
