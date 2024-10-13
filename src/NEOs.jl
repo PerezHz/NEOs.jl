@@ -28,7 +28,6 @@ using Healpix: ang2pixRing, Resolution
 using StatsBase: mean, std
 using LsqFit: curve_fit, vcov
 using Roots: find_zeros
-using Clustering: kmeans
 using HORIZONS: smb_spk
 using OhMyThreads: tmap, tmap!
 using TaylorIntegration: RetAlloc, _determine_parsing!, _taylorinteg!
@@ -88,7 +87,7 @@ include("constants.jl")
 include("observations/observations.jl")
 include("propagation/propagation.jl")
 include("orbitdetermination/orbitdetermination.jl")
-include("postprocessing/outlier_rejection.jl")
+include("postprocessing/bplane.jl")
 include("init.jl")
 include("deprecated.jl")
 
