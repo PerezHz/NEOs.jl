@@ -69,7 +69,8 @@ export propagate, propagate_lyap, propagate_root
 # Osculating
 export pv2kep, yarkp2adot
 # Least squares
-export project, chi2, nms, nrms, leastsquares, tryls
+export LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
+       project, chi2, nms, nrms, leastsquares, leastsquares!, tryls
 # NEOSolution
 export epoch, sigmas, snr, jplcompare, uncertaintyparameter
 # Too Short Arc

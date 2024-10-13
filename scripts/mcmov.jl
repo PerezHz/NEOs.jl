@@ -43,7 +43,7 @@ end
     using NEOs, Dates, TaylorSeries, PlanetaryEphemeris, JLD2
     using NEOs: AdmissibleRegion, OpticalResidual, RadecMPC, PropagationBuffer,
                 reduce_tracklets, argoldensearch, scaled_variables, attr2bary,
-                propres!, nobs
+                propres!, nobs, _lsmethods
 
     function mcmov(points::Vector{Tuple{T, T}}, A::AdmissibleRegion{T},
         radec::Vector{RadecMPC{T}}, params::NEOParameters{T},
@@ -73,6 +73,8 @@ end
         res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(radec)]
         # Origin
         x0 = zeros(T, 6)
+        # Least squares cache and methods
+        lscache, lsmethods = LeastSquaresCache(x0, 1:4, 10), _lsmethods(res, x0, 1:4)
         # Manifold of variations
         mov = Matrix{T}(undef, 13, length(points))
         # Iterate mov points
@@ -90,7 +92,7 @@ end
             # Propagation and residuals
             propres!(res, od, jd0, q, params; buffer)
             # Least squares fit
-            fit = newtonls(res, x0, 10, 1:4)
+            fit = tryls(res, x0, lscache, lsmethods)
             # Objective function
             Q = nms(res)
             # Save results
@@ -156,10 +158,12 @@ function main()
         push!(points_per_worker[k], point)
         k = mod1(k+1, Nw)
     end
-    println("• ", sum(length, points_per_worker), " domain points in the manifold of variations")
+    Np = sum(length, points_per_worker)
+    println("• ", Np, " points in the manifold of variations")
     # Manifold of variations
     movs = pmap(p -> mcmov(p, A, radec, params, varorder), points_per_worker)
     mov = reduce(hcat, movs)
+    println("• ", count(!isnan, view(mov, 13, :)), "/", Np, " points converged")
 
     # Save results
     tmpdesig = radec[1].tmpdesig

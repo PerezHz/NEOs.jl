@@ -51,8 +51,8 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     # Origin
     x0, x1 = zeros(T, 6), zeros(T, 6)
     # Least squares cache and methods
-    cache = LeastSquaresCache(x0, 1:4, 5)
-    methods = _lsmethods(res, x0, 1:4)
+    lscache = LeastSquaresCache(x0, 1:4, 5)
+    lsmethods = _lsmethods(res, x0, 1:4)
     # Gradient of objective function wrt (ρ, v_ρ)
     g_t = Vector{T}(undef, 2)
     # First momentum
@@ -78,7 +78,7 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         propres!(res, od, jd0 - ae[5]/c_au_per_day, q, params; buffer, idxs)
         iszero(length(res)) && break
         # Least squares fit
-        fit = tryls(res, x0, cache, methods)
+        fit = tryls(res, x0, lscache, lsmethods)
         !fit.success && break
         x1 .= fit.x
         # Current Q
