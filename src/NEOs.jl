@@ -81,7 +81,7 @@ export NEOParameters, ODProblem, curvature, issinglearc, orbitdetermination
 # B plane
 export valsecchi_circle, bopik, mtp
 # Outlier rejection
-export outlier_rejection
+export outlier_rejection!
 
 include("constants.jl")
 include("observations/observations.jl")
