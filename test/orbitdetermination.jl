@@ -625,7 +625,7 @@ end
             coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
             gaussorder = 6, gaussQmax = 1.0,
             adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,
-            jtlsiter = 20, newtoniter = 10
+            jtlsiter = 20, lsiter = 10
         )
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)

@@ -85,7 +85,7 @@ end
             coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
             gaussorder = 6, gaussQmax = 1.0,
             adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,
-            jtlsiter = 20, newtoniter = 10
+            jtlsiter = 20, lsiter = 10
         )
         # Start of computation
         init_time = now()
@@ -105,7 +105,7 @@ end
             coeffstol = 10.0, bwdoffset = 0.007, fwdoffset = 0.007,
             gaussorder = 6, gaussQmax = 1.0,
             adamiter = 200, adamQtol = 0.01, tsaQmax = 2.0,
-            jtlsiter = 20, newtoniter = 5
+            jtlsiter = 20, lsiter = 5
         )
         # Initial orbit determination
         _sol_ = orbitdetermination(od, params; initcond)

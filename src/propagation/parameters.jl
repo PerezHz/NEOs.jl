@@ -37,11 +37,9 @@ Parameters for all orbit determination functions.
 
 ## Jet Transport Least Squares Parameters
 
-- `jtlsiter::Int`: maximum number of iterations for jet transport least squares
-    (default: `5`).
-- `newtoniter::Int`: number of iterations for differential corrections / Newton's method
-    (default: `5`).
-- `jtlsorder::Int`: order of the jet transport perturbation (default: `5`).
+- `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `5`).
+- `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
+- `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `5`).
 
 ## Outlier Rejection Parameters
 
@@ -78,8 +76,8 @@ Parameters for all orbit determination functions.
     tsaorder::Int = 6
     tsaQmax::T = 1.5
     # Jet Transport Least Squares Parameters
+    lsiter::Int = 5
     jtlsiter::Int = 5
-    newtoniter::Int = 5
     jtlsorder::Int = 5
     # Outlier Rejection Parameters
     outrej::Bool = false
