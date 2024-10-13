@@ -280,7 +280,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     c = -(μ_S^2)*(B*B)
 
     # Solve Lagrange equation
-    sol = solve_lagrange(a, b, c; niter = params.newtoniter)
+    sol = solve_lagrange(a, b, c; niter = params.lsiter)
 
     # Number of solutions
     n_sol = length(sol)

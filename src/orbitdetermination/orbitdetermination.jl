@@ -123,7 +123,7 @@ function addradec!(::Val{true}, rin::Vector{Int}, fit::LeastSquaresFit{T},
     params::NEOParameters{T}) where {T <: Real}
     while !isempty(tout)
         extra = indices(tout[1])
-        fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.newtoniter)
+        fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.lsiter)
         !fit_new.success && break
         fit = fit_new
         tracklet = popfirst!(tout)
@@ -143,7 +143,7 @@ function addradec!(::Val{false}, rin::Vector{Int}, fit::LeastSquaresFit{T},
     params::NEOParameters{T}) where {T <: Real}
     if nrms(res[rin], fit) < params.tsaQmax && !isempty(tout)
         extra = indices(tout[1])
-        fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.newtoniter)
+        fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.lsiter)
         !fit_new.success && return rin, fit
         fit = fit_new
         tracklet = popfirst!(tout)
@@ -187,7 +187,7 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
     # Vector of O-C residuals
     res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(od.radec)]
     # Least squares cache and methods
-    lscache = LeastSquaresCache(x0, 1:6, params.newtoniter)
+    lscache = LeastSquaresCache(x0, 1:6, params.lsiter)
     lsmethods = _lsmethods(res, x0, 1:6)
     # Initial subset of radec for orbit fit
     tin, tout, rin = _initialtracklets(od.tracklets, tracklets)
