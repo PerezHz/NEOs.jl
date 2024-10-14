@@ -82,17 +82,19 @@ end
         od = ODProblem(newtonian!, radec)
         # Parameters
         params = NEOParameters(
-            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-            gaussorder = 6, gaussQmax = 1.0,
-            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,
-            jtlsiter = 20, lsiter = 10
+            coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
+            gaussorder = 6, gaussQmax = 2.0,                       # Gauss method
+            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,        # ADAM
+            jtlsiter = 20, lsiter = 10,                            # Least squares
+            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
+            fudge = 10.0, max_per = 34.0
         )
         # Start of computation
         init_time = now()
         # Initial orbit determination
         sol = orbitdetermination(od, params; initcond)
         # Termination condition
-        if length(sol.res) == length(radec) && nrms(sol) < 1.5
+        if length(sol.res) == length(radec) && nrms(sol) < 2.0
             # Time of computation
             Δ = (now() - init_time).value
             # Save orbit
@@ -102,10 +104,8 @@ end
         end
         # Parameters
         params = NEOParameters(params;
-            coeffstol = 10.0, bwdoffset = 0.007, fwdoffset = 0.007,
-            gaussorder = 6, gaussQmax = 1.0,
-            adamiter = 200, adamQtol = 0.01, tsaQmax = 2.0,
-            jtlsiter = 20, lsiter = 5
+            coeffstol = 10.0, adamiter = 200, adamQtol = 0.01,
+            lsiter = 5
         )
         # Initial orbit determination
         _sol_ = orbitdetermination(od, params; initcond)
