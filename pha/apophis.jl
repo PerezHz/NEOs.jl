@@ -51,7 +51,7 @@ function parse_commandline()
         "--maxsteps"
             help = "Maximum number of steps during integration"
             arg_type = Int
-            default = 10_000
+            default = 100_000
         "--nyears_bwd"
             help = "Years in backward integration"
             arg_type = Float64
@@ -132,7 +132,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     print_header("Main integration", 2)
     tmax = nyears_bwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
-    println("• Final time of integration: ", jdtdb2utc(jd0 + tmax))
+    println("• Final time of integration: ", jdtdb2dtutc(jd0 + tmax))
 
     params = NEOParameters(;maxsteps, order, abstol, parse_eqs)
     sol_bwd = NEOs.propagate(dynamics, jd0, nyears_bwd, q0, params)
@@ -141,7 +141,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     tmax = nyears_fwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
-    println("• Final time of integration: ", jdtdb2utc(jd0 + tmax))
+    println("• Final time of integration: ", jdtdb2dtutc(jd0 + tmax))
 
     sol_fwd, tvS, xvS, gvS = NEOs.propagate_root(dynamics, jd0, nyears_fwd, q0, params)
     jldsave("Apophis_fwd.jld2"; sol_fwd, tvS, xvS, gvS)
