@@ -153,6 +153,7 @@ function lsstep(ls::Newton{T}, x::Vector{T}) where {T <: Real}
     # Evaluate gradient and hessian
     TS.evaluate!(ls.GQ, x, ls.dQ)
     TS.evaluate!(ls.HQ, x, ls.d2Q)
+    cond(ls.d2Q) > inv(eps(T)) && return Vector{T}(undef, 0), false
     # Newton update rule
     Δx = -inv(ls.d2Q) * ls.dQ
     # Normal matrix
@@ -239,6 +240,7 @@ function lsstep(ls::DifferentialCorrections{T}, x::Vector{T}) where {T <: Real}
     # Evaluate D and C matrices
     TS.evaluate!(ls.D, x, ls.Dx)
     TS.evaluate!(ls.C, x, ls.Cx)
+    cond(ls.Cx) > inv(eps(T)) && return Vector{T}(undef, 0), false
     # Differential corrections update rule
     Δx = -inv(ls.Cx) * ls.Dx
     # Error metric
@@ -396,6 +398,7 @@ function lsstep(ls::LevenbergMarquardt{T}, x::Vector{T}) where {T <: Real}
     for i in axes(ls.d2Q, 1)
         ls.d2Q[i, i] *= (1 + ls.λ)
     end
+    cond(ls.d2Q) > inv(eps(T)) && return Vector{T}(undef, 0), false
     # Levenberg-Marquardt update rule
     Δx = -inv(ls.d2Q) * ls.dQ
     _x_ = deepcopy(x)
