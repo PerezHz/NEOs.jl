@@ -112,7 +112,7 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
         # Pre-allocate solutions
-        sols = [zero(NEOSolution{Float64, Float64}, 4)]
+        sols = [zero(NEOSolution{Float64, Float64}) for _ in 1:4]
         # Start of computation
         init_time = now()
         # Initial orbit determination cycle
@@ -126,13 +126,14 @@ end
         end
         # Time of computation
         Δ = (now() - init_time).value
-        # Drop incomplete solutions
-        filter!(s -> length(s.res) == length(radec), sols)
-        isempty(sols) && return false
+        # Select complete solutions
+        mask = findall(s -> length(s.res) == length(radec), sols)
+        isempty(mask) && return false
         # Choose best solution
-        sol = minimum(nrms, sols; init = Inf)
+        _, k = findmin(nrms, view(sols, mask))
         # Save orbit
-        jldsave(filename; sol = sol, Δ = Δ)
+        k = mask[k]
+        jldsave(filename; sol = sols[k], Δ = Δ, k = k)
         return true
     end
 end
