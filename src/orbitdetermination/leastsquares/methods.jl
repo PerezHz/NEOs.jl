@@ -108,43 +108,44 @@ mutable struct Newton{T} <: AbstractLeastSquaresMethod{T}
     HQ::Matrix{TaylorN{T}}
     dQ::Vector{T}
     d2Q::Matrix{T}
-    @doc raw"""
-        Newton(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-            x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+end
 
-    Return a `Newton{T}` object for least squares minimization.
-
-    See also [`leastsquares`](@ref).
-
-    ## Arguments
-
-    - `res::AbstractVector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
-    - `x_0::Vector{T}`: initial guess.
-    - `idxs::AbstractVector{Int}`: subset of parameters for fit.
-
-    !!! reference
-        See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
-    """
-    function Newton(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
+@doc raw"""
+    Newton(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
         x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
-        # Number of observations and degrees of freedom
-        nobs, npar = 2*notout(res), length(idxs)
-        # Mean square residual and its gradient
-        Q = nms(res)
-        GQ = TaylorSeries.gradient(Q)[idxs]
-        # Hessian
-        HQ = [zero(Q) for _ in 1:npar, _ in 1:npar]
-        for j in eachindex(idxs)
-            for i in eachindex(idxs)
-                HQ[i, j] = TS.differentiate(GQ[idxs[j]], idxs[i])
-            end
-        end
-        # Evaluate gradient and hessian
-        dQ = TS.evaluate(GQ, x0)
-        d2Q = TS.evaluate(HQ, x0)
 
-        return new{T}(nobs, npar, Q, GQ, HQ, dQ, d2Q)
+Return a `Newton{T}` object for least squares minimization.
+
+See also [`leastsquares`](@ref).
+
+## Arguments
+
+- `res::AbstractVector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
+- `x_0::Vector{T}`: initial guess.
+- `idxs::AbstractVector{Int}`: subset of parameters for fit.
+
+!!! reference
+    See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
+"""
+function Newton(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
+    x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+    # Number of observations and degrees of freedom
+    nobs, npar = 2*notout(res), length(idxs)
+    # Mean square residual and its gradient
+    Q = nms(res)
+    GQ = TaylorSeries.gradient(Q)[idxs]
+    # Hessian
+    HQ = [zero(Q) for _ in 1:npar, _ in 1:npar]
+    for j in eachindex(idxs)
+        for i in eachindex(idxs)
+            HQ[i, j] = TS.differentiate(GQ[idxs[j]], idxs[i])
+        end
     end
+    # Evaluate gradient and hessian
+    dQ = TS.evaluate(GQ, x0)
+    d2Q = TS.evaluate(HQ, x0)
+
+    return Newton{T}(nobs, npar, Q, GQ, HQ, dQ, d2Q)
 end
 
 getid(::Newton) = "Newton"
@@ -199,39 +200,40 @@ mutable struct DifferentialCorrections{T} <: AbstractLeastSquaresMethod{T}
     C::Matrix{TaylorN{T}}
     Dx::Vector{T}
     Cx::Matrix{T}
-    @doc raw"""
-        DifferentialCorrections(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-            x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+end
 
-    Return a `DifferentialCorrections{T}` object for least squares minimization.
-
-    See also [`leastsquares`](@ref).
-
-    ## Arguments
-
-    - `res::AbstractVector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
-    - `x_0::Vector{T}`: initial guess.
-    - `idxs::AbstractVector{Int}`: subset of parameters for fit.
-
-    !!! reference
-        See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
-    """
-    function DifferentialCorrections(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
+@doc raw"""
+    DifferentialCorrections(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
         x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
-        # Number of observations and degrees of freedom
-        nobs, npar = 2*notout(res), length(idxs)
-        # Mean square residual and its gradient
-        Q = nms(res)
-        # D matrix and normal matrix C
-        D, C = DCVB(res, idxs)
-        # Deprecated term
-        # C -> C + ξTH(res, idxs)
-        # Evaluate D and C matrices
-        Dx = TS.evaluate(D, x0)
-        Cx = TS.evaluate(C, x0)
 
-        return new{T}(nobs, npar, Q, D, C, Dx, Cx)
-    end
+Return a `DifferentialCorrections{T}` object for least squares minimization.
+
+See also [`leastsquares`](@ref).
+
+## Arguments
+
+- `res::AbstractVector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
+- `x_0::Vector{T}`: initial guess.
+- `idxs::AbstractVector{Int}`: subset of parameters for fit.
+
+!!! reference
+    See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
+"""
+function DifferentialCorrections(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
+    x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+    # Number of observations and degrees of freedom
+    nobs, npar = 2*notout(res), length(idxs)
+    # Mean square residual and its gradient
+    Q = nms(res)
+    # D matrix and normal matrix C
+    D, C = DCVB(res, idxs)
+    # Deprecated term
+    # C -> C + ξTH(res, idxs)
+    # Evaluate D and C matrices
+    Dx = TS.evaluate(D, x0)
+    Cx = TS.evaluate(C, x0)
+
+    return DifferentialCorrections{T}(nobs, npar, Q, D, C, Dx, Cx)
 end
 
 getid(::DifferentialCorrections) = "Differential Corrections"
@@ -347,45 +349,46 @@ mutable struct LevenbergMarquardt{T} <: AbstractLeastSquaresMethod{T}
     HQ::Matrix{TaylorN{T}}
     dQ::Vector{T}
     d2Q::Matrix{T}
-    @doc raw"""
-        LevenbergMarquardt(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-            x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+end
 
-    Return a `LevenbergMarquardt{T}` object for least squares minimization.
-
-    See also [`leastsquares`](@ref).
-
-    ## Arguments
-
-    - `res::AbstractVector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
-    - `x_0::Vector{T}`: initial guess.
-    - `idxs::AbstractVector{Int}`: subset of parameters for fit.
-
-    !!! reference
-        See section 15.5.2 of https://numerical.recipes.
-    """
-    function LevenbergMarquardt(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
+@doc raw"""
+    LevenbergMarquardt(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
         x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
-        # Number of observations and degrees of freedom
-        nobs, npar = 2*notout(res), length(idxs)
-        # Damping factor
-        λ = T(0.001)
-        # Mean square residual and its gradient
-        Q = nms(res)
-        GQ = TaylorSeries.gradient(Q)[idxs]
-        # Hessian
-        HQ = [zero(Q) for _ in 1:npar, _ in 1:npar]
-        for j in eachindex(idxs)
-            for i in eachindex(idxs)
-                HQ[i, j] = TS.differentiate(GQ[idxs[j]], idxs[i])
-            end
-        end
-        # Evaluate gradient and hessian
-        dQ = TS.evaluate(GQ, x0)
-        d2Q = TS.evaluate(HQ, x0)
 
-        return new{T}(nobs, npar, idxs, λ, Q, GQ, HQ, dQ, d2Q)
+Return a `LevenbergMarquardt{T}` object for least squares minimization.
+
+See also [`leastsquares`](@ref).
+
+## Arguments
+
+- `res::AbstractVector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
+- `x_0::Vector{T}`: initial guess.
+- `idxs::AbstractVector{Int}`: subset of parameters for fit.
+
+!!! reference
+    See section 15.5.2 of https://numerical.recipes.
+"""
+function LevenbergMarquardt(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
+    x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+    # Number of observations and degrees of freedom
+    nobs, npar = 2*notout(res), length(idxs)
+    # Damping factor
+    λ = T(0.001)
+    # Mean square residual and its gradient
+    Q = nms(res)
+    GQ = TaylorSeries.gradient(Q)[idxs]
+    # Hessian
+    HQ = [zero(Q) for _ in 1:npar, _ in 1:npar]
+    for j in eachindex(idxs)
+        for i in eachindex(idxs)
+            HQ[i, j] = TS.differentiate(GQ[idxs[j]], idxs[i])
+        end
     end
+    # Evaluate gradient and hessian
+    dQ = TS.evaluate(GQ, x0)
+    d2Q = TS.evaluate(HQ, x0)
+
+    return LevenbergMarquardt{T}(nobs, npar, idxs, λ, Q, GQ, HQ, dQ, d2Q)
 end
 
 getid(::LevenbergMarquardt) = "Levenberg-Marquardt"
