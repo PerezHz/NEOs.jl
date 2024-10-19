@@ -50,6 +50,9 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(idxs)]
     # Origin
     x0, x1 = zeros(T, 6), zeros(T, 6)
+    # Least squares cache and methods
+    lscache = LeastSquaresCache(x0, 1:4, 5)
+    lsmethods = _lsmethods(res, x0, 1:4)
     # Gradient of objective function wrt (ρ, v_ρ)
     g_t = Vector{T}(undef, 2)
     # First momentum
@@ -75,7 +78,7 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         propres!(res, od, jd0 - ae[5]/c_au_per_day, q, params; buffer, idxs)
         iszero(length(res)) && break
         # Least squares fit
-        fit = tryls(res, x0, 5, 1:4)
+        fit = tryls(res, x0, lscache, lsmethods)
         !fit.success && break
         x1 .= fit.x
         # Current Q
@@ -154,7 +157,7 @@ function tsaiod(od::ODProblem{D, T}, params::NEOParameters{T};
             # Jet Transport initial condition
             q = [q0[k] + scalings[k] * TaylorN(k, order = params.tsaorder) for k in 1:6]
             # Jet Transport Least Squares
-            _sol_ = jtls(od, jd0, q, i, params, false)
+            _sol_ = jtls(od, jd0, q, od.tracklets[i:i], params, false)
             # Update solution
             sol = updatesol(sol, _sol_, od.radec)
             # Termination condition
