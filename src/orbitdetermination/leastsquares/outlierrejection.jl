@@ -14,7 +14,7 @@ struct OutlierRejectionCache{T} <: AbstractLeastSquaresCache{T}
         χ2s = Vector{T}(undef, L)
         ξ = Vector{T}(undef, 2)
         γ = zeros(T, 2, 2)
-        A = Matrix{T}(undef, 6, 2)
+        A = Matrix{T}(undef, get_numvars(), 2)
         γ_ξ = Matrix{T}(undef, 2, 2)
         return new{T}(mask, eval_res, χ2s, ξ, γ, A, γ_ξ, L)
     end
