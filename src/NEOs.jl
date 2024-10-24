@@ -26,9 +26,9 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, daysec, yr
         numberofbodies, kmsec2auday, meanmotion, meananomaly, selecteph, getinterpindex
 using Healpix: ang2pixRing, Resolution
 using StatsBase: mean, std
+using LinearAlgebra: inv!
 using LsqFit: curve_fit, vcov
 using Roots: find_zeros
-using Clustering: kmeans
 using HORIZONS: smb_spk
 using OhMyThreads: tmap, tmap!
 using TaylorIntegration: RetAlloc, _determine_parsing!, _taylorinteg!
@@ -60,7 +60,7 @@ export loadpeeph, bwdfwdeph
 export obsposECEF, obsposvelECI
 # Optical astrometry processing
 export UniformWeights, Veres17, Farnocchia15, Eggl20, compute_radec, unfold,
-       residuals, outlier
+       residuals, isoutlier
 # Radar astrometry processing
 export compute_delay, radar_astrometry
 # Asteroid dynamical models
@@ -70,7 +70,8 @@ export propagate, propagate_lyap, propagate_root
 # Osculating
 export pv2kep, yarkp2adot
 # Least squares
-export project, chi2, nms, nrms, diffcorr, newtonls, levenbergmarquardt, tryls
+export LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
+       project, chi2, nms, nrms, leastsquares, leastsquares!, tryls
 # NEOSolution
 export epoch, sigmas, snr, jplcompare, uncertaintyparameter
 # Too Short Arc
@@ -82,13 +83,13 @@ export NEOParameters, ODProblem, curvature, issinglearc, orbitdetermination
 # B plane
 export valsecchi_circle, bopik, mtp
 # Outlier rejection
-export outlier_rejection
+export outlier_rejection!
 
 include("constants.jl")
 include("observations/observations.jl")
 include("propagation/propagation.jl")
 include("orbitdetermination/orbitdetermination.jl")
-include("postprocessing/outlier_rejection.jl")
+include("postprocessing/bplane.jl")
 include("init.jl")
 include("deprecated.jl")
 
