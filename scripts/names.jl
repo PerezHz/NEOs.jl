@@ -48,7 +48,7 @@ function isodcompatible(radec::Vector{RadecMPC{T}}) where {T <: Real}
     # Filter out incompatible observations
     filter!(radec) do r
         hascoord(r.observatory) && !issatellite(r.observatory) &&
-        date(r) >= Date(2000)
+        date(r) > DateTime(2000, 1, 1, 12)
     end
     length(radec) < 3 && return false
     # There is at least one set of 3 tracklets with a < 15 days timespan
@@ -94,7 +94,7 @@ function main()
     # Delete repeated NEOs
     unique!(provdesig)
     # We can only process asteroids discovered between 2000 and 2024
-    filter!(desig -> "2000" <= desig[1:4] <= "2024", provdesig)
+    # filter!(desig -> "2000" <= desig[1:4] <= "2024", provdesig)
 
     if 0 < N < length(provdesig)
         # Shuffle the provisional designations list
