@@ -598,7 +598,7 @@ end
             # Filter out incompatible observations
             filter!(radec) do r
                 hascoord(r.observatory) && !issatellite(r.observatory) &&
-                date(r) >= Date(2000)
+                date(r) > DateTime(2000, 1, 1, 12)
             end
             length(radec) < 3 && return false, radec
             # Find the first set of 3 tracklets with a < 15 days timespan
@@ -614,18 +614,21 @@ end
         end
 
         # Fetch and filter optical astrometry
-        radec = fetch_radec_mpc("2011 UE256")
-        _, radec = radecfilter(radec)
+        radec = fetch_radec_mpc("2023 QR6")
+        flag, radec = radecfilter(radec)
 
-        @test length(radec) == 14
-        @test numberofdays(radec) < 0.85
+        @test flag
+        @test length(radec) == 6
+        @test numberofdays(radec) < 6.22
 
         # Parameters
         params = NEOParameters(
-            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-            gaussorder = 6, gaussQmax = 1.0,
-            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,
-            jtlsiter = 20, lsiter = 10
+            coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
+            gaussorder = 6, gaussQmax = 2.0,                       # Gauss method
+            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,        # ADAM
+            jtlsiter = 20, lsiter = 10,                            # Least squares
+            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
+            fudge = 10.0, max_per = 34.0
         )
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
@@ -633,7 +636,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Oct 1, 2024
+        # Values by Oct 25, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -651,21 +654,21 @@ end
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
-        @test length(sol.res) == 14
+        @test length(sol.res) == 6
         @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
-        @test all( sigmas(sol) .< 0.24 )
-        @test all( snr(sol) .> 0.40)
-        @test nrms(sol) < 0.42
+        @test all( sigmas(sol) .< 0.018 )
+        @test all( snr(sol) .> 7.14)
+        @test nrms(sol) < 0.28
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
-        @test isdiag(sol.jacobian)
-        @test maximum(sol.jacobian) < 1e-5
+        @test !isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 0.003
         # Compatibility with JPL
-        JPL = [1.5278518651683686, 0.9328047239405421, 0.3755795874791371,
-            -0.014356510695499359, 0.0002883092503924326, 0.002280143873309611]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1.33)
+        JPL = [0.8273620205094612, -0.8060976455411443, -0.650602108942513,
+            0.016599531390362098, -0.0056141558047514955, 0.0028999599926801418]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.53)
     end
 
 end
