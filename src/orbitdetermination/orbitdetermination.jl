@@ -87,6 +87,29 @@ function propres!(res::Vector{OpticalResidual{T, U}}, od::ODProblem{D, T},
     end
 end
 
+# Decide whether to start jtls or not
+function isjtlsfit(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
+    params::NEOParameters{T}) where {D, T <: Real, V <: Number}
+    # Try plain propagation and residuals
+    bwd, fwd, res = propres(od, jd0, cte.(q), params)
+    isempty(res) && return false
+    # Check that orbit crosses all admissible regions
+    mask = BitVector(undef, length(od.tracklets))
+    for i in eachindex(od.tracklets)
+        A = AdmissibleRegion(od.tracklets[i], params)
+        At0 = dtutc2days(A.date)
+        if At0 <= jd0 - JD_J2000
+            q0 = bwd(At0)
+        else
+            q0 = fwd(At0)
+        end
+        ρ, v_ρ = bary2topo(A, q0)
+        mask[i] = (ρ, v_ρ) in A
+    end
+
+    return all(mask)
+end
+
 # Initial subset of radec for jtls
 function _initialtracklets(trksa::AbstractVector{Tracklet{T}},
     trksb::AbstractVector{Tracklet{T}}) where {T <: Real}
@@ -176,8 +199,11 @@ Compute an orbit via Jet Transport Least Squares.
 function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
     tracklets::AbstractVector{Tracklet{T}}, params::NEOParameters{T},
     mode::Bool = true) where {D, T <: Real, V <: Number}
+    # Decide whether to start jtls or not
+    start = isjtlsfit(od, jd0, q, params)
+    start || return zero(NEOSolution{T, T})
     # Plain initial condition
-    q0 = constant_term.(q)
+    q0 = cte.(q)
     # JT tail
     dq = q - q0
     # Propagation buffer
@@ -191,19 +217,16 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
     lsmethods = _lsmethods(res, x0, 1:6)
     # Initial subset of radec for orbit fit
     tin, tout, rin = _initialtracklets(od.tracklets, tracklets)
-    # Residuals space to barycentric coordinates jacobian
-    J = Matrix(TS.jacobian(dq))
-    # Best orbit
-    best_sol, best_Q = zero(NEOSolution{T, T}), T(Inf)
+    # Allocate memory for orbits
+    sols = [zero(NEOSolution{T, T}) for _ in 1:params.jtlsiter]
+    Qs = fill(T(Inf), params.jtlsiter)
     # Outlier rejection
     if params.outrej
         orcache = OutlierRejectionCache(T, nobs(od))
-        best_out = notout(res)
+        outs = zeros(Int, params.jtlsiter)
     end
-    # Convergence flag
-    flag = false
     # Jet transport least squares
-    for _ in 1:params.jtlsiter
+    for i in 1:params.jtlsiter
         # Initial conditions
         q = q0 + dq
         # Propagation & residuals
@@ -220,33 +243,34 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
                 χ2_rec = params.χ2_rec, χ2_rej = params.χ2_rej,
                 fudge = params.fudge, max_per = params.max_per)
         end
-        # NRMS
-        Q = nrms(res, fit)
-        # Break condition
-        C1 = abs(best_Q - Q) < 0.01
-        C2 = params.outrej ? (best_out == notout(res)) : true
-        if C1 && C2
-            flag = true
-        end
-        # Update NRMS and initial conditions
-        best_Q = Q
+        # Update solution
+        Qs[i] = nrms(res, fit)
+        J = Matrix(TS.jacobian(dq, fit.x))
+        sols[i] = evalfit(NEOSolution(tin, bwd, fwd, res[rin], fit, J))
         if params.outrej
-            best_out = notout(res)
+            outs[i] = notout(res)
         end
-        J .= TS.jacobian(dq, fit.x)
-        best_sol = evalfit(NEOSolution(tin, bwd, fwd, res[rin], fit, J))
-        flag && break
+        # Convergence conditions
+        if i > 1
+            C1 = abs(Qs[i-1] - Qs[i]) < 0.01
+            C2 = params.outrej ? (outs[i-1] == outs[i]) : true
+            C1 && C2 && break
+        end
+        i > 2 && issorted(view(Qs, i-2:i)) && break
         # Update initial condition
-        q0 .= q(fit.x)
+        TS.evaluate!(q, fit.x, q0)
+    end
+    # Find complete solutions
+    mask = findall(s -> length(s.res) == length(od.radec), sols)
+    # Choose best solution
+    if isempty(mask)
+        _, k = findmin(nrms, sols)
+    else
+        _, k = findmin(nrms, view(sols, mask))
+        k = mask[k]
     end
 
-    # Case: all solutions were unsuccesful
-    if isinf(best_Q)
-        return zero(NEOSolution{T, T})
-    # Case: at least one solution was succesful
-    else
-        return best_sol
-    end
+    return sols[k]
 end
 
 # Default naive initial conditions for iod
