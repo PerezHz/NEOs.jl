@@ -7,7 +7,7 @@ using LinearAlgebra
 using Test
 
 using NEOs: NEOSolution, RadecMPC, reduce_tracklets,
-    indices, numberofdays
+    indices, numberofdays, nout
 
 function iodsubradec(radec::Vector{RadecMPC{T}}, N::Int = 3) where {T <: Real}
     tracklets = reduce_tracklets(radec)
@@ -54,7 +54,7 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 9
-        @test iszero(count(outlier.(sol.res)))
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 9e-4 )
@@ -96,7 +96,7 @@ end
         @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
         @test length(sol1.res) == 43
-        @test iszero(count(outlier.(sol1.res)))
+        @test iszero(nout(sol1.res))
         # Least squares fit
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 2e-4 )
@@ -149,7 +149,7 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 9
-        @test iszero(count(outlier.(sol.res)))
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 8e-5 )
@@ -317,7 +317,7 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 10
-        @test iszero(count(outlier.(sol.res)))
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 6e-3 )
@@ -345,14 +345,15 @@ end
         @test numberofdays(subradec) < 2.16
 
         # Parameters
-        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
+        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007,
+            outrej = true, χ2_rec = 1.0, χ2_rej = 1.25, fudge = 0.0)
         # Orbit determination problem
         od = ODProblem(newtonian!, subradec)
 
-        # Initial Orbit Determination
+        # Initial Orbit Determination (with outlier rejection)
         sol = orbitdetermination(od, params)
 
-        # Values by Oct 1, 2024
+        # Values by Oct 11, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -371,12 +372,12 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 18
-        @test count(outlier.(sol.res)) == 0
+        @test nout(sol.res) == 2
         # Least squares fit
         @test sol.fit.success
-        @test all( sigmas(sol) .< 3e-4 )
-        @test all( snr(sol) .> 574)
-        @test nrms(sol) < 0.46
+        @test all( sigmas(sol) .< 4e-3 )
+        @test all( snr(sol) .> 50)
+        @test nrms(sol) < 0.22
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
         @test !isdiag(sol.jacobian)
@@ -384,13 +385,12 @@ end
         # Compatibility with JPL
         JPL = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
             -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1.75)
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.07)
 
         # Add remaining observations
         NEOs.update!(od, radec)
+        # Refine orbit (with outlier rejection)
         sol1 = orbitdetermination(od, sol, params)
-        # Outlier rejection
-        sol1 = outlier_rejection(od, sol1, params)
 
         # Orbit solution
         @test isa(sol1, NEOSolution{Float64, Float64})
@@ -409,7 +409,7 @@ end
         @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
         @test length(sol1.res) == 21
-        @test count(outlier.(sol1.res)) == 2
+        @test nout(sol1.res) == 2
         # Least squares fit
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 3e-4 )
@@ -420,7 +420,7 @@ end
         @test isdiag(sol1.jacobian)
         @test maximum(sol1.jacobian) < 8e-7
         # Compatibility with JPL
-        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 1.2e-3)
+        @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 7e-4)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(od, sol1, params) == 8
     end
@@ -471,7 +471,7 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 7
-        @test iszero(count(outlier.(sol.res)))
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 3e-4 )
@@ -525,7 +525,7 @@ end
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 18
-        @test iszero(count(outlier.(sol.res)))
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
         @test all( sigmas(sol) .< 2e-5 )
@@ -567,7 +567,7 @@ end
         @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
         @test length(sol1.res) == 97
-        @test iszero(count(outlier.(sol1.res)))
+        @test iszero(nout(sol1.res))
         # Least squares fit
         @test sol1.fit.success
         @test all( sigmas(sol1) .< 4e-7 )
@@ -598,7 +598,7 @@ end
             # Filter out incompatible observations
             filter!(radec) do r
                 hascoord(r.observatory) && !issatellite(r.observatory) &&
-                date(r) >= Date(2000)
+                date(r) > DateTime(2000, 1, 1, 12)
             end
             length(radec) < 3 && return false, radec
             # Find the first set of 3 tracklets with a < 15 days timespan
@@ -614,18 +614,21 @@ end
         end
 
         # Fetch and filter optical astrometry
-        radec = fetch_radec_mpc("2011 UE256")
-        _, radec = radecfilter(radec)
+        radec = fetch_radec_mpc("2023 QR6")
+        flag, radec = radecfilter(radec)
 
-        @test length(radec) == 14
-        @test numberofdays(radec) < 0.85
+        @test flag
+        @test length(radec) == 6
+        @test numberofdays(radec) < 6.22
 
         # Parameters
         params = NEOParameters(
-            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-            gaussorder = 6, gaussQmax = 1.0,
-            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,
-            jtlsiter = 20, newtoniter = 10
+            coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
+            gaussorder = 6, gaussQmax = 2.0,                       # Gauss method
+            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,        # ADAM
+            jtlsiter = 20, lsiter = 10,                            # Least squares
+            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
+            fudge = 10.0, max_per = 34.0
         )
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
@@ -633,7 +636,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Oct 1, 2024
+        # Values by Oct 25, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -651,21 +654,21 @@ end
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
         @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
-        @test length(sol.res) == 14
-        @test iszero(count(outlier.(sol.res)))
+        @test length(sol.res) == 6
+        @test iszero(nout(sol.res))
         # Least squares fit
         @test sol.fit.success
-        @test all( sigmas(sol) .< 0.24 )
-        @test all( snr(sol) .> 0.40)
-        @test nrms(sol) < 0.42
+        @test all( sigmas(sol) .< 0.018 )
+        @test all( snr(sol) .> 7.14)
+        @test nrms(sol) < 0.28
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
-        @test isdiag(sol.jacobian)
-        @test maximum(sol.jacobian) < 1e-5
+        @test !isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 0.003
         # Compatibility with JPL
-        JPL = [1.5278518651683686, 0.9328047239405421, 0.3755795874791371,
-            -0.014356510695499359, 0.0002883092503924326, 0.002280143873309611]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 1.33)
+        JPL = [0.8273620205094612, -0.8060976455411443, -0.650602108942513,
+            0.016599531390362098, -0.0056141558047514955, 0.0028999599926801418]
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.53)
     end
 
 end

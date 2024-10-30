@@ -1,5 +1,5 @@
 include("osculating.jl")
-include("least_squares.jl")
+include("leastsquares/methods.jl")
 include("odproblem.jl")
 include("neosolution.jl")
 include("admissibleregion.jl")
@@ -87,24 +87,53 @@ function propres!(res::Vector{OpticalResidual{T, U}}, od::ODProblem{D, T},
     end
 end
 
-# Initial subset of radec for jtls
-function _initialtracklets(tracklets::Vector{Tracklet{T}}, i::Int) where {T <: Real}
-    if iszero(i)
-        tin = deepcopy(tracklets)
-        tout = Vector{Tracklet{T}}(undef, 0)
-        rin = sort!(reduce(vcat, indices.(tracklets)))
-    else
-        tin = [tracklets[i]]
-        tout = sort(tracklets, by = x -> abs( (x.date - tracklets[i].date).value ))[2:end]
-        rin = sort!(indices(tracklets[i]))
-        while length(rin) < 3 && !isempty(tout)
-            tracklet = popfirst!(tout)
-            push!(tin, tracklet)
-            sort!(tin)
-            rin = vcat(rin, tracklet.indices)
-            sort!(rin)
+# Decide whether to start jtls or not
+function isjtlsfit(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
+    params::NEOParameters{T}) where {D, T <: Real, V <: Number}
+    # Try plain propagation and residuals
+    bwd, fwd, res = propres(od, jd0, cte.(q), params)
+    isempty(res) && return false
+    # Check that orbit crosses all admissible regions
+    mask = BitVector(undef, length(od.tracklets))
+    for i in eachindex(od.tracklets)
+        A = AdmissibleRegion(od.tracklets[i], params)
+        At0 = dtutc2days(A.date)
+        if At0 <= jd0 - JD_J2000
+            q0 = bwd(At0)
+        else
+            q0 = fwd(At0)
         end
+        ρ, v_ρ = bary2topo(A, q0)
+        mask[i] = (ρ, v_ρ) in A
     end
+
+    return all(mask)
+end
+
+# Initial subset of radec for jtls
+function _initialtracklets(trksa::AbstractVector{Tracklet{T}},
+    trksb::AbstractVector{Tracklet{T}}) where {T <: Real}
+    # Starting tracklets
+    tin = sort!(intersect(trksa, trksb))
+    # Remaining tracklets
+    tout = sort!(setdiff(trksa, trksb))
+    # Consistency check
+    @assert sort!(union(tin, tout)) == trksa
+    # Sort tout by absolute time to tin
+    et = mean(@. dtutc2et(date(tin)))
+    dts = @. abs(dtutc2et(date(tout)) - et)
+    permute!(tout, sortperm(dts))
+    # Starting observations
+    rin = sort!(reduce(vcat, indices.(tin)))
+    # jtls needs at least three observations
+    while length(rin) < 3 && !isempty(tout)
+        tracklet = popfirst!(tout)
+        push!(tin, tracklet)
+        sort!(tin)
+        rin = vcat(rin, indices(tracklet))
+        sort!(rin)
+    end
+
     return tin, tout, rin
 end
 
@@ -117,7 +146,7 @@ function addradec!(::Val{true}, rin::Vector{Int}, fit::LeastSquaresFit{T},
     params::NEOParameters{T}) where {T <: Real}
     while !isempty(tout)
         extra = indices(tout[1])
-        fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter)
+        fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.lsiter)
         !fit_new.success && break
         fit = fit_new
         tracklet = popfirst!(tout)
@@ -137,7 +166,7 @@ function addradec!(::Val{false}, rin::Vector{Int}, fit::LeastSquaresFit{T},
     params::NEOParameters{T}) where {T <: Real}
     if nrms(res[rin], fit) < params.tsaQmax && !isempty(tout)
         extra = indices(tout[1])
-        fit_new = tryls(res[rin ∪ extra], x0, params.newtoniter)
+        fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.lsiter)
         !fit_new.success && return rin, fit
         fit = fit_new
         tracklet = popfirst!(tout)
@@ -151,8 +180,9 @@ function addradec!(::Val{false}, rin::Vector{Int}, fit::LeastSquaresFit{T},
 end
 
 @doc raw"""
-    jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TayloN{T}}, i::Int,
-        params::NEOParameters{T} [, mode::Bool]) where {D, T <: Real, V <: Number}
+    jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TayloN{T}},
+        tracklets::AbstractVector{Tracklet{T}}, params::NEOParameters{T}
+        [, mode::Bool]) where {D, T <: Real, V <: Number}
 
 Compute an orbit via Jet Transport Least Squares.
 
@@ -161,64 +191,86 @@ Compute an orbit via Jet Transport Least Squares.
 - `od::ODProblem{D, T}`: orbit determination problem.
 - `jd0::V`: reference epoch [Julian days TDB].
 - `q::Vector{TaylorN{T}}`: jet transport initial condition.
-- `i::Int`: index of `tracklets` to start least squares fit.
+- `tracklets::AbstractVector{Tracklet{T}}`: initial tracklets for fit.
 - `params::NEOParameters{T}`: see `Jet Transport Least Squares Parameters`
     of [`NEOParameters`](@ref).
 - `mode::Bool`: `addradec!` mode (default: `true`).
 """
-function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}}, i::Int,
-    params::NEOParameters{T}, mode::Bool = true) where {D, T <: Real, V <: Number}
+function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
+    tracklets::AbstractVector{Tracklet{T}}, params::NEOParameters{T},
+    mode::Bool = true) where {D, T <: Real, V <: Number}
+    # Decide whether to start jtls or not
+    start = isjtlsfit(od, jd0, q, params)
+    start || return zero(NEOSolution{T, T})
     # Plain initial condition
-    q0 = constant_term.(q)
+    q0 = cte.(q)
     # JT tail
     dq = q - q0
-    # Vector of O-C residuals
-    res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(od.radec)]
     # Propagation buffer
     buffer = PropagationBuffer(od, jd0, 1, nobs(od), q, params)
     # Origin
     x0 = zeros(T, 6)
+    # Vector of O-C residuals
+    res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(od.radec)]
+    # Least squares cache and methods
+    lscache = LeastSquaresCache(x0, 1:6, params.lsiter)
+    lsmethods = _lsmethods(res, x0, 1:6)
     # Initial subset of radec for orbit fit
-    tin, tout, rin = _initialtracklets(od.tracklets, i)
-    # Residuals space to barycentric coordinates jacobian
-    J = Matrix(TS.jacobian(dq))
-    # Best orbit
-    best_sol, best_Q = zero(NEOSolution{T, T}), T(Inf)
-    # Convergence flag
-    flag = false
+    tin, tout, rin = _initialtracklets(od.tracklets, tracklets)
+    # Allocate memory for orbits
+    sols = [zero(NEOSolution{T, T}) for _ in 1:params.jtlsiter]
+    Qs = fill(T(Inf), params.jtlsiter)
+    # Outlier rejection
+    if params.outrej
+        orcache = OutlierRejectionCache(T, nobs(od))
+        outs = zeros(Int, params.jtlsiter)
+    end
     # Jet transport least squares
-    for _ in 1:params.jtlsiter
+    for i in 1:params.jtlsiter
         # Initial conditions
         q = q0 + dq
         # Propagation & residuals
         bwd, fwd = propres!(res, od, jd0, q, params; buffer)
         iszero(length(res)) && break
         # Orbit fit
-        fit = tryls(res[rin], x0, params.newtoniter)
+        fit = tryls(res[rin], x0, lscache, lsmethods)
         !fit.success && break
         # Incrementally add observations to fit
         rin, fit = addradec!(Val(mode), rin, fit, tin, tout, res, x0, params)
-        # NRMS
-        Q = nrms(res, fit)
-        if abs(best_Q - Q) < 0.1
-            flag = true
+        # Outlier rejection
+        if params.outrej
+            outlier_rejection!(view(res, rin), fit.x, fit.Γ, orcache;
+                χ2_rec = params.χ2_rec, χ2_rej = params.χ2_rej,
+                fudge = params.fudge, max_per = params.max_per)
         end
-        # Update NRMS and initial conditions
-        best_Q = Q
-        J .= TS.jacobian(dq, fit.x)
-        best_sol = evalfit(NEOSolution(tin, bwd, fwd, res[rin], fit, J))
-        flag && break
+        # Update solution
+        Qs[i] = nrms(res, fit)
+        J = Matrix(TS.jacobian(dq, fit.x))
+        sols[i] = evalfit(NEOSolution(tin, bwd, fwd, res[rin], fit, J))
+        if params.outrej
+            outs[i] = notout(res)
+        end
+        # Convergence conditions
+        if i > 1
+            C1 = abs(Qs[i-1] - Qs[i]) < 0.01
+            C2 = params.outrej ? (outs[i-1] == outs[i]) : true
+            C1 && C2 && break
+        end
+        i > 2 && issorted(view(Qs, i-2:i)) && break
         # Update initial condition
-        q0 .= q(fit.x)
+        TS.evaluate!(q, fit.x, q0)
+    end
+    # Find complete solutions
+    mask = findall(s -> length(s.res) == length(od.radec), sols)
+    # Choose best solution
+    if isempty(mask)
+        _, k = findmin(nrms, sols)
+    else
+        _, k = findmin(nrms, view(sols, mask))
+        k = mask[k]
     end
 
-    # Case: all solutions were unsuccesful
-    if isinf(best_Q)
-        return zero(NEOSolution{T, T})
-    # Case: at least one solution was succesful
-    else
-        return best_sol
-    end
+    return sols[k]
 end
 
 # Default naive initial conditions for iod
@@ -329,6 +381,5 @@ function orbitdetermination(od::ODProblem{D, T}, sol::NEOSolution{T, T},
     # Jet Transport initial condition
     q = q0 + dq
     # Jet Transport Least Squares
-    _, i = findmin(t -> abs(dtutc2days(t.date) - sol.bwd.t0), od.tracklets)
-    return jtls(od, jd0, q, i, params)
+    return jtls(od, jd0, q, sol.tracklets, params, true)
 end

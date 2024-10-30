@@ -47,7 +47,7 @@ function evaluate(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     end
     return res_new
 end
-(res::Vector{OpticalResidual{T, TaylorN{T}}})(x::Vector{T}) where {T <: Real} =
+(res::AbstractVector{OpticalResidual{T, TaylorN{T}}})(x::Vector{T}) where {T <: Real} =
     evaluate(res, x)
 
 # Print method for OpticalResidual
@@ -55,7 +55,7 @@ end
 # α: -138.79801 δ: -89.80025
 # α: -134.79450 δ: -91.42509 (outlier)
 function show(io::IO, x::OpticalResidual)
-    outlier_flag = outlier(x) ? " (outlier)" : ""
+    outlier_flag = isoutlier(x) ? " (outlier)" : ""
     print(io, "α: ", @sprintf("%+.5f", cte(x.ξ_α)), " δ: ",
           @sprintf("%+.5f", cte(x.ξ_δ)), outlier_flag)
 end
@@ -96,7 +96,11 @@ ra(res::OpticalResidual) = res.ξ_α
 dec(res::OpticalResidual) = res.ξ_δ
 wra(res::OpticalResidual) = res.w_α
 wdec(res::OpticalResidual) = res.w_δ
-outlier(res::OpticalResidual) = res.outlier
+isoutlier(res::OpticalResidual) = res.outlier
+nout(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number} =
+    count(isoutlier, res)
+notout(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number} =
+    count(!isoutlier, res)
 
 euclid3D(x::Vector{T}) where {T <: Real} = sqrt(dot3D(x, x))
 function euclid3D(x::Vector{TaylorN{T}}) where {T <: Real}
@@ -371,7 +375,7 @@ function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
     # Type of asteroid ephemeris
     U = typeof(a1_et1)
     # Vector of residuals
-    res = Vector{OpticalResidual{T, U}}(undef, length(radec))
+    res = [zero(OpticalResidual{T, U}) for _ in eachindex(radec)]
     residuals!(res, radec, w8s, bias; xva, kwargs...)
 
     return res
@@ -382,7 +386,7 @@ function residuals!(res::Vector{OpticalResidual{T, U}},
     bias::AbstractVector{Tuple{T, T}}; xva::AstEph, kwargs...) where {AstEph,
     T <: Real, U <: Number}
 
-    tmap!(res, radec, w8s, bias) do obs, w8, bias
+    tmap!(res, radec, w8s, bias, isoutlier.(res)) do obs, w8, bias, outlier
         # Observed ra/dec
         α_obs = rad2arcsec(ra(obs))   # arcsec
         δ_obs = rad2arcsec(dec(obs))  # arcsec
@@ -398,7 +402,7 @@ function residuals!(res::Vector{OpticalResidual{T, U}},
             δ_obs - δ_comp - δ_corr,
             w8,
             w8,
-            false
+            outlier
         )
     end
 

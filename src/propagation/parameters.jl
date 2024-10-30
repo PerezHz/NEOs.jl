@@ -37,15 +37,18 @@ Parameters for all orbit determination functions.
 
 ## Jet Transport Least Squares Parameters
 
-- `jtlsiter::Int`: maximum number of iterations for jet transport least squares
-    (default: `5`).
-- `newtoniter::Int`: number of iterations for differential corrections / Newton's method
-    (default: `5`).
-- `jtlsorder::Int`: order of the jet transport perturbation (default: `5`).
+- `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `5`).
+- `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
+- `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `5`).
 
 ## Outlier Rejection Parameters
 
-- `max_per::T`: maximum allowed rejection percentage (default: `18.0`).
+- `outrej::Bool`: whether to perform outlier rejection during least squares
+    iterations (default: `false`).
+- `χ2_rec::T`: recovery threshold (default: `7.0`).
+- `χ2_rej::T`: rejection threshold (default: `8.0`).
+- `fudge::T`: rejection fudge term coefficient (default: `400.0`).
+- `max_per::T`: maximum allowed rejection percentage (default: `10.0`).
 """
 @kwdef struct NEOParameters{T <: Real}
     # Propagation Parameters
@@ -73,11 +76,15 @@ Parameters for all orbit determination functions.
     tsaorder::Int = 6
     tsaQmax::T = 1.5
     # Jet Transport Least Squares Parameters
+    lsiter::Int = 5
     jtlsiter::Int = 5
-    newtoniter::Int = 5
     jtlsorder::Int = 5
     # Outlier Rejection Parameters
-    max_per::T = 18.0
+    outrej::Bool = false
+    χ2_rec::T = 7.0
+    χ2_rej::T = 8.0
+    fudge::T = 400.0
+    max_per::T = 10.0
 end
 
 # Outer constructors

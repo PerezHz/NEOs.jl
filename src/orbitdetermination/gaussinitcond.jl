@@ -280,7 +280,7 @@ function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Da
     c = -(μ_S^2)*(B*B)
 
     # Solve Lagrange equation
-    sol = solve_lagrange(a, b, c; niter = params.newtoniter)
+    sol = solve_lagrange(a, b, c; niter = params.lsiter)
 
     # Number of solutions
     n_sol = length(sol)
@@ -482,7 +482,7 @@ function gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: 
         # Jet transport initial conditions
         q = solG[i].statevect .+ params.eph_su(jd0 - JD_J2000)
         # Jet Transport Least Squares
-        _sol_ = jtls(od, jd0, q, 0, params, true)
+        _sol_ = jtls(od, jd0, q, od.tracklets, params, true)
         # Update solution
         sol = updatesol(sol, _sol_, od.radec)
         # Termination condition
@@ -491,7 +491,7 @@ function gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: 
         od.tracklets[2].nobs < 2 && continue
         jd0 = _adam!(od, 2, q, jd0, params)
         # Jet Transport Least Squares
-        _sol_ = jtls(od, jd0, q, 0, params, true)
+        _sol_ = jtls(od, jd0, q, od.tracklets, params, true)
         # Update solution
         sol = updatesol(sol, _sol_, od.radec)
         # Termination condition

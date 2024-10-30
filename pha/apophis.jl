@@ -41,7 +41,7 @@ function parse_commandline()
 
     @add_arg_table! s begin
         "--jd0"
-            help = "Initial epoch calendar date (UTC)"
+            help = "Initial epoch calendar date (TDB)"
             arg_type = DateTime
             default = DateTime(2020, 12, 17)
         "--varorder"
@@ -51,7 +51,7 @@ function parse_commandline()
         "--maxsteps"
             help = "Maximum number of steps during integration"
             arg_type = Int
-            default = 10_000
+            default = 100_000
         "--nyears_bwd"
             help = "Years in backward integration"
             arg_type = Float64
@@ -132,7 +132,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     print_header("Main integration", 2)
     tmax = nyears_bwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
-    println("• Final time of integration: ", jdtdb2utc(jd0 + tmax))
+    println("• Final time of integration: ", jdtdb2dtutc(jd0 + tmax))
 
     params = NEOParameters(;maxsteps, order, abstol, parse_eqs)
     sol_bwd = NEOs.propagate(dynamics, jd0, nyears_bwd, q0, params)
@@ -141,11 +141,11 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
 
     tmax = nyears_fwd*yr
     println("• Initial time of integration: ", string(jd0_datetime))
-    println("• Final time of integration: ", jdtdb2utc(jd0 + tmax))
+    println("• Final time of integration: ", jdtdb2dtutc(jd0 + tmax))
 
     sol_fwd, tvS, xvS, gvS = NEOs.propagate_root(dynamics, jd0, nyears_fwd, q0, params)
     jldsave("Apophis_fwd.jld2"; sol_fwd, tvS, xvS, gvS)
-    # sol_fwd = JLD2.load("Apophis_fwd.jld2", "sol_bwd")
+    # sol_fwd = JLD2.load("Apophis_fwd.jld2", "sol_fwd")
     println()
 
     # Load Sun ephemeris
@@ -163,85 +163,90 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     # Change x, v units, resp., from au, au/day to km, km/sec
     xvs(et) = auday2kmsec(eph_su(et/daysec))
 
+    ### Process optical astrometry
 
     radec_2004_2020 = read_radec_mpc(joinpath(pkgdir(NEOs), "data", "99942_2004_2020.dat"))
     radec_2020_2021 = read_radec_mpc(joinpath(pkgdir(NEOs), "data", "99942_2020_2021.dat"))
-    radec = vcat(radec_2004_2020,radec_2020_2021)
+    radec = vcat(radec_2004_2020,radec_2020_2021) # 7941 optical observations
+
+    # Error model
+    w8s = Veres17(radec).w8s
+    bias = Eggl20(radec).bias
+
+    # Compute optical residuals
+    opt_res_w_all = NEOs.residuals(radec, w8s, bias; xvs, xve, xva)
+    res_radec_all = vcat(ra.(opt_res_w_all), dec.(opt_res_w_all))
+    w_radec_all = vcat(NEOs.wra.(opt_res_w_all), NEOs.wdec.(opt_res_w_all))
+    jldsave("Apophis_res_w_radec.jld2"; res_radec_all, w_radec_all)
+    # JLD2.@load "Apophis_res_w_radec.jld2"
+
+    # Construct DataFrame from optical astrometry
+    df_radec = DataFrame(radec)
+    # Add residuals and weights to optical astrometry DataFrame
+    nradec = round(Int,length(res_radec_all)/2)
+    df_radec[!, :res_α] .= res_radec_all[1:nradec]
+    df_radec[!, :res_δ] .= res_radec_all[1+nradec:end]
+    df_radec[!, :w_α] .= w_radec_all[1:nradec]
+    df_radec[!, :w_δ] .= w_radec_all[1+nradec:end]
+    # Filter out biased observations from observatory 217 on 28-Jan-2021
+    filter!(
+        x->(Date(x.date) != Date(2021, 1, 28)),
+        df_radec
+    ) # 7901 optical observations left
+
+    # Tholen et al. (2013) obs table (432 observations)
+    _radec_tho13_ = read_radec_mpc(joinpath(pkgdir(NEOs), "test", "data", "99942_Tholen_etal_2013.dat"))
+    radec_tho13 = DataFrame(_radec_tho13_)
+    # Veres et al. (2017) relaxation factors for Tholen et al. (2013) optical astrometry
+    rex_tho13 = NEOs.rexveres17(_radec_tho13_)
+    # Read astrometric errors from Tholen et al. (2013)
+    tho13_errors = readdlm(joinpath(pkgdir(NEOs), "data", "tholenetal2013_opterror.dat"), ',')
+    # Compute weights
+    w_α_tho13 = @. 1 / ((tho13_errors[:,1]^2 + tho13_errors[:,3]^2 + tho13_errors[:,5]^2) * rex_tho13^2)
+    w_δ_tho13 = @. 1 / ((tho13_errors[:,2]^2 + tho13_errors[:,4]^2 + tho13_errors[:,6]^2) * rex_tho13^2)
+    # Vector of RA values from Tholen et al. (2013) observations (used for filtering)
+    tho13_α = radec_tho13[!,:α]
+    # Set weights in Tholen et al. (2013) astrometry corresponding to associated uncertainties
+    df_radec[in.(df_radec.α, Ref(tho13_α)),:w_α] = w_α_tho13
+    df_radec[in.(df_radec.α, Ref(tho13_α)),:w_δ] = w_δ_tho13
+
+    # Assemble optical residuals and weights
+    res_radec = vcat(df_radec.res_α, df_radec.res_δ)
+    w_radec  = vcat(df_radec.w_α, df_radec.w_δ)
+
+    ### Process radar astrometry
 
     deldop_2005_2013 = read_radar_jpl(joinpath(pkgdir(NEOs), "data", "99942_RADAR_2005_2013.dat"))
     deldop_2021 = read_radar_jpl(joinpath(pkgdir(NEOs), "data", "99942_RADAR_2021.dat"))
-    deldop = vcat(deldop_2005_2013,deldop_2021)
-
-    # Compute optical residuals
-    opt_res_w_all = NEOs.residuals(radec; xvs, xve, xva)
-    res_radec_all = vcat(ra.(opt_res_w_all), dec.(opt_res_w_all))
-    w_radec_all = vcat(NEOs.weight_ra.(opt_res_w_all), NEOs.weight_dec.(opt_res_w_all))
-    jldsave("Apophis_res_w_radec.jld2"; res_radec_all, w_radec_all)
-    # JLD2.@load "Apophis_res_w_radec.jld2"
+    deldop = vcat(deldop_2005_2013,deldop_2021) # 38 radar observations
 
     # Compute radar residuals
     res_del, w_del, res_dop, w_dop = NEOs.residuals(deldop; xvs, xve, xva, niter=10, tord=10)
     jldsave("Apophis_res_w_deldop.jld2"; res_del, w_del, res_dop, w_dop)
     # JLD2.@load "Apophis_res_w_deldop.jld2"
 
-    ### Process optical astrometry (filter, weight, debias)
-
-    # construct DataFrame from optical astrometry
-    df_radec = DataFrame(radec)
-    # add residuals and weights to optical astrometry DataFrame
-    df_radec[!, :res_α] .= res_radec_all[1:round(Int,length(res_radec_all)/2)]
-    df_radec[!, :res_δ] .= res_radec_all[1+round(Int,length(res_radec_all)/2):end]
-    df_radec[!, :w_α] .= w_radec_all[1:round(Int,length(res_radec_all)/2)]
-    df_radec[!, :w_δ] .= w_radec_all[1+round(Int,length(res_radec_all)/2):end]
-    # filter out biased observations from observatory 217 on 28-Jan-2021
-    filter!(
-        x->(Date(x.date) != Date(2021, 1, 28)),
-        df_radec
-    )
-
-    # read astrometric errors from Tholen et al. (2013)
-    tho13_errors = readdlm(joinpath(pkgdir(NEOs), "data", "tholenetal2013_opterror.dat"), ',')
-    # compute weights
-    w_α_tho13 = 1 ./ (tho13_errors[:,1].^2 .+ tho13_errors[:,3].^2 .+ tho13_errors[:,5].^2)
-    w_δ_tho13 = 1 ./ (tho13_errors[:,2].^2 .+ tho13_errors[:,4].^2 .+ tho13_errors[:,6].^2)
-    # Tholen et al. (2013) obs table
-    radec_tho13 = DataFrame(read_radec_mpc(joinpath(pkgdir(NEOs), "test", "data", "99942_Tholen_etal_2013.dat")))
-    # vector of RA values from Tholen et al. (2013) observations (used for filtering)
-    tho13_α = radec_tho13[!,:α]
-    # set weights in Tholen et al. (2013) astrometry corresponding to associated uncertainties
-    df_radec[in.(df_radec.α, Ref(tho13_α)),:w_α] = w_α_tho13
-    df_radec[in.(df_radec.α, Ref(tho13_α)),:w_δ] = w_δ_tho13
-
-    # `opt_res_w_all_new` is a `Vector{OpticalResidual}` with the custom weights from Tholen et al. (2013) astrometry
-    # since time tags nor observation sites change, relax factors are the same
-
-    # Relaxation factors `relax_factor` account for correlations in optical astrometry data
-    # for each observation batch, count the number of observations made in the same night by
-    # the same observatory. This is achieved via inflating uncertainties (i.e., relax weights)
-    # aprropriately for each residual.
-    # Ref: Veres et al. (2017)
-    opt_res_w_all_new = eltype(opt_res_w_all)[]
-    for i in 1:size(df_radec, 1)
-        push!(opt_res_w_all_new,
-            NEOs.OpticalResidual(
-                opt_res_w_all[i].ξ_α,
-                opt_res_w_all[i].ξ_δ,
-                df_radec[i,:w_α],
-                df_radec[i,:w_δ],
-                opt_res_w_all[i].relax_factor,
-                opt_res_w_all[i].outlier)
-        )
-    end
-
-    # update optical residuals and weights (relaxation factors on weights are actually applied here)
-    res_radec, w_radec = NEOs.unfold(opt_res_w_all_new)
+    # Assemble radar residuals and weights
+    res_deldop = vcat(res_del, res_dop)
+    w_deldop  = vcat(w_del, w_dop)
 
     ### Perform orbital fit to optical and radar astrometry data
 
-    res = vcat(res_radec, res_del, res_dop)
-    w = vcat(w_radec, w_del, w_dop)
-
-    fit_OR8 = newtonls(res, w, zeros(get_numvars()), 10)
+    # Assemble residuals and weights
+    res = vcat(res_radec, res_deldop)
+    w = vcat(w_radec, w_deldop)
+    # Number of observations and parameters
+    nobs, npar = length(res), get_numvars()
+    # Target function and its derivatives
+    Q = nms(res, w)
+    GQ = TS.gradient(Q)
+    HQ = [TS.differentiate(GQ[j], i) for j in 1:npar, i in 1:npar]
+    x0 = zeros(npar)
+    dQ, d2Q = GQ(x0), HQ(x0)
+    # Least squares method and cache
+    lsmethod = Newton(nobs, npar, Q, GQ, HQ, dQ, d2Q)
+    lscache = LeastSquaresCache(x0, 1:npar, 10)
+    # Least squares fit
+    fit_OR8 = leastsquares!(lsmethod, lscache)
     x_OR8 = sol_fwd(sol_fwd.t0)(fit_OR8.x)
     σ_OR8 = sqrt.(diag(fit_OR8.Γ)).*scalings
 

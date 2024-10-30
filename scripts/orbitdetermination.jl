@@ -34,8 +34,8 @@ end
 
 @everywhere begin
     using NEOs, Dates, JLD2
-    using NEOs: AdmissibleRegion, RadecMPC, reduce_tracklets, numberofdays,
-        issatellite
+    using NEOs: AdmissibleRegion, RadecMPC, NEOSolution, reduce_tracklets,
+        numberofdays, issatellite
 
     function radecfilter(radec::Vector{RadecMPC{T}}) where {T <: Real}
         # Eliminate observations before oficial discovery
@@ -45,7 +45,7 @@ end
         # Filter out incompatible observations
         filter!(radec) do r
             hascoord(r.observatory) && !issatellite(r.observatory) &&
-            date(r) >= Date(2000)
+            date(r) > DateTime(2000, 1, 1, 12)
         end
         length(radec) < 3 && return false, radec
         # Find the first set of 3 tracklets with a < 15 days timespan
@@ -60,8 +60,8 @@ end
         return numberofdays(radec) <= 15.0, radec
     end
 
-    # Default naive initial conditions for iod
-    function initcond(A::AdmissibleRegion{T}) where {T <: Real}
+    # Naive initial conditions for iod
+    function initcond1(A::AdmissibleRegion{T}) where {T <: Real}
         v_ρ = sum(A.v_ρ_domain) / 2
         return [
             (A.ρ_domain[1], v_ρ, :log),
@@ -69,6 +69,37 @@ end
             (sum(A.ρ_domain) / 2, v_ρ, :log),
             (A.ρ_domain[2], v_ρ, :log),
         ]
+    end
+
+    function initcond2(A::AdmissibleRegion{T}) where {T <: Real}
+        v_ρ = sum(A.v_ρ_domain) / 2
+        return [
+            (A.ρ_domain[1], v_ρ, :linear),
+            (10^(sum(log10, A.ρ_domain) / 2), v_ρ, :linear),
+            (sum(A.ρ_domain) / 2, v_ρ, :linear),
+            (A.ρ_domain[2], v_ρ, :linear),
+        ]
+    end
+
+    function ioditer()
+        # Parameters
+        params = Vector{NEOParameters{Float64}}(undef, 2)
+        params[1] = NEOParameters(
+            coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
+            gaussorder = 6, gaussQmax = 2.0,                       # Gauss method
+            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,        # ADAM
+            jtlsiter = 20, lsiter = 10,                            # Least squares
+            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
+            fudge = 10.0, max_per = 34.0
+        )
+        params[2] = NEOParameters(params[1];
+            coeffstol = 10.0, adamiter = 200, adamQtol = 0.01,
+            lsiter = 5
+        )
+        # Naive initial conditions
+        initcond = [initcond1, initcond2]
+        # Initial orbit determination iterator
+        return enumerate(Iterators.product(params, initcond))
     end
 
     # Initial orbit determination routine
@@ -80,50 +111,29 @@ end
         !flag && return false
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
-        # Parameters
-        params = NEOParameters(
-            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-            gaussorder = 6, gaussQmax = 1.0,
-            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,
-            jtlsiter = 20, newtoniter = 10
-        )
+        # Pre-allocate solutions
+        sols = [zero(NEOSolution{Float64, Float64}) for _ in 1:4]
         # Start of computation
         init_time = now()
-        # Initial orbit determination
-        sol = orbitdetermination(od, params; initcond)
-        # Termination condition
-        if length(sol.res) == length(radec) && nrms(sol) < 1.5
-            # Time of computation
-            Δ = (now() - init_time).value
-            # Save orbit
-            jldsave(filename; sol = sol, Δ = Δ)
-            # Sucess flag
-            return true
+        # Initial orbit determination cycle
+        for (i, j) in ioditer()
+            # Unfold
+            params, initcond = j
+            # Initial orbit determination
+            sols[i] = orbitdetermination(od, params; initcond)
+            # Termination condition
+            length(sols[i].res) == length(radec) && nrms(sols[i]) < 2.0 && break
         end
-        # Parameters
-        params = NEOParameters(params;
-            coeffstol = 10.0, bwdoffset = 0.007, fwdoffset = 0.007,
-            gaussorder = 6, gaussQmax = 1.0,
-            adamiter = 200, adamQtol = 0.01, tsaQmax = 2.0,
-            jtlsiter = 20, newtoniter = 5
-        )
-        # Initial orbit determination
-        _sol_ = orbitdetermination(od, params; initcond)
         # Time of computation
         Δ = (now() - init_time).value
-        # Choose best orbit
-        if length(sol.res) == length(_sol_.res) == length(radec)
-            sol = min(sol, _sol_)
-        elseif length(sol.res) == length(radec)
-            sol = sol
-        elseif length(_sol_.res) == length(radec)
-            sol = _sol_
-        else
-            sol = zero(NEOSolution{Float64, Float64})
-        end
+        # Select complete solutions
+        mask = findall(s -> length(s.res) == length(radec), sols)
+        isempty(mask) && return false
+        # Choose best solution
+        _, k = findmin(nrms, view(sols, mask))
         # Save orbit
-        iszero(sol) && return false
-        jldsave(filename; sol = sol, Δ = Δ)
+        k = mask[k]
+        jldsave(filename; sol = sols[k], Δ = Δ, k = k)
         return true
     end
 end
