@@ -86,11 +86,11 @@ end
         params = Vector{NEOParameters{Float64}}(undef, 2)
         params[1] = NEOParameters(
             coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
-            gaussorder = 6, gaussQmax = 2.0,                       # Gauss method
-            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,        # ADAM
+            gaussorder = 6, gaussQmax = 1.0,                       # Gauss method
+            adamiter = 500, adamQtol = 1e-5, tsaQmax = 1.0,        # ADAM
             jtlsiter = 20, lsiter = 10,                            # Least squares
             outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
-            fudge = 10.0, max_per = 34.0
+            fudge = 400.0, max_per = 20.0
         )
         params[2] = NEOParameters(params[1];
             coeffstol = 10.0, adamiter = 200, adamQtol = 0.01,
