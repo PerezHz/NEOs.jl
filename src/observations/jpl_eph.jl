@@ -140,18 +140,22 @@ function loadpeeph(eph::TaylorInterpolant = sseph, t_0::T = sseph.t0,
 end
 
 @doc raw"""
-    bwdfwdeph(et::U, bwd::TaylorInterpolant, fwd::TaylorInterpolant) where {U <: Number}
+    bwdfwdeph(t::U, bwd::TaylorInterpolant, fwd::TaylorInterpolant
+        [, et::Bool [, kmsec::Bool]]) where {U <: Number}
 
-Paste a backward and a forward integration, evaluate at `et` and convert from
-[au, au/day] -> [km, km/sec].
+Evaluate an ephemerides at time `t`, where `bwd` (`fwd`) is the backward
+(forward) propagation.
+
+## Optional arguments
+
+- `et::Bool`: whether `t` is in ephemeris seconds since J2000 (default: `true`).
+- `kmsec::Bool`: whether to convert the state vector to [km, km/s] (default: `true`).
 """
-function bwdfwdeph(et::U, bwd::TaylorInterpolant, fwd::TaylorInterpolant) where {U <: Number}
+function bwdfwdeph(t::U, bwd::TaylorInterpolant, fwd::TaylorInterpolant,
+    et::Bool = true, kmsec::Bool = true) where {U <: Number}
     @assert bwd.t0 == fwd.t0 "Backward and forward initial times must match"
-    t = et/daysec
-    t0 = bwd.t0
-    if t <= t0
-        return auday2kmsec(bwd(t))
-    else
-        return auday2kmsec(fwd(t))
-    end
+    _t_ = et ? t/daysec : t
+    _rv_ = _t_ <= bwd.t0 ? bwd(_t_) : fwd(_t_)
+    rv = kmsec ? auday2kmsec(_rv_) : _rv_
+    return rv
 end
