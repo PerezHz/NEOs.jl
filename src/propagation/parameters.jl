@@ -31,7 +31,9 @@ Parameters for all orbit determination functions.
 - `H_max::T`: maximum absolute magnitude (default: `34.5`).
 - `a_max::T`: maximum semimajor axis (default: `100.0`).
 - `adamiter::Int`: maximum number of iterations for `ADAM` optimizer (default: `200`).
-- `Qtol::T`: target function relative tolerance (default: `0.001`).
+- `adammode::Bool`: whether to perform ADAM iterations with all the observations
+    (default: `false`).
+- `adamQtol::T`: target function relative tolerance (default: `0.001`).
 - `tsaorder::Int`: order of the jet transport perturbation (default: `6`).
 - `tsaQmax::T`: nrms threshold (default: `1.5`).
 
@@ -72,6 +74,7 @@ Parameters for all orbit determination functions.
     H_max::T = 34.5
     a_max::T = 100.0
     adamiter::Int = 200
+    adammode::Bool = false
     adamQtol::T = 0.001
     tsaorder::Int = 6
     tsaQmax::T = 1.5

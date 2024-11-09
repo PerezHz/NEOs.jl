@@ -11,7 +11,7 @@ using NEOs: NEOSolution, RadecMPC, reduce_tracklets,
 
 function iodsubradec(radec::Vector{RadecMPC{T}}, N::Int = 3) where {T <: Real}
     tracklets = reduce_tracklets(radec)
-    idxs = sort!(reduce(vcat, indices.(tracklets[1:N])))
+    idxs = indices(tracklets[1:N])
     subradec = radec[idxs]
     return subradec
 end

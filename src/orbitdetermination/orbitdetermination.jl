@@ -101,7 +101,7 @@ function _initialtracklets(trksa::AbstractVector{Tracklet{T}},
     dts = @. abs(dtutc2et(date(tout)) - et)
     permute!(tout, sortperm(dts))
     # Starting observations
-    rin = sort!(reduce(vcat, indices.(tin)))
+    rin = indices(tin)
     # jtls needs at least three observations
     while length(rin) < 3 && !isempty(tout)
         tracklet = popfirst!(tout)

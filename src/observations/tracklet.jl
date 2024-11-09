@@ -48,6 +48,8 @@ vdec(x::Tracklet) = x.v_δ
 mag(x::Tracklet) = x.mag
 nobs(x::Tracklet) = x.nobs
 indices(x::Tracklet) = x.indices
+indices(x::AbstractVector{Tracklet{T}}) where {T <: AbstractFloat} =
+    sort!(reduce(vcat, indices.(x)))
 
 # Print method for Tracklet{T}
 # Examples:
