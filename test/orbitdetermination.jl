@@ -130,7 +130,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params)
 
-        # Values by Oct 1, 2024
+        # Values by Nov 19, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -160,8 +160,8 @@ end
         @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 1e-5
         # Compatibility with JPL
-        JPL = [1.010256210875638, 0.29348888228332376, 0.10467756741992229,
-            -0.000263645106358707, 0.01837375504784015, 0.007208464525828968]
+        JPL = [1.0102562265388333, 0.29348779066421266, 0.10467713915158366,
+            -0.0002636299251231732, 0.01837375942691937, 0.007208466080956637]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 4.8e-2)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(od, sol, params) == 8
@@ -624,11 +624,11 @@ end
         # Parameters
         params = NEOParameters(
             coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
-            gaussorder = 6, gaussQmax = 2.0,                       # Gauss method
-            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,        # ADAM
-            jtlsiter = 20, lsiter = 10,                            # Least squares
+            gaussorder = 6, gaussQmax = 1.0,                       # Gauss method
+            adamiter = 500, adammode = true, adamQtol = 1e-5,      # ADAM
+            tsaQmax = 1.0, jtlsiter = 20, lsiter = 10,             # Least squares
             outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
-            fudge = 10.0, max_per = 34.0
+            fudge = 400.0, max_per = 20.0
         )
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
@@ -636,7 +636,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Oct 25, 2024
+        # Values by Nov 19, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -663,11 +663,11 @@ end
         @test nrms(sol) < 0.28
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
-        @test !isdiag(sol.jacobian)
+        @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 0.003
         # Compatibility with JPL
-        JPL = [0.8273620205094612, -0.8060976455411443, -0.650602108942513,
-            0.016599531390362098, -0.0056141558047514955, 0.0028999599926801418]
+        JPL = [ 0.827266656726981, -0.8060653913101916, -0.6506187674672722,
+            0.01660013577219304, -0.005614737443087259, 0.002899489877794496]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.53)
     end
 
