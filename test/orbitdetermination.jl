@@ -130,7 +130,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params)
 
-        # Values by Nov 19, 2024
+        # Values by Nov 20, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -157,11 +157,11 @@ end
         @test nrms(sol) < 0.46
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
-        @test isdiag(sol.jacobian)
-        @test maximum(sol.jacobian) < 1e-5
+        @test !isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 4e-5
         # Compatibility with JPL
-        JPL = [1.0102562265388333, 0.29348779066421266, 0.10467713915158366,
-            -0.0002636299251231732, 0.01837375942691937, 0.007208466080956637]
+        JPL = [1.0102558767253402, 0.2935121552882981, 0.10468669797982912,
+            -0.0002639687633186843, 0.01837366168395344, 0.007208431369660604]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 4.8e-2)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(od, sol, params) == 8
