@@ -68,3 +68,16 @@ nms(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
 
 nrms(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     fit::LeastSquaresFit{T}) where {T <: Real} = nrms(res(fit.x))
+
+# Chi-square critical value
+function critical_value(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
+    fit::LeastSquaresFit{T}) where {T <: Real}
+    # Evaluate residuals
+    _res_ = res(fit.x)
+    # Chi square distribution with N degrees of freedom
+    N = 2 * notout(_res_)
+    χ2 = N * nms(_res_)
+    d = Chisq(N)
+    # Evaluate cumulative probability at χ2
+    return cdf(d, χ2)
+end

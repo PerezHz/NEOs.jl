@@ -486,7 +486,7 @@ function gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: 
         # Update solution
         sol = updatesol(sol, _sol_, od.radec)
         # Termination condition
-        nrms(sol) <= params.gaussQmax && return sol
+        critical_value(sol) < params.significance && return sol
         # ADAM help
         od.tracklets[2].nobs < 2 && continue
         jd0 = _adam!(od, 2, q, jd0, params)
@@ -495,7 +495,7 @@ function gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: 
         # Update solution
         sol = updatesol(sol, _sol_, od.radec)
         # Termination condition
-        nrms(sol) <= params.gaussQmax && return sol
+        critical_value(sol) < params.significance && return sol
     end
 
     return sol

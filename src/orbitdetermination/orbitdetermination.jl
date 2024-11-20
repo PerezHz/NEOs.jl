@@ -141,7 +141,7 @@ function addradec!(::Val{false}, rin::Vector{Int}, fit::LeastSquaresFit{T},
     tin::Vector{Tracklet{T}}, tout::Vector{Tracklet{T}},
     res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
     params::NEOParameters{T}) where {T <: Real}
-    if nrms(res[rin], fit) < params.tsaQmax && !isempty(tout)
+    if critical_value(view(res, rin), fit) < params.significance && !isempty(tout)
         extra = indices(tout[1])
         fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.lsiter)
         !fit_new.success && return rin, fit
@@ -347,7 +347,7 @@ function orbitdetermination(od::ODProblem{D, T}, params::NEOParameters{T};
     # Update solution
     sol = updatesol(sol, _sol_, od.radec)
     # Termination condition
-    nrms(sol) <= params.gaussQmax && return sol
+    critical_value(sol) < params.significance && return sol
     # Too short arc
     _sol_ = tsaiod(od, params; initcond)
     # Update solution

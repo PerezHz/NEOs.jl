@@ -133,7 +133,7 @@ function tsaiod(od::ODProblem{D, T}, params::NEOParameters{T};
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
     # Unfold parameters
-    varorder, mode, Qmax = params.tsaorder, params.adammode, params.tsaQmax
+    varorder, mode, significance = params.tsaorder, params.adammode, params.significance
     # Iterate tracklets
     for i in eachindex(od.tracklets)
         # ADAM requires a minimum of 2 observations
@@ -164,7 +164,7 @@ function tsaiod(od::ODProblem{D, T}, params::NEOParameters{T};
             # Update solution
             sol = updatesol(sol, _sol_, od.radec)
             # Termination condition
-            nrms(sol) <= Qmax && return sol
+            critical_value(sol) < significance && return sol
         end
     end
 
