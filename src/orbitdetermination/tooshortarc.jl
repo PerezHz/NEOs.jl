@@ -166,6 +166,8 @@ function tsaiod(od::ODProblem{D, T}, params::NEOParameters{T};
             # Termination condition
             critical_value(sol) < significance && return sol
         end
+        # Global ADAM should be independent of starting tracklet
+        mode && break
     end
 
     return sol

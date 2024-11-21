@@ -130,7 +130,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params)
 
-        # Values by Nov 20, 2024
+        # Values by Nov 21, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -158,7 +158,7 @@ end
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
         @test !isdiag(sol.jacobian)
-        @test maximum(sol.jacobian) < 4e-5
+        @test maximum(sol.jacobian) < 4.1e-5
         # Compatibility with JPL
         JPL = [1.0102558767253402, 0.2935121552882981, 0.10468669797982912,
             -0.0002639687633186843, 0.01837366168395344, 0.007208431369660604]
@@ -635,7 +635,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Nov 19, 2024
+        # Values by Nov 21, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
