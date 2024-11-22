@@ -87,7 +87,7 @@ end
         params[1] = NEOParameters(
             coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
             adamiter = 500, adamQtol = 1e-5,                       # ADAM
-            jtlsiter = 20, lsiter = 10,                            # Least squares
+            jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
             outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
             fudge = 400.0, max_per = 20.0
         )
@@ -121,7 +121,8 @@ end
             # Initial orbit determination
             sols[i] = orbitdetermination(od, params; initcond)
             # Termination condition
-            length(sols[i].res) == length(radec) && nrms(sols[i]) < 2.0 && break
+            length(sols[i].res) == length(radec) &&
+            critical_value(sols[i]) < params.significance && break
         end
         # Time of computation
         Δ = (now() - init_time).value
