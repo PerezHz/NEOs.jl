@@ -669,7 +669,7 @@ end
         JPL = [ 0.827266656726981, -0.8060653913101916, -0.6506187674672722,
             0.01660013577219304, -0.005614737443087259, 0.002899489877794496]
         @show abs.(sol() - JPL) ./ sigmas(sol)
-        # @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.53)
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.59)
     end
 
 end
