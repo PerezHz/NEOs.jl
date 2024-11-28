@@ -88,7 +88,7 @@ function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     N_drop = count(mask)
     N_sel = L - N_drop
     # Maximum allowed drops
-    max_drop = ceil(Int, max_per * L / 100)
+    max_drop = round(Int, max_per * L / 100)
     # Sort χ2s
     idxs = sortperm(χ2s, rev = true)
     # Rejection threshold

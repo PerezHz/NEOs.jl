@@ -87,29 +87,6 @@ function propres!(res::Vector{OpticalResidual{T, U}}, od::ODProblem{D, T},
     end
 end
 
-# Decide whether to start jtls or not
-function isjtlsfit(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
-    params::NEOParameters{T}) where {D, T <: Real, V <: Number}
-    # Try plain propagation and residuals
-    bwd, fwd, res = propres(od, jd0, cte.(q), params)
-    isempty(res) && return false
-    # Check that orbit crosses all admissible regions
-    mask = BitVector(undef, length(od.tracklets))
-    for i in eachindex(od.tracklets)
-        A = AdmissibleRegion(od.tracklets[i], params)
-        At0 = dtutc2days(A.date)
-        if At0 <= jd0 - JD_J2000
-            q0 = bwd(At0)
-        else
-            q0 = fwd(At0)
-        end
-        ρ, v_ρ = bary2topo(A, q0)
-        mask[i] = (ρ, v_ρ) in A
-    end
-
-    return all(mask)
-end
-
 # Initial subset of radec for jtls
 function _initialtracklets(trksa::AbstractVector{Tracklet{T}},
     trksb::AbstractVector{Tracklet{T}}) where {T <: Real}
@@ -124,7 +101,7 @@ function _initialtracklets(trksa::AbstractVector{Tracklet{T}},
     dts = @. abs(dtutc2et(date(tout)) - et)
     permute!(tout, sortperm(dts))
     # Starting observations
-    rin = sort!(reduce(vcat, indices.(tin)))
+    rin = indices(tin)
     # jtls needs at least three observations
     while length(rin) < 3 && !isempty(tout)
         tracklet = popfirst!(tout)
@@ -164,7 +141,7 @@ function addradec!(::Val{false}, rin::Vector{Int}, fit::LeastSquaresFit{T},
     tin::Vector{Tracklet{T}}, tout::Vector{Tracklet{T}},
     res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
     params::NEOParameters{T}) where {T <: Real}
-    if nrms(res[rin], fit) < params.tsaQmax && !isempty(tout)
+    if critical_value(view(res, rin), fit) < params.significance && !isempty(tout)
         extra = indices(tout[1])
         fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.lsiter)
         !fit_new.success && return rin, fit
@@ -177,6 +154,32 @@ function addradec!(::Val{false}, rin::Vector{Int}, fit::LeastSquaresFit{T},
     end
 
     return rin, fit
+end
+
+# Decide whether q is suitable for jtls
+function isjtlsfit(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
+    params::NEOParameters{T}) where {D, T <: Real, V <: Number}
+    # Try plain propagation and residuals
+    bwd, fwd, res = propres(od, jd0, cte.(q), params)
+    isempty(res) && return false
+    # Check that orbit crosses all admissible regions
+    eph(t) = bwdfwdeph(t, bwd, fwd, false, false)
+    mask = BitVector(undef, length(od.tracklets))
+    for i in eachindex(od.tracklets)
+        A = AdmissibleRegion(od.tracklets[i], params)
+        At0 = dtutc2days(A.date)
+        q0 = eph(At0)
+        ρ, v_ρ = bary2topo(A, q0)
+        mask[i] = (ρ, v_ρ) in A
+    end
+    all(mask) || return false
+    # Check that orbit stays out of Earth's radius
+    ts = find_zeros(t -> rvelea(eph, params, t), bwd.t0 + bwd.t[end] + 0.007,
+        fwd.t0 + fwd.t[end] - 0.007)
+    ds = map(t -> euclid3D(eph(t) - params.eph_ea(t)), ts)
+    mask = ds .> R_EA
+
+    return all(mask)
 end
 
 @doc raw"""
@@ -199,9 +202,6 @@ Compute an orbit via Jet Transport Least Squares.
 function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
     tracklets::AbstractVector{Tracklet{T}}, params::NEOParameters{T},
     mode::Bool = true) where {D, T <: Real, V <: Number}
-    # Decide whether to start jtls or not
-    start = isjtlsfit(od, jd0, q, params)
-    start || return zero(NEOSolution{T, T})
     # Plain initial condition
     q0 = cte.(q)
     # JT tail
@@ -229,6 +229,9 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
     for i in 1:params.jtlsiter
         # Initial conditions
         q = q0 + dq
+        # Decide whether q is suitable for jtls
+        start = isjtlsfit(od, jd0, q, params)
+        start || break
         # Propagation & residuals
         bwd, fwd = propres!(res, od, jd0, q, params; buffer)
         iszero(length(res)) && break
@@ -344,7 +347,7 @@ function orbitdetermination(od::ODProblem{D, T}, params::NEOParameters{T};
     # Update solution
     sol = updatesol(sol, _sol_, od.radec)
     # Termination condition
-    nrms(sol) <= params.gaussQmax && return sol
+    critical_value(sol) < params.significance && return sol
     # Too short arc
     _sol_ = tsaiod(od, params; initcond)
     # Update solution

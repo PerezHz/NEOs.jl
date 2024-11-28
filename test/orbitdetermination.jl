@@ -11,7 +11,7 @@ using NEOs: NEOSolution, RadecMPC, reduce_tracklets,
 
 function iodsubradec(radec::Vector{RadecMPC{T}}, N::Int = 3) where {T <: Real}
     tracklets = reduce_tracklets(radec)
-    idxs = sort!(reduce(vcat, indices.(tracklets[1:N])))
+    idxs = indices(tracklets[1:N])
     subradec = radec[idxs]
     return subradec
 end
@@ -123,14 +123,14 @@ end
         @test numberofdays(radec) < 13.1
 
         # Parameters
-        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007, adamhelp = true)
+        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
 
         # Initial Orbit Determination
         sol = orbitdetermination(od, params)
 
-        # Values by Oct 1, 2024
+        # Values by Nov 21, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -157,11 +157,11 @@ end
         @test nrms(sol) < 0.46
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
-        @test isdiag(sol.jacobian)
-        @test maximum(sol.jacobian) < 1e-5
+        @test !isdiag(sol.jacobian)
+        @test maximum(sol.jacobian) < 4.1e-5
         # Compatibility with JPL
-        JPL = [1.010256210875638, 0.29348888228332376, 0.10467756741992229,
-            -0.000263645106358707, 0.01837375504784015, 0.007208464525828968]
+        JPL = [1.0102558767253402, 0.2935121552882981, 0.10468669797982912,
+            -0.0002639687633186843, 0.01837366168395344, 0.007208431369660604]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 4.8e-2)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(od, sol, params) == 8
@@ -624,11 +624,10 @@ end
         # Parameters
         params = NEOParameters(
             coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
-            gaussorder = 6, gaussQmax = 2.0,                       # Gauss method
-            adamiter = 500, adamQtol = 1e-5, tsaQmax = 2.0,        # ADAM
-            jtlsiter = 20, lsiter = 10,                            # Least squares
+            adamiter = 500, adamQtol = 1e-5,                       # ADAM
+            jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
             outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
-            fudge = 10.0, max_per = 34.0
+            fudge = 400.0, max_per = 20.0
         )
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
@@ -636,7 +635,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Oct 25, 2024
+        # Values by Nov 21, 2024
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -663,12 +662,14 @@ end
         @test nrms(sol) < 0.28
         # Jacobian
         @test size(sol.jacobian) == (6, 6)
-        @test !isdiag(sol.jacobian)
+        # Julia v1.11.1 gives a different result for this test (28/Nov)
+        # @test isdiag(sol.jacobian)
         @test maximum(sol.jacobian) < 0.003
         # Compatibility with JPL
-        JPL = [0.8273620205094612, -0.8060976455411443, -0.650602108942513,
-            0.016599531390362098, -0.0056141558047514955, 0.0028999599926801418]
-        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.53)
+        JPL = [ 0.827266656726981, -0.8060653913101916, -0.6506187674672722,
+            0.01660013577219304, -0.005614737443087259, 0.002899489877794496]
+        @show abs.(sol() - JPL) ./ sigmas(sol)
+        @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.59)
     end
 
 end

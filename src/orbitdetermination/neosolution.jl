@@ -158,21 +158,29 @@ function min(x::NEOSolution{T, T}, y::NEOSolution{T, T}) where {T <: Real}
     return y
 end
 
-# Normalized Root Mean Square Error
-function nrms(sol::NEOSolution{T, T}) where {T <: Real}
-    if iszero(sol)
-        return T(Inf)
-    else
-        return nrms(sol.res)
-    end
-end
-# Normalized Mean Square Error
-function nms(sol::NEOSolution{T, T}) where {T <: Real}
-    if iszero(sol)
-        return T(Inf)
-    else
-        return nms(sol.res)
-    end
+# Chi-square
+chi2(sol::NEOSolution{T, T}) where {T <: Real} = iszero(sol) ? T(Inf) : chi2(sol.res)
+
+# Normalized Mean Square Residual
+nms(sol::NEOSolution{T, T}) where {T <: Real} = iszero(sol) ? T(Inf) : nms(sol.res)
+
+# Normalized Root Mean Square Residual
+nrms(sol::NEOSolution{T, T}) where {T <: Real} = iszero(sol) ? T(Inf) : nrms(sol.res)
+
+@doc raw"""
+    critical_value(sol::NEOSolution{T, T}) where {T <: Real}
+
+Return the chi-square critical value corresponding to `nms(sol)`.
+"""
+function critical_value(sol::NEOSolution{T, T}) where {T <: Real}
+    # Unsuccessful solution
+    iszero(sol) && return one(T)
+    # Chi square distribution with N degrees of freedom
+    N = 2 * notout(sol.res)
+    χ2 = N * nms(sol)
+    d = Chisq(N)
+    # Evaluate cumulative probability at χ2
+    return cdf(d, χ2)
 end
 
 @doc raw"""

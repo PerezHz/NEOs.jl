@@ -93,16 +93,22 @@ end
             propres!(res, od, jd0, q, params; buffer)
             # Least squares fit
             fit = tryls(res, x0, lscache, lsmethods)
-            # Objective function
-            Q = nms(res)
-            # Save results
-            mov[1:6, i] .= fit.x
-            mov[7:10, i] .= ae[1:4] .+ scalings[1:4] .* fit.x[1:4]
-            mov[11:12, i] .= point
-            mov[13, i] = Q(fit.x)
+            if fit.success
+                # Objective function
+                Q = nms(res)
+                # Save results
+                mov[1:6, i] .= fit.x
+                mov[7:10, i] .= ae[1:4] .+ scalings[1:4] .* fit.x[1:4]
+                mov[11:12, i] .= point
+                mov[13, i] = Q(fit.x)
+            else
+                mov[:, i] .= T(Inf)
+            end
         end
+        # Select successful points
+        mask = @. !isinf(mov[13, :])
 
-        return mov
+        return mov[:, mask]
     end
 end
 

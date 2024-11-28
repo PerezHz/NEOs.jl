@@ -14,6 +14,7 @@ using Dates, InteractiveUtils, LazyArtifacts, LinearAlgebra, Printf, JSON,
 using AutoHashEquals.Compat
 using Base: RefValue
 using Dates: epochms2datetime
+using Distributions: Chisq, cdf
 using Downloads: download
 using DelimitedFiles: readdlm
 using HTTP: get
@@ -73,7 +74,7 @@ export pv2kep, yarkp2adot
 export LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
        project, chi2, nms, nrms, leastsquares, leastsquares!, tryls
 # NEOSolution
-export epoch, sigmas, snr, jplcompare, uncertaintyparameter
+export epoch, sigmas, snr, critical_value, jplcompare, uncertaintyparameter
 # Too Short Arc
 export tsaiod
 # Gauss method

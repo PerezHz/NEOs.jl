@@ -21,25 +21,24 @@ Parameters for all orbit determination functions.
 
 - `max_triplets::Int`: maximum number of triplets to check for a solution
     (default: `10`).
-- `gaussorder::Int`: order of the jet transport perturbation (default: `5`).
-- `adamhelp::Bool`: whether to refine Gauss preliminary orbit via ADAM
-    (default: `false`).
-- `gaussQmax::T`: nrms threshold (default: `5.0`).
+- `gaussorder::Int`: order of the jet transport perturbation (default: `6`).
 
 ## Too Short Arc Parameters
 
 - `H_max::T`: maximum absolute magnitude (default: `34.5`).
 - `a_max::T`: maximum semimajor axis (default: `100.0`).
 - `adamiter::Int`: maximum number of iterations for `ADAM` optimizer (default: `200`).
-- `Qtol::T`: target function relative tolerance (default: `0.001`).
+- `adammode::Bool`: whether to perform ADAM iterations with all the observations
+    (default: `true`).
+- `adamQtol::T`: target function relative tolerance (default: `0.001`).
 - `tsaorder::Int`: order of the jet transport perturbation (default: `6`).
-- `tsaQmax::T`: nrms threshold (default: `1.5`).
 
 ## Jet Transport Least Squares Parameters
 
 - `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `5`).
 - `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
 - `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `5`).
+- `significance::T`: chi-square significance level (default: `0.99`).
 
 ## Outlier Rejection Parameters
 
@@ -65,20 +64,19 @@ Parameters for all orbit determination functions.
     eph_ea::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephea()
     # Gauss' Method Parameters
     max_triplets::Int = 10
-    gaussorder::Int = 5
-    adamhelp::Bool = false
-    gaussQmax::T = 5.0
+    gaussorder::Int = 6
     # Too Short Arc Parameters
     H_max::T = 34.5
     a_max::T = 100.0
     adamiter::Int = 200
+    adammode::Bool = true
     adamQtol::T = 0.001
     tsaorder::Int = 6
-    tsaQmax::T = 1.5
     # Jet Transport Least Squares Parameters
     lsiter::Int = 5
     jtlsiter::Int = 5
     jtlsorder::Int = 5
+    significance::T = 0.99
     # Outlier Rejection Parameters
     outrej::Bool = false
     χ2_rec::T = 7.0
