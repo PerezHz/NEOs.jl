@@ -85,6 +85,9 @@ function main()
         # Parse lines
         lines = readlines("tmp.txt")[3:end]
         filter!(!isempty, lines)
+        # Filter used for the sample of NEOs discovered between
+        # June 2024 and November 2024
+        # filter!(l -> Date(2024, 6) < Date(l[184:193], "YYYY mm dd") < Date(2024, 12), lines)
         filter!(l -> isempty(strip(l[1:27])), lines)
         # Parse provisional designations
         provdesig = vcat(provdesig, map(l -> strip(l[28:40]), lines))
