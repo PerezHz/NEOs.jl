@@ -106,7 +106,7 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     # Find attributable elements with smallest Q
     t = argmin(Qs)
 
-    return aes[:, t], Qs[t]
+    return aes[:, 1:t], Qs[1:t]
 end
 
 @doc raw"""
@@ -146,7 +146,8 @@ function tsaiod(od::ODProblem{D, T}, params::NEOParameters{T};
         for j in eachindex(I0)
             # ADAM minimization over manifold of variations
             ρ, v_ρ, scale = I0[j]
-            ae, Q = adam(od, i, A, ρ, v_ρ, params; scale)
+            aes, Qs = adam(od, i, A, ρ, v_ρ, params; scale)
+            ae, Q = aes[:, end], Qs[end]
             # ADAM failed to converge
             isinf(Q) && continue
             # Initial time of integration [julian days]
