@@ -57,9 +57,10 @@ function isunknown(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
     return m == unknownobs()
 end
 
-isground(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :ground
-issatellite(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :satellite
-isoccultation(m::ObservatoryMPC{T}) where {T <: AbstractFloat} = m.type == :occultation
+isground(m::ObservatoryMPC) = m.type == :ground
+issatellite(m::ObservatoryMPC) = m.type == :satellite
+isoccultation(m::ObservatoryMPC)= m.type == :occultation
+isgeocentric(m::ObservatoryMPC) = m.code == "500"
 
 @doc raw"""
     hascoord(m::ObservatoryMPC{T}) where {T <: AbstractFloat}
