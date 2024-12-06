@@ -59,6 +59,9 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     m, _m_ = zeros(T, 2), zeros(T, 2)
     # Second momentum
     n, _n_ = zeros(T, 2), zeros(T, 2)
+    # Detect sawtooth efect (see https://arxiv.org/abs/2410.10056#)
+    Qthreshold = nms_threshold(2*length(res), params.significance)
+    Nsawtooth = 0
     # Gradient descent
     for t in 1:maxiter
         # Current attributable elements (plain)
@@ -85,8 +88,12 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         Q = nms(res)
         Q(x1) < 0 && break
         Qs[t] = Q(x1)
-        # Convergence condition
-        t > 1 && abs(Qs[t] - Qs[t-1]) / Qs[t] < Qtol && break
+        # Convergence conditions
+        if t > 1
+            (Qs[t-1] < Qthreshold < Qs[t]) && (Nsawtooth += 1)
+            Nsawtooth == 2 && break
+            abs(Qs[t] - Qs[t-1]) / Qs[t] < Qtol && break
+        end
         # Gradient of objective function wrt (ρ, v_ρ)
         g_t[1] = differentiate(Q, 5)(x1)
         g_t[2] = differentiate(Q, 6)(x1)
