@@ -81,3 +81,11 @@ function critical_value(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     # Evaluate cumulative probability at χ2
     return cdf(d, χ2)
 end
+
+# NMS threshold
+function nms_threshold(N::Int, significance::T) where {T <: Real}
+    # Chi-square distribution
+    dist = Chisq(N)
+    # Find Q for which cdf(dist, Q) == significance
+    return find_zeros(t -> cdf(dist, t) - significance, 0, 1e6)[1] / N
+end
