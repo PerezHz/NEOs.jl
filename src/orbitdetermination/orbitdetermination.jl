@@ -170,7 +170,11 @@ function isjtlsfit(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         At0 = dtutc2days(A.date)
         q0 = eph(At0)
         ρ, v_ρ = bary2topo(A, q0)
-        mask[i] = (ρ, v_ρ) in A
+        ρmin, ρmax = A.ρ_domain
+        c1 = (isnan(od.tracklets[i].mag) ? R_EA : ρmin) ≤ ρ ≤ ρmax
+        y_range = rangerates(A, ρ, :outer)
+        c2 = (length(y_range) == 2) && (y_range[1] ≤ v_ρ ≤ y_range[2])
+        mask[i] = c1 && c2
     end
     all(mask) || return false
     # Check that orbit stays out of Earth's radius
@@ -240,6 +244,9 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         !fit.success && break
         # Incrementally add observations to fit
         rin, fit = addradec!(Val(mode), rin, fit, tin, tout, res, x0, params)
+        # Residuals space to barycentric coordinates jacobian
+        J = Matrix(TS.jacobian(dq, fit.x))
+        all(diag(J * fit.Γ * J') .> 0) || break
         # Outlier rejection
         if params.outrej
             outlier_rejection!(view(res, rin), fit.x, fit.Γ, orcache;
@@ -248,7 +255,6 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         end
         # Update solution
         Qs[i] = nrms(res, fit)
-        J = Matrix(TS.jacobian(dq, fit.x))
         sols[i] = evalfit(NEOSolution(tin, bwd, fwd, res[rin], fit, J))
         if params.outrej
             outs[i] = notout(res)
