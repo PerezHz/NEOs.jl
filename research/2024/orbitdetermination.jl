@@ -139,6 +139,8 @@ end
 end
 
 function main()
+    # Initial time
+    init_time = now()
     # Parse arguments from commandline
     parsed_args = parse_commandline()
     # Input names file
@@ -162,6 +164,10 @@ function main()
     # Distributed orbit determination
     mask = pmap(iod, neos, filenames; on_error = ex -> false)
     println("• ", count(mask), " / ", length(neos), " successful NEOs")
+
+    # Final time
+    final_time = now()
+    println("• Run started ", init_time, " and finished ", final_time)
 
     return nothing
 end
