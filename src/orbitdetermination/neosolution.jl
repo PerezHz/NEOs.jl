@@ -203,7 +203,7 @@ sigmas(sol::NEOSolution{T, T}) where {T <: Real} = sqrt.(diag(sol.jacobian * sol
 Return `sol`'s initial condition signal-to-noise ratios in barycentric cartesian coordinates.
 """
 snr(sol::NEOSolution{T, T}) where {T <: Real} =
-    iszero(sol) ? fill(T(Inf), 6) : abs.(sol()) ./ sigmas(sol)
+    iszero(sol) ? zeros(T, 6) : abs.(sol()) ./ sigmas(sol)
 
 @doc raw"""
     minmaxdates(sol::NEOSolution{T, U}) where {T <: Real, U <: Number}

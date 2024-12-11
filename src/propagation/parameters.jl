@@ -19,8 +19,8 @@ Parameters for all orbit determination functions.
 
 ## Gauss Method Parameters
 
-- `max_triplets::Int`: maximum number of triplets to check for a solution
-    (default: `10`).
+- `safegauss::Bool`: whether to try Gauss Method only when exactly three tracklets
+    are available (default: `true`).
 - `gaussorder::Int`: order of the jet transport perturbation (default: `6`).
 
 ## Too Short Arc Parameters
@@ -63,7 +63,7 @@ Parameters for all orbit determination functions.
     eph_su::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephsu()
     eph_ea::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephea()
     # Gauss' Method Parameters
-    max_triplets::Int = 10
+    safegauss::Bool = true
     gaussorder::Int = 6
     # Too Short Arc Parameters
     H_max::T = 34.5

@@ -360,9 +360,8 @@ function numberofdays(tracklets::AbstractVector{Tracklet{T}}) where {T <: Real}
     return (tf - t0).value / 86_400_000
 end
 
-# Given a vector of three `tracklets`, update `observatories`, `dates`,
-# `α` and `δ` with the best combination of three observations for Gauss'
-# method. See the line after equation (27) of
+# Update `observatories`, `dates`, `α` and `δ` with the best combination of
+# three observations for Gauss' method. See the line after equation (27) of
 # https://doi.org/10.1016/j.icarus.2007.11.033
 function _gausstriplet!(observatories::Vector{ObservatoryMPC{T}},
     dates::Vector{DateTime}, α::Vector{T}, δ::Vector{T},
@@ -373,12 +372,12 @@ function _gausstriplet!(observatories::Vector{ObservatoryMPC{T}},
     CI = CartesianIndices((a.nobs, b.nobs, c.nobs))
     # Allocate memory
     triplet = [0, 0, 0]
-    τ = Inf
+    τ = typemax(Int)
     # Check all possible triplets of indices
     for ci in CI
         # Unfold indices
         i, j, k = ci.I
-        # Absolute difference between τ1 and τ3
+        # Minimize asymmetry
         τ1 = (b.radec[j].date - a.radec[i].date).value
         τ3 = (c.radec[k].date - b.radec[j].date).value
         _τ_ = abs(τ3 - τ1)
@@ -395,6 +394,42 @@ function _gausstriplet!(observatories::Vector{ObservatoryMPC{T}},
     dates .= a.radec[i].date, b.radec[j].date, c.radec[k].date
     α .= a.radec[i].α, b.radec[j].α, c.radec[k].α
     δ .= a.radec[i].δ, b.radec[j].δ, c.radec[k].δ
+    # Sort triplet
+    idxs = sortperm(dates)
+    permute!(observatories, idxs)
+    permute!(dates, idxs)
+    permute!(α, idxs)
+    permute!(δ, idxs)
+
+    return nothing
+end
+
+function _gausstriplet!(observatories::Vector{ObservatoryMPC{T}},
+    dates::Vector{DateTime}, α::Vector{T}, δ::Vector{T},
+    radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+    # Allocate memory
+    triplet = [0, 0, 0]
+    τa, τb = 0, typemax(Int)
+    # Check all possible triplets of indices
+    L = length(radec)
+    for i in 1:L-2, j in i+1:L-1, k in j+1:L
+        # Maximize timespan and minimize asymmetry
+        τ1 = (radec[j].date - radec[i].date).value
+        τ3 = (radec[k].date - radec[j].date).value
+        _τa_, _τb_ = abs(τ1) + abs(τ3), abs(τ3 - τ1)
+        # Update triplet and τ
+        if _τa_ > τa || (_τa_ == τa && _τb_ < τb)
+            triplet .= i, j, k
+            τa, τb = _τa_, _τb_
+        end
+    end
+    # Unfold triplet
+    i, j, k = triplet
+    # Update observatories, dates, α and δ
+    @. observatories = observatory(radec[triplet])
+    @. dates = date(radec[triplet])
+    @. α = ra(radec[triplet])
+    @. δ = dec(radec[triplet])
     # Sort triplet
     idxs = sortperm(dates)
     permute!(observatories, idxs)
@@ -455,19 +490,26 @@ See also [`gauss_method`](@ref).
 function gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: Real}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
+    # Unfold parameters
+    safegauss, varorder, significance = params.safegauss, params.gaussorder,
+        params.significance
     # This function requires exactly 3 tracklets
-    length(od.tracklets) != 3 && return sol
+    (safegauss && length(od.tracklets) != 3) && return sol
     # Jet transport scaling factors
     scalings = fill(1e-6, 6)
     # Jet transport perturbation (ra/dec)
-    dq = [scalings[i] * TaylorN(i, order = params.gaussorder) for i in 1:6]
+    dq = [scalings[i] * TaylorN(i, order = varorder) for i in 1:6]
     # gauss_method input
     observatories = Vector{ObservatoryMPC{T}}(undef, 3)
     dates = Vector{DateTime}(undef, 3)
     α = Vector{T}(undef, 3)
     δ = Vector{T}(undef, 3)
     # Find best triplet of observations
-    _gausstriplet!(observatories, dates, α, δ, od.tracklets)
+    if safegauss
+        _gausstriplet!(observatories, dates, α, δ, od.tracklets)
+    else
+        _gausstriplet!(observatories, dates, α, δ, od.radec)
+    end
     # Julian day of middle observation
     _jd0_ = dtutc2jdtdb(dates[2])
     # Gauss method solution
@@ -487,16 +529,17 @@ function gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: 
         # Update solution
         sol = updatesol(sol, _sol_, od.radec)
         # Termination condition
-        critical_value(sol) < params.significance && return sol
+        critical_value(sol) < significance && return sol
         # ADAM help
-        od.tracklets[2].nobs < 2 && continue
-        jd0 = _adam!(od, 2, q, jd0, params)
+        j = safegauss ? 2 : findfirst(@. dates[2] in od.tracklets)
+        nobs(od.tracklets[j]) < 2 && continue
+        jd0 = _adam!(od, j, q, jd0, params)
         # Jet Transport Least Squares
         _sol_ = jtls(od, jd0, q, od.tracklets, params, true)
         # Update solution
         sol = updatesol(sol, _sol_, od.radec)
         # Termination condition
-        critical_value(sol) < params.significance && return sol
+        critical_value(sol) < significance && return sol
     end
 
     return sol

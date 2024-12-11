@@ -51,6 +51,9 @@ indices(x::Tracklet) = x.indices
 indices(x::AbstractVector{Tracklet{T}}) where {T <: AbstractFloat} =
     sort!(reduce(vcat, indices.(x)))
 
+# Check if any observation in `t` has time `date`
+in(d::DateTime, t::Tracklet{T}) where {T <: Real} = d in date.(t.radec)
+
 # Print method for Tracklet{T}
 # Examples:
 # 3 observation tracklet around 2023-11-18T19:59:55.392 at WFST, Lenghu
