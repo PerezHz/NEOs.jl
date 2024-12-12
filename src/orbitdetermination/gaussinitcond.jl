@@ -453,11 +453,7 @@ function _adam!(od::ODProblem{D, T}, i::Int, q::Vector{TaylorN{T}}, jd0::T,
     # Epoch [days since J2000]
     At0 = dtutc2days(A.date)
     # Barycentric cartesian initial condition
-    if At0 <= jd0 - JD_J2000
-        q0 = bwd(At0)
-    else
-        q0 = fwd(At0)
-    end
+    q0 = bwdfwdeph(At0, bwd, fwd, false, false)
     # Range and range rate
     ρ, v_ρ = bary2topo(A, q0)
     # Boundary projection

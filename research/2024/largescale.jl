@@ -198,17 +198,17 @@ function main()
         framestyle = :box, yminorgrid = true, xminorgrid = true,
         margin = 0.5Measures.mm, dpi = 300, legend = true)
     # NRMS histogram
-    filename1, filename2 = joinpath(input1, "QHIST.png"), joinpath(input2, "QHIST.png")
+    filename1, filename2 = joinpath(input1, "QHIST.pdf"), joinpath(input2, "QHIST.pdf")
     qhist(Q1, mask1, filename1; ymax = 600.0, ysub = 550.0, sub = "(a)")
     qhist(Q2, mask2, filename2; ymax = 200.0, ysub = 182.5, sub = "(b)")
     println("• Saved NRMS histograms to: \n", filename1, "\n", filename2)
     # SNR histogram
-    filename1, filename2 = joinpath(input1, "SHIST.png"), joinpath(input2, "SHIST.png")
+    filename1, filename2 = joinpath(input1, "SHIST.pdf"), joinpath(input2, "SHIST.pdf")
     shist(S1, mask1, filename1; ymax = 450.0, ysub = 425.0, sub = "(a)")
     shist(S2, mask2, filename2; ymax = 150.0, ysub = 142.5, sub = "(b)")
     println("• Saved SNR histograms to: \n", filename1, "\n", filename2)
     # Residuals marginal histograms
-    filename1, filename2 = joinpath(input1, "RHIST.png"), joinpath(input2, "RHIST.png")
+    filename1, filename2 = joinpath(input1, "RHIST.pdf"), joinpath(input2, "RHIST.pdf")
     neosmarginalhist(αs1, δs1, filename1;
         sub = "(a)", rmax = 6.0, hmax = 30_000.0, bins = -6:0.4:6,
         sticks = -6.0:2.0:6.0, hticks = 6_000:6_000:30_000,
@@ -216,7 +216,7 @@ function main()
     neosmarginalhist(αs2, δs2, filename2;
         sub = "(b)", rmax = 5.0, hmax = 10_000.0, bins = -5:0.5:5,
         sticks = -5.0:2.5:5.0, hticks = 2_000:2_000:10_000,
-        slabel = [-3, 3, -4.5, 10_850, 11_600, -4.75])
+        slabel = [-4, 4.15, -4.5, 10_850, 11_600, -4.75])
     println("• Saved residuals marginal histograms to: \n", filename1, "\n", filename2)
 
     # Final time
