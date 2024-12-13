@@ -157,8 +157,11 @@ function adamplot(A::AdmissibleRegion{T}, aes::Matrix{T}, mov::Matrix{T},
     plot!(A, boundary = :inner, N = 10_000, ρscale = scale, color = :black,
         label = "", linewidth = 2)
     xs = scale == :log ? log10.(aes[5, :]) : aes[5, :]
-    scatter!(xs, aes[6, :], markersize = 4, color = :white,
-        markerstrokecolor = :black, label = "")
+    shapes, sizes = fill(:circle, length(xs)), fill(4.0, length(xs))
+    shapes[1], shapes[end] = :star5, :square
+    sizes[1], sizes[end] = 5.5, 4.5
+    scatter!(xs, aes[6, :], markersize = sizes, color = :white,
+        markershape = shapes, markerstrokecolor = :black, label = "")
     if !isnothing(bounds)
         xlims!(bounds[1], bounds[2])
         ylims!(bounds[3], bounds[4])
