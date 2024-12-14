@@ -2,7 +2,8 @@
 # This function is a multithreaded version of
 # https://github.com/PerezHz/PlanetaryEphemeris.jl/blob/ed36a2f6e34567a14887cf2811ec7787f124f062/src/interpolation/TaylorInterpolant.jl#L147
 # TO DO: move this to PlanetaryEphemeris.jl
-function tpeeval(tinterp::TaylorInterpolant{T, U, 2}, t::TT) where {T, U, TT <: TaylorInterpCallingArgs{T, U}}
+function tpeeval(tinterp::TaylorInterpolant{T, U, 2}, t::TT) where {T, U,
+    TT <: TaylorInterpCallingArgs{T, U}}
     # Get index of tinterp.x that interpolates at time t
     ind::Int, δt::TT = getinterpindex(tinterp, t)
     # Evaluate tinterp.x[ind] at δt
@@ -21,6 +22,30 @@ end
 
 function evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T<:Real}
     return one(q)*eph(t)
+end
+
+# In-place methods of evaleph
+function evaleph!(y::Vector{Taylor1{TaylorN{T}}}, eph::TaylorInterpolant{T, T, 2},
+    t::Taylor1{T}) where {T <: Real}
+    eph_t = tpeeval(eph, t)
+    @inbounds for i in eachindex(eph_t)
+        TS.zero!(y[i])
+        for k in eachindex(y[i])
+            y[i][k][0][1] = eph_t[i][k]
+        end
+    end
+    return nothing
+end
+
+function evaleph!(y::Vector{Taylor1{T}}, eph::TaylorInterpolant{T, T, 2},
+    t::Taylor1{T}) where {T <: Real}
+    eph_t = tpeeval(eph, t)
+    @inbounds for i in eachindex(eph_t)
+        for k in eachindex(y[i])
+            TS.identity!(y[i], eph_t[i], k)
+        end
+    end
+    return nothing
 end
 
 @doc raw"""
@@ -95,7 +120,8 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
+    local ss16asteph_t = params.ssepht
+    evaleph!(ss16asteph_t, params.sseph, dsj2k)
     # Accelerations at dsj2k
     local acceph_t = evaleph(params.acceph, dsj2k, q[1])
     # Newtonian potentials at dsj2k
@@ -669,7 +695,8 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
+    local ss16asteph_t = params.ssepht
+    evaleph!(ss16asteph_t, params.sseph, dsj2k)
     # Accelerations at dsj2k
     local acceph_t = evaleph(params.acceph, dsj2k, q[1])
     # Newtonian potentials at dsj2k
@@ -1205,7 +1232,8 @@ function newtonian!(dq, q, params, t)
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
+    local ss16asteph_t = params.ssepht
+    evaleph!(ss16asteph_t, params.sseph, dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
     # Number of bodies, including NEA

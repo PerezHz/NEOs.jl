@@ -15,7 +15,8 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_ng_ep
     order = t.order
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
-    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
+    local ss16asteph_t = params.ssepht
+    evaleph!(ss16asteph_t, params.sseph, dsj2k)
     local acceph_t = evaleph(params.acceph, dsj2k, q[1])
     local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
     local S = eltype(q)
@@ -1004,7 +1005,8 @@ function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
     sumpnz = __ralloc.v1[183]
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
-    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
+    local ss16asteph_t = params.ssepht
+    evaleph!(ss16asteph_t, params.sseph, dsj2k)
     local acceph_t = evaleph(params.acceph, dsj2k, q[1])
     local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
     local S = eltype(q)
@@ -1304,7 +1306,8 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_t
     order = t.order
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
-    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
+    local ss16asteph_t = params.ssepht
+    evaleph!(ss16asteph_t, params.sseph, dsj2k)
     local acceph_t = evaleph(params.acceph, dsj2k, q[1])
     local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
     local S = eltype(q)
@@ -2189,7 +2192,8 @@ function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, 
     sumpnz = __ralloc.v1[183]
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
-    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
+    local ss16asteph_t = params.ssepht
+    evaleph!(ss16asteph_t, params.sseph, dsj2k)
     local acceph_t = evaleph(params.acceph, dsj2k, q[1])
     local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
     local S = eltype(q)
@@ -2439,7 +2443,8 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T
     order = t.order
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
-    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
+    local ss16asteph_t = params.ssepht
+    evaleph!(ss16asteph_t, params.sseph, dsj2k)
     local S = eltype(q)
     local N = 10
     local Nm1 = N - 1
@@ -2556,7 +2561,8 @@ function TaylorIntegration.jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T}, q::Abst
     tmp1566 = __ralloc.v1[20]
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
-    local ss16asteph_t = evaleph(params.sseph, dsj2k, q[1])
+    local ss16asteph_t = params.ssepht
+    evaleph!(ss16asteph_t, params.sseph, dsj2k)
     local S = eltype(q)
     local N = 10
     local Nm1 = N - 1

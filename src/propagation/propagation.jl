@@ -2,8 +2,9 @@ include("asteroid_dynamical_models.jl")
 include("jetcoeffs.jl")
 include("parameters.jl")
 
-mutable struct DynamicalParameters{T <: Real, V <: Number}
+mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
     sseph::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}
+    ssepht::Vector{Taylor1{U}}
     acceph::Union{Nothing, TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}}
     poteph::Union{Nothing, TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}}
     jd0::V
@@ -18,7 +19,7 @@ struct PropagationBuffer{T <: Real, U <: Number, V <: Number}
     dx::Vector{Taylor1{U}}
     q0::Vector{U}
     rv::RetAlloc{Taylor1{U}}
-    params::DynamicalParameters{T, V}
+    params::DynamicalParameters{T, U, V}
 end
 
 @doc raw"""
@@ -54,6 +55,7 @@ function PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U}
     days_0, days_f = minmax(tlim[1], tlim[2])
     # Load Solar System ephemeris [au, au/day]
     _sseph = convert(T, loadpeeph(sseph, days_0, days_f))
+    _ssepht = [zero(x[1]) for _ in axes(_sseph.x, 2)]
     # Number of massive bodies
     Nm1 = numberofbodies(_sseph)
     # Number of bodies, including NEA
@@ -75,7 +77,7 @@ function PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U}
         UJ_interaction[ea] = true
     end
     # Dynamical parameters for `propagate`
-    _params = DynamicalParameters{T, V}(_sseph, _acceph, _poteph, jd0, UJ_interaction, N, μ)
+    _params = DynamicalParameters{T, U, V}(_sseph, _ssepht, _acceph, _poteph, jd0, UJ_interaction, N, μ)
     # Determine if specialized jetcoeffs! method exists
     _, rv = _determine_parsing!(true, dynamics, t, x, dx, _params)
 
