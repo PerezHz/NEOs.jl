@@ -89,7 +89,7 @@ end
             adamiter = 500, adamQtol = 1e-5,                       # ADAM
             jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
             outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
-            fudge = 400.0, max_per = 20.0
+            fudge = 100.0, max_per = 20.0
         )
         params[2] = NEOParameters(params[1];
             coeffstol = 10.0, adamiter = 200, adamQtol = 0.01,

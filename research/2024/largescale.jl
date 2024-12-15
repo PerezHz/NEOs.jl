@@ -128,6 +128,8 @@ function main()
     C1, C2 = @. critical_value(sols1), critical_value(sols2)
     # SNR
     S1, S2 = @. minimum(snr(sols1)), minimum(snr(sols2))
+    # Minimization routines
+    R1, R2 = map(s -> s.fit.routine, sols1), map(s -> s.fit.routine, sols2)
     # NEOs that converged within 0.99 confidence
     mask1 = @. (C1 ≤ 0.99) && !isinf(S1)
     mask2 = @. (C2 ≤ 0.99) && !isinf(S2)
@@ -174,6 +176,20 @@ function main()
     println("On average, the observations used in sample 2 span a time of ",
         m2, " days for the NEOs under 99% confidence, but only ", m2S,
         " days for the NEOs with a minimal SNR smaller than 1")
+    # Minimization routines
+    fs1 = countmap(R1[mask1])
+    n1 = @sprintf("%.2f", (fs1[Symbol("Newton")]*100/count(mask1)))
+    d1 = @sprintf("%.2f", (fs1[Symbol("Differential Corrections")]*100/count(mask1)))
+    l1 = @sprintf("%.2f", (fs1[Symbol("Levenberg-Marquardt")]*100/count(mask1)))
+    fs2 = countmap(R2[mask2])
+    n2 = @sprintf("%.2f", (fs2[Symbol("Newton")]*100/count(mask2)))
+    d2 = @sprintf("%.2f", (fs2[Symbol("Differential Corrections")]*100/count(mask2)))
+    l2 = @sprintf("%.2f", (fs2[Symbol("Levenberg-Marquardt")]*100/count(mask2)))
+    println("• Minimization routines statistics: ")
+    println("Sample 1: Newton (", n1, "%), Differential Corrections (",
+        d1, "%) and Levenberg-Marquardt (", l1, "%)")
+    println("Sample 2: Newton (", n2, "%), Differential Corrections (",
+        d2, "%) and Levenberg-Marquardt (", l2, "%)")
     # Residuals statistics
     println("• Residuals statistics: ")
     pretty_table(
