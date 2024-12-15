@@ -643,7 +643,7 @@ end
         @test uncertaintyparameter(od, sol1, params) == 5
     end
 
-    @testset "scripts/orbitdetermination.jl" begin
+    @testset "research/2024/orbitdetermination.jl" begin
         using NEOs: iodinitcond, issatellite
 
         function radecfilter(radec::Vector{RadecMPC{T}}) where {T <: Real}
@@ -680,10 +680,11 @@ end
         # Parameters
         params = NEOParameters(
             coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
+            safegauss = true, refscale = :log,                     # Gauss method
             adamiter = 500, adamQtol = 1e-5,                       # ADAM
             jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
             outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
-            fudge = 400.0, max_per = 20.0
+            fudge = 100.0, max_per = 20.0
         )
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)

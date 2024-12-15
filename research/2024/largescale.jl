@@ -226,13 +226,13 @@ function main()
     # Residuals marginal histograms
     filename1, filename2 = joinpath(input1, "RHIST.pdf"), joinpath(input2, "RHIST.pdf")
     neosmarginalhist(αs1, δs1, filename1;
-        sub = "(a)", rmax = 6.0, hmax = 30_000.0, bins = -6:0.4:6,
-        sticks = -6.0:2.0:6.0, hticks = 6_000:6_000:30_000,
-        slabel = [-5, 5, -5.5, 32_500, 35_000, -5.75])
+        sub = "(a)", rmax = 6.0, hmax = 20_000.0, bins = -6:0.2:6,
+        sticks = -6.0:2.0:6.0, hticks = 5_000:5_000:20_000,
+        slabel = [-5, 5, -5.5, 21_650, 23_250, -5.75])
     neosmarginalhist(αs2, δs2, filename2;
-        sub = "(b)", rmax = 5.0, hmax = 10_000.0, bins = -5:0.5:5,
-        sticks = -5.0:2.5:5.0, hticks = 2_000:2_000:10_000,
-        slabel = [-4, 4.15, -4.5, 10_850, 11_600, -4.75])
+        sub = "(b)", rmax = 5.0, hmax = 8_000.0, bins = -5:0.25:5,
+        sticks = -5.0:2.5:5.0, hticks = 2_000:2_000:8_000,
+        slabel = [-4, 4.15, -4.5, 8_650, 9_350, -4.75])
     println("• Saved residuals marginal histograms to: \n", filename1, "\n", filename2)
 
     # Final time

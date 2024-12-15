@@ -459,7 +459,7 @@ function _adam!(od::ODProblem{D, T}, i::Int, q::Vector{TaylorN{T}}, jd0::T,
     # Boundary projection
     ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
     # ADAM
-    aes, Qs = adam(od, i, A, ρ, v_ρ, params; scale = :log)
+    aes, Qs = adam(od, i, A, ρ, v_ρ, params; scale = params.refscale)
     ae, Q = aes[:, end], Qs[end]
     # Epoch [julian days] (corrected for light-time)
     jd0 = dtutc2jdtdb(A.date) - ae[5] / c_au_per_day
