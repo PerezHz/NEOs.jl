@@ -234,8 +234,7 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         # Initial conditions
         q = q0 + dq
         # Decide whether q is suitable for jtls
-        start = isjtlsfit(od, jd0, q, params)
-        start || break
+        params.jtlsmask && isjtlsfit(od, jd0, q, params) || break
         # Propagation & residuals
         bwd, fwd = propres!(res, od, jd0, q, params; buffer)
         iszero(length(res)) && break

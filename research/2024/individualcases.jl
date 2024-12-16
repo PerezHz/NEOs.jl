@@ -82,7 +82,7 @@ function neo2024PDC25(filename::String)
         adamiter = 500, adamQtol = 1e-5,                       # ADAM
         jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
         outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
-        fudge = 400.0, max_per = 20.0
+        fudge = 100.0, max_per = 20.0
     )
     od = ODProblem(newtonian!, radec[1:6], UniformWeights)
     od.w8s.w8s .= 0.2
@@ -179,7 +179,7 @@ function neo2014AA(filename::String)
         adamiter = 500, adamQtol = 1e-5,                       # ADAM
         jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
         outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
-        fudge = 400.0, max_per = 20.0
+        fudge = 100.0, max_per = 20.0
     )
     od = ODProblem(newtonian!, radec)
     # Declare jet transport variables
@@ -205,19 +205,23 @@ function neo2014AA(filename::String)
     println("Distance to JPL's orbit in units of the maximum uncertainty: ",
         dist2jpl, "σ")
     # Table of osculating elements
-    t = epoch(sol)
+    jd0 = epoch(sol) + J2000
     q0 .= sol()
     q .= [q0[k] + (abs(q0[k]) / 10^5) * TaylorN(k, order = varorder) for k in 1:6]
-    osc = pv2kep(q - params.eph_su(t); jd = t + J2000, frame = :ecliptic)
+    params = NEOParameters(params; bwdoffset = 0.5)
+    bwd, _, _ = propres(od, jd0, q, params)
+    jd0, t = 2456658.5, 2456658.5 - J2000
+    osc = pv2kep(bwd(t) - params.eph_su(t); jd = jd0, frame = :ecliptic)
     ele = [osc.a, osc.e, osc.i, osc.Ω, osc.ω, osc.M + 360]
     Γ_E = project(ele, sol.fit)
     σ_E = sqrt.(diag(Γ_E))
-    ss = [@sprintf("%.2f", cte(e[1])) * " ± " * @sprintf("%.2f", e[2]) for e in zip(ele, σ_E)]
-    jplele = [1.163565938981179, 2.128090019677558e-1, 1.423534633215789,
-        1.016022497979083e2, 5.237751207097402e1, 3.243415033199261e2]
-    jplss = [@sprintf("%.2f", e) for e in jplele]
+    ss = [@sprintf("%.3f", cte(e[1])) * " ± " * @sprintf("%.3f", e[2]) for e in zip(ele, σ_E)]
+    jplele = [1.161570914329746, 0.210903385513902, 1.4109467942359,
+        101.613014674528, 52.3157504212017, 324.0051879996831]
+    jplsig = [0.0042653, 0.0042378, 0.029249, 0.0096696, 0.19112, 0.18696]
+    jplss = [@sprintf("%.3f", e[1]) * " ± " * @sprintf("%.3f", e[2]) for e in zip(jplele, jplsig)]
     println("Comparison of the orbital elements obtained for 2014 AA at epoch ",
-        @sprintf("%.2f", epoch(sol) + J2000), " JD using ADAM-JT with the JPL ",
+        @sprintf("%.2f", jd0), " JD using ADAM-JT with the JPL ",
         " result (Farnocchia et al., 2016):")
     pretty_table(
     [
@@ -244,7 +248,7 @@ function neo2020CV1(filename::String)
         adamiter = 500, adamQtol = 1e-5,                       # ADAM
         jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
         outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
-        fudge = 400.0, max_per = 20.0
+        fudge = 100.0, max_per = 20.0
     )
     od = ODProblem(newtonian!, radec[7:end])
     # Declare jet transport variables
@@ -286,7 +290,7 @@ function neo2024MK(filename::String)
         adamiter = 500, adamQtol = 1e-5,                       # ADAM
         jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
         outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
-        fudge = 400.0, max_per = 20.0
+        fudge = 100.0, max_per = 20.0
     )
     od = ODProblem(newtonian!, radec[10:21])
     # Declare jet transport variables

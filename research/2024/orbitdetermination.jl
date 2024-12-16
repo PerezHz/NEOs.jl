@@ -83,23 +83,31 @@ end
 
     function ioditer()
         # Parameters
-        params = Vector{NEOParameters{Float64}}(undef, 2)
-        params[1] = NEOParameters(
+        params1 = NEOParameters(
             coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
             safegauss = true, refscale = :log,                     # Gauss method
-            adamiter = 500, adamQtol = 1e-5,                       # ADAM
-            jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
-            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
-            fudge = 100.0, max_per = 20.0
+            adammode = true, adamiter = 500, adamQtol = 1e-5,      # ADAM
+            jtlsmask = true, jtlsiter = 20, lsiter = 10,           # Jet Transport Least Squares
+            significance = 0.99, outrej = true, χ2_rec = 7.0,      # Outlier rejection
+            χ2_rej = 8.0, fudge = 100.0, max_per = 20.0
         )
-        params[2] = NEOParameters(params[1];
-            coeffstol = 10.0, safegauss = false, adamiter = 200,
-            adamQtol = 0.01, lsiter = 5
-        )
-        # Naive initial conditions
-        initcond = [initcond1, initcond2]
+        params2 = NEOParameters(params1; coeffstol = 10.0, safegauss = false,
+            adamiter = 200, adamQtol = 0.01, lsiter = 5)
+        params3 = NEOParameters(params1; refscale = :linear)
+        params4 = NEOParameters(params2; refscale = :linear)
+        params5 = NEOParameters(params1; adammode = false, jtlsmask = false,
+            fudge = 0.0, max_per = 34.0)
         # Initial orbit determination iterator
-        return enumerate(Iterators.product(params, initcond))
+        return enumerate([
+            (params1, initcond1),
+            (params2, initcond1),
+            (params3, initcond2),
+            (params4, initcond2),
+            (params5, initcond1),
+            (params5, initcond2),
+
+        ])
+        enumerate(Iterators.product(params, initcond))
     end
 
     # Initial orbit determination routine
@@ -112,7 +120,7 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
         # Pre-allocate solutions
-        sols = [zero(NEOSolution{Float64, Float64}) for _ in 1:4]
+        sols = [zero(NEOSolution{Float64, Float64}) for _ in 1:6]
         # Start of computation
         init_time = now()
         # Initial orbit determination cycle
