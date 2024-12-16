@@ -95,8 +95,7 @@ end
             adamiter = 200, adamQtol = 0.01, lsiter = 5)
         params3 = NEOParameters(params1; refscale = :linear)
         params4 = NEOParameters(params2; refscale = :linear)
-        params5 = NEOParameters(params1; adammode = false, jtlsmask = false,
-            fudge = 0.0, max_per = 34.0)
+        params5 = NEOParameters(params1; adammode = false, jtlsmask = false)
         # Initial orbit determination iterator
         return enumerate([
             (params1, initcond1),
@@ -104,10 +103,8 @@ end
             (params3, initcond2),
             (params4, initcond2),
             (params5, initcond1),
-            (params5, initcond2),
-
+            (params5, initcond2)
         ])
-        enumerate(Iterators.product(params, initcond))
     end
 
     # Initial orbit determination routine
