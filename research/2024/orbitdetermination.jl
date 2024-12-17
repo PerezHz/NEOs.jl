@@ -151,13 +151,14 @@ end
         end
         # Stage 2: fit a subset of the considered astrometry
         for (i, j) in enumerate(iter)
-            subfit!(od) || break
             # Unfold
             params, initcond = j
             # Initial orbit determination
+            subfit!(od) || break
             sols[i+4] = orbitdetermination(od, params; initcond)
-            # Add remaining observations
             NEOs.update!(od, radec)
+            # Add remaining observations
+            iszero(sols[i+4]) && continue
             sols[i+4] = orbitdetermination(od, sols[i+4], params)
             # Termination condition
             if length(sols[i+4].res) == length(radec) &&
