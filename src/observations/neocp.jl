@@ -70,9 +70,9 @@ function NEOCPObject(dict::Dict{String, Any})
     year = Int(dict["Discovery_year"])
     month = Int(dict["Discovery_month"])
     day = Float64(dict["Discovery_day"])
-    day_i = floor(Int, day)
+    day_i = clamp(floor(Int, day), 1, daysinmonth(Date(year, month)))
     utc = day - day_i
-    date = DateTime(year, month, day_i) + Microsecond( round(1e6*86_400*utc) )
+    date = DateTime(year, month, day_i) + Microsecond( round(1e6*daysec*utc) )
     # Right ascension [rad]
     α = deg2rad(Float64(dict["R.A."]) * 15)
     # Declination [rad]
