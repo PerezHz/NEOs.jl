@@ -188,6 +188,8 @@ end
                 return true
             end
         end
+        # Time of computation
+        Δ = (now() - init_time).value
         # Select complete solutions
         mask = findall(s -> length(s.res) == length(radec), sols)
         isempty(mask) && return false
