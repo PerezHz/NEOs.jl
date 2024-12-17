@@ -1,5 +1,5 @@
 @doc raw"""
-    Tracklet{T <: AbstractFloat}
+    Tracklet{T <: Real}
 
 A set of optical observations taken by the same observatory on the same night.
 
@@ -17,7 +17,7 @@ A set of optical observations taken by the same observatory on the same night.
 - `nobs::Int`: number of observations.
 - `idxs::Vector{Int}`: indices of original `radec` that entered the tracklet.
 """
-@auto_hash_equals struct Tracklet{T <: AbstractFloat}
+@auto_hash_equals fields = (radec,) struct Tracklet{T <: Real}
     radec::Vector{RadecMPC{T}}
     observatory::ObservatoryMPC{T}
     night::TimeOfDay
@@ -32,7 +32,7 @@ A set of optical observations taken by the same observatory on the same night.
     # Inner constructor
     function Tracklet{T}(radec::Vector{RadecMPC{T}}, observatory::ObservatoryMPC{T},
                                  night::TimeOfDay, date::DateTime, α::T, δ::T, v_α::T, v_δ::T,
-                                 mag::T, nobs::Int, indices::Vector{Int}) where {T <: AbstractFloat}
+                                 mag::T, nobs::Int, indices::Vector{Int}) where {T <: Real}
 
         return new{T}(radec, observatory, night, date, α, δ, v_α, v_δ, mag, nobs, indices)
     end
@@ -48,8 +48,11 @@ vdec(x::Tracklet) = x.v_δ
 mag(x::Tracklet) = x.mag
 nobs(x::Tracklet) = x.nobs
 indices(x::Tracklet) = x.indices
-indices(x::AbstractVector{Tracklet{T}}) where {T <: AbstractFloat} =
+indices(x::AbstractVector{Tracklet{T}}) where {T <: Real} =
     sort!(reduce(vcat, indices.(x)))
+astrometry(x::Tracklet) = x.radec
+astrometry(x::AbstractVector{Tracklet{T}}) where {T <: Real} =
+    sort!(reduce(vcat, astrometry.(x)))
 
 # Check if any observation in `t` has time `date`
 in(d::DateTime, t::Tracklet{T}) where {T <: Real} = d in date.(t.radec)
@@ -58,12 +61,15 @@ in(d::DateTime, t::Tracklet{T}) where {T <: Real} = d in date.(t.radec)
 # Examples:
 # 3 observation tracklet around 2023-11-18T19:59:55.392 at WFST, Lenghu
 # 4 observation tracklet around 2023-11-22T08:07:46.336 at Mt. Lemmon Survey
-function show(io::IO, x::Tracklet{T}) where {T <: AbstractFloat}
+function show(io::IO, x::Tracklet{T}) where {T <: Real}
     print(io, x.nobs, " observation tracklet around ", x.date, " at ", x.observatory.name)
 end
 
 # Order in Tracklet is given by date
-isless(a::Tracklet{T}, b::Tracklet{T}) where {T <: AbstractFloat} = a.date < b.date
+isless(a::Tracklet{T}, b::Tracklet{T}) where {T <: Real} = a.date < b.date
+
+# Return the milliseconds between b.date and a.date
+datediff(a::Tracklet{T}, b::Tracklet{T}) where {T <: Real} = (date(a) - date(b)).value
 
 # Evaluate a polynomial with coefficients p in every element of x
 polymodel(x, p) = map(y -> evalpoly(y, p), x)
@@ -72,12 +78,12 @@ polymodel(x, p) = map(y -> evalpoly(y, p), x)
 polyerror(x) = sum(x .^ 2) / length(x)
 
 @doc raw"""
-    polyfit(x::Vector{T}, y::Vector{T}; tol::T = 1e-4) where {T <: AbstractFloat}
+    polyfit(x::Vector{T}, y::Vector{T}; tol::T = 1e-4) where {T <: Real}
 
 Fit a polynomial to points `(x, y)`. The order of the polynomial is increased
 until `polyerror` is less than `tol`.
 """
-function polyfit(x::Vector{T}, y::Vector{T}; tol::T = 1e-4) where {T <: AbstractFloat}
+function polyfit(x::Vector{T}, y::Vector{T}; tol::T = 1e-4) where {T <: Real}
     # Avoid odd and high orders (to have a defined concavity and avoid overfit)
     for order in [1, 2, 4, 6]
         # Initial guess for coefficients
@@ -92,11 +98,11 @@ function polyfit(x::Vector{T}, y::Vector{T}; tol::T = 1e-4) where {T <: Abstract
 end
 
 @doc raw"""
-    diffcoeffs(x::Vector{T}) where {T <: AbstractFloat}
+    diffcoeffs(x::Vector{T}) where {T <: Real}
 
 Return the coefficients of the derivative of a polynomial with coefficients `x`.
 """
-function diffcoeffs(x::Vector{T}) where {T <: AbstractFloat}
+function diffcoeffs(x::Vector{T}) where {T <: Real}
     y = Vector{T}(undef, length(x)-1)
     for i in eachindex(y)
         y[i] = i * x[i+1]
@@ -105,7 +111,7 @@ function diffcoeffs(x::Vector{T}) where {T <: AbstractFloat}
 end
 
 # Outer constructor
-function Tracklet(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) where {T <: AbstractFloat}
+function Tracklet(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) where {T <: Real}
     # Defining quantities of a Tracklet
     observatory = df.observatory[1]
     night = df.TimeOfDay[1]
@@ -161,13 +167,13 @@ function Tracklet(radec::Vector{RadecMPC{T}}, df::AbstractDataFrame) where {T <:
 end
 
 @doc raw"""
-    reduce_tracklets(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+    reduce_tracklets(radec::Vector{RadecMPC{T}}) where {T <: Real}
 
 Return a `Vector{Tracklet{T}}` where each element corresponds to a batch of
 observations taken by the same observatory on the same night. The reduction
 is performed via polynomial regression.
 """
-function reduce_tracklets(radec::Vector{RadecMPC{T}}) where {T <: AbstractFloat}
+function reduce_tracklets(radec::Vector{RadecMPC{T}}) where {T <: Real}
     # Convert to DataFrame
     df = DataFrame(radec)
     # Compute TimeOfDay

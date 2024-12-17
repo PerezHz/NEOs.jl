@@ -234,7 +234,9 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         # Initial conditions
         q = q0 + dq
         # Decide whether q is suitable for jtls
-        params.jtlsmask && isjtlsfit(od, jd0, q, params) || break
+        if params.jtlsmask
+            isjtlsfit(od, jd0, q, params) || break
+        end
         # Propagation & residuals
         bwd, fwd = propres!(res, od, jd0, q, params; buffer)
         iszero(length(res)) && break
@@ -378,16 +380,20 @@ Fit a least squares orbit to `od` using `sol` as an initial condition.
 """
 function orbitdetermination(od::ODProblem{D, T}, sol::NEOSolution{T, T},
     params::NEOParameters{T}) where {D, T <: Real}
-    # Reference epoch [Julian days TDB]
-    jd0 = sol.bwd.t0 + PE.J2000
+    # Reference epoch [TDB]
+    t = epoch(sol)
+    jd0 = t + PE.J2000
     # Plain barycentric initial condition
-    q0 = sol(sol.bwd.t0)
+    q0 = sol(t)
     # Scaling factors
     scalings = abs.(q0) ./ 10^6
     # Jet transport variables
     dq = scaled_variables("dx", scalings; order = params.jtlsorder)
     # Jet Transport initial condition
     q = q0 + dq
+    # ADAM refinement
+    _, j = findmin(@. abs(t - dtutc2days(date(od.tracklets))))
+    jd0 = _adam!(od, j, q, jd0, params)
     # Jet Transport Least Squares
     return jtls(od, jd0, q, sol.tracklets, params, true)
 end

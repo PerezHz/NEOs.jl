@@ -86,25 +86,37 @@ end
         params1 = NEOParameters(
             coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
             safegauss = true, refscale = :log,                     # Gauss method
-            adammode = true, adamiter = 500, adamQtol = 1e-5,      # ADAM
-            jtlsmask = true, jtlsiter = 20, lsiter = 10,           # Jet Transport Least Squares
-            significance = 0.99, outrej = true, χ2_rec = 7.0,      # Outlier rejection
-            χ2_rej = 8.0, fudge = 100.0, max_per = 20.0
+            adamiter = 500, adamQtol = 1e-5,                       # ADAM
+            jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
+            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
+            fudge = 100.0, max_per = 20.0
         )
         params2 = NEOParameters(params1; coeffstol = 10.0, safegauss = false,
             adamiter = 200, adamQtol = 0.01, lsiter = 5)
         params3 = NEOParameters(params1; refscale = :linear)
         params4 = NEOParameters(params2; refscale = :linear)
-        params5 = NEOParameters(params1; adammode = false, jtlsmask = false)
         # Initial orbit determination iterator
-        return enumerate([
+        return [
             (params1, initcond1),
             (params2, initcond1),
             (params3, initcond2),
-            (params4, initcond2),
-            (params5, initcond1),
-            (params5, initcond2)
-        ])
+            (params4, initcond2)
+        ]
+    end
+
+    function subfit!(od::ODProblem{D, T}) where {D, T <: Real}
+        ts = od.tracklets
+        (length(ts) < 2 || length(ts) > 3) && return false
+        if length(ts) == 2
+            _, i = findmax(nobs, ts)
+            idxs = i:i
+        elseif length(ts) == 3
+            d1, d3 = datediff(ts[2], ts[1]), datediff(ts[3], ts[2])
+            idxs = d1 > d3 ? (2:3) : (1:2)
+        end
+        radec = deepcopy(astrometry(ts[idxs]))
+        NEOs.update!(od, radec)
+        return true
     end
 
     # Initial orbit determination routine
@@ -116,30 +128,73 @@ end
         !flag && return false
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
-        # Pre-allocate solutions
-        sols = [zero(NEOSolution{Float64, Float64}) for _ in 1:6]
+        # Pre-allocate parameters and solutions
+        iter = ioditer()
+        sols = [zero(NEOSolution{Float64, Float64}) for _ in 1:8]
         # Start of computation
         init_time = now()
-        # Initial orbit determination cycle
-        for (i, j) in ioditer()
+        # Stage 1: standard initial orbit determination
+        for (i, j) in enumerate(iter)
             # Unfold
             params, initcond = j
             # Initial orbit determination
             sols[i] = orbitdetermination(od, params; initcond)
             # Termination condition
-            length(sols[i].res) == length(radec) &&
-            critical_value(sols[i]) < params.significance && break
+            if length(sols[i].res) == length(radec) &&
+                critical_value(sols[i]) < params.significance
+                # Time of computation
+                Δ = (now() - init_time).value
+                # Save orbit
+                jldsave(filename; sol = sols[i], Δ = Δ, i = i)
+                return true
+            end
         end
-        # Time of computation
-        Δ = (now() - init_time).value
+        # Stage 2: fit a subset of the considered astrometry
+        for (i, j) in enumerate(iter)
+            subfit!(od) || break
+            # Unfold
+            params, initcond = j
+            # Initial orbit determination
+            sols[i+4] = orbitdetermination(od, params; initcond)
+            # Add remaining observations
+            NEOs.update!(od, radec)
+            sols[i+4] = orbitdetermination(od, sols[i+4], params)
+            # Termination condition
+            if length(sols[i+4].res) == length(radec) &&
+                critical_value(sols[i+4]) < params.significance
+                # Time of computation
+                Δ = (now() - init_time).value
+                # Save orbit
+                jldsave(filename; sol = sols[i+4], Δ = Δ, i = i+4)
+                return true
+            end
+        end
+        # Stage 3: relax Carpino rejection threshold
+        for i in eachindex(sols)
+            length(sols[i].res) != length(radec) && continue
+            # Unfold
+            params, _ = iter[i <= 4 ? i : i-4]
+            params = NEOParameters(params; fudge = 0.0, max_per = 30.0)
+            # Retry orbit determination with lower rejection threshold
+            sols[i] = orbitdetermination(od, sols[i], params)
+            # Termination condition
+            if length(sols[i].res) == length(radec) &&
+                critical_value(sols[i]) < params.significance
+                # Time of computation
+                Δ = (now() - init_time).value
+                # Save orbit
+                jldsave(filename; sol = sols[i], Δ = Δ, i = i+8)
+                return true
+            end
+        end
         # Select complete solutions
         mask = findall(s -> length(s.res) == length(radec), sols)
         isempty(mask) && return false
         # Choose best solution
-        _, k = findmin(nrms, view(sols, mask))
+        _, i = findmin(nrms, view(sols, mask))
         # Save orbit
-        k = mask[k]
-        jldsave(filename; sol = sols[k], Δ = Δ, k = k)
+        i = mask[i]
+        jldsave(filename; sol = sols[i], Δ = Δ, i = i)
         return true
     end
 end

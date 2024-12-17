@@ -39,7 +39,7 @@ Parameters for all orbit determination functions.
 
 - `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `5`).
 - `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
-- `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `5`).
+- `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `6`).
 - `significance::T`: chi-square significance level (default: `0.99`).
 - `jtlsmask::Bool`: whether to use `isjtlsfit` to skip bad-conditioned
     preliminary orbits in `jtls` (default: `true`).
@@ -80,7 +80,7 @@ Parameters for all orbit determination functions.
     # Jet Transport Least Squares Parameters
     lsiter::Int = 5
     jtlsiter::Int = 5
-    jtlsorder::Int = 5
+    jtlsorder::Int = 6
     significance::T = 0.99
     jtlsmask::Bool = true
     # Outlier Rejection Parameters
