@@ -35,7 +35,7 @@ end
 @everywhere begin
     using NEOs, Dates, JLD2
     using NEOs: AdmissibleRegion, RadecMPC, NEOSolution, reduce_tracklets,
-        numberofdays, issatellite
+        numberofdays, issatellite, updatesol
 
     function radecfilter(radec::Vector{RadecMPC{T}}) where {T <: Real}
         # Eliminate observations before oficial discovery
@@ -174,9 +174,10 @@ end
             length(sols[i].res) != length(radec) && continue
             # Unfold
             params, _ = iter[i <= 4 ? i : i-4]
-            params = NEOParameters(params; fudge = 0.0, max_per = 30.0)
+            params = NEOParameters(params; fudge = 0.0, max_per = 34.0)
             # Retry orbit determination with lower rejection threshold
-            sols[i] = orbitdetermination(od, sols[i], params)
+            sol = orbitdetermination(od, sols[i], params)
+            sols[i] = updatesol(sols[i], sol, radec)
             # Termination condition
             if length(sols[i].res) == length(radec) &&
                 critical_value(sols[i]) < params.significance
