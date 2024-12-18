@@ -121,6 +121,17 @@ function main()
         !isfile(filename) && return zero(NEOSolution{Float64, Float64})
         return JLD2.load(filename, "sol")
     end
+    # Load convergence flags
+    F1 = map(neos1) do neo
+        filename = joinpath(input1, replace(neo, " " => "") * ".jld2")
+        !isfile(filename) && return zero(NEOSolution{Float64, Float64})
+        return JLD2.load(filename, "i")
+    end
+    F2 = map(neos2) do neo
+        filename = joinpath(input2, replace(neo, " " => "") * ".jld2")
+        !isfile(filename) && return zero(NEOSolution{Float64, Float64})
+        return JLD2.load(filename, "i")
+    end
 
     # NRMS
     Q1, Q2 = @. nrms(sols1), nrms(sols2)
@@ -131,8 +142,8 @@ function main()
     # Minimization routines
     R1, R2 = map(s -> s.fit.routine, sols1), map(s -> s.fit.routine, sols2)
     # NEOs that converged within 0.99 confidence
-    mask1 = @. (C1 ≤ 0.99) && !isinf(S1)
-    mask2 = @. (C2 ≤ 0.99) && !isinf(S2)
+    mask1 = @. (C1 ≤ 0.99) && !isinf(S1) && (F1 ≤ 4)
+    mask2 = @. (C2 ≤ 0.99) && !isinf(S2) && (F2 ≤ 4)
     # Right ascension and declination residuals
     αs1 = reduce(vcat, map(sols1[mask1]) do s
         m = @. !isoutlier(s.res)
