@@ -152,6 +152,9 @@ end
 
 iszero(x::NEOSolution{T, U}) where {T <: Real, U <: Number} = x == zero(NEOSolution{T, U})
 
+# Number of observations
+nobs(x::NEOSolution) = length(x.res)
+
 # Override Base.min
 function min(x::NEOSolution{T, T}, y::NEOSolution{T, T}) where {T <: Real}
     nrms(x) <= nrms(y) && return x
@@ -202,7 +205,8 @@ sigmas(sol::NEOSolution{T, T}) where {T <: Real} = sqrt.(diag(sol.jacobian * sol
 
 Return `sol`'s initial condition signal-to-noise ratios in barycentric cartesian coordinates.
 """
-snr(sol::NEOSolution{T, T}) where {T <: Real} = abs.(sol()) ./ sigmas(sol)
+snr(sol::NEOSolution{T, T}) where {T <: Real} =
+    iszero(sol) ? zeros(T, 6) : abs.(sol()) ./ sigmas(sol)
 
 @doc raw"""
     minmaxdates(sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
@@ -211,7 +215,8 @@ Return the dates of the earliest and latest observation in `sol`.
 """
 function minmaxdates(sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
     dates = map(t -> extrema(date, t.radec), sol.tracklets)
-    return minimum(first, dates), maximum(last, dates)
+    t = days2dtutc(epoch(sol))
+    return min(t, minimum(first, dates)), max(t, maximum(last, dates))
 end
 
 @doc raw"""
@@ -228,7 +233,7 @@ function jplcompare(des::String, sol::NEOSolution{T, U}) where {T <: Real, U <: 
     # Time of first (last) observation
     t0, tf = minmaxdates(sol)
     # Download JPL ephemerides
-    bsp = smb_spk("DES = $(des);", t0, tf)
+    bsp = smb_spk("DES = $(des);", t0 - Minute(10), tf + Minute(10))
     # Object ID
     id = parse(Int, bsp[1:end-4])
     # Load JPL ephemerides

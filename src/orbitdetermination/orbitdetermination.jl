@@ -170,7 +170,11 @@ function isjtlsfit(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         At0 = dtutc2days(A.date)
         q0 = eph(At0)
         ρ, v_ρ = bary2topo(A, q0)
-        mask[i] = (ρ, v_ρ) in A
+        ρmin, ρmax = A.ρ_domain
+        c1 = (isnan(od.tracklets[i].mag) ? R_EA : ρmin) ≤ ρ ≤ ρmax
+        y_range = rangerates(A, ρ, :outer)
+        c2 = (length(y_range) == 2) && (y_range[1] ≤ v_ρ ≤ y_range[2])
+        mask[i] = c1 && c2
     end
     all(mask) || return false
     # Check that orbit stays out of Earth's radius
@@ -230,8 +234,9 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         # Initial conditions
         q = q0 + dq
         # Decide whether q is suitable for jtls
-        start = isjtlsfit(od, jd0, q, params)
-        start || break
+        if params.jtlsmask
+            isjtlsfit(od, jd0, q, params) || break
+        end
         # Propagation & residuals
         bwd, fwd = propres!(res, od, jd0, q, params; buffer)
         iszero(length(res)) && break
@@ -240,6 +245,9 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         !fit.success && break
         # Incrementally add observations to fit
         rin, fit = addradec!(Val(mode), rin, fit, tin, tout, res, x0, params)
+        # Residuals space to barycentric coordinates jacobian
+        J = Matrix(TS.jacobian(dq, fit.x))
+        all(diag(J * fit.Γ * J') .> 0) || break
         # Outlier rejection
         if params.outrej
             outlier_rejection!(view(res, rin), fit.x, fit.Γ, orcache;
@@ -248,7 +256,6 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         end
         # Update solution
         Qs[i] = nrms(res, fit)
-        J = Matrix(TS.jacobian(dq, fit.x))
         sols[i] = evalfit(NEOSolution(tin, bwd, fwd, res[rin], fit, J))
         if params.outrej
             outs[i] = notout(res)
@@ -288,14 +295,9 @@ function iodinitcond(A::AdmissibleRegion{T}) where {T <: Real}
 end
 
 # Update `sol` iff `_sol_` is complete and has a lower nrms
-function updatesol(sol::NEOSolution{T, T}, _sol_::NEOSolution{T, T},
-    radec::Vector{RadecMPC{T}}) where {T <: Real}
-    if length(_sol_.res) == length(radec)
-        return min(sol, _sol_)
-    else
-        return sol
-    end
-end
+updatesol(sol::NEOSolution{T, T}, _sol_::NEOSolution{T, T},
+    radec::Vector{RadecMPC{T}}) where {T <: Real} =
+    nobs(_sol_) == length(radec) ? min(sol, _sol_) : sol
 
 include("tooshortarc.jl")
 include("gaussinitcond.jl")
@@ -373,16 +375,31 @@ Fit a least squares orbit to `od` using `sol` as an initial condition.
 """
 function orbitdetermination(od::ODProblem{D, T}, sol::NEOSolution{T, T},
     params::NEOParameters{T}) where {D, T <: Real}
-    # Reference epoch [Julian days TDB]
-    jd0 = sol.bwd.t0 + PE.J2000
+    # Unfold parameters
+    varorder, significance, mode = params.jtlsorder, params.significance, params.adammode
+    # Reference epoch [TDB]
+    t = epoch(sol)
+    jd0 = t + PE.J2000
     # Plain barycentric initial condition
-    q0 = sol(sol.bwd.t0)
+    q0 = sol(t)
     # Scaling factors
     scalings = abs.(q0) ./ 10^6
     # Jet transport variables
-    dq = scaled_variables("dx", scalings; order = params.jtlsorder)
+    dq = scaled_variables("dx", scalings; order = varorder)
     # Jet Transport initial condition
     q = q0 + dq
     # Jet Transport Least Squares
-    return jtls(od, jd0, q, sol.tracklets, params, true)
+    sol1 = jtls(od, jd0, q, sol.tracklets, params, true)
+    # Termination condition
+    (nobs(sol1) == nobs(od) && critical_value(sol1) < significance) && return sol1
+    # ADAM refinement
+    _, i = findmin(@. abs(t - dtutc2days(date(od.tracklets))))
+    jd0 = _adam!(od, i, q, jd0, params)
+    # Jet Transport Least Squares
+    trks = mode ? od.tracklets[:] : od.tracklets[i:i]
+    sol2 = jtls(od, jd0, q, trks, params, true)
+    # Update solution
+    sol1 = updatesol(sol1, sol2, od.radec)
+
+    return sol1
 end

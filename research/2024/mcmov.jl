@@ -22,19 +22,57 @@ function parse_commandline()
         "--input", "-i"
             help = "input optical astrometry file"
             arg_type = String
+        "--output", "-o"
+            help = "output .jld2 file"
+            arg_type = String
+            default = "MCMOV.jld2"
+        "--tracklet", "-t"
+            help = "initial tracklet"
+            arg_type = Int
+            default = 1
         "--varorder", "-v"
             help = "jet transport order"
             arg_type = Int
             default = 5
-        "--Nx", "-x"
+        "--scale", "-s"
+            help = "horizontal scale (log / linear)"
+            arg_type = Symbol
+            default = :log
+        "--Qmax", "-q"
+            help = "maximum allowed nms"
+            arg_type = Float64
+            default = 1e10
+        "--xmin"
+            help = "lower horizontal bound"
+            arg_type = Float64
+            default = -Inf
+        "--xmax"
+            help = "upper horizontal bound"
+            arg_type = Float64
+            default = Inf
+        "--ymin"
+            help = "lower vertical bound"
+            arg_type = Float64
+            default = -Inf
+        "--ymax"
+            help = "upper vertical bound"
+            arg_type = Float64
+            default = Inf
+        "--Nx"
             help = "number of points in x"
             arg_type = Int
             default = 100
-        "--Ny", "-y"
+        "--Ny"
             help = "number of points in y"
             arg_type = Int
             default = 100
     end
+
+    s.epilog = """
+        If the bounds `[xmin, xmax]×[ymin, ymax]` are oimitted, the script will fit
+        a box to the AR. The horizontal bounds `[xmin, xmax]` must be consistent with
+        `scale`.
+    """
 
     return parse_args(s)
 end
@@ -46,8 +84,9 @@ end
                 propres!, nobs, _lsmethods
 
     function mcmov(points::Vector{Tuple{T, T}}, A::AdmissibleRegion{T},
-        radec::Vector{RadecMPC{T}}, params::NEOParameters{T},
-        varorder::Int = 2) where {T <: Real}
+        radec::Vector{RadecMPC{T}}, bounds::Vector{Float64},
+        params::NEOParameters{T}, varorder::Int = 2,
+        scale::Symbol = :log, Qmax::Float64 = 1e10) where {T <: Real}
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
         # JT variables
@@ -59,24 +98,24 @@ end
         # Scaling factors
         scalings = Vector{T}(undef, 6)
         scalings[1:4] .= abs.(ae[1:4]) ./ 1e6
-        x_min, x_max = log10.(A.ρ_domain)
-        _, y_min = argoldensearch(A, 10^x_min, 10^x_max, :min, :outer, 1e-20)
-        _, y_max = argoldensearch(A, 10^x_min, 10^x_max, :max, :outer, 1e-20)
-        scalings[5:6] .= (x_max - x_min) / 100, (y_max - y_min) / 100
+        xmin, xmax, ymin, ymax = bounds
+        scalings[5:6] .= (xmax - xmin) / 100, (ymax - ymin) / 100
         # Attributable elements (jet transport)
         AE = ae .+ scalings .* dae
         # TDB epoch of admissible region
         _jd0_ = dtutc2jdtdb(A.date)
         # Propagation buffer
+        _buffer_ = PropagationBuffer(od, _jd0_, 1, nobs(od), AE(), params)
         buffer = PropagationBuffer(od, _jd0_, 1, nobs(od), AE, params)
         # Vector of residuals
+        _res_ = [zero(OpticalResidual{T, T}) for _ in eachindex(radec)]
         res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(radec)]
         # Origin
         x0 = zeros(T, 6)
         # Least squares cache and methods
-        lscache, lsmethods = LeastSquaresCache(x0, 1:4, 10), _lsmethods(res, x0, 1:4)
+        lscache, lsmethods = LeastSquaresCache(x0, 1:4, 20), _lsmethods(res, x0, 1:4)
         # Manifold of variations
-        mov = Matrix{T}(undef, 13, length(points))
+        mov = fill(T(Inf), 13, length(points))
         # Iterate mov points
         for (i, point) in enumerate(points)
             # Attributable elements (plain)
@@ -84,26 +123,31 @@ end
             # Attributable elements (JT)
             AE .= ae .+ scalings .* dae
             # Topocentric range
-            AE[5] = 10^AE[5]
+            if scale == :log
+                AE[5] = 10^AE[5]
+            end
             # Barycentric initial conditions (JT)
             q = attr2bary(A, AE, params)
             # Reference epoch in julian days (corrrected for light-time)
             jd0 = _jd0_ - constant_term(AE[5]) / c_au_per_day
             # Propagation and residuals
+            propres!(_res_, od, jd0, q(), params; buffer = _buffer_)
+            if isempty(_res_)
+                _res_ = [zero(OpticalResidual{T, T}) for _ in eachindex(radec)]
+                continue
+            end
+            nms(_res_) > Qmax && continue
             propres!(res, od, jd0, q, params; buffer)
             # Least squares fit
             fit = tryls(res, x0, lscache, lsmethods)
-            if fit.success
-                # Objective function
-                Q = nms(res)
-                # Save results
-                mov[1:6, i] .= fit.x
-                mov[7:10, i] .= ae[1:4] .+ scalings[1:4] .* fit.x[1:4]
-                mov[11:12, i] .= point
-                mov[13, i] = Q(fit.x)
-            else
-                mov[:, i] .= T(Inf)
-            end
+            !fit.success && continue
+            # Objective function
+            Q = nms(res)
+            # Save results
+            mov[1:6, i] .= fit.x
+            mov[7:10, i] .= ae[1:4] .+ scalings[1:4] .* fit.x[1:4]
+            mov[11:12, i] .= point
+            mov[13, i] = Q(fit.x)
         end
         # Select successful points
         mask = @. !isinf(mov[13, :])
@@ -117,49 +161,70 @@ function main()
     init_time = now()
     # Parse arguments from commandline
     parsed_args = parse_commandline()
-    # Input file
-    input::String = parsed_args["input"]
+    # Input and output files
+    input::String, output::String = parsed_args["input"], parsed_args["output"]
+    # Initial tracklet
+    idxtrk::Int = parsed_args["tracklet"]
     # Jet transport order
     varorder::Int = parsed_args["varorder"]
+    # Horizontal scale
+    scale::Symbol = Symbol(parsed_args["scale"])
+    # Maximum allowed nms
+    Qmax::Float64 = parsed_args["Qmax"]
+    # Horizontal and vertical bounds
+    xmin::Float64, xmax::Float64 = parsed_args["xmin"], parsed_args["xmax"]
+    ymin::Float64, ymax::Float64 = parsed_args["ymin"], parsed_args["ymax"]
     # Number of points in x (y)
-    Nx::Int = parsed_args["Nx"]
-    Ny::Int = parsed_args["Ny"]
+    Nx::Int, Ny::Int = parsed_args["Nx"], parsed_args["Ny"]
     # Number of workers
     Nw = nworkers()
     # Print header
     println("Manifold of variations computation via Jet Transport Monte Carlo")
     println("• Detected ", Nw, " worker(s) with ", Threads.nthreads(), " thread(s) each")
     println("• Input file: ", input)
-    println("• Jet transport order: ", varorder)
-    println("• Number of points in x (y): ", Nx, " (", Ny, ")")
 
     # Read optical astrometry
     radec = read_radec_mpc(input)
     # Orbit determination parameters
-    params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
-    # Reduce tracklet
-    tracklet = reduce_tracklets(radec)[1]
+    params = NEOParameters(
+        coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007, # Propagation
+        jtlsiter = 20, lsiter = 20, significance = 0.99,       # Least squares
+    )
+    # Reduce tracklets
+    tracklets = reduce_tracklets(radec)
+    idxtrk = clamp(idxtrk, 1, length(tracklets))
+    println("• Initial tracklet: ", idxtrk)
     # Admissible region
-    A = AdmissibleRegion(tracklet, params)
+    A = AdmissibleRegion(tracklets[idxtrk], params)
     # Set jet transport variables
     set_variables(Float64, "dx"; order = varorder, numvars = 6)
+    println("• Jet transport order: ", varorder)
 
     # Global box
-    x_min, x_max = log10.(A.ρ_domain)
-    _, y_min = argoldensearch(A, A.ρ_domain[1], A.ρ_domain[2], :min, :outer, 1e-20)
-    _, y_max = argoldensearch(A, A.ρ_domain[1], A.ρ_domain[2], :max, :outer, 1e-20)
+    println("• Horizontal scale: ", scale)
+    println("• Maximum allowed nms: ", Qmax)
+    ρmin, ρmax = A.ρ_domain
+    if scale == :log
+        xmin, xmax = max(xmin, log10(ρmin)), min(xmax, log10(ρmax))
+    elseif scale == :linear
+        xmin, xmax = max(xmin, ρmin), min(xmax, ρmax)
+    end
+    ymin = max(ymin, argoldensearch(A, ρmin, ρmax, :min, :outer, 1e-20)[2])
+    ymax = min(ymax, argoldensearch(A, ρmin, ρmax, :max, :outer, 1e-20)[2])
+    bounds = [xmin, xmax, ymin, ymax]
     # Grid of domain points
-    side_x = LinRange(x_min, x_max, Nx)
-    side_y = LinRange(y_min, y_max, Ny)
+    side_x = LinRange(xmin, xmax, Nx)
+    side_y = LinRange(ymin, ymax, Ny)
     points = Iterators.product(side_x, side_y)
+    println("• Number of points in x (y): ", Nx, " (", Ny, ")")
     # Distribute domain points over workers
     points_per_worker = [Tuple{Float64, Float64}[] for _ in 1:Nw]
     k = 1
     for point in points
         # Check point is inside AR
-        if !((10^point[1], point[2]) in A)
-             continue
-        end
+        mask = scale == :log ? ((10^point[1], point[2]) in A) :
+            ((point[1], point[2]) in A)
+        !mask && continue
         # Save point in corresponding worker
         push!(points_per_worker[k], point)
         k = mod1(k+1, Nw)
@@ -167,13 +232,13 @@ function main()
     Np = sum(length, points_per_worker)
     println("• ", Np, " points in the manifold of variations")
     # Manifold of variations
-    movs = pmap(p -> mcmov(p, A, radec, params, varorder), points_per_worker)
+    movs = pmap(points_per_worker) do p
+        return mcmov(p, A, radec, bounds, params, varorder, scale, Qmax)
+    end
     mov = reduce(hcat, movs)
     println("• ", count(!isnan, view(mov, 13, :)), "/", Np, " points converged")
 
     # Save results
-    tmpdesig = radec[1].tmpdesig
-    output = string(tmpdesig, "MCMOV.jld2")
     jldsave(output; mov = mov)
     println("• Output saved to: ", output)
 

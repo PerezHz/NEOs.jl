@@ -59,6 +59,8 @@ export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophis
 export loadpeeph, bwdfwdeph
 # Observer position in ECEF and ECI frames
 export obsposECEF, obsposvelECI
+# Tracklet
+export nobs, astrometry, datediff
 # Optical astrometry processing
 export UniformWeights, Veres17, Farnocchia15, Eggl20, compute_radec, unfold,
        residuals, isoutlier
