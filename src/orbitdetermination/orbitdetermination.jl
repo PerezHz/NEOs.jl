@@ -295,14 +295,9 @@ function iodinitcond(A::AdmissibleRegion{T}) where {T <: Real}
 end
 
 # Update `sol` iff `_sol_` is complete and has a lower nrms
-function updatesol(sol::NEOSolution{T, T}, _sol_::NEOSolution{T, T},
-    radec::Vector{RadecMPC{T}}) where {T <: Real}
-    if length(_sol_.res) == length(radec)
-        return min(sol, _sol_)
-    else
-        return sol
-    end
-end
+updatesol(sol::NEOSolution{T, T}, _sol_::NEOSolution{T, T},
+    radec::Vector{RadecMPC{T}}) where {T <: Real} =
+    nobs(_sol_) == length(radec) ? min(sol, _sol_) : sol
 
 include("tooshortarc.jl")
 include("gaussinitcond.jl")
@@ -380,6 +375,8 @@ Fit a least squares orbit to `od` using `sol` as an initial condition.
 """
 function orbitdetermination(od::ODProblem{D, T}, sol::NEOSolution{T, T},
     params::NEOParameters{T}) where {D, T <: Real}
+    # Unfold parameters
+    varorder, significance, mode = params.jtlsorder, params.significance, params.adammode
     # Reference epoch [TDB]
     t = epoch(sol)
     jd0 = t + PE.J2000
@@ -388,12 +385,21 @@ function orbitdetermination(od::ODProblem{D, T}, sol::NEOSolution{T, T},
     # Scaling factors
     scalings = abs.(q0) ./ 10^6
     # Jet transport variables
-    dq = scaled_variables("dx", scalings; order = params.jtlsorder)
+    dq = scaled_variables("dx", scalings; order = varorder)
     # Jet Transport initial condition
     q = q0 + dq
-    # ADAM refinement
-    _, j = findmin(@. abs(t - dtutc2days(date(od.tracklets))))
-    jd0 = _adam!(od, j, q, jd0, params)
     # Jet Transport Least Squares
-    return jtls(od, jd0, q, sol.tracklets, params, true)
+    sol1 = jtls(od, jd0, q, sol.tracklets, params, true)
+    # Termination condition
+    (nobs(sol1) == nobs(od) && critical_value(sol1) < significance) && return sol1
+    # ADAM refinement
+    _, i = findmin(@. abs(t - dtutc2days(date(od.tracklets))))
+    jd0 = _adam!(od, i, q, jd0, params)
+    # Jet Transport Least Squares
+    trks = mode ? od.tracklets[:] : od.tracklets[i:i]
+    sol2 = jtls(od, jd0, q, trks, params, true)
+    # Update solution
+    sol1 = updatesol(sol1, sol2, od.radec)
+
+    return sol1
 end
