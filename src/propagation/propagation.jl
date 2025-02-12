@@ -6,7 +6,9 @@ mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
     sseph::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}
     ssepht::Vector{Taylor1{U}}
     acceph::Union{Nothing, TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}}
+    accepht::Union{Nothing, Vector{Taylor1{U}}}
     poteph::Union{Nothing, TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}}
+    potepht::Union{Nothing, Vector{Taylor1{U}}}
     jd0::V
     UJ_interaction::Union{Nothing, Vector{Bool}}
     N::Int
@@ -66,18 +68,21 @@ function PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U}
     @assert N == length(μ) "Total number of bodies in ephemeris must be equal to length of GM vector μ"
     # Accelerations, Newtonian potentials and interaction matrix with flattened bodies
     if dynamics == newtonian!
-        _acceph = nothing
-        _poteph = nothing
+        _acceph, _accepht = nothing, nothing
+        _poteph, _potepht = nothing, nothing
         UJ_interaction = nothing
     else
         _acceph = convert(T, loadpeeph(acceph, days_0, days_f))
+        _accepht = [zero(x[1]) for _ in axes(_acceph.x, 2)]
         _poteph = convert(T, loadpeeph(poteph, days_0, days_f))
+        _potepht = [zero(x[1]) for _ in axes(_poteph.x, 2)]
         UJ_interaction = fill(false, N)
         # Turn on Earth interaction
         UJ_interaction[ea] = true
     end
     # Dynamical parameters for `propagate`
-    _params = DynamicalParameters{T, U, V}(_sseph, _ssepht, _acceph, _poteph, jd0, UJ_interaction, N, μ)
+    _params = DynamicalParameters{T, U, V}(_sseph, _ssepht, _acceph, _accepht,
+        _poteph, _potepht, jd0, UJ_interaction, N, μ)
     # Determine if specialized jetcoeffs! method exists
     _, rv = _determine_parsing!(true, dynamics, t, x, dx, _params)
 

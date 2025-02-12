@@ -17,8 +17,10 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_ng_ep
     local dsj2k = t + (jd0 - JD_J2000)
     local ss16asteph_t = params.ssepht
     evaleph!(ss16asteph_t, params.sseph, dsj2k)
-    local acceph_t = evaleph(params.acceph, dsj2k, q[1])
-    local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
+    local acceph_t = params.accepht
+    evaleph!(acceph_t, params.acceph, dsj2k)
+    local newtonianNb_Potential_t = params.potepht
+    evaleph!(newtonianNb_Potential_t, params.poteph, dsj2k)
     local S = eltype(q)
     local UJ_interaction = params.UJ_interaction
     local N = params.N
@@ -1007,8 +1009,10 @@ function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
     local dsj2k = t + (jd0 - JD_J2000)
     local ss16asteph_t = params.ssepht
     evaleph!(ss16asteph_t, params.sseph, dsj2k)
-    local acceph_t = evaleph(params.acceph, dsj2k, q[1])
-    local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
+    local acceph_t = params.accepht
+    evaleph!(acceph_t, params.acceph, dsj2k)
+    local newtonianNb_Potential_t = params.potepht
+    evaleph!(newtonianNb_Potential_t, params.poteph, dsj2k)
     local S = eltype(q)
     local UJ_interaction = params.UJ_interaction
     local N = params.N
@@ -1308,8 +1312,10 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_t
     local dsj2k = t + (jd0 - JD_J2000)
     local ss16asteph_t = params.ssepht
     evaleph!(ss16asteph_t, params.sseph, dsj2k)
-    local acceph_t = evaleph(params.acceph, dsj2k, q[1])
-    local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
+    local acceph_t = params.accepht
+    evaleph!(acceph_t, params.acceph, dsj2k)
+    local newtonianNb_Potential_t = params.potepht
+    evaleph!(newtonianNb_Potential_t, params.poteph, dsj2k)
     local S = eltype(q)
     local UJ_interaction = params.UJ_interaction
     local N = params.N
@@ -2194,8 +2200,10 @@ function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, 
     local dsj2k = t + (jd0 - JD_J2000)
     local ss16asteph_t = params.ssepht
     evaleph!(ss16asteph_t, params.sseph, dsj2k)
-    local acceph_t = evaleph(params.acceph, dsj2k, q[1])
-    local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
+    local acceph_t = params.accepht
+    evaleph!(acceph_t, params.acceph, dsj2k)
+    local newtonianNb_Potential_t = params.potepht
+    evaleph!(newtonianNb_Potential_t, params.poteph, dsj2k)
     local S = eltype(q)
     local UJ_interaction = params.UJ_interaction
     local N = params.N

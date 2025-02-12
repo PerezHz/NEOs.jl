@@ -123,9 +123,11 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     local ss16asteph_t = params.ssepht
     evaleph!(ss16asteph_t, params.sseph, dsj2k)
     # Accelerations at dsj2k
-    local acceph_t = evaleph(params.acceph, dsj2k, q[1])
+    local acceph_t = params.accepht
+    evaleph!(acceph_t, params.acceph, dsj2k)
     # Newtonian potentials at dsj2k
-    local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
+    local newtonianNb_Potential_t = params.potepht
+    evaleph!(newtonianNb_Potential_t, params.poteph, dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
@@ -698,9 +700,11 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     local ss16asteph_t = params.ssepht
     evaleph!(ss16asteph_t, params.sseph, dsj2k)
     # Accelerations at dsj2k
-    local acceph_t = evaleph(params.acceph, dsj2k, q[1])
+    local acceph_t = params.accepht
+    evaleph!(acceph_t, params.acceph, dsj2k)
     # Newtonian potentials at dsj2k
-    local newtonianNb_Potential_t = evaleph(params.poteph, dsj2k, q[1])
+    local newtonianNb_Potential_t = params.potepht
+    evaleph!(newtonianNb_Potential_t, params.poteph, dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
