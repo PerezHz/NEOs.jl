@@ -212,13 +212,15 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
     dq = q - q0
     # Propagation buffer
     buffer = PropagationBuffer(od, jd0, 1, nobs(od), q, params)
+    # Number of jet transport variables
+    Npar = get_numvars()
     # Origin
-    x0 = zeros(T, 6)
+    x0 = zeros(T, Npar)
     # Vector of O-C residuals
     res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(od.radec)]
     # Least squares cache and methods
-    lscache = LeastSquaresCache(x0, 1:6, params.lsiter)
-    lsmethods = _lsmethods(res, x0, 1:6)
+    lscache = LeastSquaresCache(x0, 1:Npar, params.lsiter)
+    lsmethods = _lsmethods(res, x0, 1:Npar)
     # Initial subset of radec for orbit fit
     tin, tout, rin = _initialtracklets(od.tracklets, tracklets)
     # Allocate memory for orbits
