@@ -62,8 +62,8 @@ export obsposECEF, obsposvelECI
 # Tracklet
 export nobs, astrometry, datediff
 # Optical astrometry processing
-export UniformWeights, Veres17, Farnocchia15, Eggl20, compute_radec, unfold,
-       residuals, isoutlier
+export UniformWeights, Veres17, Farnocchia15, Eggl20, ZeroDebiasing, w8sades,
+        compute_radec, unfold, residuals, isoutlier
 # Radar astrometry processing
 export compute_delay, radar_astrometry
 # Asteroid dynamical models

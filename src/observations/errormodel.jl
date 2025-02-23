@@ -188,6 +188,37 @@ function w8sveres17(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     return 1 ./ (rex .* σs) .^ 2
 end
 
+function w8sades(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+    # ID
+    id = isempty(radec[end].num) ? radec[end].tmpdesig : radec[end].num
+    # HTTP parameters
+    params = JSON.json(Dict("desigs" => [id], "output_format" => ["ADES_DF"]))
+    resp = get(MPC_OBS_API_URL, ("Content-Type" => "application/json",), params)
+    # Convert to String
+    text = String(resp.body)
+    # Parse JSON
+    dict = JSON.parse(text)
+    # Parse weights
+    obs = dict[1]["ADES_DF"]
+    w8sra = Vector{T}(undef, length(obs))
+    w8sdec = Vector{T}(undef, length(obs))
+    for i in eachindex(obs)
+        o = obs[i]
+        if haskey(o, "rmsra") && !isnothing(o["rmsra"])
+            w8sra[i] = parse(T, o["rmsra"])
+        else
+            w8sra[i] = σsveres17(radec[i])
+        end
+        if haskey(o, "rmsdec") && !isnothing(o["rmsdec"])
+            w8sdec[i] = parse(T, o["rmsdec"])
+        else
+            w8sdec[i] = σsveres17(radec[i])
+        end
+    end
+
+    return @. 1 / w8sra^2, 1 / w8sdec^2
+end
+
 # Optical astrometry debiasing schemes API
 # All debiasing schemes `D{T}` must:
 # 1. be mutable subtypes of `AbstractDebiasingScheme{T}`,
@@ -419,3 +450,27 @@ debiasing(obs::RadecMPC{T}, catcodes::RefValue{Vector{String}},
     truth::RefValue{String}, resol::RefValue{Resolution},
     table::RefValue{Matrix{T}}) where {T <: Real} =
     debiasing(obs, catcodes[], truth[], resol[], table[])
+
+@doc raw"""
+    ZeroDebiasing{T} <: AbstractDebiasingScheme{T}
+
+Zero optical astrometry debiasing scheme.
+"""
+mutable struct ZeroDebiasing{T} <: AbstractDebiasingScheme{T}
+    bias::Vector{Tuple{T, T}}
+    # Default constructor
+    function ZeroDebiasing(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+        bias = [(zero(T), zero(T)) for _ in eachindex(radec)]
+        return new{T}(bias)
+    end
+end
+
+# Override getid
+getid(::ZeroDebiasing) = string("Zero")
+
+# Override update!
+function update!(d::ZeroDebiasing{T},
+    radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+    d.bias = [(zero(T), zero(T)) for _ in eachindex(radec)]
+    return nothing
+end
