@@ -335,7 +335,7 @@ function anglediff(x::T, y::S) where {T, S <: Number}
 end
 
 @doc raw"""
-    residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
+    residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{Tuple{T, T}},
         bias::AbstractVector{Tuple{T, T}}; xva::AstEph,
         kwargs...) where {AstEph, T <: Real}
 
@@ -348,7 +348,7 @@ See also [`OpticalResidual`](@ref) and [`compute_radec`](@ref).
 ## Arguments
 
 - `radec::AbstractVector{RadecMPC{T}}`: optical astrometry.
-- `w8s::AbstractVector{T}`: statistical weights.
+- `w8s::AbstractVector{Tuple{T, T}}`: statistical weights.
 - `bias::AbstractVector{Tuple{T, T}}`: debiasing corrections.
 
 ## Keyword arguments
@@ -361,7 +361,7 @@ See also [`OpticalResidual`](@ref) and [`compute_radec`](@ref).
 All ephemeris must take [et seconds since J2000] and return [barycentric position in km
 and velocity in km/sec].
 """
-function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
+function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{Tuple{T, T}},
     bias::AbstractVector{Tuple{T, T}}; xva::AstEph, kwargs...) where {AstEph, T <: Real}
 
     # Check consistency between arrays
@@ -382,7 +382,7 @@ function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
 end
 
 function residuals!(res::Vector{OpticalResidual{T, U}},
-    radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
+    radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{Tuple{T, T}},
     bias::AbstractVector{Tuple{T, T}}; xva::AstEph, kwargs...) where {AstEph,
     T <: Real, U <: Number}
 
@@ -392,6 +392,8 @@ function residuals!(res::Vector{OpticalResidual{T, U}},
         δ_obs = rad2arcsec(dec(obs))  # arcsec
         # Computed ra/dec
         α_comp, δ_comp = compute_radec(obs; xva = xva, kwargs...)   # arcsec
+        # Statistical weights
+        α_w8, δ_w8 = w8
         # Debiasing corrections
         α_corr, δ_corr = bias
         # Observed minus computed residual ra/dec
@@ -400,57 +402,8 @@ function residuals!(res::Vector{OpticalResidual{T, U}},
         return OpticalResidual{T, U}(
             anglediff(α_obs, α_comp) * cos(dec(obs)) - α_corr,
             δ_obs - δ_comp - δ_corr,
-            w8,
-            w8,
-            outlier
-        )
-    end
-
-    return nothing
-end
-
-function residuals(radec::AbstractVector{RadecMPC{T}}, w8sra::AbstractVector{T},
-    w8sdec::AbstractVector{T}, bias::AbstractVector{Tuple{T, T}};
-    xva::AstEph, kwargs...) where {AstEph, T <: Real}
-
-    # Check consistency between arrays
-    @assert length(radec) == length(w8s) == length(bias)
-    # UTC time of first astrometric observation
-    utc1 = date(radec[1])
-    # TDB seconds since J2000.0 for first astrometric observation
-    et1 = dtutc2et(utc1)
-    # Asteroid ephemeris at et1
-    a1_et1 = xva(et1)[1]
-    # Type of asteroid ephemeris
-    U = typeof(a1_et1)
-    # Vector of residuals
-    res = [zero(OpticalResidual{T, U}) for _ in eachindex(radec)]
-    residuals!(res, radec, w8sra, w8sdec, bias; xva, kwargs...)
-
-    return res
-end
-
-function residuals!(res::Vector{OpticalResidual{T, U}},
-    radec::AbstractVector{RadecMPC{T}}, w8sra::AbstractVector{T},
-    w8sdec::AbstractVector{T}, bias::AbstractVector{Tuple{T, T}};
-    xva::AstEph, kwargs...) where {AstEph, T <: Real, U <: Number}
-
-    tmap!(res, radec, w8sra, w8sdec, bias, isoutlier.(res)) do obs, w8ra, w8dec, bias, outlier
-        # Observed ra/dec
-        α_obs = rad2arcsec(ra(obs))   # arcsec
-        δ_obs = rad2arcsec(dec(obs))  # arcsec
-        # Computed ra/dec
-        α_comp, δ_comp = compute_radec(obs; xva = xva, kwargs...)   # arcsec
-        # Debiasing corrections
-        α_corr, δ_corr = bias
-        # Observed minus computed residual ra/dec
-        # Note: ra is multiplied by a metric factor cos(dec) to match the format of
-        # debiasing corrections
-        return OpticalResidual{T, U}(
-            anglediff(α_obs, α_comp) * cos(dec(obs)) - α_corr,
-            δ_obs - δ_comp - δ_corr,
-            w8ra,
-            w8dec,
+            α_w8,
+            δ_w8,
             outlier
         )
     end

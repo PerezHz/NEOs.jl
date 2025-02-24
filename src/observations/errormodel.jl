@@ -8,7 +8,7 @@ abstract type AbstractErrorModel{T <: Real} end
 # Optical astrometry weighting schemes API
 # All weighting schemes `W{T}` must:
 # 1. be mutable subtypes of `AbstractWeightingScheme{T}`,
-# 2. have a `w8s::Vector{T}` field,
+# 2. have a `w8s::Vector{Tuple{T, T}}` field,
 # 3. implement a `W(::AbstractVector{RadecMPC{T}})` constructor,
 # 4. override `getid(::W)`,
 # 5. override `update!(::W{T}, ::AbstractVector{RadecMPC{T}})`.
@@ -30,19 +30,21 @@ show(io::IO, w::AbstractWeightingScheme) = print(io, getid(w),
 Uniform optical astrometry weighting scheme.
 """
 mutable struct UniformWeights{T} <: AbstractWeightingScheme{T}
-    w8s::Vector{T}
+    w8s::Vector{Tuple{T, T}}
     # Default constructor
-    UniformWeights(radec::AbstractVector{RadecMPC{T}}) where {T <: Real} =
-        new{T}(ones(T, length(radec)))
+    function UniformWeights(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+        w8s = [(one(T), one(T)) for _ in eachindex(radec)]
+        return new{T}(w8s)
+    end
 end
 
 # Override getid
-getid(w::UniformWeights) = "Uniform"
+getid(::UniformWeights) = "Uniform"
 
 # Override update!
 function update!(w::UniformWeights{T},
     radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
-    w.w8s = ones(T, length(radec))
+    w.w8s = [(one(T), one(T)) for _ in eachindex(radec)]
     return nothing
 end
 
@@ -55,14 +57,15 @@ Veres et al. (2017) optical astrometry weighting scheme.
     See https://doi.org/10.1016/j.icarus.2017.05.021.
 """
 mutable struct Veres17{T} <: AbstractWeightingScheme{T}
-    w8s::Vector{T}
+    w8s::Vector{Tuple{T, T}}
     # Default constructor
-    Veres17(radec::AbstractVector{RadecMPC{T}}) where {T <: Real} =
-        new{T}(w8sveres17(radec))
+    function Veres17(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+        return new{T}(w8sveres17(radec))
+    end
 end
 
 # Override getid
-getid(w::Veres17) = "Veres et al. (2017)"
+getid(::Veres17) = "Veres et al. (2017)"
 
 # Override update!
 function update!(w::Veres17{T},
@@ -185,9 +188,45 @@ to Veres et al. (2017).
 function w8sveres17(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     σs = σsveres17.(radec)
     rex = rexveres17(radec)
-    return 1 ./ (rex .* σs) .^ 2
+    return @. tuple(1 / (rex * σs) ^ 2, 1 / (rex * σs) ^ 2)
 end
 
+@doc raw"""
+    ADESWeights{T} <: AbstractWeightingScheme{T}
+
+ADES optical astrometry weighting scheme.
+
+!!! reference
+    See https://minorplanetcenter.net/mpcops/documentation/ades/.
+"""
+mutable struct ADESWeights{T} <: AbstractWeightingScheme{T}
+    w8s::Vector{Tuple{T, T}}
+    # Default constructor
+    function ADESWeights(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+        return new{T}(w8sades(radec))
+    end
+end
+
+# Override getid
+getid(::ADESWeights) = "ADES"
+
+# Override update!
+function update!(w::ADESWeights{T},
+    radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+    w.w8s = w8sades(radec)
+    return nothing
+end
+
+@doc raw"""
+    w8sades(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+
+Return the statistical weight of each element of `radec` according
+to the ADES format. If ADES does not contain the necessary information,
+return the weight assigned by Veres et al. (2017).
+
+!!! reference
+    See https://minorplanetcenter.net/mpcops/documentation/ades/.
+"""
 function w8sades(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     # ID
     id = isempty(radec[end].num) ? radec[end].tmpdesig : radec[end].num
@@ -216,7 +255,7 @@ function w8sades(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
         end
     end
 
-    return @. 1 / w8sra^2, 1 / w8sdec^2
+    return @. tuple(1 / w8sra^2, 1 / w8sdec^2)
 end
 
 # Optical astrometry debiasing schemes API
@@ -262,7 +301,7 @@ mutable struct Farnocchia15{T} <: AbstractDebiasingScheme{T}
 end
 
 # Override getid
-getid(d::Farnocchia15) = "Farnocchia et al. (2015)"
+getid(::Farnocchia15) = "Farnocchia et al. (2015)"
 
 # Override update!
 function update!(d::Farnocchia15{T},
