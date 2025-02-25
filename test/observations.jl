@@ -2,6 +2,7 @@
 
 using NEOs
 using Dates
+using LinearAlgebra
 using Test
 
 using NEOs: src_path
@@ -348,4 +349,56 @@ using NEOs: src_path
         @test tracklets[3].night.utc == -1
     end
 
+    @testset "AbstractErrorModel" begin
+        # Download optical astrometry
+        radec = fetch_radec_mpc("2014 AA")
+
+        # Weighting schemes
+        w1 = UniformWeights(radec)
+        w2 = Veres17(radec)
+        w3 = ADESWeights(radec)
+        w4 = NEOCCWeights(radec)
+        w5 = NEODyS2Weights(radec)
+
+        @test isa(w1, UniformWeights{Float64})
+        @test isa(w2, Veres17{Float64})
+        @test isa(w3, ADESWeights{Float64})
+        @test isa(w4, NEOCCWeights{Float64})
+        @test isa(w5, NEODyS2Weights{Float64})
+
+        @test length(radec) == length(w1.w8s) == length(w2.w8s) == length(w3.w8s) ==
+            length(w4.w8s) == length(w5.w8s)
+        @test all(==((1.0, 1.0)), w1.w8s)
+        @test all(x -> isapprox(x[1], 0.017, atol = 1e-3) &&
+            isapprox(x[2], 0.027, atol = 1e-3), w2.w8s)
+
+        @test all(==((2.2857142857142856, 2.2857142857142856)), w2.w8s)
+        @test all(==((4.0, 4.0)), w3.w8s)
+        @test all(==((2.288743273955703, 2.288743273955703)), w4.w8s)
+        @test all(==((2.288743273955703, 2.288743273955703)), w5.w8s)
+
+        # Debiasing schemes
+        d1 = Farnocchia15(radec)
+        d2 = Eggl20(radec)
+        d3 = ZeroDebiasing(radec)
+        d4 = NEOCCDebiasing(radec)
+        d5 = NEODyS2Debiasing(radec)
+
+        @test isa(d1, Farnocchia15{Float64})
+        @test isa(d2, Eggl20{Float64})
+        @test isa(d3, ZeroDebiasing{Float64})
+        @test isa(d4, NEOCCDebiasing{Float64})
+        @test isa(d5, NEODyS2Debiasing{Float64})
+
+        @test length(radec) == length(d1.bias) == length(d2.bias) == length(d3.bias) ==
+            length(d4.bias) == length(d5.bias)
+        @test all(x -> isapprox(x[1], 0.017, atol = 1e-3) &&
+            isapprox(x[2], 0.027, atol = 1e-3), d1.bias)
+        @test all(x -> isapprox(x[1], 0.021, atol = 1e-3) &&
+            isapprox(x[2], -0.019, atol = 1e-3), d2.bias)
+        @test all(==((0.0, 0.0)), d3.bias)
+        @test all(==((0.017, 0.028)), d4.bias)
+        @test all(==((0.017, 0.028)), d5.bias)
+
+    end
 end
