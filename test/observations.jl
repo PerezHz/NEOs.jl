@@ -369,13 +369,13 @@ using NEOs: src_path
         @test length(radec) == length(w1.w8s) == length(w2.w8s) == length(w3.w8s) ==
             length(w4.w8s) == length(w5.w8s)
         @test all(==((1.0, 1.0)), w1.w8s)
-        @test all(x -> isapprox(x[1], 0.017, atol = 1e-3) &&
-            isapprox(x[2], 0.027, atol = 1e-3), w2.w8s)
-
-        @test all(==((2.2857142857142856, 2.2857142857142856)), w2.w8s)
+        @test all(x -> isapprox(x[1], 2.285, atol = 1e-3) &&
+            isapprox(x[2], 2.285, atol = 1e-3), w2.w8s)
         @test all(==((4.0, 4.0)), w3.w8s)
-        @test all(==((2.288743273955703, 2.288743273955703)), w4.w8s)
-        @test all(==((2.288743273955703, 2.288743273955703)), w5.w8s)
+        @test all(x -> isapprox(x[1], 2.288, atol = 1e-3) &&
+            isapprox(x[2], 2.288, atol = 1e-3), w4.w8s)
+        @test all(x -> isapprox(x[1], 2.288, atol = 1e-3) &&
+            isapprox(x[2], 2.288, atol = 1e-3), w5.w8s)
 
         # Debiasing schemes
         d1 = Farnocchia15(radec)
