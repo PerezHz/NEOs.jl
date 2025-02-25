@@ -117,8 +117,17 @@ using NEOs: src_path
 
     @testset "RadecMPC" begin
 
-        using NEOs: RADEC_MPC_REGEX, RadecMPC
+        using NEOs: RADEC_MPC_REGEX, RadecMPC, unpackdesig, packdesig
         using Dates
+
+        # (Un)packdesig
+        packedids = ["J95X00A", "J95X01L", "J95F13B", "J98SA8Q", "J98SC7V", "J98SG2S",
+            "K99AJ3Z", "K08Aa0A", "K07Tf8A"]
+        unpackedids = ["1995 XA", "1995 XL1", "1995 FB13", "1998 SQ108", "1998 SV127",
+            "1998 SS162", "2099 AZ193", "2008 AA360", "2007 TA418"]
+
+        @test all(unpackdesig.(packedids) .== unpackedids)
+        @test all(packdesig.(unpackedids) .== packedids)
 
         # Parse RadecMPC
         apophis_s = "99942K04M04N  C2004 03 15.10789 04 06 08.08 +16 55 04.6                om6394691"
