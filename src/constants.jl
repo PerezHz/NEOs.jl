@@ -150,6 +150,11 @@ const MPC_NEOCP_OBS_API_URL = "https://data.minorplanetcenter.net/api/get-obs-ne
 # NEO Confirmation Page Show Orbits URL
 const NEOCP_SHOWORBS_URL = "https://cgi.minorplanetcenter.net/cgi-bin/showobsorbs.cgi"
 
+# NEOCC Automated data access url
+const NEOCC_URL = "https://neo.ssa.esa.int/"
+# NEOCC Observations API url
+const NEOCC_OBS_API_URL = NEOCC_URL * "PSDB-portlet/download?file="
+
 # Abbreviations
 const cte = constant_term
 

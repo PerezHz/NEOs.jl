@@ -66,13 +66,78 @@ function RadecMPC(date::DateTime, α::T, δ::T, observatory::ObservatoryMPC{T}) 
     RadecMPC{T}("", "", "", "", "", date, α, δ, "", "", "", unknowncat(), "", observatory)
 end
 
+@doc raw"""
+    unpackdesig(s::AbstractString)
+
+Unpack a MPC provisional designation.
+
+See also [`packdesig`](@ref).
+
+!!! reference
+    See https://minorplanetcenter.net/iau/info/PackedDes.html#prov.
+"""
+function unpackdesig(s::AbstractString)
+    if s[1] == 'I'
+        century = 1800
+    elseif s[1] == 'J'
+        century = 1900
+    elseif s[1] == 'K'
+        century = 2000
+    end
+    year = century + parse(Int, s[2:3])
+    half_month_letter = s[4]
+    second_letter = s[7]
+    if all(isnumeric, s[5:6])
+        cycle_count = parse(Int, s[5:6])
+    elseif isuppercase(s[5])
+        cycle_count = 100 + 10 * (s[5] - 'A') + parse(Int, s[6])
+    else
+        cycle_count = 100 + 10 * (s[5] - 6 - 'A') + parse(Int, s[6])
+    end
+
+    return string(year, " ", half_month_letter, second_letter,
+        cycle_count)
+end
+
+@doc raw"""
+    packdesig(s::AbstractString)
+
+Pack a MPC provisional designation.
+
+See also [`unpackdesig`](@ref).
+
+!!! reference
+    See https://minorplanetcenter.net/iau/info/PackedDes.html#prov.
+"""
+function packdesig(s::AbstractString)
+    year, tail = split(s, " ")
+    if year[1:2] == "18"
+        packed_year = string("I", year[3:4])
+    elseif year[1:2] == "19"
+        packed_year = string("J", year[3:4])
+    elseif year[1:2] == "20"
+        packed_year = string("K", year[3:4])
+    end
+    half_month_letter, second_letter = tail[1:2]
+    number = parse(Int, tail[3:end])
+    if number ≤ 99
+        cycle_count = lpad(tail[3:end], 2, "0")
+    elseif 100 ≤ number ≤ 359
+        cycle_count = string(parse(Int, tail[3:4]) - 10 + 'A', tail[end])
+    else
+        cycle_count = string(parse(Int, tail[3:4]) - 36 + 'a', tail[end])
+    end
+
+    return string(packed_year, half_month_letter, cycle_count, second_letter)
+end
+
 # Print method for RadecMPC
 # Examples:
 # K08E68K α: 166.27754° δ: -0.66325° t: 2008-03-05T10:34:27.840 obs: Mt. Lemmon Survey
 # 99942 α: 146.12752° δ: 13.31300° t: 2004-06-19T04:11:47.990 obs: Kitt Peak
 function show(io::IO, m::RadecMPC{T}) where {T <: AbstractFloat}
     # If there is no number, use temporary designation
-    id_str = filter(!isspace, m.num) == "" ? m.tmpdesig : m.num
+    id_str = filter(!isspace, m.num) == "" ? unpackdesig(m.tmpdesig) : m.num
 
     print(io, id_str, " α: ", @sprintf("%.5f", rad2deg(m.α)), "° δ: ", @sprintf("%.5f", rad2deg(m.δ)), "° t: ", m.date,
               " obs: ", m.observatory.name)
