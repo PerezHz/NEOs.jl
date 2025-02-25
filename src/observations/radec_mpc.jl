@@ -94,9 +94,10 @@ function unpackdesig(s::AbstractString)
     else
         cycle_count = 100 + 10 * (s[5] - 6 - 'A') + parse(Int, s[6])
     end
+    cycle_count_s = iszero(cycle_count) ? "" : string(cycle_count)
 
     return string(year, " ", half_month_letter, second_letter,
-        cycle_count)
+        cycle_count_s)
 end
 
 @doc raw"""
@@ -119,7 +120,7 @@ function packdesig(s::AbstractString)
         packed_year = string("K", year[3:4])
     end
     half_month_letter, second_letter = tail[1:2]
-    number = parse(Int, tail[3:end])
+    number = length(tail) > 2 ? parse(Int, tail[3:end]) : 0
     if number ≤ 99
         cycle_count = lpad(tail[3:end], 2, "0")
     elseif 100 ≤ number ≤ 359
