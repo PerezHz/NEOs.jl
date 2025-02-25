@@ -64,7 +64,7 @@ function parsexml(filename::String)
         catalogue = unknowncat()
         mag = parse(Float64, o[10].children[1].value)
         band = o[12].children[1].value
-        radec[i] = RadecMPC{Float64}("", "2024PDC25", "", "", "C", date,
+        radec[i] = RadecMPC{Float64}("", "K24P25DC", "", "", "C", date,
             α, δ, "", mag, band, catalogue, "", observatory)
     end
     sort!(radec)
@@ -84,8 +84,8 @@ function neo2024PDC25(filename::String)
         outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
         fudge = 100.0, max_per = 20.0
     )
-    od = ODProblem(newtonian!, radec[1:6], UniformWeights)
-    od.w8s.w8s .= 0.2
+    od = ODProblem(newtonian!, radec[1:6], UniformWeights, ZeroDebiasing)
+    od.w8s.w8s .= [(1 / 0.2^2, 1 / 0.2^2) for _ in 1:6]
     # Declare jet transport variables
     varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
     dq = scaled_variables("dx", fill(1e-6, 6); order = varorder)
@@ -123,9 +123,11 @@ function neo2024PDC25(filename::String)
         "nrms = ", @sprintf("%.3f", nrms(sol2)))
     # Include remaining observations
     NEOs.update!(od, radec)
-    od.w8s.w8s .= 0.2
-    println("First root fails to converge in JT least squares when considering ",
-        "the full set of optical astrometry")
+    od.w8s.w8s .= [(1 / 0.2^2, 1 / 0.2^2) for _ in eachindex(radec)]
+    sol12 = orbitdetermination(od, sol1, params)
+    println("First root converges via JT least squares to an orbit with ",
+        "nrms = ", @sprintf("%.3f", nrms(sol12)), " when considering the full ",
+        "set of optical astrometry")
     sol22 = orbitdetermination(od, sol2, params)
     println("Second root converges via JT least squares to an orbit with ",
         "nrms = ", @sprintf("%.3f", nrms(sol22)), " when considering the full ",
