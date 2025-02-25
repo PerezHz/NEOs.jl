@@ -61,9 +61,11 @@ export loadpeeph, bwdfwdeph
 export obsposECEF, obsposvelECI
 # Tracklet
 export nobs, astrometry, datediff
+# Error model
+export UniformWeights, Veres17, ADESWeights, NEOCCWeights, NEODyS2Weights
+export Farnocchia15, Eggl20, ZeroDebiasing, NEOCCDebiasing, NEODyS2Debiasing
 # Optical astrometry processing
-export UniformWeights, Veres17, ADESWeights, Farnocchia15, Eggl20, ZeroDebiasing,
-        compute_radec, unfold, residuals, isoutlier
+export compute_radec, unfold, residuals, isoutlier
 # Radar astrometry processing
 export compute_delay, radar_astrometry
 # Asteroid dynamical models

@@ -155,6 +155,11 @@ const NEOCC_URL = "https://neo.ssa.esa.int/"
 # NEOCC Observations API url
 const NEOCC_OBS_API_URL = NEOCC_URL * "PSDB-portlet/download?file="
 
+# NEODyS-2 main webpage
+const NEODyS2_URL = "https://newton.spacedys.com/neodys/"
+# NEODyS-2 Observations API url
+const NEODyS2_OBS_API_URL = "https://newton.spacedys.com/~neodys2/mpcobs/"
+
 # Abbreviations
 const cte = constant_term
 
