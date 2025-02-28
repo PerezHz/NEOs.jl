@@ -21,6 +21,9 @@ const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
 
 # Parsing
 
+# Characters for MPC base 62 encoding of RadecMPC fields
+const BASE_62_ENCODING = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
 # Regular expression to parse a catalogue in MPC format
 const CATALOGUE_MPC_REGEX = r"\s{2}(?P<code>\w{1})\s{4}(?P<name>.*)"
 # Header of MPC catalogues file
