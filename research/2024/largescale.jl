@@ -47,7 +47,7 @@ function shist(snrs::Vector{T}, mask::BitVector, filename::String;
     p = @sprintf("%.2f", count(mask) * 100 / length(snrs))
     l = "$(count(mask))/$(length(snrs)) NEOs ($p%)"
     histogram(log10.(snrs[mask]), label = l,
-        xlabel = L"\log_{10}(\textrm{minimum \ SNR})",
+        xlabel = L"\log_{10}(\textrm{SNR})",
         ylabel = "Number of NEOs", xlim = (-4, 5), ylim = (0, ymax),
         xticks = -4:5, yticks = 0:50:ymax, legend = :topleft, bins = -4:0.2:5)
     annotate!(4.5, ysub, sub)
