@@ -211,7 +211,7 @@ G function of an [`AdmissibleRegion`](@ref).
 """
 function arG(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
     if ρ == G⁻¹0(coeffs)
-        return coeffs[3] * zero(ρ)
+        return zero(coeffs[3] * ρ)
     else
         return 2 * k_gauss^2 * μ_ES / ρ - coeffs[3] * ρ^2
     end
