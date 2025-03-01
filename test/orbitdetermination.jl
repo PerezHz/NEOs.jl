@@ -261,7 +261,8 @@ end
         a, b = rangerates(A, A.ρ_domain[1], :inner)
         @test a ≈ -b atol = 1e-18
         @test minimum(rangerates(A, A.ρ_domain[2], :outer)) == A.Fs[3, 2]
-        @test isempty(rangerates(A, ρ0, :inner))
+        @test !isempty(rangerates(A, ρ0, :inner))
+        @test rangerates(A, ρ0, :inner) == [zero(ρ0)]
         @test isempty(rangerates(A, A.ρ_domain[2] + 1.0, :outer))
         @test isempty(rangerates(A, ρ0 + 1.0, :inner))
         @test rangerate(A, A.ρ_domain[1], :min, :outer) == A.v_ρ_domain[1]

@@ -195,15 +195,29 @@ arS(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arS(A.coeffs
 @doc raw"""
     arG(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
 
+Auxiliary function to compute the root of G ([`AdmissibleRegion`](@ref)) from
+an [`AdmissibleRegion`](@ref).
+"""
+G⁻¹0(coeffs::Vector) = cbrt(2 * k_gauss^2 * μ_ES / coeffs[3])
+G⁻¹0(A::AdmissibleRegion) = G⁻¹0(A.coeffs)
+
+@doc raw"""
+    arG(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
+
 G function of an [`AdmissibleRegion`](@ref).
 
 !!! reference
     See equation (8.13) of https://doi.org/10.1017/CBO9781139175371.
 """
 function arG(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
-    return 2 * k_gauss^2 * μ_ES / ρ - coeffs[3] * ρ^2
+    if ρ == G⁻¹0(coeffs)
+        return zero(coeffs[3] * ρ)
+    else
+        return 2 * k_gauss^2 * μ_ES / ρ - coeffs[3] * ρ^2
+    end
 end
 arG(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arG(A.coeffs, ρ)
+
 
 @doc raw"""
     arenergycoeffs(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T <: Real, S <: Number}
@@ -300,7 +314,7 @@ function _helrangerates(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: Real}
 end
 
 function _georangerates(coeffs::Vector{T}, ρ::S) where {T, S <: Real}
-    ρ0 = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / coeffs[3]))
+    ρ0 = min(R_SI, G⁻¹0(coeffs))
     !(0 < ρ <= ρ0) && return Vector{T}(undef, 0)
     a, b, c = _argeoenergycoeffs(coeffs, ρ)
     d = b^2 - 4*a*c
@@ -347,7 +361,7 @@ function _helrangerate(coeffs::Vector{T}, a_max::T, ρ::T, m::Symbol) where {T <
 end
 
 function _georangerate(coeffs::Vector{T}, ρ::T, m::Symbol) where {T <: Real}
-    ρ0 = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / coeffs[3]))
+    ρ0 = min(R_SI, G⁻¹0(coeffs))
     @assert 0 < ρ <= ρ0 "No solutions for geocentric energy outside 0 < ρ <= ρ0"
     a, b, c = _argeoenergycoeffs(coeffs, ρ)
     d = b^2 - 4*a*c
@@ -455,7 +469,7 @@ an admissible region with coefficients `coeffs`.
 """
 function _geomaxrange(coeffs::Vector{T}) where {T <: Real}
     # Initial guess
-    ρ_max = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / coeffs[3]))
+    ρ_max = min(R_SI, G⁻¹0(coeffs))
     # Make sure G(ρ) ≥ 0 and there is at least one _georangerate solution
     niter = 0
     while _argeoenergydis(coeffs, ρ_max) < 0 || length(_georangerates(coeffs, ρ_max)) == 0
