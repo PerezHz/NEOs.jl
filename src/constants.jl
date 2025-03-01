@@ -226,3 +226,39 @@ const R_SI = 0.010044
 const R_EA = 4.24e-5
 # Ratio between the mass of the Earth and the mass of the Sun
 const μ_ES = PE.μ[ea] / PE.μ[su] # 1 / 328_900.5614
+
+# Conversion to V band used by MPC
+# See https://minorplanetcenter.net/iau/info/BandConversion.txt
+const V_BAND_CORRECTION = Dict{String, Float64}(
+    "" => -0.8,
+    "U" => -1.3,
+    "B" => -0.8,
+    "g" => -0.35,
+    "V" =>  0,
+    "r" =>  0.14,
+    "R" =>  0.4,
+    "C" =>  0.4,
+    "W" =>  0.4,
+    "i" =>  0.32,
+    "z" =>  0.26,
+    "I" =>  0.8,
+    "J" =>  1.2,
+    "w" => -0.13,
+    "y" =>  0.32,
+    "L" =>  0.2,
+    "H" =>  1.4,
+    "K" =>  1.7,
+    "Y" =>  0.7,
+    "G" =>  0.28,
+    "v" =>  0,
+    "c" => -0.05,
+    "o" =>  0.33,
+    "u" => +2.5
+)
+# Parameters of the linear H and G magnitude system for asteroids
+# See https://minorplanetcenter.net/iau/ECS/MPCArchive/1985/MPC_19851227.pdf
+const SLOPE_PARAMETER = 0.15
+const PHASE_INTEGRAL_A1 = 3.33
+const PHASE_INTEGRAL_A2 = 1.87
+const PHASE_INTEGRAL_B1 = 0.63
+const PHASE_INTEGRAL_B2 = 1.22

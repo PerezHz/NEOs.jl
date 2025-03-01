@@ -35,7 +35,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params)
 
-        # Values by Oct 1, 2024
+        # Values by Mar 1, 2025
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -68,6 +68,9 @@ end
         JPL = [-0.9867704701732631, 0.3781890325424674, 0.14094513213009532,
             -0.008773157203087259, -0.00947109649687576, -0.005654229864757284]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.76)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(sol, params)
+        @test H - dH ≤ 24.3 ≤ H + dH
 
         # Add observations
         subradec = iodsubradec(radec, 15)
@@ -108,6 +111,9 @@ end
         @test maximum(sol1.jacobian) < 1e-6
         # Compatibility with JPL
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.31)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(sol1, params)
+        @test H - dH ≤ 24.3 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(od, sol1, params) == 7
     end
@@ -130,7 +136,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params)
 
-        # Values by Dec 11, 2024
+        # Values by Mar 1, 2025
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -163,6 +169,9 @@ end
         JPL = [1.0042569058151192, 0.2231639040146286, 0.11513854178693468,
             -0.010824212819531798, 0.017428798232689943, 0.0071046780555307385]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 8.1e-3)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(sol, params)
+        @test H - dH ≤ 24.0 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(od, sol, params) == 10
     end
@@ -186,7 +195,7 @@ end
         scaled_variables("dx", ones(6); order = varorder)
         sol = gaussiod(od, params)
 
-        # Values by Dec 11, 2024
+        # Values by Mar 1, 2025
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -219,6 +228,9 @@ end
         JPL = [-0.12722461679828806, -0.9466098076903212, -0.4526816007640767,
             0.02048875631534963, -0.00022720097573790754, 0.00321302850930331]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.16)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(sol, params)
+        @test H - dH ≤ 21.7 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(od, sol, params) == 9
     end
@@ -349,7 +361,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params)
 
-        # Values by Oct 1, 2024
+        # Values by Mar 1, 2025
 
         # Curvature
         C, Γ_C = curvature(radec)
@@ -388,6 +400,9 @@ end
         JPL = [-0.9698405495747651, 0.24035304578776012, 0.10288276585828428,
             -0.009512301266159554, -0.01532548565855646, -0.00809464581680694]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.012)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(sol, params)
+        @test H - dH ≤ 29.6 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(od, sol, params) == 11
     end
@@ -410,7 +425,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         sol = orbitdetermination(od, params)
 
-        # Values by Oct 11, 2024
+        # Values by Mar 1, 2025
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -443,6 +458,9 @@ end
         JPL = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
             -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.07)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(sol, params)
+        @test H - dH ≤ 26.7 ≤ H + dH
 
         # Add remaining observations
         NEOs.update!(od, radec)
@@ -478,6 +496,9 @@ end
         @test maximum(sol1.jacobian) < 8e-7
         # Compatibility with JPL
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 7e-4)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(sol, params)
+        @test H - dH ≤ 26.7 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(od, sol1, params) == 8
     end
@@ -503,7 +524,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params)
 
-        # Values by Oct 1, 2024
+        # Values by Mar 1, 2025
 
         # Curvature
         C, Γ_C = curvature(radec)
@@ -542,6 +563,9 @@ end
         JPL = [-0.1793421909678032, 0.8874121750891107, 0.3841434101167349,
             -0.017557851117612377, -0.005781634223099801, -0.0020075106081869185]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.3)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(sol, params)
+        @test H - dH ≤ 30.9 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(od, sol, params) == 10
 
@@ -563,7 +587,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params)
 
-        # Values by Oct 1, 2024
+        # Values by Mar 1, 2025
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -596,6 +620,9 @@ end
         JPL = [0.9739760787551061, 0.21541704400792083, 0.09401075290627411,
             -0.00789675674941779, 0.0160619782715116, 0.006135361409943397]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.20)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(sol, params)
+        @test H - dH ≤ 30.4 ≤ H + dH
 
         # Add observations
         subradec = iodsubradec(radec, 10)
@@ -636,6 +663,9 @@ end
         @test maximum(sol1.jacobian) < 1e-6
         # Compatibility with JPL
         @test all(abs.(sol1() - JPL) ./ sigmas(sol1) .< 0.17)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(sol, params)
+        @test H - dH ≤ 30.4 ≤ H + dH
         # Parameters uncertainty
         @test all(sigmas(sol1) .< sigmas(sol))
         # TODO: understand better differences wrt JPL solutions
@@ -693,7 +723,7 @@ end
         # Initial Orbit Determination
         sol = orbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Nov 21, 2024
+        # Values by Mar 1, 2025
 
         # Orbit solution
         @test isa(sol, NEOSolution{Float64, Float64})
@@ -727,6 +757,11 @@ end
         JPL = [ 0.827266656726981, -0.8060653913101916, -0.6506187674672722,
             0.01660013577219304, -0.005614737443087259, 0.002899489877794496]
         @test all(abs.(sol() - JPL) ./ sigmas(sol) .< 0.59)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(sol, params)
+        @test H - dH ≤ 18.5 ≤ H + dH
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(od, sol, params) == 11
     end
 
 end

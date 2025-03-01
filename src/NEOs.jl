@@ -28,7 +28,7 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, daysec, yr
 using Healpix: ang2pixRing, Resolution
 using StatsBase: mean, std
 using LinearAlgebra: inv!
-using LsqFit: curve_fit, vcov
+using LsqFit: curve_fit, vcov, standard_errors
 using Roots: find_zeros
 using HORIZONS: smb_spk
 using OhMyThreads: tmap, tmap!
@@ -89,6 +89,8 @@ export NEOParameters, ODProblem, curvature, issinglearc, orbitdetermination
 export valsecchi_circle, bopik, mtp
 # Outlier rejection
 export outlier_rejection!
+# Magnitude
+export absolutemagnitude
 
 include("constants.jl")
 include("observations/observations.jl")

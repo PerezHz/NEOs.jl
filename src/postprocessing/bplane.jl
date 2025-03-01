@@ -1,3 +1,5 @@
+include("magnitude.jl")
+
 @doc raw"""
     crosssection(μ_P, R_P, vinf)
 
