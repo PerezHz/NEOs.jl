@@ -1,5 +1,5 @@
 include("osculating.jl")
-include("leastsquares/methods.jl")
+include("leastsquares/fit.jl")
 include("odproblem.jl")
 include("neosolution.jl")
 include("admissibleregion.jl")
