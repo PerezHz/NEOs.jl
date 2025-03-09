@@ -1,5 +1,9 @@
-include("targetfunctions.jl")
-include("fit.jl")
+@doc raw"""
+    AbstractLeastSquares{T <: Real}
+
+Supertype for the least squares API.
+"""
+abstract type AbstractLeastSquares{T <: Real} end
 
 @doc raw"""
     AbstractLeastSquaresCache{T} <: AbstractLeastSquares{T}
@@ -23,8 +27,6 @@ struct LeastSquaresCache{T} <: AbstractLeastSquaresCache{T}
     end
 end
 
-include("outlierrejection.jl")
-
 @doc raw"""
     AbstractLeastSquaresMethod{T} <: AbstractLeastSquares{T}
 
@@ -36,7 +38,7 @@ abstract type AbstractLeastSquaresMethod{T} <: AbstractLeastSquares{T} end
 function leastsquares!(ls::LS, cache::LeastSquaresCache{T}) where {T <: Real,
     LS <: AbstractLeastSquaresMethod{T}}
     # Allocate memory for least squares fit
-    fit = LeastSquaresFit(T, getid(ls))
+    fit = LeastSquaresFit(T, typeof(ls))
     # Unfold
     x0, xs, Qs, idxs = cache.x0, cache.xs, cache.Qs, cache.idxs
     maxiter = cache.maxiter
@@ -68,7 +70,7 @@ function leastsquares!(ls::LS, cache::LeastSquaresCache{T}) where {T <: Real,
     Γ = inv(C)
     # Update fit
     if all(diag(Γ) .> 0)
-        fit = LeastSquaresFit(true, xs[:, i], Γ, Symbol(getid(ls)))
+        fit = LeastSquaresFit(true, xs[:, i], Γ, typeof(ls))
     end
 
     return fit

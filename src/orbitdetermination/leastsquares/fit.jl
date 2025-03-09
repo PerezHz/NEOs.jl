@@ -1,9 +1,6 @@
-@doc raw"""
-    AbstractLeastSquares{T <: Real}
-
-Supertype for the least squares API.
-"""
-abstract type AbstractLeastSquares{T <: Real} end
+include("methods.jl")
+include("targetfunctions.jl")
+include("outlierrejection.jl")
 
 @doc raw"""
     LeastSquaresFit{T} <: AbstractLeastSquares{T}
@@ -15,26 +12,26 @@ A least squares fit.
 - `success::Bool`: whether the routine converged or not.
 - `x::Vector{T}`: deltas that minimize the objective function.
 - `Γ::Matrix{T}`: covariance matrix.
-- `routine::Symbol`: minimization routine.
+- `routine::Type{<:AbstractLeastSquaresMethod}`: minimization routine.
 """
 @auto_hash_equals struct LeastSquaresFit{T} <: AbstractLeastSquares{T}
     success::Bool
     x::Vector{T}
     Γ::Matrix{T}
-    routine::Symbol
+    routine::Type{<:AbstractLeastSquaresMethod}
     # Inner constructor
     LeastSquaresFit(success::Bool, x::Vector{T}, Γ::Matrix{T},
-        routine::Symbol) where {T <: Real} = new{T}(success, x, Γ, routine)
+        routine::Type{<:AbstractLeastSquaresMethod}) where {T <: Real} = new{T}(success, x, Γ, routine)
 end
 
 # Outer constructor
-LeastSquaresFit(::Type{T}, id::AbstractString) where {T <: Real} =
-    LeastSquaresFit(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), Symbol(id))
+LeastSquaresFit(::Type{T}, method::Type{<:AbstractLeastSquaresMethod}) where {T <: Real} =
+    LeastSquaresFit(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), method)
 
 # Definition of zero LeastSquaresFit{T}
 zero(::Type{LeastSquaresFit{T}}) where {T <: Real} =
     LeastSquaresFit(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0),
-    Symbol("Least Squares"))
+    AbstractLeastSquaresMethod)
 
 # Print method for LeastSquaresFit
 # Examples:
