@@ -39,7 +39,7 @@ zero(::Type{LeastSquaresFit{T}}) where {T <: Real} =
 # Succesful Differential Corrections
 function show(io::IO, fit::LeastSquaresFit)
     success_s = fit.success ? "Succesful" : "Unsuccesful"
-    routine_s = String(fit.routine)
+    routine_s = string(fit.routine)
     print(io, success_s, " ", routine_s)
 end
 
