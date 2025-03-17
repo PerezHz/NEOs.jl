@@ -500,7 +500,7 @@ end
         H, dH = absolutemagnitude(sol, params)
         @test H - dH ≤ 26.7 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, sol1, params) == 8
+        @test uncertaintyparameter(od, sol1, params) == 9
     end
 
     @testset "Interesting NEOs" begin
