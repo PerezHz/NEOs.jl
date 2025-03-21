@@ -31,7 +31,7 @@ using LinearAlgebra: inv!
 using LsqFit: curve_fit, vcov, standard_errors
 using Roots: find_zeros
 using HORIZONS: smb_spk
-using OhMyThreads: tmap, tmap!
+using OhMyThreads: tmap, tmap!, @allow_boxed_captures
 using TaylorIntegration: RetAlloc, _determine_parsing!, _taylorinteg!
 
 # Constants

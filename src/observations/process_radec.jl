@@ -386,7 +386,7 @@ function residuals!(res::Vector{OpticalResidual{T, U}},
     bias::AbstractVector{Tuple{T, T}}; xva::AstEph, kwargs...) where {AstEph,
     T <: Real, U <: Number}
 
-    tmap!(res, radec, w8s, bias, isoutlier.(res)) do obs, w8, bias, outlier
+    @allow_boxed_captures tmap!(res, radec, w8s, bias, isoutlier.(res)) do obs, w8, bias, outlier
         # Observed ra/dec
         α_obs = rad2arcsec(ra(obs))   # arcsec
         δ_obs = rad2arcsec(dec(obs))  # arcsec
