@@ -28,7 +28,7 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, daysec, yr
 using Healpix: ang2pixRing, Resolution
 using StatsBase: mean, std
 using LinearAlgebra: inv!
-using LsqFit: curve_fit, vcov, standard_errors
+using LsqFit: curve_fit, vcov, stderror
 using Roots: find_zeros
 using HORIZONS: smb_spk
 using OhMyThreads: tmap, tmap!, @allow_boxed_captures

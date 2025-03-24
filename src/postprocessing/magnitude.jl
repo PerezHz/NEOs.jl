@@ -41,7 +41,7 @@ function absolutemagnitude(sol::NEOSolution{T, T},
     H0 = [mean(view(hs, mask))]
     fit = curve_fit(hmodel, view(tdata, mask), view(hs, mask), H0)
     H = fit.param[1]
-    dH = standard_errors(fit)[1]
+    dH = stderror(fit)[1]
 
     return H, dH
 end
