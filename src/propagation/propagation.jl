@@ -164,7 +164,7 @@ end
 
 @doc raw"""
     propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-        params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number, D}
+        params::NEOParameters{T}; kwargs...) where {D, T <: Real, U <: Number, V <: Number}
 
 Integrate an orbit via the Taylor method. The initial Julian date `jd0` is assumed
 to be in TDB time scale.
@@ -176,21 +176,26 @@ to be in TDB time scale.
 - `tspan::T`: time span of the integration [in years].
 - `q0::Vector{U}`: vector of initial conditions.
 - `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+
+## Keyword arguments
+
+- `callback`: break callback.
 """
-function propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-            params::NEOParameters{T}) where {T <: Real, U <: Number, V <: Number, D}
+function propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, params::NEOParameters{T};
+            callback = nothing) where {D, T <: Real, U <: Number, V <: Number}
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
     tlim = minmax(_jd0_, _jd0_ + tspan * yr) .- JD_J2000
     buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
     # Propagate orbit
-    return _propagate(dynamics, jd0, tspan, q0, buffer, params)
+    return _propagate(dynamics, jd0, tspan, q0, buffer, params; callback)
 end
 
 function _propagate(
         dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-        buffer::PropagationBuffer{T, U, V}, params::NEOParameters{T}
-    ) where {T <: Real, U <: Number, V <: Number, D}
+        buffer::PropagationBuffer{T, U, V}, params::NEOParameters{T};
+        callback = nothing
+    ) where {D, T <: Real, U <: Number, V <: Number}
     # Unfold
     abstol, maxsteps = params.abstol, params.maxsteps
     cache, dparams = buffer.cache, buffer.params
@@ -198,7 +203,7 @@ function _propagate(
     dparams.jd0 = jd0
     # Propagate orbit
     @time sol = taylorinteg!(Val(true), dynamics, q0, zero(T), tspan * yr, abstol,
-        cache, dparams; maxsteps)
+        cache, dparams; maxsteps, callback)
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
@@ -207,7 +212,7 @@ end
 
 @doc raw"""
     propagate_root(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, params::NEOParameters{T};
-        kwargs...) where {T <: Real, U <: Number, V <: Number D}
+        kwargs...) where {D, T <: Real, U <: Number, V <: Number}
 
 Integrate an orbit via the Taylor method while finding the zeros of `NEOs.rvelea`.
 
@@ -224,24 +229,27 @@ Integrate an orbit via the Taylor method while finding the zeros of `NEOs.rvelea
 - `eventorder::Int`: order of the derivative of `rvelea` whose roots are computed.
 - `newtoniter::Int`: maximum Newton-Raphson iterations per detected root.
 - `nrabstol::T`: allowed tolerance for the Newton-Raphson process.
+- `callback`: break callback.
 """
 function propagate_root(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
             params::NEOParameters{T}; eventorder::Int = 0, newtoniter::Int = 10,
-            nrabstol::T = eps(T)) where {T <: Real, U <: Number, V <: Number, D}
+            nrabstol::T = eps(T), callback = nothing) where {D, T <: Real, U <: Number,
+            V <: Number}
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
     tlim = minmax(_jd0_, _jd0_ + tspan * yr) .- JD_J2000
     buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
     # Propagate orbit
     return _propagate_root(dynamics, jd0, tspan, q0, buffer, params;
-        eventorder, newtoniter, nrabstol)
+        eventorder, newtoniter, nrabstol, callback)
 end
 
 function _propagate_root(
         dynamics::D, jd0::V, tspan::T, q0::Vector{U},
         buffer::PropagationBuffer{T, U, V}, params::NEOParameters{T};
-        eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T)
-    ) where {T <: Real, U <: Number, V <: Number, D}
+        eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T),
+        callback = nothing
+    ) where {D, T <: Real, U <: Number, V <: Number}
     # Unfold
     abstol, maxsteps = params.abstol, params.maxsteps
     cache, dparams = buffer.cache, buffer.params
@@ -249,7 +257,7 @@ function _propagate_root(
     dparams.jd0 = jd0
     # Propagate orbit
     @time sol = taylorinteg!(Val(true), dynamics, rvelea, q0, zero(T), tspan * yr,
-        abstol, cache, dparams; maxsteps, eventorder, newtoniter, nrabstol)
+        abstol, cache, dparams; maxsteps, eventorder, newtoniter, nrabstol, callback)
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
