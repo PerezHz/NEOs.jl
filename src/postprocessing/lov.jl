@@ -1,23 +1,12 @@
-function covariance(od::ODProblem{D, T}, sol::NEOSolution{T, T},
-    params::NEOParameters{T}) where {D, T <: Real}
-    # Reference epoch [Julian days TDB]
-    jd0 = epoch(sol) + PE.J2000
-    # Plain initial condition
-    q00 = sol(epoch(sol))
-    # Scaling factors
-    scalings = 3 * sigmas(sol)
-
-    return covariance(od, jd0, q00, params; scalings)
-end
-
-function covariance(od::ODProblem{D, T}, jd0::T, q00::Vector{T}, params::NEOParameters{T};
+function covariance(res::Vector{OpticalResidual{T, TaylorN{T}}},
+    od::ODProblem{D, T}, jd0::T, q00::Vector{T}, params::NEOParameters{T};
     scalings::Vector{T} = abs.(q00) ./ 1e6) where {D, T <: Real}
     # Jet transport variables
     dq = set_variables(T, "dx"; order = 2, numvars = 6)
     # Jet transport initial condition
     q0 = q00 + scalings .* dq
     # Propagation and residuals
-    _, _, res = propres(od, jd0, q0, params)
+    propres!(res, od, jd0, q0, params)
     # Covariance matrix in residuals space
     Q = nms(res)
     C = notout(res) * TS.hessian(Q)
@@ -29,11 +18,11 @@ function covariance(od::ODProblem{D, T}, jd0::T, q00::Vector{T}, params::NEOPara
     return Γ_c
 end
 
-function lovcovariance(od::ODProblem{D, T}, jd0::T, q00::Vector{T},
-    params::NEOParameters{T}; scalings::Vector{T} = abs.(q00) ./ 1e6,
-    order::Int = 20) where {D, T <: Real}
+function lovcovariance(res::Vector{OpticalResidual{T, TaylorN{T}}},
+    od::ODProblem{D, T}, jd0::T, q00::Vector{T}, params::NEOParameters{T};
+    scalings::Vector{T} = abs.(q00) ./ 1e6, order::Int = 20) where {D, T <: Real}
     # Covariance matrix
-    Γ_c = covariance(od, jd0, q00, params; scalings)
+    Γ_c = covariance(res, od, jd0, q00, params; scalings)
     # Greatest eigenpair
     E = eigen(Γ_c)
     k1, v1 = sqrt(E.values[end]), E.vectors[:, end]
@@ -42,7 +31,7 @@ function lovcovariance(od::ODProblem{D, T}, jd0::T, q00::Vector{T},
     # LOV initial condition
     q0 = q00 + k1 * v1 * dq
     # Propagation and residuals
-    _, _, res = propres(od, jd0, q0, params)
+    propres!(res, od, jd0, q0, params)
     # Covariance matrix in residuals space
     Q = nms(res)
     C = notout(res) * TS.differentiate(Q, (2,))
@@ -96,18 +85,20 @@ function machseries(Γ::AbstractMatrix{TaylorN{T}}, order::Int) where {T <: Real
 end
 
 @taylorize function lov!(dq, q, lovparams, t)
-    local od = lovparams[1]
-    local jd0 = lovparams[2]
-    local params = lovparams[3]
-    local scalings = lovparams[4]
-    local lovorder = lovparams[5]
-    local Γ_c = lovcovariance(od, jd0, constant_term.(q), params; scalings,
+    local res = lovparams[1]
+    local od = lovparams[2]
+    local jd0 = lovparams[3]
+    local params = lovparams[4]
+    local scalings = lovparams[5]
+    local lovorder = lovparams[6]
+    local Γ_c = lovcovariance(res, od, jd0, constant_term.(q), params; scalings,
         order = lovorder)
     local λ, v = machseries(Γ_c, lovorder)
-    dq[1] = sqrt(λ) * v[1]
-    dq[2] = sqrt(λ) * v[2]
-    dq[3] = sqrt(λ) * v[3]
-    dq[4] = sqrt(λ) * v[4]
-    dq[5] = sqrt(λ) * v[5]
-    dq[6] = sqrt(λ) * v[6]
+    sqrt_λ = sqrt(λ)
+    dq[1] = sqrt_λ * v[1]
+    dq[2] = sqrt_λ * v[2]
+    dq[3] = sqrt_λ * v[3]
+    dq[4] = sqrt_λ * v[4]
+    dq[5] = sqrt_λ * v[5]
+    dq[6] = sqrt_λ * v[6]
 end
