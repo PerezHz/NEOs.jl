@@ -7,7 +7,7 @@ the following constraints:
 - absolute magnitude ≤ `H_max`,
 - geocentric energy ≥ `0`.
 
-# Fields
+## Fields
 
 - `date::DateTime`: time of observation.
 - `α::T`: right ascension.
@@ -48,21 +48,16 @@ the following constraints:
 end
 
 # Definition of zero AdmissibleRegion{T}
-function zero(::Type{AdmissibleRegion{T}}) where {T <: Real}
-    return AdmissibleRegion{T}(
-        DateTime(2000), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
-        Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
-        Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
-        Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs()
-    )
-end
+zero(::Type{AdmissibleRegion{T}}) where {T <: Real} = AdmissibleRegion{T}(
+    DateTime(2000), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
+    Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
+    Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
+    Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs()
+)
 
 iszero(x::AdmissibleRegion{T}) where {T <: Real} = x == zero(AdmissibleRegion{T})
 
 # Print method for AdmissibleRegion
-# Examples:
-# AE: [11.55523, 13.29296, -1.01625, -0.55432] t: 2019-10-23T05:23:27.384 obs: Palomar Mountain--ZTF
-# AE: [358.56604, 1.25546, -2.05305, -1.91538] t: 2019-11-01T09:03:26.280 obs: Pan-STARRS 1, Haleakala
 function show(io::IO, A::AdmissibleRegion{T}) where {T <: Real}
     v = string(
         @sprintf("%.5f", rad2deg(A.α)), ", ",
@@ -75,10 +70,10 @@ end
 
 # Outer constructor
 function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where {T <: Real}
-    # Unfold
+    # Unpack
     obs, t_datetime, α, δ = observatory(tracklet), date(tracklet), ra(tracklet), dec(tracklet)
     v_α, v_δ, h = vra(tracklet), vdec(tracklet), mag(tracklet)
-    H_max, a_max = params.H_max, params.a_max
+    @unpack H_max, a_max = params
     # Topocentric unit vector and partials
     ρ, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Time of observation [days since J2000]
@@ -120,8 +115,7 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     Fs[3, :] .= [ρ_max, v_ρ_mid]
 
     return AdmissibleRegion{T}(t_datetime, α, δ, v_α, v_δ, H_max, a_max,
-                               ρ, ρ_α, ρ_δ, q, coeffs, ρ_domain, v_ρ_domain,
-                               Fs, obs)
+        ρ, ρ_α, ρ_δ, q, coeffs, ρ_domain, v_ρ_domain, Fs, obs)
 end
 
 @doc raw"""

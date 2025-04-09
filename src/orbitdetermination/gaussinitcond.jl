@@ -444,6 +444,8 @@ end
 # minimization over the middle tracklet's manifold of variations.
 function _adam!(od::ODProblem{D, T}, i::Int, q::Vector{TaylorN{T}}, jd0::T,
     params::NEOParameters{T}) where {D, T <: Real}
+    # Unpack parameters
+    @unpack refscale, tsaorder = params
     # Middle tracklet
     tracklet = od.tracklets[i]
     # Exploratory propagation
@@ -459,14 +461,14 @@ function _adam!(od::ODProblem{D, T}, i::Int, q::Vector{TaylorN{T}}, jd0::T,
     # Boundary projection
     ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
     # ADAM
-    aes, Qs = adam(od, i, A, ρ, v_ρ, params; scale = params.refscale)
+    aes, Qs = adam(od, i, A, ρ, v_ρ, params; scale = refscale)
     ae, Q = aes[:, end], Qs[end]
     # Epoch [julian days] (corrected for light-time)
     jd0 = dtutc2jdtdb(A.date) - ae[5] / c_au_per_day
     # Convert attributable elements to barycentric cartesian coordinates
     q0 = attr2bary(A, ae, params)
     # Jet Transport initial condition
-    q .= [q0[j] + (abs(q0[j]) / 10^5) * TaylorN(j, order = params.tsaorder) for j in 1:6]
+    q .= [q0[j] + (abs(q0[j]) / 10^5) * TaylorN(j, order = tsaorder) for j in 1:6]
 
     return jd0
 end
@@ -486,15 +488,15 @@ See also [`gauss_method`](@ref).
 function gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: Real}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
-    # Unfold parameters
-    safegauss, varorder, significance = params.safegauss, params.gaussorder,
-        params.significance
+    # Unpack parameters
+    @unpack safegauss, gaussorder, significance, eph_su = params
+    @unpack tracklets, radec = od
     # This function requires exactly 3 tracklets
-    (safegauss && length(od.tracklets) != 3) && return sol
+    (safegauss && length(tracklets) != 3) && return sol
     # Jet transport scaling factors
     scalings = fill(1e-6, 6)
     # Jet transport perturbation (ra/dec)
-    dq = [scalings[i] * TaylorN(i, order = varorder) for i in 1:6]
+    dq = [scalings[i] * TaylorN(i, order = gaussorder) for i in 1:6]
     # gauss_method input
     observatories = Vector{ObservatoryMPC{T}}(undef, 3)
     dates = Vector{DateTime}(undef, 3)
@@ -502,9 +504,9 @@ function gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: 
     δ = Vector{T}(undef, 3)
     # Find best triplet of observations
     if safegauss
-        _gausstriplet!(observatories, dates, α, δ, od.tracklets)
+        _gausstriplet!(observatories, dates, α, δ, tracklets)
     else
-        _gausstriplet!(observatories, dates, α, δ, od.radec)
+        _gausstriplet!(observatories, dates, α, δ, radec)
     end
     # Julian day of middle observation
     _jd0_ = dtutc2jdtdb(dates[2])
@@ -519,21 +521,21 @@ function gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: 
         # Epoch (corrected for light-time)
         jd0 = _jd0_ - cte(solG[i].ρ[2]) / c_au_per_day
         # Jet transport initial conditions
-        q = solG[i].statevect .+ params.eph_su(jd0 - JD_J2000)
+        q = solG[i].statevect .+ eph_su(jd0 - JD_J2000)
         # Jet Transport Least Squares
-        _sol_ = jtls(od, jd0, q, od.tracklets, params, true)
+        _sol_ = jtls(od, jd0, q, tracklets, params, true)
         # Update solution
-        sol = updatesol(sol, _sol_, od.radec)
+        sol = updatesol(sol, _sol_, radec)
         # Termination condition
         critical_value(sol) < significance && return sol
         # ADAM help
-        j = safegauss ? 2 : findfirst(@. dates[2] in od.tracklets)
-        nobs(od.tracklets[j]) < 2 && continue
+        j = safegauss ? 2 : findfirst(@. dates[2] in tracklets)
+        nobs(tracklets[j]) < 2 && continue
         jd0 = _adam!(od, j, q, jd0, params)
         # Jet Transport Least Squares
-        _sol_ = jtls(od, jd0, q, od.tracklets, params, true)
+        _sol_ = jtls(od, jd0, q, tracklets, params, true)
         # Update solution
-        sol = updatesol(sol, _sol_, od.radec)
+        sol = updatesol(sol, _sol_, radec)
         # Termination condition
         critical_value(sol) < significance && return sol
     end
