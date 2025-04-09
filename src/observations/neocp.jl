@@ -105,7 +105,7 @@ list and return the output as `Vector{NEOCPObject{Float64}}`.
 """
 function fetch_objects_neocp()
     # HTTP response
-    resp = get(NEOCP_FILE_URL)
+    resp = HTTP.get(NEOCP_FILE_URL)
     # Parse response body as String
     text = String(resp.body)
     # Parse JSON
@@ -130,7 +130,7 @@ return the output as `Vector{RadecMPC{Float64}}`.
 function fetch_radec_neocp(id::AbstractString)
     # HTTP parameters
     params = JSON.json(Dict("trksubs" => [id], "output_format" => ["OBS80"]))
-    resp = get(MPC_NEOCP_OBS_API_URL, ("Content-Type" => "application/json",), params)
+    resp = HTTP.get(MPC_NEOCP_OBS_API_URL, ("Content-Type" => "application/json",), params)
     # Convert to String
     text = String(resp.body)
     # Parse JSON
@@ -179,7 +179,7 @@ function get_orbits_neocp(id::AbstractString, filename::AbstractString =
     # Assemble URL
     url = string(NEOCP_SHOWORBS_URL, "?Obj=", id, "&orb=y")
     # HTTP response
-    resp = get(url)
+    resp = HTTP.get(url)
     # Parse response body as String
     text = String(resp.body)
     # Break lines

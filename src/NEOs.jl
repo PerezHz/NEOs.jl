@@ -10,14 +10,13 @@ import PlanetaryEphemeris as PE
 
 using Dates, InteractiveUtils, LazyArtifacts, LinearAlgebra, Printf, JSON,
       TaylorSeries, SatelliteToolboxTransformations, TaylorIntegration,
-      SPICE, JLD2, Scratch, Parameters
+      SPICE, JLD2, Scratch, Parameters, HTTP
 using AutoHashEquals.Compat
 using Base: RefValue
 using Dates: epochms2datetime
 using Distributions: Chisq, cdf
 using Downloads: download
 using DelimitedFiles: readdlm
-using HTTP: get
 using DataFrames: DataFrame, nrow, eachcol, eachrow, groupby, combine, AbstractDataFrame,
         DataFrameRow, GroupedDataFrame
 using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, daysec, yr,
