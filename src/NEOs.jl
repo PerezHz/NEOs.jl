@@ -10,7 +10,7 @@ import PlanetaryEphemeris as PE
 
 using Dates, InteractiveUtils, LazyArtifacts, LinearAlgebra, Printf, JSON,
       TaylorSeries, SatelliteToolboxTransformations, TaylorIntegration,
-      SPICE, JLD2, Scratch
+      SPICE, JLD2, Scratch, Parameters
 using AutoHashEquals.Compat
 using Base: RefValue
 using Dates: epochms2datetime
@@ -93,6 +93,7 @@ export outlier_rejection!
 export absolutemagnitude
 
 include("constants.jl")
+include("parameters.jl")
 include("observations/observations.jl")
 include("propagation/propagation.jl")
 include("orbitdetermination/orbitdetermination.jl")

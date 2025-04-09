@@ -1,6 +1,5 @@
 include("asteroid_dynamical_models.jl")
 include("jetcoeffs.jl")
-include("parameters.jl")
 
 mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
     sseph::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}
