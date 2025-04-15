@@ -335,7 +335,7 @@ function anglediff(x::T, y::S) where {T, S <: Number}
 end
 
 @doc raw"""
-    residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
+    residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{Tuple{T, T}},
         bias::AbstractVector{Tuple{T, T}}; xva::AstEph,
         kwargs...) where {AstEph, T <: Real}
 
@@ -348,7 +348,7 @@ See also [`OpticalResidual`](@ref) and [`compute_radec`](@ref).
 ## Arguments
 
 - `radec::AbstractVector{RadecMPC{T}}`: optical astrometry.
-- `w8s::AbstractVector{T}`: statistical weights.
+- `w8s::AbstractVector{Tuple{T, T}}`: statistical weights.
 - `bias::AbstractVector{Tuple{T, T}}`: debiasing corrections.
 
 ## Keyword arguments
@@ -361,7 +361,7 @@ See also [`OpticalResidual`](@ref) and [`compute_radec`](@ref).
 All ephemeris must take [et seconds since J2000] and return [barycentric position in km
 and velocity in km/sec].
 """
-function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
+function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{Tuple{T, T}},
     bias::AbstractVector{Tuple{T, T}}; xva::AstEph, kwargs...) where {AstEph, T <: Real}
 
     # Check consistency between arrays
@@ -382,16 +382,18 @@ function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
 end
 
 function residuals!(res::Vector{OpticalResidual{T, U}},
-    radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{T},
+    radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{Tuple{T, T}},
     bias::AbstractVector{Tuple{T, T}}; xva::AstEph, kwargs...) where {AstEph,
     T <: Real, U <: Number}
 
-    tmap!(res, radec, w8s, bias, isoutlier.(res)) do obs, w8, bias, outlier
+    @allow_boxed_captures tmap!(res, radec, w8s, bias, isoutlier.(res)) do obs, w8, bias, outlier
         # Observed ra/dec
         α_obs = rad2arcsec(ra(obs))   # arcsec
         δ_obs = rad2arcsec(dec(obs))  # arcsec
         # Computed ra/dec
         α_comp, δ_comp = compute_radec(obs; xva = xva, kwargs...)   # arcsec
+        # Statistical weights
+        α_w8, δ_w8 = w8
         # Debiasing corrections
         α_corr, δ_corr = bias
         # Observed minus computed residual ra/dec
@@ -400,8 +402,8 @@ function residuals!(res::Vector{OpticalResidual{T, U}},
         return OpticalResidual{T, U}(
             anglediff(α_obs, α_comp) * cos(dec(obs)) - α_corr,
             δ_obs - δ_comp - δ_corr,
-            w8,
-            w8,
+            α_w8,
+            δ_w8,
             outlier
         )
     end

@@ -152,6 +152,9 @@ end
 
 iszero(x::NEOSolution{T, U}) where {T <: Real, U <: Number} = x == zero(NEOSolution{T, U})
 
+# Number of observations
+nobs(x::NEOSolution) = length(x.res)
+
 # Override Base.min
 function min(x::NEOSolution{T, T}, y::NEOSolution{T, T}) where {T <: Real}
     nrms(x) <= nrms(y) && return x
@@ -202,7 +205,8 @@ sigmas(sol::NEOSolution{T, T}) where {T <: Real} = sqrt.(diag(sol.jacobian * sol
 
 Return `sol`'s initial condition signal-to-noise ratios in barycentric cartesian coordinates.
 """
-snr(sol::NEOSolution{T, T}) where {T <: Real} = abs.(sol()) ./ sigmas(sol)
+snr(sol::NEOSolution{T, T}) where {T <: Real} =
+    iszero(sol) ? zeros(T, 6) : abs.(sol()) ./ sigmas(sol)
 
 @doc raw"""
     minmaxdates(sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
@@ -211,7 +215,8 @@ Return the dates of the earliest and latest observation in `sol`.
 """
 function minmaxdates(sol::NEOSolution{T, U}) where {T <: Real, U <: Number}
     dates = map(t -> extrema(date, t.radec), sol.tracklets)
-    return minimum(first, dates), maximum(last, dates)
+    t = days2dtutc(epoch(sol))
+    return min(t, minimum(first, dates)), max(t, maximum(last, dates))
 end
 
 @doc raw"""
@@ -228,7 +233,7 @@ function jplcompare(des::String, sol::NEOSolution{T, U}) where {T <: Real, U <: 
     # Time of first (last) observation
     t0, tf = minmaxdates(sol)
     # Download JPL ephemerides
-    bsp = smb_spk("DES = $(des);", t0, tf)
+    bsp = smb_spk("DES = $(des);", t0 - Minute(10), tf + Minute(10))
     # Object ID
     id = parse(Int, bsp[1:end-4])
     # Load JPL ephemerides
@@ -264,27 +269,28 @@ function uncertaintyparameter(od::ODProblem{D, T}, sol::NEOSolution{T, T},
     # Check consistency between od and sol
     @assert od.tracklets == sol.tracklets
     # Epoch [Julian days TDB]
-    jd0 = sol.bwd.t0 + PE.J2000
+    jd0 = epoch(sol) + PE.J2000
     # Barycentric initial conditions
-    q0 = sol(sol.bwd.t0)
+    q0 = sol(epoch(sol))
     # Scaling factors
     scalings = abs.(q0) ./ 10^6
     # Jet transport variables
-    dq = scaled_variables("dx", scalings; order = params.jtlsorder)
+    dq = scaled_variables("dx", scalings; order = 2)
     # Origin
     x0 = zeros(T, 6)
     # Initial conditions
     q = q0 + dq
     # Propagation and residuals
-    bwd, fwd, res = propres(od, jd0, q, params)
-    # Orbit fit
-    fit = tryls(res, x0; maxiter = params.lsiter)
-    # Residuals space to barycentric coordinates jacobian.
-    J = Matrix(TS.jacobian(dq))
-    # Update solution
-    _sol_ = NEOSolution(od.tracklets, bwd, fwd, res, fit, J)
+    _, _, res = propres(od, jd0, q, params)
+    res = @. OpticalResidual(ra(res), dec(res), wra(sol.res), wdec(sol.res),
+        isoutlier(sol.res))
+    nobs = 2 * notout(res)
+    # Covariance matrix
+    Q = nms(res)
+    C = (nobs/2) * TS.hessian(Q, x0)
+    Γ = inv(C)
     # Osculating keplerian elements
-    osc = pv2kep(_sol_() - params.eph_su(sol.bwd.t0); jd = jd0, frame = :ecliptic)
+    osc = pv2kep(q - params.eph_su(epoch(sol)); jd = jd0, frame = :ecliptic)
     # Eccentricity
     e = osc.e
     # Gauss gravitational constant [deg]
@@ -293,14 +299,15 @@ function uncertaintyparameter(od::ODProblem{D, T}, sol::NEOSolution{T, T},
     Tp = osc.tp
     # Orbital period [days]
     P = 2π * sqrt(osc.a^3 / μ_S)
-    # Covariance matrix
-    Γ = project([Tp, P], fit)
+    # Projected covariance matrix
+    t_car2kep = TS.jacobian([Tp, P], x0)
+    Γ = t_car2kep * Γ * t_car2kep'
     # Uncertainties
     dTp, dP = sqrt.(diag(Γ))
     # Convert orbital period to years
     P = P/yr
     # In-orbit longitude runoff [arcsec / decade]
-    runoff = (dTp * e(fit.x) + 10 * dP / P(fit.x)) * (k_0 / P(fit.x)) * 3_600 * 3
+    runoff = (dTp * e(x0) + 10 * dP / P(x0)) * (k_0 / P(x0)) * 3_600 * 3
     # Uncertainty parameter
     C = log(648_000) / 9
     U = floor(Int, log(runoff)/C) + 1

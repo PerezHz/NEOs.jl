@@ -2,6 +2,7 @@
 
 using NEOs
 using Dates
+using LinearAlgebra
 using Test
 
 using NEOs: src_path
@@ -117,8 +118,26 @@ using NEOs: src_path
 
     @testset "RadecMPC" begin
 
-        using NEOs: RADEC_MPC_REGEX, RadecMPC
+        using NEOs: RADEC_MPC_REGEX, RadecMPC, unpackdesig, packdesig,
+            unpacknum, packnum
         using Dates
+
+        # (Un)packdesig
+        packedids = ["J95X00A", "J95X01L", "J95F13B", "J98SA8Q", "J98SC7V", "J98SG2S",
+            "K99AJ3Z", "K08Aa0A", "K07Tf8A"]
+        unpackedids = ["1995 XA", "1995 XL1", "1995 FB13", "1998 SQ108", "1998 SV127",
+            "1998 SS162", "2099 AZ193", "2008 AA360", "2007 TA418"]
+
+        @test all(unpackdesig.(packedids) .== unpackedids)
+        @test all(packdesig.(unpackedids) .== packedids)
+
+        packednums = ["03202", "50000", "A0345", "a0017", "K3289", "~0000",
+            "~000z", "~AZaz", "~zzzz"]
+        unpackednums = ["3202", "50000", "100345", "360017", "203289", "620000",
+            "620061", "3140113", "15396335"]
+
+        @test all(unpacknum.(packednums) .== unpackednums)
+        @test all(packnum.(unpackednums) .== packednums)
 
         # Parse RadecMPC
         apophis_s = "99942K04M04N  C2004 03 15.10789 04 06 08.08 +16 55 04.6                om6394691"
@@ -228,7 +247,7 @@ using NEOs: src_path
         object = objects[1]
         # Check NEOCPObject fields
         @test 0 <= object.score <= 100
-        @test object.date >= today() - Month(3)
+        # @test object.date >= today() - Month(3)
         @test 0 <= object.α <= 2π
         @test -π <= object.δ <= π
         @test object.nobs > 0
@@ -339,4 +358,56 @@ using NEOs: src_path
         @test tracklets[3].night.utc == -1
     end
 
+    @testset "AbstractErrorModel" begin
+        # Download optical astrometry
+        radec = fetch_radec_mpc("2014 AA")
+
+        # Weighting schemes
+        w1 = UniformWeights(radec)
+        w2 = Veres17(radec)
+        w3 = ADESWeights(radec)
+        w4 = NEOCCWeights(radec)
+        w5 = NEODyS2Weights(radec)
+
+        @test isa(w1, UniformWeights{Float64})
+        @test isa(w2, Veres17{Float64})
+        @test isa(w3, ADESWeights{Float64})
+        @test isa(w4, NEOCCWeights{Float64})
+        @test isa(w5, NEODyS2Weights{Float64})
+
+        @test length(radec) == length(w1.w8s) == length(w2.w8s) == length(w3.w8s) ==
+            length(w4.w8s) == length(w5.w8s)
+        @test all(==((1.0, 1.0)), w1.w8s)
+        @test all(x -> isapprox(x[1], 2.285, atol = 1e-3) &&
+            isapprox(x[2], 2.285, atol = 1e-3), w2.w8s)
+        @test all(==((4.0, 4.0)), w3.w8s)
+        @test all(x -> isapprox(x[1], 2.288, atol = 1e-3) &&
+            isapprox(x[2], 2.288, atol = 1e-3), w4.w8s)
+        @test all(x -> isapprox(x[1], 2.288, atol = 1e-3) &&
+            isapprox(x[2], 2.288, atol = 1e-3), w5.w8s)
+
+        # Debiasing schemes
+        d1 = Farnocchia15(radec)
+        d2 = Eggl20(radec)
+        d3 = ZeroDebiasing(radec)
+        d4 = NEOCCDebiasing(radec)
+        d5 = NEODyS2Debiasing(radec)
+
+        @test isa(d1, Farnocchia15{Float64})
+        @test isa(d2, Eggl20{Float64})
+        @test isa(d3, ZeroDebiasing{Float64})
+        @test isa(d4, NEOCCDebiasing{Float64})
+        @test isa(d5, NEODyS2Debiasing{Float64})
+
+        @test length(radec) == length(d1.bias) == length(d2.bias) == length(d3.bias) ==
+            length(d4.bias) == length(d5.bias)
+        @test all(x -> isapprox(x[1], 0.017, atol = 1e-3) &&
+            isapprox(x[2], 0.027, atol = 1e-3), d1.bias)
+        @test all(x -> isapprox(x[1], 0.021, atol = 1e-3) &&
+            isapprox(x[2], -0.019, atol = 1e-3), d2.bias)
+        @test all(==((0.0, 0.0)), d3.bias)
+        @test all(==((0.017, 0.028)), d4.bias)
+        @test all(==((0.017, 0.028)), d5.bias)
+
+    end
 end

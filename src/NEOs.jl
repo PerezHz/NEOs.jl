@@ -28,10 +28,10 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, daysec, yr
 using Healpix: ang2pixRing, Resolution
 using StatsBase: mean, std
 using LinearAlgebra: inv!
-using LsqFit: curve_fit, vcov
+using LsqFit: curve_fit, vcov, stderror
 using Roots: find_zeros
 using HORIZONS: smb_spk
-using OhMyThreads: tmap, tmap!
+using OhMyThreads: tmap, tmap!, @allow_boxed_captures
 using TaylorIntegration: RetAlloc, _determine_parsing!, _taylorinteg!
 
 # Constants
@@ -59,9 +59,13 @@ export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophis
 export loadpeeph, bwdfwdeph
 # Observer position in ECEF and ECI frames
 export obsposECEF, obsposvelECI
+# Tracklet
+export nobs, astrometry, datediff
+# Error model
+export UniformWeights, Veres17, ADESWeights, NEOCCWeights, NEODyS2Weights
+export Farnocchia15, Eggl20, ZeroDebiasing, NEOCCDebiasing, NEODyS2Debiasing
 # Optical astrometry processing
-export UniformWeights, Veres17, Farnocchia15, Eggl20, compute_radec, unfold,
-       residuals, isoutlier
+export compute_radec, unfold, residuals, isoutlier
 # Radar astrometry processing
 export compute_delay, radar_astrometry
 # Asteroid dynamical models
@@ -85,6 +89,8 @@ export NEOParameters, ODProblem, curvature, issinglearc, orbitdetermination
 export valsecchi_circle, bopik, mtp
 # Outlier rejection
 export outlier_rejection!
+# Magnitude
+export absolutemagnitude
 
 include("constants.jl")
 include("observations/observations.jl")

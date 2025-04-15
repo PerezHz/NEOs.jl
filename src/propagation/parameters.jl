@@ -19,8 +19,10 @@ Parameters for all orbit determination functions.
 
 ## Gauss Method Parameters
 
-- `max_triplets::Int`: maximum number of triplets to check for a solution
-    (default: `10`).
+- `safegauss::Bool`: whether to try Gauss Method only when exactly three tracklets
+    are available (default: `true`).
+- `refscale::Symbol`: horizontal scale for ADAM refinement of Gauss preliminary
+    orbit (default: `:log`).
 - `gaussorder::Int`: order of the jet transport perturbation (default: `6`).
 
 ## Too Short Arc Parameters
@@ -37,8 +39,10 @@ Parameters for all orbit determination functions.
 
 - `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `5`).
 - `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
-- `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `5`).
+- `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `6`).
 - `significance::T`: chi-square significance level (default: `0.99`).
+- `jtlsmask::Bool`: whether to use `isjtlsfit` to skip bad-conditioned
+    preliminary orbits in `jtls` (default: `true`).
 
 ## Outlier Rejection Parameters
 
@@ -63,7 +67,8 @@ Parameters for all orbit determination functions.
     eph_su::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephsu()
     eph_ea::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephea()
     # Gauss' Method Parameters
-    max_triplets::Int = 10
+    safegauss::Bool = true
+    refscale::Symbol = :log
     gaussorder::Int = 6
     # Too Short Arc Parameters
     H_max::T = 34.5
@@ -75,8 +80,9 @@ Parameters for all orbit determination functions.
     # Jet Transport Least Squares Parameters
     lsiter::Int = 5
     jtlsiter::Int = 5
-    jtlsorder::Int = 5
+    jtlsorder::Int = 6
     significance::T = 0.99
+    jtlsmask::Bool = true
     # Outlier Rejection Parameters
     outrej::Bool = false
     χ2_rec::T = 7.0
