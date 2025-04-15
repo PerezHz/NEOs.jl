@@ -71,34 +71,27 @@ end
 # Outer constructor
 function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where {T <: Real}
     # Unpack
-    obs, t_datetime, α, δ = observatory(tracklet), date(tracklet), ra(tracklet), dec(tracklet)
-    v_α, v_δ, h = vra(tracklet), vdec(tracklet), mag(tracklet)
+    @unpack observatory, date, α, δ, v_α, v_δ, mag = tracklet
     @unpack H_max, a_max = params
     # Topocentric unit vector and partials
     ρ, ρ_α, ρ_δ = topounitpdv(α, δ)
-    # Time of observation [days since J2000]
-    t_days = dtutc2days(t_datetime)
-    # Time of observation [et seconds]
-    t_et = dtutc2et(t_datetime)
+    # Time of observation [days (et seconds) since J2000]
+    t_days, t_et = dtutc2days(date), dtutc2et(date)
     # Heliocentric position of the observer
-    q = params.eph_ea(t_days) + kmsec2auday(obsposvelECI(obs, t_et)) - params.eph_su(t_days)
+    q = params.eph_ea(t_days) + kmsec2auday(obsposvelECI(observatory, t_et)) -
+        params.eph_su(t_days)
     # Admissible region coefficients
     coeffs = arcoeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
     # Maximum range (heliocentric energy constraint)
     ρ_max = _helmaxrange(coeffs, a_max)
     iszero(ρ_max) && return zero(AdmissibleRegion{T})
     # Minimum range
-    if isnan(h)
-        if R_SI < ρ_max
-            # Earth's sphere of influence radius
-            ρ_min = R_SI
-        else
-            # Earth's physical radius
-            ρ_min = R_EA
-        end
+    if isnan(mag)
+        # Earth's sphere of influence radius / Earth's physical radius
+        ρ_min = R_SI < ρ_max ? R_SI : R_EA
     else
         # Tiny object boundary
-        ρ_min = 10^((h - H_max)/5)
+        ρ_min = 10^((mag - H_max)/5)
     end
     ρ_min > ρ_max && return zero(AdmissibleRegion{T})
     # Range domain
@@ -114,8 +107,8 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where
     Fs[2, :] .= [ρ_min, v_ρ_max]
     Fs[3, :] .= [ρ_max, v_ρ_mid]
 
-    return AdmissibleRegion{T}(t_datetime, α, δ, v_α, v_δ, H_max, a_max,
-        ρ, ρ_α, ρ_δ, q, coeffs, ρ_domain, v_ρ_domain, Fs, obs)
+    return AdmissibleRegion{T}(date, α, δ, v_α, v_δ, H_max, a_max,
+        ρ, ρ_α, ρ_δ, q, coeffs, ρ_domain, v_ρ_domain, Fs, observatory)
 end
 
 @doc raw"""
