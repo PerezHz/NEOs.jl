@@ -32,7 +32,7 @@ using LsqFit: curve_fit, vcov, stderror
 using Roots: find_zeros
 using HORIZONS: smb_spk
 using OhMyThreads: tmap, tmap!, @allow_boxed_captures
-using TaylorIntegration: RetAlloc, _determine_parsing!, _taylorinteg!
+using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!
 
 # Constants
 export d_EM_km, d_EM_au
