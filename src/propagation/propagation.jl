@@ -37,7 +37,7 @@ Return a `PropagationBuffer` object with pre-allocated memory for `propagate`.
 function PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U},
     params::NEOParameters{T}) where {D, T <: Real, U <: Number, V <: Number}
     # Unpack parameters
-    @unpack order, μ_ast = params
+    @unpack order, μ_ast, maxsteps = params
     # Check order
     @assert order <= SSEPHORDER "order ($order) must be less or equal than SS ephemeris \
         order ($SSEPHORDER)"
@@ -74,7 +74,7 @@ function PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U}
     dparams = DynamicalParameters{T, U, V}(_sseph, _ssepht, _acceph, _accepht,
         _poteph, _potepht, jd0, UJ_interaction, N, μ)
     # TaylorIntegration cache
-    cache = init_cache(Val(true), zero(T), q0, maxsteps, order, dynamics, _params)
+    cache = init_cache(Val(true), zero(T), q0, maxsteps, order, dynamics, dparams)
 
     return PropagationBuffer{T, U, V}(cache, dparams)
 end
