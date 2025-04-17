@@ -1,5 +1,5 @@
 @doc raw"""
-    NEOParameters([params::NEOParameters{T};] kwargs...) where {T <: Real}
+    Parameters([params::Parameters{T};] kwargs...) where {T <: Real}
 
 Parameters for all orbit determination functions.
 
@@ -53,7 +53,7 @@ Parameters for all orbit determination functions.
 - `fudge::T`: rejection fudge term coefficient (default: `400.0`).
 - `max_per::T`: maximum allowed rejection percentage (default: `10.0`).
 """
-@with_kw struct NEOParameters{T <: Real}
+@with_kw struct Parameters{T <: Real}
     # Propagation Parameters
     maxsteps::Int = 500
     μ_ast::Vector{T} = μ_ast343_DE430[1:end]

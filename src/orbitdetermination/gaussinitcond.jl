@@ -188,9 +188,9 @@ function heliocentric_energy(r::Vector{T}) where {T <: Number}
 end
 
 @doc raw"""
-    gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: Real}
+    gauss_method(obs::Vector{RadecMPC{T}}, params::Parameters{T}) where {T <: Real}
     gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime},
-        α::Vector{U}, δ::Vector{U}, params::NEOParameters{T}) where {T <: Real, U <: Number}
+        α::Vector{U}, δ::Vector{U}, params::Parameters{T}) where {T <: Real, U <: Number}
 
 Core Gauss method of Initial Orbit determination (IOD).
 
@@ -201,12 +201,12 @@ Core Gauss method of Initial Orbit determination (IOD).
 - `dates::Vector{DateTime}`: times of observation.
 - `α::Vector{U}`: right ascension [rad].
 - `δ::Vector{U}`: declination [rad].
-- `params::NEOParameters{T}`: see `Gauss Method Parameters` of [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see `Gauss Method Parameters` of [`Parameters`](@ref).
 
 !!! reference
     See Algorithm 5.5 in page 274 https://doi.org/10.1016/C2016-0-02107-1.
 """
-function gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where {T <: Real}
+function gauss_method(obs::Vector{RadecMPC{T}}, params::Parameters{T}) where {T <: Real}
 
     # Make sure observations are in temporal order
     sort!(obs)
@@ -223,7 +223,7 @@ function gauss_method(obs::Vector{RadecMPC{T}}, params::NEOParameters{T}) where 
 end
 
 function gauss_method(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime},
-                      α::Vector{U}, δ::Vector{U}, params::NEOParameters{T}) where {T <: Real, U <: Number}
+                      α::Vector{U}, δ::Vector{U}, params::Parameters{T}) where {T <: Real, U <: Number}
 
     # Check we have exactly three observations
     @assert length(observatories) == length(dates) == length(α) == length(δ) == 3 "Gauss method requires exactly three observations"
@@ -443,7 +443,7 @@ end
 # Update an initial condition `q`, obtained by Gauss' method, via ADAM
 # minimization over the middle tracklet's manifold of variations.
 function _adam!(od::ODProblem{D, T}, i::Int, q::Vector{TaylorN{T}}, jd0::T,
-    params::NEOParameters{T}) where {D, T <: Real}
+    params::Parameters{T}) where {D, T <: Real}
     # Unpack parameters
     @unpack refscale, tsaorder = params
     # Middle tracklet
@@ -474,7 +474,7 @@ function _adam!(od::ODProblem{D, T}, i::Int, q::Vector{TaylorN{T}}, jd0::T,
 end
 
 @doc raw"""
-    gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: Real}
+    gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Real}
 
 Fit a preliminary orbit to `od` via jet transport Gauss method.
 
@@ -483,9 +483,9 @@ See also [`gauss_method`](@ref).
 ## Arguments
 
 - `od::ODProblem{D, T}`: an orbit determination problem.
-- `params::NEOParameters{T}`: see `Gauss' Method Parameters` of [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see `Gauss' Method Parameters` of [`Parameters`](@ref).
 """
-function gaussiod(od::ODProblem{D, T}, params::NEOParameters{T}) where {D, T <: Real}
+function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Real}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
     # Unpack parameters

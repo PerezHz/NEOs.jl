@@ -6,7 +6,7 @@ include("admissibleregion.jl")
 
 # Times used within propres
 function _proprestimes(radec::AbstractVector{RadecMPC{T}}, jd0::U,
-    params::NEOParameters{T}) where {T <: Real, U <: Number}
+    params::Parameters{T}) where {T <: Real, U <: Number}
     # Time of first (last) observation
     t0, tf = dtutc2jdtdb(date(radec[1])), dtutc2jdtdb(date(radec[end]))
     # TDB epoch (plain)
@@ -19,7 +19,7 @@ function _proprestimes(radec::AbstractVector{RadecMPC{T}}, jd0::U,
 end
 
 # Propagate an orbit and compute residuals
-function propres(od::ODProblem{D, T}, jd0::V, q0::Vector{U}, params::NEOParameters{T};
+function propres(od::ODProblem{D, T}, jd0::V, q0::Vector{U}, params::Parameters{T};
     buffer::Union{Nothing, PropagationBuffer{T, U, V}} = nothing,
     idxs::AbstractVector{Int} = eachindex(od.radec)) where {D, T <: Real, U <: Number,
     V <: Number}
@@ -55,7 +55,7 @@ end
 
 # In-place method of propres
 function propres!(res::Vector{OpticalResidual{T, U}}, od::ODProblem{D, T},
-    jd0::V, q0::Vector{U}, params::NEOParameters{T};
+    jd0::V, q0::Vector{U}, params::Parameters{T};
     buffer::Union{Nothing, PropagationBuffer{T, U, V}} = nothing,
     idxs::AbstractVector{Int} = eachindex(od.radec))  where {D, T <: Real, U <: Number,
     V <: Number}
@@ -124,7 +124,7 @@ end
 function addradec!(::Val{true}, rin::Vector{Int}, fit::LeastSquaresFit{T},
     tin::Vector{Tracklet{T}}, tout::Vector{Tracklet{T}},
     res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
-    params::NEOParameters{T}) where {T <: Real}
+    params::Parameters{T}) where {T <: Real}
     while !isempty(tout)
         extra = indices(tout[1])
         fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.lsiter)
@@ -144,7 +144,7 @@ end
 function addradec!(::Val{false}, rin::Vector{Int}, fit::LeastSquaresFit{T},
     tin::Vector{Tracklet{T}}, tout::Vector{Tracklet{T}},
     res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
-    params::NEOParameters{T}) where {T <: Real}
+    params::Parameters{T}) where {T <: Real}
     if critical_value(view(res, rin), fit) < params.significance && !isempty(tout)
         extra = indices(tout[1])
         fit_new = tryls(res[rin ∪ extra], x0; maxiter = params.lsiter)
@@ -162,7 +162,7 @@ end
 
 # Decide whether q is suitable for jtls
 function isjtlsfit(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
-    params::NEOParameters{T}) where {D, T <: Real, V <: Number}
+    params::Parameters{T}) where {D, T <: Real, V <: Number}
     # Unpack
     @unpack eph_ea = params
     @unpack tracklets = od
@@ -195,7 +195,7 @@ end
 
 @doc raw"""
     jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TayloN{T}},
-        tracklets::AbstractVector{Tracklet{T}}, params::NEOParameters{T}
+        tracklets::AbstractVector{Tracklet{T}}, params::Parameters{T}
         [, mode::Bool]) where {D, T <: Real, V <: Number}
 
 Compute an orbit via Jet Transport Least Squares.
@@ -206,12 +206,12 @@ Compute an orbit via Jet Transport Least Squares.
 - `jd0::V`: reference epoch [Julian days TDB].
 - `q::Vector{TaylorN{T}}`: jet transport initial condition.
 - `tracklets::AbstractVector{Tracklet{T}}`: initial tracklets for fit.
-- `params::NEOParameters{T}`: see `Jet Transport Least Squares Parameters`
-    of [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see `Jet Transport Least Squares Parameters`
+    of [`Parameters`](@ref).
 - `mode::Bool`: `addradec!` mode (default: `true`).
 """
 function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
-    tracklets::AbstractVector{Tracklet{T}}, params::NEOParameters{T},
+    tracklets::AbstractVector{Tracklet{T}}, params::Parameters{T},
     mode::Bool = true) where {D, T <: Real, V <: Number}
     # Unpack
     @unpack lsiter, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
@@ -324,7 +324,7 @@ function issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <:
 end
 
 @doc raw"""
-    orbitdetermination(od::ODProblem{D, T}, params::NEOParameters{T};
+    orbitdetermination(od::ODProblem{D, T}, params::Parameters{T};
         kwargs...) where {D, I, T <: Real}
 
 Initial Orbit Determination (IOD) routine.
@@ -332,7 +332,7 @@ Initial Orbit Determination (IOD) routine.
 ## Arguments
 
 - `od::ODProblem{D, T}`: an orbit determination problem.
-- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see [`Parameters`](@ref).
 
 ## Keyword arguments
 
@@ -344,7 +344,7 @@ Initial Orbit Determination (IOD) routine.
 !!! warning
     This function will change the (global) `TaylorSeries` variables.
 """
-function orbitdetermination(od::ODProblem{D, T}, params::NEOParameters{T};
+function orbitdetermination(od::ODProblem{D, T}, params::Parameters{T};
     initcond::I = iodinitcond) where {D, I, T <: Real}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
@@ -374,7 +374,7 @@ end
 
 @doc raw"""
     orbitdetermination(od::ODProblem{D, T}, sol::NEOSolution{T, T},
-        params::NEOParameters{T}) where {D, T <: Real}
+        params::Parameters{T}) where {D, T <: Real}
 
 Fit a least squares orbit to `od` using `sol` as an initial condition.
 
@@ -382,13 +382,13 @@ Fit a least squares orbit to `od` using `sol` as an initial condition.
 
 - `od::ODProblem{D, T}`: orbit determination problem.
 - `sol::NEOSolution{T, T}:` preliminary orbit.
-- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see [`Parameters`](@ref).
 
 !!! warning
     This function will change the (global) `TaylorSeries` variables.
 """
 function orbitdetermination(od::ODProblem{D, T}, sol::NEOSolution{T, T},
-    params::NEOParameters{T}) where {D, T <: Real}
+    params::Parameters{T}) where {D, T <: Real}
     # Unpack parameters
     @unpack jtlsorder, significance, adammode = params
     @unpack radec, tracklets = od

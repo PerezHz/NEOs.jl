@@ -22,7 +22,7 @@ end
 
 @doc raw"""
     PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U},
-        params::NEOParameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+        params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
 
 Return a `PropagationBuffer` object with pre-allocated memory for `propagate`.
 
@@ -32,10 +32,10 @@ Return a `PropagationBuffer` object with pre-allocated memory for `propagate`.
 - `jd0::V`: initial Julian date (TDB).
 - `tlim::Tuple{T, T}`: ephemeris timespan [in days since J2000].
 - `q0::Vector{U}`: vector of initial conditions.
-- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see [`Parameters`](@ref).
 """
 function PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U},
-    params::NEOParameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+    params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
     # Unpack parameters
     @unpack order, μ_ast, maxsteps = params
     # Check order
@@ -164,7 +164,7 @@ end
 
 @doc raw"""
     propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-        params::NEOParameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+        params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
 
 Integrate an orbit via the Taylor method. The initial Julian date `jd0` is assumed
 to be in TDB time scale.
@@ -175,10 +175,10 @@ to be in TDB time scale.
 - `jd0::V`: initial Julian date (TDB).
 - `tspan::T`: time span of the integration [in years].
 - `q0::Vector{U}`: vector of initial conditions.
-- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see [`Parameters`](@ref).
 """
 function propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-            params::NEOParameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+            params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
     tlim = minmax(_jd0_, _jd0_ + tspan * yr) .- JD_J2000
@@ -189,7 +189,7 @@ end
 
 function _propagate(
         dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-        buffer::PropagationBuffer{T, U, V}, params::NEOParameters{T}
+        buffer::PropagationBuffer{T, U, V}, params::Parameters{T}
     ) where {D, T <: Real, U <: Number, V <: Number}
     # Unpack
     @unpack abstol, maxsteps = params
@@ -206,7 +206,7 @@ function _propagate(
 end
 
 @doc raw"""
-    propagate_root(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, params::NEOParameters{T};
+    propagate_root(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, params::Parameters{T};
         kwargs...) where {D, T <: Real, U <: Number, V <: Number}
 
 Integrate an orbit via the Taylor method while finding the zeros of `NEOs.rvelea`.
@@ -217,7 +217,7 @@ Integrate an orbit via the Taylor method while finding the zeros of `NEOs.rvelea
 - `jd0::V`: initial Julian date (TDB).
 - `tspan::T`: time span of the integration [in years].
 - `q0::Vector{U}`: vector of initial conditions.
-- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see [`Parameters`](@ref).
 
 ## Keyword arguments
 
@@ -226,7 +226,7 @@ Integrate an orbit via the Taylor method while finding the zeros of `NEOs.rvelea
 - `nrabstol::T`: allowed tolerance for the Newton-Raphson process.
 """
 function propagate_root(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-            params::NEOParameters{T}; eventorder::Int = 0, newtoniter::Int = 10,
+            params::Parameters{T}; eventorder::Int = 0, newtoniter::Int = 10,
             nrabstol::T = eps(T)) where {D, T <: Real, U <: Number, V <: Number}
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
@@ -239,7 +239,7 @@ end
 
 function _propagate_root(
         dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-        buffer::PropagationBuffer{T, U, V}, params::NEOParameters{T};
+        buffer::PropagationBuffer{T, U, V}, params::Parameters{T};
         eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T)
     ) where {D, T <: Real, U <: Number, V <: Number}
     # Unpack
@@ -259,7 +259,7 @@ end
 
 @doc raw"""
     propagate_lyap(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-        params::NEOParameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+        params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
 
 Compute the Lyapunov spectrum of an orbit.
 
@@ -269,10 +269,10 @@ Compute the Lyapunov spectrum of an orbit.
 - `jd0::V`: initial Julian date (TDB).
 - `tspan::T`: time span of the integration [in Julian days].
 - `q0::Vector{U}`: vector of initial conditions.
-- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see [`Parameters`](@ref).
 """
 function propagate_lyap(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-            params::NEOParameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+            params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
     tlim = minmax(_jd0_, _jd0_ + tspan * yr) .- JD_J2000

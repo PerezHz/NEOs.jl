@@ -77,7 +77,7 @@ function neo2024PDC25(filename::String)
     # Load astrometry
     radec = parsexml(filename)
     # Orbit determination parameters and problem
-    params = NEOParameters(
+    params = Parameters(
         coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
         adamiter = 500, adamQtol = 1e-5,                       # ADAM
         jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
@@ -176,7 +176,7 @@ function neo2014AA(filename::String)
     # Load astrometry
     radec = fetch_radec_mpc("2014 AA")
     # Orbit determination parameters and problem
-    params = NEOParameters(
+    params = Parameters(
         coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
         adamiter = 500, adamQtol = 1e-5,                       # ADAM
         jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
@@ -210,7 +210,7 @@ function neo2014AA(filename::String)
     jd0 = epoch(sol) + J2000
     q0 .= sol()
     q .= [q0[k] + (abs(q0[k]) / 10^5) * TaylorN(k, order = varorder) for k in 1:6]
-    params = NEOParameters(params; bwdoffset = 0.5)
+    params = Parameters(params; bwdoffset = 0.5)
     bwd, _, _ = propres(od, jd0, q, params)
     jd0, t = 2456658.5, 2456658.5 - J2000
     osc = pv2kep(bwd(t) - params.eph_su(t); jd = jd0, frame = :ecliptic)
@@ -245,7 +245,7 @@ function neo2020CV1(filename::String)
     # Load astrometry
     radec = fetch_radec_mpc("2020 CV1")
     # Orbit determination parameters and problem
-    params = NEOParameters(
+    params = Parameters(
         coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
         adamiter = 500, adamQtol = 1e-5,                       # ADAM
         jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares
@@ -287,7 +287,7 @@ function neo2024MK(filename::String)
     # Load astrometry
     radec = fetch_radec_mpc("2024 MK")
     # Orbit determination parameters and problem
-    params = NEOParameters(
+    params = Parameters(
         coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
         adamiter = 500, adamQtol = 1e-5,                       # ADAM
         jtlsiter = 20, lsiter = 10, significance = 0.99,       # Least squares

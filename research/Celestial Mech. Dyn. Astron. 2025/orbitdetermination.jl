@@ -83,7 +83,7 @@ end
 
     function ioditer()
         # Parameters
-        params1 = NEOParameters(
+        params1 = Parameters(
             coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
             safegauss = true, refscale = :log,                     # Gauss method
             adamiter = 500, adamQtol = 1e-5,                       # ADAM
@@ -91,10 +91,10 @@ end
             outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,             # Outlier rejection
             fudge = 100.0, max_per = 20.0
         )
-        params2 = NEOParameters(params1; coeffstol = 10.0, safegauss = false,
+        params2 = Parameters(params1; coeffstol = 10.0, safegauss = false,
             adamiter = 200, adamQtol = 0.01, lsiter = 5)
-        params3 = NEOParameters(params1; refscale = :linear)
-        params4 = NEOParameters(params2; refscale = :linear)
+        params3 = Parameters(params1; refscale = :linear)
+        params4 = Parameters(params2; refscale = :linear)
         # Initial orbit determination iterator
         return [
             (params1, initcond1),
@@ -175,7 +175,7 @@ end
             length(sols[i].res) != length(radec) && continue
             # Unfold
             params, _ = iter[i <= 4 ? i : i-4]
-            params = NEOParameters(params; fudge = 0.0, max_per = 34.0)
+            params = Parameters(params; fudge = 0.0, max_per = 34.0)
             # Retry orbit determination with lower rejection threshold
             sol = orbitdetermination(od, sols[i], params)
             sols[i] = updatesol(sols[i], sol, radec)

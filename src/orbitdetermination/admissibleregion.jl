@@ -69,7 +69,7 @@ function show(io::IO, A::AdmissibleRegion{T}) where {T <: Real}
 end
 
 # Outer constructor
-function AdmissibleRegion(tracklet::Tracklet{T}, params::NEOParameters{T}) where {T <: Real}
+function AdmissibleRegion(tracklet::Tracklet{T}, params::Parameters{T}) where {T <: Real}
     # Unpack
     @unpack observatory, date, α, δ, v_α, v_δ, mag = tracklet
     @unpack H_max, a_max = params
@@ -624,12 +624,12 @@ end
 
 @doc raw"""
     attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
-              params::NEOParameters{T}) where {T <: Real, U <: Number}
+              params::Parameters{T}) where {T <: Real, U <: Number}
 
 Convert attributable elements `a` to barycentric cartesian coordinates.
 """
 function attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
-                   params::NEOParameters{T}) where {T <: Real, U <: Number}
+                   params::Parameters{T}) where {T <: Real, U <: Number}
     # Unfold
     α, δ, v_α, v_δ, ρ, v_ρ = a
     # Light-time correction to epoch

@@ -81,7 +81,7 @@ nobs(od::ODProblem) = length(od.radec)
 
 # Special PropagationBuffer constructor
 function PropagationBuffer(od::ODProblem{D, T}, jd0::V, k0::Int, kf::Int, q0::Vector{U},
-    params::NEOParameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+    params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
     t0 = dtutc2days(date(od.radec[k0]))
     tf = dtutc2days(date(od.radec[kf]))
     tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)

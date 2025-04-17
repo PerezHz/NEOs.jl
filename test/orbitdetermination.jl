@@ -27,8 +27,8 @@ end
         @test numberofdays(subradec) < 0.18
 
         # Parameters
-        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007, parse_eqs = false)
-        params = NEOParameters(params, parse_eqs = true)
+        params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007, parse_eqs = false)
+        params = Parameters(params, parse_eqs = true)
         # Orbit determination problem
         od = ODProblem(newtonian!, subradec)
 
@@ -129,7 +129,7 @@ end
         @test numberofdays(radec) < 1.95
 
         # Parameters
-        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007, safegauss = false)
+        params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007, safegauss = false)
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
 
@@ -186,7 +186,7 @@ end
         @test numberofdays(subradec) < 42.8
 
         # Parameters
-        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
+        params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007)
         # Orbit determination problem
         od = ODProblem(newtonian!, subradec)
 
@@ -243,7 +243,7 @@ end
         # Fetch optical astrometry
         radec = fetch_radec_mpc("2024 BX1")
         # Parameters
-        params = NEOParameters()
+        params = Parameters()
         # First tracklet
         radec = radec[1:3]
         tracklet = reduce_tracklets(radec)[1]
@@ -354,7 +354,7 @@ end
         @test numberofdays(radec) < 0.05
 
         # Parameters
-        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
+        params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007)
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
 
@@ -417,7 +417,7 @@ end
         @test numberofdays(subradec) < 2.16
 
         # Parameters
-        params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007,
+        params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007,
             outrej = true, χ2_rec = 1.0, χ2_rej = 1.25, fudge = 0.0)
         # Orbit determination problem
         od = ODProblem(newtonian!, subradec)
@@ -517,7 +517,7 @@ end
         @test numberofdays(radec) < 0.05
 
         # Parameters
-        params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
+        params = Parameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
 
@@ -580,7 +580,7 @@ end
         @test numberofdays(subradec) < 0.34
 
         # Parameters
-        params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
+        params = Parameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
         # Orbit determination problem
         od = ODProblem(newtonian!, subradec)
 
@@ -709,7 +709,7 @@ end
         @test numberofdays(radec) < 6.22
 
         # Parameters
-        params = NEOParameters(
+        params = Parameters(
             coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
             safegauss = true, refscale = :log,                     # Gauss method
             adamiter = 500, adamQtol = 1e-5,                       # ADAM

@@ -6,7 +6,7 @@ using NEOs, Plots
 radec = fetch_radec_mpc("2016 TU93")
 
 # Orbit determination
-params = NEOParameters(bwdoffset = 0.007, fwdoffset = 0.007)
+params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007)
 od = ODProblem(newtonian!, radec)
 sol = orbitdetermination(od, params)
 

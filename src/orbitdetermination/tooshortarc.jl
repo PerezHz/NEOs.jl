@@ -1,6 +1,6 @@
 @doc raw"""
     adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
-         params::NEOParameters{T}; kwargs...) where {D, T <: Real}
+         params::Parameters{T}; kwargs...) where {D, T <: Real}
 
 Adaptative moment estimation (ADAM) minimizer of normalized mean square
 residual of `od.tracklets[i].radec` over the manifold of variations of `A`,
@@ -19,7 +19,7 @@ starting from `(ρ, v_ρ)`.
     See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
 """
 function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
-    params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
+    params::Parameters{T}; scale::Symbol = :linear, η::T = 25.0,
     μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2) where {D, T <: Real}
     # Initial time of integration [julian days TDB]
     jd0 = dtutc2jdtdb(A.date)
@@ -118,7 +118,7 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
 end
 
 @doc raw"""
-    tsaiod(od::ODProblem{D, T}, params::NEOParameters{T};
+    tsaiod(od::ODProblem{D, T}, params::Parameters{T};
         initcond::I = iodinitcond) where {D, I, T <: Real}
 
 Fit a preliminary orbit to `od` via jet transport minimization
@@ -127,7 +127,7 @@ of the normalized mean square residual over the manifold of variations.
 ## Arguments
 
 - `od::ODProblem{D, T}`: an orbit determination problem.
-- `params::NEOParameters{T}`: see `Too Short Arc Parameters` of [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see `Too Short Arc Parameters` of [`Parameters`](@ref).
 
 ## Keyword arguments
 
@@ -136,7 +136,7 @@ of the normalized mean square residual over the manifold of variations.
     where each element has the form `(ρ, v_ρ, scale)`
     (default: `iodinitcond`).
 """
-function tsaiod(od::ODProblem{D, T}, params::NEOParameters{T};
+function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
     initcond::I = iodinitcond) where {D, I, T <: Real}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
