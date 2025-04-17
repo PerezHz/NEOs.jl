@@ -1437,7 +1437,7 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_t
     accY = Taylor1(identity(constant_term(zero_q_1)), order)
     accZ = Taylor1(identity(constant_term(zero_q_1)), order)
     local M_ = Array{S}(undef, 3, 3, N)
-    local M_[:, :, ea] = t2c_jpl_de430(dsj2k) .+ zero_q_1
+    local M_[:, :, ea] = seval(dsj2k, zero_q_1)
     dq[1] = Taylor1(identity(constant_term(q[4])), order)
     dq[2] = Taylor1(identity(constant_term(q[5])), order)
     dq[3] = Taylor1(identity(constant_term(q[6])), order)
@@ -2211,7 +2211,7 @@ function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, 
     local μ = params.μ
     local zero_q_1 = auxzero(q[1])
     local M_ = Array{S}(undef, 3, 3, N)
-    local M_[:, :, ea] = t2c_jpl_de430(dsj2k) .+ zero_q_1
+    local M_[:, :, ea] = seval(dsj2k, zero_q_1)
     for ord = 0:order - 1
         ordnext = ord + 1
         TaylorSeries.identity!(pntempX, zero_q_1, ord)
