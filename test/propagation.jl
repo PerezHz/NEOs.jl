@@ -38,7 +38,7 @@ using InteractiveUtils: methodswith
         q0 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01,
               -9.071450085084557E-03, -9.353197026254517E-03, -5.610023032269034E-03]
         # Propagation parameters
-        params = NEOParameters(maxsteps = 1, order = 25, abstol = 1e-20,
+        params = Parameters(maxsteps = 1, order = 25, abstol = 1e-20,
                             parse_eqs = true)
 
         # Initial time [days since J2000]
@@ -57,7 +57,7 @@ using InteractiveUtils: methodswith
             params
         )
         # Propagate orbit
-        params = NEOParameters(params; maxsteps = 1_000)
+        params = Parameters(params; maxsteps = 1_000)
         sol_bwd = NEOs.propagate(
             dynamics,
             jd0,
@@ -164,7 +164,7 @@ using InteractiveUtils: methodswith
               0.0029591421121582077, -0.01423233538611057, -0.005218412537773594,
               -5.592839897872e-14, 0.0]
         # Propagation parameters
-        params = NEOParameters(maxsteps = 1, order = 25, abstol = 1e-20,
+        params = Parameters(maxsteps = 1, order = 25, abstol = 1e-20,
                             parse_eqs = true)
 
         # Initial time [days since J2000]
@@ -183,7 +183,7 @@ using InteractiveUtils: methodswith
             params
         )
         # Propagate orbit
-        params = NEOParameters(params, maxsteps = 5_000)
+        params = Parameters(params, maxsteps = 5_000)
         sol = NEOs.propagate(
             dynamics,
             jd0,
@@ -278,11 +278,11 @@ using InteractiveUtils: methodswith
         q0 = [-0.9170913888342959, -0.37154308794738056, -0.1610606989484252,
               0.009701519087787077, -0.012766026792868212, -0.0043488589639194275] + dq
         # Propagation parameters
-        params = NEOParameters(maxsteps = 10, order = 25, abstol = 1e-20, parse_eqs = true)
+        params = Parameters(maxsteps = 10, order = 25, abstol = 1e-20, parse_eqs = true)
 
         # test parsed vs non-parsed propagation
         sol = NEOs.propagate(dynamics, jd0, 1.0, q0, params)
-        params = NEOParameters(params, parse_eqs = false)
+        params = Parameters(params, parse_eqs = false)
         solnp = NEOs.propagate(dynamics, jd0, 1.0, q0, params)
         @test sol.t == solnp.t
         # TODO: fix roundoff differences near deep close approach in 2029
@@ -293,7 +293,7 @@ using InteractiveUtils: methodswith
         @test sol == recovered_sol
         rm("test.jld2")
 
-        params = NEOParameters(params; maxsteps = 1)
+        params = Parameters(params; maxsteps = 1)
         sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, jd0, nyears, q0, params)
 
         @test JLD2.writeas(typeof(sol)) == PlanetaryEphemeris.TaylorInterpolantNSerialization{Float64}
@@ -335,25 +335,25 @@ using InteractiveUtils: methodswith
         q0::Vector{TaylorN{Float64}} = q00 + vcat(dq, zero(dq[1]))
 
         # test parsed vs non-parsed propagation: gravity-only model
-        params = NEOParameters(maxsteps=10, order=25, abstol=1e-20, parse_eqs=true)
+        params = Parameters(maxsteps=10, order=25, abstol=1e-20, parse_eqs=true)
         sol   = NEOs.propagate(dynamicsg, jd0, nyears, q0[1:6], params)
-        params = NEOParameters(params, parse_eqs=false)
+        params = Parameters(params, parse_eqs=false)
         solnp = NEOs.propagate(dynamicsg, jd0, nyears, q0[1:6], params)
         @test sol.t == solnp.t
         @test norm(sol.x-solnp.x, Inf) < 1e-16
         @test sol == solnp
 
         # test parsed vs non-parsed propagation: nongravitational model
-        params = NEOParameters(params, parse_eqs=true)
+        params = Parameters(params, parse_eqs=true)
         sol   = NEOs.propagate(dynamicsng, jd0, nyears, q0, params)
-        params = NEOParameters(params, parse_eqs=false)
+        params = Parameters(params, parse_eqs=false)
         solnp = NEOs.propagate(dynamicsng, jd0, nyears, q0, params)
         @test sol.t == solnp.t
         @test norm(sol.x-solnp.x, Inf) < 1e-16
         @test sol == solnp
 
         # propagate orbit (nongrav model)
-        params = NEOParameters(params, maxsteps = 2_000, parse_eqs = true)
+        params = Parameters(params, maxsteps = 2_000, parse_eqs = true)
         sol = NEOs.propagate(
             dynamicsng,
             jd0,

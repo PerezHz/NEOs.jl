@@ -1,5 +1,5 @@
 @doc raw"""
-    NEOParameters([params::NEOParameters{T};] kwargs...) where {T <: Real}
+    Parameters([params::Parameters{T};] kwargs...) where {T <: Real}
 
 Parameters for all orbit determination functions.
 
@@ -53,7 +53,7 @@ Parameters for all orbit determination functions.
 - `fudge::T`: rejection fudge term coefficient (default: `400.0`).
 - `max_per::T`: maximum allowed rejection percentage (default: `10.0`).
 """
-@kwdef struct NEOParameters{T <: Real}
+@with_kw struct Parameters{T <: Real}
     # Propagation Parameters
     maxsteps::Int = 500
     μ_ast::Vector{T} = μ_ast343_DE430[1:end]
@@ -89,39 +89,6 @@ Parameters for all orbit determination functions.
     χ2_rej::T = 8.0
     fudge::T = 400.0
     max_per::T = 10.0
-end
-
-# Outer constructors
-function NEOParameters(params::NEOParameters{T}; kwargs...) where {T <: Real}
-    fields = fieldnames(NEOParameters{T})
-    vals = Vector{Any}(undef, length(fields))
-    for i in eachindex(vals)
-        if fields[i] in keys(kwargs)
-            vals[i] = kwargs[fields[i]]
-        else
-            vals[i] = getfield(params, i)
-        end
-    end
-
-    return NEOParameters{T}(vals...)
-end
-
-# Print method for NEOParameters
-function show(io::IO, p::NEOParameters{T}) where {T <: Real}
-    avoid = [:μ_ast, :eph_su, :eph_ea]
-    params = fieldnames(NEOParameters{T})
-    s = Vector{String}(undef, length(params)+1)
-    s[1] = "NEOParameters{$T}:\n"
-    for i in eachindex(params)
-        if params[i] in avoid
-            s[i+1] = ""
-        else
-            x = string(params[i], ":")
-            s[i+1] = string("    ", rpad(x, 15), getfield(p, params[i]), "\n")
-        end
-    end
-
-    print(io, join(s))
 end
 
 # Load Sun (Earth) ephemeris

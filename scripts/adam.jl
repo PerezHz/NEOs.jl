@@ -47,7 +47,7 @@ end
         indices, _lsmethods
 
     function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
-        params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
+        params::Parameters{T}; scale::Symbol = :linear, η::T = 25.0,
         μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2) where {D, T <: Real}
         # Initial time of integration [julian days TDB]
         jd0 = dtutc2jdtdb(A.date)
@@ -161,7 +161,7 @@ function main()
     # Read optical astrometry
     radec = read_radec_mpc(input)
     # Orbit determination parameters
-    params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+    params = Parameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
         adamiter = maxiter)
     # Reduce tracklet
     tracklet = reduce_tracklets(radec)[1]

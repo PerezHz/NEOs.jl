@@ -521,7 +521,7 @@ as `Vector{RadecMPC{Float64}}`.
 function fetch_radec_mpc(id::AbstractString)
     # HTTP parameters
     params = JSON.json(Dict("desigs" => [id], "output_format" => ["OBS80"]))
-    resp = get(MPC_OBS_API_URL, ("Content-Type" => "application/json",), params)
+    resp = HTTP.get(MPC_OBS_API_URL, ("Content-Type" => "application/json",), params)
     # Convert to String
     text = String(resp.body)
     # Parse JSON

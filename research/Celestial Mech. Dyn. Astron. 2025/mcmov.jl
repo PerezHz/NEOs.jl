@@ -84,9 +84,9 @@ end
                 propres!, nobs, _lsmethods
 
     function mcmov(points::Vector{Tuple{T, T}}, A::AdmissibleRegion{T},
-        radec::Vector{RadecMPC{T}}, bounds::Vector{Float64},
-        params::NEOParameters{T}, varorder::Int = 2,
-        scale::Symbol = :log, Qmax::Float64 = 1e10) where {T <: Real}
+                   radec::Vector{RadecMPC{T}}, bounds::Vector{Float64},
+                   params::Parameters{T}, varorder::Int = 2,
+                   scale::Symbol = :log, Qmax::Float64 = 1e10) where {T <: Real}
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
         # JT variables
@@ -186,7 +186,7 @@ function main()
     # Read optical astrometry
     radec = read_radec_mpc(input)
     # Orbit determination parameters
-    params = NEOParameters(
+    params = Parameters(
         coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007, # Propagation
         jtlsiter = 20, lsiter = 20, significance = 0.99,       # Least squares
     )

@@ -134,7 +134,7 @@ function download_scratch(url::String, filename::String; connect_timeout = 180, 
     # Local file
     path = joinpath(scratch_path[], filename)
     # Get raw html (HTTP.get retries four times by default)
-    resp = get(url; connect_timeout, readtimeout)
+    resp = HTTP.get(url; connect_timeout, readtimeout)
     # Read local file
     txt = String(resp.body)
 

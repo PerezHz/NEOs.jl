@@ -1,6 +1,6 @@
 @doc raw"""
     adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
-         params::NEOParameters{T}; kwargs...) where {D, T <: Real}
+         params::Parameters{T}; kwargs...) where {D, T <: Real}
 
 Adaptative moment estimation (ADAM) minimizer of normalized mean square
 residual of `od.tracklets[i].radec` over the manifold of variations of `A`,
@@ -19,15 +19,16 @@ starting from `(ρ, v_ρ)`.
     See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
 """
 function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
-    params::NEOParameters{T}; scale::Symbol = :linear, η::T = 25.0,
+    params::Parameters{T}; scale::Symbol = :linear, η::T = 25.0,
     μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2) where {D, T <: Real}
     # Initial time of integration [julian days TDB]
     jd0 = dtutc2jdtdb(A.date)
-    # Unfold parameters
-    maxiter, mode, Qtol = params.adamiter, params.adammode, params.adamQtol
+    # Unpack
+    @unpack adamiter, adammode, adamQtol, significance = params
+    @unpack tracklets = od
     # Allocate memory
-    aes = Matrix{T}(undef, 6, maxiter+1)
-    Qs = fill(T(Inf), maxiter+1)
+    aes = Matrix{T}(undef, 6, adamiter+1)
+    Qs = fill(T(Inf), adamiter+1)
     # Initial attributable elements
     aes[:, 1] .= A.α, A.δ, A.v_α, A.v_δ, ρ, v_ρ
     # Scaling factors
@@ -43,7 +44,7 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     dae = [scalings[i] * TaylorN(i, order = adamorder) for i in 1:6]
     AE = aes[:, 1] .+ dae
     # Subset of radec
-    idxs = mode ? indices(od.tracklets) : indices(od.tracklets[i])
+    idxs = adammode ? indices(tracklets) : indices(tracklets[i])
     # Propagation buffer
     buffer = PropagationBuffer(od, jd0, idxs[1], idxs[end], AE, params)
     # Vector of O-C residuals
@@ -60,10 +61,10 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     # Second momentum
     n, _n_ = zeros(T, 2), zeros(T, 2)
     # Detect sawtooth efect (see https://arxiv.org/abs/2410.10056#)
-    Qthreshold = nms_threshold(2*length(res), params.significance)
+    Qthreshold = nms_threshold(2*length(res), significance)
     Nsawtooth = 0
     # Gradient descent
-    for t in 1:maxiter
+    for t in 1:adamiter
         # Current attributable elements (plain)
         ae = aes[:, t]
         # Attributable elements (JT)
@@ -71,7 +72,7 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
             AE .= ae + dae
         elseif scale == :log
             AE .= [ae[1] + dae[1], ae[2] + dae[2], ae[3] + dae[3],
-                  ae[4] + dae[4], 10^(log10(ae[5]) + dae[5]), ae[6] + dae[6]]
+                ae[4] + dae[4], 10^(log10(ae[5]) + dae[5]), ae[6] + dae[6]]
         end
         # Barycentric state vector
         q = attr2bary(A, AE, params)
@@ -92,7 +93,7 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         if t > 1
             (Qs[t-1] < Qthreshold < Qs[t]) && (Nsawtooth += 1)
             Nsawtooth == 2 && break
-            abs(Qs[t] - Qs[t-1]) / Qs[t] < Qtol && break
+            abs(Qs[t] - Qs[t-1]) / Qs[t] < adamQtol && break
         end
         # Gradient of objective function wrt (ρ, v_ρ)
         g_t[1] = differentiate(Q, 5)(x1)
@@ -117,7 +118,7 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
 end
 
 @doc raw"""
-    tsaiod(od::ODProblem{D, T}, params::NEOParameters{T};
+    tsaiod(od::ODProblem{D, T}, params::Parameters{T};
         initcond::I = iodinitcond) where {D, I, T <: Real}
 
 Fit a preliminary orbit to `od` via jet transport minimization
@@ -126,7 +127,7 @@ of the normalized mean square residual over the manifold of variations.
 ## Arguments
 
 - `od::ODProblem{D, T}`: an orbit determination problem.
-- `params::NEOParameters{T}`: see `Too Short Arc Parameters` of [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see `Too Short Arc Parameters` of [`Parameters`](@ref).
 
 ## Keyword arguments
 
@@ -135,18 +136,19 @@ of the normalized mean square residual over the manifold of variations.
     where each element has the form `(ρ, v_ρ, scale)`
     (default: `iodinitcond`).
 """
-function tsaiod(od::ODProblem{D, T}, params::NEOParameters{T};
+function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
     initcond::I = iodinitcond) where {D, I, T <: Real}
     # Allocate memory for orbit
     sol = zero(NEOSolution{T, T})
-    # Unfold parameters
-    varorder, mode, significance = params.tsaorder, params.adammode, params.significance
+    # Unpack
+    @unpack tsaorder, adammode, significance = params
+    @unpack radec, tracklets = od
     # Iterate tracklets
-    for i in eachindex(od.tracklets)
+    for i in eachindex(tracklets)
         # ADAM requires a minimum of 2 observations
-        nobs(od.tracklets[i]) < 2 && continue
+        nobs(tracklets[i]) < 2 && continue
         # Admissible region
-        A = AdmissibleRegion(od.tracklets[i], params)
+        A = AdmissibleRegion(tracklets[i], params)
         # List of naive initial conditions
         I0 = initcond(A)
         # Iterate naive initial conditions
@@ -165,17 +167,17 @@ function tsaiod(od::ODProblem{D, T}, params::NEOParameters{T};
             # Scaling factors
             scalings = abs.(q0) ./ 10^5
             # Jet Transport initial condition
-            q = [q0[k] + scalings[k] * TaylorN(k, order = varorder) for k in 1:6]
+            q = [q0[k] + scalings[k] * TaylorN(k, order = tsaorder) for k in 1:6]
             # Jet Transport Least Squares
-            trks = mode ? od.tracklets[:] : od.tracklets[i:i]
-            _sol_ = jtls(od, jd0, q, trks, params, mode)
+            trks = adammode ? tracklets[:] : tracklets[i:i]
+            _sol_ = jtls(od, jd0, q, trks, params, adammode)
             # Update solution
-            sol = updatesol(sol, _sol_, od.radec)
+            sol = updatesol(sol, _sol_, radec)
             # Termination condition
             critical_value(sol) < significance && return sol
         end
         # Global ADAM should be independent of starting tracklet
-        mode && break
+        adammode && break
     end
 
     return sol

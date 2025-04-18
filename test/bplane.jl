@@ -13,7 +13,7 @@ using NEOs: propres
     # Fetch optical astrometry
     radec = fetch_radec_mpc("2018 LA")
     # Parameters
-    params = NEOParameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
+    params = Parameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
     # Orbit determination problem
     od = ODProblem(newtonian!, radec)
 
@@ -31,7 +31,7 @@ using NEOs: propres
     # Values by Oct 12, 2024
 
     # Time of close approach
-    params = NEOParameters(params; fwdoffset = 0.3)
+    params = Parameters(params; fwdoffset = 0.3)
     bwd, fwd, res = propres(od, epoch(sol) + J2000, sol(), params)
     t_CA = find_zeros(t -> rvelea(t, fwd, params), fwd.t0, fwd.t0 + fwd.t[end-1])[1]
     # Asteroid's geocentric state vector

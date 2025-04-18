@@ -124,7 +124,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     jd0 = dtutc2jdtdb(jd0_datetime)
 
     print_header("Integrator warmup", 2)
-    params = NEOParameters(;maxsteps=1, order, abstol, parse_eqs)
+    params = Parameters(;maxsteps=1, order, abstol, parse_eqs)
     _ = NEOs.propagate(dynamics, jd0, nyears_fwd, q0, params)
     _ = NEOs.propagate_root(dynamics, jd0, nyears_fwd, q0, params)
     println()
@@ -134,7 +134,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     println("• Initial time of integration: ", string(jd0_datetime))
     println("• Final time of integration: ", jdtdb2dtutc(jd0 + tmax))
 
-    params = NEOParameters(;maxsteps, order, abstol, parse_eqs)
+    params = Parameters(;maxsteps, order, abstol, parse_eqs)
     sol_bwd = NEOs.propagate(dynamics, jd0, nyears_bwd, q0, params)
     jldsave("Apophis_bwd.jld2"; sol_bwd)
     # sol_bwd = JLD2.load("Apophis_bwd.jld2", "sol_bwd")

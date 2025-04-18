@@ -10,14 +10,13 @@ import PlanetaryEphemeris as PE
 
 using Dates, InteractiveUtils, LazyArtifacts, LinearAlgebra, Printf, JSON,
       TaylorSeries, SatelliteToolboxTransformations, TaylorIntegration,
-      SPICE, JLD2, Scratch
+      SPICE, JLD2, Scratch, HTTP
 using AutoHashEquals.Compat
 using Base: RefValue
 using Dates: epochms2datetime
 using Distributions: Chisq, cdf
 using Downloads: download
 using DelimitedFiles: readdlm
-using HTTP: get
 using DataFrames: DataFrame, nrow, eachcol, eachrow, groupby, combine, AbstractDataFrame,
         DataFrameRow, GroupedDataFrame
 using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, daysec, yr,
@@ -33,6 +32,7 @@ using Roots: find_zeros
 using HORIZONS: smb_spk
 using OhMyThreads: tmap, tmap!, @allow_boxed_captures
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!
+using Parameters: @with_kw, @unpack
 
 # Constants
 export d_EM_km, d_EM_au
@@ -84,7 +84,7 @@ export tsaiod
 # Gauss method
 export gauss_method, gaussiod
 # Orbit determination
-export NEOParameters, ODProblem, curvature, issinglearc, orbitdetermination
+export Parameters, ODProblem, curvature, issinglearc, orbitdetermination
 # B plane
 export valsecchi_circle, bopik, mtp
 # Outlier rejection
@@ -93,6 +93,7 @@ export outlier_rejection!
 export absolutemagnitude
 
 include("constants.jl")
+include("parameters.jl")
 include("observations/observations.jl")
 include("propagation/propagation.jl")
 include("orbitdetermination/orbitdetermination.jl")

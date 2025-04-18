@@ -232,7 +232,7 @@ function w8sades(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     id = isempty(radec[end].num) ? unpackdesig(radec[end].tmpdesig) : radec[end].num
     # HTTP parameters
     params = JSON.json(Dict("desigs" => [id], "output_format" => ["ADES_DF"]))
-    resp = get(MPC_OBS_API_URL, ("Content-Type" => "application/json",), params)
+    resp = HTTP.get(MPC_OBS_API_URL, ("Content-Type" => "application/json",), params)
     # Convert to String
     text = String(resp.body)
     # Parse JSON
@@ -298,7 +298,7 @@ function w8sneocc(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     id = isempty(radec[end].num) ? unpackdesig(radec[end].tmpdesig) : radec[end].num
     id = replace(id, " " => "")
     # HTTP query
-    resp = get(string(NEOCC_OBS_API_URL, id, ".rwo"))
+    resp = HTTP.get(string(NEOCC_OBS_API_URL, id, ".rwo"))
     # Convert to String
     text = String(resp.body)
     # Parse lines
@@ -350,7 +350,7 @@ function w8sneodys2(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     id = isempty(radec[end].num) ? unpackdesig(radec[end].tmpdesig) : radec[end].num
     id = replace(id, " " => "")
     # HTTP query
-    resp = get(string(NEODyS2_OBS_API_URL, id, ".rwo"))
+    resp = HTTP.get(string(NEODyS2_OBS_API_URL, id, ".rwo"))
     # Convert to Strings
     text = String(resp.body)
     # Parse lines

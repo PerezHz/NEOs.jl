@@ -248,7 +248,7 @@ end
 
 @doc raw"""
     uncertaintyparameter(od::ODProblem{D, T}, sol::NEOSolution{T, T},
-        params::NEOParameters{T}) where {D, T <: Real}
+        params::Parameters{T}) where {D, T <: Real}
 
 Return the Minor Planet Center Uncertainty Parameter.
 
@@ -256,7 +256,7 @@ Return the Minor Planet Center Uncertainty Parameter.
 
 - `od::ODProblem{D, T}`: an orbit determination problem.
 - `sol::NEOSolution{T, T}:` reference orbit.
-- `params::NEOParameters{T}`: see [`NEOParameters`](@ref).
+- `params::Parameters{T}`: see [`Parameters`](@ref).
 
 !!! reference
     https://www.minorplanetcenter.net/iau/info/UValue.html
@@ -265,7 +265,7 @@ Return the Minor Planet Center Uncertainty Parameter.
     This function will change the (global) `TaylorSeries` variables.
 """
 function uncertaintyparameter(od::ODProblem{D, T}, sol::NEOSolution{T, T},
-    params::NEOParameters{T}) where {D, T <: Real}
+    params::Parameters{T}) where {D, T <: Real}
     # Check consistency between od and sol
     @assert od.tracklets == sol.tracklets
     # Epoch [Julian days TDB]
