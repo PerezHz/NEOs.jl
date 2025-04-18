@@ -2,7 +2,7 @@ module NEOs
 
 # __precompile__(false)
 
-import Base: show, string, isless, convert, zero, iszero, isnan, in, min
+import Base: show, string, isless, convert, zero, iszero, isnan, in
 import Tables: istable, rowaccess, rows, schema, Schema
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import JLD2: writeas
@@ -77,8 +77,9 @@ export pv2kep, yarkp2adot
 # Least squares
 export LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
        project, chi2, nms, nrms, leastsquares, leastsquares!, tryls
-# NEOSolution
-export epoch, sigmas, snr, critical_value, jplcompare, uncertaintyparameter
+# AbstractOrbit
+export PreliminaryOrbit, LeastSquaresOrbit, epoch, minmaxdates, critical_value, sigmas,
+       snr, jplcompare, uncertaintyparameter
 # Too Short Arc
 export tsaiod
 # Gauss method

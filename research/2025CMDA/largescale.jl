@@ -1,6 +1,6 @@
 using ArgParse, NEOs, JLD2, StatsBase, Dates
 using Plots, LaTeXStrings, Measures, Printf, PrettyTables
-using NEOs: NEOSolution, numberofdays
+using NEOs: LeastSquaresOrbit, numberofdays
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -113,23 +113,23 @@ function main()
     # Load orbits
     sols1 = map(neos1) do neo
         filename = joinpath(input1, replace(neo, " " => "") * ".jld2")
-        !isfile(filename) && return zero(NEOSolution{Float64, Float64})
+        !isfile(filename) && return zero(LeastSquaresOrbit{Float64, Float64})
         return JLD2.load(filename, "sol")
     end
     sols2 = map(neos2) do neo
         filename = joinpath(input2, replace(neo, " " => "") * ".jld2")
-        !isfile(filename) && return zero(NEOSolution{Float64, Float64})
+        !isfile(filename) && return zero(LeastSquaresOrbit{Float64, Float64})
         return JLD2.load(filename, "sol")
     end
     # Load convergence flags
     F1 = map(neos1) do neo
         filename = joinpath(input1, replace(neo, " " => "") * ".jld2")
-        !isfile(filename) && return zero(NEOSolution{Float64, Float64})
+        !isfile(filename) && return zero(LeastSquaresOrbit{Float64, Float64})
         return JLD2.load(filename, "i")
     end
     F2 = map(neos2) do neo
         filename = joinpath(input2, replace(neo, " " => "") * ".jld2")
-        !isfile(filename) && return zero(NEOSolution{Float64, Float64})
+        !isfile(filename) && return zero(LeastSquaresOrbit{Float64, Float64})
         return JLD2.load(filename, "i")
     end
 
