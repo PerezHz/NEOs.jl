@@ -139,7 +139,7 @@ of the normalized mean square residual over the manifold of variations.
 function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
     initcond::I = iodinitcond) where {D, I, T <: Real}
     # Allocate memory for orbit
-    sol = zero(NEOSolution{T, T})
+    sol = zero(LeastSquaresOrbit{T, T})
     # Unpack
     @unpack tsaorder, adammode, significance = params
     @unpack radec, tracklets = od

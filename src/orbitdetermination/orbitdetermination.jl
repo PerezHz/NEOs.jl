@@ -1,7 +1,9 @@
 include("osculating.jl")
 include("leastsquares/fit.jl")
 include("odproblem.jl")
-include("neosolution.jl")
+include("abstractorbit/abstractorbit.jl")
+include("abstractorbit/preliminaryorbit.jl")
+include("abstractorbit/leastsquaresorbit.jl")
 include("admissibleregion.jl")
 
 # Times used within propres
@@ -234,7 +236,7 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
     # Initial subset of radec for orbit fit
     tin, tout, rin = _initialtracklets(od.tracklets, tracklets)
     # Allocate memory for orbits
-    sols = [zero(NEOSolution{T, T}) for _ in 1:jtlsiter]
+    sols = [zero(LeastSquaresOrbit{T, T}) for _ in 1:jtlsiter]
     Qs = fill(T(Inf), jtlsiter)
     # Outlier rejection
     if outrej
@@ -267,7 +269,7 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         end
         # Update solution
         Qs[i] = nrms(res, fit)
-        sols[i] = evalfit(NEOSolution(tin, bwd, fwd, res[rin], fit, J))
+        sols[i] = evalfit(LeastSquaresOrbit(tin, bwd, fwd, res[rin], fit, J))
         if outrej
             outs[i] = notout(res)
         end
@@ -306,9 +308,14 @@ function iodinitcond(A::AdmissibleRegion{T}) where {T <: Real}
 end
 
 # Update `sol` iff `_sol_` is complete and has a lower nrms
-updatesol(sol::NEOSolution{T, T}, _sol_::NEOSolution{T, T},
-    radec::Vector{RadecMPC{T}}) where {T <: Real} =
-    nobs(_sol_) == length(radec) ? min(sol, _sol_) : sol
+function updatesol(sol::LeastSquaresOrbit{T, T}, _sol_::LeastSquaresOrbit{T, T},
+    radec::Vector{RadecMPC{T}}) where {T <: Real}
+    if nobs(_sol_) == length(radec)
+        return nrms(sol) <= nrms(_sol_) ? sol : _sol_
+    else
+        return sol
+    end
+end
 
 include("tooshortarc.jl")
 include("gaussinitcond.jl")
@@ -347,7 +354,7 @@ Initial Orbit Determination (IOD) routine.
 function orbitdetermination(od::ODProblem{D, T}, params::Parameters{T};
     initcond::I = iodinitcond) where {D, I, T <: Real}
     # Allocate memory for orbit
-    sol = zero(NEOSolution{T, T})
+    sol = zero(LeastSquaresOrbit{T, T})
     # Unpack
     @unpack tsaorder, gaussorder, jtlsorder, significance = params
     @unpack radec = od
@@ -373,7 +380,7 @@ function orbitdetermination(od::ODProblem{D, T}, params::Parameters{T};
 end
 
 @doc raw"""
-    orbitdetermination(od::ODProblem{D, T}, sol::NEOSolution{T, T},
+    orbitdetermination(od::ODProblem{D, T}, sol::LeastSquaresOrbit{T, T},
         params::Parameters{T}) where {D, T <: Real}
 
 Fit a least squares orbit to `od` using `sol` as an initial condition.
@@ -381,13 +388,13 @@ Fit a least squares orbit to `od` using `sol` as an initial condition.
 ## Arguments
 
 - `od::ODProblem{D, T}`: orbit determination problem.
-- `sol::NEOSolution{T, T}:` preliminary orbit.
+- `sol::LeastSquaresOrbit{T, T}:` preliminary orbit.
 - `params::Parameters{T}`: see [`Parameters`](@ref).
 
 !!! warning
     This function will change the (global) `TaylorSeries` variables.
 """
-function orbitdetermination(od::ODProblem{D, T}, sol::NEOSolution{T, T},
+function orbitdetermination(od::ODProblem{D, T}, sol::LeastSquaresOrbit{T, T},
     params::Parameters{T}) where {D, T <: Real}
     # Unpack parameters
     @unpack jtlsorder, significance, adammode = params
