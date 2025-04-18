@@ -6,7 +6,7 @@ using PlanetaryEphemeris
 using LinearAlgebra
 using Test
 
-using NEOs: NEOSolution, RadecMPC, reduce_tracklets,
+using NEOs: LeastSquaresOrbit, RadecMPC, reduce_tracklets,
     indices, numberofdays, nout, scaled_variables
 
 function iodsubradec(radec::Vector{RadecMPC{T}}, N::Int = 3) where {T <: Real}
@@ -38,7 +38,7 @@ end
         # Values by Mar 1, 2025
 
         # Orbit solution
-        @test isa(sol, NEOSolution{Float64, Float64})
+        @test isa(sol, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
         @test length(sol.tracklets) == 3
         @test sol.tracklets[1].radec[1] == subradec[1]
@@ -47,11 +47,9 @@ end
         # Backward integration
         @test dtutc2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
-        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
         @test dtutc2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
-        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 9
         @test iszero(nout(sol.res))
@@ -83,7 +81,7 @@ end
         sol1 = orbitdetermination(od, sol, params)
 
         # Orbit solution
-        @test isa(sol1, NEOSolution{Float64, Float64})
+        @test isa(sol1, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
         @test length(sol1.tracklets) == 15
         @test sol1.tracklets[1].radec[1] == subradec[1]
@@ -92,11 +90,9 @@ end
         # Backward integration
         @test dtutc2days(date(subradec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
         @test all( norm.(sol1.bwd.x, Inf) .< 1.2 )
-        @test isempty(sol1.t_bwd) && isempty(sol1.x_bwd) && isempty(sol1.g_bwd)
         # Forward integration
         @test dtutc2days(date(subradec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
         @test all( norm.(sol1.fwd.x, Inf) .< 1.2 )
-        @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
         @test length(sol1.res) == 43
         @test iszero(nout(sol1.res))
@@ -139,7 +135,7 @@ end
         # Values by Mar 1, 2025
 
         # Orbit solution
-        @test isa(sol, NEOSolution{Float64, Float64})
+        @test isa(sol, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
         @test length(sol.tracklets) == 2
         @test sol.tracklets[1].radec[1] == radec[1]
@@ -148,11 +144,9 @@ end
         # Backward integration
         @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
-        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
         @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
-        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 6
         @test iszero(nout(sol.res))
@@ -198,7 +192,7 @@ end
         # Values by Mar 1, 2025
 
         # Orbit solution
-        @test isa(sol, NEOSolution{Float64, Float64})
+        @test isa(sol, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
         @test length(sol.tracklets) == 3
         @test sol.tracklets[1].radec[1] == subradec[1]
@@ -207,11 +201,9 @@ end
         # Backward integration
         @test dtutc2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
-        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
         @test dtutc2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
-        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 12
         @test iszero(nout(sol.res))
@@ -370,7 +362,7 @@ end
         χ2 = C' * inv(Γ_C) * C
         @test χ2 > 2_516
         # Orbit solution
-        @test isa(sol, NEOSolution{Float64, Float64})
+        @test isa(sol, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
         @test length(sol.tracklets) == 1
         @test sol.tracklets[1].radec[1] == radec[1]
@@ -379,11 +371,9 @@ end
         # Backward integration
         @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
-        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
         @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
-        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 10
         @test iszero(nout(sol.res))
@@ -428,7 +418,7 @@ end
         # Values by Mar 1, 2025
 
         # Orbit solution
-        @test isa(sol, NEOSolution{Float64, Float64})
+        @test isa(sol, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
         @test length(sol.tracklets) == 3
         @test sol.tracklets[1].radec[1] == subradec[1]
@@ -437,11 +427,9 @@ end
         # Backward integration
         @test dtutc2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
-        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
         @test dtutc2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
-        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 18
         @test nout(sol.res) == 2
@@ -468,7 +456,7 @@ end
         sol1 = orbitdetermination(od, sol, params)
 
         # Orbit solution
-        @test isa(sol1, NEOSolution{Float64, Float64})
+        @test isa(sol1, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
         @test length(sol1.tracklets) == 4
         @test sol1.tracklets[1].radec[1] == radec[1]
@@ -477,11 +465,9 @@ end
         # Backward integration
         @test dtutc2days(date(radec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
         @test all( norm.(sol1.bwd.x, Inf) .< 2 )
-        @test isempty(sol1.t_bwd) && isempty(sol1.x_bwd) && isempty(sol1.g_bwd)
         # Forward integration
         @test dtutc2days(date(radec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
         @test all( norm.(sol1.fwd.x, Inf) .< 2 )
-        @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
         @test length(sol1.res) == 21
         @test nout(sol1.res) == 2
@@ -533,7 +519,7 @@ end
         χ2 = C' * inv(Γ_C) * C
         @test χ2 > 1.03e6
         # Orbit solution
-        @test isa(sol, NEOSolution{Float64, Float64})
+        @test isa(sol, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
         @test length(sol.tracklets) == 1
         @test sol.tracklets[1].radec[1] == radec[1]
@@ -542,11 +528,9 @@ end
         # Backward integration
         @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
-        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
         @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 1e9 )
-        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 7
         @test iszero(nout(sol.res))
@@ -590,7 +574,7 @@ end
         # Values by Mar 1, 2025
 
         # Orbit solution
-        @test isa(sol, NEOSolution{Float64, Float64})
+        @test isa(sol, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
         @test length(sol.tracklets) == 3
         @test sol.tracklets[1].radec[1] == subradec[1]
@@ -599,11 +583,9 @@ end
         # Backward integration
         @test dtutc2days(date(subradec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
-        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
         @test dtutc2days(date(subradec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 1e4 )
-        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 18
         @test iszero(nout(sol.res))
@@ -635,7 +617,7 @@ end
         sol1 = orbitdetermination(od, sol, params)
 
         # Orbit solution
-        @test isa(sol1, NEOSolution{Float64, Float64})
+        @test isa(sol1, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
         @test length(sol1.tracklets) == 10
         @test sol1.tracklets[1].radec[1] == subradec[1]
@@ -644,11 +626,9 @@ end
         # Backward integration
         @test dtutc2days(date(subradec[1])) > sol1.bwd.t0 + sol1.bwd.t[end]
         @test all( norm.(sol1.bwd.x, Inf) .< 1 )
-        @test isempty(sol1.t_bwd) && isempty(sol1.x_bwd) && isempty(sol1.g_bwd)
         # Forward integration
         @test dtutc2days(date(subradec[end])) < sol1.fwd.t0 + sol1.fwd.t[end]
         @test all( norm.(sol1.fwd.x, Inf) .< 1e15 )
-        @test isempty(sol1.t_fwd) && isempty(sol1.x_fwd) && isempty(sol1.g_fwd)
         # Vector of residuals
         @test length(sol1.res) == 97
         @test iszero(nout(sol1.res))
@@ -726,7 +706,7 @@ end
         # Values by Mar 1, 2025
 
         # Orbit solution
-        @test isa(sol, NEOSolution{Float64, Float64})
+        @test isa(sol, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
         @test length(sol.tracklets) == 3
         @test sol.tracklets[1].radec[1] == radec[1]
@@ -735,11 +715,9 @@ end
         # Backward integration
         @test dtutc2days(date(radec[1])) > sol.bwd.t0 + sol.bwd.t[end]
         @test all( norm.(sol.bwd.x, Inf) .< 2 )
-        @test isempty(sol.t_bwd) && isempty(sol.x_bwd) && isempty(sol.g_bwd)
         # Forward integration
         @test dtutc2days(date(radec[end])) < sol.fwd.t0 + sol.fwd.t[end]
         @test all( norm.(sol.fwd.x, Inf) .< 2 )
-        @test isempty(sol.t_fwd) && isempty(sol.x_fwd) && isempty(sol.g_fwd)
         # Vector of residuals
         @test length(sol.res) == 6
         @test iszero(nout(sol.res))

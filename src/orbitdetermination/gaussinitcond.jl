@@ -487,7 +487,7 @@ See also [`gauss_method`](@ref).
 """
 function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Real}
     # Allocate memory for orbit
-    sol = zero(NEOSolution{T, T})
+    sol = zero(LeastSquaresOrbit{T, T})
     # Unpack parameters
     @unpack safegauss, gaussorder, significance, eph_su = params
     @unpack tracklets, radec = od
