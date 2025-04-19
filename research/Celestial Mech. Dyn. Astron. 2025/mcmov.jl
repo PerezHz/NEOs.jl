@@ -80,8 +80,8 @@ end
 @everywhere begin
     using NEOs, Dates, TaylorSeries, PlanetaryEphemeris, JLD2
     using NEOs: AdmissibleRegion, OpticalResidual, RadecMPC, PropagationBuffer,
-                reduce_tracklets, argoldensearch, scaled_variables, attr2bary,
-                propres!, nobs, _lsmethods
+                init_residuals, reduce_tracklets, argoldensearch, scaled_variables,
+                attr2bary, propres!, nobs, _lsmethods
 
     function mcmov(points::Vector{Tuple{T, T}}, A::AdmissibleRegion{T},
                    radec::Vector{RadecMPC{T}}, bounds::Vector{Float64},
@@ -108,8 +108,8 @@ end
         _buffer_ = PropagationBuffer(od, _jd0_, 1, nobs(od), AE(), params)
         buffer = PropagationBuffer(od, _jd0_, 1, nobs(od), AE, params)
         # Vector of residuals
-        _res_ = [zero(OpticalResidual{T, T}) for _ in eachindex(radec)]
-        res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(radec)]
+        _res_ = init_residuals(T, od)
+        res = init_residuals(TaylorN{T}, od)
         # Origin
         x0 = zeros(T, 6)
         # Least squares cache and methods
@@ -133,7 +133,7 @@ end
             # Propagation and residuals
             propres!(_res_, od, jd0, q(), params; buffer = _buffer_)
             if isempty(_res_)
-                _res_ = [zero(OpticalResidual{T, T}) for _ in eachindex(radec)]
+                _res_ = init_residuals(T, od)
                 continue
             end
             nms(_res_) > Qmax && continue

@@ -5,10 +5,9 @@ An astrometric optical observed minus computed residual.
 
 ## Fields
 
-- `ξ_α::U`: right ascension residual.
-- `ξ_δ::U`: declination residual.
-- `w_α::T`: right ascension weight.
-- `w_δ::T`: declination weight.
+- `ξ_α/ξ_δ::U`: right ascension (declination) residual.
+- `w_α/w_δ::T`: right ascension (declination) weight.
+- `μ_α/μ_δ::T`: right ascension (declination) debiasing factor.
 - `outlier::Bool`: whether the residual is an outlier or not.
 """
 @auto_hash_equals struct OpticalResidual{T <: Real, U <: Number}
@@ -16,27 +15,28 @@ An astrometric optical observed minus computed residual.
     ξ_δ::U
     w_α::T
     w_δ::T
+    μ_α::T
+    μ_δ::T
     outlier::Bool
     # Inner constructor
-    function OpticalResidual{T, U}(ξ_α::U, ξ_δ::U, w_α::T, w_δ::T,
-        outlier::Bool = false) where {T <: Real, U <:  Number}
-        new{T, U}(ξ_α, ξ_δ, w_α, w_δ, outlier)
-    end
+    OpticalResidual{T, U}(ξ_α::U, ξ_δ::U, w_α::T, w_δ::T, μ_α::T, μ_δ::T,
+        outlier::Bool = false) where {T <: Real, U <:  Number} =
+        new{T, U}(ξ_α, ξ_δ, w_α, w_δ, μ_α, μ_δ, outlier)
 end
 
 # Outer constructor
-OpticalResidual(ξ_α::U, ξ_δ::U, w_α::T, w_δ::T,
+OpticalResidual(ξ_α::U, ξ_δ::U, w_α::T, w_δ::T, μ_α::T, μ_δ::T,
     outlier::Bool = false) where {T <: Real, U <: Number} =
-    OpticalResidual{T, U}(ξ_α, ξ_δ, w_α, w_δ, outlier)
+    OpticalResidual{T, U}(ξ_α, ξ_δ, w_α, w_δ, μ_α, μ_δ, outlier)
 
 # Definition of zero OpticalResidual
 zero(::Type{OpticalResidual{T, U}}) where {T <: Real, U <: Number} =
-    OpticalResidual{T, U}(zero(U), zero(U), zero(T), zero(T), false)
+    OpticalResidual{T, U}(zero(U), zero(U), zero(T), zero(T), zero(T), zero(T), false)
 
 # Evaluate methods
-function evaluate(res::OpticalResidual{T, TaylorN{T}}, x::Vector{T}) where {T <: Real}
-    OpticalResidual(res.ξ_α(x), res.ξ_δ(x), res.w_α, res.w_δ, res.outlier)
-end
+evaluate(res::OpticalResidual{T, TaylorN{T}}, x::Vector{T}) where {T <: Real} =
+    OpticalResidual{T, T}(res.ξ_α(x), res.ξ_δ(x), res.w_α, res.w_δ, res.μ_α,
+    res.μ_δ, res.outlier)
 (res::OpticalResidual{T, TaylorN{T}})(x::Vector{T}) where {T <: Real} = evaluate(res, x)
 
 function evaluate(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
@@ -51,9 +51,6 @@ end
     evaluate(res, x)
 
 # Print method for OpticalResidual
-# Examples:
-# α: -138.79801 δ: -89.80025
-# α: -134.79450 δ: -91.42509 (outlier)
 function show(io::IO, x::OpticalResidual)
     outlier_flag = isoutlier(x) ? " (outlier)" : ""
     print(io, "α: ", @sprintf("%+.5f", cte(x.ξ_α)), " δ: ",
@@ -61,34 +58,36 @@ function show(io::IO, x::OpticalResidual)
 end
 
 @doc raw"""
-    unfold(ξs::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
+    unfold(::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
 
-Concatenate right ascension and declination residuals for an orbit fit.
+Concatenate the non-outlier right ascension and declination residuals, weights and
+debiasing factors; and return three vectors.
 """
 function unfold(ξs::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
     # Number of non outliers
-    L = count(x -> !x.outlier, ξs)
-    # Vector of residuals
+    L = notout(ξs)
+    # Vector of residuals, weights and debiasing factors
     res = Vector{U}(undef, 2*L)
-    # Vector of weights
     w = Vector{T}(undef, 2*L)
+    μ = Vector{T}(undef, 2*L)
     # Global counter
     k = 1
-    # Fill residuals and weights
+    # Fill residuals, weights and debiasing factors
     for i in eachindex(ξs)
-        if !ξs[i].outlier
-            # Right ascension
-            res[k] = ξs[i].ξ_α
-            w[k] = ξs[i].w_α
-            # Declination
-            res[k+L] = ξs[i].ξ_δ
-            w[k+L] = ξs[i].w_δ
-            # Update global counter
-            k += 1
-        end
+        isoutlier(ξs[i]) && continue
+        # Right ascension
+        res[k] = ξs[i].ξ_α
+        w[k] = ξs[i].w_α
+        μ[k] = ξs[i].μ_α
+        # Declination
+        res[k+L] = ξs[i].ξ_δ
+        w[k+L] = ξs[i].w_δ
+        μ[k+L] = ξs[i].μ_δ
+        # Update global counter
+        k += 1
     end
 
-    return res, w
+    return res, w, μ
 end
 
 # Functions to get specific fields of a OpticalResidual object
@@ -96,16 +95,19 @@ ra(res::OpticalResidual) = res.ξ_α
 dec(res::OpticalResidual) = res.ξ_δ
 wra(res::OpticalResidual) = res.w_α
 wdec(res::OpticalResidual) = res.w_δ
+μra(res::OpticalResidual) = res.μ_α
+μdec(res::OpticalResidual) = res.μ_δ
 isoutlier(res::OpticalResidual) = res.outlier
 nout(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number} =
     count(isoutlier, res)
 notout(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number} =
     count(!isoutlier, res)
 
-euclid3D(x::Vector{T}) where {T <: Real} = sqrt(dot3D(x, x))
-function euclid3D(x::Vector{TaylorN{T}}) where {T <: Real}
+# Warning: functions euclid3D(x) and dot3D(x) assume length(x) >= 3
+euclid3D(x::AbstractVector{T}) where {T <: Real} = sqrt(dot3D(x, x))
+function euclid3D(x::AbstractVector{TaylorN{T}}) where {T <: Real}
     z, w = zero(x[1]), zero(x[1])
-    @inbounds for i in eachindex(x)
+    @inbounds for i in 1:3
         TS.zero!(w)
         for k in eachindex(x[i])
             TS.mul!(w, x[i], x[i], k)
@@ -119,10 +121,11 @@ function euclid3D(x::Vector{TaylorN{T}}) where {T <: Real}
     return w
 end
 
-dot3D(x::Vector{T}, y::Vector{T}) where {T <: Real} = x[1]*y[1] + x[2]*y[2] + x[3]*y[3]
+dot3D(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real} =
+    x[1]*y[1] + x[2]*y[2] + x[3]*y[3]
 function dot3D(x::Vector{TaylorN{T}}, y::Vector{U}) where {T <: Real, U <: Number}
     z, w = zero(x[1]), zero(x[1])
-    @inbounds for i in eachindex(x)
+    @inbounds for i in 1:3
         TS.zero!(w)
         for k in eachindex(x[i])
             TS.mul!(w, x[i], y[i], k)
@@ -225,14 +228,15 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
         # Signal path distance (down-leg)
         q_D = ρ_r
 
-        # Shapiro correction to time-delay
-        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)  # seconds
-        # Troposphere correction to time-delay
-        # Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r) # seconds
-        # Solar corona correction to time-delay
-        # Δτ_corona_D = corona_delay(constant_term.(r_a_t_b), r_r_t_r, r_s_t_r, F_tx, station_code) # seconds
-        # Total time-delay
-        Δτ_D = Δτ_rel_D # + Δτ_tropo_D #+ Δτ_corona_D # seconds
+        # Shapiro correction to time-delay [seconds]
+        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)
+        # Troposphere correction to time-delay [seconds]
+        # Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)
+        # Solar corona correction to time-delay [seconds]
+        # Δτ_corona_D = corona_delay(constant_term.(r_a_t_b),
+        #   r_r_t_r, r_s_t_r, F_tx, station_code)
+        # Total time-delay [seconds]
+        Δτ_D = Δτ_rel_D # + Δτ_tropo_D + Δτ_corona_D
 
         # New estimate
         p_dot_23 = dot3D(ρ_vec_r, v_a_t_b)/ρ_r
@@ -275,7 +279,8 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
     g1 = (2μ_DE430[su]/(c_au_per_day^2))/(E_H/au)
     g2 = 1 + dot3D(q_vec, e_vec)
     # See ESAA 2014, equation (7.116)
-    u1_vec = U_norm*(  u_vec + (g1/g2)*( dot3D(u_vec,q_vec)*e_vec - dot3D(e_vec,u_vec)*q_vec )  )
+    u1_vec = U_norm * ( u_vec + (g1/g2) * ( dot3D(u_vec, q_vec) * e_vec -
+        dot3D(e_vec, u_vec) * q_vec ) )
     u1_norm = euclid3D(u1_vec)
 
     # Compute right ascension, declination angles
@@ -321,7 +326,7 @@ end
 
 # Angle difference taking into account the discontinuity in [0, 2π) -> [0, 2π)
 # x and y must be in arcsec
-function anglediff(x::T, y::S) where {T, S <: Number}
+function anglediff(x::T, y::S) where {T <: Number, S <: Number}
     # Signed difference
     Δ = x - y
     # Absolute difference
@@ -334,10 +339,25 @@ function anglediff(x::T, y::S) where {T, S <: Number}
     end
 end
 
+function init_residuals(::Type{U}, radec::AbstractVector{RadecMPC{T}},
+    w8s::AbstractVector{Tuple{T, T}}, bias::AbstractVector{Tuple{T, T}},
+    outliers::AbstractVector{Bool}) where {T <: Real, U <: Number}
+    # Check consistency between arrays
+    @assert length(radec) == length(w8s) == length(bias) == length(outliers)
+    # Initialize vector of residuals
+    res = Vector{OpticalResidual{T, U}}(undef, length(radec))
+    for i in eachindex(radec)
+        ξ_α, ξ_δ = zero(U), zero(U)
+        w_α, w_δ = w8s[i]
+        μ_α, μ_δ = bias[i]
+        res[i] = OpticalResidual{T, U}(ξ_α, ξ_δ, w_α, w_δ, μ_α, μ_δ, outliers[i])
+    end
+
+    return res
+end
+
 @doc raw"""
-    residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{Tuple{T, T}},
-        bias::AbstractVector{Tuple{T, T}}; xva::AstEph,
-        kwargs...) where {AstEph, T <: Real}
+    residuals(radec, w8s, bias [, outliers]; xva, kwargs...) where {AstEph, T <: Real}
 
 Compute observed minus computed residuals for optical astrometry `radec`.
 Corrections due to Earth orientation, LOD and polar motion are computed
@@ -350,6 +370,7 @@ See also [`OpticalResidual`](@ref) and [`compute_radec`](@ref).
 - `radec::AbstractVector{RadecMPC{T}}`: optical astrometry.
 - `w8s::AbstractVector{Tuple{T, T}}`: statistical weights.
 - `bias::AbstractVector{Tuple{T, T}}`: debiasing corrections.
+- `outliers::AbstractVector{Bool}`: outlier flags (default: `fill(false, length(radec))`).
 
 ## Keyword arguments
 
@@ -362,10 +383,9 @@ All ephemeris must take [et seconds since J2000] and return [barycentric positio
 and velocity in km/sec].
 """
 function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{Tuple{T, T}},
-    bias::AbstractVector{Tuple{T, T}}; xva::AstEph, kwargs...) where {AstEph, T <: Real}
+    bias::AbstractVector{Tuple{T, T}}, outliers::AbstractVector{Bool} = fill(false,
+    length(radec)); xva::AstEph, kwargs...) where {AstEph, T <: Real}
 
-    # Check consistency between arrays
-    @assert length(radec) == length(w8s) == length(bias)
     # UTC time of first astrometric observation
     utc1 = date(radec[1])
     # TDB seconds since J2000.0 for first astrometric observation
@@ -375,35 +395,32 @@ function residuals(radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{Tuple
     # Type of asteroid ephemeris
     U = typeof(a1_et1)
     # Vector of residuals
-    res = [zero(OpticalResidual{T, U}) for _ in eachindex(radec)]
-    residuals!(res, radec, w8s, bias; xva, kwargs...)
+    res = init_residuals(U, radec, w8s, bias, outliers)
+    residuals!(res, radec; xva, kwargs...)
 
     return res
 end
 
-function residuals!(res::Vector{OpticalResidual{T, U}},
-    radec::AbstractVector{RadecMPC{T}}, w8s::AbstractVector{Tuple{T, T}},
-    bias::AbstractVector{Tuple{T, T}}; xva::AstEph, kwargs...) where {AstEph,
-    T <: Real, U <: Number}
+function residuals!(res::Vector{OpticalResidual{T, U}}, radec::AbstractVector{RadecMPC{T}};
+    xva::AstEph, kwargs...) where {AstEph, T <: Real, U <: Number}
 
-    @allow_boxed_captures tmap!(res, radec, w8s, bias, isoutlier.(res)) do obs, w8, bias, outlier
-        # Observed ra/dec
-        α_obs = rad2arcsec(ra(obs))   # arcsec
-        δ_obs = rad2arcsec(dec(obs))  # arcsec
-        # Computed ra/dec
-        α_comp, δ_comp = compute_radec(obs; xva = xva, kwargs...)   # arcsec
-        # Statistical weights
-        α_w8, δ_w8 = w8
-        # Debiasing corrections
-        α_corr, δ_corr = bias
+    @allow_boxed_captures tmap!(res, radec, wra.(res), wdec.(res), μra.(res),
+        μdec.(res), isoutlier.(res)) do obs, w_α, w_δ, μ_α, μ_δ, outlier
+        # Observed ra/dec [arcsec]
+        obs_α = rad2arcsec(ra(obs))
+        obs_δ = rad2arcsec(dec(obs))
+        # Computed ra/dec [arcsec]
+        comp_α, comp_δ = compute_radec(obs; xva = xva, kwargs...)
         # Observed minus computed residual ra/dec
         # Note: ra is multiplied by a metric factor cos(dec) to match the format of
         # debiasing corrections
         return OpticalResidual{T, U}(
-            anglediff(α_obs, α_comp) * cos(dec(obs)) - α_corr,
-            δ_obs - δ_comp - δ_corr,
-            α_w8,
-            δ_w8,
+            anglediff(obs_α, comp_α) * cos(dec(obs)) - μ_α,
+            obs_δ - comp_δ - μ_δ,
+            w_α,
+            w_δ,
+            μ_α,
+            μ_δ,
             outlier
         )
     end
