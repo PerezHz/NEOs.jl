@@ -26,6 +26,11 @@ function minmaxdates(orbit::AbstractOrbit)
     return min(t, minimum(first, dates)), max(t, maximum(last, dates))
 end
 
+function numberofdays(orbit::AbstractOrbit)
+    t0, tf = minmaxdates(orbit)
+    return (tf - t0).value / 86_400_000
+end
+
 # Evaluation in time method
 (orbit::AbstractOrbit)(t = epoch(orbit)) = t <= epoch(orbit) ? orbit.bwd(t) : orbit.fwd(t)
 
@@ -51,4 +56,17 @@ function critical_value(orbit::AbstractOrbit{T, U}) where {T <: Real, U <: Numbe
     d = Chisq(N)
     # Evaluate cumulative probability at χ2
     return cdf(d, χ2)
+end
+
+function init_residuals(::Type{V}, orbit::AbstractOrbit{T, U}) where {T <: Real,
+    U <: Number, V <: Number}
+    # Initialize vector of residuals
+    res = Vector{OpticalResidual{T, V}}(undef, nobs(orbit))
+    for i in eachindex(res)
+        ξ_α, ξ_δ = zero(V), zero(V)
+        @unpack w_α, w_δ, μ_α, μ_δ, outlier = orbit.res[i]
+        res[i] = OpticalResidual{T, V}(ξ_α, ξ_δ, w_α, w_δ, μ_α, μ_δ, outlier)
+    end
+
+    return res
 end

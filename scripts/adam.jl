@@ -43,8 +43,8 @@ end
 @everywhere begin
     using NEOs, Dates, TaylorSeries, PlanetaryEphemeris, JLD2
     using NEOs: RadecMPC, AdmissibleRegion, PropagationBuffer, OpticalResidual,
-        attr2bary, propres!, boundary_projection, reduce_tracklets, arboundary,
-        indices, _lsmethods
+        init_residuals, attr2bary, propres!, boundary_projection, reduce_tracklets,
+        arboundary, indices, _lsmethods
 
     function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
         params::Parameters{T}; scale::Symbol = :linear, η::T = 25.0,
@@ -75,7 +75,7 @@ end
         # Propagation buffer
         buffer = PropagationBuffer(od, jd0, idxs[1], idxs[end], AE, params)
         # Vector of O-C residuals
-        res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(idxs)]
+        res = init_residuals(TaylorN{T}, od, idxs)
         # Origin
         x0, x1 = zeros(T, 6), zeros(T, 6)
         # Least squares cache and methods
