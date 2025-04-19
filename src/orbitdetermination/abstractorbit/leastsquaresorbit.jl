@@ -154,9 +154,8 @@ function uncertaintyparameter(od::ODProblem{D, T}, orbit::LeastSquaresOrbit{T, T
     # Initial conditions
     q = q0 + dq
     # Propagation and residuals
-    _, _, res = propres(od, jd0, q, params)
-    res = @. OpticalResidual(ra(res), dec(res), wra(orbit.res), wdec(orbit.res),
-        isoutlier(orbit.res))
+    res = init_residuals(TaylorN{T}, orbit)
+    propres!(res, od, jd0, q, params)
     nobs = 2 * notout(res)
     # Covariance matrix
     Q = nms(res)

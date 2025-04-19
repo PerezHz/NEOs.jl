@@ -65,7 +65,7 @@ export nobs, astrometry, datediff
 export UniformWeights, Veres17, ADESWeights, NEOCCWeights, NEODyS2Weights
 export Farnocchia15, Eggl20, ZeroDebiasing, NEOCCDebiasing, NEODyS2Debiasing
 # Optical astrometry processing
-export compute_radec, unfold, residuals, isoutlier
+export unfold, wra, wdec, μra, μdec, isoutlier, compute_radec, residuals
 # Radar astrometry processing
 export compute_delay, radar_astrometry
 # Asteroid dynamical models

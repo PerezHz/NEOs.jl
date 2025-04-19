@@ -48,7 +48,7 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     # Propagation buffer
     buffer = PropagationBuffer(od, jd0, idxs[1], idxs[end], AE, params)
     # Vector of O-C residuals
-    res = [zero(OpticalResidual{T, TaylorN{T}}) for _ in eachindex(idxs)]
+    res = init_residuals(TaylorN{T}, od, idxs)
     # Origin
     x0, x1 = zeros(T, 6), zeros(T, 6)
     # Least squares cache and methods

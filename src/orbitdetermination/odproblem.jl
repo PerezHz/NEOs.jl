@@ -89,3 +89,14 @@ function PropagationBuffer(od::ODProblem{D, T}, jd0::V, k0::Int, kf::Int, q0::Ve
 
     return buffer
 end
+
+function init_residuals(
+        ::Type{U}, od::ODProblem{D, T},
+        idxs::AbstractVector{Int} =  eachindex(od.radec),
+        outliers::AbstractVector{Bool} = fill(false, length(idxs))
+    ) where {D, T <: Real, U <: Number}
+    radec = view(od.radec, idxs)
+    w8s = view(od.w8s.w8s, idxs)
+    bias = view(od.bias.bias, idxs)
+    return init_residuals(U, radec, w8s, bias, outliers)
+end
