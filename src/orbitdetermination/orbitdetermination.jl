@@ -8,9 +8,9 @@ include("propres.jl")
 include("abstractorbit/abstractorbit.jl")
 include("abstractorbit/preliminaryorbit.jl")
 include("abstractorbit/leastsquaresorbit.jl")
-include("admissibleregion.jl")
-include("tooshortarc.jl")
-include("gaussinitcond.jl")
+include("preliminary/admissibleregion.jl")
+include("preliminary/tooshortarc.jl")
+include("preliminary/gaussinitcond.jl")
 
 # Initial subset of radec for jtls
 function _initialtracklets(trksa::AbstractVector{Tracklet{T}},
@@ -115,63 +115,59 @@ function isjtlsfit(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
 end
 
 @doc raw"""
-    jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TayloN{T}},
-        tracklets::AbstractVector{Tracklet{T}}, params::Parameters{T}
-        [, mode::Bool]) where {D, T <: Real, V <: Number}
+    jtls(od, orbit, params [, mode::Bool]) where {D, T <: Real}
 
-Compute an orbit via Jet Transport Least Squares.
+Jet Transport Least Squares method for orbit determination.
 
 ## Arguments
 
 - `od::ODProblem{D, T}`: orbit determination problem.
-- `jd0::V`: reference epoch [Julian days TDB].
-- `q::Vector{TaylorN{T}}`: jet transport initial condition.
-- `tracklets::AbstractVector{Tracklet{T}}`: initial tracklets for fit.
-- `params::Parameters{T}`: see `Jet Transport Least Squares Parameters`
-    of [`Parameters`](@ref).
+- `orbit::AbstractOrbit{T, T}`: a priori orbit.
+- `params::Parameters{T}`: see the `Least Squares` section of [`Parameters`](@ref).
 - `mode::Bool`: `addradec!` mode (default: `true`).
 """
-function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
-    tracklets::AbstractVector{Tracklet{T}}, params::Parameters{T},
-    mode::Bool = true) where {D, T <: Real, V <: Number}
+function jtls(od::ODProblem{D, T}, orbit::O, params::Parameters{T},
+              mode::Bool = true) where {D, T <: Real, O <: AbstractOrbit{T, T}}
     # Unpack
-    @unpack lsiter, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
-        fudge, max_per = params
-    # Plain initial condition
-    q0 = cte.(q)
-    # JT tail
-    dq = q - q0
-    # Propagation buffer
-    buffer = PropagationBuffer(od, jd0, 1, nobs(od), q, params)
+    @unpack jtlsorder, lsiter, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
+            fudge, max_per = params
+    # Reference epoch [Julian days TDB]
+    jd0 = epoch(orbit) + PE.J2000
     # Number of jet transport variables
     Npar = get_numvars()
+    # Jet transport initial condition
+    q00 = orbit()
+    scalings = all(>(0), variances(orbit)) ? sigmas(orbit) : abs.(q00) ./ 1e6
+    dq = [scalings[i] * TaylorN(i, order = jtlsorder) for i in 1:Npar]
+    q0 = q00 + dq
+    # Initialize propagation buffer and vector of residuals
+    buffer = PropagationBuffer(od, jd0, 1, nobs(od), q0, params)
+    res = init_residuals(TaylorN{T}, od, orbit)
     # Origin
     x0 = zeros(T, Npar)
-    # Vector of O-C residuals
-    res = init_residuals(TaylorN{T}, od)
     # Least squares cache and methods
     lscache = LeastSquaresCache(x0, 1:Npar, lsiter)
     lsmethods = _lsmethods(res, x0, 1:Npar)
     # Initial subset of radec for orbit fit
-    tin, tout, rin = _initialtracklets(od.tracklets, tracklets)
+    tin, tout, rin = _initialtracklets(od.tracklets, orbit.tracklets)
     # Allocate memory for orbits
-    sols = [zero(LeastSquaresOrbit{T, T}) for _ in 1:jtlsiter]
+    orbits = [zero(LeastSquaresOrbit{T, T}) for _ in 1:jtlsiter]
     Qs = fill(T(Inf), jtlsiter)
     # Outlier rejection
     if outrej
         orcache = OutlierRejectionCache(T, nobs(od))
         outs = zeros(Int, jtlsiter)
     end
-    # Jet transport least squares
+    # Jet Transport Least Squares
     for i in 1:jtlsiter
         # Initial conditions
-        q = q0 + dq
-        # Decide whether q is suitable for jtls
+        @. q0 = q00 + dq
+        # Decide whether q0 is suitable for jtls
         if jtlsmask
-            isjtlsfit(od, jd0, q, params) || break
+            isjtlsfit(od, jd0, q0, params) || break
         end
         # Propagation & residuals
-        bwd, fwd = propres!(res, od, jd0, q, params; buffer)
+        bwd, fwd = propres!(res, od, jd0, q0, params; buffer)
         iszero(length(res)) && break
         # Orbit fit
         fit = tryls(res[rin], x0, lscache, lsmethods)
@@ -180,7 +176,7 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         rin, fit = addradec!(Val(mode), rin, fit, tin, tout, res, x0, params)
         # Residuals space to barycentric coordinates jacobian
         J = Matrix(TS.jacobian(dq, fit.x))
-        all(diag(J * fit.Γ * J') .> 0) || break
+        all(>(0), diag(J * fit.Γ * J')) || break
         # Outlier rejection
         if outrej
             outlier_rejection!(view(res, rin), fit.x, fit.Γ, orcache;
@@ -188,7 +184,7 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         end
         # Update solution
         Qs[i] = nrms(res, fit)
-        sols[i] = evalfit(LeastSquaresOrbit(tin, bwd, fwd, res[rin], fit, J))
+        orbits[i] = evalfit(LeastSquaresOrbit(tin, bwd, fwd, res[rin], fit, J))
         if outrej
             outs[i] = notout(res)
         end
@@ -200,19 +196,19 @@ function jtls(od::ODProblem{D, T}, jd0::V, q::Vector{TaylorN{T}},
         end
         i > 2 && issorted(view(Qs, i-2:i)) && break
         # Update initial condition
-        TS.evaluate!(q, fit.x, q0)
+        TS.evaluate!(q0, fit.x, q00)
     end
     # Find complete solutions
-    mask = findall(s -> length(s.res) == length(od.radec), sols)
+    mask = findall(o -> length(o.res) == length(od.radec), orbits)
     # Choose best solution
     if isempty(mask)
-        _, k = findmin(nrms, sols)
+        _, k = findmin(nrms, orbits)
     else
-        _, k = findmin(nrms, view(sols, mask))
+        _, k = findmin(nrms, view(orbits, mask))
         k = mask[k]
     end
 
-    return sols[k]
+    return orbits[k]
 end
 
 # Default naive initial conditions for iod
@@ -226,13 +222,13 @@ function iodinitcond(A::AdmissibleRegion{T}) where {T <: Real}
     ]
 end
 
-# Update `sol` iff `_sol_` is complete and has a lower nrms
-function updatesol(sol::LeastSquaresOrbit{T, T}, _sol_::LeastSquaresOrbit{T, T},
+# Update `orbit` iff `_orbit_` is complete and has a lower nrms
+function updateorbit(orbit::LeastSquaresOrbit{T, T}, _orbit_::LeastSquaresOrbit{T, T},
     radec::Vector{RadecMPC{T}}) where {T <: Real}
-    if nobs(_sol_) == length(radec)
-        return nrms(sol) <= nrms(_sol_) ? sol : _sol_
+    if nobs(_orbit_) == length(radec)
+        return nrms(orbit) <= nrms(_orbit_) ? orbit : _orbit_
     else
-        return sol
+        return orbit
     end
 end
 
@@ -247,10 +243,9 @@ function issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <:
 end
 
 @doc raw"""
-    orbitdetermination(od::ODProblem{D, T}, params::Parameters{T};
-        kwargs...) where {D, I, T <: Real}
+    initialorbitdetermination(od, params; kwargs...) where {D, I, T <: Real}
 
-Initial Orbit Determination (IOD) routine.
+Jet Transport Initial Orbit Determination.
 
 ## Arguments
 
@@ -261,13 +256,15 @@ Initial Orbit Determination (IOD) routine.
 
 - `initcond::I`: naive initial conditions function; takes as input an
     `AdmissibleRegion{T}` and outputs a `Vector{Tuple{T, T, Symbol}}`,
-    where each element has the form `(ρ, v_ρ, scale)`
-    (default: `iodinitcond`).
+    where each element has the form `(ρ, v_ρ, scale)` (default: `iodinitcond`).
 
 !!! warning
     This function will change the (global) `TaylorSeries` variables.
+
+!!! reference
+    See https://doi.org/10.1007/s10569-025-10246-2.
 """
-function orbitdetermination(od::ODProblem{D, T}, params::Parameters{T};
+function initialorbitdetermination(od::ODProblem{D, T}, params::Parameters{T};
     initcond::I = iodinitcond) where {D, I, T <: Real}
     # Allocate memory for orbit
     sol = zero(LeastSquaresOrbit{T, T})
@@ -277,67 +274,58 @@ function orbitdetermination(od::ODProblem{D, T}, params::Parameters{T};
     # Cannot handle observatories without coordinates
     all(x -> hascoord(observatory(x)), radec) || return sol
     # Cannot handle zero observations or multiple arcs
-    (isempty(radec) || !issinglearc(radec)) && return sol
+    # (isempty(radec) || !issinglearc(radec)) && return sol
     # Set jet transport variables
     varorder = max(tsaorder, gaussorder, jtlsorder)
     scaled_variables("dx", ones(T, 6); order = varorder)
     # Gauss method
     _sol_ = gaussiod(od, params)
     # Update solution
-    sol = updatesol(sol, _sol_, radec)
+    sol = updateorbit(sol, _sol_, radec)
     # Termination condition
     critical_value(sol) < significance && return sol
     # Too short arc
     _sol_ = tsaiod(od, params; initcond)
     # Update solution
-    sol = updatesol(sol, _sol_, radec)
+    sol = updateorbit(sol, _sol_, radec)
 
     return sol
 end
 
 @doc raw"""
-    orbitdetermination(od::ODProblem{D, T}, sol::LeastSquaresOrbit{T, T},
-        params::Parameters{T}) where {D, T <: Real}
+    orbitdetermination(od, orbit, params) where {D, T <: Real}
 
-Fit a least squares orbit to `od` using `sol` as an initial condition.
+Refine an existing orbit via Jet Transport Orbit Determination.
 
 ## Arguments
 
 - `od::ODProblem{D, T}`: orbit determination problem.
-- `sol::LeastSquaresOrbit{T, T}:` preliminary orbit.
+- `orbit::LeastSquaresOrbit{T, T}:` a priori orbit.
 - `params::Parameters{T}`: see [`Parameters`](@ref).
 
 !!! warning
     This function will change the (global) `TaylorSeries` variables.
+
+!!! reference
+    See https://doi.org/10.1007/s10569-025-10246-2.
 """
-function orbitdetermination(od::ODProblem{D, T}, sol::LeastSquaresOrbit{T, T},
+function orbitdetermination(od::ODProblem{D, T}, orbit::LeastSquaresOrbit{T, T},
     params::Parameters{T}) where {D, T <: Real}
     # Unpack parameters
-    @unpack jtlsorder, significance, adammode = params
+    @unpack significance = params
     @unpack radec, tracklets = od
-    # Reference epoch [TDB]
-    t = epoch(sol)
-    jd0 = t + PE.J2000
-    # Plain barycentric initial condition
-    q0 = sol(t)
-    # Scaling factors
-    scalings = abs.(q0) ./ 10^6
-    # Jet transport variables
-    dq = scaled_variables("dx", scalings; order = jtlsorder)
-    # Jet Transport initial condition
-    q = q0 + dq
     # Jet Transport Least Squares
-    sol1 = jtls(od, jd0, q, sol.tracklets, params, true)
+    orbit1 = jtls(od, orbit, params, true)
     # Termination condition
-    (nobs(sol1) == nobs(od) && critical_value(sol1) < significance) && return sol1
-    # ADAM refinement
-    _, i = findmin(@. abs(t - dtutc2days(date(tracklets))))
-    jd0 = _adam!(od, i, q, jd0, params)
+    (nobs(orbit1) == nobs(od) && critical_value(orbit1) < significance) && return orbit1
+    # Refine via minimization over the MOV
+    j = closest_tracklet(epoch(orbit), tracklets)
+    porbit = mmov(od, orbit, j, params)
+    iszero(porbit) && return orbit1
     # Jet Transport Least Squares
-    trks = adammode ? tracklets[:] : tracklets[i:i]
-    sol2 = jtls(od, jd0, q, trks, params, true)
-    # Update solution
-    sol1 = updatesol(sol1, sol2, radec)
+    orbit2 = jtls(od, porbit, params, true)
+    # Update orbit
+    orbit1 = updateorbit(orbit1, orbit2, radec)
 
-    return sol1
+    return orbit1
 end
