@@ -78,11 +78,11 @@ export pv2kep, yarkp2adot
 export LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
        project, chi2, nms, nrms, leastsquares, leastsquares!, tryls, outlier_rejection!
 # AbstractOrbit
-export PreliminaryOrbit, LeastSquaresOrbit, epoch, minmaxdates, critical_value, sigmas,
-       snr, jplcompare, uncertaintyparameter
+export GaussOrbit, MMOVOrbit, LeastSquaresOrbit, epoch, minmaxdates, critical_value,
+       sigmas, snr, jplcompare, uncertaintyparameter
 # Orbit determination
-export GaussOrbit, MMOVOrbit, ODProblem, Parameters, mmov, gaussmethod, tsaiod, gaussiod,
-       curvature, issinglearc, initialorbitdetermination, orbitdetermination
+export ODProblem, Parameters, mmov, gaussmethod, tsaiod, gaussiod, curvature, issinglearc,
+       initialorbitdetermination, orbitdetermination
 # B plane
 export valsecchi_circle, bopik, mtp
 # Magnitude
