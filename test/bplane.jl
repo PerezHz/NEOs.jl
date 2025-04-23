@@ -18,7 +18,7 @@ using NEOs: propres
     od = ODProblem(newtonian!, radec)
 
     # Initial Orbit Determination
-    sol = orbitdetermination(od, params)
+    orbit = initialorbitdetermination(od, params)
 
     # Radial velocity with respect to the Earth.
     function rvelea(t, fwd, params)
@@ -28,11 +28,11 @@ using NEOs: propres
         return dot(rv[1:3], rv[4:6])
     end
 
-    # Values by Oct 12, 2024
+    # Values by Apr 23, 2025
 
     # Time of close approach
     params = Parameters(params; fwdoffset = 0.3)
-    bwd, fwd, res = propres(od, epoch(sol) + J2000, sol(), params)
+    bwd, fwd, res = propres(od, epoch(orbit) + J2000, orbit(), params)
     t_CA = find_zeros(t -> rvelea(t, fwd, params), fwd.t0, fwd.t0 + fwd.t[end-1])[1]
     # Asteroid's geocentric state vector
     xae = fwd(t_CA) - params.eph_ea(t_CA)
