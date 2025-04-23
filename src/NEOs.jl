@@ -76,20 +76,15 @@ export propagate, propagate_lyap, propagate_root
 export pv2kep, yarkp2adot
 # Least squares
 export LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
-       project, chi2, nms, nrms, leastsquares, leastsquares!, tryls
+       project, chi2, nms, nrms, leastsquares, leastsquares!, tryls, outlier_rejection!
 # AbstractOrbit
 export PreliminaryOrbit, LeastSquaresOrbit, epoch, minmaxdates, critical_value, sigmas,
        snr, jplcompare, uncertaintyparameter
-# Too Short Arc
-export tsaiod
-# Gauss method
-export gauss_method, gaussiod
 # Orbit determination
-export Parameters, ODProblem, curvature, issinglearc, orbitdetermination
+export GaussOrbit, MMOVOrbit, ODProblem, Parameters, mmov, gaussmethod, tsaiod, gaussiod,
+       curvature, issinglearc, initialorbitdetermination, orbitdetermination
 # B plane
 export valsecchi_circle, bopik, mtp
-# Outlier rejection
-export outlier_rejection!
 # Magnitude
 export absolutemagnitude
 

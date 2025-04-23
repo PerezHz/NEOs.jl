@@ -1,10 +1,16 @@
 @doc raw"""
-    adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
-         params::Parameters{T}; kwargs...) where {D, T <: Real}
+    mmov(od, i, A, ρ, v_ρ, params; kwargs...) where {D, T <: Real}
 
-Adaptative moment estimation (ADAM) minimizer of normalized mean square
-residual of `od.tracklets[i].radec` over the manifold of variations of `A`,
-starting from `(ρ, v_ρ)`.
+Minimization over the MOV method for preliminary orbit determination.
+
+## Arguments
+
+- `od::ODProblem{D, T}`: orbit determination problem.
+- `i::Int`: index of reference tracklet.
+- `A::AdmissibleRegion{T}`: admissible region of reference tracklet.
+- `ρ/v_ρ::T`: starting point on `A`.
+- `params::Parameters{T}`: see the `Minimization over the MOV` section of
+    [`Parameters`](@ref).
 
 ## Keyword arguments
 
@@ -16,17 +22,17 @@ starting from `(ρ, v_ρ)`.
 - `adamorder::Int`: jet transport order (default: `2`).
 
 !!! reference
-    See Algorithm 1 of https://doi.org/10.48550/arXiv.1412.6980.
+    See Section 4 of https://doi.org/10.1007/s10569-025-10246-2.
 """
-function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
-    params::Parameters{T}; scale::Symbol = :linear, η::T = 25.0,
-    μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2) where {D, T <: Real}
+function mmov(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
+    params::Parameters{T}; scale::Symbol = :linear, η::T = 25.0, μ::T = 0.75,
+    ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2) where {D, T <: Real}
+    # Unpack parameters
+    @unpack adamiter, adammode, adamQtol, significance = params
     # Initial time of integration [julian days TDB]
     jd0 = dtutc2jdtdb(A.date)
-    # Unpack
-    @unpack adamiter, adammode, adamQtol, significance = params
-    @unpack tracklets = od
     # Allocate memory
+    orbits = [zero(MMOVOrbit{T, T}) for _ in 1:adamiter]
     aes = Matrix{T}(undef, 6, adamiter+1)
     Qs = fill(T(Inf), adamiter+1)
     # Initial attributable elements
@@ -43,8 +49,9 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     # Jet transport variables and initial condition
     dae = [scalings[i] * TaylorN(i, order = adamorder) for i in 1:6]
     AE = aes[:, 1] .+ dae
-    # Subset of radec
-    idxs = adammode ? indices(tracklets) : indices(tracklets[i])
+    # Considered tracklets
+    tracklets = adammode ? od.tracklets[:] : od.tracklets[i:i]
+    idxs = indices(tracklets)
     # Propagation buffer
     buffer = PropagationBuffer(od, jd0, idxs[1], idxs[end], AE, params)
     # Vector of O-C residuals
@@ -56,9 +63,8 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     lsmethods = _lsmethods(res, x0, 1:4)
     # Gradient of objective function wrt (ρ, v_ρ)
     g_t = Vector{T}(undef, 2)
-    # First momentum
+    # First and second momentum
     m, _m_ = zeros(T, 2), zeros(T, 2)
-    # Second momentum
     n, _n_ = zeros(T, 2), zeros(T, 2)
     # Detect sawtooth efect (see https://arxiv.org/abs/2410.10056#)
     Qthreshold = nms_threshold(2*length(res), significance)
@@ -66,20 +72,20 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     # Gradient descent
     for t in 1:adamiter
         # Current attributable elements (plain)
-        ae = aes[:, t]
+        ae = view(aes, :, t)
         # Attributable elements (JT)
         if scale == :linear
             AE .= ae + dae
         elseif scale == :log
-            AE .= [ae[1] + dae[1], ae[2] + dae[2], ae[3] + dae[3],
-                ae[4] + dae[4], 10^(log10(ae[5]) + dae[5]), ae[6] + dae[6]]
+            AE .= ae[1] + dae[1], ae[2] + dae[2], ae[3] + dae[3],
+                ae[4] + dae[4], 10^(log10(ae[5]) + dae[5]), ae[6] + dae[6]
         end
         # Barycentric state vector
         q = attr2bary(A, AE, params)
         # Propagation and residuals
         # TO DO: `ρ::TaylorN` is too slow for `adam` due to evaluations
         # within the dynamical model
-        propres!(res, od, jd0 - ae[5]/c_au_per_day, q, params; buffer, idxs)
+        bwd, fwd = propres!(res, od, jd0 - ae[5]/c_au_per_day, q, params; buffer, idxs)
         iszero(length(res)) && break
         # Least squares fit
         fit = tryls(res, x0, lscache, lsmethods)
@@ -89,6 +95,15 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         Q = nms(res)
         Q(x1) < 0 && break
         Qs[t] = Q(x1)
+        # Covariance matrix
+        nobs = 2 * notout(res)
+        C = (nobs/2) * TS.hessian(Q, x1)
+        Γ = inv(C)
+        # Residuals space to barycentric coordinates jacobian
+        J = Matrix(TS.jacobian(q - cte.(q), x1))
+        # Update orbit
+        orbits[t] = evaldeltas(MMOVOrbit(tracklets, bwd, fwd, res,
+            Γ, J, aes[:, 1:t], Qs[1:t]), x0)
         # Convergence conditions
         if t > 1
             (Qs[t-1] < Qthreshold < Qs[t]) && (Nsawtooth += 1)
@@ -111,41 +126,78 @@ function adam(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         # Projection
         aes[5:6, t+1] .= boundary_projection(A, aes[5, t+1], aes[6, t+1])
     end
-    # Find attributable elements with smallest Q
+    # Find orbit with smallest Q
     t = argmin(Qs)
 
-    return aes[:, 1:t], Qs[1:t]
+    return orbits[t]
 end
 
 @doc raw"""
-    tsaiod(od::ODProblem{D, T}, params::Parameters{T};
-        initcond::I = iodinitcond) where {D, I, T <: Real}
+    mmov(od, gorbit, i, params) where {D, T <: Real}
 
-Fit a preliminary orbit to `od` via jet transport minimization
-of the normalized mean square residual over the manifold of variations.
+Refine a Gauss orbit via Minimization over the MOV.
+
+- `od::ODProblem{D, T}`: orbit determination problem.
+- `gorbit::AbstractOrbit{T, T}`: a priori orbit.
+- `i::Int`: index of reference tracklet.
+- `params::Parameters{T}`: see the `Gauss Method` and `Minimization over the MOV`
+    sections of [`Parameters`](@ref).
+"""
+function mmov(od::ODProblem{D, T}, orbit::O, i::Int,
+    params::Parameters{T}) where {D, T <: Real, O <: AbstractOrbit{T, T}}
+    # Unpack parameters
+    @unpack refscale = params
+    # Middle tracklet
+    tracklet = od.tracklets[i]
+    # Admissible region
+    A = AdmissibleRegion(tracklet, params)
+    # Epoch [days since J2000]
+    At0 = dtutc2days(A.date)
+    # Barycentric cartesian initial condition
+    q0 = orbit(At0)
+    # Range and range rate
+    ρ, v_ρ = bary2topo(A, q0)
+    # Boundary projection
+    ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
+    # Minimization over the MOV
+    orbit1 = mmov(od, i, A, ρ, v_ρ, params; scale = refscale)
+
+    return orbit1
+end
+
+@doc raw"""
+    tsaiod(od, params; kwargs...) where {D, I, T <: Real}
+
+Compute a `LeastSquaresOrbit` via Minimization over the MOV followed by
+Jet Transport Least Squares.
+
+See also [`mmov`](@ref).
 
 ## Arguments
 
 - `od::ODProblem{D, T}`: an orbit determination problem.
-- `params::Parameters{T}`: see `Too Short Arc Parameters` of [`Parameters`](@ref).
+- `params::Parameters{T}`: see the `Minimization over the MOV` and `Least
+    Squares` sections  of [`Parameters`](@ref).
 
 ## Keyword arguments
 
 - `initcond::I`: naive initial conditions function; takes as input an
     `AdmissibleRegion{T}` and outputs a `Vector{Tuple{T, T, Symbol}}`,
-    where each element has the form `(ρ, v_ρ, scale)`
-    (default: `iodinitcond`).
+    where each element has the form `(ρ, v_ρ, scale)` (default: `iodinitcond`).
+
+!!! reference
+    See https://doi.org/10.1007/s10569-025-10246-2.
 """
 function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
     initcond::I = iodinitcond) where {D, I, T <: Real}
     # Allocate memory for orbit
-    sol = zero(LeastSquaresOrbit{T, T})
+    orbit = zero(LeastSquaresOrbit{T, T})
     # Unpack
     @unpack tsaorder, adammode, significance = params
     @unpack radec, tracklets = od
     # Iterate tracklets
     for i in eachindex(tracklets)
-        # ADAM requires a minimum of 2 observations
+        # Minimization over the MOV requires a minimum of 2 observations
         nobs(tracklets[i]) < 2 && continue
         # Admissible region
         A = AdmissibleRegion(tracklets[i], params)
@@ -153,32 +205,21 @@ function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
         I0 = initcond(A)
         # Iterate naive initial conditions
         for j in eachindex(I0)
-            # ADAM minimization over manifold of variations
+            # Minimization over the MOV
             ρ, v_ρ, scale = I0[j]
-            aes, Qs = adam(od, i, A, ρ, v_ρ, params; scale)
-            ae, Q = aes[:, end], Qs[end]
-            # ADAM failed to converge
-            isinf(Q) && continue
-            # Initial time of integration [julian days]
-            # (corrected for light-time)
-            jd0 = dtutc2jdtdb(A.date) - ae[5] / c_au_per_day
-            # Convert attributable elements to barycentric cartesian coordinates
-            q0 = attr2bary(A, ae, params)
-            # Scaling factors
-            scalings = abs.(q0) ./ 10^5
-            # Jet Transport initial condition
-            q = [q0[k] + scalings[k] * TaylorN(k, order = tsaorder) for k in 1:6]
+            porbit = mmov(od, i, A, ρ, v_ρ, params; scale)
+            # Failed to converge
+            iszero(porbit) && continue
             # Jet Transport Least Squares
-            trks = adammode ? tracklets[:] : tracklets[i:i]
-            _sol_ = jtls(od, jd0, q, trks, params, adammode)
-            # Update solution
-            sol = updatesol(sol, _sol_, radec)
+            _orbit_ = jtls(od, porbit, params, adammode)
+            # Update orbit
+            orbit = updateorbit(orbit, _orbit_, radec)
             # Termination condition
-            critical_value(sol) < significance && return sol
+            critical_value(orbit) < significance && return orbit
         end
-        # Global ADAM should be independent of starting tracklet
+        # Global MMOV should be independent of starting tracklet
         adammode && break
     end
 
-    return sol
+    return orbit
 end
