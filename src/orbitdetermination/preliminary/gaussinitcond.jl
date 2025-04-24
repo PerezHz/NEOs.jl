@@ -328,6 +328,9 @@ See also [`gaussmethod`](@ref).
 - `params::Parameters{T}`: see `Gauss Method` and `Least Squares` sections
     of [`Parameters`](@ref).
 
+!!! warning
+    This function may change the (global) `TaylorSeries` variables.
+
 !!! reference
     See https://doi.org/10.1007/s10569-025-10246-2.
 """
@@ -339,6 +342,8 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
     @unpack tracklets, radec = od
     # This function requires exactly 3 tracklets
     (safegauss && length(tracklets) != 3) && return orbit
+    # Set jet transport variables
+    set_od_order(params)
     # Preliminary orbits
     porbits = gaussmethod(od, params)
     # Filter preliminary orbits
@@ -384,8 +389,9 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
             return orbit
         end
     end
-
-    @warn("Orbit determination did not converge or could not fit all the astrometry")
+    # Unsuccessful orbit determination
+    verbose && @warn("Orbit determination did not converge within \
+        the given parameters or could not fit all the astrometry")
 
     return orbit
 end

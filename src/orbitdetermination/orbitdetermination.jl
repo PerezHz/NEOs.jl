@@ -259,7 +259,7 @@ Jet Transport Initial Orbit Determination.
     where each element has the form `(ρ, v_ρ, scale)` (default: `iodinitcond`).
 
 !!! warning
-    This function will change the (global) `TaylorSeries` variables.
+    This function may change the (global) `TaylorSeries` variables.
 
 !!! reference
     See https://doi.org/10.1007/s10569-025-10246-2.
@@ -276,8 +276,7 @@ function initialorbitdetermination(od::ODProblem{D, T}, params::Parameters{T};
     # Cannot handle zero observations or multiple arcs
     # (isempty(radec) || !issinglearc(radec)) && return sol
     # Set jet transport variables
-    varorder = max(tsaorder, gaussorder, jtlsorder)
-    scaled_variables("dx", ones(T, 6); order = varorder)
+    set_od_order(params)
     # Gauss method
     _sol_ = gaussiod(od, params)
     # Update solution
@@ -304,7 +303,7 @@ Refine an existing orbit via Jet Transport Orbit Determination.
 - `params::Parameters{T}`: see [`Parameters`](@ref).
 
 !!! warning
-    This function will change the (global) `TaylorSeries` variables.
+    This function may change the (global) `TaylorSeries` variables.
 
 !!! reference
     See https://doi.org/10.1007/s10569-025-10246-2.
@@ -314,6 +313,8 @@ function orbitdetermination(od::ODProblem{D, T}, orbit::LeastSquaresOrbit{T, T},
     # Unpack parameters
     @unpack significance, verbose = params
     @unpack radec, tracklets = od
+    # Set jet transport variables
+    set_od_order(params)
     # Jet Transport Least Squares
     orbit1 = jtls(od, orbit, params, true)
     # Termination condition
@@ -344,8 +345,9 @@ function orbitdetermination(od::ODProblem{D, T}, orbit::LeastSquaresOrbit{T, T},
     end
     # Update orbit
     orbit1 = updateorbit(orbit1, orbit2, radec)
-
-    @warn("Orbit determination did not converge or could not fit all the astrometry")
+    # Unsuccessful orbit determination
+    verbose && @warn("Orbit determination did not converge within \
+        the given parameters or could not fit all the astrometry")
 
     return orbit1
 end
