@@ -335,7 +335,7 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
     # Allocate memory for orbit
     orbit = zero(LeastSquaresOrbit{T, T})
     # Unpack
-    @unpack safegauss, significance = params
+    @unpack safegauss, significance, verbose = params
     @unpack tracklets, radec = od
     # This function requires exactly 3 tracklets
     (safegauss && length(tracklets) != 3) && return orbit
@@ -353,7 +353,7 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
         orbit = updateorbit(orbit, _orbit_, radec)
         # Termination condition
         if critical_value(orbit) < significance
-            println(
+            verbose && println(
                 "* Gauss method converged to:\n\n",
                 summary(porbits[i]), "\n",
                 "* Jet Transport Least Squares converged to: \n\n",
@@ -374,7 +374,7 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
         # Termination condition
         if critical_value(orbit) < significance
             Niter = length(porbit.Qs)
-            println(
+            verbose && println(
                 "* Refinement of GaussOrbit via MMOV converged in \
                 $Niter iterations to:\n\n",
                 summary(porbit), "\n",
