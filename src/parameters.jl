@@ -1,7 +1,11 @@
 @doc raw"""
     Parameters([params::Parameters{T};] kwargs...) where {T <: Real}
 
-Parameters for all orbit determination functions.
+A collection of the most important parameters in `NEOs.jl` functions.
+
+## Common
+
+-  `verbose::Bool`: whether to print output or not (default: `true`).
 
 ## Propagation
 
@@ -54,7 +58,9 @@ Parameters for all orbit determination functions.
 - `max_per::T`: maximum allowed rejection percentage (default: `10.0`).
 """
 @with_kw struct Parameters{T <: Real}
-    # Propagation Parameters
+    # Common
+    verbose::Bool = true
+    # Propagation
     maxsteps::Int = 500
     μ_ast::Vector{T} = μ_ast343_DE430[1:end]
     order::Int = 25
@@ -66,24 +72,24 @@ Parameters for all orbit determination functions.
     # Sun (earth) ephemeris
     eph_su::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephsu()
     eph_ea::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephea()
-    # Gauss' Method Parameters
+    # Gauss' Method
     safegauss::Bool = true
     refscale::Symbol = :log
     gaussorder::Int = 6
-    # Too Short Arc Parameters
+    # Minimization over the MOV
     H_max::T = 34.5
     a_max::T = 100.0
     adamiter::Int = 200
     adammode::Bool = true
     adamQtol::T = 0.001
     tsaorder::Int = 6
-    # Jet Transport Least Squares Parameters
+    # Least Squares
     lsiter::Int = 5
     jtlsiter::Int = 5
     jtlsorder::Int = 6
     significance::T = 0.99
     jtlsmask::Bool = true
-    # Outlier Rejection Parameters
+    # Outlier Rejection
     outrej::Bool = false
     χ2_rec::T = 7.0
     χ2_rej::T = 8.0

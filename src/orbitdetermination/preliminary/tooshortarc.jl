@@ -193,7 +193,7 @@ function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
     # Allocate memory for orbit
     orbit = zero(LeastSquaresOrbit{T, T})
     # Unpack
-    @unpack tsaorder, adammode, significance = params
+    @unpack tsaorder, adammode, significance, verbose = params
     @unpack radec, tracklets = od
     # Iterate tracklets
     for i in eachindex(tracklets)
@@ -217,7 +217,7 @@ function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
             # Termination condition
             if critical_value(orbit) < significance
                 Niter = length(porbit.Qs)
-                println(
+                verbose && println(
                     "* Minimization over the MOV converged in $Niter iterations to:\n\n",
                     summary(porbit), "\n",
                     "* Jet Transport Least Squares converged to: \n\n",

@@ -312,13 +312,13 @@ Refine an existing orbit via Jet Transport Orbit Determination.
 function orbitdetermination(od::ODProblem{D, T}, orbit::LeastSquaresOrbit{T, T},
     params::Parameters{T}) where {D, T <: Real}
     # Unpack parameters
-    @unpack significance = params
+    @unpack significance, verbose = params
     @unpack radec, tracklets = od
     # Jet Transport Least Squares
     orbit1 = jtls(od, orbit, params, true)
     # Termination condition
     if (nobs(orbit1) == nobs(od) && critical_value(orbit1) < significance)
-        println(
+        verbose && println(
             "* Jet Transport Least Squares converged to: \n\n",
             summary(orbit1)
         )
@@ -333,7 +333,7 @@ function orbitdetermination(od::ODProblem{D, T}, orbit::LeastSquaresOrbit{T, T},
     # Termination condition
     if (nobs(orbit2) == nobs(od) && critical_value(orbit2) < significance)
         Niter = length(porbit.Qs)
-        println(
+        verbose && println(
             "* Refinement of LeastSquaresOrbit via MMOV converged in \
             $Niter iterations to:\n\n",
             summary(porbit), "\n",
