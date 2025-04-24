@@ -215,11 +215,22 @@ function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
             # Update orbit
             orbit = updateorbit(orbit, _orbit_, radec)
             # Termination condition
-            critical_value(orbit) < significance && return orbit
+            if critical_value(orbit) < significance
+                Niter = length(porbit.Qs)
+                println(
+                    "* Minimization over the MOV converged in $Niter iterations to:\n\n",
+                    summary(porbit), "\n",
+                    "* Jet Transport Least Squares converged to: \n\n",
+                    summary(orbit)
+                )
+                return orbit
+            end
         end
         # Global MMOV should be independent of starting tracklet
         adammode && break
     end
+
+    @warn("Orbit determination did not converge or could not fit all the astrometry")
 
     return orbit
 end

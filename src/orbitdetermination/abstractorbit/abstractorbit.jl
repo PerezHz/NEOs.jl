@@ -185,3 +185,31 @@ function uncertaintyparameter(od::ODProblem{D, T}, orbit::AbstractOrbit{T, T},
 
     return clamp(U, 0, 10)
 end
+
+function summary(orbit::AbstractOrbit)
+    O = typeof(orbit)
+    Nobs, Nout = nobs(orbit), nout(orbit.res)
+    Ndays = @sprintf("%.8f", numberofdays(orbit))
+    t0 = epoch(orbit) + PE.J2000
+    d0 = julian2datetime(t0)
+    Q = nrms(orbit)
+    q0, σ0 = orbit(), sigmas(orbit)
+    sq0 = [rpad(@sprintf("%+.12E", q0[i]), 25) for i in eachindex(q0)]
+    sσ0 = [rpad(@sprintf("%+.12E", σ0[i]), 25) for i in eachindex(σ0)]
+    s = string(
+        "$O\n",
+        repeat('-', 68), "\n",
+        "Astrometry: $Nobs observations ($Nout outliers) spanning $Ndays days\n",
+        "Epoch: $t0 JDTDB ($d0 TDB)\n",
+        "NRMS: $Q\n",
+        repeat('-', 68), "\n",
+        "Variable    Nominal value            Uncertainty              Units\n",
+        "x           ", sq0[1], sσ0[1], "au\n",
+        "y           ", sq0[2], sσ0[2], "au\n",
+        "z           ", sq0[3], sσ0[3], "au\n",
+        "vx          ", sq0[4], sσ0[4], "au/day\n",
+        "vy          ", sq0[5], sσ0[5], "au/day\n",
+        "vz          ", sq0[6], sσ0[6], "au/day\n"
+    )
+    return s
+end
