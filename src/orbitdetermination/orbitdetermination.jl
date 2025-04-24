@@ -317,15 +317,35 @@ function orbitdetermination(od::ODProblem{D, T}, orbit::LeastSquaresOrbit{T, T},
     # Jet Transport Least Squares
     orbit1 = jtls(od, orbit, params, true)
     # Termination condition
-    (nobs(orbit1) == nobs(od) && critical_value(orbit1) < significance) && return orbit1
+    if (nobs(orbit1) == nobs(od) && critical_value(orbit1) < significance)
+        println(
+            "* Jet Transport Least Squares converged to: \n\n",
+            summary(orbit1)
+        )
+        return orbit1
+    end
     # Refine via minimization over the MOV
     j = closest_tracklet(epoch(orbit), tracklets)
     porbit = mmov(od, orbit, j, params)
     iszero(porbit) && return orbit1
     # Jet Transport Least Squares
     orbit2 = jtls(od, porbit, params, true)
+    # Termination condition
+    if (nobs(orbit2) == nobs(od) && critical_value(orbit2) < significance)
+        Niter = length(porbit.Qs)
+        println(
+            "* Refinement of LeastSquaresOrbit via MMOV converged in \
+            $Niter iterations to:\n\n",
+            summary(porbit), "\n",
+            "* Jet Transport Least Squares converged to: \n\n",
+            summary(orbit2)
+        )
+        return orbit2
+    end
     # Update orbit
     orbit1 = updateorbit(orbit1, orbit2, radec)
+
+    @warn("Orbit determination did not converge or could not fit all the astrometry")
 
     return orbit1
 end

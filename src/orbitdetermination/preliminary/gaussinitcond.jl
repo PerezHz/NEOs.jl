@@ -352,7 +352,15 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
         # Update orbit
         orbit = updateorbit(orbit, _orbit_, radec)
         # Termination condition
-        critical_value(orbit) < significance && return orbit
+        if critical_value(orbit) < significance
+            println(
+                "* Gauss method converged to:\n\n",
+                summary(porbits[i]), "\n",
+                "* Jet Transport Least Squares converged to: \n\n",
+                summary(orbit)
+            )
+            return orbit
+        end
         # Refine via Minimization over the MOV
         j = safegauss ? 2 : closest_tracklet(epoch(porbits[i]), tracklets)
         nobs(tracklets[j]) < 2 && continue
@@ -364,8 +372,20 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
         # Update orbit
         orbit = updateorbit(orbit, _orbit_, radec)
         # Termination condition
-        critical_value(orbit) < significance && return orbit
+        if critical_value(orbit) < significance
+            Niter = length(porbit.Qs)
+            println(
+                "* Refinement of GaussOrbit via MMOV converged in \
+                $Niter iterations to:\n\n",
+                summary(porbit), "\n",
+                "* Jet Transport Least Squares converged to: \n\n",
+                summary(orbit)
+            )
+            return orbit
+        end
     end
+
+    @warn("Orbit determination did not converge or could not fit all the astrometry")
 
     return orbit
 end
