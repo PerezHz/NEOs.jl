@@ -131,16 +131,18 @@ Return the Minor Planet Center uncertainty parameter.
 - `orbit::AbstractOrbit{T, T}`: a priori orbit.
 - `params::Parameters{T}`: see [`Parameters`](@ref).
 
-!!! reference
-    https://www.minorplanetcenter.net/iau/info/UValue.html
-
 !!! warning
-    This function will change the (global) `TaylorSeries` variables.
+    This function may change the (global) `TaylorSeries` variables.
+
+!!! reference
+    https://www.minorplanetcenter.net/iau/info/UValue.html.
 """
 function uncertaintyparameter(od::ODProblem{D, T}, orbit::AbstractOrbit{T, T},
     params::Parameters{T}) where {D, T <: Real}
     # Check consistency between od and orbit
     @assert od.tracklets == orbit.tracklets
+    # Set jet transport variables
+    set_od_order(T, 2)
     # Reference epoch [Julian days TDB]
     t = epoch(orbit)
     jd0 = t + PE.J2000
@@ -149,7 +151,7 @@ function uncertaintyparameter(od::ODProblem{D, T}, orbit::AbstractOrbit{T, T},
     # Scaling factors
     scalings = all(>(0), variances(orbit)) ? sigmas(orbit) : @. abs(q00) / 1e6
     # Jet transport variables
-    dq = scaled_variables("dx", scalings; order = 2)
+    dq = [scalings[i] * TaylorN(i, order = 2) for i in 1:6]
     # Origin
     x0 = zeros(T, 6)
     # Initial conditions

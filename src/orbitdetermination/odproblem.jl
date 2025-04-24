@@ -100,3 +100,16 @@ function init_residuals(
     bias = view(od.bias.bias, idxs)
     return init_residuals(U, radec, w8s, bias, outliers)
 end
+
+function set_od_order(::Type{T}, varorder::Int) where {T <: Real}
+    if get_order() < varorder || get_numvars() < 6
+        set_variables(T, "dx"; order = varorder, numvars = 6)
+    end
+    return nothing
+end
+function set_od_order(params::Parameters{T}) where {T <: Real}
+    @unpack tsaorder, gaussorder, jtlsorder = params
+    varorder = max(tsaorder, gaussorder, jtlsorder)
+    set_od_order(T, varorder)
+    return nothing
+end

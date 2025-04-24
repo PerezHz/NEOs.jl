@@ -7,7 +7,7 @@ using LinearAlgebra
 using Test
 
 using NEOs: LeastSquaresOrbit, RadecMPC, reduce_tracklets,
-    indices, numberofdays, nout, scaled_variables
+    indices, numberofdays, nout
 
 function iodsubradec(radec::Vector{RadecMPC{T}}, N::Int = 3) where {T <: Real}
     tracklets = reduce_tracklets(radec)
@@ -185,8 +185,6 @@ end
         od = ODProblem(newtonian!, subradec)
 
         # Initial Orbit Determination
-        varorder = max(params.tsaorder, params.gaussorder, params.jtlsorder)
-        scaled_variables("dx", ones(6); order = varorder)
         orbit = gaussiod(od, params)
 
         # Values by Apr 23, 2025

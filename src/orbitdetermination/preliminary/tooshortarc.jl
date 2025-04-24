@@ -185,6 +185,9 @@ See also [`mmov`](@ref).
     `AdmissibleRegion{T}` and outputs a `Vector{Tuple{T, T, Symbol}}`,
     where each element has the form `(ρ, v_ρ, scale)` (default: `iodinitcond`).
 
+!!! warning
+    This function may change the (global) `TaylorSeries` variables.
+
 !!! reference
     See https://doi.org/10.1007/s10569-025-10246-2.
 """
@@ -195,6 +198,8 @@ function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
     # Unpack
     @unpack tsaorder, adammode, significance, verbose = params
     @unpack radec, tracklets = od
+    # Set jet transport variables
+    set_od_order(params)
     # Iterate tracklets
     for i in eachindex(tracklets)
         # Minimization over the MOV requires a minimum of 2 observations
@@ -229,8 +234,9 @@ function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
         # Global MMOV should be independent of starting tracklet
         adammode && break
     end
-
-    @warn("Orbit determination did not converge or could not fit all the astrometry")
+    # Unsuccessful orbit determination
+    verbose && @warn("Orbit determination did not converge within \
+        the given parameters or could not fit all the astrometry")
 
     return orbit
 end
