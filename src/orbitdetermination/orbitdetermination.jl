@@ -133,13 +133,17 @@ function jtls(od::ODProblem{D, T}, orbit::O, params::Parameters{T},
             fudge, max_per = params
     # Reference epoch [Julian days TDB]
     jd0 = epoch(orbit) + PE.J2000
+    # Allocate memory for orbits
+    orbits = [zero(LeastSquaresOrbit{T, T}) for _ in 1:jtlsiter]
+    q00s = Matrix{T}(undef, 6, jtlsiter+1)
+    Qs = fill(T(Inf), jtlsiter+1)
     # Number of jet transport variables
     Npar = get_numvars()
     # Jet transport initial condition
-    q00 = orbit()
-    scalings = all(>(0), variances(orbit)) ? sigmas(orbit) : abs.(q00) ./ 1e6
+    q00s[:, 1] .= orbit()
+    scalings = all(>(0), variances(orbit)) ? sigmas(orbit) : abs.(q00s[:, 1]) ./ 1e6
     dq = [scalings[i] * TaylorN(i, order = jtlsorder) for i in 1:Npar]
-    q0 = q00 + dq
+    q0 = q00s[:, 1] + dq
     # Initialize propagation buffer and vector of residuals
     buffer = PropagationBuffer(od, jd0, 1, nobs(od), q0, params)
     res = init_residuals(TaylorN{T}, od, orbit)
@@ -150,9 +154,6 @@ function jtls(od::ODProblem{D, T}, orbit::O, params::Parameters{T},
     lsmethods = _lsmethods(res, x0, 1:Npar)
     # Initial subset of radec for orbit fit
     tin, tout, rin = _initialtracklets(od.tracklets, orbit.tracklets)
-    # Allocate memory for orbits
-    orbits = [zero(LeastSquaresOrbit{T, T}) for _ in 1:jtlsiter]
-    Qs = fill(T(Inf), jtlsiter)
     # Outlier rejection
     if outrej
         orcache = OutlierRejectionCache(T, nobs(od))
@@ -161,7 +162,7 @@ function jtls(od::ODProblem{D, T}, orbit::O, params::Parameters{T},
     # Jet Transport Least Squares
     for i in 1:jtlsiter
         # Initial conditions
-        @. q0 = q00 + dq
+        @. q0 = q00s[:, i] + dq
         # Decide whether q0 is suitable for jtls
         if jtlsmask
             isjtlsfit(od, jd0, q0, params) || break
@@ -184,7 +185,8 @@ function jtls(od::ODProblem{D, T}, orbit::O, params::Parameters{T},
         end
         # Update solution
         Qs[i] = nrms(res, fit)
-        orbits[i] = evalfit(LeastSquaresOrbit(tin, bwd, fwd, res[rin], fit, J))
+        orbits[i] = evalfit(LeastSquaresOrbit(tin, bwd, fwd, res[rin],
+            fit, J, q00s[:, 1:i], Qs[1:i]))
         if outrej
             outs[i] = notout(res)
         end
@@ -196,7 +198,7 @@ function jtls(od::ODProblem{D, T}, orbit::O, params::Parameters{T},
         end
         i > 2 && issorted(view(Qs, i-2:i)) && break
         # Update initial condition
-        TS.evaluate!(q0, fit.x, q00)
+        q00s[:, i+1] .= q0(fit.x)
     end
     # Find complete solutions
     mask = findall(o -> length(o.res) == length(od.radec), orbits)
@@ -319,8 +321,9 @@ function orbitdetermination(od::ODProblem{D, T}, orbit::LeastSquaresOrbit{T, T},
     orbit1 = jtls(od, orbit, params, true)
     # Termination condition
     if (nobs(orbit1) == nobs(od) && critical_value(orbit1) < significance)
+        N2 = length(orbit1.Qs)
         verbose && println(
-            "* Jet Transport Least Squares converged to: \n\n",
+            "* Jet Transport Least Squares converged in $N2 iterations to: \n\n",
             summary(orbit1)
         )
         return orbit1
@@ -333,12 +336,12 @@ function orbitdetermination(od::ODProblem{D, T}, orbit::LeastSquaresOrbit{T, T},
     orbit2 = jtls(od, porbit, params, true)
     # Termination condition
     if (nobs(orbit2) == nobs(od) && critical_value(orbit2) < significance)
-        Niter = length(porbit.Qs)
+        N1, N2 = length(porbit.Qs), length(orbit2.Qs)
         verbose && println(
             "* Refinement of LeastSquaresOrbit via MMOV converged in \
-            $Niter iterations to:\n\n",
+            $N1 iterations to:\n\n",
             summary(porbit), "\n",
-            "* Jet Transport Least Squares converged to: \n\n",
+            "* Jet Transport Least Squares converged in $N2 iterations to: \n\n",
             summary(orbit2)
         )
         return orbit2
