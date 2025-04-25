@@ -221,11 +221,11 @@ function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
             orbit = updateorbit(orbit, _orbit_, radec)
             # Termination condition
             if critical_value(orbit) < significance
-                Niter = length(porbit.Qs)
+                N1, N2 = length(porbit.Qs), length(orbit.Qs)
                 verbose && println(
-                    "* Minimization over the MOV converged in $Niter iterations to:\n\n",
+                    "* Minimization over the MOV converged in $N1 iterations to:\n\n",
                     summary(porbit), "\n",
-                    "* Jet Transport Least Squares converged to: \n\n",
+                    "* Jet Transport Least Squares converged in $N2 iterations to: \n\n",
                     summary(orbit)
                 )
                 return orbit

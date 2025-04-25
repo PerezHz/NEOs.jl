@@ -358,10 +358,11 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
         orbit = updateorbit(orbit, _orbit_, radec)
         # Termination condition
         if critical_value(orbit) < significance
+            N2 = length(orbit.Qs)
             verbose && println(
                 "* Gauss method converged to:\n\n",
                 summary(porbits[i]), "\n",
-                "* Jet Transport Least Squares converged to: \n\n",
+                "* Jet Transport Least Squares converged in $N2 iterations to: \n\n",
                 summary(orbit)
             )
             return orbit
@@ -378,12 +379,11 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
         orbit = updateorbit(orbit, _orbit_, radec)
         # Termination condition
         if critical_value(orbit) < significance
-            Niter = length(porbit.Qs)
+            N1, N2 = length(porbit.Qs), length(orbit.Qs)
             verbose && println(
-                "* Refinement of GaussOrbit via MMOV converged in \
-                $Niter iterations to:\n\n",
+                "* Refinement of GaussOrbit via MMOV converged in $N1 iterations to:\n\n",
                 summary(porbit), "\n",
-                "* Jet Transport Least Squares converged to: \n\n",
+                "* Jet Transport Least Squares converged in $N2 iterations to: \n\n",
                 summary(orbit)
             )
             return orbit
