@@ -3,17 +3,17 @@
 hmodel(t, p) = @. p[1] + t
 
 @doc raw"""
-    absolutemagnitude(sol::LeastSquaresOrbit{T, T}, params::Parameters{T}) where {T <: Real}
+    absolutemagnitude(::AbstractOrbit{T, T}, ::Parameters{T}) where {T <: Real}
 
-Return the absolute magnitude of orbit `sol`, as well as its standard error.
+Return the absolute magnitude of an orbit, as well as its standard error.
 This function uses the linear H and G model for asteroids.
 
 !!! reference
     See https://minorplanetcenter.net/iau/ECS/MPCArchive/1985/MPC_19851227.pdf.
 """
-function absolutemagnitude(sol::LeastSquaresOrbit{T, T}, params::Parameters{T}) where {T <: Real}
+function absolutemagnitude(orbit::AbstractOrbit{T, T}, params::Parameters{T}) where {T <: Real}
     # Extract optical astrometry
-    radec = astrometry(sol.tracklets)
+    radec = astrometry(orbit.tracklets)
     # Observation times
     ts = @. dtutc2days(date(radec))
     # Observed magnitudes and bands
@@ -21,7 +21,7 @@ function absolutemagnitude(sol::LeastSquaresOrbit{T, T}, params::Parameters{T}) 
     # Convert magnitudes to V band
     hs .+= getindex.(Ref(V_BAND_CORRECTION), bands)
     # Asteroid, Earth and Sun positions
-    xa = [sol(t)[1:3] for t in ts]
+    xa = [orbit(t)[1:3] for t in ts]
     xe = [params.eph_ea(t)[1:3] for t in ts]
     xs = [params.eph_su(t)[1:3] for t in ts]
     # Distances
