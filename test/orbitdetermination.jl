@@ -545,7 +545,10 @@ end
         @test maximum(orbit1.J) < 4e-3
         # Convergence history
         @test size(orbit1.qs, 1) == 6
-        @test size(orbit1.qs, 2) == length(orbit1.Qs) == 1
+        # (26/04/2025) There are roundoff differences in the nrms of the two
+        # jtls iterations; hence, in some os/julia versions, the first (second)
+        # iteration has the lowest nrms.
+        # @test size(orbit1.qs, 2) == length(orbit1.Qs) == 1
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
