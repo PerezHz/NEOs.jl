@@ -6,8 +6,9 @@ using PlanetaryEphemeris
 using LinearAlgebra
 using Test
 
-using NEOs: LeastSquaresOrbit, RadecMPC, reduce_tracklets,
-    indices, numberofdays, nout
+using NEOs: RadecMPC, numberofdays, nobs, minmaxdates, notout, nout, reduce_tracklets,
+    indices
+using Statistics: mean
 
 function iodsubradec(radec::Vector{RadecMPC{T}}, N::Int = 3) where {T <: Real}
     tracklets = reduce_tracklets(radec)
@@ -23,11 +24,12 @@ end
         # Subset of radec for IOD
         subradec = iodsubradec(radec, 3)
 
-        @test length(subradec) == 9
-        @test numberofdays(subradec) < 0.18
-
         # Parameters
-        params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007, parse_eqs = false)
+        params = Parameters(
+           coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+           gaussorder = 2, jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           significance = 0.99, outrej = false, parse_eqs = false
+        )
         params = Parameters(params, parse_eqs = true)
         # Orbit determination problem
         od = ODProblem(newtonian!, subradec)
@@ -35,33 +37,43 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 23, 2025
+        # Values by Apr 25, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
-        @test length(orbit.tracklets) == 3
+        @test length(subradec) == nobs(od) == nobs(orbit) == 9
+        @test numberofdays(subradec) == numberofdays(orbit) < 0.18
+        @test minmaxdates(orbit) == (date(subradec[1]), date(subradec[end]))
+        @test length(od.tracklets) == length(orbit.tracklets) == 3
+        @test od.tracklets == orbit.tracklets
         @test orbit.tracklets[1].radec[1] == subradec[1]
         @test orbit.tracklets[end].radec[end] == subradec[end]
         @test issorted(orbit.tracklets)
-        # Backward integration
+        # Backward (forward) integration
+        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-4)
         @test dtutc2days(date(subradec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        # Forward integration
         @test dtutc2days(date(subradec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test length(orbit.res) == 9
-        @test iszero(nout(orbit.res))
+        @test notout(orbit.res) == 9
+        @test nout(orbit.res) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 9e-4 )
         @test all( snr(orbit) .> 14.5)
+        @test chi2(orbit) < 0.53
         @test nrms(orbit) < 0.18
         # Jacobian
         @test size(orbit.J) == (6, 6)
         @test isdiag(orbit.J)
         @test maximum(orbit.J) < 9e-4
+        # Convergence history
+        @test size(orbit.qs, 1) == 6
+        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test issorted(orbit.Qs, rev = true)
+        @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
         JPL = [-0.9867704701732631, 0.3781890325424674, 0.14094513213009532,
             -0.008773157203087259, -0.00947109649687576, -0.005654229864757284]
@@ -69,12 +81,11 @@ end
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 24.3 ≤ H + dH
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(od, orbit, params) == 10
 
         # Add observations
         subradec = iodsubradec(radec, 15)
-
-        @test length(subradec) == 43
-        @test numberofdays(subradec) < 2.76
 
         # Refine orbit
         NEOs.update!(od, subradec)
@@ -83,28 +94,38 @@ end
         # Check type
         @test isa(orbit1, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
-        @test length(orbit1.tracklets) == 15
+        @test length(subradec) == nobs(od) == nobs(orbit1) == 43
+        @test numberofdays(subradec) == numberofdays(orbit1) < 2.76
+        @test minmaxdates(orbit1) == (date(subradec[1]), date(subradec[end]))
+        @test length(od.tracklets) == length(orbit1.tracklets) == 15
+        @test od.tracklets == orbit1.tracklets
         @test orbit1.tracklets[1].radec[1] == subradec[1]
         @test orbit1.tracklets[end].radec[end] == subradec[end]
         @test issorted(orbit1.tracklets)
-        # Backward integration
+        # Backward (forward) integration
+        @test epoch(orbit1) == epoch(orbit)
         @test dtutc2days(date(subradec[1])) > orbit1.bwd.t0 + orbit1.bwd.t[end]
         @test all( norm.(orbit1.bwd.x, Inf) .< 1.2 )
-        # Forward integration
         @test dtutc2days(date(subradec[end])) < orbit1.fwd.t0 + orbit1.fwd.t[end]
         @test all( norm.(orbit1.fwd.x, Inf) .< 1.2 )
         # Vector of residuals
-        @test length(orbit1.res) == 43
-        @test iszero(nout(orbit1.res))
+        @test notout(orbit1.res) == 43
+        @test nout(orbit1.res) == 0
         # Least squares fit
         @test orbit1.fit.success
         @test all( sigmas(orbit1) .< 2e-4 )
         @test all( snr(orbit1) .> 866 )
+        @test chi2(orbit1) < 11.64
         @test nrms(orbit1) < 0.37
         # Jacobian
         @test size(orbit1.J) == (6, 6)
         @test isdiag(orbit1.J)
         @test maximum(orbit1.J) < 9e-4
+        # Convergence history
+        @test size(orbit1.qs, 1) == 6
+        @test size(orbit1.qs, 2) == length(orbit1.Qs) == 6
+        @test issorted(orbit1.Qs, rev = true)
+        @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
         @test all(abs.(orbit1() - JPL) ./ sigmas(orbit1) .< 0.31)
         # Absolute magnitude
@@ -121,48 +142,59 @@ end
         # subradec = iodsubradec(radec, 3)
         # In this case: radec == subradec
 
-        @test length(radec) == 6
-        @test numberofdays(radec) < 1.95
-
         # Parameters
-        params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007, safegauss = false)
+        params = Parameters(
+           coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+           gaussorder = 2, jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           significance = 0.99, outrej = false, safegauss = false
+        )
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 23, 2025
+        # Values by Apr 25, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
-        @test length(orbit.tracklets) == 2
+        @test length(radec) == nobs(od) == nobs(orbit) == 6
+        @test numberofdays(radec) == numberofdays(orbit) < 1.95
+        @test minmaxdates(orbit) == (date(radec[1]), date(radec[end]))
+        @test length(od.tracklets) == length(orbit.tracklets) == 2
+        @test od.tracklets == orbit.tracklets
         @test orbit.tracklets[1].radec[1] == radec[1]
         @test orbit.tracklets[end].radec[end] == radec[end]
         @test issorted(orbit.tracklets)
-        # Backward integration
+        # Backward (forward) integration
+        @test isapprox(epoch(orbit), dtutc2days(date(radec[4])), atol = 3e-4)
         @test dtutc2days(date(radec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        # Forward integration
         @test dtutc2days(date(radec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test length(orbit.res) == 6
-        @test iszero(nout(orbit.res))
+        @test notout(orbit.res) == 6
+        @test nout(orbit.res) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 5e-3 )
         @test all( snr(orbit) .> 21.4)
+        @test chi2(orbit) < 2.53
         @test nrms(orbit) < 0.46
         # Jacobian
         @test size(orbit.J) == (6, 6)
         @test isdiag(orbit.J)
-        @test maximum(orbit.J) < 6.1e-4
+        @test maximum(orbit.J) < 6.8e-4
+        # Convergence history
+        @test size(orbit.qs, 1) == 6
+        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test issorted(orbit.Qs, rev = true)
+        @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
         JPL = [1.0042569058151192, 0.2231639040146286, 0.11513854178693468,
             -0.010824212819531798, 0.017428798232689943, 0.0071046780555307385]
-        @test all(abs.(orbit() - JPL) ./ sigmas(orbit) .< 8.1e-3)
+        @test all(abs.(orbit() - JPL) ./ sigmas(orbit) .< 6e-3)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 24.0 ≤ H + dH
@@ -176,9 +208,6 @@ end
         # Subset of radec for IOD
         subradec = radec[10:21]
 
-        @test length(subradec) == 12
-        @test numberofdays(subradec) < 42.8
-
         # Parameters
         params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007)
         # Orbit determination problem
@@ -187,33 +216,43 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by Apr 23, 2025
+        # Values by Apr 25, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
-        @test length(orbit.tracklets) == 3
+        @test length(subradec) == nobs(od) == nobs(orbit) == 12
+        @test numberofdays(subradec) == numberofdays(orbit) < 42.8
+        @test minmaxdates(orbit) == (date(subradec[1]), date(subradec[end]))
+        @test length(od.tracklets) == length(orbit.tracklets) == 3
+        @test od.tracklets == orbit.tracklets
         @test orbit.tracklets[1].radec[1] == subradec[1]
         @test orbit.tracklets[end].radec[end] == subradec[end]
         @test issorted(orbit.tracklets)
-        # Backward integration
+        # Backward (forward) integration
+        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-4)
         @test dtutc2days(date(subradec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        # Forward integration
         @test dtutc2days(date(subradec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test length(orbit.res) == 12
-        @test iszero(nout(orbit.res))
+        @test notout(orbit.res) == 12
+        @test nout(orbit.res) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 6.6e-4 )
         @test all( snr(orbit) .> 38.8)
+        @test chi2(orbit) < 2.43
         @test nrms(orbit) < 0.32
         # Jacobian
         @test size(orbit.J) == (6, 6)
         @test isdiag(orbit.J)
         @test maximum(orbit.J) < 9.5e-6
+        # Convergence history
+        @test size(orbit.qs, 1) == 6
+        @test size(orbit.qs, 2) == length(orbit.Qs) == 3
+        @test issorted(orbit.Qs, rev = true)
+        @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
         JPL = [-0.12722461679828806, -0.9466098076903212, -0.4526816007640767,
             0.02048875631534963, -0.00022720097573790754, 0.00321302850930331]
@@ -340,18 +379,20 @@ end
         # subradec = iodsubradec(radec, 3)
         # In this case: radec == subradec
 
-        @test length(radec) == 10
-        @test numberofdays(radec) < 0.05
-
         # Parameters
-        params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007)
+        params = Parameters(
+           coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+           tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
+           jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           significance = 0.99, outrej = false
+        )
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 23, 2025
+        # Values by Apr 25, 2025
 
         # Curvature
         C, Γ_C = curvature(radec)
@@ -362,32 +403,42 @@ end
         # Check type
         @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
-        @test length(orbit.tracklets) == 1
+        @test length(radec) == nobs(od) == nobs(orbit) == 10
+        @test numberofdays(radec) == numberofdays(orbit) < 0.05
+        @test minmaxdates(orbit) == (date(radec[1]), date(radec[end]))
+        @test length(od.tracklets) == length(orbit.tracklets) == 1
+        @test od.tracklets == orbit.tracklets
         @test orbit.tracklets[1].radec[1] == radec[1]
         @test orbit.tracklets[end].radec[end] == radec[end]
         @test issorted(orbit.tracklets)
-        # Backward integration
+        # Backward (forward) integration
+        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), radec), atol = 7e-5)
         @test dtutc2days(date(radec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        # Forward integration
         @test dtutc2days(date(radec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test length(orbit.res) == 10
-        @test iszero(nout(orbit.res))
+        @test notout(orbit.res) == 10
+        @test nout(orbit.res) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 6e-3 )
         @test all( snr(orbit) .> 4.1)
+        @test chi2(orbit) < 14.24
         @test nrms(orbit) < 0.85
         # Jacobian
         @test size(orbit.J) == (6, 6)
         @test isdiag(orbit.J)
-        @test maximum(orbit.J) < 1e-5
+        @test maximum(orbit.J) < 9.2e-3
+        # Convergence history
+        @test size(orbit.qs, 1) == 6
+        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test issorted(orbit.Qs, rev = true)
+        @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
         JPL = [-0.9698405495747651, 0.24035304578776012, 0.10288276585828428,
             -0.009512301266159554, -0.01532548565855646, -0.00809464581680694]
-        @test all(abs.(orbit() - JPL) ./ sigmas(orbit) .< 0.012)
+        @test all(abs.(orbit() - JPL) ./ sigmas(orbit) .< 0.013)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 29.6 ≤ H + dH
@@ -401,9 +452,6 @@ end
         # Subset of radec for IOD
         subradec = iodsubradec(radec, 3)
 
-        @test length(subradec) == 18
-        @test numberofdays(subradec) < 2.16
-
         # Parameters
         params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007,
             outrej = true, χ2_rec = 1.0, χ2_rej = 1.25, fudge = 0.0)
@@ -413,33 +461,43 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 23, 2025
+        # Values by Apr 25, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
-        @test length(orbit.tracklets) == 3
+        @test length(subradec) == nobs(od) == nobs(orbit) == 18
+        @test numberofdays(subradec) == numberofdays(orbit) < 2.16
+        @test minmaxdates(orbit) == (date(subradec[1]), date(subradec[end]))
+        @test length(od.tracklets) == length(orbit.tracklets) == 3
+        @test od.tracklets == orbit.tracklets
         @test orbit.tracklets[1].radec[1] == subradec[1]
         @test orbit.tracklets[end].radec[end] == subradec[end]
         @test issorted(orbit.tracklets)
-        # Backward integration
+        # Backward (forward) integration
+        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 2e-3)
         @test dtutc2days(date(subradec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        # Forward integration
         @test dtutc2days(date(subradec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test length(orbit.res) == 18
+        @test notout(orbit.res) == 16
         @test nout(orbit.res) == 2
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 4e-3 )
         @test all( snr(orbit) .> 50)
+        @test chi2(orbit) < 1.55
         @test nrms(orbit) < 0.22
         # Jacobian
         @test size(orbit.J) == (6, 6)
         @test isdiag(orbit.J)
         @test maximum(orbit.J) < 5e-4
+        # Convergence history
+        @test size(orbit.qs, 1) == 6
+        @test size(orbit.qs, 2) == length(orbit.Qs) == 5
+        # @test issorted(orbit.Qs, rev = true)
+        @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
         JPL = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
             -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
@@ -447,6 +505,8 @@ end
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 26.7 ≤ H + dH
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(od, orbit, params) == 10
 
         # Add remaining observations
         NEOs.update!(od, radec)
@@ -456,28 +516,38 @@ end
         # Check type
         @test isa(orbit1, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
-        @test length(orbit1.tracklets) == 4
+        @test length(radec) == nobs(od) == nobs(orbit1) == 21
+        @test numberofdays(radec) == numberofdays(orbit1) < 3.03
+        @test minmaxdates(orbit1) == (date(radec[1]), date(radec[end]))
+        @test length(od.tracklets) == length(orbit1.tracklets) == 4
+        @test od.tracklets == orbit1.tracklets
         @test orbit1.tracklets[1].radec[1] == radec[1]
         @test orbit1.tracklets[end].radec[end] == radec[end]
         @test issorted(orbit1.tracklets)
-        # Backward integration
+        # Backward (forward) integration
+        @test epoch(orbit1) == epoch(orbit)
         @test dtutc2days(date(radec[1])) > orbit1.bwd.t0 + orbit1.bwd.t[end]
         @test all( norm.(orbit1.bwd.x, Inf) .< 2 )
-        # Forward integration
         @test dtutc2days(date(radec[end])) < orbit1.fwd.t0 + orbit1.fwd.t[end]
         @test all( norm.(orbit1.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test length(orbit1.res) == 21
+        @test notout(orbit1.res) == 19
         @test nout(orbit1.res) == 2
         # Least squares fit
         @test orbit1.fit.success
         @test all( sigmas(orbit1) .< 3e-4 )
         @test all( snr(orbit1) .> 574)
+        @test chi2(orbit1) < 2.38
         @test nrms(orbit1) < 0.25
         # Jacobian
         @test size(orbit1.J) == (6, 6)
         @test isdiag(orbit1.J)
         @test maximum(orbit1.J) < 4e-3
+        # Convergence history
+        @test size(orbit1.qs, 1) == 6
+        @test size(orbit1.qs, 2) == length(orbit1.Qs) == 1
+        @test issorted(orbit1.Qs, rev = true)
+        @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
         @test all(abs.(orbit1() - JPL) ./ sigmas(orbit1) .< 7e-4)
         # Absolute magnitude
@@ -497,18 +567,20 @@ end
         # subradec = iodsubradec(radec, 3)
         # In this case: radec == subradec
 
-        @test length(radec) == 7
-        @test numberofdays(radec) < 0.05
-
         # Parameters
-        params = Parameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
+        params = Parameters(
+           coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+           tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
+           jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           significance = 0.99, outrej = false
+        )
         # Orbit determination problem
         od = ODProblem(newtonian!, radec)
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 23, 2025
+        # Values by Apr 25, 2025
 
         # Curvature
         C, Γ_C = curvature(radec)
@@ -519,28 +591,38 @@ end
         # Check type
         @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
-        @test length(orbit.tracklets) == 1
+        @test length(radec) == nobs(od) == nobs(orbit) == 7
+        @test numberofdays(radec) == numberofdays(orbit) < 0.05
+        @test minmaxdates(orbit) == (date(radec[1]), date(radec[end]))
+        @test length(od.tracklets) == length(orbit.tracklets) == 1
+        @test od.tracklets == orbit.tracklets
         @test orbit.tracklets[1].radec[1] == radec[1]
         @test orbit.tracklets[end].radec[end] == radec[end]
         @test issorted(orbit.tracklets)
-        # Backward integration
+        # Backward (forward) integration
+        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), radec), atol = 2e-5)
         @test dtutc2days(date(radec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        # Forward integration
         @test dtutc2days(date(radec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 1e9 )
         # Vector of residuals
-        @test length(orbit.res) == 7
-        @test iszero(nout(orbit.res))
+        @test notout(orbit.res) == 7
+        @test nout(orbit.res) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 3e-4 )
         @test all( snr(orbit) .> 20.5)
+        @test chi2(orbit) < 0.23
         @test nrms(orbit) < 0.13
         # Jacobian
         @test size(orbit.J) == (6, 6)
         @test isdiag(orbit.J)
         @test maximum(orbit.J) < 3e-4
+        # Convergence history
+        @test size(orbit.qs, 1) == 6
+        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test issorted(orbit.Qs, rev = true)
+        @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
         JPL = [-0.1793421909678032, 0.8874121750891107, 0.3841434101167349,
             -0.017557851117612377, -0.005781634223099801, -0.0020075106081869185]
@@ -558,44 +640,55 @@ end
         # Subset of radec for IOD
         subradec = iodsubradec(radec, 3)
 
-        @test length(subradec) == 18
-        @test numberofdays(subradec) < 0.34
-
         # Parameters
-        params = Parameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
+        params = Parameters(
+           coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+           gaussorder = 2, jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           significance = 0.99, outrej = false, parse_eqs = false
+        )
         # Orbit determination problem
         od = ODProblem(newtonian!, subradec)
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 23, 2025
+        # Values by Apr 25, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
-        @test length(orbit.tracklets) == 3
+        @test length(subradec) == nobs(od) == nobs(orbit) == 18
+        @test numberofdays(subradec) == numberofdays(orbit) < 0.34
+        @test minmaxdates(orbit) == (date(subradec[1]), date(subradec[end]))
+        @test length(od.tracklets) == length(orbit.tracklets) == 3
+        @test od.tracklets == orbit.tracklets
         @test orbit.tracklets[1].radec[1] == subradec[1]
         @test orbit.tracklets[end].radec[end] == subradec[end]
         @test issorted(orbit.tracklets)
-        # Backward integration
+        # Backward (forward) integration
+        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-3)
         @test dtutc2days(date(subradec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        # Forward integration
         @test dtutc2days(date(subradec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 1e4 )
         # Vector of residuals
-        @test length(orbit.res) == 18
-        @test iszero(nout(orbit.res))
+        @test notout(orbit.res) == 18
+        @test nout(orbit.res) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 2e-5 )
-        @test all( snr(orbit) .> 645)
+        @test all( snr(orbit) .> 644)
+        @test chi2(orbit) < 4.35
         @test nrms(orbit) < 0.35
         # Jacobian
         @test size(orbit.J) == (6, 6)
         @test isdiag(orbit.J)
         @test maximum(orbit.J) < 2e-5
+        # Convergence history
+        @test size(orbit.qs, 1) == 6
+        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test issorted(orbit.Qs, rev = true)
+        @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
         JPL = [0.9739760787551061, 0.21541704400792083, 0.09401075290627411,
             -0.00789675674941779, 0.0160619782715116, 0.006135361409943397]
@@ -603,12 +696,11 @@ end
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 30.4 ≤ H + dH
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(od, orbit, params) == 8
 
         # Add observations
         subradec = iodsubradec(radec, 10)
-
-        @test length(subradec) == 97
-        @test numberofdays(subradec) < 0.70
 
         # Refine orbit
         NEOs.update!(od, subradec)
@@ -617,28 +709,38 @@ end
         # Check type
         @test isa(orbit1, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
-        @test length(orbit1.tracklets) == 10
+        @test length(subradec) == nobs(od) == nobs(orbit1) == 97
+        @test numberofdays(subradec) == numberofdays(orbit1) < 0.70
+        @test minmaxdates(orbit1) == (date(subradec[1]), date(subradec[end]))
+        @test length(od.tracklets) == length(orbit1.tracklets) == 10
+        @test od.tracklets == orbit1.tracklets
         @test orbit1.tracklets[1].radec[1] == subradec[1]
         @test orbit1.tracklets[end].radec[end] == subradec[93]
         @test issorted(orbit1.tracklets)
-        # Backward integration
+        # Backward (forward) integration
+        @test epoch(orbit1) == epoch(orbit)
         @test dtutc2days(date(subradec[1])) > orbit1.bwd.t0 + orbit1.bwd.t[end]
         @test all( norm.(orbit1.bwd.x, Inf) .< 1 )
-        # Forward integration
         @test dtutc2days(date(subradec[end])) < orbit1.fwd.t0 + orbit1.fwd.t[end]
         @test all( norm.(orbit1.fwd.x, Inf) .< 1e15 )
         # Vector of residuals
-        @test length(orbit1.res) == 97
-        @test iszero(nout(orbit1.res))
+        @test notout(orbit1.res) == 97
+        @test nout(orbit1.res) == 0
         # Least squares fit
         @test orbit1.fit.success
         @test all( sigmas(orbit1) .< 4e-7 )
         @test all( snr(orbit1) .> 21_880)
+        @test chi2(orbit1) < 54.85
         @test nrms(orbit1) < 0.53
         # Jacobian
         @test size(orbit1.J) == (6, 6)
         @test isdiag(orbit1.J)
         @test maximum(orbit1.J) < 2e-5
+        # Convergence history
+        @test size(orbit1.qs, 1) == 6
+        @test size(orbit1.qs, 2) == length(orbit1.Qs) == 2
+        @test issorted(orbit1.Qs, rev = true)
+        @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
         @test all(abs.(orbit1() - JPL) ./ sigmas(orbit1) .< 0.17)
         # Absolute magnitude
@@ -682,10 +784,6 @@ end
         radec = fetch_radec_mpc("2023 QR6")
         flag, radec = radecfilter(radec)
 
-        @test flag
-        @test length(radec) == 6
-        @test numberofdays(radec) < 6.22
-
         # Parameters
         params = Parameters(
             coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042, # Propagation
@@ -701,33 +799,44 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Apr 23, 2025
+        # Values by Apr 25, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
         # Tracklets
-        @test length(orbit.tracklets) == 3
+        @test flag
+        @test length(radec) == nobs(od) == nobs(orbit) == 6
+        @test numberofdays(radec) == numberofdays(orbit) < 6.22
+        @test minmaxdates(orbit) == (date(radec[1]), date(radec[end]))
+        @test length(od.tracklets) == length(orbit.tracklets) == 3
+        @test od.tracklets == orbit.tracklets
         @test orbit.tracklets[1].radec[1] == radec[1]
         @test orbit.tracklets[end].radec[end] == radec[end]
         @test issorted(orbit.tracklets)
-        # Backward integration
+        # Backward (forward) integration
+        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 3e-3)
         @test dtutc2days(date(radec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        # Forward integration
         @test dtutc2days(date(radec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test length(orbit.res) == 6
-        @test iszero(nout(orbit.res))
+        @test notout(orbit.res) == 6
+        @test nout(orbit.res) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 0.018 )
         @test all( snr(orbit) .> 7.14)
+        @test chi2(orbit) < 0.91
         @test nrms(orbit) < 0.28
         # Jacobian
         @test size(orbit.J) == (6, 6)
         @test isdiag(orbit.J)
         @test maximum(orbit.J) < 0.007
+        # Convergence history
+        @test size(orbit.qs, 1) == 6
+        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test issorted(orbit.Qs, rev = true)
+        @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
         JPL = [ 0.827266656726981, -0.8060653913101916, -0.6506187674672722,
             0.01660013577219304, -0.005614737443087259, 0.002899489877794496]
