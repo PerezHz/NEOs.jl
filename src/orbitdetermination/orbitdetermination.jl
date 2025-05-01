@@ -134,7 +134,7 @@ function jtls(od::ODProblem{D, T}, orbit::O, params::Parameters{T},
     # Reference epoch [Julian days TDB]
     jd0 = epoch(orbit) + PE.J2000
     # Allocate memory for orbits
-    orbits = [zero(LeastSquaresOrbit{T, T}) for _ in 1:jtlsiter]
+    orbits = [zero(LeastSquaresOrbit{D, T, T}) for _ in 1:jtlsiter]
     q00s = Matrix{T}(undef, 6, jtlsiter+1)
     Qs = fill(T(Inf), jtlsiter+1)
     # Number of jet transport variables
@@ -185,7 +185,7 @@ function jtls(od::ODProblem{D, T}, orbit::O, params::Parameters{T},
         end
         # Update solution
         Qs[i] = nrms(res, fit)
-        orbits[i] = evalfit(LeastSquaresOrbit(tin, bwd, fwd, res[rin],
+        orbits[i] = evalfit(LeastSquaresOrbit(od.dynamics, tin, bwd, fwd, res[rin],
             fit, J, q00s[:, 1:i], Qs[1:i]))
         if outrej
             outs[i] = notout(res)
@@ -224,16 +224,6 @@ function iodinitcond(A::AdmissibleRegion{T}) where {T <: Real}
     ]
 end
 
-# Update `orbit` iff `_orbit_` is complete and has a lower nrms
-function updateorbit(orbit::LeastSquaresOrbit{T, T}, _orbit_::LeastSquaresOrbit{T, T},
-    radec::Vector{RadecMPC{T}}) where {T <: Real}
-    if nobs(_orbit_) == length(radec)
-        return nrms(orbit) <= nrms(_orbit_) ? orbit : _orbit_
-    else
-        return orbit
-    end
-end
-
 @doc raw"""
     issinglearc(radec::Vector{RadecMPC{T}}, arc::Day = Day(30)) where {T <: Real}
 
@@ -269,7 +259,7 @@ Jet Transport Initial Orbit Determination.
 function initialorbitdetermination(od::ODProblem{D, T}, params::Parameters{T};
     initcond::I = iodinitcond) where {D, I, T <: Real}
     # Allocate memory for orbit
-    sol = zero(LeastSquaresOrbit{T, T})
+    sol = zero(LeastSquaresOrbit{D, T, T})
     # Unpack
     @unpack tsaorder, gaussorder, jtlsorder, significance = params
     @unpack radec = od
@@ -301,7 +291,7 @@ Refine an existing orbit via Jet Transport Orbit Determination.
 ## Arguments
 
 - `od::ODProblem{D, T}`: orbit determination problem.
-- `orbit::LeastSquaresOrbit{T, T}:` a priori orbit.
+- `orbit::AbstractOrbit{T, T}:` a priori orbit.
 - `params::Parameters{T}`: see [`Parameters`](@ref).
 
 !!! warning
@@ -310,11 +300,11 @@ Refine an existing orbit via Jet Transport Orbit Determination.
 !!! reference
     See https://doi.org/10.1007/s10569-025-10246-2.
 """
-function orbitdetermination(od::ODProblem{D, T}, orbit::LeastSquaresOrbit{T, T},
+function orbitdetermination(od::ODProblem{D, T}, orbit::AbstractOrbit{T, T},
     params::Parameters{T}) where {D, T <: Real}
     # Unpack parameters
     @unpack significance, verbose = params
-    @unpack radec, tracklets = od
+    @unpack tracklets, radec = od
     # Set jet transport variables
     set_od_order(params)
     # Jet Transport Least Squares

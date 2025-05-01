@@ -7,7 +7,7 @@ abstract type AbstractLeastSquaresOrbit{T, U} <: AbstractOrbit{T, U} end
 
 # Initialize a vector of residuals consistent with od and orbit
 function init_residuals(::Type{U}, od::ODProblem{D, T},
-    orbit::AbstractLeastSquaresOrbit{T, T}) where {D, T <: Real, U <: Number}
+    orbit::AbstractLeastSquaresOrbit) where {D, T <: Real, U <: Number}
     # Optical astrometry
     odradec, orbitradec = od.radec, astrometry(orbit)
     # Weights and debiasing factors
@@ -26,15 +26,17 @@ function init_residuals(::Type{U}, od::ODProblem{D, T},
     return res
 end
 
-variances(orbit::AbstractLeastSquaresOrbit) = diag(orbit.J * orbit.fit.Γ * orbit.J')
+covariance(orbit::AbstractLeastSquaresOrbit) = orbit.fit.Γ
+variances(orbit::AbstractLeastSquaresOrbit) = diag(orbit.J * covariance(orbit) * orbit.J')
 
 @doc raw"""
-    LeastSquaresOrbit{T, U} <: AbstractLeastSquaresOrbit{T, U}
+    LeastSquaresOrbit{D, T, U} <: AbstractLeastSquaresOrbit{T, U}
 
 An asteroid least squares orbit.
 
 ## Fields
 
+- `dynamics::D`: dynamical model.
 - `tracklets::Vector{Tracklet{T}}`: vector of tracklets.
 - `bwd/fwd::TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}}`:
     backward (forward) integration.
@@ -44,7 +46,8 @@ An asteroid least squares orbit.
 - `qs::Matrix{T}`: history of initial conditions.
 - `Qs::Vector{T}`: history of the target function.
 """
-@auto_hash_equals struct LeastSquaresOrbit{T, U} <: AbstractLeastSquaresOrbit{T, U}
+@auto_hash_equals struct LeastSquaresOrbit{D, T, U} <: AbstractLeastSquaresOrbit{T, U}
+    dynamics::D
     tracklets::Vector{Tracklet{T}}
     bwd::TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}}
     fwd::TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}}
@@ -54,34 +57,35 @@ An asteroid least squares orbit.
     qs::Matrix{T}
     Qs::Vector{T}
     # Inner constructor
-    function LeastSquaresOrbit{T, U}(tracklets::Vector{Tracklet{T}},
+    function LeastSquaresOrbit{D, T, U}(dynamics::D, tracklets::Vector{Tracklet{T}},
         bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
         res::Vector{OpticalResidual{T, U}}, fit::LeastSquaresFit{T},
-        J::Matrix{T}, qs::Matrix{T}, Qs::Vector{T}) where {T <: Real, U <: Number}
+        J::Matrix{T}, qs::Matrix{T}, Qs::Vector{T}) where {D, T <: Real, U <: Number}
         @assert bwd.t0 == fwd.t0 "Backward and forward integration initial \
             times must match"
         @assert nobs(tracklets) == length(res) "Number of observations must \
             match number of residuals"
         _bwd_ = TaylorInterpolant(bwd.t0, bwd.t, collect(bwd.x))
         _fwd_ = TaylorInterpolant(fwd.t0, fwd.t, collect(fwd.x))
-        return new{T, U}(tracklets, _bwd_, _fwd_, res, fit, J, qs, Qs)
+        return new{D, T, U}(dynamics, tracklets, _bwd_, _fwd_, res, fit, J, qs, Qs)
     end
 end
 
 # Outer constructor
 LeastSquaresOrbit(
-    tracklets::Vector{Tracklet{T}}, bwd::TaylorInterpolant{T, U, 2},
+    dynamics::D, tracklets::Vector{Tracklet{T}}, bwd::TaylorInterpolant{T, U, 2},
     fwd::TaylorInterpolant{T, U, 2}, res::Vector{OpticalResidual{T, U}},
     fit::LeastSquaresFit{T}, J::Matrix{T}, qs::Matrix{T}, Qs::Vector{T}
-    ) where {T <: Real, U <: Number} = LeastSquaresOrbit{T, U}(tracklets,
-    bwd, fwd, res, fit, J, qs, Qs)
+    ) where {D, T <: Real, U <: Number} = LeastSquaresOrbit{D, T, U}(dynamics,
+    tracklets, bwd, fwd, res, fit, J, qs, Qs)
 
 # Print method for LeastSquaresOrbit
 show(io::IO, orbit::LeastSquaresOrbit) = print(io, "Least squares orbit with ",
     length(orbit.res), " residuals")
 
 # Definition of zero LeastSquaresOrbit
-function zero(::Type{LeastSquaresOrbit{T, U}}) where {T <: Real, U <: Number}
+function zero(::Type{LeastSquaresOrbit{D, T, U}}) where {D, T <: Real, U <: Number}
+    dynamics = D.instance
     tracklets = Vector{Tracklet{T}}(undef, 0)
     bwd = zero(TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}})
     fwd = zero(TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}})
@@ -90,14 +94,14 @@ function zero(::Type{LeastSquaresOrbit{T, U}}) where {T <: Real, U <: Number}
     J = Matrix{T}(undef, 0, 0)
     qs = Matrix{T}(undef, 0, 0)
     Qs = Vector{T}(undef, 0)
-    return LeastSquaresOrbit{T, U}(tracklets, bwd, fwd, res, fit, J, qs, Qs)
+    return LeastSquaresOrbit{D, T, U}(dynamics, tracklets, bwd, fwd, res, fit, J, qs, Qs)
 end
 
-iszero(orbit::LeastSquaresOrbit{T, U}) where {T <: Real, U <: Number} =
-    orbit == zero(LeastSquaresOrbit{T, U})
+iszero(orbit::LeastSquaresOrbit{D, T, U}) where {D, T <: Real, U <: Number} =
+    orbit == zero(LeastSquaresOrbit{D, T, U})
 
 # Evaluate integrations and residuals in fit deltas
-function evalfit(orbit::LeastSquaresOrbit{T, TaylorN{T}}) where {T <: Real}
+function evalfit(orbit::LeastSquaresOrbit{D, T, TaylorN{T}}) where {D, T <: Real}
     # Fit δs
     δs = orbit.fit.x
     # Evaluate integrations
@@ -108,6 +112,6 @@ function evalfit(orbit::LeastSquaresOrbit{T, TaylorN{T}}) where {T <: Real}
     # Evaluate residuals
     new_res = orbit.res(δs)
 
-    return LeastSquaresOrbit{T, T}(orbit.tracklets, new_bwd, new_fwd, new_res,
-        orbit.fit, orbit.J, orbit.qs, orbit.Qs)
+    return LeastSquaresOrbit{D, T, T}(orbit.dynamics, orbit.tracklets, new_bwd,
+        new_fwd, new_res, orbit.fit, orbit.J, orbit.qs, orbit.Qs)
 end
