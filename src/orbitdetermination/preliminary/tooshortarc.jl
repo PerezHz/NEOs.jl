@@ -32,7 +32,7 @@ function mmov(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
     # Initial time of integration [julian days TDB]
     jd0 = dtutc2jdtdb(A.date)
     # Allocate memory
-    orbits = [zero(MMOVOrbit{T, T}) for _ in 1:adamiter]
+    orbits = [zero(MMOVOrbit{D, T, T}) for _ in 1:adamiter]
     aes = Matrix{T}(undef, 6, adamiter+1)
     Qs = fill(T(Inf), adamiter+1)
     # Initial attributable elements
@@ -102,7 +102,7 @@ function mmov(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         # Residuals space to barycentric coordinates jacobian
         J = Matrix(TS.jacobian(q - cte.(q), x1))
         # Update orbit
-        orbits[t] = evaldeltas(MMOVOrbit(tracklets, bwd, fwd, res,
+        orbits[t] = evaldeltas(MMOVOrbit(od.dynamics, tracklets, bwd, fwd, res,
             Γ, J, aes[:, 1:t], Qs[1:t]), x0)
         # Convergence conditions
         if t > 1
@@ -194,10 +194,10 @@ See also [`mmov`](@ref).
 function tsaiod(od::ODProblem{D, T}, params::Parameters{T};
     initcond::I = iodinitcond) where {D, I, T <: Real}
     # Allocate memory for orbit
-    orbit = zero(LeastSquaresOrbit{T, T})
+    orbit = zero(LeastSquaresOrbit{D, T, T})
     # Unpack
     @unpack tsaorder, adammode, significance, verbose = params
-    @unpack radec, tracklets = od
+    @unpack tracklets, radec = od
     # Set jet transport variables
     set_od_order(params)
     # Iterate tracklets

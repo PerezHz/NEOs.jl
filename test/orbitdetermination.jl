@@ -40,7 +40,7 @@ end
         # Values by Apr 25, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
         # Tracklets
         @test length(subradec) == nobs(od) == nobs(orbit) == 9
         @test numberofdays(subradec) == numberofdays(orbit) < 0.18
@@ -82,7 +82,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 24.3 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 10
 
         # Add observations
         subradec = iodsubradec(radec, 15)
@@ -92,7 +92,7 @@ end
         orbit1 = orbitdetermination(od, orbit, params)
 
         # Check type
-        @test isa(orbit1, LeastSquaresOrbit{Float64, Float64})
+        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
         # Tracklets
         @test length(subradec) == nobs(od) == nobs(orbit1) == 43
         @test numberofdays(subradec) == numberofdays(orbit1) < 2.76
@@ -132,7 +132,7 @@ end
         H, dH = absolutemagnitude(orbit1, params)
         @test H - dH ≤ 24.3 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, orbit1, params) == 7
+        @test uncertaintyparameter(orbit1, params) == 7
     end
 
     @testset "Unsafe Gauss Method" begin
@@ -157,7 +157,7 @@ end
         # Values by Apr 25, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
         # Tracklets
         @test length(radec) == nobs(od) == nobs(orbit) == 6
         @test numberofdays(radec) == numberofdays(orbit) < 1.95
@@ -199,7 +199,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 24.0 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 10
     end
 
     @testset "Gauss Method with ADAM refinement" begin
@@ -219,7 +219,7 @@ end
         # Values by Apr 25, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
         # Tracklets
         @test length(subradec) == nobs(od) == nobs(orbit) == 12
         @test numberofdays(subradec) == numberofdays(orbit) < 42.8
@@ -261,7 +261,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 21.7 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, orbit, params) == 9
+        @test uncertaintyparameter(orbit, params) == 9
     end
 
     @testset "Admissible region" begin
@@ -401,7 +401,7 @@ end
         χ2 = C' * inv(Γ_C) * C
         @test χ2 > 2_516
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
         # Tracklets
         @test length(radec) == nobs(od) == nobs(orbit) == 10
         @test numberofdays(radec) == numberofdays(orbit) < 0.05
@@ -443,7 +443,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 29.6 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 10
     end
 
     @testset "Outlier Rejection" begin
@@ -464,7 +464,7 @@ end
         # Values by Apr 25, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
         # Tracklets
         @test length(subradec) == nobs(od) == nobs(orbit) == 18
         @test numberofdays(subradec) == numberofdays(orbit) < 2.16
@@ -506,7 +506,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 26.7 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 10
 
         # Add remaining observations
         NEOs.update!(od, radec)
@@ -514,7 +514,7 @@ end
         orbit1 = orbitdetermination(od, orbit, params)
 
         # Check type
-        @test isa(orbit1, LeastSquaresOrbit{Float64, Float64})
+        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
         # Tracklets
         @test length(radec) == nobs(od) == nobs(orbit1) == 21
         @test numberofdays(radec) == numberofdays(orbit1) < 3.03
@@ -557,7 +557,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 26.7 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, orbit1, params) == 9
+        @test uncertaintyparameter(orbit1, params) == 9
     end
 
     @testset "Interesting NEOs" begin
@@ -592,7 +592,7 @@ end
         χ2 = C' * inv(Γ_C) * C
         @test χ2 > 1.03e6
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
         # Tracklets
         @test length(radec) == nobs(od) == nobs(orbit) == 7
         @test numberofdays(radec) == numberofdays(orbit) < 0.05
@@ -634,7 +634,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 30.9 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 10
 
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
@@ -658,7 +658,7 @@ end
         # Values by Apr 25, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
         # Tracklets
         @test length(subradec) == nobs(od) == nobs(orbit) == 18
         @test numberofdays(subradec) == numberofdays(orbit) < 0.34
@@ -700,7 +700,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 30.4 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, orbit, params) == 8
+        @test uncertaintyparameter(orbit, params) == 8
 
         # Add observations
         subradec = iodsubradec(radec, 10)
@@ -710,7 +710,7 @@ end
         orbit1 = orbitdetermination(od, orbit, params)
 
         # Check type
-        @test isa(orbit1, LeastSquaresOrbit{Float64, Float64})
+        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
         # Tracklets
         @test length(subradec) == nobs(od) == nobs(orbit1) == 97
         @test numberofdays(subradec) == numberofdays(orbit1) < 0.70
@@ -754,7 +754,7 @@ end
         # TODO: understand better differences wrt JPL solutions
         # @test nrms(orbit1) < nrms(orbit)
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, orbit1, params) == 5
+        @test uncertaintyparameter(orbit1, params) == 5
     end
 
     @testset "research/Celestial Mech. Dyn. Astron. 2025/orbitdetermination.jl" begin
@@ -805,7 +805,7 @@ end
         # Values by Apr 25, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
         # Tracklets
         @test flag
         @test length(radec) == nobs(od) == nobs(orbit) == 6
@@ -848,7 +848,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 18.5 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(od, orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 10
     end
 
 end

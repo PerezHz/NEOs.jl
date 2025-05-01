@@ -5,6 +5,8 @@ Supertype for the orbits API.
 """
 abstract type AbstractOrbit{T <: Real, U <: Number} end
 
+numtypes(::AbstractOrbit{T, U}) where {T, U} = T, U
+
 @doc raw"""
     epoch(::AbstractOrbit)
 
@@ -91,6 +93,16 @@ coordinates at the reference epoch.
 """
 snr(orbit::AbstractOrbit) = abs.(orbit()) ./ sigmas(orbit)
 
+# Update `orbit` iff `_orbit_` is complete and has a lower nrms
+function updateorbit(orbit::AbstractOrbit{T, T}, _orbit_::AbstractOrbit{T, T},
+    radec::Vector{RadecMPC{T}}) where {T <: Real}
+    if nobs(_orbit_) == length(radec)
+        return nrms(orbit) <= nrms(_orbit_) ? orbit : _orbit_
+    else
+        return orbit
+    end
+end
+
 @doc raw"""
     jplcompare(des::String, orbit::AbstractOrbit)
 
@@ -121,13 +133,12 @@ function jplcompare(des::String, orbit::AbstractOrbit)
 end
 
 @doc raw"""
-    uncertaintyparameter(od, orbit, params) where {D, T <: Real}
+    uncertaintyparameter(orbit, params) where {T <: Real}
 
 Return the Minor Planet Center uncertainty parameter.
 
 ## Arguments
 
-- `od::ODProblem{D, T}`: an orbit determination problem.
 - `orbit::AbstractOrbit{T, T}`: a priori orbit.
 - `params::Parameters{T}`: see [`Parameters`](@ref).
 
@@ -137,33 +148,17 @@ Return the Minor Planet Center uncertainty parameter.
 !!! reference
     https://www.minorplanetcenter.net/iau/info/UValue.html.
 """
-function uncertaintyparameter(od::ODProblem{D, T}, orbit::AbstractOrbit{T, T},
-    params::Parameters{T}) where {D, T <: Real}
-    # Check consistency between od and orbit
-    @assert od.tracklets == orbit.tracklets
+function uncertaintyparameter(orbit::AbstractOrbit{T, T},
+    params::Parameters{T}) where {T <: Real}
     # Set jet transport variables
     set_od_order(T, 2)
     # Reference epoch [Julian days TDB]
     t = epoch(orbit)
     jd0 = t + PE.J2000
-    # Barycentric initial conditions
-    q00 = orbit(t)
-    # Scaling factors
-    scalings = all(>(0), variances(orbit)) ? sigmas(orbit) : @. abs(q00) / 1e6
-    # Jet transport variables
-    dq = [scalings[i] * TaylorN(i, order = 2) for i in 1:6]
+    # Jet transport initial condition
+    q0 = orbit(t) + diag(orbit.J) .* get_variables(T, 2)
     # Origin
     x0 = zeros(T, 6)
-    # Initial conditions
-    q0 = q00 + dq
-    # Propagation and residuals
-    res = init_residuals(TaylorN{T}, orbit)
-    propres!(res, od, jd0, q0, params)
-    nobs = 2 * notout(res)
-    # Covariance matrix
-    Q = nms(res)
-    C = (nobs/2) * TS.hessian(Q, x0)
-    Γ = inv(C)
     # Osculating keplerian elements
     osc = pv2kep(q0 - params.eph_su(t); jd = jd0, frame = :ecliptic)
     # Semimajor axis [au], eccentricity and time of perihelion passage [julian days]
@@ -174,7 +169,7 @@ function uncertaintyparameter(od::ODProblem{D, T}, orbit::AbstractOrbit{T, T},
     P = 2π * sqrt(a^3 / μ_S)
     # Projected covariance matrix
     t_car2kep = TS.jacobian([tp, P], x0)
-    Γ_kep = t_car2kep * Γ * t_car2kep'
+    Γ_kep = t_car2kep * covariance(orbit) * t_car2kep'
     # Uncertainties
     dtp, dP = sqrt.(diag(Γ_kep))
     # Convert orbital period to years
@@ -189,7 +184,9 @@ function uncertaintyparameter(od::ODProblem{D, T}, orbit::AbstractOrbit{T, T},
 end
 
 function summary(orbit::AbstractOrbit)
-    O = typeof(orbit)
+    O = nameof(typeof(orbit))
+    T, U = numtypes(orbit)
+    D = orbit.dynamics
     Nobs, Nout = nobs(orbit), nout(orbit.res)
     Ndays = @sprintf("%.8f", numberofdays(orbit))
     t0 = epoch(orbit) + PE.J2000
@@ -199,8 +196,9 @@ function summary(orbit::AbstractOrbit)
     sq0 = [rpad(@sprintf("%+.12E", q0[i]), 25) for i in eachindex(q0)]
     sσ0 = [rpad(@sprintf("%+.12E", σ0[i]), 25) for i in eachindex(σ0)]
     s = string(
-        "$O\n",
+        "$O with numeric types ($T, $U)\n",
         repeat('-', 68), "\n",
+        "Dynamical model: $D\n",
         "Astrometry: $Nobs observations ($Nout outliers) spanning $Ndays days\n",
         "Epoch: $t0 JDTDB ($d0 TDB)\n",
         "NRMS: $Q\n",
