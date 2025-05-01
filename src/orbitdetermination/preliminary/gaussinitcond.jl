@@ -187,7 +187,7 @@ Gauss method for preliminary orbit determination.
 function gaussmethod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Real}
     # Unpack
     @unpack safegauss, gaussorder, eph_su = params
-    @unpack tracklets, radec = od
+    @unpack dynamics, tracklets, radec = od
     # Find best triplet of observations
     observatories, dates, α, δ = safegauss ? gausstriplet(tracklets) : gausstriplet(radec)
     # Julian day of middle observation
@@ -197,10 +197,10 @@ function gaussmethod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: 
     # Jet transport perturbation (ra/dec)
     dq = [scalings[i] * TaylorN(i, order = gaussorder) for i in 1:6]
     # Gauss method solutions
-    τ_1, τ_3, ρ_vec, R_vec, D_0, _D_, a, b, c, r_2s, r_vec, ρ =
+    τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2s, r_vec, ρ =
         gaussmethod(observatories, dates, α .+ dq[1:3], δ .+ dq[4:6], params)
     # Preliminary orbits
-    orbits = Vector{GaussOrbit{T, T}}(undef, length(r_2s))
+    orbits = Vector{GaussOrbit{D, T, T}}(undef, length(r_2s))
     for i in eachindex(orbits)
         # Epoch (corrected for light-time)
         jd0 = _jd0_ - cte(ρ[2, i]) / c_au_per_day
@@ -209,7 +209,7 @@ function gaussmethod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: 
         # Propagation and residuals
         bwd, fwd, res = propres(od, jd0, q0, params)
         if isempty(res)
-            orbits[i] = zero(GaussOrbit{T, T})
+            orbits[i] = zero(GaussOrbit{D, T, T})
             continue
         end
         # Current Q
@@ -221,8 +221,8 @@ function gaussmethod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: 
         # Residuals space to barycentric coordinates jacobian
         J = Matrix(TS.jacobian(q0 - cte.(q0)))
         # Update orbit
-        orbits[i] = evaldeltas(GaussOrbit(tracklets, bwd, fwd, res, Γ, J, τ_1, τ_3,
-            ρ_vec, R_vec, D_0, _D_, a, b, c, r_2s[i], r_vec[:, :, i], ρ[:, i]))
+        orbits[i] = evaldeltas(GaussOrbit(dynamics, tracklets, bwd, fwd, res, Γ, J, τ_1,
+            τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2s[i], r_vec[:, :, i], ρ[:, i]))
     end
     # Sort orbits by nms
     sort!(orbits, by = nms)
@@ -336,7 +336,7 @@ See also [`gaussmethod`](@ref).
 """
 function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Real}
     # Allocate memory for orbit
-    orbit = zero(LeastSquaresOrbit{T, T})
+    orbit = zero(LeastSquaresOrbit{D, T, T})
     # Unpack
     @unpack safegauss, significance, verbose = params
     @unpack tracklets, radec = od
