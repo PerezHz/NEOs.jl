@@ -79,7 +79,7 @@ export LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
        project, chi2, nms, nrms, leastsquares, leastsquares!, tryls, outlier_rejection!
 # AbstractOrbit
 export GaussOrbit, MMOVOrbit, LeastSquaresOrbit, epoch, minmaxdates, critical_value,
-       sigmas, snr, jplcompare, uncertaintyparameter
+       sigmas, snr, jplcompare, keplerian, uncertaintyparameter
 # Orbit determination
 export ODProblem, Parameters, mmov, gaussmethod, tsaiod, gaussiod, curvature, issinglearc,
        initialorbitdetermination, orbitdetermination

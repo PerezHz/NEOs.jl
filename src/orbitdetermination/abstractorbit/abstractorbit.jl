@@ -133,6 +133,43 @@ function jplcompare(des::String, orbit::AbstractOrbit)
 end
 
 @doc raw"""
+    keplerian(orbit, params) where {T <: Real}
+
+Return the heliocentric ecliptic keplerian osculating elements of an orbit
+at its reference epoch, as well as the projected covariance matrix.
+
+See also [`pv2kep`](@ref).
+
+## Arguments
+
+- `orbit::AbstractOrbit{T, T}`: a priori orbit.
+- `params::Parameters{T}`: see [`Parameters`](@ref).
+
+!!! warning
+    This function may change the (global) `TaylorSeries` variables.
+"""
+function keplerian(orbit::AbstractOrbit{T, T}, params::Parameters{T}) where {T <: Real}
+    # Set jet transport variables
+    set_od_order(T, 2)
+    # Reference epoch [Julian days TDB]
+    t = epoch(orbit)
+    jd0 = t + PE.J2000
+    # Jet transport initial condition
+    q0 = orbit(t) + diag(orbit.J) .* get_variables(T, 2)
+    # Origin
+    x0 = zeros(T, 6)
+    # Osculating keplerian elements
+    osc = pv2kep(q0 - params.eph_su(t); jd = jd0, frame = :ecliptic)
+    osc0 = [osc.a, osc.e, osc.i, osc.Ω, osc.ω, mod(osc.M, 360)]
+    osc00 = constant_term.(osc0)
+    # Projected covariance matrix
+    t_car2kep = TS.jacobian(osc0, x0)
+    Γ_kep = t_car2kep * covariance(orbit) * t_car2kep'
+
+    return osc00, Γ_kep
+end
+
+@doc raw"""
     uncertaintyparameter(orbit, params) where {T <: Real}
 
 Return the Minor Planet Center uncertainty parameter.
