@@ -47,6 +47,8 @@ vra(x::Tracklet) = x.v_α
 vdec(x::Tracklet) = x.v_δ
 mag(x::Tracklet) = x.mag
 nobs(x::Tracklet) = x.nobs
+nobs(x::AbstractVector{Tracklet{T}}) where {T <: Real} =
+    sum(nobs, x; init = 0)
 indices(x::Tracklet) = x.indices
 indices(x::AbstractVector{Tracklet{T}}) where {T <: Real} =
     sort!(reduce(vcat, indices.(x)))
