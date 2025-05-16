@@ -103,7 +103,7 @@ function mmov(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         J = Matrix(TS.jacobian(q - cte.(q), x1))
         # Update orbit
         orbits[t] = evaldeltas(MMOVOrbit(od.dynamics, tracklets, bwd, fwd, res,
-            Γ, J, aes[:, 1:t], Qs[1:t]), x0)
+            Γ, J, aes[:, 1:t], Qs[1:t]), x1)
         # Convergence conditions
         if t > 1
             (Qs[t-1] < Qthreshold < Qs[t]) && (Nsawtooth += 1)
