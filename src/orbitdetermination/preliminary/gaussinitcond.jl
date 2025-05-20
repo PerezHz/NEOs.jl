@@ -79,9 +79,10 @@ function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T};
 end
 
 # Check topocentric slant ranges are positive
-isphysical(orbit::GaussOrbit) = all(orbit.ρ .> 0)
+isphysical(orbit::GaussOrbit) = iszero(orbit) ? false : all(orbit.ρ .> 0)
 # Check heliocentric energy is negative
 function isclosed(orbit::GaussOrbit)
+    iszero(orbit) && return false
     # Heliocentric state vector [au, au/day]
     r = orbit.r_vec[:, 2]
     # Heliocentric energy per unit mass
@@ -370,23 +371,25 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
         # Refine via Minimization over the MOV
         j = safegauss ? 2 : closest_tracklet(epoch(porbits[i]), tracklets)
         nobs(tracklets[j]) < 2 && continue
-        porbit = mmov(od, porbits[i], j, params)
-        # MMOV failed to converge
-        iszero(porbit) && continue
-        # Jet Transport Least Squares
-        _orbit_ = jtls(od, porbit, params, true)
-        # Update orbit
-        orbit = updateorbit(orbit, _orbit_, radec)
-        # Termination condition
-        if critical_value(orbit) < significance
-            N1, N2 = length(porbit.Qs), length(orbit.Qs)
-            verbose && println(
-                "* Refinement of GaussOrbit via MMOV converged in $N1 iterations to:\n\n",
-                summary(porbit), "\n",
-                "* Jet Transport Least Squares converged in $N2 iterations to: \n\n",
-                summary(orbit)
-            )
-            return orbit
+        for scale in (:log, :linear)
+            porbit = mmov(od, porbits[i], j, scale, params)
+            # MMOV failed to converge
+            iszero(porbit) && continue
+            # Jet Transport Least Squares
+            _orbit_ = jtls(od, porbit, params, true)
+            # Update orbit
+            orbit = updateorbit(orbit, _orbit_, radec)
+            # Termination condition
+            if critical_value(orbit) < significance
+                N1, N2 = length(porbit.Qs), length(orbit.Qs)
+                verbose && println(
+                    "* Refinement of GaussOrbit via MMOV converged in $N1 iterations to:\n\n",
+                    summary(porbit), "\n",
+                    "* Jet Transport Least Squares converged in $N2 iterations to: \n\n",
+                    summary(orbit)
+                )
+                return orbit
+            end
         end
     end
     # Unsuccessful orbit determination
