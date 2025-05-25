@@ -114,36 +114,37 @@ function mmov(od::ODProblem{D, T}, i::Int, A::AdmissibleRegion{T}, ρ::T, v_ρ::
         g_t[1] = differentiate(Q, 5)(x1)
         g_t[2] = differentiate(Q, 6)(x1)
         # First momentum
-        m .= μ * m + (1 - μ) * g_t
-        _m_ .= m / (1 - μ^t)
+        @. m = μ * m + (1 - μ) * g_t
+        @. _m_ = m / (1 - μ^t)
         # Second momentum
-        n .= ν * n + (1 - ν) * g_t .^ 2
-        _n_ .= n / (1 - ν^t)
+        @. n = ν * n + (1 - ν) * g_t ^ 2
+        @. _n_ = n / (1 - ν^t)
         # Step
-        x1[5:6] = x1[5:6] - η * _m_ ./ (sqrt.(_n_) .+ ϵ)
+        @. x1[5:6] = x1[5:6] - η * _m_ / (sqrt(_n_) + ϵ)
         # Update attributable elements
         aes[:, t+1] .= AE(x1)
         # Projection
         aes[5:6, t+1] .= boundary_projection(A, aes[5, t+1], aes[6, t+1])
     end
     # Find orbit with smallest Q
-    t = argmin(Qs)
+    _, t = findmin(nms, orbits)
 
     return orbits[t]
 end
 
 @doc raw"""
-    mmov(od, gorbit, i, params) where {D, T <: Real}
+    mmov(od, orbit, i, scale, params) where {D, T <: Real}
 
-Refine a Gauss orbit via Minimization over the MOV.
+Refine an orbit via Minimization over the MOV.
 
 - `od::ODProblem{D, T}`: orbit determination problem.
-- `gorbit::AbstractOrbit{T, T}`: a priori orbit.
+- `orbit::AbstractOrbit{T, T}`: a priori orbit.
 - `i::Int`: index of reference tracklet.
+- `scale::Symbol`: horizontal scale, either `:log` or `:linear`.
 - `params::Parameters{T}`: see the `Gauss Method` and `Minimization over the MOV`
     sections of [`Parameters`](@ref).
 """
-function mmov(od::ODProblem{D, T}, orbit::O, i::Int,
+function mmov(od::ODProblem{D, T}, orbit::O, i::Int, scale::Symbol,
     params::Parameters{T}) where {D, T <: Real, O <: AbstractOrbit{T, T}}
     # Unpack parameters
     @unpack refscale = params
@@ -160,7 +161,7 @@ function mmov(od::ODProblem{D, T}, orbit::O, i::Int,
     # Boundary projection
     ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
     # Minimization over the MOV
-    orbit1 = mmov(od, i, A, ρ, v_ρ, params; scale = refscale)
+    orbit1 = mmov(od, i, A, ρ, v_ρ, params; scale)
 
     return orbit1
 end

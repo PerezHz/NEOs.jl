@@ -96,8 +96,17 @@ snr(orbit::AbstractOrbit) = abs.(orbit()) ./ sigmas(orbit)
 # Update `orbit` iff `_orbit_` is complete and has a lower nrms
 function updateorbit(orbit::AbstractOrbit{T, T}, _orbit_::AbstractOrbit{T, T},
     radec::Vector{RadecMPC{T}}) where {T <: Real}
-    if nobs(_orbit_) == length(radec)
+    L1, L2, L = nobs(orbit), nobs(_orbit_), length(radec)
+    # Both orbits are complete
+    if L1 == L2 == L
         return nrms(orbit) <= nrms(_orbit_) ? orbit : _orbit_
+    # Only orbit is complete
+    elseif L1 == L
+        return orbit
+    # Only _orbit_ is complete
+    elseif L2 == L
+        return _orbit_
+    # Neither orbit is complete
     else
         return orbit
     end
