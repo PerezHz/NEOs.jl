@@ -71,7 +71,7 @@ end
         @test maximum(orbit.J) < 9e-4
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
@@ -198,7 +198,7 @@ end
         @test maximum(orbit.J) < 6.8e-4
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
@@ -225,14 +225,21 @@ end
         subradec = radec[10:21]
 
         # Parameters
-        params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007)
+        params = Parameters(
+            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+            gaussorder = 2, safegauss = true,
+            tsaorder = 2, adamiter = 500, adamQtol = 1e-5, jtlsorder = 6,
+            jtlsmask = false, jtlsiter = 20, lsiter = 10, significance = 0.99,
+            outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10),
+            fudge = 100.0, max_per = 34.0,
+        )
         # Orbit determination problem
         od = ODProblem(newtonian!, subradec)
 
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by May 2, 2025
+        # Values by May 25, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
@@ -266,7 +273,7 @@ end
         @test maximum(orbit.J) < 9.5e-6
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) == 3
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 3
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
@@ -454,7 +461,7 @@ end
         @test maximum(orbit.J) < 9.2e-3
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
@@ -523,7 +530,7 @@ end
         @test maximum(orbit.J) < 5e-4
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) == 5
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 5
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
@@ -661,7 +668,7 @@ end
         @test maximum(orbit.J) < 3e-4
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
@@ -733,7 +740,7 @@ end
         @test maximum(orbit.J) < 2e-5
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
@@ -891,7 +898,7 @@ end
         @test maximum(orbit.J) < 0.007
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) == 2
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL

@@ -320,24 +320,26 @@ function orbitdetermination(od::ODProblem{D, T}, orbit::AbstractOrbit{T, T},
     end
     # Refine via minimization over the MOV
     j = closest_tracklet(epoch(orbit), tracklets)
-    porbit = mmov(od, orbit, j, params)
-    iszero(porbit) && return orbit1
-    # Jet Transport Least Squares
-    orbit2 = jtls(od, porbit, params, true)
-    # Termination condition
-    if (nobs(orbit2) == nobs(od) && critical_value(orbit2) < significance)
-        N1, N2 = length(porbit.Qs), length(orbit2.Qs)
-        verbose && println(
-            "* Refinement of LeastSquaresOrbit via MMOV converged in \
-            $N1 iterations to:\n\n",
-            summary(porbit), "\n",
-            "* Jet Transport Least Squares converged in $N2 iterations to: \n\n",
-            summary(orbit2)
-        )
-        return orbit2
+    for scale in (:log, :linear)
+        porbit = mmov(od, orbit, j, scale, params)
+        iszero(porbit) && continue
+        # Jet Transport Least Squares
+        orbit2 = jtls(od, porbit, params, true)
+        # Update orbit
+        orbit1 = updateorbit(orbit1, orbit2, radec)
+        # Termination condition
+        if (nobs(orbit1) == nobs(od) && critical_value(orbit1) < significance)
+            N1, N2 = length(porbit.Qs), length(orbit1.Qs)
+            verbose && println(
+                "* Refinement of LeastSquaresOrbit via MMOV converged in \
+                $N1 iterations to:\n\n",
+                summary(porbit), "\n",
+                "* Jet Transport Least Squares converged in $N2 iterations to: \n\n",
+                summary(orbit1)
+            )
+            return orbit1
+        end
     end
-    # Update orbit
-    orbit1 = updateorbit(orbit1, orbit2, radec)
     # Unsuccessful orbit determination
     verbose && @warn("Orbit determination did not converge within \
         the given parameters or could not fit all the astrometry")
