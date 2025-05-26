@@ -60,3 +60,6 @@ computing resources provided by LANCAD-UNAM-DGTIC-284.
 - Pérez-Hernández, Jorge A., & Benet, Luis. (2023).
     [PerezHz/TaylorIntegration.jl](https://github.com/PerezHzTaylorIntegration.jl):
     v0.14.2 (Version v0.14.2). Zenodo. https://doi.org/10.5281/zenodo.8104080
+- Ramírez-Montoya, L.E., Pérez-Hernández, J.A. & Benet, L. Jet transport applications to
+    the preliminary orbit determination problem. Celest Mech Dyn Astron 137, 16 (2025).
+    https://doi.org/10.1007/s10569-025-10246-2
