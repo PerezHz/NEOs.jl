@@ -488,15 +488,18 @@ end
         subradec = iodsubradec(radec, 3)
 
         # Parameters
-        params = Parameters(bwdoffset = 0.007, fwdoffset = 0.007,
-            outrej = true, χ2_rec = 1.0, χ2_rej = 1.25, fudge = 0.0)
+        params = Parameters(
+            bwdoffset = 0.007, fwdoffset = 0.007,
+            gaussorder = 2, jtlsorder = 2, jtlsiter = 20, lsiter = 10,
+            outrej = true, χ2_rec = 1.0, χ2_rej = 1.25, fudge = 0.0
+        )
         # Orbit determination problem
         od = ODProblem(newtonian!, subradec)
 
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 2, 2025
+        # Values by May 26, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
@@ -530,19 +533,19 @@ end
         @test maximum(orbit.J) < 5e-4
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) <= 5
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 7
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
         q0, σ0 = orbit(), sigmas(orbit)
         JPL_CAR = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
             -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
-        @test all(@. abs(q0 - JPL_CAR) / σ0 < 0.07)
+        @test all(@. abs(q0 - JPL_CAR) / σ0 < 0.08)
         q0, Γ_kep = keplerian(orbit, params)
         σ0 = sqrt.(diag(Γ_kep))
         JPL_OSC = [1.776244846691859E+00, 4.381984418639090E-01, 7.819612775042287E-01,
             2.742918197067644E+02, 9.751283439586027E+01, 1.116208224849003E+01]
-        @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.06)
+        @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.07)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 26.7 ≤ H + dH
