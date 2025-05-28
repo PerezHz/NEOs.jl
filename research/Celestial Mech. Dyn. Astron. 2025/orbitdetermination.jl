@@ -34,7 +34,7 @@ end
 
 @everywhere begin
     using NEOs, Dates, JLD2
-    using NEOs: AdmissibleRegion, RadecMPC, NEOSolution, reduce_tracklets,
+    using NEOs: AdmissibleRegion, RadecMPC, LeastSquaresOrbit, reduce_tracklets,
         numberofdays, issatellite, updatesol
 
     function radecfilter(radec::Vector{RadecMPC{T}}) where {T <: Real}
@@ -130,7 +130,7 @@ end
         od = ODProblem(newtonian!, radec)
         # Pre-allocate parameters and solutions
         iter = ioditer()
-        sols = [zero(NEOSolution{Float64, Float64}) for _ in 1:8]
+        sols = [zero(LeastSquaresOrbit{Float64, Float64}) for _ in 1:8]
         # Start of computation
         init_time = now()
         # Stage 1: standard initial orbit determination

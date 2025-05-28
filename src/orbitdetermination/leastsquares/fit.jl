@@ -1,7 +1,3 @@
-include("methods.jl")
-include("targetfunctions.jl")
-include("outlierrejection.jl")
-
 @doc raw"""
     LeastSquaresFit{T} <: AbstractLeastSquares{T}
 
