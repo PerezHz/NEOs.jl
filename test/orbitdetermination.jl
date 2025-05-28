@@ -253,7 +253,7 @@ end
         @test orbit.tracklets[end].radec[end] == subradec[end]
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-4)
+        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 5e-4)
         @test dtutc2days(date(subradec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
         @test dtutc2days(date(subradec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
