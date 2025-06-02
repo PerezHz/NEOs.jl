@@ -35,7 +35,7 @@ end
 @everywhere begin
     using NEOs, Dates, JLD2
     using NEOs: AdmissibleRegion, RadecMPC, LeastSquaresOrbit, reduce_tracklets,
-        numberofdays, issatellite, updatesol
+        numberofdays, issatellite, updateorbit
 
     function radecfilter(radec::Vector{RadecMPC{T}}) where {T <: Real}
         # Eliminate observations before oficial discovery
@@ -126,11 +126,14 @@ end
         # Get at most 3 tracklets for orbit determination
         flag, radec = radecfilter(radec)
         !flag && return false
+        # Dynamical model
+        dynamics = newtonian!
+        D = typeof(dynamics)
         # Orbit determination problem
-        od = ODProblem(newtonian!, radec)
+        od = ODProblem(dynamics, radec)
         # Pre-allocate parameters and solutions
         iter = ioditer()
-        sols = [zero(LeastSquaresOrbit{Float64, Float64}) for _ in 1:8]
+        sols = [zero(LeastSquaresOrbit{D, Float64, Float64}) for _ in 1:8]
         # Start of computation
         init_time = now()
         # Stage 1: standard initial orbit determination
@@ -138,7 +141,7 @@ end
             # Unfold
             params, initcond = j
             # Initial orbit determination
-            sols[i] = orbitdetermination(od, params; initcond)
+            sols[i] = initialorbitdetermination(od, params; initcond)
             # Termination condition
             if length(sols[i].res) == length(radec) &&
                 critical_value(sols[i]) < params.significance
@@ -155,7 +158,7 @@ end
             params, initcond = j
             # Initial orbit determination
             subfit!(od) || break
-            sols[i+4] = orbitdetermination(od, params; initcond)
+            sols[i+4] = initialorbitdetermination(od, params; initcond)
             NEOs.update!(od, radec)
             # Add remaining observations
             iszero(sols[i+4]) && continue
@@ -178,7 +181,7 @@ end
             params = Parameters(params; fudge = 0.0, max_per = 34.0)
             # Retry orbit determination with lower rejection threshold
             sol = orbitdetermination(od, sols[i], params)
-            sols[i] = updatesol(sols[i], sol, radec)
+            sols[i] = updateorbit(sols[i], sol, radec)
             # Termination condition
             if length(sols[i].res) == length(radec) &&
                 critical_value(sols[i]) < params.significance
