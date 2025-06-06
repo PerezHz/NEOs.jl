@@ -197,7 +197,7 @@ function _propagate(
     # Update reference epoch
     dparams.jd0 = jd0
     # Propagate orbit
-    @time sol = taylorinteg!(Val(true), dynamics, q0, zero(T), tspan * yr, abstol,
+    sol = taylorinteg!(Val(true), dynamics, q0, zero(T), tspan * yr, abstol,
         cache, dparams; maxsteps)
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
@@ -248,7 +248,7 @@ function _propagate_root(
     # Update reference epoch
     dparams.jd0 = jd0
     # Propagate orbit
-    @time sol = taylorinteg!(Val(true), dynamics, rvelea, q0, zero(T), tspan * yr,
+    sol = taylorinteg!(Val(true), dynamics, rvelea, q0, zero(T), tspan * yr,
         abstol, cache, dparams; maxsteps, eventorder, newtoniter, nrabstol)
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
@@ -281,8 +281,8 @@ function propagate_lyap(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
     @unpack order, abstol, maxsteps = params
     @unpack dparams = buffer
     # Propagate orbit
-    @time sol = lyap_taylorinteg(dynamics, q0, zero(T), tspan * yr, order,
-          abstol, dparams; maxsteps)
+    sol = lyap_taylorinteg(dynamics, q0, zero(T), tspan * yr, order,
+        abstol, dparams; maxsteps)
 
     return sol.t, sol.x, sol.λ
 end

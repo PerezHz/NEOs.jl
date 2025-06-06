@@ -98,12 +98,12 @@ function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
         # Reject
         if χ2s[i] > χ2_rej && N_drop < max_drop && !mask[i]
             res[i] = OpticalResidual(res[i].ξ_α, res[i].ξ_δ, res[i].w_α,
-                res[i].w_δ, true)
+                res[i].w_δ, res[i].μ_α, res[i].μ_δ, true)
             N_drop += 1
         # Recover
         elseif χ2s[i] < χ2_rec && mask[i]
             res[i] = OpticalResidual(res[i].ξ_α, res[i].ξ_δ, res[i].w_α,
-                res[i].w_δ, false)
+                res[i].w_δ, res[i].μ_α, res[i].μ_δ, false)
             N_drop -= 1
         end
     end

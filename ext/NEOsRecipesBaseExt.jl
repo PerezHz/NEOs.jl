@@ -2,7 +2,7 @@ module NEOsRecipesBaseExt
 
 using RecipesBase
 using PlanetaryEphemeris: TaylorInterpolant
-using NEOs: OpticalResidual, AdmissibleRegion, NEOSolution, cte, ra, dec, arboundary
+using NEOs: OpticalResidual, AdmissibleRegion, LeastSquaresOrbit, cte, ra, dec, arboundary
 
 @recipe function f(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
     seriestype --> :scatter
@@ -20,7 +20,8 @@ end
 end
 
 @recipe function f(sol::U, t0::T, tf::T; N::Int = 100,
-                   projection::Symbol = :xyz) where {T <: Real, U <: Union{TaylorInterpolant, NEOSolution}}
+        projection::Symbol = :xyz) where {T <: Real,
+        U <: Union{TaylorInterpolant, LeastSquaresOrbit}}
     seriestype --> :path
     ts = LinRange(t0, tf, N)
     rvs = Matrix{T}(undef, 6, N)
