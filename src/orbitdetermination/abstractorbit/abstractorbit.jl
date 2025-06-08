@@ -91,7 +91,8 @@ sigmas(orbit::AbstractOrbit) = map(x -> x < 0 ? NaN * x : sqrt(x), variances(orb
 Return the signal-to-noise ratios in barycentric cartesian
 coordinates at the reference epoch.
 """
-snr(orbit::AbstractOrbit) = abs.(orbit()) ./ sigmas(orbit)
+snr(orbit::AbstractOrbit{T, U}) where {T, U} = iszero(orbit) ? Vector{U}(undef, 0) :
+    abs.(orbit()) ./ sigmas(orbit)
 
 # Update `orbit` iff `_orbit_` is complete and has a lower nrms
 function updateorbit(orbit::AbstractOrbit{T, T}, _orbit_::AbstractOrbit{T, T},
