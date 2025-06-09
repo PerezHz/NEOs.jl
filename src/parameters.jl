@@ -1,9 +1,13 @@
 @doc raw"""
     Parameters([params::Parameters{T};] kwargs...) where {T <: Real}
 
-Parameters for all orbit determination functions.
+A collection of the most important parameters in `NEOs.jl` functions.
 
-## Propagation Parameters
+## Common
+
+-  `verbose::Bool`: whether to print output or not (default: `true`).
+
+## Propagation
 
 - `maxsteps::Int`: maximum number of steps for the integration (default: `500`).
 - `μ_ast::Vector{T}`: vector of gravitational parameters
@@ -17,7 +21,7 @@ Parameters for all orbit determination functions.
     (default: `0.5`).
 - `coeffstol::T`: maximum size of the coefficients (default: `10.0`).
 
-## Gauss Method Parameters
+## Gauss Method
 
 - `safegauss::Bool`: whether to try Gauss Method only when exactly three tracklets
     are available (default: `true`).
@@ -25,7 +29,7 @@ Parameters for all orbit determination functions.
     orbit (default: `:log`).
 - `gaussorder::Int`: order of the jet transport perturbation (default: `6`).
 
-## Too Short Arc Parameters
+## Minimization over the MOV
 
 - `H_max::T`: maximum absolute magnitude (default: `34.5`).
 - `a_max::T`: maximum semimajor axis (default: `100.0`).
@@ -35,7 +39,7 @@ Parameters for all orbit determination functions.
 - `adamQtol::T`: target function relative tolerance (default: `0.001`).
 - `tsaorder::Int`: order of the jet transport perturbation (default: `6`).
 
-## Jet Transport Least Squares Parameters
+## Least Squares
 
 - `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `5`).
 - `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
@@ -44,7 +48,7 @@ Parameters for all orbit determination functions.
 - `jtlsmask::Bool`: whether to use `isjtlsfit` to skip bad-conditioned
     preliminary orbits in `jtls` (default: `true`).
 
-## Outlier Rejection Parameters
+## Outlier Rejection
 
 - `outrej::Bool`: whether to perform outlier rejection during least squares
     iterations (default: `false`).
@@ -54,7 +58,9 @@ Parameters for all orbit determination functions.
 - `max_per::T`: maximum allowed rejection percentage (default: `10.0`).
 """
 @with_kw struct Parameters{T <: Real}
-    # Propagation Parameters
+    # Common
+    verbose::Bool = true
+    # Propagation
     maxsteps::Int = 500
     μ_ast::Vector{T} = μ_ast343_DE430[1:end]
     order::Int = 25
@@ -66,24 +72,24 @@ Parameters for all orbit determination functions.
     # Sun (earth) ephemeris
     eph_su::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephsu()
     eph_ea::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephea()
-    # Gauss' Method Parameters
+    # Gauss' Method
     safegauss::Bool = true
     refscale::Symbol = :log
     gaussorder::Int = 6
-    # Too Short Arc Parameters
+    # Minimization over the MOV
     H_max::T = 34.5
     a_max::T = 100.0
     adamiter::Int = 200
     adammode::Bool = true
     adamQtol::T = 0.001
     tsaorder::Int = 6
-    # Jet Transport Least Squares Parameters
+    # Least Squares
     lsiter::Int = 5
     jtlsiter::Int = 5
     jtlsorder::Int = 6
     significance::T = 0.99
     jtlsmask::Bool = true
-    # Outlier Rejection Parameters
+    # Outlier Rejection
     outrej::Bool = false
     χ2_rec::T = 7.0
     χ2_rej::T = 8.0

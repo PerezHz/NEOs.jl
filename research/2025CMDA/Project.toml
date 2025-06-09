@@ -18,4 +18,4 @@ TaylorSeries = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
 XML = "72c71f33-b9b6-44de-8c94-c961784809e2"
 
 [compat]
-NEOs = "0.11"
+NEOs = "0.14"

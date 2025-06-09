@@ -16,7 +16,7 @@ Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
 - [Luis Benet](http://www.cicc.unam.mx/~benet/),
 Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
 - [Luis Eduardo Ramírez Montoya](https://github.com/LuEdRaMo),
-Facultad de Ciencias, Universidad Nacional Autónoma de México (UNAM)
+Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
 
 ## Installation
 
@@ -50,7 +50,7 @@ The `--help` option can be passed to see a list of the customizable settings
 
 ## Acknowledgments
 
-We acknowledge financial support from UNAM-PAPIIT grant IG100819 and IG-101122, as well as
+We acknowledge financial support from UNAM-PAPIIT grants IG100819 and IG-101122, as well as
 computing resources provided by LANCAD-UNAM-DGTIC-284.
 
 ## References

@@ -1,6 +1,6 @@
 using ArgParse, NEOs, JLD2, StatsBase, Dates
 using Plots, LaTeXStrings, Measures, Printf, PrettyTables
-using NEOs: NEOSolution, numberofdays
+using NEOs: LeastSquaresOrbit, numberofdays
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -111,53 +111,54 @@ function main()
     neos1 = readlines(joinpath(input1, "names.txt"))
     neos2 = readlines(joinpath(input2, "names.txt"))
     # Load orbits
-    sols1 = map(neos1) do neo
+    D = typeof(newtonian!)
+    orbits1 = map(neos1) do neo
         filename = joinpath(input1, replace(neo, " " => "") * ".jld2")
-        !isfile(filename) && return zero(NEOSolution{Float64, Float64})
+        !isfile(filename) && return zero(LeastSquaresOrbit{D, Float64, Float64})
         return JLD2.load(filename, "sol")
     end
-    sols2 = map(neos2) do neo
+    orbits2 = map(neos2) do neo
         filename = joinpath(input2, replace(neo, " " => "") * ".jld2")
-        !isfile(filename) && return zero(NEOSolution{Float64, Float64})
+        !isfile(filename) && return zero(LeastSquaresOrbit{D, Float64, Float64})
         return JLD2.load(filename, "sol")
     end
     # Load convergence flags
     F1 = map(neos1) do neo
         filename = joinpath(input1, replace(neo, " " => "") * ".jld2")
-        !isfile(filename) && return zero(NEOSolution{Float64, Float64})
+        !isfile(filename) && return 13
         return JLD2.load(filename, "i")
     end
     F2 = map(neos2) do neo
         filename = joinpath(input2, replace(neo, " " => "") * ".jld2")
-        !isfile(filename) && return zero(NEOSolution{Float64, Float64})
+        !isfile(filename) && return 13
         return JLD2.load(filename, "i")
     end
 
     # NRMS
-    Q1, Q2 = @. nrms(sols1), nrms(sols2)
+    Q1, Q2 = @. nrms(orbits1), nrms(orbits2)
     # Chi-squared critical values
-    C1, C2 = @. critical_value(sols1), critical_value(sols2)
+    C1, C2 = @. critical_value(orbits1), critical_value(orbits2)
     # SNR
-    S1, S2 = @. minimum(snr(sols1)), minimum(snr(sols2))
+    S1, S2 = @. minimum(snr(orbits1); init = Inf), minimum(snr(orbits2); init = Inf)
     # Minimization routines
-    R1, R2 = map(s -> s.fit.routine, sols1), map(s -> s.fit.routine, sols2)
+    R1, R2 = map(s -> s.fit.routine, orbits1), map(s -> s.fit.routine, orbits2)
     # NEOs that converged within 0.99 confidence
     mask1 = @. (C1 ≤ 0.99) && !isinf(S1) && (F1 ≤ 4)
     mask2 = @. (C2 ≤ 0.99) && !isinf(S2) && (F2 ≤ 4)
     # Right ascension and declination residuals
-    αs1 = reduce(vcat, map(sols1[mask1]) do s
+    αs1 = reduce(vcat, map(orbits1[mask1]) do s
         m = @. !isoutlier(s.res)
         return @. ra(s.res[m])
     end)
-    δs1 = reduce(vcat, map(sols1[mask1]) do s
+    δs1 = reduce(vcat, map(orbits1[mask1]) do s
         m = @. !isoutlier(s.res)
         return @. dec(s.res[m])
     end)
-    αs2 = reduce(vcat, map(sols2[mask2]) do s
+    αs2 = reduce(vcat, map(orbits2[mask2]) do s
         m = @. !isoutlier(s.res)
         return @. ra(s.res[m])
     end)
-    δs2 = reduce(vcat, map(sols2[mask2]) do s
+    δs2 = reduce(vcat, map(orbits2[mask2]) do s
         m = @. !isoutlier(s.res)
         return @. dec(s.res[m])
     end)
@@ -177,10 +178,10 @@ function main()
         " have a minimal SNR lower that 1")
     println("In sample 2: ", p2, " of the NEOs within 99% confidence",
         " have a minimal SNR lower that 1")
-    m1 = @sprintf("%.2f", mean(numberofdays(s.tracklets) for s in sols1[mask1]))
-    m1S = @sprintf("%.2f", mean(numberofdays(s.tracklets) for s in sols1[mask1S]))
-    m2 = @sprintf("%.2f", mean(numberofdays(s.tracklets) for s in sols2[mask2]))
-    m2S = @sprintf("%.2f", mean(numberofdays(s.tracklets) for s in sols2[mask2S]))
+    m1 = @sprintf("%.2f", mean(numberofdays(s.tracklets) for s in orbits1[mask1]))
+    m1S = @sprintf("%.2f", mean(numberofdays(s.tracklets) for s in orbits1[mask1S]))
+    m2 = @sprintf("%.2f", mean(numberofdays(s.tracklets) for s in orbits2[mask2]))
+    m2S = @sprintf("%.2f", mean(numberofdays(s.tracklets) for s in orbits2[mask2S]))
     println("On average, the observations used in sample 1 span a time of ",
         m1, " days for the NEOs under 99% confidence, but only ", m1S,
         " days for the NEOs with a minimal SNR smaller than 1")
@@ -189,13 +190,13 @@ function main()
         " days for the NEOs with a minimal SNR smaller than 1")
     # Minimization routines
     fs1 = countmap(R1[mask1])
-    n1 = @sprintf("%.2f", (fs1[Symbol("Newton")]*100/count(mask1)))
-    d1 = @sprintf("%.2f", (fs1[Symbol("Differential Corrections")]*100/count(mask1)))
-    l1 = @sprintf("%.2f", (fs1[Symbol("Levenberg-Marquardt")]*100/count(mask1)))
+    n1 = @sprintf("%.2f", (fs1[Newton{Float64}]*100/count(mask1)))
+    d1 = @sprintf("%.2f", (fs1[DifferentialCorrections{Float64}]*100/count(mask1)))
+    l1 = @sprintf("%.2f", (fs1[LevenbergMarquardt{Float64}]*100/count(mask1)))
     fs2 = countmap(R2[mask2])
-    n2 = @sprintf("%.2f", (fs2[Symbol("Newton")]*100/count(mask2)))
-    d2 = @sprintf("%.2f", (fs2[Symbol("Differential Corrections")]*100/count(mask2)))
-    l2 = @sprintf("%.2f", (fs2[Symbol("Levenberg-Marquardt")]*100/count(mask2)))
+    n2 = @sprintf("%.2f", (fs2[Newton{Float64}]*100/count(mask2)))
+    d2 = @sprintf("%.2f", (fs2[DifferentialCorrections{Float64}]*100/count(mask2)))
+    l2 = @sprintf("%.2f", (fs2[LevenbergMarquardt{Float64}]*100/count(mask2)))
     println("• Minimization routines statistics: ")
     println("Sample 1: Newton (", n1, "%), Differential Corrections (",
         d1, "%) and Levenberg-Marquardt (", l1, "%)")

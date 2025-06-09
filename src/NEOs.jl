@@ -2,7 +2,7 @@ module NEOs
 
 # __precompile__(false)
 
-import Base: show, string, isless, convert, zero, iszero, isnan, in, min
+import Base: show, string, isless, convert, zero, iszero, isnan, in, summary
 import Tables: istable, rowaccess, rows, schema, Schema
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import JLD2: writeas
@@ -65,7 +65,7 @@ export nobs, astrometry, datediff
 export UniformWeights, Veres17, ADESWeights, NEOCCWeights, NEODyS2Weights
 export Farnocchia15, Eggl20, ZeroDebiasing, NEOCCDebiasing, NEODyS2Debiasing
 # Optical astrometry processing
-export compute_radec, unfold, residuals, isoutlier
+export unfold, wra, wdec, μra, μdec, isoutlier, compute_radec, residuals
 # Radar astrometry processing
 export compute_delay, radar_astrometry
 # Asteroid dynamical models
@@ -76,19 +76,15 @@ export propagate, propagate_lyap, propagate_root
 export pv2kep, yarkp2adot
 # Least squares
 export LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
-       project, chi2, nms, nrms, leastsquares, leastsquares!, tryls
-# NEOSolution
-export epoch, sigmas, snr, critical_value, jplcompare, uncertaintyparameter
-# Too Short Arc
-export tsaiod
-# Gauss method
-export gauss_method, gaussiod
+       project, chi2, nms, nrms, leastsquares, leastsquares!, tryls, outlier_rejection!
+# AbstractOrbit
+export GaussOrbit, MMOVOrbit, LeastSquaresOrbit, epoch, minmaxdates, critical_value,
+       sigmas, snr, jplcompare, keplerian, uncertaintyparameter
 # Orbit determination
-export Parameters, ODProblem, curvature, issinglearc, orbitdetermination
+export ODProblem, Parameters, mmov, gaussmethod, tsaiod, gaussiod, curvature, issinglearc,
+       initialorbitdetermination, orbitdetermination
 # B plane
 export valsecchi_circle, bopik, mtp
-# Outlier rejection
-export outlier_rejection!
 # Magnitude
 export absolutemagnitude
 

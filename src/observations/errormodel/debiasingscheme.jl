@@ -36,8 +36,7 @@ mutable struct Farnocchia15{T} <: AbstractDebiasingScheme{T}
     # Default constructor
     function Farnocchia15(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
         catcodes, truth, resol, table = select_debiasing_table("2014")
-        bias = debiasing.(radec, Ref(catcodes), Ref(truth),
-            Ref(resol), Ref(table))
+        bias = debiasing(radec, catcodes, truth, resol, table)
         return new{T}(bias, catcodes, truth, resol, table)
     end
 end
@@ -48,8 +47,7 @@ getid(::Farnocchia15) = "Farnocchia et al. (2015)"
 # Override update!
 function update!(d::Farnocchia15{T},
     radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
-    d.bias = debiasing.(radec, Ref(d.catcodes), Ref(d.truth),
-    Ref(d.resol), Ref(d.table))
+    d.bias = debiasing(radec, d.catcodes, d.truth, d.resol, d.table)
     return nothing
 end
 
@@ -73,8 +71,7 @@ mutable struct Eggl20{T} <: AbstractDebiasingScheme{T}
         hires::Bool = false) where {T <: Real}
         id = hires ? "hires2018" : "2018"
         catcodes, truth, resol, table = select_debiasing_table(id)
-        bias = debiasing.(radec, Ref(catcodes), Ref(truth),
-            Ref(resol), Ref(table))
+        bias = debiasing(radec, catcodes, truth, resol, table)
         return new{T}(bias, hires, catcodes, truth, resol, table)
     end
 end
@@ -86,8 +83,7 @@ getid(d::Eggl20) = string("Eggl et al. (2020)", d.hires ?
 # Override update!
 function update!(d::Eggl20{T},
     radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
-    d.bias = debiasing.(radec, Ref(d.catcodes), Ref(d.truth),
-    Ref(d.resol), Ref(d.table))
+    d.bias = debiasing(radec, d.catcodes, d.truth, d.resol, d.table)
     return nothing
 end
 
@@ -148,24 +144,53 @@ function select_debiasing_table(id::String = "2018")
 end
 
 @doc raw"""
-    debiasing(obs::RadecMPC{T}, catcodes::Vector{String}, truth::String,
+    debiasing(obs::AbstractVector{RadecMPC{T}}, catcodes::Vector{String}, truth::String,
         resol::Resolution, table::Matrix{T}) where {T <: Real}
 
-Return total debiasing correction [arcsec] in both right ascension and declination.
+Return the total debiasing correction (in arcsec) in both right ascension and declination,
+for each element of a vector of optical astrometry.
 
 ## Arguments
 
-- `obs::RadecMPC{T}`: optical observation.
+- `obs::AbstractVector{RadecMPC{T}}`: optical astrometry.
 - `catcodes::Vector{String}`: catalogues present in debiasing table.
 - `truth::String`: truth catalogue of debiasing table.
 - `resol::Resolution`: resolution.
 - `table::Matrix{T}`: debiasing table.
 """
+function debiasing(obs::AbstractVector{RadecMPC{T}}, catcodes::Vector{String},
+    truth::String, resol::Resolution, table::Matrix{T}) where {T <: Real}
+    # Allocate memory
+    bias = Vector{Tuple{T, T}}(undef, length(obs))
+    warncodes = Vector{Int}(undef, length(obs))
+    # Fill
+    for i in eachindex(obs)
+        bias[i], warncodes[i] = debiasing(obs[i], catcodes, truth, resol, table)
+    end
+    # Print warnings
+    I1 = findall(==(1), warncodes)
+    N1, C1 = length(I1), unique!(catalogue.(obs[I1]))
+    !isempty(I1) && @warn "Catalogues $C1 not found in the debiasing table.\n\
+        Setting debiasing corrections equal to zero in $N1 observations."
+    I2 = findall(==(2), warncodes)
+    N2, C2 = length(I2), unique!(catalogue.(obs[I2]))
+    !isempty(I2) && @warn "Catalogues $C2 not available in the observation record.\n\
+        Setting debiasing corrections equal to zero in $N2 observations."
+    I3 = findall(==(3), warncodes)
+    N3, C3 = length(I3), unique!(catalogue.(obs[I3]))
+    !isempty(I3) && @warn "Catalogues $C3 do not correspond to an MPC catalogue code.\n\
+        Setting debiasing corrections equal to zero in $N3 observations."
+
+    return bias
+end
+
 function debiasing(obs::RadecMPC{T}, catcodes::Vector{String},
     truth::String, resol::Resolution, table::Matrix{T}) where {T <: Real}
 
     # Catalogue code
     catcode = obs.catalogue.code
+    # Warning code
+    warncode = 0
 
     # If star catalogue is not present in debiasing table,
     # then set corrections equal to zero
@@ -174,18 +199,13 @@ function debiasing(obs::RadecMPC{T}, catcodes::Vector{String},
         if !isunknown(obs.catalogue)
             # Truth catalogue is not present in debiasing table
             # but it does not send a warning
-            if catcode != truth
-                @warn "Catalogue $(obs.catalogue.name) not found in debiasing table. \
-                Setting debiasing corrections equal to zero."
-            end
+            warncode = catcode == truth ? 0 : 1
         # Unknown catalogue
         elseif catcode == ""
-            @warn "Catalog information not available in observation record. \
-            Setting debiasing corrections equal to zero."
+            warncode = 2
         # Catalogue code is not empty but it does not match an MPC catalogue code either
         else
-            @warn "Catalog code $catcode does not correspond to MPC catalogue code. \
-            Setting debiasing corrections equal to zero."
+            warncode = 3
         end
         α_corr, δ_corr = zero(T), zero(T)
     # If star catalogue is present in debiasing table, then compute corrections
@@ -224,13 +244,8 @@ function debiasing(obs::RadecMPC{T}, catcodes::Vector{String},
         δ_corr = dDEC + yrs_J2000_tt*pmDEC/1_000
     end
 
-    return α_corr, δ_corr
+    return (α_corr, δ_corr), warncode
 end
-
-debiasing(obs::RadecMPC{T}, catcodes::RefValue{Vector{String}},
-    truth::RefValue{String}, resol::RefValue{Resolution},
-    table::RefValue{Matrix{T}}) where {T <: Real} =
-    debiasing(obs, catcodes[], truth[], resol[], table[])
 
 @doc raw"""
     ZeroDebiasing{T} <: AbstractDebiasingScheme{T}
