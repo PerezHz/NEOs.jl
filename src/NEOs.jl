@@ -1,17 +1,24 @@
 module NEOs
 
 # __precompile__(false)
+import Base: show, isless, string
 
-import Base: show, string, isless, convert, zero, iszero, isnan, in, summary
+
+import Base: convert, zero, iszero, isnan, in, summary
 import Tables: istable, rowaccess, rows, schema, Schema
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import JLD2: writeas
 import PlanetaryEphemeris as PE
 
-using Dates, InteractiveUtils, LazyArtifacts, LinearAlgebra, Printf, JSON,
+using AutoHashEquals, Dates, HTTP, JSON, Printf, Scratch, XML
+
+using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
+using StaticArraysCore: SVector
+
+
+using InteractiveUtils, LazyArtifacts, LinearAlgebra,
       TaylorSeries, SatelliteToolboxTransformations, TaylorIntegration,
-      SPICE, JLD2, Scratch, HTTP
-using AutoHashEquals.Compat
+      SPICE, JLD2
 using Base: RefValue
 using Dates: epochms2datetime
 using Distributions: Chisq, cdf
@@ -36,19 +43,19 @@ using Parameters: @with_kw, @unpack
 
 # Constants
 export d_EM_km, d_EM_au
-# CatalogueMPC
-export unknowncat, read_catalogues_mpc, write_catalogues_mpc, update_catalogues_mpc,
-       search_cat_code
-# ObservatoryMPC
-export unknownobs, hascoord, read_observatories_mpc, write_observatories_mpc,
-       update_observatories_mpc, search_obs_code
-# RadecMPC
-export ra, dec, date, observatory, read_radec_mpc, write_radec_mpc, get_radec_mpc,
-       fetch_radec_mpc
-# RadarJPL
-export hasdelay, hasdoppler, delay, doppler, rcvr, xmit, read_radar_jpl, write_radar_jpl
-# NEOCPObject
-export fetch_objects_neocp, get_radec_neocp, fetch_radec_neocp, get_orbits_neocp
+# Minor bodies astrometry interface
+export MPC, NEOCP, NEOCC, NEODyS2, JPL
+export unpacknum, packnum, unpackdesig, packdesig, date, ra, dec, observatory
+export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
+export update_observatories_mpc, search_observatory_code, fetch_observatory_information
+export fetch_optical_mpc80, read_optical_mpc80, write_optical_mpc80
+export fetch_neocp_objects, read_neocp_objects, write_neocp_objects
+export fetch_optical_rwo, read_optical_rwo, write_optical_rwo
+export fetch_optical_ades, read_optical_ades, write_optical_ades
+export fetch_radar_jpl, read_radar_jpl, write_radar_jpl
+export fetch_radar_rwo, read_radar_rwo, write_radar_rwo
+
+#=
 # Units
 export julian2etsecs, etsecs2julian, dtutc2et, dtutc2jdtdb, et2dtutc, jdtdb2dtutc,
        et_to_200X, days_to_200X, dtutc_to_200X, dtutc2days, days2dtutc,
@@ -87,14 +94,16 @@ export ODProblem, Parameters, mmov, gaussmethod, tsaiod, gaussiod, curvature, is
 export valsecchi_circle, bopik, mtp
 # Magnitude
 export absolutemagnitude
+=#
 
 include("constants.jl")
 include("parameters.jl")
-include("observations/observations.jl")
-include("propagation/propagation.jl")
-include("orbitdetermination/orbitdetermination.jl")
-include("postprocessing/bplane.jl")
+include("astrometry/astrometry.jl")
+# include("observations/observations.jl")
+# include("propagation/propagation.jl")
+# include("orbitdetermination/orbitdetermination.jl")
+# include("postprocessing/bplane.jl")
 include("init.jl")
-include("deprecated.jl")
+# include("deprecated.jl")
 
 end

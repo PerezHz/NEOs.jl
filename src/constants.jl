@@ -3,7 +3,176 @@
 # Path to NEOs src directory
 const src_path = dirname(pathof(NEOs))
 # Path to scratch space
-const scratch_path = Ref{String}("")
+const SCRATCH_PATH = Ref{String}("")
+
+## Minor bodies astrometry interface
+
+# Characters for MPC base 62 encoding
+const BASE_62_ENCODING = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+# CatalogueMPC
+
+# See https://github.com/IAU-ADES/ADES-Master/blob/83c7232d5a019c36244363cf3c7bcdeb3f10af6e/Python/bin/packUtil.py#L184
+const CATALOGUE_MPC_CODES_TO_NAMES = Dict(
+    ' ' => "UNK",
+    'a' => "USNOA1",
+    'b' => "USNOSA1",
+    'c' => "USNOA2",
+    'd' => "USNOSA2",
+    'e' => "UCAC1",
+    'f' => "Tyc1",
+    'g' => "Tyc2",
+    'h' => "GSC1.0",
+    'i' => "GSC1.1",
+    'j' => "GSC1.2",
+    'k' => "GSC2.2",
+    'l' => "ACT",
+    'm' => "GSCACT",
+    'n' => "SDSS8",
+    'o' => "USNOB1",
+    'p' => "PPM",
+    'q' => "UCAC4",
+    'r' => "UCAC2",
+    's' => "USNOB2",  # USNOB2 missing on ADES web page
+    't' => "PPMXL",
+    'u' => "UCAC3",
+    'v' => "NOMAD",
+    'w' => "CMC14",
+    'x' => "Hip2",
+    'y' => "Hip1",
+    'z' => "GSC",
+    'A' => "AC",
+    'B' => "SAO1984",
+    'C' => "SAO",
+    'D' => "AGK3",
+    'E' => "FK4",
+    'F' => "ACRS",
+    'G' => "LickGas",
+    'H' => "Ida93",
+    'I' => "Perth70",
+    'J' => "COSMOS",
+    'K' => "Yale",
+    'L' => "2MASS",
+    'M' => "GSC2.3",
+    'N' => "SDSS7",
+    'O' => "SSTRC1",
+    'P' => "MPOSC3",
+    'Q' => "CMC15",
+    'R' => "SSTRC4",
+    'S' => "URAT1",
+    'T' => "URAT2",  # URAT2 missing on ADES web page
+    'U' => "Gaia1",
+    'V' => "Gaia2",
+    'W' => "Gaia3",
+    'X' => "Gaia3E",
+    'Y' => "UCAC5",
+    'Z' => "ATLAS2",
+    '0' => "IHW",
+    '1' => "PS1_DR1",
+    '2' => "PS1_DR2",
+    '3' => "Gaia_Int",
+    '4' => "GZ",
+    '5' => "UBSC",
+    '6' => "Gaia2016",
+)
+
+const CATALOGUE_MPC_NAMES_TO_CODES = Dict(value => key for (key, value) in CATALOGUE_MPC_CODES_TO_NAMES)
+
+const CATALOGUES_MPC_FILE_URL = "https://www.minorplanetcenter.net/iau/info/astCat_photCat.json"
+
+# ObservatoryMPC
+
+const OBSERVATORIES_MPC_API = "https://data.minorplanetcenter.net/api/obscodes"
+
+# OpticalMPC80
+
+const MPC80_OPTICAL_COLUMNS = [
+    1:5, 6:12, 13:13, 14:14, 15:15, 16:32, 33:44,
+    45:56, 57:65, 66:70, 71:71, 72:72, 73:77, 78:80
+]
+const OBSERVATIONS_MPC_API = "https://data.minorplanetcenter.net/api/get-obs"
+
+const OBSERVATIONS_NEOCP_API = "https://data.minorplanetcenter.net/api/get-obs-neocp"
+
+# NEOCPObject
+
+const NEOCP_OBJECT_COLUMNS = [
+    1:7, 9:11, 13:25, 26:34, 35:42, 44:47,
+    49:69, 79:82, 83:89, 90:94, 95:101
+]
+
+# NEO Confirmation Page File URL
+const NEOCP_OBJECTS_FILE_URL = "https://www.minorplanetcenter.net/iau/NEO/neocp.txt"
+
+# OpticalRWO
+
+const RWO_OPTICAL_HEADER = """
+! Object   Obser ============= Date ============= ================== Right Ascension =================  ================= Declination ===================== ==== Magnitude ==== Ast Obs  Residual SEL
+! Design   K T N YYYY MM DD.dddddddddd   Accuracy HH MM SS.sss  Accuracy      RMS  F     Bias    Resid sDD MM SS.ss  Accuracy      RMS  F     Bias    Resid Val  B   RMS  Resid Cat Cod       Chi A M
+"""
+
+const RWO_OPTICAL_COLUMNS = [
+    1:11, 12:12, 14:14, 16:16, 18:38, 41:49, 51:62, 65:73, 74:82, 84:84, 88:93,
+    97:102, 104:115, 118:126, 127:135, 137:137, 141:146, 147:155, 157:161, 162:162,
+    163:170, 171: 176, 177:180, 181:183, 184:193, 195:195, 197:197
+]
+
+# NEOCC main webpage
+const NEOCC_URL = "https://neo.ssa.esa.int/"
+# NEOCC Observations API url
+const OBSERVATIONS_NEOCC_API = NEOCC_URL * "PSDB-portlet/download?file="
+
+# NEODyS-2 main webpage
+const NEODyS2_URL = "https://newton.spacedys.com/neodys/"
+# NEODyS-2 Observations API url
+const OBSERVATIONS_NEODyS2_API = "https://newton.spacedys.com/~neodys2/mpcobs/"
+
+# RadarJPL
+
+const JPL_TO_MPC_OBSCODES = Dict(
+    "-1"  => "251", # Arecibo
+    "-2"  => "254",	# Haystack
+    "-9"  => "256",	# Green Bank (GBT)
+    "-13" => "252",	# DSS 13
+    "-14" => "253",	# DSS 14
+    "-25" => "257",	# DSS 25
+    "-38" => "255",	# Evpatoria
+    "-73" => "259",	# EISCAT Tromso UHF (32-m)
+)
+
+const MPC_TO_JPL_OBSCODES = Dict(value => key for (key, value) in JPL_TO_MPC_OBSCODES)
+
+const RADAR_JPL_API = "https://ssd-api.jpl.nasa.gov/sb_radar.api"
+
+# RadarRWO
+
+const RWO_RADAR_HEADER = """
+! Object   Obser ====== Date =======  ============ Radar range/range rate (km or km/d) =============  Station  ====  Residual
+! Design   K T N YYYY MM DD hh:mm:ss         Measure  Accuracy       rms F        Bias       Resid    TRX  RCX        Chi   S
+"""
+
+const RWO_RADAR_COLUMNS = [
+    1:11,  12:12, 14:14, 16:16, 18:36, 37:52, 53:62, 63:72,
+    74:74, 75:86, 87:98, 103:105, 108:110, 111:122, 125:125
+]
+
+# Parsing
+
+# Format of date in JPL radar data files
+const RADAR_JPL_DATEFORMAT = "yyyy-mm-dd HH:MM:SS"
+
+# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2014.07.033
+const mpc_catalogue_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "o", "p", "q", "r",
+                                  "u", "v", "w", "L", "N"]
+
+# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2019.113596
+const mpc_catalogue_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "n", "o", "p", "q",
+                                  "r", "t", "u", "v", "w", "L", "N", "Q", "R", "S", "U", "W"]
+
+# URLs
+
+# NEO Confirmation Page Show Orbits URL
+const NEOCP_SHOWORBS_URL = "https://cgi.minorplanetcenter.net/cgi-bin/showobsorbs.cgi"
 
 # Load Solar System, accelerations, newtonian potentials and TT-TDB 2000-2100 ephemeris
 const sseph_artifact_path = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
@@ -18,150 +187,6 @@ const EPOCHMSJ2000::Int = (DateTime(2000, 1, 1, 12) - DateTime(0)).value
 
 # Earth orientation parameters (eop) 2000
 const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
-
-# Parsing
-
-# Characters for MPC base 62 encoding of RadecMPC fields
-const BASE_62_ENCODING = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-
-# Regular expression to parse a catalogue in MPC format
-const CATALOGUE_MPC_REGEX = r"\s{2}(?P<code>\w{1})\s{4}(?P<name>.*)"
-# Header of MPC catalogues file
-const CATALOGUES_MPC_HEADER = "Char   Catalogue"
-# Regular expression to parse an observatory in MPC format
-const OBSERVATORY_MPC_REGEX = Regex(string(
-    # Code regex + space (columns 1-3)
-    raw"(?P<code>[A-Z\d]{3})",
-    # Longitude regex (columns 4-13)
-    raw"(?P<long>[\.\d\s]{10})",
-    # Cosine regex + space (column 14-21)
-    raw"(?P<cos>[\.\d\s]{8})",
-    # Sine regex (column 22-30)
-    raw"(?P<sin>[\+\-\.\d\s]{9})",
-    # Name regex (columns 31-80)
-    raw"(?P<name>.*)",
-))
-# Header of MPC observatories file
-const OBSERVATORIES_MPC_HEADER = "Code  Long.   cos      sin    Name"
-# Regular expression to parse an optical measurement in MPC format
-const RADEC_MPC_REGEX = Regex(string(
-    # Number regex (columns 1-5)
-    raw"(?P<num>.{5})",
-    # Temporary designation regex (columns 6-12)
-    raw"(?P<tmpdesig>.{7})",
-    # Discovery asterisk regex (column 13)
-    raw"(?P<discovery>[\*\s]{1})",
-    # Publishable note regex (column 14)
-    raw"(?P<publishnote>.{1})",
-    # Observation technique regex (column 15)
-    raw"(?P<obstech>[^xX]{1})",
-    # Date of observation regex (columns 16-32)
-    raw"(?P<date>\d{4}\s\d{2}\s\d{2}\.[\d\s]{6})",
-    # Right ascension regex (columns 33-44)
-    raw"(?P<α>\d{2}\s\d{2}\s\d{2}\.[\d\s]{3})",
-    # Declination regex (columns 45-56)
-    raw"(?P<δ>[\+|\-]{1}\d{2}\s\d{2}\s\d{2}\.[\d\s]{2})",
-    # Info 1 regex (columns 57-65)
-    raw"(?P<info1>.{9})",
-    # Magnitude regex (columns 66-70)
-    raw"(?P<mag>[\.\s\d]{5})",
-    # Band regex (column 71)
-    raw"(?P<band>[\w\s]{1})",
-    # Catalogue regex (column 72)
-    raw"(?P<catalogue>[\w\s]{1})",
-    # Info 2 regex (columns 73-77)
-    raw"(?P<info2>.{5})",
-    # Observatory code regex (columns 78-80)
-    raw"(?P<obscode>\w{3})",
-    # Optional fields (in case of satellite observations)
-    # Breakline regex
-    raw"(?:\n)?",
-    # Number regex (columns 1-5)
-    raw"(?<optional>(?P<_num_>.{5})?",
-    # Temporary designation regex (columns 6-12)
-    raw"(?P<_tmpdesig_>.{7})?",
-    # Blank space regex (column 13)
-    raw"(?P<_discovery_>\s)?",
-    # Publishable note regex (column 14)
-    raw"(?P<_publishnote_>.{1})?",
-    # s regex (column 15)
-    raw"(?P<_obstech_>s)?",
-    # Date of observation regex (columns 16-32)
-    raw"(?P<_date_>\d{4}\s\d{2}\s\d{2}\.[\d\s]{6})",
-    # Units + space regex (columns 33-34)
-    raw"(?P<_units_>\d\s)",
-    # X component of geocentric vector (columns 35-46)
-    raw"(?P<_x_>[\-\+]{1}[\.\d\s]{11})",
-    # Y component of geocentric vector (columns 47-58)
-    raw"(?P<_y_>[\-\+]{1}[\.\d\s]{11})",
-    # Z component of geocentric vector (columns 59-70)
-    raw"(?P<_z_>[\-\+]{1}[\.\d\s]{11})",
-    # Band regex (column 71)
-    raw"(?P<_band_>[\w\s]{1})?",
-    # Catalogue regex (column 72)
-    raw"(?P<_catalogue_>[\w\s]{1})?",
-    # Info 2 regex (columns 73-77)
-    raw"(?P<_info2_>.{5})?",
-    # Observatory code regex (columns 78-80)
-    raw"(?P<_obscode_>\w{3})?)?",
-))
-# Regular expression to parse a radar measurement in JPL format
-const RADAR_JPL_REGEX = Regex(string(
-    # ID regex + tab
-    raw"(?P<id>.*)\t",
-    # Date regex + tab
-    raw"(?P<date>.*)\t",
-    # Measurement regex + tab
-    raw"(?P<measurement>.*)\t",
-    # Uncertainty regex + tab
-    raw"(?P<uncertainty>.*)\t",
-    # Units regex + tab
-    raw"(?P<units>.*)\t",
-    # Frequency regex + tab
-    raw"(?P<freq>.*)\t",
-    # Reciever regex + tab
-    raw"(?P<rcvr>.*)\t",
-    # Emitter regex + tab
-    raw"(?P<xmit>.*)\t",
-    # Bouncepoint regex + end of line
-    raw"(?P<bouncepoint>.*)"
-))
-# Format of date in JPL radar data files
-const RADAR_JPL_DATEFORMAT = "yyyy-mm-dd HH:MM:SS"
-
-# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2014.07.033
-const mpc_catalogue_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "o", "p", "q", "r",
-                                  "u", "v", "w", "L", "N"]
-
-# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2019.113596
-const mpc_catalogue_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "n", "o", "p", "q",
-                                  "r", "t", "u", "v", "w", "L", "N", "Q", "R", "S", "U", "W"]
-
-# URLs
-
-# MPC catalogues file url
-const CATALOGUES_MPC_URL = "https://www.minorplanetcenter.net/iau/info/CatalogueCodes.html"
-# MPC observatories file url
-const OBSERVATORIES_MPC_URL = "https://www.minorplanetcenter.net/iau/lists/ObsCodes.html"
-
-# MPC Oservations API url
-const MPC_OBS_API_URL = "https://data.minorplanetcenter.net/api/get-obs"
-# NEO Confirmation Page File URL
-const NEOCP_FILE_URL = "https://www.minorplanetcenter.net/Extended_Files/neocp.json"
-# MPC NEOCP Oservations API url
-const MPC_NEOCP_OBS_API_URL = "https://data.minorplanetcenter.net/api/get-obs-neocp"
-# NEO Confirmation Page Show Orbits URL
-const NEOCP_SHOWORBS_URL = "https://cgi.minorplanetcenter.net/cgi-bin/showobsorbs.cgi"
-
-# NEOCC Automated data access url
-const NEOCC_URL = "https://neo.ssa.esa.int/"
-# NEOCC Observations API url
-const NEOCC_OBS_API_URL = NEOCC_URL * "PSDB-portlet/download?file="
-
-# NEODyS-2 main webpage
-const NEODyS2_URL = "https://newton.spacedys.com/neodys/"
-# NEODyS-2 Observations API url
-const NEODyS2_OBS_API_URL = "https://newton.spacedys.com/~neodys2/mpcobs/"
 
 # Abbreviations
 const cte = constant_term
