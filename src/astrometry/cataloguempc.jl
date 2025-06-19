@@ -1,5 +1,5 @@
 """
-    CatalogueMPC <: AbstractCatalogue
+    CatalogueMPC <: AbstractAstrometryCatalogue
 
 A star catalogue recognized by the Minor Planet Center.
 
@@ -16,12 +16,15 @@ A star catalogue recognized by the Minor Planet Center.
     The list of catalogue names and deprecation flags is available at:
     - https://minorplanetcenter.net/mpcops/documentation/valid-ades-values/#astCat
 """
-@auto_hash_equals fields = (code,) struct CatalogueMPC <: AbstractCatalogue
+@auto_hash_equals fields = (code,) struct CatalogueMPC <: AbstractAstrometryCatalogue
     code::Char
     value::String
     meaning::String
     deprecated::Bool
 end
+
+# Order in CatalogueMPC is given by code
+isless(a::CatalogueMPC, b::CatalogueMPC) = a.code < b.code
 
 isdeprecated(c::CatalogueMPC) = c.deprecated
 isunknown(c::CatalogueMPC) = c.code == ' '
@@ -31,7 +34,7 @@ unknowncat() = CatalogueMPC(' ', "UNK", "UNKNOWN", true)
 show(io::IO, c::CatalogueMPC) = isunknown(c) ? print(io, "Unknown catalogue") :
     print(io, c.meaning, " [", c.code, "]")
 
-# Internal constructor
+# Constructor
 function CatalogueMPC(dict)
     value = astrometryparse(String, dict["Value"])
     code = astrometryparse(Char, CATALOGUE_MPC_NAMES_TO_CODES[value])
@@ -41,6 +44,7 @@ function CatalogueMPC(dict)
     return CatalogueMPC(code, value, meaning, deprecated)
 end
 
+# Parsing
 function parse_catalogues_mpc(text::AbstractString)
     # Parse JSON
     dict = JSON.parse(text)
@@ -52,7 +56,7 @@ function parse_catalogues_mpc(text::AbstractString)
     # Eliminate repeated entries
     unique!(cats)
     # Sort by single-character code
-    sort!(cats, by = x -> x.code)
+    sort!(cats)
 
     return cats
 end

@@ -1,7 +1,7 @@
-# Internal paths
+## Internal paths
 
 # Path to NEOs src directory
-const src_path = dirname(pathof(NEOs))
+const SRC_PATH = dirname(pathof(NEOs))
 # Path to scratch space
 const SCRATCH_PATH = Ref{String}("")
 
@@ -101,7 +101,6 @@ const NEOCP_OBJECT_COLUMNS = [
     49:69, 79:82, 83:89, 90:94, 95:101
 ]
 
-# NEO Confirmation Page File URL
 const NEOCP_OBJECTS_FILE_URL = "https://www.minorplanetcenter.net/iau/NEO/neocp.txt"
 
 # OpticalRWO
@@ -117,30 +116,38 @@ const RWO_OPTICAL_COLUMNS = [
     163:170, 171: 176, 177:180, 181:183, 184:193, 195:195, 197:197
 ]
 
-# NEOCC main webpage
 const NEOCC_URL = "https://neo.ssa.esa.int/"
-# NEOCC Observations API url
 const OBSERVATIONS_NEOCC_API = NEOCC_URL * "PSDB-portlet/download?file="
 
-# NEODyS-2 main webpage
 const NEODyS2_URL = "https://newton.spacedys.com/neodys/"
-# NEODyS-2 Observations API url
 const OBSERVATIONS_NEODyS2_API = "https://newton.spacedys.com/~neodys2/mpcobs/"
+
+# TimeOfDay
+
+const EOPIAU = Union{EopIau1980, EopIau2000A}
+
+# Earth orientation parameters (EOP) 2000
+const EOP_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
 
 # RadarJPL
 
 const JPL_TO_MPC_OBSCODES = Dict(
     "-1"  => "251", # Arecibo
-    "-2"  => "254",	# Haystack
-    "-9"  => "256",	# Green Bank (GBT)
-    "-13" => "252",	# DSS 13
-    "-14" => "253",	# DSS 14
-    "-25" => "257",	# DSS 25
-    "-38" => "255",	# Evpatoria
-    "-73" => "259",	# EISCAT Tromso UHF (32-m)
+    "-2"  => "254",	# Haystack, Westford
+    "-9"  => "256",	# Green Bank
+    "-13" => "252",	# Goldstone DSS 13, Fort Irwin
+    "-14" => "253",	# Goldstone DSS 14, Fort Irwin
+    "-35" => "263", # Canberra DSS 35
+    "-36" => "264", # Canberra DSS 36
+    "-38" => "255",	# Yevpatoriya
+    "-43" => "265", # Canberra DSS 43
+    "-47" => "271", # ATCA DSS 47
+    "-73" => "259",	# EISCAT Tromso UHF
 )
 
 const MPC_TO_JPL_OBSCODES = Dict(value => key for (key, value) in JPL_TO_MPC_OBSCODES)
+
+const RADAR_JPL_DATEFORMAT = "yyyy-mm-dd HH:MM:SS"
 
 const RADAR_JPL_API = "https://ssd-api.jpl.nasa.gov/sb_radar.api"
 
@@ -156,23 +163,23 @@ const RWO_RADAR_COLUMNS = [
     74:74, 75:86, 87:98, 103:105, 108:110, 111:122, 125:125
 ]
 
-# Parsing
+# AbstractDebiasingScheme
 
-# Format of date in JPL radar data files
-const RADAR_JPL_DATEFORMAT = "yyyy-mm-dd HH:MM:SS"
+# MPC catalogues corresponding to debiasing tables included in:
+# - https://doi.org/10.1016/j.icarus.2014.07.033
+const CATALOGUE_MPC_CODES_2014 = [
+    'a', 'b', 'c', 'd', 'e', 'g', 'i', 'j', 'l', 'm',
+    'o', 'p', 'q', 'r', 'u', 'v', 'w', 'L', 'N'
+]
 
-# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2014.07.033
-const mpc_catalogue_codes_2014 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "o", "p", "q", "r",
-                                  "u", "v", "w", "L", "N"]
+# MPC catalogues corresponding to debiasing tables included in:
+# - https://doi.org/10.1016/j.icarus.2019.113596
+const CATALOGUE_MPC_CODES_2018 = [
+    'a', 'b', 'c', 'd', 'e', 'g', 'i', 'j', 'l', 'm', 'n', 'o', 'p',
+    'q', 'r', 't', 'u', 'v', 'w', 'L', 'N', 'Q', 'R', 'S', 'U', 'W'
+]
 
-# MPC catalogues corresponding to debiasing tables included in https://doi.org/10.1016/j.icarus.2019.113596
-const mpc_catalogue_codes_2018 = ["a", "b", "c", "d", "e", "g", "i", "j", "l", "m", "n", "o", "p", "q",
-                                  "r", "t", "u", "v", "w", "L", "N", "Q", "R", "S", "U", "W"]
-
-# URLs
-
-# NEO Confirmation Page Show Orbits URL
-const NEOCP_SHOWORBS_URL = "https://cgi.minorplanetcenter.net/cgi-bin/showobsorbs.cgi"
+# Propagation
 
 # Load Solar System, accelerations, newtonian potentials and TT-TDB 2000-2100 ephemeris
 const sseph_artifact_path = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
@@ -184,9 +191,6 @@ const SSEPHORDER::Int = get_order(sseph.x[1])
 
 # Milliseconds between rounding epoch and J2000
 const EPOCHMSJ2000::Int = (DateTime(2000, 1, 1, 12) - DateTime(0)).value
-
-# Earth orientation parameters (eop) 2000
-const eop_IAU2000A::EopIau2000A = fetch_iers_eop(Val(:IAU2000A))
 
 # Abbreviations
 const cte = constant_term
@@ -230,6 +234,8 @@ const Λ3 = zeros(11)
 
 # Speed of light
 const clightkms = 2.99792458E5   # km/sec
+const c_km_per_day = c_au_per_day * au # km/day
+const c_km_per_us = c_cm_per_sec * 1e-11 # km/microsecond
 # Parameters related to speed of light, c
 const c_p2 = 29979.063823897606      # c^2 = 29979.063823897606 au^2/d^2
 const c_m2 = 3.3356611996764786e-5   # c^-2 = 3.3356611996764786e-5 d^2/au^2
@@ -251,6 +257,8 @@ const R_SI = 0.010044
 const R_EA = 4.24e-5
 # Ratio between the mass of the Earth and the mass of the Sun
 const μ_ES = PE.μ[ea] / PE.μ[su] # 1 / 328_900.5614
+
+# Postprocessing
 
 # Conversion to V band used by MPC
 # See https://minorplanetcenter.net/iau/info/BandConversion.txt
@@ -280,6 +288,7 @@ const V_BAND_CORRECTION = Dict{String, Float64}(
     "o" =>  0.33,
     "u" => +2.5
 )
+
 # Parameters of the linear H and G magnitude system for asteroids
 # See https://minorplanetcenter.net/iau/ECS/MPCArchive/1985/MPC_19851227.pdf
 const SLOPE_PARAMETER = 0.15

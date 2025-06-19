@@ -72,15 +72,15 @@ An optical astrometric observation in the RWO format.
 - `date_accuracy::T`: time accuracy of `date`.
 - `ra::T`: observed right ascension [rad].
 - `ra_accuracy::T`: accuracy for `ra`.
-- `ra_rms::T`: a-priori formal RMS for `ra`.
+- `ra_rms::T`: a-priori formal RMS for `ra` [arcsec].
 - `ra_flag::Bool`: manual weight flag for `ra`.
-- `ra_bias::T`: bias for `ra`.
+- `ra_bias::T`: bias for `ra` [arcsec].
 - `ra_resid::T`: residual for `ra`.
 - `dec::T`: observed declination [rad].
 - `dec_accuracy::T`: accuracy for `dec`.
-- `dec_rms::T`: a-priori formal RMS for `dec`.
+- `dec_rms::T`: a-priori formal RMS for `dec` [arcsec].
 - `dec_flag::Bool`: manual weight flag for `dec`.
-- `dec_bias::T`: bias for `dec`.
+- `dec_bias::T`: bias for `dec` [arcsec].
 - `dec_resid::T`: residual for `dec`.
 - `mag::T`: apparent magnitude.
 - `mag_band::Char`: colour band for `mag`.
@@ -131,8 +131,16 @@ An optical astrometric observation in the RWO format.
     header::String
 end
 
+# AbstractAstrometryObservation interface
 date(x::OpticalRWO) = x.date
 observatory(x::OpticalRWO) = x.observatory
+catalogue(x::OpticalRWO) = x.catalogue
+function rms(x::OpticalRWO{T}) where {T <: Real}
+    (isnan(x.ra_rms) ? one(T) : x.ra_rms, isnan(x.dec_rms) ? one(T) : x.dec_rms)
+end
+function debias(x::OpticalRWO{T}) where {T <: Real}
+    return (isnan(x.ra_bias) ? zero(T) : x.ra_bias, isnan(x.dec_bias) ? zero(T) : x.dec_bias)
+end
 
 # Print method for OpticalRWO
 show(io::IO, o::OpticalRWO) = print(io, o.design, " α: ", @sprintf("%.5f",
@@ -206,7 +214,7 @@ function parse_optical_rwo(text::AbstractString)
         end
     end
     # Two-line observations
-    mask = findall(!hascoord, df.observatory)
+    mask = findall(istwoliner, df.observatory)
     for i in mask
         obs = df.observatory[i]
         line = view(reader.optical[i], 199:length(reader.optical[i]))

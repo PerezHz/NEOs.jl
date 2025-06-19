@@ -30,7 +30,7 @@ An optical astrometric observation in the Minor Planet Center ADES format.
     occultation observations with respect to the star specified by `raStar` and
     `decStar` [rad].
 - `rmsra/rmsdec::T`: for `ra`/`dec` and `deltara/deltadec` observations, the random
-    component of the uncertainty [rad].
+    component of the uncertainty [arcsec].
 - `rmscorr::T`: correlation between `ra` and `dec`.
 - `astcat::CatalogueMPC`: star catalog used for the astrometric reduction.
 - `mag::T`: apparent magnitude.
@@ -41,7 +41,7 @@ An optical astrometric observation in the Minor Planet Center ADES format.
 - `disc::String`: discovery flag.
 - `subfmt::String`: submission format.
 - `prectime::Int`: precision of the reported observation time [millionths of a day].
-- `precra/precdec::T`: reported precision for archival astrometry.
+- `precra/precdec::T`: reported precision for archival astrometry [rad].
 - `unctime::T`: estimated systematic time error [sec].
 - `notes::String`: a set of one-character note flags to communicate observing
     circumstances.
@@ -109,8 +109,14 @@ An optical astrometric observation in the Minor Planet Center ADES format.
     source::String
 end
 
+# AbstractAstrometryObservation interface
 date(x::OpticalADES) = x.obstime
 observatory(x::OpticalADES) = x.stn
+catalogue(x::OpticalADES) = x.astcat
+function rms(x::OpticalADES{T}) where {T <: Real}
+    return (isnan(x.rmsra) ? one(T) : x.rmsra, isnan(x.rmsdec) ? one(T) : x.rmsdec)
+end
+debias(x::OpticalADES{T}) where {T <: Real} = (zero(T), zero(T))
 
 # Print method for OpticalADES
 function show(io::IO, o::OpticalADES)
@@ -124,7 +130,13 @@ end
 # Parsing
 
 adesparse(_, ::Type{String}, x) = String(x)
-adesparse(_, ::Type{CatalogueMPC}, x) = isempty(x) ? unknowncat() : search_catalogue_code(first(x))
+function adesparse(_, ::Type{CatalogueMPC}, x)
+    if isempty(x) || !(x in keys(CATALOGUE_MPC_NAMES_TO_CODES))
+        return unknowncat()
+    else
+        return search_catalogue_code(CATALOGUE_MPC_NAMES_TO_CODES[x])
+    end
+end
 adesparse(_, ::Type{ObservatoryMPC{T}}, x) where {T <: Real} = search_observatory_code(x)
 adesparse(_, ::Type{Int}, x) = isa(x, Number) ? round(Int, x) : parse(Int, x)
 
@@ -134,16 +146,14 @@ function adesparse(_, ::Type{DateTime}, x)
     return date + Microsecond( round( Int, fraction * 1e6 ) )
 end
 
-arcsec2rad(x::Number) = deg2rad(x / 3_600)
-
 function adesparse(name, ::Type{T}, x) where {T <: Real}
     isempty(x) && return T(NaN)
     y = parse(T, x)
     if name in (:ra, :dec, :rastar, :decstar)
         return deg2rad(y)
-    elseif name in (:deltara, :deltadec, :rmsra, :rmsdec, :precra, :precdec)
+    elseif name in (:deltara, :deltadec, :precra, :precdec)
         return arcsec2rad(y)
-    else
+    else # name in (:rmsra, :rmsdec, etc.)
         return y
     end
 end
@@ -172,7 +182,7 @@ function parse_optical_ades(text::String)
             name = Symbol(lowercase(tag(child)))
             if name in names
                 type = fieldtype(R, name)
-                x = strip(value(first(child)))
+                x = strip(XML.value(first(child)))
                 df[i, name] = adesparse(name, type, x)
             end
         end

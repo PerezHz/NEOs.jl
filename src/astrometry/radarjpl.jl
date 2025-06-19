@@ -7,7 +7,7 @@ A radar astrometric observation in the JPL format.
 
 - `des::String`: primary designation of the object.
 - `epoch::DateTime`: epoch of the measurement (UTC).
-- `value::T`: radar delay or Doppler measurement.
+- `value::T`: radar delay [us] or Doppler measurement [Hz].
 - `sigma::T`: estimated 1-sigma uncertainty of the measurement.
 - `units::String`: units associated with the measurement; `us`
     (microseconds) for delay and `Hz` (hertz) for Doppler.
@@ -33,7 +33,13 @@ A radar astrometric observation in the JPL format.
     bp::String
 end
 
+# AbstractAstrometryObservation interface
 date(x::RadarJPL) = x.epoch
+measure(x::RadarJPL) = x.value
+frequency(x::RadarJPL) = x.freq
+observatory(x::RadarJPL) = x.rcvr
+rms(x::RadarJPL) = x.sigma
+debias(::RadarJPL{T}) where {T <: Real} = zero(T)
 
 isdelay(r::RadarJPL) = r.units == "us"
 isdoppler(r::RadarJPL) = r.units == "Hz"
@@ -50,7 +56,7 @@ show(io::IO, r::RadarJPL) = print(io, r.des, " value: ", @sprintf("%+e", r.value
 
 jplparse(_, ::Type{String}, x) = String(x)
 jplparse(_, ::Type{T}, x) where {T <: Real} = parse(T, x)
-jplparse(_, ::Type{DateTime}, x) = DateTime(x, "yyyy-mm-dd HH:MM:SS")
+jplparse(_, ::Type{DateTime}, x) = DateTime(x, RADAR_JPL_DATEFORMAT)
 jplparse(_, ::Type{ObservatoryMPC{T}}, x) where {T <: Real} =
     search_observatory_code(JPL_TO_MPC_OBSCODES[x])
 
@@ -74,8 +80,6 @@ function parse_radar_jpl(text::AbstractString)
             df[i, name] = jplparse(name, type, x)
         end
     end
-    # Source string
-    # df.source = reader.optical
     # Parse observations
     radar = RadarJPL.(eachrow(df))
     # Eliminate repeated entries
@@ -87,15 +91,25 @@ function parse_radar_jpl(text::AbstractString)
 end
 
 """
-    fetch_radar_jpl(id, source)
+    fetch_radar_jpl([id, ] source)
 
 Return the radar astrometry of minor body `id` in the JPL format.
-The `source` of the observations can only be `JPL`.
+The `source` of the observations can only be `JPL`. If `id` is
+omitted, return all the radar astrometry available.
 
 !!! reference
     The JPL Small-Body Radar Astrometry API is described at:
     - https://ssd-api.jpl.nasa.gov/doc/sb_radar.html
 """
+function fetch_radar_jpl(::Type{JPL})
+    # Get and parse HTTP response
+    text = fetch_http_text(JPL; id = "" => "")
+    # Parse observations
+    radar = parse_radar_jpl(text)
+
+    return radar
+end
+
 function fetch_radar_jpl(id::Pair{String, String}, ::Type{JPL})
     # Get and parse HTTP response
     text = fetch_http_text(JPL; id)
@@ -110,7 +124,7 @@ end
 jplstr(x::String) = x
 jplstr(x::Real) = string(x)
 jplstr(x::ObservatoryMPC) = MPC_TO_JPL_OBSCODES[x.code]
-jplstr(x::DateTime) = Dates.format(x, "yyyy-mm-dd HH:MM:SS")
+jplstr(x::DateTime) = Dates.format(x, RADAR_JPL_DATEFORMAT)
 
 """
     read_radar_jpl(filename)
@@ -133,12 +147,12 @@ Write `obs` to `filename` in the JPL format.
 """
 function write_radar_jpl(obs::AbstractVector{RadarJPL{T}},
                          filename::AbstractString) where {T <: Real}
-    fields = ["des", "epoch", "value", "sigma", "units", "freq", "rcvr", "xmit", "bp"]
+    names = fieldnames(RadarJPL{T})
+    fields = [string(name) for name in names]
     signature = Dict("source"  => "NASA/JPL Small-Body Radar Astrometry API",
                      "version" => "1.1")
     count = string(length(obs))
     data = Vector{Vector{String}}(undef, length(obs))
-    names = fieldnames(RadarJPL{T})
     for i in eachindex(data)
         data[i] = [jplstr(getfield(obs[i], name)) for name in names]
     end

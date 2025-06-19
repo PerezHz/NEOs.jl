@@ -1,5 +1,5 @@
 """
-    ObservatoryMPC{T} <: AbstractObservatory{T}
+    ObservatoryMPC{T} <: AbstractAstrometryObservatory{T}
 
 An observatory recognized by the Minor Planet Center.
 
@@ -49,7 +49,7 @@ For space-based observatories:
 - `ICRF_AU` or `ICRF_KM`: cartesian IAU International Celestial Reference Frame.
     Coordinates represent equatorial rectangular coordinates [au or km].
 """
-@auto_hash_equals fields = (code,) struct ObservatoryMPC{T} <: AbstractObservatory{T}
+@auto_hash_equals fields = (code,) struct ObservatoryMPC{T} <: AbstractAstrometryObservatory{T}
     code::String
     frame::String
     coords::SVector{3, T}
@@ -58,18 +58,8 @@ For space-based observatories:
     observations_type::String
 end
 
-# Outer constructor
-function ObservatoryMPC(obs::ObservatoryMPC{T};
-    code::String = obs.code,
-    frame::String = obs.frame,
-    coords::SVector{3, T} = obs.coords,
-    name::String = obs.name,
-    uses_two_line_observations::Bool = obs.uses_two_line_observations,
-    observations_type::String = obs.observations_type
-    ) where {T <: Real}
-    return ObservatoryMPC{T}(code, frame, coords, name,
-        uses_two_line_observations, observations_type)
-end
+# Order in ObservatoryMPC is given by code
+isless(a::ObservatoryMPC, b::ObservatoryMPC) = a.code < b.code
 
 istwoliner(o::ObservatoryMPC) = o.uses_two_line_observations
 
@@ -79,7 +69,7 @@ issatellite(o::ObservatoryMPC) = o.observations_type == "satellite"
 isradar(o::ObservatoryMPC) = o.observations_type == "radar"
 isroving(o::ObservatoryMPC) = o.observations_type == "roving"
 
-isgeocentric(o::ObservatoryMPC) = o.code == "500"
+isgeocentric(o::ObservatoryMPC) = o.code == "500" || o.code == "244"
 hascoord(o::ObservatoryMPC) = all(!isnan, o.coords)
 
 isunknown(o::ObservatoryMPC) = isempty(o.code)
@@ -97,7 +87,19 @@ function show(io::IO, o::ObservatoryMPC)
     end
 end
 
-# Internal constructor
+# Constructors
+function ObservatoryMPC(obs::ObservatoryMPC{T};
+    code::String = obs.code,
+    frame::String = obs.frame,
+    coords::SVector{3, T} = obs.coords,
+    name::String = obs.name,
+    uses_two_line_observations::Bool = obs.uses_two_line_observations,
+    observations_type::String = obs.observations_type
+    ) where {T <: Real}
+    return ObservatoryMPC{T}(code, frame, coords, name,
+        uses_two_line_observations, observations_type)
+end
+
 function ObservatoryMPC(pair)
     code = astrometryparse(String, first(pair))
     dict = last(pair)
@@ -123,6 +125,7 @@ function ObservatoryMPC(pair)
         uses_two_line_observations, observations_type)
 end
 
+# Parsing
 function parse_observatories_mpc(text::AbstractString)
     # Parse JSON
     dict = JSON.parse(text)
@@ -134,7 +137,7 @@ function parse_observatories_mpc(text::AbstractString)
     # Eliminate repeated entries
     unique!(obs)
     # Sort by three-character code
-    sort!(obs, by = x -> x.code)
+    sort!(obs)
 
     return obs
 end

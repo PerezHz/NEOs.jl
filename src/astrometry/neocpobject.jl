@@ -8,8 +8,8 @@ An object listed in the Minor Planet Center NEO Confirmation Page.
 - `desig::String`: temporary designation.
 - `score::T`: NEO desirability score.
 - `date::DateTime`: discovery date.
-- `α::T`: right ascension [rad].
-- `δ::T`: declination [rad].
+- `ra::T`: right ascension [rad].
+- `dec::T`: declination [rad].
 - `V::T`: rough current magnitude.
 - `updated::String`: last update.
 - `nobs::Int`: number of observations.
@@ -37,8 +37,12 @@ An object listed in the Minor Planet Center NEO Confirmation Page.
     source::String
 end
 
+# AbstractAstrometryObservation interface
 date(x::NEOCPObject) = x.date
 observatory(::NEOCPObject{T}) where {T} = unknownobs(T)
+catalogue(::NEOCPObject) = unknowncat()
+rms(::NEOCPObject{T}) where {T <: Real} = (T(NaN), T(NaN))
+debias(::NEOCPObject{T}) where {T <: Real} = (T(NaN), T(NaN))
 
 # Print method for NEOCPObject
 function show(io::IO, x::NEOCPObject)
@@ -150,34 +154,3 @@ function write_neocp_objects(obs::AbstractVector{NEOCPObject{T}},
         end
     end
 end
-
-#=
-"""
-    get_orbits_neocp(id::AbstractString [, filename::AbstractString])
-
-Download sample orbits of NEOCP [1] object `id` and save the output to `filename`
-(default: `id.txt`).
-
-!!! reference
-    [1] https://www.minorplanetcenter.net/iau/NEO/toconfirm_tabular.html.
-"""
-function get_orbits_neocp(id::AbstractString, filename::AbstractString =
-    replace(id, " " => "_") * ".txt")
-    # Assemble URL
-    url = string(NEOCP_SHOWORBS_URL, "?Obj=", id, "&orb=y")
-    # HTTP response
-    resp = HTTP.get(url)
-    # Parse response body as String
-    text = String(resp.body)
-    # Break lines
-    lines = split(text, "\n", keepempty = false)
-    # Save result to filename
-    open(filename, "w") do file
-        for i in 2:length(lines)-1
-            write(file, lines[i], "\n")
-        end
-    end
-
-    return filename
-end
-=#

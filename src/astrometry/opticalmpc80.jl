@@ -80,9 +80,14 @@ An optical astrometric observation in Minor Planet Center 80-column format.
     source::String
 end
 
-isdiscovery(x::OpticalMPC80) = x.discovery == '*'
+# AbstractAstrometryObservation interface
 date(x::OpticalMPC80) = x.date
 observatory(x::OpticalMPC80) = x.observatory
+catalogue(x::OpticalMPC80) = x.catalogue
+rms(::OpticalMPC80{T}) where {T <: Real} = (one(T), one(T))
+debias(::OpticalMPC80{T}) where {T <: Real} = (zero(T), zero(T))
+
+isdiscovery(x::OpticalMPC80) = x.discovery == '*'
 
 # Print method for OpticalMPC80
 function show(io::IO, o::OpticalMPC80)

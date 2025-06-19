@@ -6,6 +6,10 @@ using NEOs: SCRATCH_PATH
 @testset "AbstractAstrometry" begin
 
     @testset "Utils" begin
+
+        # This tests are based on the examples in:
+        # https://minorplanetcenter.net/iau/info/PackedDes.html
+
         # (Un)packdesig
         packedids = ["J95X00A", "J95X01L", "J95F13B", "J98SA8Q", "J98SC7V", "J98SG2S",
             "K99AJ3Z", "K08Aa0A", "K07Tf8A"]
@@ -22,6 +26,7 @@ using NEOs: SCRATCH_PATH
 
         @test all(unpacknum.(packednums) .== unpackednums)
         @test all(packnum.(unpackednums) .== packednums)
+
     end
 
     @testset "CatalogueMPC" begin
@@ -31,6 +36,7 @@ using NEOs: SCRATCH_PATH
 
         # Check global variable CATALOGUES_MPC[]
         @test allunique(CATALOGUES_MPC[])
+        @test issorted(CATALOGUES_MPC[])
         @test isa(CATALOGUES_MPC[], Vector{CatalogueMPC})
         @test count(isdeprecated, CATALOGUES_MPC[]) == 42
         @test count(isunknown, CATALOGUES_MPC[]) == 1
@@ -74,6 +80,7 @@ using NEOs: SCRATCH_PATH
         # Update catalogues file
         update_catalogues_mpc()
         @test allunique(CATALOGUES_MPC[])
+        @test issorted(CATALOGUES_MPC[])
         @test isa(CATALOGUES_MPC[], Vector{CatalogueMPC})
         @test count(isdeprecated, CATALOGUES_MPC[]) == 42
         @test count(isunknown, CATALOGUES_MPC[]) == 1
@@ -94,13 +101,14 @@ using NEOs: SCRATCH_PATH
 
         # Check global variable OBSERVATORIES_MPC[]
         @test allunique(OBSERVATORIES_MPC[])
+        @test issorted(OBSERVATORIES_MPC[])
         @test isa(OBSERVATORIES_MPC[], Vector{ObservatoryMPC{Float64}})
         @test count(isoptical, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 35
         @test count(isoccultation, OBSERVATORIES_MPC[]) == 2
         @test count(issatellite, OBSERVATORIES_MPC[]) == 19
         @test count(isradar, OBSERVATORIES_MPC[]) == 12
         @test count(isroving, OBSERVATORIES_MPC[]) == 2
-        @test count(isgeocentric, OBSERVATORIES_MPC[]) == 1
+        @test count(isgeocentric, OBSERVATORIES_MPC[]) == 2
         @test count(hascoord, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 22
         @test count(isunknown, OBSERVATORIES_MPC[]) == 0
 
@@ -158,13 +166,14 @@ using NEOs: SCRATCH_PATH
         # Update observatories file
         update_observatories_mpc()
         @test allunique(OBSERVATORIES_MPC[])
+        @test issorted(OBSERVATORIES_MPC[])
         @test isa(OBSERVATORIES_MPC[], Vector{ObservatoryMPC{Float64}})
         @test count(isoptical, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 35
         @test count(isoccultation, OBSERVATORIES_MPC[]) == 2
         @test count(issatellite, OBSERVATORIES_MPC[]) == 19
         @test count(isradar, OBSERVATORIES_MPC[]) == 12
         @test count(isroving, OBSERVATORIES_MPC[]) == 2
-        @test count(isgeocentric, OBSERVATORIES_MPC[]) == 1
+        @test count(isgeocentric, OBSERVATORIES_MPC[]) == 2
         @test count(hascoord, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 22
         @test count(isunknown, OBSERVATORIES_MPC[]) == 0
 
@@ -218,6 +227,7 @@ using NEOs: SCRATCH_PATH
         @test obs["updated_at"] == "Tue, 15 Apr 2025 20:52:50 GMT"
         @test obs["uses_two_line_observations"] == false
         @test obs["web_link"] == "http://www.lpl.arizona.edu/css/"
+
     end
 
 end

@@ -1,8 +1,48 @@
-# Astrometry sources
+"""
+    MPC <: AbstractAstrometrySource
+
+Type representing the Minor Planet Center's APIs, except for those
+related to the NEO Confirmation Page.
+
+See also [`NEOCP`](@ref).
+"""
 struct MPC <: AbstractAstrometrySource end
+
+"""
+    NEOCP <: AbstractAstrometrySource
+
+Type representing the Minor Planet Center's APIs related to the
+NEO Confirmation Page.
+
+See also [`MPC`](@ref).
+"""
 struct NEOCP <: AbstractAstrometrySource end
+
+"""
+    NEOCC <: AbstractAstrometrySource
+
+Type representing the Near-Earth Objects Coordination Centre
+automated data access APIs.
+
+See also [`NEODyS2`](@ref).
+"""
 struct NEOCC <: AbstractAstrometrySource end
+
+"""
+    NEODyS2 <: AbstractAstrometrySource
+
+Type representing the Near-Earth Objects Dynamic Site 2 APIs.
+
+See also [`NEOCC`](@ref).
+"""
 struct NEODyS2 <: AbstractAstrometrySource end
+
+"""
+    JPL <: AbstractAstrometrySource
+
+Type representing the Jet Propulsion Laboratory Solar System
+Dynamics APIs.
+"""
 struct JPL <: AbstractAstrometrySource end
 
 function get_http_response(::Type{MPC}; mode::Int = 0, id::AbstractString = "",
@@ -29,12 +69,14 @@ function get_http_response(::Type{MPC}; mode::Int = 0, id::AbstractString = "",
     return resp
 end
 
+# NEOCPObject
 function get_http_response(::Type{NEOCP}; mode::Int = 0, id::AbstractString = "",
                            format::AbstractString = "", connect_timeout = 180,
                            readtimeout = 180, kwargs...)
-    # NEOCPObject
+    # All objects listed in the NEOCP
     if mode == 0
         resp = HTTP.get(NEOCP_OBJECTS_FILE_URL; connect_timeout, readtimeout, kwargs...)
+    # Specific object from the NEOCP
     else
         params = JSON.json(Dict("trksubs" => [id], "output_format" => [format]))
         resp = HTTP.get(OBSERVATIONS_NEOCP_API, ("Content-Type" => "application/json",),
@@ -44,6 +86,7 @@ function get_http_response(::Type{NEOCP}; mode::Int = 0, id::AbstractString = ""
     return resp
 end
 
+# OpticalMPC80 / OpticalADES / RadarRWO
 function get_http_response(::Type{NEOCC}; id::AbstractString, connect_timeout = 180,
                            readtimeout = 180, kwargs...)
     url = OBSERVATIONS_NEOCC_API * id * ".rwo"
@@ -52,6 +95,7 @@ function get_http_response(::Type{NEOCC}; id::AbstractString, connect_timeout = 
     return resp
 end
 
+# OpticalMPC80 / OpticalADES / RadarRWO
 function get_http_response(::Type{NEODyS2}; id::AbstractString, connect_timeout = 180,
                            readtimeout = 180, kwargs...)
     url = OBSERVATIONS_NEODyS2_API * id * ".rwo"
@@ -60,9 +104,10 @@ function get_http_response(::Type{NEODyS2}; id::AbstractString, connect_timeout 
     return resp
 end
 
+# RadarJPL
 function get_http_response(::Type{JPL}; id::Pair{String, String},
                            connect_timeout = 180, readtimeout = 180, kwargs...)
-    query = Dict(id)
+    query = isempty(first(id)) ? Dict{String, String}() : Dict{String, String}(id)
     resp = HTTP.get(RADAR_JPL_API; query, connect_timeout, readtimeout,
         status_exception = false, require_ssl_verification = false, kwargs...)
 
