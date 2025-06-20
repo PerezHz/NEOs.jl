@@ -77,8 +77,9 @@ function show(io::IO, x::OpticalTracklet)
     print(io, x.nobs, " observation tracklet around ", x.date, " at ", x.observatory.name)
 end
 
-# Return the milliseconds between b.date and a.date
-datediff(a::OpticalTracklet, b::OpticalTracklet) = (date(a) - date(b)).value
+# Return the milliseconds between two dates
+datediff(a::DateTime, b::DateTime) = (a - b).value
+datediff(a::OpticalTracklet, b::OpticalTracklet) = datediff(date(a), date(b))
 
 # Evaluate a polynomial with coefficients p in every element of x
 polymodel(x, p) = map(y -> evalpoly(y, p), x)

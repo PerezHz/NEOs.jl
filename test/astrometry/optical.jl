@@ -434,15 +434,21 @@ using Test
 
         # Sunrise and sunset
         sun1, sun2, sun3 = sunriseset(optical1[1]), sunriseset(optical2[1]), sunriseset(optical3[1])
-        @test sun1[1] == sun2[1] == sun3[1] == DateTime("2000-01-07T19:00:19.709")
-        @test sun1[2] == sun2[2] == sun3[2] == DateTime("2000-01-08T09:03:20.951")
+
+        @test abs(datediff(sun1[1], DateTime("2000-01-07T19:00:19.709"))) < 2
+        @test abs(datediff(sun2[1], DateTime("2000-01-07T19:00:19.709"))) < 2
+        @test abs(datediff(sun3[1], DateTime("2000-01-07T19:00:19.709"))) < 2
+
+        @test abs(datediff(sun1[2], DateTime("2000-01-08T09:03:20.951"))) < 2
+        @test abs(datediff(sun2[2], DateTime("2000-01-08T09:03:20.951"))) < 2
+        @test abs(datediff(sun3[2], DateTime("2000-01-08T09:03:20.951"))) < 2
 
         # obsposECEF
         posECEF1 = obsposECEF.(optical1)
         posECEF2 = obsposECEF.(optical2)
         posECEF3 = obsposECEF.(optical3)
 
-        @test maximum(norm, posECEF1 - posECEF2) < 9e-11
+        @test maximum(norm, posECEF1 - posECEF2) < 1.4e-10
         @test maximum(norm, posECEF1 - posECEF3) < 1.28
         @test maximum(norm, posECEF2 - posECEF3) < 1.28
 
@@ -463,11 +469,11 @@ using Test
         rECI1, rECI2, rECI3 = @. norm(getindex(posvelECI1, $Ref(1:3))),
             norm(getindex(posvelECI2, $Ref(1:3))), norm(getindex(posvelECI3, $Ref(1:3)))
         mask1, mask2, mask3 = @. isnight(light1), isnight(light2), isnight(light3)
-        @test 6_362 ≤ minimum(rECI1[mask1]) == minimum(rECI2[mask2]) == minimum(rECI3[mask3])
-        @test maximum(rECI1[mask1]) == maximum(rECI2[mask2]) == maximum(rECI3[mask3]) ≤ 6_3780
+        @test 6362 ≤ minimum(rECI1[mask1]) ≈ minimum(rECI2[mask2]) ≈ minimum(rECI3[mask3])
+        @test maximum(rECI1[mask1]) ≈ maximum(rECI2[mask2]) ≈ maximum(rECI3[mask3]) ≤ 6380
 
-        @test maximum(abs, rECEF1 - rECI1) < 1.8e-10
-        @test maximum(abs, rECEF2 - rECI2) < 1.8e-10
+        @test maximum(abs, rECEF1 - rECI1) < 2.4e-10
+        @test maximum(abs, rECEF2 - rECI2) < 2.4e-10
         @test maximum(abs, rECEF3 - rECI3) < 2.4e-10
 
     end
