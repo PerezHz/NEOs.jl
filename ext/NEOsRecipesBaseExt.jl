@@ -1,5 +1,6 @@
 module NEOsRecipesBaseExt
 
+#=
 using RecipesBase
 using PlanetaryEphemeris: TaylorInterpolant
 using NEOs: OpticalResidual, AdmissibleRegion, AbstractOrbit, cte, ra, dec, arboundary
@@ -46,5 +47,7 @@ end
         return xs, ys, zs
     end
 end
+
+=#
 
 end
