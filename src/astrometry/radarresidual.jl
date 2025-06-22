@@ -5,45 +5,45 @@ An astrometric radar observed minus computed residual.
 
 # Fields
 
-- `measure::U`: time delay [us] or Doppler shift [Hz] residual.
-- `weight::T`: statistical weight [same units as `measure`⁻²].
-- `debias::T`: debiasing factor [same units as `measure`].
+- `residual::U`: normalized time delay [us] or Doppler shift [Hz] residual.
+- `weight::T`: statistical weight [same units as `residual`⁻¹].
+- `debias::T`: debiasing factor [same units as `residual`].
 - `outlier::Bool`: whether the residual is an outlier or not.
 """
 @auto_hash_equals struct RadarResidual{T, U} <: AbstractRadarResidual{T, U}
-    measure::U
+    residual::U
     weight::T
     debias::T
     outlier::Bool
     # Inner constructor
-    function RadarResidual{T, U}(measure::U, weight::T, debias::T,
+    function RadarResidual{T, U}(residual::U, weight::T, debias::T,
                                  outlier::Bool = false) where {T <: Real, U <:  Number}
-        return new{T, U}(measure, weight, debias, outlier)
+        return new{T, U}(residual, weight, debias, outlier)
     end
 end
+
+# AbstractAstrometryResidual interface
+residual(x::RadarResidual) = x.residual
+weight(x::RadarResidual) = x.weight
+debias(x::RadarResidual) = x.debias
+
+dof(::Type{RadarResidual{T, U}}) where {T, U} = 1
+chi2(x::RadarResidual) = !isoutlier(x) * residual(x)^2
 
 # Definition of zero RadarResidual
 zero(::Type{RadarResidual{T, U}}) where {T, U} = RadarResidual{T, U}(
         zero(U), zero(T), zero(T), false)
 iszero(x::RadarResidual{T, U}) where {T, U} = x == zero(RadarResidual{T, U})
 
-measure(x::RadarResidual) = x.measure
-weight(x::RadarResidual) = x.weight
-debias(x::RadarResidual) = x.debias
-
-isoutlier(x::RadarResidual) = x.outlier
-nout(x::AbstractVector{RadarResidual{T, U}}) where {T, U} = count(isoutlier, x)
-notout(x::AbstractVector{RadarResidual{T, U}}) where {T, U} = count(!isoutlier, x)
-
 # Print method for RadarResidual
 function show(io::IO, x::RadarResidual)
     outlier_flag = isoutlier(x) ? " (outlier)" : ""
-    print(io, "measure: ", @sprintf("%+.5f", cte(x.measure)), outlier_flag)
+    print(io, "residual: ", @sprintf("%+.5f", cte(residual(x))), outlier_flag)
 end
 
 # Evaluate methods
 evaluate(y::RadarResidual{T, TaylorN{T}}, x::Vector{T}) where {T <: Real} =
-    RadarResidual{T, T}(y.measure(x), y.weight, y.debias, y.outlier)
+    RadarResidual{T, T}(y.residual(x), y.weight, y.debias, y.outlier)
 
 (y::RadarResidual{T, TaylorN{T}})(x::Vector{T}) where {T <: Real} = evaluate(y, x)
 
@@ -78,7 +78,7 @@ function unfold(y::AbstractVector{RadarResidual{T, U}}) where {T <: Real, U <: N
     for i in eachindex(y)
         isoutlier(y[i]) && continue
         # Right ascension
-        z[k], w[k], d[k] = measure(y[i]), weight(y[i]), debias(y[i])
+        z[k], w[k], d[k] = residual(y[i]), weight(y[i]), debias(y[i])
         # Update global counter
         k += 1
     end
@@ -632,7 +632,7 @@ All ephemeris must take  [et seconds since J2000] and return [barycentric
 position in km and velocity in km/sec].
 """
 radar_astrometry(radar::AbstractRadarAstrometry{T}; kwargs...) where {T <: Real} =
-    radar_astrometry(observatory(radar), date(radar), freq(radar); kwargs...)
+    radar_astrometry(observatory(radar), date(radar), frequency(radar); kwargs...)
 
 function radar_astrometry(observatory::ObservatoryMPC, t_r_utc::DateTime, F_tx::Real;
                           tc::Real = 1.0, autodiff::Bool = true, kwargs...)
@@ -660,12 +660,12 @@ function init_residuals(::Type{U},
     # Check consistency between arrays
     @assert length(radar) == length(outliers)
     # Initialize vector of residuals
-    res = Vector{OpticalResidual{T, U}}(undef, length(radar))
+    res = Vector{RadarResidual{T, U}}(undef, length(radar))
     for i in eachindex(radar)
-        measure = zero(U)
-        weight = 1 / rms(radar[i])^2
+        residual = zero(U)
+        weight = 1 / rms(radar[i])
         bias = debias(radar[i])
-        res[i] = RadarResidual{T, U}(measure, weight, bias, outliers[i])
+        res[i] = RadarResidual{T, U}(residual, weight, bias, outliers[i])
     end
 
     return res
@@ -723,7 +723,7 @@ function residuals!(res::Vector{RadarResidual{T, U}}, radar::AbstractRadarVector
                     xva::AstEph, kwargs...) where {AstEph, T <: Real, U <: Number}
 
     @allow_boxed_captures tmap!(res, radar, weight.(res), debias.(res),
-        isoutlier.(res)) do x, w8, bias, outlier
+                                isoutlier.(res)) do x, w8, bias, outlier
         # Observed time-delay or Doppler shift
         observed = measure(x)
         # Computed time-delay and Doppler shift
@@ -731,7 +731,7 @@ function residuals!(res::Vector{RadarResidual{T, U}}, radar::AbstractRadarVector
         computed = isdelay(x) ? delay : doppler
         # Observed minus computed residual
         return RadarResidual{T, U}(
-            observed - computed - debias,
+            w8 * ( observed - computed - bias ),
             w8,
             bias,
             outlier

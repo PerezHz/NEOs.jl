@@ -1,6 +1,8 @@
-include("asteroid_dynamical_models.jl")
+include("dynamicalmodels.jl")
 include("jetcoeffs.jl")
 
+# Internal types used in the propagate* functions
+# TO DO: ¿Merge these two structures into one?
 mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
     sseph::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}
     ssepht::Vector{Taylor1{U}}
@@ -20,22 +22,43 @@ struct PropagationBuffer{T <: Real, U <: Number, V <: Number}
     dparams::DynamicalParameters{T, U, V}
 end
 
-@doc raw"""
-    PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U},
-        params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+"""
+    loadpeeph(eph, t0, tf)
+
+Return a copy of `eph` in timerange `[t0, tf]`, where both times must have units
+of TDB days since J2000. Currently, the only available options for `eph` are:
+- `NEOs.sseph`: solar system ephemeris,
+- `NEOs.acceph`: accelerations ephemeris,
+- `NEOs.poteph`: newtonian potentials ephemeris.
+
+!!! warning
+    Running this function for the first time will download the `sseph_p100` artifact
+    (885 MB) which can take several minutes.
+"""
+function loadpeeph(eph::TaylorInterpolant = sseph, t0::Real = sseph.t0,
+                   tf::Real = sseph.t0 + sseph.t[end])
+    @assert 0.0 ≤ t0 ≤ tf ≤ 36_525.0
+    j0 = searchsortedlast(eph.t, t0)
+    jf = searchsortedfirst(eph.t, tf)
+    return TaylorInterpolant(eph.t0, eph.t[j0:jf], eph.x[j0:jf-1, :])
+end
+
+"""
+    PropagationBuffer(dynamics, jd0, tlim, q0, params)
 
 Return a `PropagationBuffer` object with pre-allocated memory for `propagate`.
 
-## Arguments
+# Arguments
 
-- `dynamics::D`: dynamical model function.
-- `jd0::V`: initial Julian date (TDB).
-- `tlim::Tuple{T, T}`: ephemeris timespan [in days since J2000].
-- `q0::Vector{U}`: vector of initial conditions.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
+- `dynamics`: dynamical model function.
+- `jd0::Number`: initial Julian date (TDB).
+- `tlim::Tuple{Real, Real}`: ephemeris timespan [days since J2000].
+- `q0::Vector{<:Number}`: vector of initial conditions.
+- `params::Parameters{<:Real}`: see the `Propagation` section of [`Parameters`](@ref).
 """
 function PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U},
-    params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+                           params::Parameters{T}) where {D, T <: Real, U <: Number,
+                           V <: Number}
     # Unpack parameters
     @unpack order, μ_ast, maxsteps = params
     # Check order
@@ -79,36 +102,7 @@ function PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U}
     return PropagationBuffer{T, U, V}(cache, dparams)
 end
 
-@doc raw"""
-    rvelea(dx, x, params, t)
-
-Return `true` and the asteroid's radial velocity with respect to the Earth.
-
-## Arguments
-
-- `dx`: asteroid's velocities.
-- `x`: asteroid's degrees of freedom.
-- `params`: dynamical parameters (see [`DynamicalParameters`](@ref)).
-- `t`: time.
 """
-function rvelea(dx, x, params, t)
-    # Julian date (TDB) of start time
-    jd0 = params.jd0
-    # Days since J2000.0 = 2.451545e6
-    dsj2k = t + (jd0 - JD_J2000)
-    # Solar system ephemeris at dsj2k
-    ss16asteph_t = params.ssepht
-    evaleph!(ss16asteph_t, params.sseph, dsj2k)
-    # Total number of bodies
-    N = params.N
-    # Earth's ephemeris
-    xe = ss16asteph_t[nbodyind(N-1, ea)]
-
-    return true, (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) +
-        (x[3]-xe[3])*(x[6]-xe[6])
-end
-
-@doc raw"""
     rvelea(eph, params, t)
 
 Return the geocentric radial velocity of `eph` at time `t`, using
@@ -121,16 +115,37 @@ function rvelea(eph, params, t)
     return dot3D(rv[1:3], rv[4:6])
 end
 
-@doc raw"""
-    scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6);
-        order::Int = 5) where {T <: Real}
+# Return `true` and the asteroid's radial velocity with respect to the Earth
+function rvelea(dx, x, params, t)
+    # Julian date (TDB) of start time
+    jd0 = params.jd0
+    # Days since J2000.0 = 2.451545e6
+    dsj2k = t + (jd0 - JD_J2000)
+    # Solar system ephemeris at dsj2k
+    ss16asteph_t = params.ssepht
+    evaleph!(ss16asteph_t, params.sseph, dsj2k)
+    # Total number of bodies
+    N = params.N
+    # Earth's ephemeris
+    xe = ss16asteph_t[nbodyind(N-1, ea)]
+    # Geocentric radial velocity
+    return true, (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) +
+        (x[3]-xe[3])*(x[6]-xe[6])
+end
 
-Equivalent to `TaylorSeries.set_variables` times a scaling given by `c`.
+"""
+    scaled_variables(names::String, c::Vector{T}; [order::Int = 5])
+
+Equivalent to:
+
+`TaylorSeries.set_variables(T, names; order, numvars = length(c))`
+
+times a scaling given by `c`.
 """
 function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6);
-            order::Int = 5) where {T <: Real}
+                          order::Int = 5) where {T <: Real}
     # Set TaylorN variables
-    dq = set_variables(T, names, order = order, numvars = length(c))
+    dq = set_variables(T, names; order, numvars = length(c))
     # Scale jet transport perturbation
     for i in eachindex(dq)
         dq[i][1][i] = c[i]
@@ -138,8 +153,8 @@ function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6);
     return dq
 end
 
-function issuccessfulprop(sol::TaylorInterpolant, t::T;
-    tol::T = 10.0) where {T <: Real}
+# Check if an integration was successful
+function issuccessfulprop(sol::TaylorInterpolant, t::T; tol::T = 10.0) where {T <: Real}
     # Zero TaylorInterpolant
     iszero(sol) && return false
     # Forward integration
@@ -162,127 +177,109 @@ function issuccessfulprop(sol::TaylorInterpolant, t::T;
     return all( norm.(view(sol.x, 1:i, :), Inf) .< tol )
 end
 
-@doc raw"""
-    propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-        params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
-
-Integrate an orbit via the Taylor method. The initial Julian date `jd0` is assumed
-to be in TDB time scale.
-
-## Arguments
-
-- `dynamics::D`: dynamical model function.
-- `jd0::V`: initial Julian date (TDB).
-- `tspan::T`: time span of the integration [in years].
-- `q0::Vector{U}`: vector of initial conditions.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
 """
-function propagate(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-            params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+    propagate(f, q0, jd0, tmax, params)
+
+Integrate the dynamical model `f` starting from an initial condition `q0` [au, au/day]
+at time `jd0` [julian date TDB] for a period of `tmax` [years]. For a list of parameters
+see the `Propagation` section of [`Parameters`](@ref).
+
+This function uses the Taylor Method implemented in `TaylorIntegration`.
+"""
+function propagate(f::D, q0::Vector{U}, jd0::Number, tmax::T,
+                   params::Parameters{T}) where {D, T <: Real, U <: Number}
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
-    tlim = minmax(_jd0_, _jd0_ + tspan * yr) .- JD_J2000
-    buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
+    tlim = minmax(_jd0_, _jd0_ + tmax * yr) .- JD_J2000
+    buffer = PropagationBuffer(f, jd0, tlim, q0, params)
     # Propagate orbit
-    return _propagate(dynamics, jd0, tspan, q0, buffer, params)
+    return _propagate(f, q0, jd0, tmax, buffer, params)
 end
 
-function _propagate(
-        dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-        buffer::PropagationBuffer{T, U, V}, params::Parameters{T}
-    ) where {D, T <: Real, U <: Number, V <: Number}
+function _propagate(f::D, q0::Vector{U}, jd0::V, tmax::T, buffer::PropagationBuffer{T, U, V},
+                    params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
     # Unpack
     @unpack abstol, maxsteps = params
     @unpack cache, dparams = buffer
     # Update reference epoch
     dparams.jd0 = jd0
     # Propagate orbit
-    sol = taylorinteg!(Val(true), dynamics, q0, zero(T), tspan * yr, abstol,
-        cache, dparams; maxsteps)
+    orbit = taylorinteg!(Val(true), f, q0, zero(T), tmax * yr, abstol, cache, dparams;
+                         maxsteps)
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
-    return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, sol.t, sol.p)
+    return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, orbit.t, orbit.p)
 end
 
-@doc raw"""
-    propagate_root(dynamics::D, jd0::V, tspan::T, q0::Vector{U}, params::Parameters{T};
-        kwargs...) where {D, T <: Real, U <: Number, V <: Number}
-
-Integrate an orbit via the Taylor method while finding the zeros of `NEOs.rvelea`.
-
-## Arguments
-
-- `dynamics::D`: dynamical model function.
-- `jd0::V`: initial Julian date (TDB).
-- `tspan::T`: time span of the integration [in years].
-- `q0::Vector{U}`: vector of initial conditions.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
-
-## Keyword arguments
-
-- `eventorder::Int`: order of the derivative of `rvelea` whose roots are computed.
-- `newtoniter::Int`: maximum Newton-Raphson iterations per detected root.
-- `nrabstol::T`: allowed tolerance for the Newton-Raphson process.
 """
-function propagate_root(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-            params::Parameters{T}; eventorder::Int = 0, newtoniter::Int = 10,
-            nrabstol::T = eps(T)) where {D, T <: Real, U <: Number, V <: Number}
+    propagate_root(f, q0, jd0, tmax, params; kwargs...)
+
+Integrate the dynamical model `f` starting from an initial condition `q0` [au, au/day]
+at time `jd0` [julian date TDB] for a period of `tmax` [years], while finding the zeros
+of `NEOs.rvelea`. For a list of parameters see the `Propagation` section of
+[`Parameters`](@ref).
+
+This function uses the Taylor Method implemented in `TaylorIntegration`.
+
+# Keyword arguments
+
+- `eventorder::Int`: order of the derivative of `NEOs.rvelea` whose roots are computed
+    (default: `0`).
+- `newtoniter::Int`: maximum Newton-Raphson iterations per detected root (default: `10`).
+- `nrabstol::T`: allowed tolerance for the Newton-Raphson process (default: `eps(T)`).
+"""
+function propagate_root(f::D, q0::Vector{U}, jd0::Number, tmax::T, params::Parameters{T};
+                        eventorder::Int = 0, newtoniter::Int = 10,
+                        nrabstol::T = eps(T)) where {D, T <: Real, U <: Number}
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
-    tlim = minmax(_jd0_, _jd0_ + tspan * yr) .- JD_J2000
-    buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
+    tlim = minmax(_jd0_, _jd0_ + tmax * yr) .- JD_J2000
+    buffer = PropagationBuffer(f, jd0, tlim, q0, params)
     # Propagate orbit
-    return _propagate_root(dynamics, jd0, tspan, q0, buffer, params;
-        eventorder, newtoniter, nrabstol)
+    return _propagate_root(f, q0, jd0, tmax, buffer, params; eventorder,
+        newtoniter, nrabstol)
 end
 
-function _propagate_root(
-        dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-        buffer::PropagationBuffer{T, U, V}, params::Parameters{T};
-        eventorder::Int = 0, newtoniter::Int = 10, nrabstol::T = eps(T)
-    ) where {D, T <: Real, U <: Number, V <: Number}
+function _propagate_root(f::D, q0::Vector{U}, jd0::V, tmax::T, buffer::PropagationBuffer{T, U, V},
+                         params::Parameters{T}; eventorder::Int = 0, newtoniter::Int = 10,
+                         nrabstol::T = eps(T)) where {D, T <: Real, U <: Number, V <: Number}
     # Unpack
     @unpack abstol, maxsteps = params
     @unpack cache, dparams = buffer
     # Update reference epoch
     dparams.jd0 = jd0
     # Propagate orbit
-    sol = taylorinteg!(Val(true), dynamics, rvelea, q0, zero(T), tspan * yr,
-        abstol, cache, dparams; maxsteps, eventorder, newtoniter, nrabstol)
+    orbit = taylorinteg!(Val(true), f, rvelea, q0, zero(T), tmax * yr, abstol, cache,
+                         dparams; maxsteps, eventorder, newtoniter, nrabstol)
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
-    return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, sol.t, sol.p), sol.tevents,
-        sol.xevents, sol.gresids
+    return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, orbit.t, orbit.p),
+        orbit.tevents, orbit.xevents, orbit.gresids
 end
 
-@doc raw"""
-    propagate_lyap(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-        params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
-
-Compute the Lyapunov spectrum of an orbit.
-
-## Arguments
-
-- `dynamics::D`: dynamical model function.
-- `jd0::V`: initial Julian date (TDB).
-- `tspan::T`: time span of the integration [in Julian days].
-- `q0::Vector{U}`: vector of initial conditions.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
 """
-function propagate_lyap(dynamics::D, jd0::V, tspan::T, q0::Vector{U},
-            params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
+    propagate_lyap(f, q0, jd0, tmax, params)
+
+Compute the Lyapunov spectrum of an orbit given by integrating the dynamical model `f`
+starting from an initial condition `q0` [au, au/day] at time `jd0` [julian date TDB]
+for a period of `tmax` [years]. For a list of parameters see the `Propagation` section
+of [`Parameters`](@ref).
+
+This function uses the Taylor Method implemented in `TaylorIntegration`.
+"""
+function propagate_lyap(f::D, q0::Vector{U}, jd0::Number, tmax::T,
+                        params::Parameters{T}) where {D, T <: Real, U <: Number}
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
-    tlim = minmax(_jd0_, _jd0_ + tspan * yr) .- JD_J2000
-    buffer = PropagationBuffer(dynamics, jd0, tlim, q0, params)
+    tlim = minmax(_jd0_, _jd0_ + tmax * yr) .- JD_J2000
+    buffer = PropagationBuffer(f, jd0, tlim, q0, params)
     # Unpack
     @unpack order, abstol, maxsteps = params
     @unpack dparams = buffer
     # Propagate orbit
-    sol = lyap_taylorinteg(dynamics, q0, zero(T), tspan * yr, order,
-        abstol, dparams; maxsteps)
+    orbit = lyap_taylorinteg(f, q0, zero(T), tmax * yr, order, abstol, dparams; maxsteps)
 
-    return sol.t, sol.x, sol.λ
+    return orbit.t, orbit.x, orbit.λ
 end

@@ -5,8 +5,8 @@ An astrometric optical observed minus computed residual.
 
 # Fields
 
-- `ra/dec::U`: right ascension (declination) residual [arcsec].
-- `wra/wdec::T`: right ascension (declination) weight [arcsec⁻²].
+- `ra/dec::U`: normalized right ascension (declination) residual [arcsec].
+- `wra/wdec::T`: right ascension (declination) weight [arcsec⁻¹].
 - `dra/ddec::T`: right ascension (declination) debiasing factor [arcsec].
 - `outlier::Bool`: whether the residual is an outlier or not.
 """
@@ -25,10 +25,13 @@ An astrometric optical observed minus computed residual.
     end
 end
 
-# Definition of zero OpticalResidual
-zero(::Type{OpticalResidual{T, U}}) where {T, U} = OpticalResidual{T, U}(
-        zero(U), zero(U), zero(T), zero(T), zero(T), zero(T), false)
-iszero(x::OpticalResidual{T, U}) where {T, U} = x == zero(OpticalResidual{T, U})
+# AbstractAstrometryResidual interface
+residual(x::OpticalResidual) = (ra(x), dec(x))
+weight(x::OpticalResidual) = (wra(x), wdec(x))
+debias(x::OpticalResidual) = (dra(x), ddec(x))
+
+dof(::Type{OpticalResidual{T, U}}) where {T, U} = 2
+chi2(x::OpticalResidual) = !isoutlier(x) * (ra(x)^2 + dec(x)^2)
 
 ra(x::OpticalResidual) = x.ra
 dec(x::OpticalResidual) = x.dec
@@ -37,15 +40,16 @@ wdec(x::OpticalResidual) = x.wdec
 dra(x::OpticalResidual) = x.dra
 ddec(x::OpticalResidual) = x.ddec
 
-isoutlier(x::OpticalResidual) = x.outlier
-nout(x::AbstractVector{OpticalResidual{T, U}}) where {T, U} = count(isoutlier, x)
-notout(x::AbstractVector{OpticalResidual{T, U}}) where {T, U} = count(!isoutlier, x)
+# Definition of zero OpticalResidual
+zero(::Type{OpticalResidual{T, U}}) where {T, U} = OpticalResidual{T, U}(
+        zero(U), zero(U), zero(T), zero(T), zero(T), zero(T), false)
+iszero(x::OpticalResidual{T, U}) where {T, U} = x == zero(OpticalResidual{T, U})
 
 # Print method for OpticalResidual
 function show(io::IO, x::OpticalResidual)
     outlier_flag = isoutlier(x) ? " (outlier)" : ""
-    print(io, "α: ", @sprintf("%+.5f", cte(x.ξ_α)), " δ: ",
-        @sprintf("%+.5f", cte(x.ξ_δ)), outlier_flag)
+    print(io, "α: ", @sprintf("%+.5f", cte(ra(x))), " δ: ",
+        @sprintf("%+.5f", cte(dec(x))), outlier_flag)
 end
 
 # Evaluate methods
@@ -132,7 +136,7 @@ end
 dot3D(x::Vector{T}, y::Vector{TaylorN{T}}) where {T <: Real} = dot3D(y, x)
 
 """
-    compute_radec(::AbstractOpticalResidual; xva, kwargs...)
+    compute_radec(::AbstractOpticalAstrometry; xva, kwargs...)
 
 Compute the astrometric right ascension and declination [arcsec]. Corrections
 due to Earth orientation, LOD and polar motion are considered.
@@ -147,7 +151,7 @@ due to Earth orientation, LOD and polar motion are considered.
 All ephemeris must take [et seconds since J2000] and return [barycentric position
 in km and velocity in km/sec].
 """
-compute_radec(x::AbstractOpticalResidual; kwargs...) =
+compute_radec(x::AbstractOpticalAstrometry; kwargs...) =
     compute_radec(observatory(x), date(x); kwargs...)
 
 function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
@@ -385,22 +389,26 @@ end
 function residuals!(res::Vector{OpticalResidual{T, U}}, optical::AbstractOpticalVector{T};
                     xva::AstEph, kwargs...) where {AstEph, T <: Real, U <: Number}
 
-    @allow_boxed_captures tmap!(res, optical, wra.(res), wdec.(res), dra.(res),
-        ddec.(res), isoutlier.(res)) do x, w8ra, w8dec, biasra, biasdec, outlier
+    @allow_boxed_captures tmap!(res, optical, weight.(res), debias.(res),
+                                isoutlier.(res)) do x, w8s, bias, outlier
         # Observed ra/dec [arcsec]
         obsra, obsdec = rad2arcsec.(measure(x))
         # Computed ra/dec [arcsec]
         compra, compdec = compute_radec(x; xva, kwargs...)
+        # Statistical weights [arcsec⁻²]
+        wra, wdec = w8s
+        # Debiasing factors [arcsec]
+        dra, ddec = bias
         # Observed minus computed residual ra/dec
         # Note: ra is multiplied by a metric factor cos(dec) to match the format of
         # debiasing corrections
         return OpticalResidual{T, U}(
-            anglediff(obsra, compra) * cos(dec(x)) - biasra,
-            obsdec - compdec - biasdec,
-            w8ra,
-            w8dec,
-            biasra,
-            biasdec,
+            wra * ( anglediff(obsra, compra) * cos(dec(x)) - dra ),
+            wdec * ( obsdec - compdec - ddec ),
+            wra,
+            wdec,
+            dra,
+            ddec,
             outlier
         )
     end

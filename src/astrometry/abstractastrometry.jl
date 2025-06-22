@@ -118,8 +118,33 @@ abstract type AbstractAstrometryErrorModel{T <: Real} <: AbstractAstrometry end
     AbstractAstrometryResidual{T <: Real, U <: Number} <: AbstractAstrometry
 
 Supertye for the astrometric observed minus computed residuals interface.
+
+Every astrometric residual `x` has a:
+- `residual(x)`: normalized observed minus computed residual(s) [adimensional].
+- `weight(x)`: statistical weight [same units as measure⁻¹].
+- `debias(x)`: debiasing factor [same units as measure].
 """
 abstract type AbstractAstrometryResidual{T <: Real, U <: Number} <: AbstractAstrometry end
+
+const AbstractResidualVector{T} = AbstractVector{<:AbstractAstrometryResidual{T}} where {T}
+
+evaluate(y::SVector{N, Taylor1{T}}, x::Number) where {N, T <: Number} =
+    [y[i](x) for i in eachindex(y)]
+
+(y::SVector{N, Taylor1{T}})(x::Number) where {N, T <: Number} = evaluate(y, x)
+
+evaluate(y::SVector{N, TaylorN{T}}, x::Vector{<:Number}) where {N, T <: Number} =
+    [y[i](x) for i in eachindex(y)]
+
+(y::SVector{N, TaylorN{T}})(x::Vector{T}) where {N, T <: Number} = evaluate(y, x)
+
+isoutlier(x::AbstractAstrometryResidual) = x.outlier
+nout(x::AbstractResidualVector) = count(isoutlier, x)
+notout(x::AbstractResidualVector) = count(!isoutlier, x)
+
+chi2(x::AbstractResidualVector) = sum(chi2, x)
+nms(x::AbstractResidualVector) = chi2(x) / (dof(eltype(x)) * notout(x))
+nrms(x::AbstractResidualVector) = sqrt(nms(x))
 
 """
     AbstractOpticalResidual{T, U} <: AbstractAstrometryResidual{T, U}

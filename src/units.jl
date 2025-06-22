@@ -244,3 +244,31 @@ frequency. However, this function uses only the first term in the
 expansion of ``(c - \dot{\rho})^{-1}``.
 """
 rangerate2doppler(v::Number, f_t::Number) = -2 * v * f_t * 1e6 / c_km_per_day
+
+"""
+    chi2(::AbstractVector)
+
+Return the chi-squared of a vector of normalized residuals.
+
+See also [`nms`](@ref) and [`nrms`](@ref).
+"""
+chi2(x::Number) = x^2
+chi2(x::AbstractVector) = sum(chi2, x)
+
+"""
+    nms(::AbstractVector)
+
+Return the normalized mean square error of a vector of normalized residuals.
+
+See also [`chi2`](@ref) and [`nrms`](@ref).
+"""
+nms(x::AbstractVector) = chi2(x) / length(x)
+
+"""
+    nrms(::AbstractVector)
+
+Return the normalized root mean square error of a vector of normalized residuals.
+
+See also [`chi2`](@ref) and [`nms`](@ref).
+"""
+nrms(x::AbstractVector) = sqrt(nms(x))

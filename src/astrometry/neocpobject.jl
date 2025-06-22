@@ -80,6 +80,9 @@ NEOCPObject(r::DataFrameRow) = NEOCPObject{Float64}(
 function parse_neocp_objects(text::AbstractString)
     # Parse lines
     lines = split(text, '\n', keepempty = false)
+    # Note: Some objects that were moved to the PCCP have a very long arc length,
+    # hence having a registry with more than 101 columns (see e.g. P22aZna)
+    filter!(x -> length(x) == 101, lines)
     L = length(lines)
     # Construct DataFrame
     R = NEOCPObject{Float64}

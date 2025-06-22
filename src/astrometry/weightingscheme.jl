@@ -53,7 +53,7 @@ end
 # Constructors
 function SourceWeights(optical::AbstractOpticalVector{T}) where {T <: Real}
     σs = rms.(optical)
-    w8s = @. tuple(1 / first(σs)^2, 1 / last(σs)^2)
+    w8s = @. tuple(1 / first(σs), 1 / last(σs))
     return SourceWeights{T}(w8s)
 end
 
@@ -63,7 +63,7 @@ getid(::SourceWeights) = "Source"
 # Override update!
 function update!(w::SourceWeights{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
     σs = rms.(optical)
-    w.w8s = @. tuple(1 / first(σs)^2, 1 / last(σs)^2)
+    w.w8s = @. tuple(1 / first(σs, 1 / last(σs)))
     return nothing
 end
 
@@ -189,5 +189,5 @@ end
 function w8sveres17(optical::AbstractOpticalVector{T}) where {T <: Real}
     σs = σsveres17.(optical)
     rex = rexveres17(optical)
-    return @. tuple(1 / (rex * σs) ^ 2, 1 / (rex * σs) ^ 2)
+    return @. tuple(1 / (rex * σs), 1 / (rex * σs))
 end

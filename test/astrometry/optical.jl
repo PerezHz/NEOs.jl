@@ -554,8 +554,13 @@ using Test
 
         @test length(w21.w8s) == length(w22.w8s) == length(w23.w8s)
         @test all(==((1.0, 1.0)), w21.w8s)
-        @test all(@. w22.w8s == tuple(1 / getfield(optical2, :ra_rms)^2,
-            1 / getfield(optical2, :dec_rms)^2))
+        @test all(map(w22.w8s, optical2) do w, x
+            σx = rms(x)
+            w == (1 / σx[1], 1 / σx[2])
+        end)
+
+        all( @. w22.w8s == tuple(1 / getfield(optical2, :ra_rms),
+            1 / getfield(optical2, :dec_rms)) )
 
         w31 = UniformWeights(optical3)
         w32 = SourceWeights(optical3)
@@ -564,9 +569,8 @@ using Test
         @test length(w31.w8s) == length(w32.w8s) == length(w33.w8s)
         @test all(==((1.0, 1.0)), w31.w8s)
         @test all(map(w32.w8s, optical3) do w, x
-            wra = isnan(x.rmsra) ? one(Float64) : 1 / x.rmsra^2
-            wdec = isnan(x.rmsdec) ? one(Float64) : 1 / x.rmsdec^2
-            w == (wra, wdec)
+            σx = rms(x)
+            w == (1 / σx[1], 1 / σx[2])
         end)
 
         @test w13.w8s == w23.w8s == w33.w8s

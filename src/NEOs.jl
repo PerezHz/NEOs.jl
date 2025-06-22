@@ -37,14 +37,15 @@ export Parameters
 export d_EM_km, d_EM_au
 export julian2etsecs, etsecs2julian, dtutc2et, et2dtutc, dtutc2jdtdb, jdtdb2dtutc,
        et_to_200X, days_to_200X, dtutc_to_200X, dtutc2days, days2dtutc, rad2arcsec,
-       arcsec2rad, mas2rad, range2delay, rangerate2doppler
+       arcsec2rad, mas2rad, range2delay, rangerate2doppler, chi2, nms, nrms
 export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199
 # Minor bodies astrometry interface
 export MPC, NEOCP, NEOCC, NEODyS2, JPL
 export UniformWeights, SourceWeights, Veres17
 export ZeroDebiasing, SourceDebiasing, Farnocchia15, Eggl20
 export numberofdays, unpacknum, packnum, unpackdesig, packdesig
-export date, measure, observatory, rms, debias, ra, dec, mag, catalogue, frequency
+export date, measure, observatory, rms, debias, ra, dec, mag, catalogue, frequency,
+       residual, weight, isoutlier, nout, notout
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
 export update_observatories_mpc, search_observatory_code, fetch_observatory_information
@@ -53,24 +54,23 @@ export fetch_neocp_objects, read_neocp_objects, write_neocp_objects
 export fetch_optical_rwo, read_optical_rwo, write_optical_rwo
 export fetch_optical_ades, read_optical_ades, write_optical_ades
 export nobs, astrometry, datediff, reduce_tracklets
-export wra, wdec, dra, ddec, isoutlier, unfold, compute_radec, residuals
+export wra, wdec, dra, ddec, unfold, compute_radec, residuals
 export fetch_radar_jpl, read_radar_jpl, write_radar_jpl
 export fetch_radar_rwo, read_radar_rwo, write_radar_rwo
 export compute_delay, radar_astrometry
 # Propagation
+export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!, newtonian!
+export loadpeeph, rvelea, scaled_variables, propagate, propagate_lyap, propagate_root
+# Orbit determination
 
 #=
-# Asteroid dynamical models
-export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!, newtonian!
-# Propagation
-export propagate, propagate_lyap, propagate_root
 # PE and NEOs ephemerides
-export loadpeeph, bwdfwdeph
+export bwdfwdeph
 # Osculating
 export pv2kep, yarkp2adot
 # Least squares
 export LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
-       project, chi2, nms, nrms, leastsquares, leastsquares!, tryls, outlier_rejection!
+       project, leastsquares, leastsquares!, tryls, outlier_rejection!
 # AbstractOrbit
 export GaussOrbit, MMOVOrbit, LeastSquaresOrbit, epoch, minmaxdates, critical_value,
        sigmas, snr, jplcompare, keplerian, uncertaintyparameter
@@ -88,7 +88,7 @@ include("units.jl")
 include("jpleph.jl")
 include("parameters.jl")
 include("astrometry/astrometry.jl")
-# include("propagation/propagation.jl")
+include("propagation/propagation.jl")
 # include("orbitdetermination/orbitdetermination.jl")
 # include("postprocessing/bplane.jl")
 include("init.jl")

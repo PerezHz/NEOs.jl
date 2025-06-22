@@ -1,32 +1,29 @@
-# Evaluate `tinterp` at time `t` using `OhMyThreads.tmap`
+# Evaluate `y` at time `t` using `OhMyThreads.tmap`
 # This function is a multithreaded version of
 # https://github.com/PerezHz/PlanetaryEphemeris.jl/blob/ed36a2f6e34567a14887cf2811ec7787f124f062/src/interpolation/TaylorInterpolant.jl#L147
 # TO DO: move this to PlanetaryEphemeris.jl
-function tpeeval(tinterp::TaylorInterpolant{T, U, 2}, t::TT) where {T, U,
-    TT <: TaylorInterpCallingArgs{T, U}}
-    # Get index of tinterp.x that interpolates at time t
-    ind::Int, δt::TT = getinterpindex(tinterp, t)
-    # Evaluate tinterp.x[ind] at δt
-    return tmap(x -> x(δt), TT, view(tinterp.x, ind, :))
+function tpeeval(y::TaylorInterpolant{T, U, 2}, t::TT) where {T, U,
+                 TT <: TaylorInterpCallingArgs{T, U}}
+    # Get index of y.x that interpolates at time t
+    ind::Int, δt::TT = getinterpindex(y, t)
+    # Evaluate y.x[ind] at δt
+    return tmap(x -> x(δt), TT, view(y.x, ind, :))
 end
 
-@doc raw"""
-    evaleph(eph::TaylorInterpolant, t::Taylor1, q::Taylor1{U}) where {U}
-    evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T<:Real}
-
-Evaluate planetary ephemeris with type given by `q`.
 """
-function evaleph(eph::TaylorInterpolant, t::Taylor1, q::Taylor1{U}) where {U}
-    return map(x -> Taylor1( x.coeffs*one(q[0]) ), tpeeval(eph, t))
-end
+    evaleph(eph::TaylorInterpolant, t::Taylor1, q)
 
-function evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T<:Real}
-    return one(q)*eph(t)
-end
+Evaluate `eph` at time `t` with type given by `q`.
+"""
+evaleph(eph::TaylorInterpolant, t::Taylor1, q::Taylor1{U}) where {U} =
+    map(x -> Taylor1( x.coeffs * one(q[0]) ), tpeeval(eph, t))
+
+evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T <: Real} =
+    one(q) * eph(t)
 
 # In-place methods of evaleph
 function evaleph!(y::Vector{Taylor1{TaylorN{T}}}, eph::TaylorInterpolant{T, T, 2},
-    t::Taylor1{T}) where {T <: Real}
+                  t::Taylor1{T}) where {T <: Real}
     eph_t = tpeeval(eph, t)
     @inbounds for i in eachindex(eph_t)
         TS.zero!(y[i])
@@ -38,7 +35,7 @@ function evaleph!(y::Vector{Taylor1{TaylorN{T}}}, eph::TaylorInterpolant{T, T, 2
 end
 
 function evaleph!(y::Vector{Taylor1{T}}, eph::TaylorInterpolant{T, T, 2},
-    t::Taylor1{T}) where {T <: Real}
+                  t::Taylor1{T}) where {T <: Real}
     eph_t = tpeeval(eph, t)
     @inbounds for i in eachindex(eph_t)
         for k in eachindex(y[i])
@@ -48,72 +45,41 @@ function evaleph!(y::Vector{Taylor1{T}}, eph::TaylorInterpolant{T, T, 2},
     return nothing
 end
 
-@doc raw"""
-    auxzero(a::AbstractSeries)
+# Return a zero of the same type as `a`
+auxzero(a::AbstractSeries) = zero(a)
 
-Return a zero of the same type as `a`.
+# Return a `TaylorN` with zero coefficients of the same type as `a.coeffs`
+auxzero(a::TaylorN{Taylor1{T}}) where {T <: Number} = TaylorN(zero.(a.coeffs))
+
 """
-function auxzero(a::AbstractSeries)
-    return zero(a)
-end
-
-@doc raw"""
-    auxzero(a::TaylorN{Taylor1{T}}) where {T<:Number}
-
-Return a `TaylorN` with zero coefficients of the same type as `a.coeffs`.
-"""
-function auxzero(a::TaylorN{Taylor1{T}}) where {T<:Number}
-    return TaylorN(zero.(a.coeffs))
-end
-
-# Nearth-Earth asteroid dynamical model (d=2.0)
-# Bodies considered in the model are: the Sun, the eight planets, the Moon and Ceres,
-# as well as the asteroid of interest as a test particle with null mass. Dynamical
-# effects considered are:
-# - post-Newtonian point-mass accelerations between all bodies,
-# - figure-effects (oblateness) of the Earth (J2 and J3)
-# - J2 effect of the Sun
-# - J2 and J3 effect of the Moon
-# - Kinematic model for the precession and nutation of the Earth's orientation (IAU 1976/1980 Earth orientation model)
-# - Kinematic model for the Moons's orientation (Seidelmann et al., 2006)
-# - Non-gravitational accelerations acting upon the asteroid
-# are included (Yarkovsky effect) a_nongrav = A2*t_vec*(au/r)^d, where t_vec is the
-# unit heliocentric transverse vector, au is 1 astronomical unit, r is the
-# asteroid's heliocentric range, A2 is a coefficient (with units of au/day^2),
-# and d = 2.0
-
-@doc raw"""
     RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
 
-Near-Earth asteroid dynamical model (``d = 2``). Bodies considered in the model are: the Sun,
-the eight planets, the Moon and Ceres, as well as the asteroid of interest as a test particle
-with null mass. Dynamical effects considered are:
+Asteroid dynamical model. Bodies considered in the model are: the Sun, the eight planets,
+the Moon and Ceres, as well as the asteroid of interest as a test particle with null mass.
+Dynamical effects considered are:
 
-- Post-Newtonian point-mass accelerations between all bodies: see equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
+- Post-Newtonian point-mass accelerations between all bodies. See equation (35) in page
+    7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
 
-- Figure-effects (oblateness) of the Earth (``J_2`` and ``J_3``),
+- Figure-effects (oblateness) of the Earth (``J_2`` and ``J_3``), ``J_2`` effect of the
+    Sun and ``J_2`` and ``J_3`` effect of the Moon. See equation (28) in page 13 of
+    https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract and equations (173)
+    and (174) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
 
-- ``J_2`` effect of the Sun and
+- Kinematic model for the precession and nutation of the Earth's orientation (IAU 1976/1980
+    Earth orientation model). See [`PlanetaryEphemeris.c2t_jpl_de430`](@ref).
 
-- ``J_2`` and ``J_3`` effect of the Moon: see equation (28) in page 13 of https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract and equations (173) and (174) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
+- Kinematic model for the Moon's orientation (Seidelmann et al., 2006). See equations
+    (14)-(15) in page 9 and equations (34)-(35) in page 16 of
+    https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract.
 
-- Kinematic model for the precession and nutation of the Earth's orientation (IAU 1976/1980 Earth orientation model): see [`PlanetaryEphemeris.c2t_jpl_de430`](@ref).
+- Non-gravitational accelerations acting upon the asteroid (radiation pressure and
+    Yarkovsky effect with ``d = 2``).
 
-- Kinematic model for the Moon's orientation (Seidelmann et al., 2006): see equations (14)-(15) in page 9 and equations (34)-(35) in page 16 of https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract.
+To improve performance, some internal loops are multi-threaded via `Threads.@threads for`.
 
-- Non-gravitational accelerations acting upon the asteroid: are included (Yarkovsky effect)
-```math
-\mathbf{a}_\text{nongrav} = A_2\left(\frac{1 \ \text{au}}{r}\right)^d*\hat{\mathbf{t}},
-```
-where ``\hat{\mathbf{t}}`` is the unit heliocentric transverse vector, ``r`` is the
-asteroid's heliocentric range, ``A_2`` is a coefficient (with units of au/day^2),
-and ``d = 2``.
-
-To improve performance, some internal loops are multi-threaded via `Threads.threads for`
-
-See also [`PlanetaryEphemeris.NBP_pN_A_J23E_J23M_J2S!`](@ref).
-""" RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
-
+See also [`RNp1BP_pN_A_J23E_J2S_eph_threads!`](@ref) and [`newtonian!`](@ref).
+"""
 function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
@@ -691,6 +657,32 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     nothing
 end
 
+"""
+    RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
+
+Asteroid dynamical model. Bodies considered in the model are: the Sun, the eight planets,
+the Moon and Ceres, as well as the asteroid of interest as a test particle with null mass.
+Dynamical effects considered are:
+
+- Post-Newtonian point-mass accelerations between all bodies. See equation (35) in page
+    7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
+
+- Figure-effects (oblateness) of the Earth (``J_2`` and ``J_3``), ``J_2`` effect of the
+    Sun and ``J_2`` and ``J_3`` effect of the Moon. See equation (28) in page 13 of
+    https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract and equations (173)
+    and (174) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
+
+- Kinematic model for the precession and nutation of the Earth's orientation (IAU 1976/1980
+    Earth orientation model). See [`PlanetaryEphemeris.c2t_jpl_de430`](@ref).
+
+- Kinematic model for the Moon's orientation (Seidelmann et al., 2006). See equations
+    (14)-(15) in page 9 and equations (34)-(35) in page 16 of
+    https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract.
+
+To improve performance, some internal loops are multi-threaded via `Threads.@threads for`.
+
+See also [`RNp1BP_pN_A_J23E_J2S_ng_eph_threads!`](@ref) and [`newtonian!`](@ref).
+"""
 function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
@@ -1230,6 +1222,20 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
     nothing
 end
 
+"""
+    newtonian!(dq, q, params, t)
+
+Asteroid dynamical model. Bodies considered in the model are: the Sun, the eight planets,
+the Moon, as well as the asteroid of interest as a test particle with null mass.
+Dynamical effects considered are:
+
+- Newtonian point-mass accelerations between all bodies.
+
+To improve performance, some internal loops are multi-threaded via `Threads.@threads for`.
+
+See also [`RNp1BP_pN_A_J23E_J2S_ng_eph_threads!`](@ref) and
+[`RNp1BP_pN_A_J23E_J2S_eph_threads`](@ref).
+"""
 function newtonian!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
