@@ -10,6 +10,10 @@ end
 
 function MPC80FileReader(text::AbstractString)
     # Parse optical observations
+    if Sys.iswindows()
+        # Windows uses \r\n as newline instead of \n
+        text = replace(text, "\r\n" => '\r')
+    end
     N = count(==('\n'), text)
     L = length(text)
     optical = Vector{SubString{String}}(undef, N)

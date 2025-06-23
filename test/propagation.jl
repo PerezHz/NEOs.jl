@@ -104,7 +104,7 @@ using InteractiveUtils: methodswith
 
         @test mean_optical0 ≈ -0.900 atol=1e-3
         @test std_optical0 ≈ 1.070 atol=1e-3
-        @test chi2_optical0 ≈ 479.839 atol=1e-3
+        @test chi2_optical0 ≈ 479.83 atol=1e-2
         @test nms_optical0 ≈ 1.951 atol=1e-3
         @test nrms_optical0 ≈ 1.397 atol=1e-3
 

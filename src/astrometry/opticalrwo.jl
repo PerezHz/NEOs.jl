@@ -12,6 +12,10 @@ end
 
 function RWOFileReader(text::AbstractString)
     # Parse header
+    if Sys.iswindows()
+        # Windows uses \r\n as newline instead of \n
+        text = replace(text, "\r\n" => '\r')
+    end
     @assert contains(text, "END_OF_HEADER\n") "Cannot parse text \
         as it does not contain a header"
     S1 = split(text, "END_OF_HEADER\n")
