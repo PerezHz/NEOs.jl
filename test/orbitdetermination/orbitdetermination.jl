@@ -1,4 +1,4 @@
-# This file is part of the NEOs.jl package; MIT licensed
+# This file is part of the NEOs.jacobianl package; MIT licensed
 
 using NEOs
 using Dates
@@ -6,23 +6,23 @@ using PlanetaryEphemeris
 using LinearAlgebra
 using Test
 
-using NEOs: RadecMPC, numberofdays, nobs, minmaxdates, notout, nout, reduce_tracklets,
-    indices
+using NEOs: AbstractOpticalVector, indices
 using Statistics: mean
 
-function iodsubradec(radec::Vector{RadecMPC{T}}, N::Int = 3) where {T <: Real}
-    tracklets = reduce_tracklets(radec)
+function iodsuboptical(optical::AbstractOpticalVector, N::Int = 3)
+    tracklets = reduce_tracklets(optical)
     idxs = indices(tracklets[1:N])
-    subradec = radec[idxs]
-    return subradec
+    suboptical = optical[idxs]
+    return suboptical
 end
 
 @testset "Orbit Determination" begin
     @testset "Straight Gauss Method" begin
         # Load observations
-        radec = read_radec_mpc(joinpath(pkgdir(NEOs), "test", "data", "RADEC_2023_DW.dat"))
-        # Subset of radec for IOD
-        subradec = iodsubradec(radec, 3)
+        optical = read_optical_mpc80(joinpath(pkgdir(NEOs), "test", "data",
+            "2023DW_OPTICAL.dat"))
+        # Subset of optical for IOD
+        suboptical = iodsuboptical(optical, 3)
 
         # Parameters
         params = Parameters(
@@ -32,33 +32,34 @@ end
         )
         params = Parameters(params, parse_eqs = true)
         # Orbit determination problem
-        od = ODProblem(newtonian!, subradec)
+        od = ODProblem(newtonian!, suboptical)
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 2, 2025
+        # Values by Jul 4, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(suboptical)})
         # Tracklets
-        @test length(subradec) == nobs(od) == nobs(orbit) == 9
-        @test numberofdays(subradec) == numberofdays(orbit) < 0.18
-        @test minmaxdates(orbit) == (date(subradec[1]), date(subradec[end]))
+        @test length(suboptical) == nobs(od) == nobs(orbit) == 9
+        @test numberofdays(suboptical) == numberofdays(orbit) < 0.18
+        @test minmaxdates(orbit) == (date(suboptical[1]), date(suboptical[end]))
         @test length(od.tracklets) == length(orbit.tracklets) == 3
         @test od.tracklets == orbit.tracklets
-        @test orbit.tracklets[1].radec[1] == subradec[1]
-        @test orbit.tracklets[end].radec[end] == subradec[end]
+        @test orbit.tracklets[1].indices[1] == 1
+        @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-4)
-        @test dtutc2days(date(subradec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
+        @test dtutc2days(date(suboptical[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        @test dtutc2days(date(subradec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
+        @test dtutc2days(date(suboptical[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test notout(orbit.res) == 9
-        @test nout(orbit.res) == 0
+        @test notout(orbit.ores) == 9
+        @test nout(orbit.ores) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 9e-4 )
@@ -66,9 +67,9 @@ end
         @test chi2(orbit) < 0.53
         @test nrms(orbit) < 0.18
         # Jacobian
-        @test size(orbit.J) == (6, 6)
-        @test isdiag(orbit.J)
-        @test maximum(orbit.J) < 9e-4
+        @test size(orbit.jacobian) == (6, 6)
+        @test isdiag(orbit.jacobian)
+        @test maximum(orbit.jacobian) < 9e-4
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
@@ -91,32 +92,33 @@ end
         @test uncertaintyparameter(orbit, params) == 10
 
         # Add observations
-        subradec = iodsubradec(radec, 15)
+        suboptical = iodsuboptical(optical, 15)
 
         # Refine orbit
-        NEOs.update!(od, subradec)
+        NEOs.update!(od, suboptical)
         orbit1 = orbitdetermination(od, orbit, params)
 
         # Check type
-        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
+        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(suboptical)})
         # Tracklets
-        @test length(subradec) == nobs(od) == nobs(orbit1) == 43
-        @test numberofdays(subradec) == numberofdays(orbit1) < 2.76
-        @test minmaxdates(orbit1) == (date(subradec[1]), date(subradec[end]))
+        @test length(suboptical) == nobs(od) == nobs(orbit1) == 43
+        @test numberofdays(suboptical) == numberofdays(orbit1) < 2.76
+        @test minmaxdates(orbit1) == (date(suboptical[1]), date(suboptical[end]))
         @test length(od.tracklets) == length(orbit1.tracklets) == 15
         @test od.tracklets == orbit1.tracklets
-        @test orbit1.tracklets[1].radec[1] == subradec[1]
-        @test orbit1.tracklets[end].radec[end] == subradec[end]
+        @test orbit1.tracklets[1].indices[1] == 1
+        @test orbit1.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
         @test epoch(orbit1) == epoch(orbit)
-        @test dtutc2days(date(subradec[1])) > orbit1.bwd.t0 + orbit1.bwd.t[end]
+        @test dtutc2days(date(suboptical[1])) > orbit1.bwd.t0 + orbit1.bwd.t[end]
         @test all( norm.(orbit1.bwd.x, Inf) .< 1.2 )
-        @test dtutc2days(date(subradec[end])) < orbit1.fwd.t0 + orbit1.fwd.t[end]
+        @test dtutc2days(date(suboptical[end])) < orbit1.fwd.t0 + orbit1.fwd.t[end]
         @test all( norm.(orbit1.fwd.x, Inf) .< 1.2 )
         # Vector of residuals
-        @test notout(orbit1.res) == 43
-        @test nout(orbit1.res) == 0
+        @test notout(orbit1.ores) == 43
+        @test nout(orbit1.ores) == 0
         # Least squares fit
         @test orbit1.fit.success
         @test all( sigmas(orbit1) .< 2e-4 )
@@ -124,9 +126,9 @@ end
         @test chi2(orbit1) < 11.64
         @test nrms(orbit1) < 0.37
         # Jacobian
-        @test size(orbit1.J) == (6, 6)
-        @test isdiag(orbit1.J)
-        @test maximum(orbit1.J) < 9e-4
+        @test size(orbit1.jacobian) == (6, 6)
+        @test isdiag(orbit1.jacobian)
+        @test maximum(orbit1.jacobian) < 9e-4
         # Convergence history
         @test size(orbit1.qs, 1) == 6
         @test size(orbit1.qs, 2) == length(orbit1.Qs) == 6
@@ -147,10 +149,10 @@ end
 
     @testset "Unsafe Gauss Method" begin
         # Load observations
-        radec = fetch_radec_mpc("2005 TM173")
-        # Subset of radec for IOD
-        # subradec = iodsubradec(radec, 3)
-        # In this case: radec == subradec
+        optical = fetch_optical_mpc80("2005 TM173", MPC)
+        # Subset of optical for IOD
+        # suboptical = iodsuboptical(optical, 3)
+        # In this case: optical == suboptical
 
         # Parameters
         params = Parameters(
@@ -159,33 +161,34 @@ end
            significance = 0.99, outrej = false, safegauss = false
         )
         # Orbit determination problem
-        od = ODProblem(newtonian!, radec)
+        od = ODProblem(newtonian!, optical)
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 2, 2025
+        # Values by Jul 4, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(optical)})
         # Tracklets
-        @test length(radec) == nobs(od) == nobs(orbit) == 6
-        @test numberofdays(radec) == numberofdays(orbit) < 1.95
-        @test minmaxdates(orbit) == (date(radec[1]), date(radec[end]))
+        @test length(optical) == nobs(od) == nobs(orbit) == 6
+        @test numberofdays(optical) == numberofdays(orbit) < 1.95
+        @test minmaxdates(orbit) == (date(optical[1]), date(optical[end]))
         @test length(od.tracklets) == length(orbit.tracklets) == 2
         @test od.tracklets == orbit.tracklets
-        @test orbit.tracklets[1].radec[1] == radec[1]
-        @test orbit.tracklets[end].radec[end] == radec[end]
+        @test orbit.tracklets[1].indices[1] == 1
+        @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(radec[4])), atol = 3e-4)
-        @test dtutc2days(date(radec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
+        @test isapprox(epoch(orbit), dtutc2days(date(optical[4])), atol = 3e-4)
+        @test dtutc2days(date(optical[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        @test dtutc2days(date(radec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
+        @test dtutc2days(date(optical[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test notout(orbit.res) == 6
-        @test nout(orbit.res) == 0
+        @test notout(orbit.ores) == 6
+        @test nout(orbit.ores) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 5e-3 )
@@ -193,9 +196,9 @@ end
         @test chi2(orbit) < 2.53
         @test nrms(orbit) < 0.46
         # Jacobian
-        @test size(orbit.J) == (6, 6)
-        @test isdiag(orbit.J)
-        @test maximum(orbit.J) < 6.8e-4
+        @test size(orbit.jacobian) == (6, 6)
+        @test isdiag(orbit.jacobian)
+        @test maximum(orbit.jacobian) < 6.8e-4
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
@@ -220,9 +223,9 @@ end
 
     @testset "Gauss Method with ADAM refinement" begin
         # Load observations
-        radec = fetch_radec_mpc("2024 MK")
-        # Subset of radec for IOD
-        subradec = radec[10:21]
+        optical = fetch_optical_mpc80("2024 MK", MPC)
+        # Subset of optical for IOD
+        suboptical = optical[10:21]
 
         # Parameters
         params = Parameters(
@@ -234,33 +237,34 @@ end
             fudge = 100.0, max_per = 34.0,
         )
         # Orbit determination problem
-        od = ODProblem(newtonian!, subradec)
+        od = ODProblem(newtonian!, suboptical)
 
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by May 25, 2025
+        # Values by Jul 4, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(suboptical)})
         # Tracklets
-        @test length(subradec) == nobs(od) == nobs(orbit) == 12
-        @test numberofdays(subradec) == numberofdays(orbit) < 42.8
-        @test minmaxdates(orbit) == (date(subradec[1]), date(subradec[end]))
+        @test length(suboptical) == nobs(od) == nobs(orbit) == 12
+        @test numberofdays(suboptical) == numberofdays(orbit) < 42.8
+        @test minmaxdates(orbit) == (date(suboptical[1]), date(suboptical[end]))
         @test length(od.tracklets) == length(orbit.tracklets) == 3
         @test od.tracklets == orbit.tracklets
-        @test orbit.tracklets[1].radec[1] == subradec[1]
-        @test orbit.tracklets[end].radec[end] == subradec[end]
+        @test orbit.tracklets[1].indices[1] == 1
+        @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 5e-4)
-        @test dtutc2days(date(subradec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
+        @test dtutc2days(date(suboptical[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        @test dtutc2days(date(subradec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
+        @test dtutc2days(date(suboptical[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test notout(orbit.res) == 12
-        @test nout(orbit.res) == 0
+        @test notout(orbit.ores) == 12
+        @test nout(orbit.ores) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 6.6e-4 )
@@ -268,9 +272,9 @@ end
         @test chi2(orbit) < 2.43
         @test nrms(orbit) < 0.32
         # Jacobian
-        @test size(orbit.J) == (6, 6)
-        @test isdiag(orbit.J)
-        @test maximum(orbit.J) < 9.5e-6
+        @test size(orbit.jacobian) == (6, 6)
+        @test isdiag(orbit.jacobian)
+        @test maximum(orbit.jacobian) < 9.5e-6
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 3
@@ -299,16 +303,16 @@ end
             topo2bary, bary2topo
 
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("2024 BX1")
+        optical = fetch_optical_mpc80("2024 BX1", MPC)
         # Parameters
         params = Parameters()
         # First tracklet
-        radec = radec[1:3]
-        tracklet = reduce_tracklets(radec)[1]
+        optical = optical[1:3]
+        tracklet = reduce_tracklets(optical)[1]
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by May 2, 2024
+        # Values by Jul 4, 2025
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -317,7 +321,7 @@ end
             t: 2024-01-20T21:50:15.360 obs: GINOP-KHK, Piszkesteto"
         # Coefficients
         @test length(A.coeffs) == 6
-        @test A.coeffs[3] == A.v_α^2 * cos(A.δ)^2 + A.v_δ^2  # proper motion squared
+        @test A.coeffs[3] == A.vra^2 * cos(A.dec)^2 + A.vdec^2  # proper motion squared
         # Energy discriminant
         @test arenergydis(A, A.ρ_domain[1], :outer) > 0
         @test arenergydis(A, A.ρ_domain[1], :inner) > 0
@@ -394,7 +398,8 @@ end
         # Topocentric to barycentric conversion
         @test norm(bary2topo(A, topo2bary(A, A.Fs[3, :]...)) .- A.Fs[3, :]) < 8e-6
         # Curvature
-        C, Γ_C = curvature(radec)
+        w8s = Veres17(optical)
+        C, Γ_C = curvature(optical, w8s)
         σ_C = sqrt.(diag(Γ_C))
         @test all( abs.(C) ./ σ_C .> 0.02)
         χ2 = C' * inv(Γ_C) * C
@@ -403,10 +408,10 @@ end
 
     @testset "Too Short Arc" begin
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("2008 EK68")
-        # Subset of radec for IOD
-        # subradec = iodsubradec(radec, 3)
-        # In this case: radec == subradec
+        optical = fetch_optical_mpc80("2008 EK68", MPC)
+        # Subset of optical for IOD
+        # suboptical = iodsuboptical(optical, 3)
+        # In this case: optical == suboptical
 
         # Parameters
         params = Parameters(
@@ -416,39 +421,40 @@ end
            significance = 0.99, outrej = false
         )
         # Orbit determination problem
-        od = ODProblem(newtonian!, radec)
+        od = ODProblem(newtonian!, optical)
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 2, 2025
+        # Values by Jul 4, 2025
 
         # Curvature
-        C, Γ_C = curvature(radec)
+        C, Γ_C = curvature(optical, od.weights)
         σ_C = sqrt.(diag(Γ_C))
-        @test all( abs.(C) ./ σ_C .> 5.5)
+        @test all( abs.(C) ./ σ_C .> 3.4)
         χ2 = C' * inv(Γ_C) * C
-        @test χ2 > 2_516
+        @test χ2 > 1_006
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(optical)})
         # Tracklets
-        @test length(radec) == nobs(od) == nobs(orbit) == 10
-        @test numberofdays(radec) == numberofdays(orbit) < 0.05
-        @test minmaxdates(orbit) == (date(radec[1]), date(radec[end]))
+        @test length(optical) == nobs(od) == nobs(orbit) == 10
+        @test numberofdays(optical) == numberofdays(orbit) < 0.05
+        @test minmaxdates(orbit) == (date(optical[1]), date(optical[end]))
         @test length(od.tracklets) == length(orbit.tracklets) == 1
         @test od.tracklets == orbit.tracklets
-        @test orbit.tracklets[1].radec[1] == radec[1]
-        @test orbit.tracklets[end].radec[end] == radec[end]
+        @test orbit.tracklets[1].indices[1] == 1
+        @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), radec), atol = 7e-5)
-        @test dtutc2days(date(radec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
+        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical), atol = 7e-5)
+        @test dtutc2days(date(optical[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        @test dtutc2days(date(radec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
+        @test dtutc2days(date(optical[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test notout(orbit.res) == 10
-        @test nout(orbit.res) == 0
+        @test notout(orbit.ores) == 10
+        @test nout(orbit.ores) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 6e-3 )
@@ -456,9 +462,9 @@ end
         @test chi2(orbit) < 14.24
         @test nrms(orbit) < 0.85
         # Jacobian
-        @test size(orbit.J) == (6, 6)
-        @test isdiag(orbit.J)
-        @test maximum(orbit.J) < 9.2e-3
+        @test size(orbit.jacobian) == (6, 6)
+        @test isdiag(orbit.jacobian)
+        @test maximum(orbit.jacobian) < 9.2e-3
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
@@ -483,9 +489,9 @@ end
 
     @testset "Outlier Rejection" begin
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("2007 VV7")
-        # Subset of radec for IOD
-        subradec = iodsubradec(radec, 3)
+        optical = fetch_optical_mpc80("2007 VV7", MPC)
+        # Subset of optical for IOD
+        suboptical = iodsuboptical(optical, 3)
 
         # Parameters
         params = Parameters(
@@ -494,33 +500,34 @@ end
             outrej = true, χ2_rec = 1.0, χ2_rej = 1.25, fudge = 0.0
         )
         # Orbit determination problem
-        od = ODProblem(newtonian!, subradec)
+        od = ODProblem(newtonian!, suboptical)
 
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 26, 2025
+        # Values by Jul 4, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(suboptical)})
         # Tracklets
-        @test length(subradec) == nobs(od) == nobs(orbit) == 18
-        @test numberofdays(subradec) == numberofdays(orbit) < 2.16
-        @test minmaxdates(orbit) == (date(subradec[1]), date(subradec[end]))
+        @test length(suboptical) == nobs(od) == nobs(orbit) == 18
+        @test numberofdays(suboptical) == numberofdays(orbit) < 2.16
+        @test minmaxdates(orbit) == (date(suboptical[1]), date(suboptical[end]))
         @test length(od.tracklets) == length(orbit.tracklets) == 3
         @test od.tracklets == orbit.tracklets
-        @test orbit.tracklets[1].radec[1] == subradec[1]
-        @test orbit.tracklets[end].radec[end] == subradec[end]
+        @test orbit.tracklets[1].indices[1] == 1
+        @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 2e-3)
-        @test dtutc2days(date(subradec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
+        @test dtutc2days(date(suboptical[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        @test dtutc2days(date(subradec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
+        @test dtutc2days(date(suboptical[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test notout(orbit.res) == 16
-        @test nout(orbit.res) == 2
+        @test notout(orbit.ores) == 16
+        @test nout(orbit.ores) == 2
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 4e-3 )
@@ -528,9 +535,9 @@ end
         @test chi2(orbit) < 1.55
         @test nrms(orbit) < 0.22
         # Jacobian
-        @test size(orbit.J) == (6, 6)
-        @test isdiag(orbit.J)
-        @test maximum(orbit.J) < 5e-4
+        @test size(orbit.jacobian) == (6, 6)
+        @test isdiag(orbit.jacobian)
+        @test maximum(orbit.jacobian) < 5e-4
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 7
@@ -553,30 +560,31 @@ end
         @test uncertaintyparameter(orbit, params) == 10
 
         # Add remaining observations
-        NEOs.update!(od, radec)
+        NEOs.update!(od, optical)
         # Refine orbit (with outlier rejection)
         orbit1 = orbitdetermination(od, orbit, params)
 
         # Check type
-        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
+        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(optical)})
         # Tracklets
-        @test length(radec) == nobs(od) == nobs(orbit1) == 21
-        @test numberofdays(radec) == numberofdays(orbit1) < 3.03
-        @test minmaxdates(orbit1) == (date(radec[1]), date(radec[end]))
+        @test length(optical) == nobs(od) == nobs(orbit1) == 21
+        @test numberofdays(optical) == numberofdays(orbit1) < 3.03
+        @test minmaxdates(orbit1) == (date(optical[1]), date(optical[end]))
         @test length(od.tracklets) == length(orbit1.tracklets) == 4
         @test od.tracklets == orbit1.tracklets
-        @test orbit1.tracklets[1].radec[1] == radec[1]
-        @test orbit1.tracklets[end].radec[end] == radec[end]
+        @test orbit1.tracklets[1].indices[1] == 1
+        @test orbit1.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
         @test epoch(orbit1) == epoch(orbit)
-        @test dtutc2days(date(radec[1])) > orbit1.bwd.t0 + orbit1.bwd.t[end]
+        @test dtutc2days(date(optical[1])) > orbit1.bwd.t0 + orbit1.bwd.t[end]
         @test all( norm.(orbit1.bwd.x, Inf) .< 2 )
-        @test dtutc2days(date(radec[end])) < orbit1.fwd.t0 + orbit1.fwd.t[end]
+        @test dtutc2days(date(optical[end])) < orbit1.fwd.t0 + orbit1.fwd.t[end]
         @test all( norm.(orbit1.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test notout(orbit1.res) == 19
-        @test nout(orbit1.res) == 2
+        @test notout(orbit1.ores) == 19
+        @test nout(orbit1.ores) == 2
         # Least squares fit
         @test orbit1.fit.success
         @test all( sigmas(orbit1) .< 3e-4 )
@@ -584,9 +592,9 @@ end
         @test chi2(orbit1) < 2.38
         @test nrms(orbit1) < 0.25
         # Jacobian
-        @test size(orbit1.J) == (6, 6)
-        @test isdiag(orbit1.J)
-        @test maximum(orbit1.J) < 4e-3
+        @test size(orbit1.jacobian) == (6, 6)
+        @test isdiag(orbit1.jacobian)
+        @test maximum(orbit1.jacobian) < 4e-3
         # Convergence history
         @test size(orbit1.qs, 1) == 6
         # (26/04/2025) There are roundoff differences in the nrms of the two
@@ -613,10 +621,10 @@ end
         # 2014 AA hit the Earth around January 2, 2014, 02:49 UTC
 
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("2014 AA")
-        # Subset of radec for IOD
-        # subradec = iodsubradec(radec, 3)
-        # In this case: radec == subradec
+        optical = fetch_optical_mpc80("2014 AA", MPC)
+        # Subset of optical for IOD
+        # suboptical = iodsuboptical(optical, 3)
+        # In this case: optical == suboptical
 
         # Parameters
         params = Parameters(
@@ -626,39 +634,40 @@ end
            significance = 0.99, outrej = false
         )
         # Orbit determination problem
-        od = ODProblem(newtonian!, radec)
+        od = ODProblem(newtonian!, optical)
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 2, 2025
+        # Values by Jul 4, 2025
 
         # Curvature
-        C, Γ_C = curvature(radec)
+        C, Γ_C = curvature(optical, od.weights)
         σ_C = sqrt.(diag(Γ_C))
-        @test all( abs.(C) ./ σ_C .> 7.5)
+        @test all( abs.(C) ./ σ_C .> 5.7)
         χ2 = C' * inv(Γ_C) * C
-        @test χ2 > 1.03e6
+        @test χ2 > 5.93e5
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(optical)})
         # Tracklets
-        @test length(radec) == nobs(od) == nobs(orbit) == 7
-        @test numberofdays(radec) == numberofdays(orbit) < 0.05
-        @test minmaxdates(orbit) == (date(radec[1]), date(radec[end]))
+        @test length(optical) == nobs(od) == nobs(orbit) == 7
+        @test numberofdays(optical) == numberofdays(orbit) < 0.05
+        @test minmaxdates(orbit) == (date(optical[1]), date(optical[end]))
         @test length(od.tracklets) == length(orbit.tracklets) == 1
         @test od.tracklets == orbit.tracklets
-        @test orbit.tracklets[1].radec[1] == radec[1]
-        @test orbit.tracklets[end].radec[end] == radec[end]
+        @test orbit.tracklets[1].indices[1] == 1
+        @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), radec), atol = 2e-5)
-        @test dtutc2days(date(radec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
+        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical), atol = 2e-5)
+        @test dtutc2days(date(optical[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        @test dtutc2days(date(radec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
+        @test dtutc2days(date(optical[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 1e9 )
         # Vector of residuals
-        @test notout(orbit.res) == 7
-        @test nout(orbit.res) == 0
+        @test notout(orbit.ores) == 7
+        @test nout(orbit.ores) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 3e-4 )
@@ -666,9 +675,9 @@ end
         @test chi2(orbit) < 0.23
         @test nrms(orbit) < 0.13
         # Jacobian
-        @test size(orbit.J) == (6, 6)
-        @test isdiag(orbit.J)
-        @test maximum(orbit.J) < 3e-4
+        @test size(orbit.jacobian) == (6, 6)
+        @test isdiag(orbit.jacobian)
+        @test maximum(orbit.jacobian) < 3e-4
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
@@ -693,9 +702,9 @@ end
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
         # Fetch optical astrometry
-        radec = fetch_radec_mpc("2008 TC3")
-        # Subset of radec for IOD
-        subradec = iodsubradec(radec, 3)
+        optical = fetch_optical_mpc80("2008 TC3", MPC)
+        # Subset of optical for IOD
+        suboptical = iodsuboptical(optical, 3)
 
         # Parameters
         params = Parameters(
@@ -704,33 +713,34 @@ end
            significance = 0.99, outrej = false, parse_eqs = false
         )
         # Orbit determination problem
-        od = ODProblem(newtonian!, subradec)
+        od = ODProblem(newtonian!, suboptical)
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 2, 2025
+        # Values by Jul 4, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(suboptical)})
         # Tracklets
-        @test length(subradec) == nobs(od) == nobs(orbit) == 18
-        @test numberofdays(subradec) == numberofdays(orbit) < 0.34
-        @test minmaxdates(orbit) == (date(subradec[1]), date(subradec[end]))
+        @test length(suboptical) == nobs(od) == nobs(orbit) == 18
+        @test numberofdays(suboptical) == numberofdays(orbit) < 0.34
+        @test minmaxdates(orbit) == (date(suboptical[1]), date(suboptical[end]))
         @test length(od.tracklets) == length(orbit.tracklets) == 3
         @test od.tracklets == orbit.tracklets
-        @test orbit.tracklets[1].radec[1] == subradec[1]
-        @test orbit.tracklets[end].radec[end] == subradec[end]
+        @test orbit.tracklets[1].indices[1] == 1
+        @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-3)
-        @test dtutc2days(date(subradec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
+        @test dtutc2days(date(suboptical[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        @test dtutc2days(date(subradec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
+        @test dtutc2days(date(suboptical[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 1e4 )
         # Vector of residuals
-        @test notout(orbit.res) == 18
-        @test nout(orbit.res) == 0
+        @test notout(orbit.ores) == 18
+        @test nout(orbit.ores) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 2e-5 )
@@ -738,9 +748,9 @@ end
         @test chi2(orbit) < 4.35
         @test nrms(orbit) < 0.35
         # Jacobian
-        @test size(orbit.J) == (6, 6)
-        @test isdiag(orbit.J)
-        @test maximum(orbit.J) < 2e-5
+        @test size(orbit.jacobian) == (6, 6)
+        @test isdiag(orbit.jacobian)
+        @test maximum(orbit.jacobian) < 2e-5
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
@@ -763,32 +773,33 @@ end
         @test uncertaintyparameter(orbit, params) == 8
 
         # Add observations
-        subradec = iodsubradec(radec, 10)
+        suboptical = iodsuboptical(optical, 10)
 
         # Refine orbit
-        NEOs.update!(od, subradec)
+        NEOs.update!(od, suboptical)
         orbit1 = orbitdetermination(od, orbit, params)
 
         # Check type
-        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
+        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(suboptical)})
         # Tracklets
-        @test length(subradec) == nobs(od) == nobs(orbit1) == 97
-        @test numberofdays(subradec) == numberofdays(orbit1) < 0.70
-        @test minmaxdates(orbit1) == (date(subradec[1]), date(subradec[end]))
+        @test length(suboptical) == nobs(od) == nobs(orbit1) == 97
+        @test numberofdays(suboptical) == numberofdays(orbit1) < 0.70
+        @test minmaxdates(orbit1) == (date(suboptical[1]), date(suboptical[end]))
         @test length(od.tracklets) == length(orbit1.tracklets) == 10
         @test od.tracklets == orbit1.tracklets
-        @test orbit1.tracklets[1].radec[1] == subradec[1]
-        @test orbit1.tracklets[end].radec[end] == subradec[93]
+        @test orbit1.tracklets[1].indices[1] == 1
+        @test orbit1.tracklets[end].indices[end] == 93
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
         @test epoch(orbit1) == epoch(orbit)
-        @test dtutc2days(date(subradec[1])) > orbit1.bwd.t0 + orbit1.bwd.t[end]
+        @test dtutc2days(date(suboptical[1])) > orbit1.bwd.t0 + orbit1.bwd.t[end]
         @test all( norm.(orbit1.bwd.x, Inf) .< 1 )
-        @test dtutc2days(date(subradec[end])) < orbit1.fwd.t0 + orbit1.fwd.t[end]
+        @test dtutc2days(date(suboptical[end])) < orbit1.fwd.t0 + orbit1.fwd.t[end]
         @test all( norm.(orbit1.fwd.x, Inf) .< 1e15 )
         # Vector of residuals
-        @test notout(orbit1.res) == 97
-        @test nout(orbit1.res) == 0
+        @test notout(orbit1.ores) == 97
+        @test nout(orbit1.ores) == 0
         # Least squares fit
         @test orbit1.fit.success
         @test all( sigmas(orbit1) .< 4e-7 )
@@ -796,9 +807,9 @@ end
         @test chi2(orbit1) < 54.85
         @test nrms(orbit1) < 0.53
         # Jacobian
-        @test size(orbit1.J) == (6, 6)
-        @test isdiag(orbit1.J)
-        @test maximum(orbit1.J) < 2e-5
+        @test size(orbit1.jacobian) == (6, 6)
+        @test isdiag(orbit1.jacobian)
+        @test maximum(orbit1.jacobian) < 2e-5
         # Convergence history
         @test size(orbit1.qs, 1) == 6
         @test size(orbit1.qs, 2) == length(orbit1.Qs) == 2
@@ -822,34 +833,34 @@ end
     end
 
     @testset "research/Celestial Mech. Dyn. Astron. 2025/orbitdetermination.jl" begin
-        using NEOs: iodinitcond, issatellite
+        using NEOs: iodinitcond, issatellite, hascoord
 
-        function radecfilter(radec::Vector{RadecMPC{T}}) where {T <: Real}
+        function opticalfilter(optical::AbstractOpticalVector)
             # Eliminate observations before oficial discovery
-            firstobs = findfirst(r -> !isempty(r.discovery), radec)
-            isnothing(firstobs) && return false, radec
-            radec = radec[firstobs:end]
+            firstobs = findfirst(r -> !isempty(r.discovery), optical)
+            isnothing(firstobs) && return false, optical
+            optical = optical[firstobs:end]
             # Filter out incompatible observations
-            filter!(radec) do r
+            filter!(optical) do r
                 hascoord(r.observatory) && !issatellite(r.observatory) &&
                 date(r) > DateTime(2000, 1, 1, 12)
             end
-            length(radec) < 3 && return false, radec
+            length(optical) < 3 && return false, optical
             # Find the first set of 3 tracklets with a < 15 days timespan
-            tracklets = reduce_tracklets(radec)
+            tracklets = reduce_tracklets(optical)
             for i in 1:length(tracklets)-2
                 numberofdays(tracklets[i:i+2]) > 15.0 && continue
                 tracklets = tracklets[i:i+2]
-                radec = reduce(vcat, getfield.(tracklets, :radec))
-                sort!(radec)
+                optical = optical[indices(tracklets)]
+                sort!(optical)
                 break
             end
-            return numberofdays(radec) <= 15.0, radec
+            return numberofdays(optical) <= 15.0, optical
         end
 
         # Fetch and filter optical astrometry
-        radec = fetch_radec_mpc("2023 QR6")
-        flag, radec = radecfilter(radec)
+        optical = fetch_optical_mpc80("2023 QR6", MPC)
+        flag, optical = opticalfilter(optical)
 
         # Parameters
         params = Parameters(
@@ -861,34 +872,35 @@ end
             fudge = 100.0, max_per = 20.0
         )
         # Orbit determination problem
-        od = ODProblem(newtonian!, radec)
+        od = ODProblem(newtonian!, optical)
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by May 2, 2025
+        # Values by Jul 4, 2025
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64})
+        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(optical)})
         # Tracklets
         @test flag
-        @test length(radec) == nobs(od) == nobs(orbit) == 6
-        @test numberofdays(radec) == numberofdays(orbit) < 6.22
-        @test minmaxdates(orbit) == (date(radec[1]), date(radec[end]))
+        @test length(optical) == nobs(od) == nobs(orbit) == 6
+        @test numberofdays(optical) == numberofdays(orbit) < 6.22
+        @test minmaxdates(orbit) == (date(optical[1]), date(optical[end]))
         @test length(od.tracklets) == length(orbit.tracklets) == 3
         @test od.tracklets == orbit.tracklets
-        @test orbit.tracklets[1].radec[1] == radec[1]
-        @test orbit.tracklets[end].radec[end] == radec[end]
+        @test orbit.tracklets[1].indices[1] == 1
+        @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 3e-3)
-        @test dtutc2days(date(radec[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
+        @test dtutc2days(date(optical[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
         @test all( norm.(orbit.bwd.x, Inf) .< 2 )
-        @test dtutc2days(date(radec[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
+        @test dtutc2days(date(optical[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
         @test all( norm.(orbit.fwd.x, Inf) .< 2 )
         # Vector of residuals
-        @test notout(orbit.res) == 6
-        @test nout(orbit.res) == 0
+        @test notout(orbit.ores) == 6
+        @test nout(orbit.ores) == 0
         # Least squares fit
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 0.018 )
@@ -896,9 +908,9 @@ end
         @test chi2(orbit) < 0.91
         @test nrms(orbit) < 0.28
         # Jacobian
-        @test size(orbit.J) == (6, 6)
-        @test isdiag(orbit.J)
-        @test maximum(orbit.J) < 0.007
+        @test size(orbit.jacobian) == (6, 6)
+        @test isdiag(orbit.jacobian)
+        @test maximum(orbit.jacobian) < 0.007
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2

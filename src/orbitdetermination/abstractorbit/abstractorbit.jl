@@ -1,119 +1,186 @@
-@doc raw"""
-    AbstractOrbit{T <: Real, U <: Number}
-
-Supertype for the orbits API.
 """
-abstract type AbstractOrbit{T <: Real, U <: Number} end
+    AbstractOrbit{D, T <: Real, U <: Number}
 
-numtypes(::AbstractOrbit{T, U}) where {T, U} = T, U
+Supertype for the orbits interface.
 
-@doc raw"""
+Every orbit has:
+- a dynamical function of type `D`,
+- a vector of optical astrometry of type `O <: AbstractOpticalVector{T}`,
+- a vector of optical tracklets of type `TrackletVector{T}`,
+- a backward and a forward integration, both of type `DensePropagation2{T, U}`,
+- a vector of optical residuals of type `Vector{OpticalResidual{T, U}}`,
+- a jacobian representing the transformation from the space of residuals to
+    barycentric coordinates, of type `Matrix{T}`.
+"""
+abstract type AbstractOrbit{D, T <: Real, U <: Number} end
+
+# Numeric types
+numtypes(::AbstractOrbit{D, T, U}) where {D, T, U} = T, U
+
+"""
     epoch(::AbstractOrbit)
 
 Return the reference epoch of an orbit in TDB days since J2000.
 """
-epoch(orbit::AbstractOrbit) = orbit.bwd.t0
+epoch(x::AbstractOrbit) = x.bwd.t0
 
 # Number of observations
-nobs(orbit::AbstractOrbit) = length(orbit.res)
+noptical(x::AbstractOrbit) = length(x.optical)
+nradar(x::AbstractOrbit) = hasradar(x) ? length(x.radar) : 0
+nobs(x::AbstractOrbit) = noptical(x) + nradar(x)
 
-@doc raw"""
+"""
     minmaxdates(::AbstractOrbit)
 
 Return the dates of the earliest and latest observation of an orbit.
 """
-function minmaxdates(orbit::AbstractOrbit)
-    dates = map(t -> extrema(date, t.radec), orbit.tracklets)
-    t = days2dtutc(epoch(orbit))
-    return min(t, minimum(first, dates)), max(t, maximum(last, dates))
+function minmaxdates(x::AbstractOrbit)
+    t0, tf = extrema(date, x.optical)
+    if hasradar(x)
+        _t0_, _tf_ = extrema(date, x.radar)
+        t0, tf = min(t0, _t0_), max(tf, _tf_)
+    end
+    return t0, tf
 end
 
 # Timespan of the observation window in days
-function numberofdays(orbit::AbstractOrbit)
-    t0, tf = minmaxdates(orbit)
+function numberofdays(x::AbstractOrbit)
+    t0, tf = minmaxdates(x)
     return (tf - t0).value / 86_400_000
 end
 
-# Assemble the vector of optical astrometry
-astrometry(orbit::AbstractOrbit) = astrometry(orbit.tracklets)
+# Return the optical astrometry in an orbit
+optical(x::AbstractOrbit) = x.optical
 
 # Evaluation in time method
-(orbit::AbstractOrbit)(t = epoch(orbit)) = t <= epoch(orbit) ? orbit.bwd(t) : orbit.fwd(t)
+(x::AbstractOrbit)(t = epoch(x)) = t <= epoch(x) ? x.bwd(t) : x.fwd(t)
 
-# Initialize a vector of residuals consistent with orbit
-function init_residuals(::Type{V}, orbit::AbstractOrbit{T, U}) where {T <: Real,
-    U <: Number, V <: Number}
-    # Initialize vector of residuals
-    res = Vector{OpticalResidual{T, V}}(undef, nobs(orbit))
+# Number of outlier / non-outlier residuals
+function nout(x::AbstractOrbit)
+    y = nout(x.ores)
+    if hasradar(x)
+        y += nout(x.rres)
+    end
+    return y
+end
+
+function notout(x::AbstractOrbit)
+    y = notout(x.ores)
+    if hasradar(x)
+        y += notout(x.rres)
+    end
+    return y
+end
+
+# Initialize a vector of optical residuals consistent with orbit
+function init_optical_residuals(::Type{V}, orbit::AbstractOrbit{D, T, U}) where {D,
+                                T <: Real, U <: Number, V <: Number}
+    # Initialize vector of optical residuals
+    res = Vector{OpticalResidual{T, V}}(undef, noptical(orbit))
     for i in eachindex(res)
-        ξ_α, ξ_δ = zero(V), zero(V)
-        @unpack w_α, w_δ, μ_α, μ_δ, outlier = orbit.res[i]
-        res[i] = OpticalResidual{T, V}(ξ_α, ξ_δ, w_α, w_δ, μ_α, μ_δ, outlier)
+        ra, dec = zero(V), zero(V)
+        @unpack wra, wdec, dra, ddec, outlier = orbit.res[i]
+        res[i] = OpticalResidual{T, V}(ra, dec, wra, wdec, dra, ddec, outlier)
     end
 
     return res
 end
 
 # Target functions
-chi2(orbit::AbstractOrbit{T, U}) where {T <: Real, U <: Number} =
-    iszero(orbit) ? T(Inf) : chi2(orbit.res)
-nms(orbit::AbstractOrbit{T, U}) where {T <: Real, U <: Number} =
-    iszero(orbit) ? T(Inf) : nms(orbit.res)
-nrms(orbit::AbstractOrbit{T, U}) where {T <: Real, U <: Number} =
-    iszero(orbit) ? T(Inf) : nrms(orbit.res)
+function chi2(x::AbstractOrbit{D, T, U}) where {D, T <: Real, U <: Number}
+    iszero(x) && return Inf * one(U)
+    y = chi2(x.ores)
+    if hasradar(x)
+        y += chi2(x.rres)
+    end
+    return y
+end
 
-@doc raw"""
-    critical_value(orbit::AbstractOrbit{T, U}) where {T <: Real, U <: Number}
+function nms(x::AbstractOrbit{D, T, U}) where {D, T <: Real, U <: Number}
+    iszero(x) && return Inf * one(U)
+    y = nms(x.ores)
+    if hasradar(x)
+        y += nms(x.rres)
+    end
+    return y
+end
 
-Return the chi-square critical value corresponding to `nms(orbit)`.
+function nrms(x::AbstractOrbit{D, T, U}) where {D, T <: Real, U <: Number}
+    iszero(x) && return Inf * one(U)
+    y = nrms(x.ores)
+    if hasradar(x)
+        y += nrms(x.rres)
+    end
+    return y
+end
+
 """
-function critical_value(orbit::AbstractOrbit{T, U}) where {T <: Real, U <: Number}
+    critical_value(::AbstractOrbit)
+
+Return the chi-square critical value corresponding to the normlized mean square
+residual of an orbit.
+"""
+function critical_value(x::AbstractOrbit{D, T, U}) where {D, T <: Real, U <: Number}
     # Unsuccessful orbit
-    iszero(orbit) && return one(T)
+    iszero(x) && return one(T)
     # Chi square distribution with N degrees of freedom
-    N = 2 * notout(orbit.res)
-    χ2 = N * nms(orbit)
+    N = 2 * notout(x)
+    χ2 = N * nms(x)
     d = Chisq(N)
     # Evaluate cumulative probability at χ2
     return cdf(d, χ2)
 end
 
-@doc raw"""
+"""
     sigmas(::AbstractOrbit)
 
 Return the uncertainties in barycentric cartesian coordinates at the reference epoch.
 """
-sigmas(orbit::AbstractOrbit) = map(x -> x < 0 ? NaN * x : sqrt(x), variances(orbit))
+function sigmas(orbit::AbstractOrbit{D, T, U}) where {D, T, U}
+    iszero(orbit) && return Vector{T}(undef, 0)
+    v = variances(orbit)
+    y = NaN * one(T)
+    for (i, x) in enumerate(v)
+        v[i] = x < 0 ? y : sqrt(x)
+    end
+    return v
+end
 
-@doc raw"""
+"""
     snr(::AbstractOrbit)
 
 Return the signal-to-noise ratios in barycentric cartesian
 coordinates at the reference epoch.
 """
-snr(orbit::AbstractOrbit{T, U}) where {T, U} = iszero(orbit) ? Vector{U}(undef, 0) :
-    abs.(orbit()) ./ sigmas(orbit)
+function snr(orbit::AbstractOrbit{D, T, U}) where {D, T, U}
+    iszero(orbit) && return Vector{U}(undef, 0)
+    q0, ss = orbit(), sigmas(orbit)
+    for i in eachindex(q0)
+        q0[i] = abs(q0[i]) / ss[i]
+    end
+    return q0
+end
 
-# Update `orbit` iff `_orbit_` is complete and has a lower nrms
-function updateorbit(orbit::AbstractOrbit{T, T}, _orbit_::AbstractOrbit{T, T},
-    radec::Vector{RadecMPC{T}}) where {T <: Real}
-    L1, L2, L = nobs(orbit), nobs(_orbit_), length(radec)
+# Update `x` iff `y` is complete and has a lower nrms
+function updateorbit(x::AbstractOrbit{D, T, T}, y::AbstractOrbit{D, T, T},
+                     optical::AbstractOpticalVector{T}) where {D, T <: Real}
+    L1, L2, L = noptical(x), noptical(y), length(optical)
     # Both orbits are complete
     if L1 == L2 == L
-        return nrms(orbit) <= nrms(_orbit_) ? orbit : _orbit_
-    # Only orbit is complete
+        return nrms(x) <= nrms(y) ? x : y
+    # Only x is complete
     elseif L1 == L
-        return orbit
-    # Only _orbit_ is complete
+        return x
+    # Only y is complete
     elseif L2 == L
-        return _orbit_
+        return y
     # Neither orbit is complete
     else
-        return orbit
+        return x
     end
 end
 
-@doc raw"""
+"""
     jplcompare(des::String, orbit::AbstractOrbit)
 
 Return the absolute difference between `orbit` and JPL's orbit for object
@@ -142,36 +209,32 @@ function jplcompare(des::String, orbit::AbstractOrbit)
     return @. abs(q1 - q2) / sigmas(orbit)
 end
 
-@doc raw"""
-    keplerian(orbit, params) where {T <: Real}
+"""
+    keplerian(orbit, params)
 
-Return the heliocentric ecliptic keplerian osculating elements of an orbit
+Return the heliocentric ecliptic keplerian osculating elements of an `orbit`
 at its reference epoch, as well as the projected covariance matrix.
 
 See also [`pv2kep`](@ref).
 
-## Arguments
-
-- `orbit::AbstractOrbit{T, T}`: a priori orbit.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
-
 !!! warning
     This function may change the (global) `TaylorSeries` variables.
 """
-function keplerian(orbit::AbstractOrbit{T, T}, params::Parameters{T}) where {T <: Real}
+function keplerian(orbit::AbstractOrbit{D, T, T},
+                   params::Parameters{T}) where {D, T <: Real}
     # Set jet transport variables
     set_od_order(T, 2)
     # Reference epoch [Julian days TDB]
     t = epoch(orbit)
     jd0 = t + PE.J2000
     # Jet transport initial condition
-    q0 = orbit(t) + diag(orbit.J) .* get_variables(T, 2)
+    q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
     # Origin
     x0 = zeros(T, 6)
     # Osculating keplerian elements
     osc = pv2kep(q0 - params.eph_su(t); jd = jd0, frame = :ecliptic)
     osc0 = [osc.a, osc.e, osc.i, osc.Ω, osc.ω, mod(osc.M, 360)]
-    osc00 = constant_term.(osc0)
+    osc00 = cte.(osc0)
     # Projected covariance matrix
     t_car2kep = TS.jacobian(osc0, x0)
     Γ_kep = t_car2kep * covariance(orbit) * t_car2kep'
@@ -179,31 +242,27 @@ function keplerian(orbit::AbstractOrbit{T, T}, params::Parameters{T}) where {T <
     return osc00, Γ_kep
 end
 
-@doc raw"""
-    uncertaintyparameter(orbit, params) where {T <: Real}
+"""
+    uncertaintyparameter(orbit, params)
 
-Return the Minor Planet Center uncertainty parameter.
-
-## Arguments
-
-- `orbit::AbstractOrbit{T, T}`: a priori orbit.
-- `params::Parameters{T}`: see [`Parameters`](@ref).
+Return the Minor Planet Center uncertainty parameter of an `orbit`.
 
 !!! warning
     This function may change the (global) `TaylorSeries` variables.
 
 !!! reference
-    https://www.minorplanetcenter.net/iau/info/UValue.html.
+    See:
+    - https://www.minorplanetcenter.net/iau/info/UValue.html
 """
-function uncertaintyparameter(orbit::AbstractOrbit{T, T},
-    params::Parameters{T}) where {T <: Real}
+function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
+                              params::Parameters{T}) where {D, T <: Real}
     # Set jet transport variables
     set_od_order(T, 2)
     # Reference epoch [Julian days TDB]
     t = epoch(orbit)
     jd0 = t + PE.J2000
     # Jet transport initial condition
-    q0 = orbit(t) + diag(orbit.J) .* get_variables(T, 2)
+    q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
     # Origin
     x0 = zeros(T, 6)
     # Osculating keplerian elements
@@ -234,7 +293,7 @@ function summary(orbit::AbstractOrbit)
     O = nameof(typeof(orbit))
     T, U = numtypes(orbit)
     D = orbit.dynamics
-    Nobs, Nout = nobs(orbit), nout(orbit.res)
+    Nobs, Nout = nobs(orbit), nout(orbit)
     Ndays = @sprintf("%.8f", numberofdays(orbit))
     t0 = epoch(orbit) + PE.J2000
     d0 = julian2datetime(t0)

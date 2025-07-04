@@ -1,9 +1,9 @@
-@doc raw"""
+"""
     LeastSquaresFit{T} <: AbstractLeastSquares{T}
 
 A least squares fit.
 
-## Fields
+# Fields
 
 - `success::Bool`: whether the routine converged or not.
 - `x::Vector{T}`: deltas that minimize the objective function.
@@ -15,9 +15,6 @@ A least squares fit.
     x::Vector{T}
     Γ::Matrix{T}
     routine::Type{<:AbstractLeastSquaresMethod}
-    # Inner constructor
-    LeastSquaresFit(success::Bool, x::Vector{T}, Γ::Matrix{T},
-        routine::Type{<:AbstractLeastSquaresMethod}) where {T <: Real} = new{T}(success, x, Γ, routine)
 end
 
 # Outer constructor
@@ -25,24 +22,20 @@ LeastSquaresFit(::Type{T}, method::Type{<:AbstractLeastSquaresMethod}) where {T 
     LeastSquaresFit(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), method)
 
 # Definition of zero LeastSquaresFit{T}
-zero(::Type{LeastSquaresFit{T}}) where {T <: Real} =
-    LeastSquaresFit(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0),
-    AbstractLeastSquaresMethod)
+zero(::Type{LeastSquaresFit{T}}) where {T <: Real} = LeastSquaresFit(false,
+    Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), AbstractLeastSquaresMethod)
 
 # Print method for LeastSquaresFit
-# Examples:
-# Succesful Newton
-# Succesful Differential Corrections
-function show(io::IO, fit::LeastSquaresFit)
-    success_s = fit.success ? "Succesful" : "Unsuccesful"
-    routine_s = string(fit.routine)
+function show(io::IO, x::LeastSquaresFit)
+    success_s = x.success ? "Succesful" : "Unsuccesful"
+    routine_s = string(x.routine)
     print(io, success_s, " ", routine_s)
 end
 
-@doc raw"""
-    project(y::Vector{TaylorN{T}}, fit::LeastSquaresFit{T}) where {T <: Real}
+"""
+    project(y, fit)
 
-Project the covariance matrix of `fit` into `y`.
+Project the covariance matrix of a least squares `fit` into a vector `y`.
 """
 function project(y::Vector{TaylorN{T}}, fit::LeastSquaresFit{T}) where {T <: Real}
     J = Matrix{T}(undef, get_numvars(), length(y))
@@ -53,18 +46,24 @@ function project(y::Vector{TaylorN{T}}, fit::LeastSquaresFit{T}) where {T <: Rea
 end
 
 # Target functions
-chi2(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    fit::LeastSquaresFit{T}) where {T <: Real} = chi2(res(fit.x))
+function chi2(res::AbstractResidualVector{T, TaylorN{T}},
+              fit::LeastSquaresFit{T}) where {T <: Real}
+    return chi2(res(fit.x))
+end
 
-nms(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    fit::LeastSquaresFit{T}) where {T <: Real} = nms(res(fit.x))
+function nms(res::AbstractResidualVector{T, TaylorN{T}},
+             fit::LeastSquaresFit{T}) where {T <: Real}
+    return nms(res(fit.x))
+end
 
-nrms(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    fit::LeastSquaresFit{T}) where {T <: Real} = nrms(res(fit.x))
+function nrms(res::AbstractResidualVector{T, TaylorN{T}},
+              fit::LeastSquaresFit{T}) where {T <: Real}
+    return nrms(res(fit.x))
+end
 
 # Chi-square critical value
 function critical_value(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    fit::LeastSquaresFit{T}) where {T <: Real}
+                        fit::LeastSquaresFit{T}) where {T <: Real}
     # Evaluate residuals
     _res_ = res(fit.x)
     # Chi square distribution with N degrees of freedom
@@ -76,7 +75,7 @@ function critical_value(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
 end
 
 # NMS threshold
-function nms_threshold(N::Int, significance::T) where {T <: Real}
+function nms_threshold(N::Int, significance::Real)
     # Chi-square distribution
     dist = Chisq(N)
     # Find Q for which cdf(dist, Q) == significance

@@ -1,7 +1,7 @@
 module NEOs
 
 # __precompile__(false)
-import Base: RefValue, isless, show, string, in, zero, iszero, isnan, summary
+import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary
 import PlanetaryEphemeris as PE
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import Tables: Schema, istable, rowaccess, rows, schema
@@ -28,7 +28,7 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea
       argperi, timeperipass, meanmotion, meananomaly, nbodyind, numberofbodies, selecteph,
       getinterpindex, pole_rotation, t2c_jpl_de430
 using Roots: find_zeros
-using StaticArraysCore: SVector
+using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!
 
@@ -44,7 +44,7 @@ export MPC, NEOCP, NEOCC, NEODyS2, JPL
 export UniformWeights, SourceWeights, Veres17
 export ZeroDebiasing, SourceDebiasing, Farnocchia15, Eggl20
 export numberofdays, unpacknum, packnum, unpackdesig, packdesig
-export date, measure, observatory, rms, debias, ra, dec, mag, catalogue, frequency,
+export date, measure, observatory, rms, debias, ra, dec, mag, band, catalogue, frequency,
        residual, weight, isoutlier, nout, notout
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
@@ -53,7 +53,7 @@ export fetch_optical_mpc80, read_optical_mpc80, write_optical_mpc80
 export fetch_neocp_objects, read_neocp_objects, write_neocp_objects
 export fetch_optical_rwo, read_optical_rwo, write_optical_rwo
 export fetch_optical_ades, read_optical_ades, write_optical_ades
-export nobs, astrometry, datediff, reduce_tracklets
+export nobs, datediff, reduce_tracklets
 export wra, wdec, dra, ddec, unfold, compute_radec, residuals
 export fetch_radar_jpl, read_radar_jpl, write_radar_jpl
 export fetch_radar_rwo, read_radar_rwo, write_radar_rwo
@@ -62,26 +62,19 @@ export compute_delay, radar_astrometry
 export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!, newtonian!
 export loadpeeph, rvelea, scaled_variables, propagate, propagate_lyap, propagate_root
 # Orbit determination
-
-#=
-# PE and NEOs ephemerides
-export bwdfwdeph
-# Osculating
+export ODProblem, LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
+       GaussOrbit, MMOVOrbit, LeastSquaresOrbit, AdmissibleRegion
 export pv2kep, yarkp2adot
-# Least squares
-export LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
-       project, leastsquares, leastsquares!, tryls, outlier_rejection!
-# AbstractOrbit
-export GaussOrbit, MMOVOrbit, LeastSquaresOrbit, epoch, minmaxdates, critical_value,
-       sigmas, snr, jplcompare, keplerian, uncertaintyparameter
-# Orbit determination
-export ODProblem, mmov, gaussmethod, tsaiod, gaussiod, issinglearc,
-       initialorbitdetermination, orbitdetermination
-# B plane
-export valsecchi_circle, bopik, mtp
-# Magnitude
-export absolutemagnitude
-=#
+export curvature
+export bwdfwdeph, propres, propres!
+export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
+export epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, jplcompare, keplerian,
+       uncertaintyparameter
+export topo2bary, bary2topo, attr2bary, tsaiod
+export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
+       orbitdetermination
+# Postprocessing
+export absolutemagnitude, crosssection, valsecchi_circle, bopik, mtp
 
 include("constants.jl")
 include("units.jl")
@@ -89,8 +82,8 @@ include("jpleph.jl")
 include("parameters.jl")
 include("astrometry/astrometry.jl")
 include("propagation/propagation.jl")
-# include("orbitdetermination/orbitdetermination.jl")
-# include("postprocessing/bplane.jl")
+include("orbitdetermination/orbitdetermination.jl")
+include("postprocessing/postprocessing.jl")
 include("init.jl")
 include("deprecated.jl")
 

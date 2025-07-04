@@ -137,6 +137,7 @@ end
 
 # AbstractAstrometryObservation interface
 date(x::OpticalRWO) = x.date
+band(x::OpticalRWO) = x.mag_band
 observatory(x::OpticalRWO) = x.observatory
 catalogue(x::OpticalRWO) = x.catalogue
 function rms(x::OpticalRWO{T}) where {T <: Real}

@@ -111,6 +111,7 @@ end
 
 # AbstractAstrometryObservation interface
 date(x::OpticalADES) = x.obstime
+band(x::OpticalADES) = first(x.band)
 observatory(x::OpticalADES) = x.stn
 catalogue(x::OpticalADES) = x.astcat
 function rms(x::OpticalADES{T}) where {T <: Real}

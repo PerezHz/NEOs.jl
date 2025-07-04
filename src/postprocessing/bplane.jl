@@ -1,51 +1,51 @@
-include("magnitude.jl")
-
 @doc raw"""
     crosssection(μ_P, R_P, vinf)
 
-Returns the "critical" ``B``, derived from conservation of energy and angular momentum
+Return the effective cross section [planet radii] of a planet with gravitational
+parameter `μ_P` [au³/day²] and physical radius `R_P` [au], considering an object
+approaching with asymptotic inbound velocity `vinf` [au/day].
+
+!!! reference
+    See equations (13)-(14) in pages 4-5 of:
+    - https://doi.org/10.1007/s10569-019-9914-4
+
+# Extended help
+
+The effective cross section ``B`` is derived from the conservation of energy and
+angular momentum; it represents the impact parameter corresponding to a grazing
+impact in a hyperbolic close encounter. ``B`` is given by:
 ```math
 B = \sqrt{1 + \frac{2\mu_P}{R_P v_\infty^2}},
 ```
-i.e., what impact parameter ``B`` corresponds to a grazing impact in hyperbolic close
-encounter. ``\mu_P`` is the planet's gravitational parameter, ``R_P`` is the planet's
-radius and ``v_\infty`` is the asymptotic inbound velocity. If actual ``B`` is equal or
-less to this, then impact happens. Output is in planet radii.
-
-# Arguments
-
-- `μ_P`: planetary gravitational parameter (au^3/day^2).
-- `R_P`: planetary radius (au).
-- `vinf`: asymptotic inbound velocity (au/day).
-
-!!! reference
-    See equations (13)-(14) in pages 4-5 of https://doi.org/10.1007/s10569-019-9914-4.
+where ``\mu_P`` is the planet's gravitational parameter, ``R_P`` is the planet's
+physical radius and ``v_\infty`` is the asymptotic inbound velocity. If actual ``B``
+is equal or less to this, then impact happens.
 """
-function crosssection(μ_P, R_P, vinf)
-    return sqrt( 1 + (2μ_P)/(R_P*(vinf)^2) )
-end
+crosssection(μ_P, R_P, vinf) = sqrt( 1 + (2μ_P)/(R_P*(vinf)^2) )
 
 @doc raw"""
     bopik(xae, xes)
 
-Computes Öpik's coordinates of impact parameter vector ``\mathbf{B}`` in hyperbolic planetary
-close encounter. Returns a named tuple with the following fields:
+Compute the Öpik's coordinates of a hyperbolic planetary close encounter, where
+`xae` is the asteroid's planetocentric cartesian state vector at close approach
+[au, day], and `xes` is the planet's heliocentric cartesian state vector at close
+approach [au, day].
 
-- `ξ` = ``\mathbf{B}\cdot\hat{\mathbf{\xi}}/R_E`` and `ζ` = ``\mathbf{B}\cdot\hat{\mathbf{\zeta}}/R_E``, where ``\mathbf{B}`` is the impact parameter vector, ``(\hat{\mathbf{\xi}}, \hat{\mathbf{\zeta}})`` is Öpik's frame and ``R_E`` is the Earth's radius in au.
+Returns a named tuple with the following fields:
+- `ξ` = ``\mathbf{B}\cdot\hat{\mathbf{\xi}}/R_E`` and `ζ` = ``\mathbf{B}\cdot
+    \hat{\mathbf{\zeta}}/R_E``, where ``\mathbf{B}`` is the impact parameter vector,
+    ``(\hat{\mathbf{\xi}}, \hat{\mathbf{\zeta}})`` is Öpik's frame and ``R_E`` is the
+    planet's radius [au].
 
-- `U` is another named tuple with the following fields:
-    - `y` = ``U_y``.
-    - `norm` = ``||\mathbf{U}||`` where ``\mathbf{U}`` is the planetocentric velocity vector in km/s.
+- `U` is another named tuple with fields `y` = ``U_y`` and `norm` = ``||\mathbf{U}||``,
+    where ``\mathbf{U}`` is the planetocentric velocity vector [km/s].
 
-- `b` = ``b_E``, where ``b_E`` is the Earth impact cross section ("critical B"). See [`crosssection`](@ref).
-
-# Arguments
-
-- `xae`: asteroid's geocentric position/velocity vector at closest approach in au, au/day.
-- `xes`: planet's heliocentric position/velocity vector at asteroid's closest approach in au, au/day.
+- `b` = ``b_E``, where ``b_E`` is the planet's impact cross section ("critical B").
+    See [`crosssection`](@ref).
 
 !!! reference
-    See equations (37)-(38) in page 14 of https://doi.org/10.1007/s10569-019-9914-4.
+    See equations (37)-(38) in page 14 of:
+    - https://doi.org/10.1007/s10569-019-9914-4
 """
 function bopik(xae, xes)
 
@@ -73,7 +73,8 @@ function bopik(xae, xes)
     # Osculating inclination
     i = inclination(xae...)
     # Periapsis position (unit vector) and periapsis velocity (unit vector)
-    # See first sentence below equation (3) in page 2 of https://doi.org/10.1007/s10569-019-9914-4
+    # See first sentence below equation (3) in page 2 of
+    # https://doi.org/10.1007/s10569-019-9914-4
     P_v = evec./e
     Q_v = cross(hvec, P_v)./h
     # Inbound asymptote direction
@@ -123,29 +124,37 @@ function bopik(xae, xes)
 end
 
 @doc raw"""
-    valsecchi_circle(a, e, i, k, h; m_pl=3.003489614915764e-6)
+    valsecchi_circle(a, e, i, k, h; kwargs...)
 
-Computes Valsecchi circle associated to a mean motion resonance. Returns radius ``R`` (au) and
-``\zeta``-axis coordinate ``D`` (au). This function first computes the Y-component and norm
-of the planetocentric velocity vector ``\mathbf{U}``
-```math
-U_y = \sqrt{a(1-e^2)}\cos i - 1 \quad \text{and} \quad
-U = ||\mathbf{U}|| = \sqrt{3 - \frac{1}{a} - 2\sqrt{a(1-e^2)}\cos i},
-```
-and then substitutes into `valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6, a_pl=1.0)`.
-`a `, `e` and `i` are the asteroid heliocentric semimajor axis (au), eccentricity and
-inclination (rad) respectively.
+Compute the Valsecchi circle associated to the `k:h` mean motion resonance between
+a planet and an asteroid with heliocentric semimajor axis `a` [au], eccentricity `e`
+and (ecliptic) inclination `i` [rad]. Returns the radius [au] and the ``\zeta``-axis
+coordinate [au].
 
-# Arguments
+# Keyword argument
 
-- `a`: asteroid heliocentric semimajor axis (au).
-- `e`: asteroid heliocentric eccentricity.
-- `i`: asteroid heliocentric inclination, ecliptic (rad).
-- `k/h`: `h` heliocentric revolutions of asteroid per `k` heliocentric revolutions of Earth.
-- `m_pl`: planet mass normalized to Sun's mass, equal to Earth mass in solar masses by default.
+- `m_pl`: planet mass normalized to Sun's mass (default: Earth mass in solar masses).
 
 !!! reference
-    See section 2.1 in page 1181 of https://doi.org/10.1051/0004-6361:20031039.
+    See section 2.1 in page 1181 of:
+    - https://doi.org/10.1051/0004-6361:20031039
+
+# Extended help
+
+A `k:h` resonance corresponds to `h` heliocentric revolutions of the asteroid per `k`
+heliocentric revolutions of the planet.
+
+This function first computes the Y-component and norm of the planetocentric velocity
+vector ``\mathbf{U}``, which are given by:
+```math
+\begin{align*}
+    U_y & = \sqrt{a(1-e^2)}\cos i - 1\\
+    U   & = ||\mathbf{U}|| = \sqrt{3 - \frac{1}{a} - 2\sqrt{a(1-e^2)}\cos i},
+\end{align*}
+```
+where `a `, `e` and `i` are the asteroid's heliocentric semimajor axis [au], eccentricity
+and (ecliptic) inclination [rad], respectively. Then, it substitutes into
+`valsecchi_circle(U_y, U_norm, k, h; m_pl)`.
 """
 function valsecchi_circle(a, e, i, k, h; m_pl=3.003489614915764e-6)
     # Components and norm of the planetocentric velocity vector
@@ -161,27 +170,39 @@ function valsecchi_circle(a, e, i, k, h; m_pl=3.003489614915764e-6)
 end
 
 @doc raw"""
-    valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6, a_pl=1.0)
+    valsecchi_circle(U_y, U_norm, k, h; kwargs...)
 
-Computes Valsecchi circle associated to a mean motion resonance. Returns radius ``R`` (au) and
-``\zeta``-axis coordinate ``D`` (au)
-```math
-R = \left|\frac{c\sin\theta_0'}{\cos\theta_0' - \cos\theta}\right| \quad \text{and} \quad
-D = \frac{c\sin\theta}{\cos\theta_0' - \cos\theta},
-```
-where ``c = m/U^2`` with ``m`` the mass of the planet and ``U = ||\mathbf{U}||`` the norm of
-the planetocentric velocity vector; and ``\theta``, ``\theta_0'`` are the angles between Y-axis
-and ``\mathbf{U}`` pre and post encounter respectively.
+Compute the Valsecchi circle associated to the `k:h` mean motion resonance between
+a planet and an asteroid, where `U_y` and `U_norm` are the Y-component and Euclidean
+norm of the unperturbed planetocentric velocity vector. The Y-axis coincides with the
+direction of motion of the planet. Both `U_y`, `U_norm` are in units such that the
+heliocentric velocity of the planet is 1. Returns the radius [au] and the ``\zeta``-axis
+coordinate [au].
 
-# Arguments
-- `U_y`: Y-component of unperturbed planetocentric velocity (Y-axis coincides with the direction of motion of the planet).
-- `U_norm`: Euclidean norm of unperturbed planetocentric velocity. Both `U_y`, `U_norm` are in units such that the heliocentric velocity of the planet is 1.
-- `k/h`: `h` heliocentric revolutions of asteroid per `k` heliocentric revolutions of Earth.
-- `m_pl`: planet mass normalized to Sun's mass, equal to Earth mass in solar masses by default.
-- `a_pl`: planetary heliocentric semimajor axis in au; default value is 1.
+# Keyword arguments
+
+- `m_pl`: planet mass normalized to Sun's mass (default: Earth mass in solar masses).
+- `a_pl`: planetary heliocentric semimajor axis [a] (default: `1.0`).
 
 !!! reference
-    See pages 1181, 1182 and 1187 of https://doi.org/10.1051/0004-6361:20031039.
+    See pages 1181, 1182 and 1187 of:
+    - https://doi.org/10.1051/0004-6361:20031039
+
+# Extended help
+
+A `k:h` resonance corresponds to `h` heliocentric revolutions of the asteroid per `k`
+heliocentric revolutions of the planet.
+
+The radius ``R`` [au] and ``\zeta``-axis coordinate ``D`` [au] are given by:
+```math
+\begin{\align*}
+    R & = \left|\frac{c\sin\theta_0'}{\cos\theta_0' - \cos\theta}\right| \\
+    D & = \frac{c\sin\theta}{\cos\theta_0' - \cos\theta},
+\end{align*}
+```
+where ``c = m/U^2`` with ``m`` the mass of the planet and ``U = ||\mathbf{U}||`` the norm
+of the planetocentric velocity vector; and ``\theta``, ``\theta_0'`` are the angles between
+Y-axis and ``\mathbf{U}`` pre and post encounter respectively.
 """
 function valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6, a_pl=1.0)
     # Post-encounter semimajor axis
@@ -210,19 +231,16 @@ function valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6, a_pl=1.0
     return R0, D0
 end
 
-@doc raw"""
-    mtp(xae::Vector{U}) where {U <: Number}
+"""
+    mtp(xae)
 
-Return the cartesian coordinates [Earth radii] on the modified
-target plane of an asteroid's close approach with the Earth.
-
-# Arguments
-
-- `xae::Vector{U}`: asteroid's geocentric position/velocity
-   vector at close approach [au, au/day].
+Return the cartesian coordinates [planet radii] on the modified target
+plane of a planetary close encounter, where `xae` is the asteroid's
+planetocentric cartesian state vector at close approach [au, day].
 
 !!! reference
-    See equations (43)-(44) in page 15 of https://doi.org/10.1007/s10569-019-9914-4.
+    See equations (43)-(44) in page 15 of:
+    - https://doi.org/10.1007/s10569-019-9914-4
 """
 function mtp(xae::Vector{U}) where {U <: Number}
     # Unfold geocentric position and velocity

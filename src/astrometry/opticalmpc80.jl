@@ -86,6 +86,7 @@ end
 
 # AbstractAstrometryObservation interface
 date(x::OpticalMPC80) = x.date
+band(x::OpticalMPC80) = x.band
 observatory(x::OpticalMPC80) = x.observatory
 catalogue(x::OpticalMPC80) = x.catalogue
 rms(::OpticalMPC80{T}) where {T <: Real} = (one(T), one(T))

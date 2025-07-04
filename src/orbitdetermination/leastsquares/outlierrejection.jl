@@ -2,50 +2,45 @@ struct OutlierRejectionCache{T} <: AbstractLeastSquaresCache{T}
     mask::BitVector
     eval_res::Vector{OpticalResidual{T, T}}
     χ2s::Vector{T}
-    ξ::Vector{T}
-    γ::Matrix{T}
+    ξ::MVector{2, T}
+    γ::SMatrix{2, 2, T, 4}
     A::Matrix{T}
-    γ_ξ::Matrix{T}
+    γ_ξ::MMatrix{2, 2, T, 4}
     L::Int
-    # Inner constructor
-    function OutlierRejectionCache(::Type{T}, L::Int) where {T <: Real}
-        mask = BitVector(undef, L)
-        eval_res = Vector{OpticalResidual{T, T}}(undef, L)
-        χ2s = Vector{T}(undef, L)
-        ξ = Vector{T}(undef, 2)
-        γ = zeros(T, 2, 2)
-        A = Matrix{T}(undef, get_numvars(), 2)
-        γ_ξ = Matrix{T}(undef, 2, 2)
-        return new{T}(mask, eval_res, χ2s, ξ, γ, A, γ_ξ, L)
-    end
 end
 
-@doc raw"""
-    outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-        x::Vector{T}, Γ::Matrix{T} [, cache::OutlierRejectionCache{T}];
-        kwargs...) where {T <: Real}
+# Constructor
+function OutlierRejectionCache(::Type{T}, L::Int) where {T <: Real}
+    mask = BitVector(undef, L)
+    eval_res = Vector{OpticalResidual{T, T}}(undef, L)
+    χ2s = Vector{T}(undef, L)
+    ξ = MVector{2, T}(zero(T), zero(T))
+    γ = SMatrix{2, 2, T}(I)
+    A = Matrix{T}(undef, get_numvars(), 2)
+    γ_ξ = MMatrix{2, 2, T}(I)
+    return OutlierRejectionCache{T}(mask, eval_res, χ2s, ξ, γ, A, γ_ξ, L)
+end
 
-Carpino et al. (2003) outlier rejection algorithm.
+"""
+    outlier_rejection!(res, x, Γ [, cache]; kwargs...)
+
+Reject outliers in a vector of optical residuals `res` using the Carpino et al. (2003)
+algorithm. The residuals are evaluated at `x` and have a covariance matrix `Γ`. A
+pre-allocated `cache` can be passed to save memory.
 
 See also [`carpino_smoothing`](@ref).
 
-## Arguments
+# Keyword arguments
 
-- `res::AbstractVector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
-- `x::Vector{T}`: evaluation deltas.
-- `Γ::Matrix{T}`: covariance matrix.
-- `cache::OutlierRejectionCache{T}`: see [`OutlierRejectionCache`](@ref).
-
-## Keyword arguments
-
-- `χ2_rec::T`: recovery threshold (default: `7.0`).
-- `χ2_rej::T`: rejection threshold (default: `8.0`).
-- `fudge::T`: rejection fudge term coefficient (default: `400.0`).
-- `α::T`: scaling factor for maximum chi (default: `0.25`).
-- `max_per::T`: maximum allowed drop percentage (default: `10.0`).
+- `χ2_rec::Real`: recovery threshold (default: `7.0`).
+- `χ2_rej::Real`: rejection threshold (default: `8.0`).
+- `fudge::Real`: rejection fudge term coefficient (default: `400.0`).
+- `α::Real`: scaling factor for maximum chi (default: `0.25`).
+- `max_per::Real`: maximum allowed drop percentage (default: `10.0`).
 
 !!! reference
-    See https://doi.org/10.1016/S0019-1035(03)00051-4.
+    See:
+    - https://doi.org/10.1016/S0019-1035(03)00051-4
 """
 function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     x::Vector{T}, Γ::Matrix{T}, cache::OutlierRejectionCache{T} =
@@ -54,8 +49,10 @@ function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     # Number of residuals
     L = length(res)
     # Unfold
-    mask, eval_res, χ2s, ξ, γ, A, γ_ξ = view(cache.mask, 1:L), view(cache.eval_res, 1:L),
-        view(cache.χ2s, 1:L), cache.ξ, cache.γ, cache.A, cache.γ_ξ
+    mask = view(cache.mask, 1:L)
+    eval_res = view(cache.eval_res, 1:L)
+    χ2s = view(cache.χ2s, 1:L)
+    @unpack ξ, γ, A, γ_ξ = cache
     # Outliers mask
     map!(isoutlier, mask, res)
     # Evaluate residuals
@@ -67,16 +64,18 @@ function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
         # Outlier flag
         outlier = mask[i]
         # Current observation covariance matrix
-        γ[1, 1], γ[2, 2] = inv(res[i].w_α), inv(res[i].w_δ)
+        # Note: since the residuals are already normalized, the single
+        # observation covariance matrix is the 2x2 identity. Otherwise:
+        # γ = [σ_α^2 0; 0 σ_δ^2]
         # Current model matrix
-        A[:, 1] = TS.gradient(res[i].ξ_α)(x)
-        A[:, 2] = TS.gradient(res[i].ξ_δ)(x)
+        A[:, 1] = TS.gradient(ra(res[i]))(x)
+        A[:, 2] = TS.gradient(dec(res[i]))(x)
         # Outlier sign
         outlier_sign = 2 * outlier - 1
         # Current residual covariance matrix
         γ_ξ .= γ + outlier_sign * (A') * Γ * A
         # Current residual
-        ξ .= eval_res[i].ξ_α, eval_res[i].ξ_δ
+        ξ .= ra(eval_res[i]), dec(eval_res[i])
         # Current chi2
         χ2s[i] = abs(ξ' * inv(γ_ξ) * ξ)
         # Update maximum χ2
@@ -92,18 +91,18 @@ function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     # Sort χ2s
     idxs = sortperm(χ2s, rev = true)
     # Rejection threshold
-    χ2_rej = max(χ2_rej + carpino_smoothing(N_sel, fudge), α*χ2_max)
+    χ2_rej = max(χ2_rej + carpino_smoothing(N_sel, fudge), α * χ2_max)
     # Rejection / recovery loop
     @inbounds for i in idxs
         # Reject
         if χ2s[i] > χ2_rej && N_drop < max_drop && !mask[i]
-            res[i] = OpticalResidual(res[i].ξ_α, res[i].ξ_δ, res[i].w_α,
-                res[i].w_δ, res[i].μ_α, res[i].μ_δ, true)
+            res[i] = OpticalResidual{T, TaylorN{T}}(ra(res[i]), dec(res[i]), wra(res[i]),
+                                     wdec(res[i]), dra(res[i]), ddec(res[i]), true)
             N_drop += 1
         # Recover
         elseif χ2s[i] < χ2_rec && mask[i]
-            res[i] = OpticalResidual(res[i].ξ_α, res[i].ξ_δ, res[i].w_α,
-                res[i].w_δ, res[i].μ_α, res[i].μ_δ, false)
+            res[i] = OpticalResidual{T, TaylorN{T}}(ra(res[i]), dec(res[i]), wra(res[i]),
+                                     wdec(res[i]), dra(res[i]), ddec(res[i]), false)
             N_drop -= 1
         end
     end
@@ -111,15 +110,16 @@ function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     return nothing
 end
 
-@doc raw"""
-    carpino_smoothing(n::Int [, A::T]) where {T <: Real}
+"""
+    carpino_smoothing(n::Int [, A::Real])
 
 Carpino et al. (2003) rejection condition fudge term
 with coefficient `A` (default: `400.0`).
 
-See also [`outlier_rejection`](@ref).
+See also [`outlier_rejection!`](@ref).
 
 !!! reference
-    See page 253 of https://doi.org/10.1016/S0019-1035(03)00051-4.
+    See page 253 of:
+    - https://doi.org/10.1016/S0019-1035(03)00051-4
 """
-carpino_smoothing(n::Int, A::T = 400.0) where {T <: Real} = A*(1.2)^(-n)
+carpino_smoothing(n::Int, A::Real = 400.0) = A * (1.2)^(-n)

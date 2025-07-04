@@ -181,12 +181,16 @@ const CATALOGUE_MPC_CODES_2018 = [
 
 # Propagation
 
+# Abbreviation for a dense TaylorInterpolant
+const DensePropagation1{T, U} = TaylorInterpolant{T, U, 1, Vector{T}, Vector{Taylor1{U}}}
+const DensePropagation2{T, U} = TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}}
+
 # Load Solar System, accelerations, newtonian potentials and TT-TDB 2000-2100 ephemeris
 const sseph_artifact_path = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
-const sseph::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Taylor1{Float64}}} = JLD2.load(sseph_artifact_path, "ss16ast_eph")
-const acceph::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Taylor1{Float64}}} = JLD2.load(sseph_artifact_path, "acc_eph")
-const poteph::TaylorInterpolant{Float64, Float64, 2, Vector{Float64}, Matrix{Taylor1{Float64}}} = JLD2.load(sseph_artifact_path, "pot_eph")
-const ttmtdb::TaylorInterpolant{Float64, Float64, 1, Vector{Float64}, Vector{Taylor1{Float64}}} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
+const sseph::DensePropagation2{Float64, Float64} = JLD2.load(sseph_artifact_path, "ss16ast_eph")
+const acceph::DensePropagation2{Float64, Float64} = JLD2.load(sseph_artifact_path, "acc_eph")
+const poteph::DensePropagation2{Float64, Float64} = JLD2.load(sseph_artifact_path, "pot_eph")
+const ttmtdb::DensePropagation1{Float64, Float64} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
 const SSEPHORDER::Int = get_order(sseph.x[1])
 
 # Milliseconds between rounding epoch and J2000
@@ -262,31 +266,31 @@ const μ_ES = PE.μ[ea] / PE.μ[su] # 1 / 328_900.5614
 
 # Conversion to V band used by MPC
 # See https://minorplanetcenter.net/iau/info/BandConversion.txt
-const V_BAND_CORRECTION = Dict{String, Float64}(
-    "" => -0.8,
-    "U" => -1.3,
-    "B" => -0.8,
-    "g" => -0.35,
-    "V" =>  0,
-    "r" =>  0.14,
-    "R" =>  0.4,
-    "C" =>  0.4,
-    "W" =>  0.4,
-    "i" =>  0.32,
-    "z" =>  0.26,
-    "I" =>  0.8,
-    "J" =>  1.2,
-    "w" => -0.13,
-    "y" =>  0.32,
-    "L" =>  0.2,
-    "H" =>  1.4,
-    "K" =>  1.7,
-    "Y" =>  0.7,
-    "G" =>  0.28,
-    "v" =>  0,
-    "c" => -0.05,
-    "o" =>  0.33,
-    "u" => +2.5
+const V_BAND_CORRECTION = Dict{Char, Float64}(
+    ' ' => -0.8,
+    'U' => -1.3,
+    'B' => -0.8,
+    'g' => -0.35,
+    'V' =>  0,
+    'r' =>  0.14,
+    'R' =>  0.4,
+    'C' =>  0.4,
+    'W' =>  0.4,
+    'i' =>  0.32,
+    'z' =>  0.26,
+    'I' =>  0.8,
+    'J' =>  1.2,
+    'w' => -0.13,
+    'y' =>  0.32,
+    'L' =>  0.2,
+    'H' =>  1.4,
+    'K' =>  1.7,
+    'Y' =>  0.7,
+    'G' =>  0.28,
+    'v' =>  0,
+    'c' => -0.05,
+    'o' =>  0.33,
+    'u' => +2.5
 )
 
 # Parameters of the linear H and G magnitude system for asteroids

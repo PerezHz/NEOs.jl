@@ -76,6 +76,7 @@ Every optical observation `x` has a:
 - `ra(x)`: right ascension [rad].
 - `dec(x)`: declination [rad].
 - `mag(x)`: apparent magnitude.
+- `band(x)`: photometric band.
 - `observatory(x)`: observing station.
 - `catalogue(x)`: reference star catalogue.
 - `rms(x)`: a-priori formal RMS [arcsec].
@@ -126,7 +127,7 @@ Every astrometric residual `x` has a:
 """
 abstract type AbstractAstrometryResidual{T <: Real, U <: Number} <: AbstractAstrometry end
 
-const AbstractResidualVector{T} = AbstractVector{<:AbstractAstrometryResidual{T}} where {T}
+const AbstractResidualVector{T, U} = AbstractVector{<:AbstractAstrometryResidual{T, U}} where {T, U}
 
 evaluate(y::SVector{N, Taylor1{T}}, x::Number) where {N, T <: Number} =
     [y[i](x) for i in eachindex(y)]

@@ -1,13 +1,13 @@
-@doc raw"""
+"""
     OsculatingElements{T <: Number}
 
-Osculating orbital elements of a NEO.
+Keplerian osculating orbital elements.
 
 # Fields
 
 - `e::T`: eccentricity.
 - `q::T`: perihelion distance [au].
-- `tp::T`: time of pericenter passage [jd].
+- `tp::T`: time of pericenter passage [julian date].
 - `M::T`: mean anomaly [deg].
 - `Ω::T`: longitude of ascending node [deg].
 - `ω::T`: argument of pericentre [deg].
@@ -23,87 +23,52 @@ Osculating orbital elements of a NEO.
     i::T
     M::T
     a::T
-    # Inner constructor
-    function OsculatingElements{T}(e::T, q::T, tp::T, Ω::T, ω::T, i::T, M::T, a::T) where {T <: Number}
-        return new{T}(e, q, tp, Ω, ω, i, M, a)
-    end
 end
 
-# Outer constructors
-function OsculatingElements(e::T, q::T, tp::T, Ω::T, ω::T, i::T, M::T, a::T) where {T <: Number}
-    return OsculatingElements{T}(e, q, tp, Ω, ω, i, M, a)
-end
-
-function OsculatingElements()
-    return OsculatingElements(NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
-end
+OsculatingElements() = OsculatingElements(NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
 
 # A OsculatingElements is NaN if all its fields are NaN
-function isnan(osc::OsculatingElements{T}) where {T <: Number}
-    return isnan(osc.e) && isnan(osc.q) && isnan(osc.tp) && isnan(osc.Ω) && isnan(osc.ω) &&
-           isnan(osc.i) && isnan(osc.M) && isnan(osc.a)
-end
+isnan(x::OsculatingElements) = isnan(x.e) && isnan(x.q) && isnan(x.tp) && isnan(x.Ω) &&
+    isnan(x.ω) && isnan(x.i) && isnan(x.M) && isnan(x.a)
 
 # Print method for OsculatingElements
-# Example:
-# Eccentricity (e):                   0.4231715487782969
-# Pericenter distance (q):            0.5028397744678126 au
-# Time of pericenter passage (tp):    2021-03-19T03:45:01.293 JDTDB
-# Longitude of Ascending Node (Ω):    17.855086873010706 deg
-# Argument of pericenter (ω):         194.74654283451 deg
-# Inclination (i):                    34.81327005431841 deg
-# Mean anomaly (M):                   118.87965684315387 deg
-# Semimajor axis (a):                 0.8717319220347314 au
-function show(io::IO, m::OsculatingElements{T}) where {T <: Number}
-
-    print(io, rpad("Eccentricity (e): ", 36), @sprintf("%.5f", cte(m.e)), "\n")
-    print(io, rpad("Pericenter distance (q): ", 36), @sprintf("%.5f", cte(m.q)), " au\n")
-    if isnan(m.tp)
-        print(io, rpad("Time of pericenter passage (tp): ", 36), "NaN JDTDB\n")
-    else
-        print(io, rpad("Time of pericenter passage (tp): ", 36), julian2datetime(cte(m.tp)), " JDTDB\n")
-    end
-    print(io, rpad("Longitude of Ascending Node (Ω): ", 36), @sprintf("%.5f", cte(m.Ω)), " deg\n")
-    print(io, rpad("Argument of pericenter (ω): ", 36), @sprintf("%.5f", cte(m.ω)), " deg\n")
-    print(io, rpad("Inclination (i): ", 36), @sprintf("%.5f", cte(m.i)), " deg\n")
-    print(io, rpad("Mean anomaly (M): ", 36), @sprintf("%.5f", cte(m.M)), " deg\n")
-    print(io, rpad("Semimajor axis (a): ", 36), @sprintf("%.5f", cte(m.a)), " au\n")
-
+function show(io::IO, x::OsculatingElements)
+    print(io,
+        rpad("Eccentricity (e):", 36), @sprintf("%.5f", cte(x.e)), "\n",
+        rpad("Pericenter distance (q):", 36), @sprintf("%.5f", cte(x.q)), " au\n",
+        rpad("Time of pericenter passage (tp):", 36), isnan(x.tp) ? "NaN" :
+        julian2datetime(cte(x.tp)), " JDTDB\n",
+        rpad("Longitude of Ascending Node (Ω):", 36), @sprintf("%.5f", cte(x.Ω)), " deg\n",
+        rpad("Argument of pericenter (ω):", 36), @sprintf("%.5f", cte(x.ω)), " deg\n",
+        rpad("Inclination (i):", 36), @sprintf("%.5f", cte(x.i)), " deg\n",
+        rpad("Mean anomaly (M):", 36), @sprintf("%.5f", cte(x.M)), " deg\n",
+        rpad("Semimajor axis (a): ", 36), @sprintf("%.5f", cte(x.a)), " au\n"
+    )
 end
 
-@doc raw"""
-    equatorial2ecliptic(xas::Vector{T}) where {T <: Number}
-
-Rotate state vector `xas` from equatorial plane to the ecliptic.
-"""
-function equatorial2ecliptic(xas::Vector{T}) where {T <: Number}
+# Rotate state vector `xas` from equatorial plane to the ecliptic.
+function equatorial2ecliptic(xas::AbstractVector{T}) where {T <: Number}
     # Rotation matrix (only positions)
     m_eq2ecl = Rx(deg2rad(ϵ0_deg))
     # Rotational matrix (positions + velocities)
     m_xv_eq2ecl = hcat(vcat(m_eq2ecl, zeros(3,3)), vcat(zeros(3,3), m_eq2ecl))
     # Rotated state vector
-    return m_xv_eq2ecl*xas
+    return m_xv_eq2ecl * xas
 end
 
-@doc raw"""
-    pv2kep(xas::Vector{U}; μ::T = μ_S, jd::T = JD_J2000,
-           frame::Symbol = :equatorial) where {T <: Real, U <: Number}
-
-Compute the orbital elements of the NEO with state vector `xas`.
-Return an `OsculatingElements` object.
-
-See also [`equatorial2ecliptic`](@ref), [`eccentricity`](@ref), [`semimajoraxis`](@ref),
-[`timeperipass`](@ref), [`longascnode`](@ref), [`argperi`](@ref) and [`inclination`](@ref).
-
-# Arguments
-
-- `xas::Vector{U}`: state vector of the asteroid `[x, y, z, v_x, v_y, v_z]`.
-- `μ_S::T`: mass parameter of the central body (Sun).
-- `jd::T`: orbit epoch of reference in julian days.
-- `frame::Symbol`: plane of reference (`:equatorial` or `:ecliptic`).
 """
-function pv2kep(xas::Vector{U}; μ::T = μ_S, jd::T = JD_J2000,
-                frame::Symbol = :equatorial) where {T <: Real, U <: Number}
+    pv2kep(xas; kwargs...)
+
+Return the Keplerian osculating orbital elements of a cartesian state vector `xas`.
+
+# Keyword arguments
+
+- `μ::Real`: gravitational parameter of the central body (default: `μ_S`).
+- `jd::Real`: epoch of reference [julian days] (default: `JD_J2000`).
+- `frame::Symbol`: plane of reference, one of `:equatorial` (default) or `:ecliptic`.
+"""
+function pv2kep(xas::AbstractVector{T}; μ::Real = μ_S, jd::Real = JD_J2000,
+                frame::Symbol = :equatorial) where {T <: Number}
     if frame == :ecliptic
         xas = equatorial2ecliptic(xas)
     end
@@ -119,38 +84,29 @@ function pv2kep(xas::Vector{U}; μ::T = μ_S, jd::T = JD_J2000,
     return OsculatingElements(e, q, tp, Ω, ω, i, M, a)
 end
 
-@doc raw"""
-    (osc::OsculatingElements{T})(t::T) where {T <: Number}
-
-Return cartesian state vector of orbit `osc` at time `t` (Julian day).
-"""
-function (osc::OsculatingElements{T})(t::U) where {T,U <: Number}
-
+# Return the cartesian state vector of x at time t [julian days]
+function (x::OsculatingElements)(t::Number)
     # Mean motion
-    n = PE.meanmotion(μ_S, osc.a)
+    n = PE.meanmotion(μ_S, x.a)
     # Mean anomaly
-    M = PE.meananomaly(n, t, osc.tp)
+    M = PE.meananomaly(n, t, x.tp)
     # Eccentric anomaly
-    E = PE.eccentricanomaly(osc.e, M)
+    E = PE.eccentricanomaly(x.e, M)
     # True anomaly
-    f = PE.trueanomaly(osc.e, E)
-
+    f = PE.trueanomaly(x.e, E)
     # Distance to the central body
-    r = osc.a * (1 - osc.e^2) / (1 + osc.e * cos(f))
-
+    r = x.a * (1 - x.e^2) / (1 + x.e * cos(f))
     # Obtain position and velocity in the orbital frame
     r_o = r .* [cos(f), sin(f), 0.0]
-    v_o = (sqrt(μ_S*osc.a)/r) .* [-sin(E), sqrt(1 - osc.e^2) * cos(E), 0.0]
-
+    v_o = (sqrt(μ_S*x.a)/r) .* [-sin(E), sqrt(1 - x.e^2) * cos(E), 0.0]
     # Transform r_o and v_o to the inertial frame
-    ω = deg2rad(osc.ω)
-    i = deg2rad(osc.i)
-    Ω = deg2rad(osc.Ω)
+    ω = deg2rad(x.ω)
+    i = deg2rad(x.i)
+    Ω = deg2rad(x.Ω)
     # Rotation from orbital to inertial frame
     A = Rz(-Ω) * Rx(-i) * Rz(-ω)
     r_i = A * r_o
     v_i = A * v_o
-
     # State vector
     pv_i = vcat(r_i, v_i)
 
@@ -158,29 +114,31 @@ function (osc::OsculatingElements{T})(t::U) where {T,U <: Number}
 end
 
 @doc raw"""
-    yarkp2adot(A2, a, e, μ_S)
+    yarkp2adot(A2, a, e; kwargs...)
 
-Return the average semimajor axis drift due to the Yarkovsky effect
+Return the average semimajor axis drift of an orbit with Yarkovsky coefficient `A2`,
+semimajor axis `a` and eccentricity `e`.
+
+# Keyword argument
+
+- `μ`: gravitational parameter of the central body (default: `μ_S`).
+
+!!! reference
+    See:
+    - https://doi.org/10.1016/j.icarus.2013.02.004
+
+# Extended help
+
+The average semimajor axis drift is given by:
 ```math
 \begin{align*}
-    \left\langle\dot{a}\right\rangle & = \frac{2A_2(1-e^2)}{n}\left(\frac{1 \ \text{AU}}{p}\right)^2 \\
+    \left\langle\dot{a}\right\rangle
+    & = \frac{2A_2(1-e^2)}{n}\left(\frac{1 \ \text{AU}}{p}\right)^2 \\
     & = \frac{2A_2}{(1-e^2)\sqrt{a\mu_\odot}}(1 \ \text{AU})^2,
 \end{align*}
 ```
-where ``A_2`` is the Yarkovsky parameter, ``\mu_\odot = GM_\odot`` is the Sun's gravitational parameter,
-``e`` is the eccentricity, ``n = \sqrt{\mu/a^3}`` is the mean motion, ``p = a(1-e^2)`` is the
-semilatus rectum, and ``a`` is the semimajor axis.
-
-# Arguments
-
-- `A2`: Yarkovsky parameter.
-- `a`: semimajor axis.
-- `e`: eccentricity.
-- `μ_S`: mass parameter of the Sun.
-
-!!! reference
-    See https://doi.org/10.1016/j.icarus.2013.02.004.
+where ``A_2`` is the Yarkovsky parameter, ``\mu_\odot = GM_\odot`` is the Sun's
+gravitational parameter, ``e`` is the eccentricity, ``n = \sqrt{\mu/a^3}`` is the
+mean motion, ``p = a(1-e^2)`` is the semilatus rectum, and ``a`` is the semimajor axis.
 """
-function yarkp2adot(A2, a, e; μ = μ_S)
-    return 2A2/(sqrt(a)*(1-e^2)*sqrt(μ))
-end
+yarkp2adot(A2, a, e; μ = μ_S) = 2A2 / (sqrt(a) * (1 - e^2) * sqrt(μ))

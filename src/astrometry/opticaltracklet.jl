@@ -1,11 +1,11 @@
 """
-    OpticalTracklet{T, O <: AbstractOpticalVector{T}} <: AbstractOpticalAstrometry{T}
+    OpticalTracklet{T} <: AbstractOpticalAstrometry{T}
 
-A set of optical astrometry taken by the same observatory on the same night.
+The averague of a set of optical astrometry taken by the
+same observatory on the same night.
 
 # Fields
 
-- `optical::RefValue{O}`: reference to a vector of optical astrometry.
 - `observatory::ObservatoryMPC{T}`: observing station.
 - `night::TimeOfDay`: night of observation.
 - `date::DateTime`: mean date of observation.
@@ -15,10 +15,10 @@ A set of optical astrometry taken by the same observatory on the same night.
 - `vdec::T`: mean declination velocity [rad/day].
 - `mag::T`: mean apparent magnitude.
 - `nobs::Int`: number of observations.
-- `idxs::Vector{Int}`: indices of `optical` astrometry which are included in the tracklet.
+- `idxs::Vector{Int}`: indices of the original optical astrometry
+    vector which are included in the tracklet.
 """
-@auto_hash_equals fields = (date, ra, dec, observatory) struct OpticalTracklet{T, O <: AbstractOpticalVector{T}} <: AbstractOpticalAstrometry{T}
-    optical::RefValue{O}
+@auto_hash_equals fields = (date, ra, dec, observatory) struct OpticalTracklet{T} <: AbstractOpticalAstrometry{T}
     observatory::ObservatoryMPC{T}
     night::TimeOfDay
     date::DateTime
@@ -31,6 +31,10 @@ A set of optical astrometry taken by the same observatory on the same night.
     indices::Vector{Int}
 end
 
+# Abbreviations
+const TrackletVector{T} = Vector{OpticalTracklet{T}} where {T}
+const AbstractTrackletVector{T} = AbstractVector{OpticalTracklet{T}} where {T}
+
 # AbstractAstrometryObservation interface
 date(x::OpticalTracklet) = x.date
 observatory(x::OpticalTracklet) = x.observatory
@@ -39,24 +43,10 @@ rms(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
 debias(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
 
 nobs(x::OpticalTracklet) = x.nobs
-nobs(x::AbstractVector{OpticalTracklet{T, O}}) where {T, O} =
-    sum(nobs, x; init = 0)
+nobs(x::AbstractTrackletVector) = sum(nobs, x; init = 0)
 
 indices(x::OpticalTracklet) = x.indices
-indices(x::AbstractVector{OpticalTracklet{T, O}}) where {T, O} =
-    sort!(reduce(vcat, indices.(x)))
-
-astrometry(x::OpticalTracklet) = x.optical[][x.indices]
-astrometry(x::AbstractVector{OpticalTracklet{T, O}}) where {T, O} =
-    sort!(reduce(vcat, astrometry.(x)))
-
-# Check if any observation in `t` has time `date`
-function in(d::DateTime, t::OpticalTracklet)
-    for x in view(t.optical, t.indices)
-        d == date(x) && return true
-    end
-    return false
-end
+indices(x::AbstractTrackletVector) = sort!(reduce(vcat, indices.(x)))
 
 #=
 # TO DO: rename this function (e.g. as `timerange`), as the
@@ -74,12 +64,17 @@ end
 
 # Print method for OpticalTracklet
 function show(io::IO, x::OpticalTracklet)
-    print(io, x.nobs, " observation tracklet around ", x.date, " at ", x.observatory.name)
+    print(io, nobs(x), " observation tracklet around ", date(x),
+          " at ", observatory(x).name)
 end
 
 # Return the milliseconds between two dates
 datediff(a::DateTime, b::DateTime) = (a - b).value
 datediff(a::OpticalTracklet, b::OpticalTracklet) = datediff(date(a), date(b))
+
+# Find the tracklet whose epoch is closest to t
+closest_tracklet(t::Real, y::AbstractTrackletVector) =
+    findmin(@. abs(t - dtutc2days(date(y))))[2]
 
 # Evaluate a polynomial with coefficients p in every element of x
 polymodel(x, p) = map(y -> evalpoly(y, p), x)
@@ -114,8 +109,7 @@ function diffcoeffs(x::AbstractVector{T}) where {T <: Real}
 end
 
 # Outer constructor
-function OpticalTracklet(optical::RefValue{<:AbstractOpticalVector{T}},
-                         df::AbstractDataFrame) where {T <: Real}
+function OpticalTracklet(df::AbstractDataFrame)
     # Defining quantities of a Tracklet
     observatory = df.observatory[1]
     night = df.TimeOfDay[1]
@@ -125,10 +119,10 @@ function OpticalTracklet(optical::RefValue{<:AbstractOpticalVector{T}},
     if isone(nobs)
         date = df.date[1]
         ra, dec = df.ra[1], df.dec[1]
-        vra, vdec = zero(T), zero(T)
+        vra, vdec = zero(ra), zero(dec)
         mag = df.mag[1]
-        return OpticalTracklet(optical, observatory, night, date, ra,
-            dec, vra, vdec, mag, nobs, indices)
+        return OpticalTracklet(observatory, night, date, ra, dec,
+                               vra, vdec, mag, nobs, indices)
     end
     # Make sure there are no repeated dates
     gdf = groupby(df, :date)
@@ -164,8 +158,8 @@ function OpticalTracklet(optical::RefValue{<:AbstractOpticalVector{T}},
     # Mean apparent magnitude
     mag = mean(filter(!isnan, df.mag))
 
-    return OpticalTracklet(optical, observatory, night, date, ra,
-        dec, vra, vdec, mag, nobs, indices)
+    return OpticalTracklet(observatory, night, date, ra, dec,
+                           vra, vdec, mag, nobs, indices)
 end
 
 """
@@ -175,7 +169,7 @@ Return a vector of optical tracklets where each element corresponds to a
 batch of observations taken by the same observatory on the same night.
 The reduction is performed via polynomial regression.
 """
-function reduce_tracklets(optical::O) where {T <: Real, O <: AbstractOpticalVector{T}}
+function reduce_tracklets(optical::AbstractOpticalVector{T}) where {T <: Real}
     # Construct DataFrame
     df = DataFrame(date = date.(optical), ra = ra.(optical), dec = dec.(optical),
         observatory = observatory.(optical), mag = mag.(optical))
@@ -184,9 +178,9 @@ function reduce_tracklets(optical::O) where {T <: Real, O <: AbstractOpticalVect
     # Group by observatory and TimeOfDay
     gdf = groupby(df, [:observatory, :TimeOfDay])
     # Reduce tracklets
-    tracklets = Vector{OpticalTracklet{T, O}}(undef, gdf.ngroups)
+    tracklets = TrackletVector{T}(undef, gdf.ngroups)
     Threads.@threads for i in eachindex(tracklets)
-        tracklets[i] = OpticalTracklet(Ref(optical), gdf[i])
+        tracklets[i] = OpticalTracklet(gdf[i])
     end
     # Sort by date
     sort!(tracklets)

@@ -1,26 +1,23 @@
 # Topocentric (line-of-sight) unit vector
-function topounit(α::T, δ::T) where {T <: Number}
+topounit(x::AbstractOpticalAstrometry)= topounit(ra(x), dec(x))
 
+function topounit(α::T, δ::T) where {T <: Number}
     sin_α, cos_α = sincos(α)
     sin_δ, cos_δ = sincos(δ)
-
     pos = [cos_δ * cos_α, cos_δ * sin_α, sin_δ]
-
     return pos
 end
 
-topounit(obs::RadecMPC{T}) where {T <: Real} = topounit(obs.α, obs.δ)
-
 # 1st order approximation to Lagrange's f and g functions
 # TO DO: Should we allow to use other μ?
-function f_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
+function f_Lagrange(τ::Real, r::Number)
     r3 = r * r * r
-    return 1 - μ_S * (τ^2) / 2 / r3
+    return 1 - μ_S * (τ^2) / (2r3)
 end
 
-function g_Lagrange(τ::T, r::U) where {T <: Real, U <: Number}
+function g_Lagrange(τ::Real, r::Number)
     r3 = r * r * r
-    return τ - μ_S * (τ^3) / 6 / r3
+    return τ - μ_S * (τ^3) / (6r3)
 end
 
 # Format Lagrange equation as `r⁸ + a r⁶ + b r³ + c = 0`
@@ -28,20 +25,19 @@ function _format_Lagrange_equation(a::T, b::T, c::T) where {T <: Real}
     a_sgn = a ≥ 0 ? "+" : "-"
     b_sgn = b ≥ 0 ? "+" : "-"
     c_sgn = c ≥ 0 ? "+" : "-"
-
-    return join(["r⁸ ", a_sgn, " ", abs(a), " r⁶ ", b_sgn, " ", abs(b), " r³ ",
-        c_sgn, " ", abs(c), " = 0"])
+    return string("r⁸ ", a_sgn, " ", abs(a), " r⁶ ", b_sgn, " ", abs(b),
+                  " r³ ", c_sgn, " ", abs(c), " = 0")
 end
 
 # Lagrange polynomial to be solved during Gauss method and its derivative
-function lagrange(x::T, a::U, b::U, c::U) where {T, U <: Number}
+function lagrange(x::Number, a::U, b::U, c::U) where {U <: Number}
     # Evaluate via Horner's method
     x2 = x * x
     x3 = x2 * x
     return c + x3 * (b + x3 * (a + x2))
 end
 
-function lagrange_derivative(x::T, a::U, b::U) where {T, U <: Number}
+function lagrange_derivative(x::Number, a::U, b::U) where {U <: Number}
     # Evaluate via Horner's method
     x2 = x * x
     x3 = x2 * x
@@ -52,11 +48,13 @@ end
 # TO DO: Allow to control interval over which to look for solutions
 # Currently we look between the radius of the Sun (∼0.00465047 AU) and
 # the radius of the Solar System (∼40 AU)
-solve_lagrange(a::T, b::T, c::T; niter::Int = 5, rmin = 0.00465047,
-    rmax = 40.0) where {T <: Real} = find_zeros(x -> lagrange(x, a, b, c), rmin, rmax)
+function solve_lagrange(a::T, b::T, c::T; niter::Int = 5, rmin::Real = 0.00465047,
+                        rmax::Real = 40.0) where {T <: Real}
+    return find_zeros(x -> lagrange(x, a, b, c), rmin, rmax)
+end
 
 function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T};
-    niter::Int = 5) where {T <: Real}
+                        niter::Int = 5) where {T <: Real}
     # 0-th order solution
     sol0 = solve_lagrange(cte(a), cte(b), cte(c))
     # Vector of solutions
@@ -78,33 +76,15 @@ function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T};
     return sol
 end
 
-# Check topocentric slant ranges are positive
-isphysical(orbit::GaussOrbit) = iszero(orbit) ? false : all(orbit.ρ .> 0)
-
-# Check heliocentric energy is negative
-function isclosed(orbit::GaussOrbit)
-    iszero(orbit) && return false
-    # Heliocentric state vector [au, au/day]
-    r = orbit.r_vec[:, 2]
-    # Heliocentric energy per unit mass
-    kinetic = 0.5 * (r[4]^2 + r[5]^2 + r[6]^2)
-    potential = k_gauss^2 / sqrt(r[1]^2 + r[2]^2 + r[3]^2)
-    E  = kinetic - potential
-
-    return E <= 0
-end
-
-# Find the tracklet whose epoch is closest to t
-closest_tracklet(t::T, tracklets::Vector{Tracklet{T}}) where {T <: Real} =
-    findmin(@. abs(t - dtutc2days(date(tracklets))))[2]
-
 # Find the best combination of three observations for Gauss' method.
 # See the line after equation (27) of https://doi.org/10.1016/j.icarus.2007.11.033
-function gausstriplet(tracklets::AbstractVector{Tracklet{T}}) where {T <: Real}
+function gausstriplet(::Val{true}, optical::AbstractOpticalVector,
+                      tracklets::AbstractTrackletVector)
     # Unfold tracklets
-    a, b, c = tracklets
+    a, b, c = view(optical, indices(tracklets[1])), view(optical, indices(tracklets[2])),
+              view(optical, indices(tracklets[3]))
     # All possible triplets of indices
-    CI = CartesianIndices((a.nobs, b.nobs, c.nobs))
+    CI = CartesianIndices((length(a), length(b), length(c)))
     # Allocate memory
     triplet = [0, 0, 0]
     τ = typemax(Int)
@@ -113,8 +93,8 @@ function gausstriplet(tracklets::AbstractVector{Tracklet{T}}) where {T <: Real}
         # Unfold indices
         i, j, k = ci.I
         # Minimize asymmetry
-        τ1 = (b.radec[j].date - a.radec[i].date).value
-        τ3 = (c.radec[k].date - b.radec[j].date).value
+        τ1 = (date(b[j]) - date(a[i])).value
+        τ3 = (date(c[k]) - date(b[j])).value
         _τ_ = abs(τ3 - τ1)
         # Update triplet and τ
         if _τ_ < τ
@@ -125,10 +105,10 @@ function gausstriplet(tracklets::AbstractVector{Tracklet{T}}) where {T <: Real}
     # Unfold triplet
     i, j, k = triplet
     # Update observatories, dates, α and δ
-    observatories = [a.observatory, b.observatory, c.observatory]
-    dates = [a.radec[i].date, b.radec[j].date, c.radec[k].date]
-    α = [a.radec[i].α, b.radec[j].α, c.radec[k].α]
-    δ = [a.radec[i].δ, b.radec[j].δ, c.radec[k].δ]
+    observatories = [observatory(a[i]), observatory(b[j]), observatory(c[k])]
+    dates = [date(a[i]), date(b[j]), date(c[k])]
+    α = [ra(a[i]), ra(b[j]), ra(c[k])]
+    δ = [dec(a[i]), dec(b[j]), dec(c[k])]
     # Sort triplet
     idxs = sortperm(dates)
     permute!(observatories, idxs)
@@ -139,16 +119,17 @@ function gausstriplet(tracklets::AbstractVector{Tracklet{T}}) where {T <: Real}
     return observatories, dates, α, δ
 end
 
-function gausstriplet(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
+function gausstriplet(::Val{false}, optical::AbstractOpticalVector,
+                      tracklets::AbstractTrackletVector)
     # Allocate memory
     triplet = [0, 0, 0]
     τa, τb = 0, typemax(Int)
     # Check all possible triplets of indices
-    L = length(radec)
+    L = length(optical)
     for i in 1:L-2, j in i+1:L-1, k in j+1:L
         # Maximize timespan and minimize asymmetry
-        τ1 = (radec[j].date - radec[i].date).value
-        τ3 = (radec[k].date - radec[j].date).value
+        τ1 = (date(optical[j]) - date(optical[i])).value
+        τ3 = (date(optical[k]) - date(optical[j])).value
         _τa_, _τb_ = abs(τ1) + abs(τ3), abs(τ3 - τ1)
         # Update triplet and τ
         if _τa_ > τa || (_τa_ == τa && _τb_ < τb)
@@ -159,10 +140,10 @@ function gausstriplet(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     # Unfold triplet
     i, j, k = triplet
     # Update observatories, dates, α and δ
-    observatories = observatory.(radec[triplet])
-    dates = date.(radec[triplet])
-    α = ra.(radec[triplet])
-    δ = dec.(radec[triplet])
+    observatories = observatory.(optical[triplet])
+    dates = date.(optical[triplet])
+    α = ra.(optical[triplet])
+    δ = dec.(optical[triplet])
     # Sort triplet
     idxs = sortperm(dates)
     permute!(observatories, idxs)
@@ -173,25 +154,23 @@ function gausstriplet(radec::AbstractVector{RadecMPC{T}}) where {T <: Real}
     return observatories, dates, α, δ
 end
 
-@doc raw"""
-    gaussmethod(od, params) where {D, T <: Real}
+"""
+    gaussmethod(od, params)
 
-Gauss method for preliminary orbit determination.
-
-## Arguments
-
-- `od::ODProblem{D, T}`: orbit determination problem.
-- `params::Parameters{T}`: see the `Gauss Method` section of [`Parameters`](@ref).
+Given an orbit determination problem `od`, return a vector of preliminary
+orbits computed by Gauss method. For a list of parameters, see the `Gauss
+Method` section of [`Parameters`](@ref).
 
 !!! reference
-    See Section 3 of https://doi.org/10.1007/s10569-025-10246-2.
+    See Section 3 of:
+    - https://doi.org/10.1007/s10569-025-10246-2
 """
-function gaussmethod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Real}
+function gaussmethod(od::IODProblem{D, T, O}, params::Parameters{T}) where {D, T, O}
     # Unpack
     @unpack safegauss, gaussorder, eph_su = params
-    @unpack dynamics, tracklets, radec = od
+    @unpack dynamics, optical, tracklets = od
     # Find best triplet of observations
-    observatories, dates, α, δ = safegauss ? gausstriplet(tracklets) : gausstriplet(radec)
+    observatories, dates, α, δ = gausstriplet(Val(safegauss), optical, tracklets)
     # Julian day of middle observation
     _jd0_ = dtutc2jdtdb(dates[2])
     # Scaling factors
@@ -202,16 +181,16 @@ function gaussmethod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: 
     τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2s, r_vec, ρ =
         gaussmethod(observatories, dates, α .+ dq[1:3], δ .+ dq[4:6], params)
     # Preliminary orbits
-    orbits = Vector{GaussOrbit{D, T, T}}(undef, length(r_2s))
+    orbits = Vector{GaussOrbit{D, T, T, O}}(undef, length(r_2s))
     for i in eachindex(orbits)
         # Epoch (corrected for light-time)
         jd0 = _jd0_ - cte(ρ[2, i]) / c_au_per_day
         # Jet transport initial condition
         q0 = r_vec[:, 2, i] + eph_su(jd0 - JD_J2000)
         # Propagation and residuals
-        bwd, fwd, res = propres(od, jd0, q0, params)
+        bwd, fwd, res = propres(od, q0, jd0, params)
         if isempty(res)
-            orbits[i] = zero(GaussOrbit{D, T, T})
+            orbits[i] = zero(GaussOrbit{D, T, T, O})
             continue
         end
         # Current Q
@@ -219,12 +198,13 @@ function gaussmethod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: 
         # Covariance matrix
         nobs = 2 * notout(res)
         C = (nobs/2) * TS.hessian(Q)
-        Γ = inv(C)
+        covariance = inv(C)
         # Residuals space to barycentric coordinates jacobian
-        J = Matrix(TS.jacobian(q0 - cte.(q0)))
+        jacobian = Matrix(TS.jacobian(q0 - cte.(q0)))
         # Update orbit
-        orbits[i] = evaldeltas(GaussOrbit(dynamics, tracklets, bwd, fwd, res, Γ, J, τ_1,
-            τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2s[i], r_vec[:, :, i], ρ[:, i]))
+        orbits[i] = evaldeltas(GaussOrbit(dynamics, optical, tracklets, bwd, fwd,
+            res, covariance, jacobian, τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b,
+            c, r_2s[i], r_vec[:, :, i], ρ[:, i]))
     end
     # Sort orbits by nms
     sort!(orbits, by = nms)
@@ -233,7 +213,7 @@ function gaussmethod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: 
 end
 
 function gaussmethod(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{DateTime},
-    α::Vector{U}, δ::Vector{U}, params::Parameters{T}) where {T <: Real, U <: Number}
+                     α::Vector{U}, δ::Vector{U}, params::Parameters{T}) where {T <: Real, U <: Number}
     # Check we have exactly three observations
     @assert length(observatories) == length(dates) == length(α) == length(δ) == 3
         "Gauss method requires exactly three observations"
@@ -316,32 +296,30 @@ function gaussmethod(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Dat
     return τ_1, τ_3, ρ_vec, R_vec, D_0, D, a, b, c, r_2s, r_vec, ρ
 end
 
-@doc raw"""
-    gaussiod(od, params) where {D, T <: Real}
+"""
+    gaussiod(od, params)
 
-Compute a `LeastSquaresOrbit` via Jet Transport Gauss Method followed by
-Jet Transport Least Squares.
+Given an orbit determination problem `od`, compute a `LeastSquaresOrbit`
+via Gauss method followed by Jet Transport Least Squares. For a list of
+parameters, see the `Gauss Method` and `Least Squares` sections of
+[`Parameters`](@ref).
 
 See also [`gaussmethod`](@ref).
-
-## Arguments
-
-- `od::ODProblem{D, T}`: an orbit determination problem.
-- `params::Parameters{T}`: see `Gauss Method` and `Least Squares` sections
-    of [`Parameters`](@ref).
 
 !!! warning
     This function may change the (global) `TaylorSeries` variables.
 
 !!! reference
-    See https://doi.org/10.1007/s10569-025-10246-2.
+    See section 3 of:
+    - https://doi.org/10.1007/s10569-025-10246-2
 """
-function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Real}
-    # Allocate memory for orbit
-    orbit = zero(LeastSquaresOrbit{D, T, T})
+function gaussiod(od::IODProblem{D, T, O}, params::Parameters{T}) where {D,
+                  T <: Real, O <: AbstractOpticalVector{T}}
     # Unpack
     @unpack safegauss, significance, verbose = params
-    @unpack tracklets, radec = od
+    @unpack optical, tracklets = od
+    # Pre-allocate orbit
+    orbit = zero(LeastSquaresOrbit{D, T, T, O, Nothing, Nothing})
     # This function requires exactly 3 tracklets
     (safegauss && length(tracklets) != 3) && return orbit
     # Set jet transport variables
@@ -357,7 +335,7 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
         # Jet Transport Least Squares
         _orbit_ = jtls(od, porbits[i], params, true)
         # Update orbit
-        orbit = updateorbit(orbit, _orbit_, radec)
+        orbit = updateorbit(orbit, _orbit_, optical)
         # Termination condition
         if critical_value(orbit) < significance
             N2 = length(orbit.Qs)
@@ -373,13 +351,14 @@ function gaussiod(od::ODProblem{D, T}, params::Parameters{T}) where {D, T <: Rea
         j = safegauss ? 2 : closest_tracklet(epoch(porbits[i]), tracklets)
         nobs(tracklets[j]) < 2 && continue
         for scale in (:log, :linear)
-            porbit = mmov(od, porbits[i], j, scale, params)
+            # Subset of optical to be included in the calculation
+            porbit = mmov(od, porbits[i], j, params; scale)
             # MMOV failed to converge
             iszero(porbit) && continue
             # Jet Transport Least Squares
             _orbit_ = jtls(od, porbit, params, true)
             # Update orbit
-            orbit = updateorbit(orbit, _orbit_, radec)
+            orbit = updateorbit(orbit, _orbit_, optical)
             # Termination condition
             if critical_value(orbit) < significance
                 N1, N2 = length(porbit.Qs), length(orbit.Qs)

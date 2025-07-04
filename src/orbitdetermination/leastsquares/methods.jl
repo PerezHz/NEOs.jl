@@ -1,14 +1,14 @@
-@doc raw"""
+"""
     AbstractLeastSquares{T <: Real}
 
-Supertype for the least squares API.
+Supertype for the least squares interface.
 """
 abstract type AbstractLeastSquares{T <: Real} end
 
-@doc raw"""
+"""
     AbstractLeastSquaresCache{T} <: AbstractLeastSquares{T}
 
-Supertype for the least squares caches API.
+Supertype for the least squares caches interface.
 """
 abstract type AbstractLeastSquaresCache{T} <: AbstractLeastSquares{T} end
 
@@ -18,30 +18,50 @@ struct LeastSquaresCache{T} <: AbstractLeastSquaresCache{T}
     Qs::Vector{T}
     idxs::Vector{Int}
     maxiter::Int
-    # Inner constructor
-    function LeastSquaresCache(x0::Vector{T}, idxs::AbstractVector{Int},
-        maxiter::Int = 25) where {T <: Real}
-        xs = Matrix{T}(undef, length(x0), maxiter + 1)
-        Qs = Vector{T}(undef, maxiter + 1)
-        return new{T}(x0, xs, Qs, idxs, maxiter)
-    end
 end
 
-@doc raw"""
+"""
+    LeastSquaresCache(x0 [, idxs]; kwargs...)
+
+Return a cache for [`leastsquares!`](@ref) with initial guess `x0`. If `idxs`
+(default: `eachindex(x0)`) is given, perform the minimization over a subset
+of the parameters.
+
+# Keyword argument
+
+- `maxiter::Int`: maximum number of iterations (default: `25`)
+"""
+function LeastSquaresCache(x0::Vector{T}, idxs::AbstractVector{Int} = eachindex(x0),
+    maxiter::Int = 25) where {T <: Real}
+    xs = Matrix{T}(undef, length(x0), maxiter + 1)
+    Qs = Vector{T}(undef, maxiter + 1)
+    return LeastSquaresCache{T}(x0, xs, Qs, idxs, maxiter)
+end
+
+"""
     AbstractLeastSquaresMethod{T} <: AbstractLeastSquares{T}
 
-Supertype for the least squares methods API.
+Supertype for the least squares methods interface.
+
+Every least squares `method`:
+- is a mutable subtype of `AbstractLeastSquaresMethod{T}`,
+- has a `method(res, x0 [, idxs])` constructor,
+- defines `getid`, `lsstep`, `normalmatrix` and `update`.
 """
 abstract type AbstractLeastSquaresMethod{T} <: AbstractLeastSquares{T} end
 
-# Least squares main loop
-function leastsquares!(ls::LS, cache::LeastSquaresCache{T}) where {T <: Real,
-    LS <: AbstractLeastSquaresMethod{T}}
+"""
+    leastsquares!(ls, cache)
+
+Minimize the target function in `ls` via least squares, using the
+containers in `cache` to save intermediate results.
+"""
+function leastsquares!(ls::AbstractLeastSquaresMethod{T},
+                       cache::LeastSquaresCache{T}) where {T <: Real}
     # Allocate memory for least squares fit
     fit = LeastSquaresFit(T, typeof(ls))
     # Unfold
-    x0, xs, Qs, idxs = cache.x0, cache.xs, cache.Qs, cache.idxs
-    maxiter = cache.maxiter
+    @unpack x0, xs, Qs, idxs, maxiter = cache
     # Initial conditions
     for j in axes(xs, 2)
         xs[:, j] .= x0
@@ -76,21 +96,21 @@ function leastsquares!(ls::LS, cache::LeastSquaresCache{T}) where {T <: Real,
     return fit
 end
 
-@doc raw"""
-    leastsquares(method::LS, res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-        x0::Vector{T} [, idxs::AbstractVector{Int}]; kwargs...) where {LS, T <: Real}
+"""
+    leastsquares(method, res, x0 [, idxs]; kwargs...)
 
-Use least squares method `LS` to minimize the normalized mean square residual of `res`,
+Use least squares `method` to minimize the normalized mean square residual of `res`,
 starting from initial guess `x0`. If `idxs` (default: `eachindex(x0)`) is given,
 perform the minimization over a subset of the parameters.
 
-## Keyword arguments
+# Keyword argument
 
 - `maxiter::Int`: maximum number of iterations (default: `25`).
 """
-function leastsquares(method::LS, res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    x0::Vector{T}, idxs::AbstractVector{Int} = eachindex(x0);
-    maxiter::Int = 25) where {LS, T <: Real}
+function leastsquares(method::Type{<:AbstractLeastSquaresMethod{T}},
+                      res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
+                      x0::Vector{T}, idxs::AbstractVector{Int} = eachindex(x0);
+                      maxiter::Int = 25) where {T <: Real}
     # Consistency checks
     @assert length(idxs) ≤ length(x0) == get_numvars()
     # Initialize least squares method and cache
@@ -112,25 +132,21 @@ mutable struct Newton{T} <: AbstractLeastSquaresMethod{T}
     d2Q::Matrix{T}
 end
 
-@doc raw"""
-    Newton(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-        x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+"""
+    Newton(res, x0 [, idxs])
 
-Return a `Newton{T}` object for least squares minimization.
+Newton method for minimizing the normalized mean square of a vector of optical residuals
+`res`, starting from initial guess `x0`. If `idxs` (default: `eachindex(x0)`) is given,
+perform the minimization over a subset of the parameters.
 
 See also [`leastsquares`](@ref).
 
-## Arguments
-
-- `res::AbstractVector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
-- `x_0::Vector{T}`: initial guess.
-- `idxs::AbstractVector{Int}`: subset of parameters for fit.
-
 !!! reference
-    See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
+    See sections 5.2 and 5.3 of:
+    - https://doi.org/10.1017/CBO9781139175371
 """
-function Newton(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+function Newton(res::AbstractVector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+                idxs::AbstractVector{Int}) where {T <: Real}
     # Number of observations and degrees of freedom
     nobs, npar = 2*notout(res), length(idxs)
     # Mean square residual and its gradient
@@ -172,11 +188,11 @@ end
 
 function normalmatrix(ls::Newton{T}, x::Vector{T}) where {T <: Real}
     TS.evaluate!(ls.HQ, x, ls.d2Q)
-    return (ls.nobs/2) * ls.d2Q # C = d2Q / (2/m)
+    return (ls.nobs / 2) * ls.d2Q
 end
 
 function update!(ls::Newton{T}, res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+                 x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
     # Number of observations and degrees of freedom
     ls.nobs, ls.npar = 2*notout(res), length(idxs)
     # Mean square residual and its gradient
@@ -207,25 +223,22 @@ mutable struct DifferentialCorrections{T} <: AbstractLeastSquaresMethod{T}
     Cx::Matrix{T}
 end
 
-@doc raw"""
-    DifferentialCorrections(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-        x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+"""
+    DifferentialCorrections(res, x0 [, idxs])
 
-Return a `DifferentialCorrections{T}` object for least squares minimization.
+Differential corrections method for minimizing the normalized mean square of a
+vector of optical residuals `res`, starting from initial guess `x0`. If `idxs`
+(default: `eachindex(x0)`) is given, perform the minimization over a subset of
+the parameters.
 
 See also [`leastsquares`](@ref).
 
-## Arguments
-
-- `res::AbstractVector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
-- `x_0::Vector{T}`: initial guess.
-- `idxs::AbstractVector{Int}`: subset of parameters for fit.
-
 !!! reference
-    See sections 5.2 and 5.3 of https://doi.org/10.1017/CBO9781139175371.
+    See sections 5.2 and 5.3 of:
+    - https://doi.org/10.1017/CBO9781139175371
 """
 function DifferentialCorrections(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+                                 x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
     # Number of observations and degrees of freedom
     nobs, npar = 2*notout(res), length(idxs)
     # Mean square residual and its gradient
@@ -265,8 +278,8 @@ function normalmatrix(ls::DifferentialCorrections{T}, x::Vector{T}) where {T <: 
 end
 
 function update!(ls::DifferentialCorrections{T},
-    res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+                 res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
+                 x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
     # Number of observations and degrees of freedom
     ls.nobs, ls.npar = 2*notout(res), length(idxs)
     # Mean square residual and its gradient
@@ -297,8 +310,8 @@ function DCVB(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     # Tranpose of the normalized design matrix B
     for (j, k) in enumerate(findall(!isoutlier, res))
         # Normalized j-th ra and dec residuals
-        V[2j-1] = sqrt(res[k].w_α) * res[k].ξ_α
-        V[2j] = sqrt(res[k].w_δ) * res[k].ξ_δ
+        V[2j-1] = sqrt(wra(res[k])) * ra(res[k])
+        V[2j] = sqrt(wdec(res[k])) * dec(res[k])
         # Gradient of the j-th ra and dec residuals with respect to
         # to the initial conditions x_0[idxs]
         for i in eachindex(idxs)
@@ -359,25 +372,22 @@ mutable struct LevenbergMarquardt{T} <: AbstractLeastSquaresMethod{T}
     d2Q::Matrix{T}
 end
 
-@doc raw"""
-    LevenbergMarquardt(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-        x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+"""
+    LevenbergMarquardt(res, x0 [, idxs])
 
-Return a `LevenbergMarquardt{T}` object for least squares minimization.
+Levenberg-Marquardt method for minimizing the normalized mean square of a
+vector of optical residuals `res`, starting from initial guess `x0`. If
+`idxs` (default: `eachindex(x0)`) is given, perform the minimization over
+a subset of the parameters.
 
 See also [`leastsquares`](@ref).
 
-## Arguments
-
-- `res::AbstractVector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
-- `x_0::Vector{T}`: initial guess.
-- `idxs::AbstractVector{Int}`: subset of parameters for fit.
-
 !!! reference
-    See section 15.5.2 of https://numerical.recipes.
+    See section 15.5.2 of:
+    - https://numerical.recipes
 """
 function LevenbergMarquardt(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+                            x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
     # Number of observations and degrees of freedom
     nobs, npar = 2*notout(res), length(idxs)
     # Damping factor
@@ -430,12 +440,12 @@ end
 
 function normalmatrix(ls::LevenbergMarquardt{T}, x::Vector{T}) where {T <: Real}
     TS.evaluate!(ls.HQ, x, ls.d2Q)
-    return (ls.nobs/2) * ls.d2Q # C = d2Q / (2/m)
+    return (ls.nobs / 2) * ls.d2Q
 end
 
 function update!(ls::LevenbergMarquardt{T},
-    res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+                 res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
+                 x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
     # Number of observations and degrees of freedom
     ls.nobs, ls.npar = 2*notout(res), length(idxs)
     # Damping factor
@@ -458,14 +468,14 @@ function update!(ls::LevenbergMarquardt{T},
     return nothing
 end
 
-_lsmethods(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    x0::Vector{T}, idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real} =
-    [Newton(res, x0, idxs), DifferentialCorrections(res, x0, idxs),
-    LevenbergMarquardt(res, x0, idxs)]
+function _lsmethods(res::AbstractVector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+                    idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
+    return [Newton(res, x0, idxs), DifferentialCorrections(res, x0, idxs),
+            LevenbergMarquardt(res, x0, idxs)]
+end
 
-@doc raw"""
-    tryls(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-        x0::Vector{T} [, idxs::AbstractVector{Int}]; kwargs...) where {T <: Real}
+"""
+    tryls(res, x0 [, idxs]; kwargs...)
 
 Try the least squares minimization of the normalized mean square residual of `res`,
 starting from initial guess `x0`. If `idxs` (default: `eachindex(x0)`) is given,
@@ -474,17 +484,21 @@ perform the minimization over a subset of the parameters.
 See also [`LeastSquaresCache`](@ref), [`AbstractLeastSquaresMethod`](@ref),
 [`_lsmethods`](@ref) and [`leastsquares!`](@ref).
 
-## Keyword Arguments
+# Keyword Argument
 
 - `maxiter::Int`: maximum number of iterations (default: `25`).
-- `cache::LeastSquaresCache{T}`: least squares cache (default:
-    `LeastSquaresCache(x0, idxs, maxiter)`).
-- `methods::Vector{AbstractLeastSquaresMethod}`: least squares routines to try
-    (default: `_lsmethods(res, x0, idxs)`).
 """
+function tryls(res::AbstractVector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
+               idxs::AbstractVector{Int} = eachindex(x0);
+               maxiter::Int = 25) where {T <: Real}
+    cache = LeastSquaresCache(x0, idxs, maxiter)
+    methods = _lsmethods(res, x0, idxs)
+    return tryls(res, x0, cache, methods)
+end
+
 function tryls(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    x0::Vector{T}, cache::LeastSquaresCache{T},
-    methods::Vector{AbstractLeastSquaresMethod{T}}) where {T <: Real}
+               x0::Vector{T}, cache::LeastSquaresCache{T},
+               methods::Vector{AbstractLeastSquaresMethod{T}}) where {T <: Real}
     # Allocate memory
     fit = zero(LeastSquaresFit{T})
     # Least squares methods in order
@@ -495,12 +509,4 @@ function tryls(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     end
 
     return fit
-end
-
-function tryls(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    x0::Vector{T}, idxs::AbstractVector{Int} = eachindex(x0);
-    maxiter::Int = 25) where {T <: Real}
-    cache = LeastSquaresCache(x0, idxs, maxiter)
-    methods = _lsmethods(res, x0, idxs)
-    return tryls(res, x0, cache, methods)
 end

@@ -488,9 +488,9 @@ using Test
         trks2 = reduce_tracklets(optical2)
         trks3 = reduce_tracklets(optical3)
 
-        @test isa(trks1, Vector{OpticalTracklet{Float64, Vector{OpticalMPC80{Float64}}}})
-        @test isa(trks2, Vector{OpticalTracklet{Float64, Vector{OpticalRWO{Float64}}}})
-        @test isa(trks3, Vector{OpticalTracklet{Float64, Vector{OpticalADES{Float64}}}})
+        @test isa(trks1, Vector{OpticalTracklet{Float64}})
+        @test isa(trks2, Vector{OpticalTracklet{Float64}})
+        @test isa(trks3, Vector{OpticalTracklet{Float64}})
         @test length(trks1) == length(trks2) == length(trks3)
 
         @test nobs(trks1) == length(optical1)
@@ -500,10 +500,6 @@ using Test
         @test indices(trks1) == collect(eachindex(optical1))
         @test indices(trks2) == collect(eachindex(optical2))
         @test indices(trks3) == collect(eachindex(optical3))
-
-        @test astrometry(trks1) == optical1
-        @test astrometry(trks2) == optical2
-        @test astrometry(trks3) == optical3
 
         @test maximum(datediff.(trks1, trks2)) == 0
         @test maximum(datediff.(trks1, trks3)) == 316

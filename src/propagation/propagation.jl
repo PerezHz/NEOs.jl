@@ -44,19 +44,19 @@ function loadpeeph(eph::TaylorInterpolant = sseph, t0::Real = sseph.t0,
 end
 
 """
-    PropagationBuffer(dynamics, jd0, tlim, q0, params)
+    PropagationBuffer(dynamics, q0, jd0, tlim, params)
 
 Return a `PropagationBuffer` object with pre-allocated memory for `propagate`.
 
 # Arguments
 
 - `dynamics`: dynamical model function.
+- `q0::Vector{<:Number}`: vector of initial conditions.
 - `jd0::Number`: initial Julian date (TDB).
 - `tlim::Tuple{Real, Real}`: ephemeris timespan [days since J2000].
-- `q0::Vector{<:Number}`: vector of initial conditions.
 - `params::Parameters{<:Real}`: see the `Propagation` section of [`Parameters`](@ref).
 """
-function PropagationBuffer(dynamics::D, jd0::V, tlim::Tuple{T, T}, q0::Vector{U},
+function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::Tuple{T, T},
                            params::Parameters{T}) where {D, T <: Real, U <: Number,
                            V <: Number}
     # Unpack parameters
@@ -191,7 +191,7 @@ function propagate(f::D, q0::Vector{U}, jd0::Number, tmax::T,
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
     tlim = minmax(_jd0_, _jd0_ + tmax * yr) .- JD_J2000
-    buffer = PropagationBuffer(f, jd0, tlim, q0, params)
+    buffer = PropagationBuffer(f, q0, jd0, tlim, params)
     # Propagate orbit
     return _propagate(f, q0, jd0, tmax, buffer, params)
 end
@@ -235,7 +235,7 @@ function propagate_root(f::D, q0::Vector{U}, jd0::Number, tmax::T, params::Param
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
     tlim = minmax(_jd0_, _jd0_ + tmax * yr) .- JD_J2000
-    buffer = PropagationBuffer(f, jd0, tlim, q0, params)
+    buffer = PropagationBuffer(f, q0, jd0, tlim, params)
     # Propagate orbit
     return _propagate_root(f, q0, jd0, tmax, buffer, params; eventorder,
         newtoniter, nrabstol)
@@ -274,7 +274,7 @@ function propagate_lyap(f::D, q0::Vector{U}, jd0::Number, tmax::T,
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
     tlim = minmax(_jd0_, _jd0_ + tmax * yr) .- JD_J2000
-    buffer = PropagationBuffer(f, jd0, tlim, q0, params)
+    buffer = PropagationBuffer(f, q0, jd0, tlim, params)
     # Unpack
     @unpack order, abstol, maxsteps = params
     @unpack dparams = buffer
