@@ -77,13 +77,32 @@ function unfold(y::AbstractVector{RadarResidual{T, U}}) where {T <: Real, U <: N
     # Fill residuals, weights and debiasing factors
     for i in eachindex(y)
         isoutlier(y[i]) && continue
-        # Right ascension
+        # Residual
         z[k], w[k], d[k] = residual(y[i]), weight(y[i]), debias(y[i])
         # Update global counter
         k += 1
     end
 
     return z, w, d
+end
+
+function normalized_residuals(y::AbstractVector{RadarResidual{T, U}}) where {T, U}
+    # Number of non outliers
+    L = notout(y)
+    # Vector of normalized residuals
+    z = Vector{U}(undef, L)
+    # Global counter
+    k = 1
+    # Fill residuals
+    for i in eachindex(y)
+        isoutlier(y[i]) && continue
+        # Residual
+        z[k] = residual(y[i])
+        # Update global counter
+        k += 1
+    end
+
+    return z
 end
 
 raw"""
@@ -382,7 +401,7 @@ by an observatory around an UTC echo reception time.
 
 # Keyword arguments
 
-- `tord::Int`: order of Taylor expansions (default: `5`).
+- `tord::Int`: order of Taylor expansions (default: `10`).
 - `niter::Int`: number of light-time solution iterations (default: `10`).
 - `xve::EarthEph`: Earth ephemeris (default: `earthposvel`).
 - `xvs::SunEph`: Sun ephemeris (default: `sunposvel`).
@@ -407,7 +426,7 @@ LOD and polar motion.
 The above works only with `TaylorInterpolant` ephemeris. See
 [`PlanetaryEphemeris.TaylorInterpolant`](@ref).
 """
-function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::Int = 5,
+function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::Int = 10,
                        niter::Int = 10, xve::EarthEph = earthposvel, xvs::SunEph = sunposvel,
                        xva::AstEph) where {T <: Real, EarthEph, SunEph, AstEph}
 
@@ -622,7 +641,7 @@ Return time-delay [us] and Doppler shift [Hz].
     the nearest millisecond (default: `1.0`).
 - `autodiff::Bool`: whether to compute Doppler shift via automatic diff
     of [`compute_delay`](@ref) or not (default: `true`).
-- `tord::Int`: order of Taylor expansions (default: `5`).
+- `tord::Int`: order of Taylor expansions (default: `10`).
 - `niter::Int`: number of light-time solution iterations (default: `10`).
 - `xve::EarthEph`: Earth ephemeris (default: `earthposvel`).
 - `xvs::SunEph`: Sun ephemeris (default: `sunposvel`).
@@ -654,9 +673,10 @@ function radar_astrometry(observatory::ObservatoryMPC, t_r_utc::DateTime, F_tx::
 
 end
 
-function init_residuals(::Type{U},
-                        radar::AbstractRadarVector{T},
-                        outliers::AbstractVector{Bool}) where {T <: Real, U <: Number}
+function init_radar_residuals(
+        ::Type{U}, radar::AbstractRadarVector{T},
+        outliers::AbstractVector{Bool}
+    ) where {T <: Real, U <: Number}
     # Check consistency between arrays
     @assert length(radar) == length(outliers)
     # Initialize vector of residuals
@@ -692,7 +712,7 @@ See also [`RadarResidual`](@ref) and [`radar_astrometry`](@ref).
     nearest millisecond (default: `1.0`).
 - `autodiff::Bool`: whether to compute Doppler shift via automatic diff
     of [`compute_delay`](@ref) or not (default: `true`).
-- `tord::Int`: order of Taylor expansions (default: `5`).
+- `tord::Int`: order of Taylor expansions (default: `10`).
 - `niter::Int`: number of light-time solution iterations (default: `10`).
 - `xve::EarthEph`: Earth ephemeris (default: `earthposvel`).
 - `xvs::SunEph`: Sun ephemeris (default: `sunposvel`).
@@ -713,7 +733,7 @@ function residuals(radar::AbstractRadarVector{T},
     # Type of asteroid ephemeris
     U = typeof(a1_et1)
     # Vector of residuals
-    res = init_residuals(U, radar, outliers)
+    res = init_radar_residuals(U, radar, outliers)
     residuals!(res, radar; xva, kwargs...)
 
     return res

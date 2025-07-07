@@ -10,14 +10,18 @@ See also [`packnum`](@ref).
     - https://minorplanetcenter.net/iau/info/PackedDes.html#perm
 """
 function unpacknum(s::AbstractString)
-    # Number is less than 100,000
+    # Packed designation corresponds to a comet
+    isnumeric(first(s)) && isletter(last(s)) && return strip(s, '0')
+    # Packed designation corresponds to a minor planet and...
+    # number is less than 100,000
     if all(isnumeric, s)
         return lstrip(s, '0')
-    # Number is between 100,000 and 619,999
+    # number is between 100,000 and 619,999
     elseif isletter(s[1])
         num = 100_000 + 10_000 * (isuppercase(s[1]) ? s[1] - 'A' :
             s[1] - 6 - 'A') + parse(Int, s[2:end])
         return string(num)
+    # number is above 619,999
     elseif s[1] == '~'
         num = 620_000 + sum((findfirst(c, BASE_62_ENCODING) - 1) * 62^(4-i)
             for (i, c) in enumerate(s[2:5]))
@@ -39,15 +43,21 @@ See also [`unpacknum`](@ref).
     - https://minorplanetcenter.net/iau/info/PackedDes.html#perm
 """
 function packnum(s::AbstractString)
+    # Packed designation corresponds to a comet
+    isletter(last(s)) && return return lpad(s, 5, '0')
+    # Packed designation corresponds to a minor planet and...
+    # number is less than 100,000
     num = parse(Int, s)
     if num < 100_000
         return lpad(num, 5, '0')
+    # number is between 100,000 and 619,999
     elseif 100_000 ≤ num < 619_999
         num = num - 100_000
         q = num ÷ 10_000
         s1 = q < 26 ? q + 'A' : q + 'a' - 26
         s2 = lpad(rem(num, 10_000), 4, '0')
         return string(s1, s2)
+    # number is above 619,999
     elseif 620_000 ≤ num
         num = num - 620_000
         d = digits(num, base = 62) .+ 1

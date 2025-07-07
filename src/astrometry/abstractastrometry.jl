@@ -54,10 +54,12 @@ isless(a::AbstractAstrometryObservation, b::AbstractAstrometryObservation) = dat
 
 dtutc2et(x::AbstractAstrometryObservation) = dtutc2et(date(x))
 
-function numberofdays(radec::AbstractObservationVector{T}) where {T <: Real}
-    t0, tf = extrema(date, radec)
+function numberofdays(x::AbstractObservationVector)
+    t0, tf = extrema(date, x)
     return (tf - t0).value / 86_400_000
 end
+
+minmaxdates(x::AbstractObservationVector) = extrema(date, x)
 
 # Methods to convert an AbstractObservationVector to a DataFrame
 istable(::Type{<:AbstractObservationVector{<:Real}}) = true
@@ -129,6 +131,9 @@ abstract type AbstractAstrometryResidual{T <: Real, U <: Number} <: AbstractAstr
 
 const AbstractResidualVector{T, U} = AbstractVector{<:AbstractAstrometryResidual{T, U}} where {T, U}
 
+const AbstractResidualSet{T, U} = Union{AbstractResidualVector{T, U},
+        Tuple{AbstractResidualVector{T, U}, AbstractResidualVector{T, U}}} where {T, U}
+
 evaluate(y::SVector{N, Taylor1{T}}, x::Number) where {N, T <: Number} =
     [y[i](x) for i in eachindex(y)]
 
@@ -140,12 +145,24 @@ evaluate(y::SVector{N, TaylorN{T}}, x::Vector{<:Number}) where {N, T <: Number} 
 (y::SVector{N, TaylorN{T}})(x::Vector{T}) where {N, T <: Number} = evaluate(y, x)
 
 isoutlier(x::AbstractAstrometryResidual) = x.outlier
+
 nout(x::AbstractResidualVector) = count(isoutlier, x)
+nout(x::NTuple{2, V}) where {V} = nout(x[1]) + nout(x[2])
+
 notout(x::AbstractResidualVector) = count(!isoutlier, x)
+notout(x::NTuple{2, V}) where {V} = notout(x[1]) + notout(x[2])
+
+notoutobs(x::AbstractResidualVector) = dof(eltype(x)) * notout(x)
+notoutobs(x::NTuple{2, V}) where {V} = notoutobs(x[1]) + notoutobs(x[2])
 
 chi2(x::AbstractResidualVector) = sum(chi2, x)
-nms(x::AbstractResidualVector) = chi2(x) / (dof(eltype(x)) * notout(x))
-nrms(x::AbstractResidualVector) = sqrt(nms(x))
+chi2(x::NTuple{2, V}) where {V} = chi2(x[1]) + chi2(x[2])
+
+nms(x::AbstractResidualSet) = chi2(x) / notoutobs(x)
+nrms(x::AbstractResidualSet) = sqrt(nms(x))
+
+normalized_residuals(x::NTuple{2, V}) where {V} =
+    vcat(normalized_residuals(x[1]), normalized_residuals(x[2]))
 
 """
     AbstractOpticalResidual{T, U} <: AbstractAstrometryResidual{T, U}

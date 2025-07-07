@@ -99,6 +99,25 @@ function unfold(y::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <:
     return z, w, d
 end
 
+function normalized_residuals(y::AbstractVector{OpticalResidual{T, U}}) where {T, U}
+    # Number of non outliers
+    L = notout(y)
+    # Vector of normalized residuals
+    z = Vector{U}(undef, 2L)
+    # Global counter
+    k = 1
+    # Fill residuals
+    for i in eachindex(y)
+        isoutlier(y[i]) && continue
+        # Right ascension and declination
+        z[k], z[k+L] = ra(y[i]), dec(y[i])
+        # Update global counter
+        k += 1
+    end
+
+    return z
+end
+
 # Warning: functions euclid3D(x) and dot3D(x) assume length(x) >= 3
 euclid3D(x::AbstractVector{T}) where {T <: Real} = sqrt(dot3D(x, x))
 
@@ -323,11 +342,10 @@ function anglediff(x::Number, y::Number)
     end
 end
 
-function init_residuals(::Type{U},
-                        optical::AbstractOpticalVector{T},
-                        w8s::AbstractVector{Tuple{T, T}},
-                        bias::AbstractVector{Tuple{T, T}},
-                        outliers::AbstractVector{Bool}) where {T <: Real, U <: Number}
+function init_optical_residuals(
+        ::Type{U}, optical::AbstractOpticalVector{T}, w8s::AbstractVector{Tuple{T, T}},
+        bias::AbstractVector{Tuple{T, T}}, outliers::AbstractVector{Bool}
+    ) where {T <: Real, U <: Number}
     # Check consistency between arrays
     @assert length(optical) == length(w8s) == length(bias) == length(outliers)
     # Initialize vector of residuals
@@ -380,7 +398,7 @@ function residuals(optical::AbstractOpticalVector{T}, w8s::AbstractVector{Tuple{
     # Type of asteroid ephemeris
     U = typeof(a1_et1)
     # Vector of residuals
-    res = init_residuals(U, optical, w8s, bias, outliers)
+    res = init_optical_residuals(U, optical, w8s, bias, outliers)
     residuals!(res, optical; xva, kwargs...)
 
     return res

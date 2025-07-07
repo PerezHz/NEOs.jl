@@ -1336,3 +1336,8 @@ function newtonian!(dq, q, params, t)
 
     nothing
 end
+
+# Number of degrees of freedom for each dynamical model
+dof(::Val{newtonian!}) = 6
+dof(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}) = 6
+dof(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}) = 8

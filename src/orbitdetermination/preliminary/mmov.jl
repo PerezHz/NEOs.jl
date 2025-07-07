@@ -21,7 +21,7 @@ over the MOV` section of [`Parameters`](@ref).
     See Section 4 of:
     - https://doi.org/10.1007/s10569-025-10246-2
 """
-function mmov(od::IODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
+function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
               params::Parameters{T}; i::Int = 1, scale::Symbol = :log, η::T = 25.0,
               μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2) where {D,
               T <: Real, O <: AbstractOpticalVector{T}}
@@ -186,7 +186,7 @@ See also [`mmov`](@ref).
     See section 4 of:
     - https://doi.org/10.1007/s10569-025-10246-2
 """
-function tsaiod(od::IODProblem{D, T, O}, params::Parameters{T};
+function tsaiod(od::OpticalODProblem{D, T, O}, params::Parameters{T};
                 initcond::I = iodinitcond) where {D, I, T <: Real,
                 O <: AbstractOpticalVector{T}}
     # Unpack

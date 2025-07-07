@@ -51,7 +51,7 @@ For a list of parameters, see [`Parameters`](@ref).
     See:
     - https://doi.org/10.1007/s10569-025-10246-2
 """
-function initialorbitdetermination(od::IODProblem{D, T, O}, params::Parameters{T};
+function initialorbitdetermination(od::OpticalODProblem{D, T, O}, params::Parameters{T};
                                    initcond::I = iodinitcond) where {D, I, T <: Real,
                                    O <: AbstractOpticalVector{T}}
     # Allocate memory for orbit
@@ -82,7 +82,7 @@ end
 """
     orbitdetermination(od, orbit, params)
 
-Given an orbit determination problem `od`, refine an a priori `orbit`
+Given an orbit determination problem `od`, refine an a-priori `orbit`
 via the Jet Transport Least Squares method. For a list of parameters,
 see [`Parameters`](@ref).
 
@@ -93,7 +93,7 @@ see [`Parameters`](@ref).
     See:
     - https://doi.org/10.1007/s10569-025-10246-2
 """
-function orbitdetermination(od::IODProblem{D, T, O}, orbit::AbstractOrbit{D, T, T},
+function orbitdetermination(od::OpticalODProblem{D, T, O}, orbit::AbstractOrbit,
                             params::Parameters{T}) where {D, T <: Real,
                             O <: AbstractOpticalVector{T}}
     # Unpack parameters
@@ -133,6 +133,32 @@ function orbitdetermination(od::IODProblem{D, T, O}, orbit::AbstractOrbit{D, T, 
             )
             return orbit1
         end
+    end
+    # Unsuccessful orbit determination
+    verbose && @warn("Orbit determination did not converge within \
+        the given parameters or could not fit all the astrometry")
+
+    return orbit1
+end
+
+function orbitdetermination(od::MixedODProblem{D, T, O, R}, orbit::AbstractOrbit,
+                            params::Parameters{T}) where {D, T <: Real,
+                            O <: AbstractOpticalVector{T}, R <: AbstractRadarVector{T}}
+    # Unpack parameters
+    @unpack significance, verbose = params
+    @unpack tracklets, optical = od
+    # Set jet transport variables
+    set_od_order(params)
+    # Jet Transport Least Squares
+    orbit1 = jtls(od, orbit, params, true)
+    # Termination condition
+    if (nobs(orbit1) == nobs(od) && critical_value(orbit1) < significance)
+        N2 = length(orbit1.Qs)
+        verbose && println(
+            "* Jet Transport Least Squares converged in $N2 iterations to: \n\n",
+            summary(orbit1)
+        )
+        return orbit1
     end
     # Unsuccessful orbit determination
     verbose && @warn("Orbit determination did not converge within \

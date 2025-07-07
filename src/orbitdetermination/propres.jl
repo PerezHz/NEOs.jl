@@ -19,10 +19,9 @@ function bwdfwdeph(t::Number, bwd::TaylorInterpolant, fwd::TaylorInterpolant,
 end
 
 # Times used within propres
-function _proprestimes(optical::AbstractOpticalVector{T}, jd0::Number,
-                       params::Parameters{T}) where {T <: Real}
+function _proprestimes(x, jd0::Number, params::Parameters)
     # Time of first (last) observation
-    t0, tf = dtutc2jdtdb(date(optical[1])), dtutc2jdtdb(date(optical[end]))
+    t0, tf = dtutc2jdtdb.(minmaxdates(x))
     # TDB epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Years in backward (forward) integration
@@ -35,9 +34,9 @@ end
 """
     propres(od, q0, jd0, params; kwargs...)
 
-Propagate initial condition `q0` [au, au/day] referred to time `jd0` [julian date TDB]
-for the time needed to cover the optical astrometry in `od`. In addition, compute the
-O-C residuals of the resulting orbit with respect to the optical astrometry in `od`.
+Propagate initial condition `q0` [au, au/day] referred to time `jd0` [julian date
+TDB] for the time needed to cover the astrometry in `od`. In addition, compute the
+O-C residuals of the resulting orbit with respect to the astrometry in `od`.
 
 See also [`propagate`](@ref) and [`residuals`](@ref).
 
@@ -49,10 +48,10 @@ See also [`propagate`](@ref) and [`residuals`](@ref).
     in the computation.
 """
 function propres(
-        od::AbstractODProblem{D, T}, q0::Vector{U}, jd0::V, params::Parameters{T};
+        od::OpticalODProblem{D, T, O}, q0::Vector{U}, jd0::V, params::Parameters{T};
         buffer::Union{Nothing, PropagationBuffer{T, U, V}} = nothing,
-        idxs::AbstractVector{Int} = eachindex(od.optical)
-    ) where {D, T <: Real, U <: Number, V <: Number}
+        idxs::AbstractVector{Int} = opticalindices(od)
+    ) where {D, T <: Real, U <: Number, V <: Number, O <: AbstractOpticalVector{T}}
     # Unpack parameters
     @unpack coeffstol, eph_su, eph_ea = params
     # Subset of optical astrometry for propagation and residuals
@@ -68,7 +67,7 @@ function propres(
     fwd = _propagate(od.dynamics, q0, jd0, nyears_fwd, buffer, params)
     if !issuccessfulprop(bwd, t0 - _jd0_; tol = coeffstol) ||
        !issuccessfulprop(fwd, tf - _jd0_; tol = coeffstol)
-        return bwd, fwd, Vector{OpticalResidual{T, U}}(undef, 0)
+        return bwd, fwd, Vector{OpticalResidual{T, U}}()
     end
     # O-C residuals
     res = init_optical_residuals(U, od, idxs)
@@ -84,18 +83,58 @@ function propres(
     end
 end
 
+function propres(
+        od::MixedODProblem{D, T, O, R}, q0::Vector{U}, jd0::V, params::Parameters{T};
+        buffer::Union{Nothing, PropagationBuffer{T, U, V}} = nothing
+    ) where {D, T <: Real, U <: Number, V <: Number, O <: AbstractOpticalVector{T},
+             R <: AbstractRadarVector{T}}
+    # Unpack
+    @unpack coeffstol, eph_su, eph_ea = params
+    @unpack dynamics, optical, radar = od
+    # Times of first/last observation, epoch and years in backward/forward propagation
+    t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(od, jd0, params)
+    # Propagation buffer
+    if isnothing(buffer)
+        buffer = PropagationBuffer(od, q0, jd0, params)
+    end
+    # Backward (forward) integration
+    bwd = _propagate(dynamics, q0, jd0, nyears_bwd, buffer, params)
+    fwd = _propagate(dynamics, q0, jd0, nyears_fwd, buffer, params)
+    if !issuccessfulprop(bwd, t0 - _jd0_; tol = coeffstol) ||
+       !issuccessfulprop(fwd, tf - _jd0_; tol = coeffstol)
+        return bwd, fwd, (Vector{OpticalResidual{T, U}}(), Vector{RadarResidual{T, U}}())
+    end
+    # O-C residuals
+    res = (init_optical_residuals(U, od), init_radar_residuals(U, od))
+    try
+        residuals!(res[1], optical;
+            xvs = et -> auday2kmsec(eph_su(et/daysec)),
+            xve = et -> auday2kmsec(eph_ea(et/daysec)),
+            xva = et -> bwdfwdeph(et, bwd, fwd))
+        residuals!(res[2], radar;
+            xvs = et -> auday2kmsec(eph_su(et/daysec)),
+            xve = et -> auday2kmsec(eph_ea(et/daysec)),
+            xva = et -> bwdfwdeph(et, bwd, fwd))
+        return bwd, fwd, res
+    catch
+        empty!(res[1])
+        empty!(res[2])
+        return bwd, fwd, res
+    end
+end
+
 """
     propres!(res, od, q0, jd0, params; kwargs...)
 
 Equivalent to [`propres`](@ref), but computes the O-C residuals in-place over
-a pre-allocated vector `res`.
+a pre-allocated set `res`.
 """
 function propres!(
-        res::Vector{OpticalResidual{T, U}}, od::AbstractODProblem{D, T},
+        res::Vector{OpticalResidual{T, U}}, od::OpticalODProblem{D, T, O},
         q0::Vector{U}, jd0::V, params::Parameters{T};
         buffer::Union{Nothing, PropagationBuffer{T, U, V}} = nothing,
-        idxs::AbstractVector{Int} = eachindex(od.optical)
-    )  where {D, T <: Real, U <: Number, V <: Number}
+        idxs::AbstractVector{Int} = opticalindices(od)
+    )  where {D, T <: Real, U <: Number, V <: Number, O <: AbstractOpticalVector{T}}
     # Unpack parameters
     @unpack coeffstol, eph_su, eph_ea = params
     # Subset of optical astrometry for propagation and residuals
@@ -123,6 +162,48 @@ function propres!(
         return bwd, fwd
     catch
         empty!(res)
+        return bwd, fwd
+    end
+end
+
+function propres!(
+        res::Tuple{Vector{OpticalResidual{T, U}}, Vector{RadarResidual{T, U}}},
+        od::MixedODProblem{D, T, O, R}, q0::Vector{U}, jd0::V, params::Parameters{T};
+        buffer::Union{Nothing, PropagationBuffer{T, U, V}} = nothing
+    )  where {D, T <: Real, U <: Number, V <: Number, O <: AbstractOpticalVector{T},
+              R <: AbstractRadarVector{T}}
+    # Unpack
+    @unpack coeffstol, eph_su, eph_ea = params
+    @unpack dynamics, optical, radar = od
+    # Times of first/last observation, epoch and years in backward/forward propagation
+    t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(od, jd0, params)
+    # Propagation buffer
+    if isnothing(buffer)
+        buffer = PropagationBuffer(od, q0, jd0, params)
+    end
+    # Backward (forward) integration
+    bwd = _propagate(dynamics, q0, jd0, nyears_bwd, buffer, params)
+    fwd = _propagate(dynamics, q0, jd0, nyears_fwd, buffer, params)
+    if !issuccessfulprop(bwd, t0 - _jd0_; tol = coeffstol) ||
+       !issuccessfulprop(fwd, tf - _jd0_; tol = coeffstol)
+        empty!(res[1])
+        empty!(res[2])
+        return bwd, fwd
+    end
+    # O-C residuals
+    try
+        residuals!(res[1], optical;
+            xvs = et -> auday2kmsec(eph_su(et/daysec)),
+            xve = et -> auday2kmsec(eph_ea(et/daysec)),
+            xva = et -> bwdfwdeph(et, bwd, fwd))
+        residuals!(res[2], radar;
+            xvs = et -> auday2kmsec(eph_su(et/daysec)),
+            xve = et -> auday2kmsec(eph_ea(et/daysec)),
+            xva = et -> bwdfwdeph(et, bwd, fwd))
+        return bwd, fwd
+    catch
+        empty!(res[1])
+        empty!(res[2])
         return bwd, fwd
     end
 end

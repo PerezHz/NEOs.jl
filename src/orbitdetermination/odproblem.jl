@@ -37,7 +37,8 @@ mutable struct ODProblem{D, T,
 end
 
 # Abbreviations
-const IODProblem{D, T, O} = ODProblem{D, T, O, R, WT, DT} where {R, WT, DT}
+const OpticalODProblem{D, T, O} = ODProblem{D, T, O, Nothing, WT, DT} where {WT, DT}
+const MixedODProblem{D, T, O, R} = ODProblem{D, T, O, R, WT, DT} where {WT, DT}
 
 # Constructor
 """
@@ -78,6 +79,7 @@ function show(io::IO, x::ODProblem)
 end
 
 # AbstractODProblem interface
+scalartype(x::AbstractODProblem{D, T}) where {D, T} = T
 opticaltype(x::ODProblem) = eltype(x.optical)
 radartype(x::ODProblem) = hasradar(x) ? eltype(x.radar) : Nothing
 
@@ -89,7 +91,20 @@ noptical(x::ODProblem) = length(x.optical)
 nradar(x::ODProblem) = hasradar(x) ? length(x.radar) : 0
 nobs(x::ODProblem) = noptical(x) + nradar(x)
 
-indices(x::ODProblem) = eachindex(x.optical)
+opticalindices(x::ODProblem) = eachindex(x.optical)
+radarindices(x::MixedODProblem) = eachindex(x.radar)
+
+opticaloutliers(x::ODProblem) = fill(false, noptical(x))
+radaroutliers(x::MixedODProblem) = fill(false, nradar(x))
+
+function minmaxdates(x::ODProblem)
+    t0, tf = minmaxdates(x.optical)
+    if hasradar(x)
+        _t0_, _tf_ = minmaxdates(x.radar)
+        t0, tf = min(t0, _t0_), max(tf, _tf_)
+    end
+    return t0, tf
+end
 
 function update!(x::AbstractODProblem{D, T},
                  optical::AbstractOpticalVector{T}) where {D, T <: Real}
@@ -101,7 +116,7 @@ function update!(x::AbstractODProblem{D, T},
     return nothing
 end
 
-# Special PropagationBuffer constructor
+# Special PropagationBuffer constructors
 function PropagationBuffer(od::AbstractODProblem{D, T}, q0::Vector{<:Number}, jd0::Number,
                            k0::Int, kf::Int, params::Parameters{T}) where {D, T <: Real}
     t0 = dtutc2days(date(od.optical[k0]))
@@ -112,27 +127,38 @@ function PropagationBuffer(od::AbstractODProblem{D, T}, q0::Vector{<:Number}, jd
     return buffer
 end
 
-function init_optical_residuals(
-        ::Type{U}, od::AbstractODProblem{D, T},
-        idxs::AbstractVector{Int} = indices(od),
-        outliers::AbstractVector{Bool} = fill(false, length(idxs))
-    ) where {D, T <: Real, U <: Number}
+function PropagationBuffer(od::ODProblem, q0::Vector{<:Number}, jd0::Number,
+                           params::Parameters)
+    t0, tf = dtutc2days.(minmaxdates(od))
+    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
+    buffer = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
+    return buffer
+end
+
+function init_optical_residuals(::Type{U}, od::ODProblem, idxs = opticalindices(od),
+                                outliers = opticaloutliers(od)) where {U <: Number}
     optical = view(od.optical, idxs)
     weights = view(od.weights.w8s, idxs)
     debias = view(od.debias.bias, idxs)
-    return init_residuals(U, optical, weights, debias, outliers)
+    return init_optical_residuals(U, optical, weights, debias, outliers)
 end
 
-function set_od_order(::Type{T}, varorder::Int) where {T <: Real}
-    if get_order() < varorder || get_numvars() < 6
-        set_variables(T, "dx"; order = varorder, numvars = 6)
+function init_radar_residuals(::Type{U}, od::MixedODProblem, idxs = radarindices(od),
+                              outliers = radaroutliers(od)) where {U <: Number}
+    radar = view(od.radar, idxs)
+    return init_radar_residuals(U, radar, outliers)
+end
+
+function set_od_order(::Type{T}, varorder::Int, numvars::Int = 6) where {T <: Real}
+    if get_order() < varorder || get_numvars() != numvars
+        set_variables(T, "dx"; order = varorder, numvars = numvars)
     end
     return nothing
 end
 
-function set_od_order(params::Parameters{T}) where {T <: Real}
+function set_od_order(params::Parameters{T}, numvars::Int = 6) where {T <: Real}
     @unpack tsaorder, gaussorder, jtlsorder = params
     varorder = max(tsaorder, gaussorder, jtlsorder)
-    set_od_order(T, varorder)
+    set_od_order(T, varorder, numvars)
     return nothing
 end

@@ -22,8 +22,11 @@ covariance(x::AbstractPreliminaryOrbit) = x.covariance
 
 variances(x::AbstractPreliminaryOrbit) = diag(x.jacobian * covariance(x) * x.jacobian')
 
-init_optical_residuals(::Type{U}, od::AbstractODProblem,
+init_optical_residuals(::Type{U}, od::ODProblem,
     ::AbstractPreliminaryOrbit) where {U <: Number} = init_optical_residuals(U, od)
+
+init_radar_residuals(::Type{U}, od::ODProblem,
+    ::AbstractPreliminaryOrbit) where {U <: Number} = init_radar_residuals(U, od)
 
 """
     GaussOrbit{D, T, U,

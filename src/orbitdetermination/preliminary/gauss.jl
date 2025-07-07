@@ -165,7 +165,7 @@ Method` section of [`Parameters`](@ref).
     See Section 3 of:
     - https://doi.org/10.1007/s10569-025-10246-2
 """
-function gaussmethod(od::IODProblem{D, T, O}, params::Parameters{T}) where {D, T, O}
+function gaussmethod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where {D, T, O}
     # Unpack
     @unpack safegauss, gaussorder, eph_su = params
     @unpack dynamics, optical, tracklets = od
@@ -313,7 +313,7 @@ See also [`gaussmethod`](@ref).
     See section 3 of:
     - https://doi.org/10.1007/s10569-025-10246-2
 """
-function gaussiod(od::IODProblem{D, T, O}, params::Parameters{T}) where {D,
+function gaussiod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where {D,
                   T <: Real, O <: AbstractOpticalVector{T}}
     # Unpack
     @unpack safegauss, significance, verbose = params

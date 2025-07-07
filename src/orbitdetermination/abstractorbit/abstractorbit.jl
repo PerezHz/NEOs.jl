@@ -29,15 +29,23 @@ noptical(x::AbstractOrbit) = length(x.optical)
 nradar(x::AbstractOrbit) = hasradar(x) ? length(x.radar) : 0
 nobs(x::AbstractOrbit) = noptical(x) + nradar(x)
 
+function notoutobs(x::AbstractOrbit)
+    N = notoutobs(x.ores)
+    if hasradar(x)
+        N += notoutobs(x.rres)
+    end
+    return N
+end
+
 """
     minmaxdates(::AbstractOrbit)
 
 Return the dates of the earliest and latest observation of an orbit.
 """
 function minmaxdates(x::AbstractOrbit)
-    t0, tf = extrema(date, x.optical)
+    t0, tf = minmaxdates(x.optical)
     if hasradar(x)
-        _t0_, _tf_ = extrema(date, x.radar)
+        _t0_, _tf_ = minmaxdates(x.radar)
         t0, tf = min(t0, _t0_), max(tf, _tf_)
     end
     return t0, tf
@@ -51,6 +59,7 @@ end
 
 # Return the optical astrometry in an orbit
 optical(x::AbstractOrbit) = x.optical
+radar(x::AbstractOrbit) = hasradar(x) ? x.radar : nothing
 
 # Evaluation in time method
 (x::AbstractOrbit)(t = epoch(x)) = t <= epoch(x) ? x.bwd(t) : x.fwd(t)
@@ -86,6 +95,12 @@ function init_optical_residuals(::Type{V}, orbit::AbstractOrbit{D, T, U}) where 
     return res
 end
 
+init_residuals(::Type{U}, od::OpticalODProblem, orbit::AbstractOrbit) where {U <: Number} =
+    init_optical_residuals(U, od, orbit)
+
+init_residuals(::Type{U}, od::MixedODProblem, orbit::AbstractOrbit) where {U <: Number} =
+    init_optical_residuals(U, od, orbit), init_radar_residuals(U, od, orbit)
+
 # Target functions
 function chi2(x::AbstractOrbit{D, T, U}) where {D, T <: Real, U <: Number}
     iszero(x) && return Inf * one(U)
@@ -96,23 +111,8 @@ function chi2(x::AbstractOrbit{D, T, U}) where {D, T <: Real, U <: Number}
     return y
 end
 
-function nms(x::AbstractOrbit{D, T, U}) where {D, T <: Real, U <: Number}
-    iszero(x) && return Inf * one(U)
-    y = nms(x.ores)
-    if hasradar(x)
-        y += nms(x.rres)
-    end
-    return y
-end
-
-function nrms(x::AbstractOrbit{D, T, U}) where {D, T <: Real, U <: Number}
-    iszero(x) && return Inf * one(U)
-    y = nrms(x.ores)
-    if hasradar(x)
-        y += nrms(x.rres)
-    end
-    return y
-end
+nms(x::AbstractOrbit) = chi2(x) / notoutobs(x)
+nrms(x::AbstractOrbit) = sqrt(nms(x))
 
 """
     critical_value(::AbstractOrbit)
@@ -303,19 +303,25 @@ function summary(orbit::AbstractOrbit)
     sσ0 = [rpad(@sprintf("%+.12E", σ0[i]), 25) for i in eachindex(σ0)]
     s = string(
         "$O with numeric types ($T, $U)\n",
-        repeat('-', 68), "\n",
+        repeat('-', 69), "\n",
         "Dynamical model: $D\n",
         "Astrometry: $Nobs observations ($Nout outliers) spanning $Ndays days\n",
         "Epoch: $t0 JDTDB ($d0 TDB)\n",
         "NRMS: $Q\n",
-        repeat('-', 68), "\n",
+        repeat('-', 69), "\n",
         "Variable    Nominal value            Uncertainty              Units\n",
         "x           ", sq0[1], sσ0[1], "au\n",
         "y           ", sq0[2], sσ0[2], "au\n",
         "z           ", sq0[3], sσ0[3], "au\n",
         "vx          ", sq0[4], sσ0[4], "au/day\n",
         "vy          ", sq0[5], sσ0[5], "au/day\n",
-        "vz          ", sq0[6], sσ0[6], "au/day\n"
+        "vz          ", sq0[6], sσ0[6], "au/day\n",
     )
+    if dof(Val(D)) > 6
+        s = string(s,
+        "A1          ", sq0[8], sσ0[8], "au/day²\n",
+        "A2          ", sq0[7], sσ0[7], "au/day²\n",
+        )
+    end
     return s
 end

@@ -20,9 +20,9 @@ using NEOs: SCRATCH_PATH
         @test all(packdesig.(unpackedids) .== packedids)
 
         packednums = ["03202", "50000", "A0345", "a0017", "K3289", "~0000",
-            "~000z", "~AZaz", "~zzzz"]
+            "~000z", "~AZaz", "~zzzz", "0003I"]
         unpackednums = ["3202", "50000", "100345", "360017", "203289", "620000",
-            "620061", "3140113", "15396335"]
+            "620061", "3140113", "15396335", "3I"]
 
         @test all(unpacknum.(packednums) .== unpackednums)
         @test all(packnum.(unpackednums) .== packednums)
