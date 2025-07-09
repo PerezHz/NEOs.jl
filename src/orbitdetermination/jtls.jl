@@ -325,7 +325,7 @@ function jtls(
         #     isjtlsfit(od, q0, jd0, params) || break
         # end
         # Propagation & residuals
-        @time bwd, fwd = propres!(res, od, q0, jd0, params; buffer)
+        bwd, fwd = propres!(res, od, q0, jd0, params; buffer)
         any(isempty, res) && break
         # Orbit fit
         fit = tryls((res[1][oidxs], res[2][ridxs]), x0, lscache, lsmethods)
@@ -342,7 +342,7 @@ function jtls(
                 χ2_rec, χ2_rej, fudge, max_per)
         end
         # Update solution
-        Qs[i] = nrms(res[1], fit) + nrms(res[2], fit)
+        Qs[i] = nrms(res, fit)
         orbits[i] = evalfit(LeastSquaresOrbit(od.dynamics, od.optical[oidxs], trksin,
             od.radar[ridxs], bwd, fwd, res[1][oidxs], res[2][ridxs], fit, jacobian,
             q00s[:, 1:i], Qs[1:i]))

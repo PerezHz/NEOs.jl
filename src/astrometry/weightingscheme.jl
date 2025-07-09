@@ -63,7 +63,7 @@ getid(::SourceWeights) = "Source"
 # Override update!
 function update!(w::SourceWeights{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
     σs = rms.(optical)
-    w.w8s = @. tuple(1 / first(σs, 1 / last(σs)))
+    w.w8s = @. tuple(1 / first(σs), 1 / last(σs))
     return nothing
 end
 

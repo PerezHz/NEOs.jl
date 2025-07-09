@@ -46,20 +46,10 @@ function project(y::Vector{TaylorN{T}}, fit::LeastSquaresFit{T}) where {T <: Rea
 end
 
 # Target functions
-function chi2(res::AbstractResidualVector{T, TaylorN{T}},
-              fit::LeastSquaresFit{T}) where {T <: Real}
-    return chi2(res(fit.x))
-end
-
-function nms(res::AbstractResidualVector{T, TaylorN{T}},
-             fit::LeastSquaresFit{T}) where {T <: Real}
-    return nms(res(fit.x))
-end
-
-function nrms(res::AbstractResidualVector{T, TaylorN{T}},
-              fit::LeastSquaresFit{T}) where {T <: Real}
-    return nrms(res(fit.x))
-end
+chi2(res::AbstractResidualVector, fit::LeastSquaresFit) = chi2(res(fit.x))
+chi2(res::Tuple{O, R}, fit::LeastSquaresFit) where {O, R} = chi2(res[1], fit) + chi2(res[2], fit)
+nms(x::AbstractResidualSet, fit::LeastSquaresFit) = chi2(x, fit) / notoutobs(x)
+nrms(x::AbstractResidualSet, fit::LeastSquaresFit) = sqrt(nms(x, fit))
 
 # Chi-square critical value
 function critical_value(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},

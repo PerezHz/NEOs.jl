@@ -47,6 +47,7 @@ nobs(x::AbstractTrackletVector) = sum(nobs, x; init = 0)
 
 indices(x::OpticalTracklet) = x.indices
 indices(x::AbstractTrackletVector) = sort!(reduce(vcat, indices.(x)))
+indices(x::AbstractTrackletVector, i::AbstractVector{Int}) = indices(view(x, i))
 
 #=
 # TO DO: rename this function (e.g. as `timerange`), as the

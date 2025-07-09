@@ -147,21 +147,21 @@ evaluate(y::SVector{N, TaylorN{T}}, x::Vector{<:Number}) where {N, T <: Number} 
 isoutlier(x::AbstractAstrometryResidual) = x.outlier
 
 nout(x::AbstractResidualVector) = count(isoutlier, x)
-nout(x::NTuple{2, V}) where {V} = nout(x[1]) + nout(x[2])
+nout(x::Tuple{O, R}) where {O, R} = nout(x[1]) + nout(x[2])
 
 notout(x::AbstractResidualVector) = count(!isoutlier, x)
-notout(x::NTuple{2, V}) where {V} = notout(x[1]) + notout(x[2])
+notout(x::Tuple{O, R}) where {O, R} = notout(x[1]) + notout(x[2])
 
 notoutobs(x::AbstractResidualVector) = dof(eltype(x)) * notout(x)
-notoutobs(x::NTuple{2, V}) where {V} = notoutobs(x[1]) + notoutobs(x[2])
+notoutobs(x::Tuple{O, R}) where {O, R} = notoutobs(x[1]) + notoutobs(x[2])
 
 chi2(x::AbstractResidualVector) = sum(chi2, x)
-chi2(x::NTuple{2, V}) where {V} = chi2(x[1]) + chi2(x[2])
+chi2(x::Tuple{O, R}) where {O, R} = chi2(x[1]) + chi2(x[2])
 
 nms(x::AbstractResidualSet) = chi2(x) / notoutobs(x)
 nrms(x::AbstractResidualSet) = sqrt(nms(x))
 
-normalized_residuals(x::NTuple{2, V}) where {V} =
+normalized_residuals(x::Tuple{O, R}) where {O, R} =
     vcat(normalized_residuals(x[1]), normalized_residuals(x[2]))
 
 """

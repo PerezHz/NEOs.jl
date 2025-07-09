@@ -212,7 +212,7 @@ function LeastSquaresOrbit(od::MixedODProblem{D, T, O, R}, q00::Vector{T}, jd0::
     jacobian = Matrix(TS.jacobian(dq, fit.x))
     # History of initial conditions and target function
     qs = reshape(q00, Npar, 1)
-    Qs = [nrms(res[1], fit) + nrms(res[2], fit)]
+    Qs = [nrms(res, fit)]
 
     return evalfit(LeastSquaresOrbit{D, T, TaylorN{T}, O, R, Vector{RadarResidual{T, TaylorN{T}}}}(
         dynamics, optical, tracklets, radar, bwd, fwd, res[1], res[2], fit, jacobian, qs, Qs))
