@@ -69,6 +69,7 @@ function show(io::IO, A::AdmissibleRegion{T}) where {T <: Real}
     print(io, "AE: [", v, "]", " t: ", A.date, " obs: ", A.observatory.name)
 end
 
+# TO DO: move this method to PlanetaryEphemeris in order to avoid type piracy
 import PlanetaryEphemeris: kmsec2auday
 
 function kmsec2auday(x::SVector{6, T}) where {T <: Number}

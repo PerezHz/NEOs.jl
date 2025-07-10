@@ -9,7 +9,7 @@ testfiles = (
     "orbitdetermination/osculating.jl",
     "orbitdetermination/orbitdetermination.jl",
     "bplane.jl",
-    # "aqua.jl",
+    "aqua.jl",
 )
 
 for file in testfiles

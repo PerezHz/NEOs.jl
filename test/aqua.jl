@@ -25,8 +25,10 @@ end
 
 @testset "Aqua tests (additional)" begin
     Aqua.test_ambiguities(NEOs, broken = true)
+    Aqua.test_piracies(NEOs, broken = true)
     Aqua.test_all(
-    NEOs;
-    ambiguities=false
+        NEOs;
+        ambiguities = false,
+        piracies = false
     )
 end
