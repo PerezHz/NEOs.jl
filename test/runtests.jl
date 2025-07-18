@@ -2,11 +2,11 @@
 
 testfiles = (
     "common.jl",
-    "astrometry/common.jl",
-    "astrometry/optical.jl",
-    "astrometry/radar.jl",
+    "astrometry.jl",
+    "optical.jl",
+    "radar.jl",
     "propagation.jl",
-    "orbitdetermination/orbitdetermination.jl",
+    "orbitdetermination.jl",
     "bplane.jl",
     "aqua.jl",
 )
