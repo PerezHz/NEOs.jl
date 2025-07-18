@@ -32,18 +32,33 @@ function show(io::IO, x::LeastSquaresFit)
     print(io, success_s, " ", routine_s)
 end
 
+project(::AbstractVector{T}, Γ::AbstractMatrix{T}) where {T <: Real} =
+    fill(T(NaN), size(Γ))
+
+function project(y::AbstractVector{TaylorN{T}}, Γ::AbstractMatrix{T}) where {T <: Real}
+    J = Matrix{TaylorN{T}}(undef, get_numvars(), length(y))
+    for i in eachindex(y)
+        J[:, i] = TS.gradient(y[i])
+    end
+    return (J') * Γ * J
+end
+
+function project(y::AbstractVector{TaylorN{T}}, x::AbstractVector{T},
+                 Γ::AbstractMatrix{T}) where {T <: Real}
+    J = Matrix{T}(undef, get_numvars(), length(y))
+    for i in eachindex(y)
+        J[:, i] = TS.gradient(y[i])(x)
+    end
+    return (J') * Γ * J
+end
+
 """
     project(y, fit)
 
 Project the covariance matrix of a least squares `fit` into a vector `y`.
 """
-function project(y::Vector{TaylorN{T}}, fit::LeastSquaresFit{T}) where {T <: Real}
-    J = Matrix{T}(undef, get_numvars(), length(y))
-    for i in eachindex(y)
-        J[:, i] = TS.gradient(y[i])(fit.x)
-    end
-    return (J') * fit.Γ * J
-end
+project(y::Vector{TaylorN{T}}, fit::LeastSquaresFit{T}) where {T <: Real} =
+    project(y, fit.x, fit.Γ)
 
 # Target functions
 chi2(res::AbstractResidualVector, fit::LeastSquaresFit) = chi2(res(fit.x))

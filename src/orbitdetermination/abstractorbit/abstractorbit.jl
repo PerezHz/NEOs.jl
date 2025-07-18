@@ -17,6 +17,9 @@ abstract type AbstractOrbit{D, T <: Real, U <: Number} end
 # Numeric types
 numtypes(::AbstractOrbit{D, T, U}) where {D, T, U} = T, U
 
+# Degrees of freedom
+dof(x::AbstractOrbit) = dof(Val(x.dynamics))
+
 """
     epoch(::AbstractOrbit)
 
@@ -210,36 +213,33 @@ function jplcompare(des::String, orbit::AbstractOrbit)
 end
 
 """
-    keplerian(orbit, params)
+    osculating(orbit, params)
 
-Return the heliocentric ecliptic keplerian osculating elements of an `orbit`
-at its reference epoch, as well as the projected covariance matrix.
+Return the heliocentric ecliptic osculating elements of an `orbit`
+at its reference epoch.
 
-See also [`pv2kep`](@ref).
+See also [`cartesian2osculating`](@ref).
 
 !!! warning
     This function may change the (global) `TaylorSeries` variables.
 """
-function keplerian(orbit::AbstractOrbit{D, T, T},
-                   params::Parameters{T}) where {D, T <: Real}
+function osculating(orbit::AbstractOrbit{D, T, T},
+                    params::Parameters{T}) where {D, T <: Real}
     # Set jet transport variables
-    set_od_order(T, 2)
-    # Reference epoch [Julian days TDB]
+    Npar = dof(orbit)
+    set_od_order(T, 2, Npar)
+    # Reference epoch [MJD TDB]
     t = epoch(orbit)
-    jd0 = t + PE.J2000
+    mjd0 = t + MJD2000
     # Jet transport initial condition
     q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
     # Origin
-    x0 = zeros(T, 6)
-    # Osculating keplerian elements
-    osc = pv2kep(q0 - params.eph_su(t); jd = jd0, frame = :ecliptic)
-    osc0 = [osc.a, osc.e, osc.i, osc.Ω, osc.ω, mod(osc.M, 360)]
-    osc00 = cte.(osc0)
-    # Projected covariance matrix
-    t_car2kep = TS.jacobian(osc0, x0)
-    Γ_kep = t_car2kep * covariance(orbit) * t_car2kep'
+    x0 = zeros(T, Npar)
+    # Osculating orbital elements
+    osc = cartesian2osculating(q0[1:6] - params.eph_su(t), mjd0; μ = μ_S,
+                               frame = :ecliptic, Γ_car = covariance(orbit))
 
-    return osc00, Γ_kep
+    return evaldeltas(osc, x0)
 end
 
 """
@@ -258,17 +258,23 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
                               params::Parameters{T}) where {D, T <: Real}
     # Set jet transport variables
     set_od_order(T, 2)
-    # Reference epoch [Julian days TDB]
+    # Reference epoch [MJD TDB]
     t = epoch(orbit)
-    jd0 = t + PE.J2000
+    mjd0 = t + MJD2000
     # Jet transport initial condition
     q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
     # Origin
     x0 = zeros(T, 6)
     # Osculating keplerian elements
-    osc = pv2kep(q0 - params.eph_su(t); jd = jd0, frame = :ecliptic)
-    # Semimajor axis [au], eccentricity and time of perihelion passage [julian days]
-    @unpack a, e, tp = osc
+    osc = cartesian2osculating(q0 - params.eph_su(t), mjd0; μ = μ_S, frame = :ecliptic,
+                               Γ_car = covariance(orbit))
+    # Uncertainty parameter is not defined for hyperbolic orbits
+    ishyperbolic(osc) && throw(ArgumentError("Uncertainty parameter is not defined for \
+        hyperbolic orbits"))
+    # Semimajor axis [au], eccentricity and time of perihelion passage [MJD TDB]
+    a = semimajoraxis(osc)
+    e = eccentricity(osc)
+    tp::TaylorN{T} = timeperipass(osc)
     # Gauss gravitational constant [deg]
     k_0 = 180 * k_gauss / π
     # Orbital period [days]
@@ -301,8 +307,10 @@ function summary(orbit::AbstractOrbit)
     q0, σ0 = orbit(), sigmas(orbit)
     sq0 = [rpad(@sprintf("%+.12E", q0[i]), 25) for i in eachindex(q0)]
     sσ0 = [rpad(@sprintf("%+.12E", σ0[i]), 25) for i in eachindex(σ0)]
+    names = ["x", "y", "z", "vx", "vy", "vz", "A2", "A1"]
+    units = ["au", "au", "au", "au/day", "au/day", "au/day", "au/day²", "au/day²"]
     s = string(
-        "$O with numeric types ($T, $U)\n",
+        "$O{$T, $U}\n",
         repeat('-', 69), "\n",
         "Dynamical model: $D\n",
         "Astrometry: $Nobs observations ($Nout outliers) spanning $Ndays days\n",
@@ -310,17 +318,17 @@ function summary(orbit::AbstractOrbit)
         "NRMS: $Q\n",
         repeat('-', 69), "\n",
         "Variable    Nominal value            Uncertainty              Units\n",
-        "x           ", sq0[1], sσ0[1], "au\n",
-        "y           ", sq0[2], sσ0[2], "au\n",
-        "z           ", sq0[3], sσ0[3], "au\n",
-        "vx          ", sq0[4], sσ0[4], "au/day\n",
-        "vy          ", sq0[5], sσ0[5], "au/day\n",
-        "vz          ", sq0[6], sσ0[6], "au/day\n",
+        rpad(names[1], 12), sq0[1], sσ0[1], units[1], "\n",
+        rpad(names[2], 12), sq0[2], sσ0[2], units[2], "\n",
+        rpad(names[3], 12), sq0[3], sσ0[3], units[3], "\n",
+        rpad(names[4], 12), sq0[4], sσ0[4], units[4], "\n",
+        rpad(names[5], 12), sq0[5], sσ0[5], units[5], "\n",
+        rpad(names[6], 12), sq0[6], sσ0[6], units[6], "\n",
     )
     if dof(Val(D)) > 6
         s = string(s,
-        "A1          ", sq0[8], sσ0[8], "au/day²\n",
-        "A2          ", sq0[7], sσ0[7], "au/day²\n",
+        rpad(names[8], 12), sq0[8], sσ0[8], units[8], "\n",
+        rpad(names[7], 12), sq0[7], sσ0[7], units[7], "\n",
         )
     end
     return s

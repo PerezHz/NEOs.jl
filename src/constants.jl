@@ -193,6 +193,9 @@ const poteph::DensePropagation2{Float64, Float64} = JLD2.load(sseph_artifact_pat
 const ttmtdb::DensePropagation1{Float64, Float64} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
 const SSEPHORDER::Int = get_order(sseph.x[1])
 
+# Modified julian date offset
+const MJD2000 = JD_J2000 - 2400000.5
+
 # Milliseconds between rounding epoch and J2000
 const EPOCHMSJ2000::Int = (DateTime(2000, 1, 1, 12) - DateTime(0)).value
 
@@ -208,7 +211,7 @@ const μ_DE430 = PE.μ
 const μ_B16_DE430 = μ_DE430[12:27]     # DE430 GM's of 16 most massive asteroids
 const μ_ast343_DE430 = μ_DE430[12:end] # DE430 GM's of 343 main belt asteroids included in DE430 integration
 # Gravitational parameter of the Sun [au^2 / day^3]
-const μ_S = PE.GMS
+const μ_S::Float64 = PE.GMS
 
 # Standard value of nominal mean angular velocity of Earth (rad/sec)
 # See Explanatory Supplement to the Astronomical Almanac 2014 Sec 7.4.3.3 p. 296

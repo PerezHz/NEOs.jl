@@ -3,6 +3,8 @@ module NEOs
 # __precompile__(false)
 import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary
 import PlanetaryEphemeris as PE
+import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, longascnode,
+       meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import Tables: Schema, istable, rowaccess, rows, schema
 
@@ -34,7 +36,7 @@ using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!
 
 # Common
 export Parameters
-export d_EM_km, d_EM_au
+export d_EM_km, d_EM_au, MJD2000
 export julian2etsecs, etsecs2julian, dtutc2et, et2dtutc, dtutc2jdtdb, jdtdb2dtutc,
        et_to_200X, days_to_200X, dtutc_to_200X, dtutc2days, days2dtutc, rad2arcsec,
        arcsec2rad, mas2rad, range2delay, rangerate2doppler, chi2, nms, nrms
@@ -64,11 +66,11 @@ export loadpeeph, rvelea, scaled_variables, propagate, propagate_lyap, propagate
 # Orbit determination
 export ODProblem, LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
        GaussOrbit, MMOVOrbit, LeastSquaresOrbit, AdmissibleRegion
-export pv2kep, yarkp2adot
+export elements, iselliptic, ishyperbolic, cartesian2osculating, yarkp2adot
 export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
-export epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, jplcompare, keplerian,
+export epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, jplcompare, osculating,
        uncertaintyparameter
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,

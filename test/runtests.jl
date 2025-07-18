@@ -6,7 +6,6 @@ testfiles = (
     "astrometry/optical.jl",
     "astrometry/radar.jl",
     "propagation.jl",
-    "orbitdetermination/osculating.jl",
     "orbitdetermination/orbitdetermination.jl",
     "bplane.jl",
     "aqua.jl",
