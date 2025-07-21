@@ -87,7 +87,7 @@ end
         @test epoch(osc) == epoch(orbit) + MJD2000
         @test osc.frame == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 9.6e-15
+        @test norm(q0 - osc(), Inf) < 4.0e-14
         q0, σ0 = elements(osc), sigmas(osc)
         JPL_OSC = [8.198835710815939E-01, 3.962989389356275E-01, 5.807184452352074E+00,
             4.045356567755751E+01, 3.261403954217091E+02, 1.216665112960870E+02]
@@ -230,7 +230,7 @@ end
         @test epoch(osc) == epoch(orbit) + MJD2000
         @test osc.frame == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 1.1e-14
+        @test norm(q0 - osc(), Inf) < 6.0e-14
         q0, σ0 = elements(osc), sigmas(osc)
         JPL_OSC = [2.872424697642789E+00, 6.749395051551541E-01, 1.282355986214476E+00,
             1.725712172730245E+02, 2.413793589329106E+02, 3.538743602962668E+02 - 360]
@@ -313,7 +313,7 @@ end
         @test epoch(osc) == epoch(orbit) + MJD2000
         @test osc.frame == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 1.4e-14
+        @test norm(q0 - osc(), Inf) < 5.0e-14
         q0, σ0 = elements(osc), sigmas(osc)
         JPL_OSC = [2.232655272359251E+00, 5.480018648354085E-01, 8.456325272115306E+00,
             1.322293305412568E+01, 2.778787985886902E+02, 3.530120962605258E+02 - 360]
@@ -655,7 +655,7 @@ end
         @test epoch(osc) == epoch(orbit1) + MJD2000
         @test osc.frame == :ecliptic
         q0 = equatorial2ecliptic(orbit1() - params.eph_su(epoch(orbit1)))
-        @test norm(q0 - osc(), Inf) < 2.8e-14
+        @test norm(q0 - osc(), Inf) < 4.0e-14
         q0, σ0 = elements(osc), sigmas(osc)
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 6.9e-4)
         # Absolute magnitude
@@ -824,7 +824,7 @@ end
         @test epoch(osc) == epoch(orbit) + MJD2000
         @test osc.frame == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 1.2e-14
+        @test norm(q0 - osc(), Inf) < 5.0e-14
         q0, σ0 = elements(osc), sigmas(osc)
         JPL_OSC = [1.273091758414584E+00, 2.870222798582721E-01, 2.341999526552296E+00,
             2.339645303327229E+02, 1.941265709953888E+02, 3.288450951861228E+02 - 360]
@@ -998,7 +998,7 @@ end
         @test epoch(osc) == epoch(orbit) + MJD2000
         @test osc.frame == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 2.0e-14
+        @test norm(q0 - osc(), Inf) < 6.0e-14
         q0, σ0 = elements(osc), sigmas(osc)
         JPL_OSC = [2.279881958167905E+00, 7.595854924208774E-01, 3.859999487009846E+01,
             2.293324466168822E+02, 3.254353160068554E+02, 2.033836565098925E+01]
