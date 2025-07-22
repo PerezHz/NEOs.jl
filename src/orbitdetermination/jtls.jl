@@ -209,8 +209,8 @@ function jtls(
     scalings = jtlsscalings(orbit, Npar)
     dq = [scalings[i] * TaylorN(i, order = jtlsorder) for i in 1:Npar]
     q0 = q00s[:, 1] + dq
-    # Initialize propagation buffer and set of residuals
-    buffer = PropagationBuffer(od, q0, jd0, params)
+    # Initialize buffer and set of residuals
+    buffer = PropresBuffer(od, q0, jd0, params)
     res = init_residuals(TaylorN{T}, od, orbit)
     # Origin
     x0 = zeros(T, Npar)
@@ -299,8 +299,8 @@ function jtls(
     scalings = jtlsscalings(orbit, Npar)
     dq = [scalings[i] * TaylorN(i, order = jtlsorder) for i in 1:Npar]
     q0 = q00s[:, 1] + dq
-    # Initialize propagation buffer and set of residuals
-    buffer = PropagationBuffer(od, q0, jd0, params)
+    # Initialize buffer and set of residuals
+    buffer = PropresBuffer(od, q0, jd0, params)
     res = init_residuals(TaylorN{T}, od, orbit)
     # Origin
     x0 = zeros(T, Npar)

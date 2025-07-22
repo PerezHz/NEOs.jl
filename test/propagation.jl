@@ -90,9 +90,9 @@ using InteractiveUtils: methodswith
         _res_ = NEOs.residuals(
             optical_2023DW,
             w8s, bias;
-            xve = t -> auday2kmsec(eph_ea(t/daysec)),
-            xvs = t -> auday2kmsec(eph_su(t/daysec)),
-            xva = t -> auday2kmsec(sol_fwd(t/daysec))
+            xvs = eph_su,
+            xve = eph_ea,
+            xva = (sol_bwd, sol_fwd)
         )
         res, _, _ = unfold(_res_)
 
@@ -122,9 +122,9 @@ using InteractiveUtils: methodswith
         _res1_ = NEOs.residuals(
             optical_2023DW,
             w8s, bias,
-            xve = t -> auday2kmsec(eph_ea(t/daysec)),
-            xvs = t -> auday2kmsec(eph_su(t/daysec)),
-            xva = t -> auday2kmsec(sol1(t/daysec))
+            xvs = eph_su,
+            xve = eph_ea,
+            xva = (sol1, sol1)
         )
         res1, _, _ = unfold(_res1_)
 
@@ -190,9 +190,9 @@ using InteractiveUtils: methodswith
         res_optical = NEOs.residuals(
             optical_Apophis,
             w8s, bias,
-            xve = t -> auday2kmsec(eph_ea(t/daysec)),
-            xvs = t -> auday2kmsec(eph_su(t/daysec)),
-            xva = t -> auday2kmsec(sol(t/daysec))
+            xvs = eph_su,
+            xve = eph_ea,
+            xva = (sol, sol)
         )
         res_ra, res_dec = @. ra(res_optical), dec(res_optical)
 
@@ -382,7 +382,11 @@ using InteractiveUtils: methodswith
         bias = Eggl20(optical_Apophis).bias
 
         # Compute optical astrometry residuals
-        res_optical = NEOs.residuals(optical_Apophis, w8s, bias; xvs, xve, xva)
+        res_optical = NEOs.residuals(optical_Apophis, w8s, bias;
+            xvs = eph_su,
+            xve = eph_ea,
+            xva = (sol, sol)
+        )
         res_ra, res_dec = @. ra(res_optical), dec(res_optical)
 
         # Compute mean optical astrometric residual (right ascension and declination)

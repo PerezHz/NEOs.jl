@@ -3,8 +3,10 @@ module NEOs
 # __precompile__(false)
 import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary
 import PlanetaryEphemeris as PE
-import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, longascnode,
-       meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly
+import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination, argperi,
+       longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly
+
+
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import Tables: Schema, istable, rowaccess, rows, schema
 
@@ -82,6 +84,7 @@ include("constants.jl")
 include("units.jl")
 include("jpleph.jl")
 include("parameters.jl")
+include("fasttaylors.jl")
 include("astrometry/astrometry.jl")
 include("propagation/propagation.jl")
 include("orbitdetermination/orbitdetermination.jl")

@@ -69,15 +69,6 @@ function show(io::IO, A::AdmissibleRegion{T}) where {T <: Real}
     print(io, "AE: [", v, "]", " t: ", A.date, " obs: ", A.observatory.name)
 end
 
-# TO DO: move this method to PlanetaryEphemeris in order to avoid type piracy
-import PlanetaryEphemeris: kmsec2auday
-
-function kmsec2auday(x::SVector{6, T}) where {T <: Number}
-    k = daysec / au
-    return SVector{6, T}(x[1] / au, x[2] / au, x[3] / au,
-                         x[4] * k, x[5] * k, x[6] * k)
-end
-
 """
     AdmissibleRegion(::OpticalTracklet, ::Parameters)
 
@@ -563,7 +554,7 @@ function attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
     α, δ, v_α, v_δ, ρ, v_ρ = a
     # Light-time correction to epoch
     t = dtutc2days(A.date) -  ρ / c_au_per_day
-    # TO DO: `et::TaylorN` is too slow for `adam` due to
+    # TO DO: `et::TaylorN` is too slow for `mmov` due to
     # SatelliteToolboxTransformations overloads in src/observations/topocentric.jl
     et = dtutc2et(A.date) - cte(cte(ρ)) / c_au_per_sec
     # Line of sight vectors

@@ -16,7 +16,18 @@ mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
     μ::Vector{T}
 end
 
-struct PropagationBuffer{T <: Real, U <: Number, V <: Number}
+"""
+    PropagationBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
+
+Pre-allocated memory for the propagation functions: [`propagate`](@ref),
+[`propagate_root`](@ref) and [`propagate_lyap`](@ref).
+
+# Fields
+
+- `cache::VectorCache{...}`: `TaylorIntegration` cache.
+- `dparams::DynamicalParameters{T, U, V}`: parameters used by the dynamical model.
+"""
+struct PropagationBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
     cache::VectorCache{Vector{T}, Matrix{U}, Matrix{Taylor1{U}}, Vector{Taylor1{U}},
         Taylor1{T}, Vector{Taylor1{U}}, Vector{Taylor1{U}}, RetAlloc{Taylor1{U}}, Bool}
     dparams::DynamicalParameters{T, U, V}

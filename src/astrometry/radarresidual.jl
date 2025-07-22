@@ -460,7 +460,7 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::
     # See equation (2) of https://doi.org/10.1086/116062
     et_b_secs = et_r_secs - τ_D
 
-    # Allocate memmory for time delays
+    # Allocate memory for time delays
     Δτ_D = zero(τ_D)            # Total time delay
     Δτ_rel_D = zero(τ_D)        # Shapiro delay
     # Δτ_corona_D = zero(τ_D)   # Delay due to Solar corona
@@ -546,7 +546,7 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::
     # Magnitude of up-leg vector
     ρ_t = sqrt(ρ_vec_t[1]^2 + ρ_vec_t[2]^2 + ρ_vec_t[3]^2)
 
-    # Allocate memmory for time delays
+    # Allocate memory for time delays
     Δτ_U = zero(τ_U)            # Total time delay
     Δτ_rel_U = zero(τ_U)        # Shapiro delay
     # Δτ_corona_U = zero(τ_U)   # Delay due to Solar corona

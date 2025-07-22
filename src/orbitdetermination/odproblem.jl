@@ -116,25 +116,6 @@ function update!(x::AbstractODProblem{D, T},
     return nothing
 end
 
-# Special PropagationBuffer constructors
-function PropagationBuffer(od::AbstractODProblem{D, T}, q0::Vector{<:Number}, jd0::Number,
-                           k0::Int, kf::Int, params::Parameters{T}) where {D, T <: Real}
-    t0 = dtutc2days(date(od.optical[k0]))
-    tf = dtutc2days(date(od.optical[kf]))
-    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
-    buffer = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
-
-    return buffer
-end
-
-function PropagationBuffer(od::ODProblem, q0::Vector{<:Number}, jd0::Number,
-                           params::Parameters)
-    t0, tf = dtutc2days.(minmaxdates(od))
-    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
-    buffer = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
-    return buffer
-end
-
 function init_optical_residuals(::Type{U}, od::ODProblem, idxs = opticalindices(od),
                                 outliers = opticaloutliers(od)) where {U <: Number}
     optical = view(od.optical, idxs)

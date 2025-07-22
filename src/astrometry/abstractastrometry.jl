@@ -134,18 +134,6 @@ const AbstractResidualVector{T, U} = AbstractVector{<:AbstractAstrometryResidual
 const AbstractResidualSet{T, U} = Union{AbstractResidualVector{T, U},
         Tuple{AbstractResidualVector{T, U}, AbstractResidualVector{T, U}}} where {T, U}
 
-# TO DO: move this methods to TaylorSeries' Static Arrays Extension,
-# order to avoid type piracy
-evaluate(y::SVector{N, Taylor1{T}}, x::Number) where {N, T <: Number} =
-    [y[i](x) for i in eachindex(y)]
-
-(y::SVector{N, Taylor1{T}})(x::Number) where {N, T <: Number} = evaluate(y, x)
-
-evaluate(y::SVector{N, TaylorN{T}}, x::Vector{<:Number}) where {N, T <: Number} =
-    [y[i](x) for i in eachindex(y)]
-
-(y::SVector{N, TaylorN{T}})(x::Vector{T}) where {N, T <: Number} = evaluate(y, x)
-
 isoutlier(x::AbstractAstrometryResidual) = x.outlier
 
 nout(x::AbstractResidualVector) = count(isoutlier, x)

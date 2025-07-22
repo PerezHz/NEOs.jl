@@ -52,9 +52,8 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
     tracklets = adammode ? od.tracklets : od.tracklets[i:i]
     idxs = indices(tracklets)
     optical = od.optical[idxs]
-    # Propagation buffer
-    buffer = PropagationBuffer(od, AE, jd0, idxs[1], idxs[end], params)
-    # Vector of O-C residuals
+    # Initialize buffer and set of residuals
+    buffer = PropresBuffer(od, AE, jd0, idxs, params)
     res = init_optical_residuals(TaylorN{T}, od, idxs)
     # Origin
     x0, x1 = zeros(T, 6), zeros(T, 6)
@@ -84,7 +83,7 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
         # Barycentric state vector
         q = attr2bary(A, AE, params)
         # Propagation and residuals
-        # TO DO: `ρ::TaylorN` is too slow for `adam` due to evaluations
+        # TO DO: `ρ::TaylorN` is too slow for `mmov` due to evaluations
         # within the dynamical model
         bwd, fwd = propres!(res, od, q, jd0 - ae[5]/c_au_per_day, params; buffer, idxs)
         isempty(res) && break
