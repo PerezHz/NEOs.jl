@@ -150,7 +150,7 @@ function orbitdetermination(od::MixedODProblem{D, T, O, R}, orbit::AbstractOrbit
     # Set jet transport variables
     set_od_order(params)
     # Jet Transport Least Squares
-    orbit1 = jtls(od, orbit, params, true)
+    orbit1 = jtls(od, orbit, params)
     # Termination condition
     if (nobs(orbit1) == nobs(od) && critical_value(orbit1) < significance)
         N2 = length(orbit1.Qs)

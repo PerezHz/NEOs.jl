@@ -320,8 +320,14 @@ function gaussiod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where {D
     @unpack optical, tracklets = od
     # Pre-allocate orbit
     orbit = zero(LeastSquaresOrbit{D, T, T, O, Nothing, Nothing})
-    # This function requires exactly 3 tracklets
-    (safegauss && length(tracklets) != 3) && return orbit
+    # This function requires...
+    if safegauss
+        # exactly 3 tracklets
+        length(tracklets) != 3 && return orbit
+    else
+        # at least 3 observations
+        length(optical) < 3 && return orbit
+    end
     # Set jet transport variables
     set_od_order(params)
     # Preliminary orbits
