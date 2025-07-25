@@ -102,12 +102,14 @@ end
 
 # Add as much tracklets as possible per iteration
 function addoptical!(::Val{true}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
+                     lscache::LeastSquaresCache{T},
+                     lsmethods::Vector{AbstractLeastSquaresMethod{T}},
                      trksin::TrackletVector{T}, trksout::TrackletVector{T},
-                     res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
-                     params::Parameters{T}) where {T <: Real}
+                     res::Vector{OpticalResidual{T, TaylorN{T}}},
+                     x0::Vector{T}, params::Parameters{T}) where {T <: Real}
     while !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls(view(res, oidxs ∪ extra), x0; maxiter = params.lsiter)
+        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods)
         !fit_new.success && break
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -122,12 +124,14 @@ end
 
 # Add at most one tracklet per iteration
 function addoptical!(::Val{false}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
+                     lscache::LeastSquaresCache{T},
+                     lsmethods::Vector{AbstractLeastSquaresMethod{T}},
                      trksin::TrackletVector{T}, trksout::TrackletVector{T},
-                     res::Vector{OpticalResidual{T, TaylorN{T}}}, x0::Vector{T},
-                     params::Parameters{T}) where {T <: Real}
+                     res::Vector{OpticalResidual{T, TaylorN{T}}},
+                     x0::Vector{T}, params::Parameters{T}) where {T <: Real}
     if critical_value(view(res, oidxs), fit) < params.significance && !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls(view(res, oidxs ∪ extra), x0; maxiter = params.lsiter)
+        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods)
         !fit_new.success && return oidxs, fit
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -141,15 +145,16 @@ function addoptical!(::Val{false}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
 end
 
 function addobservations!(od::MixedODProblem, oidxs::Vector{Int}, ridxs::Vector{Int},
-                          fit::LeastSquaresFit{T}, trksin::TrackletVector{T},
-                          trksout::TrackletVector{T}, radarin::AbstractRadarVector{T},
-                          radarout::AbstractRadarVector{T}, res::AbstractResidualSet{T, TaylorN{T}},
+                          fit::LeastSquaresFit{T}, lscache::LeastSquaresCache{T},
+                          lsmethods::Vector{AbstractLeastSquaresMethod{T}},
+                          trksin::TrackletVector{T}, trksout::TrackletVector{T},
+                          radarin::AbstractRadarVector{T}, radarout::AbstractRadarVector{T},
+                          res::AbstractResidualSet{T, TaylorN{T}},
                           x0::Vector{T}, params::Parameters{T}) where {T <: Real}
     # Add optical astrometry
     while !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls((res[1][oidxs ∪ extra], res[2][ridxs]), x0;
-            maxiter = params.lsiter)
+        fit_new = tryls((res[1][oidxs ∪ extra], res[2][ridxs]), x0, lscache, lsmethods)
         !fit_new.success && break
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -162,8 +167,7 @@ function addobservations!(od::MixedODProblem, oidxs::Vector{Int}, ridxs::Vector{
     while !isempty(radarout)
         extra = findfirst(==(radarout[1]), od.radar)
         isnothing(extra) && break
-        fit_new = tryls((res[1][oidxs], res[2][ridxs ∪ extra]), x0;
-            maxiter = params.lsiter)
+        fit_new = tryls((res[1][oidxs], res[2][ridxs ∪ extra]), x0, lscache, lsmethods)
         !fit_new.success && break
         fit = fit_new
         radar = popfirst!(radarout)
@@ -239,7 +243,8 @@ function jtls(
         fit = tryls(view(res, oidxs), x0, lscache, lsmethods)
         !fit.success && break
         # Incrementally add observations to fit
-        oidxs, fit = addoptical!(Val(mode), oidxs, fit, trksin, trksout, res, x0, params)
+        oidxs, fit = addoptical!(Val(mode), oidxs, fit, lscache, lsmethods,
+                                 trksin, trksout, res, x0, params)
         # Residuals space to barycentric coordinates jacobian
         jacobian = Matrix(TS.jacobian(dq, fit.x))
         all(>(0), diag(jacobian * fit.Γ * jacobian')) || break
@@ -331,8 +336,8 @@ function jtls(
         fit = tryls((res[1][oidxs], res[2][ridxs]), x0, lscache, lsmethods)
         !fit.success && break
         # Incrementally add observations to fit
-        oidxs, ridxs, fit = addobservations!(od, oidxs, ridxs, fit, trksin, trksout, radarin,
-            radarout, res, x0, params)
+        oidxs, ridxs, fit = addobservations!(od, oidxs, ridxs, fit, lscache, lsmethods,
+            trksin, trksout, radarin, radarout, res, x0, params)
         # Residuals space to barycentric coordinates jacobian
         jacobian = Matrix(TS.jacobian(dq, fit.x))
         all(>(0), diag(jacobian * fit.Γ * jacobian')) || break

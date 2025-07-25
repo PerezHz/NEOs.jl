@@ -327,8 +327,8 @@ function summary(orbit::AbstractOrbit)
     )
     if dof(Val(D)) > 6
         s = string(s,
-        rpad(names[8], 12), sq0[8], sσ0[8], units[8], "\n",
         rpad(names[7], 12), sq0[7], sσ0[7], units[7], "\n",
+        rpad(names[8], 12), sq0[8], sσ0[8], units[8], "\n",
         )
     end
     return s

@@ -68,6 +68,7 @@ function show(io::IO, x::OsculatingElements)
     header = flag ? "Elliptic" : "Hyperbolic"
     mu = x.mu
     t0 = x.epoch
+    d0 = julian2datetime(t0 + JD_J2000 - MJD2000)
     frame = x.frame
     e0 = cte.(x.elements)
     σ0 = sqrt.(diag(x.covariance))
@@ -80,7 +81,7 @@ function show(io::IO, x::OsculatingElements)
         "$header{$T, $U} osculating elements\n",
         repeat("-", 67), "\n",
         "Mu: $mu au³/day²\n",
-        "Epoch: $t0 MJD\n",
+        "Epoch: $t0 MJD ($d0 TDB)\n",
         "Frame: $frame\n",
         repeat("-", 67), "\n",
         "Variable    Nominal value            Uncertainty              Units\n",
