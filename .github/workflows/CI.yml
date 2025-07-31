@@ -20,7 +20,9 @@ jobs:
         version:
           - '1.10'
           - '1'
-          - 'nightly'
+          # As of July 31, 2025 tests fail in nightly because of an error from LsqFit.jl:
+          # could not load symbol "dgemv_64_"
+          # - 'nightly'
         os:
           - ubuntu-latest
           - macos-latest

@@ -183,6 +183,7 @@ function updateorbit(x::AbstractOrbit{D, T, T}, y::AbstractOrbit{D, T, T},
     end
 end
 
+#=
 """
     jplcompare(des::String, orbit::AbstractOrbit)
 
@@ -211,6 +212,7 @@ function jplcompare(des::String, orbit::AbstractOrbit)
     # Absolute difference in sigma units
     return @. abs(q1 - q2) / sigmas(orbit)
 end
+=#
 
 """
     osculating(orbit, params)
