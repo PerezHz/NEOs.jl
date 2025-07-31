@@ -37,7 +37,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 18, 2025
+        # Values by Jul 31, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -180,7 +180,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 18, 2025
+        # Values by Jul 31, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -263,7 +263,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by Jul 18, 2025
+        # Values by Jul 31, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -340,7 +340,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by Jul 18, 2025
+        # Values by Jul 31, 2025
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -454,7 +454,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 18, 2025
+        # Values by Jul 31, 2025
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -540,7 +540,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 18, 2025
+        # Values by Jul 31, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -688,7 +688,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 18, 2025
+        # Values by Jul 31, 2025
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -774,7 +774,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 18, 2025
+        # Values by Jul 31, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -947,7 +947,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Jul 18, 2025
+        # Values by Jul 31, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -1008,6 +1008,111 @@ end
         @test H - dH ≤ 18.5 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit, params) == 10
+    end
+
+    @testset "Radar astrometry" begin
+        using NEOs: RadarResidual
+
+        # Load observations
+        optical = read_optical_mpc80(joinpath(pkgdir(NEOs), "data",
+            "99942_2004_2020.dat"))
+        filter!(x -> Date(2005, 1, 27) < date(x) < Date(2005, 1, 31), optical)
+        radar = read_radar_jpl(joinpath(pkgdir(NEOs, "test", "data",
+            "99942_RADAR_2005_2013.json")))
+        filter!(x -> Date(2005, 1, 27) < date(x) < Date(2005, 1, 31), radar)
+
+        # Parameters
+        params = Parameters(
+           coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+           gaussorder = 2, safegauss = false,
+           tsaorder = 2, adamiter = 500, adamQtol = 1e-5, jtlsorder = 2,
+           jtlsmask = false, jtlsiter = 20, lsiter = 10, significance = 0.99,
+           outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,
+           fudge = 100.0, max_per = 34.0,
+       )
+        # Orbit determination problem (only optical astrometry)
+        od0 = ODProblem(newtonian!, optical)
+
+        # Preliminary orbit (only optical astrometry)
+        loadjpleph()
+        jd0 = datetime2julian(DateTime(2005, 1, 29))
+        q00 = kmsec2auday(apophisposvel199(julian2etsecs(jd0)))
+        orbit0 = LeastSquaresOrbit(od0, q00, jd0, params)
+
+        # Orbit determination problem (both optical and radar astrometry)
+        od1 = ODProblem(newtonian!, optical, radar)
+
+        # Refine orbit (both optical and radar astrometry)
+        orbit1 = orbitdetermination(od1, orbit0, params)
+
+        # Values by Jul 31, 2025
+
+        # Check type
+        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
+            typeof(optical), typeof(radar), Vector{RadarResidual{Float64, Float64}}})
+        # Astrometry
+        @test length(optical) == noptical(od1) == noptical(orbit1) == 24
+        @test length(radar) == nradar(od1) == nradar(orbit1) == 5
+        @test length(optical) + length(radar) == nobs(od1) == nobs(orbit1) == 24 + 5
+        @test numberofdays(radar) == numberofdays(orbit1) < 2.04
+        @test minmaxdates(orbit1) == (date(radar[1]), date(radar[end]))
+        @test length(od1.tracklets) == length(orbit1.tracklets) == 7
+        @test od1.tracklets == orbit1.tracklets
+        @test od1.radar == orbit1.radar
+        @test orbit1.tracklets[1].indices[1] == 1
+        @test orbit1.tracklets[end].indices[end] == 23
+        @test issorted(orbit1.tracklets)
+        @test issorted(orbit1.radar)
+        # Backward (forward) integration
+        @test epoch(orbit1) == datetime2julian(date(radar[2])) - PE.J2000
+        @test dtutc2days(date(optical[1])) > orbit1.bwd.t0 + orbit1.bwd.t[end]
+        @test dtutc2days(date(radar[1])) > orbit1.bwd.t0 + orbit1.bwd.t[end]
+        @test all( norm.(orbit1.bwd.x, Inf) .< 2 )
+        @test dtutc2days(date(optical[end])) < orbit1.fwd.t0 + orbit1.fwd.t[end]
+        @test dtutc2days(date(radar[end])) < orbit1.fwd.t0 + orbit1.fwd.t[end]
+        @test all( norm.(orbit1.fwd.x, Inf) .< 2 )
+        # Vectors of residuals
+        @test notout(orbit1.ores) == 24
+        @test notout(orbit1.rres) == 5
+        @test nout(orbit1.ores) == 0
+        @test nout(orbit1.rres) == 0
+        # Least squares fit
+        @test orbit1.fit.success
+        @test all( sigmas(orbit1) .< 2.9e-7 )
+        @test all( snr(orbit1) .> 8_342)
+        @test chi2(orbit1) < 19.7
+        @test nrms(orbit1) < 0.61
+        # Jacobian
+        @test size(orbit1.jacobian) == (6, 6)
+        @test isdiag(orbit1.jacobian)
+        @test maximum(orbit1.jacobian) < 4.1e-3
+        # Convergence history
+        @test size(orbit1.qs, 1) == 6
+        @test size(orbit1.qs, 2) == length(orbit1.Qs) <= 2
+        @test issorted(orbit1.Qs, rev = true)
+        @test orbit1.Qs[end] == nrms(orbit1)
+        # Compatibility with JPL
+        q0, σ0 = orbit1(), sigmas(orbit1)
+        JPL_CAR = [-5.229992130937651E-01, 8.689454573480734E-01, 3.096174868699621E-01,
+            -1.413639580483663E-02, -5.510379552549767E-03, -2.413003153288419E-03]
+        @test all(@. abs(q0 - JPL_CAR) / σ0 < 4.5)
+        # Osculating orbital elements
+        osc = osculating(orbit1, params)
+        @test iselliptic(osc)
+        @test osc.mu == μ_S
+        @test epoch(osc) == epoch(orbit1) + MJD2000
+        @test osc.frame == :ecliptic
+        q0 = equatorial2ecliptic(orbit1() - params.eph_su(epoch(orbit1)))
+        @test norm(q0 - osc(), Inf) < 6.0e-14
+        q0, σ0 = elements(osc), sigmas(osc)
+        JPL_OSC = [9.223295977030230E-01, 1.911190963976789E-01, 3.330797253820763E+00,
+            1.263744754026979E+02, 2.044798558304837E+02, 1.361032871672047E+02]
+        @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.65)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(orbit1, params)
+        @test H - dH ≤ 18.93 ≤ H + dH
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(orbit1, params) == 5
     end
 
 end
