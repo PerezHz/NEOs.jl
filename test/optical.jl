@@ -37,6 +37,7 @@ using Test
         @test measure(apophis) == (1.0739650841580173, 0.2952738332250385)
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)
+        @test corr(apophis) == 0.0
 
         # OpticalMPC80 equality
         @test apophis == apophis
@@ -90,6 +91,7 @@ using Test
         @test nrow(optical4) == 3
         @test all(@. year(optical4.date) > 2011)
         @test all(@. isoccultation(optical4.observatory))
+
     end
 
     @testset "NEOCPObject" begin
@@ -121,6 +123,7 @@ using Test
         @test isunknown(catalogue(X85177))
         @test all(isnan, rms(X85177))
         @test all(isnan, debias(X85177))
+        @test isnan(corr(X85177))
 
         # NEOCPObject equality
         @test X85177 == X85177
@@ -201,6 +204,7 @@ using Test
         @test measure(apophis) == (1.0739650841580173, 0.2952738332250385)
         @test rms(apophis) == (0.612, 0.612)
         @test debias(apophis) == (-0.247, 0.14)
+        @test corr(apophis) == 0.0
 
         # OpticalRWO equality
         @test apophis == apophis
@@ -254,6 +258,7 @@ using Test
         @test nrow(optical4) == 3
         @test all(@. year(optical4.date) > 2011)
         @test all(@. isoccultation(optical4.observatory))
+
     end
 
     @testset "OpticalADES" begin
@@ -339,6 +344,7 @@ using Test
         @test measure(apophis) == (1.073965142335659, 0.2952737556548495)
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)
+        @test corr(apophis) == 0.0
 
         # OpticalRWO equality
         @test apophis == apophis
@@ -530,6 +536,10 @@ using Test
         @test all(x -> isnan(x[1]) && isnan(x[2]), debias.(trks1))
         @test all(x -> isnan(x[1]) && isnan(x[2]), debias.(trks2))
         @test all(x -> isnan(x[1]) && isnan(x[2]), debias.(trks3))
+
+        @test all(isnan, corr.(trks1))
+        @test all(isnan, corr.(trks2))
+        @test all(isnan, corr.(trks3))
 
     end
 

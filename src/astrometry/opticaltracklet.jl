@@ -41,6 +41,7 @@ observatory(x::OpticalTracklet) = x.observatory
 catalogue(::OpticalTracklet) = unknowncat()
 rms(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
 debias(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
+corr(::OpticalTracklet{T}) where {T <: Real} = T(NaN)
 
 nobs(x::OpticalTracklet) = x.nobs
 nobs(x::AbstractTrackletVector) = sum(nobs, x; init = 0)
