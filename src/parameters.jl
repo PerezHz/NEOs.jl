@@ -3,11 +3,11 @@
 
 A collection of the most important parameters in `NEOs.jl` functions.
 
-## Common
+# Common
 
 -  `verbose::Bool`: whether to print output or not (default: `true`).
 
-## Propagation
+# Propagation
 
 - `maxsteps::Int`: maximum number of steps for the integration (default: `500`).
 - `μ_ast::Vector{T}`: vector of gravitational parameters
@@ -21,7 +21,7 @@ A collection of the most important parameters in `NEOs.jl` functions.
     (default: `0.5`).
 - `coeffstol::T`: maximum size of the coefficients (default: `10.0`).
 
-## Gauss Method
+# Gauss Method
 
 - `safegauss::Bool`: whether to try Gauss Method only when exactly three tracklets
     are available (default: `true`).
@@ -29,7 +29,7 @@ A collection of the most important parameters in `NEOs.jl` functions.
     orbit (default: `:log`).
 - `gaussorder::Int`: order of the jet transport perturbation (default: `6`).
 
-## Minimization over the MOV
+# Minimization over the MOV
 
 - `H_max::T`: maximum absolute magnitude (default: `34.5`).
 - `a_max::T`: maximum semimajor axis (default: `100.0`).
@@ -39,7 +39,7 @@ A collection of the most important parameters in `NEOs.jl` functions.
 - `adamQtol::T`: target function relative tolerance (default: `0.001`).
 - `tsaorder::Int`: order of the jet transport perturbation (default: `6`).
 
-## Least Squares
+# Least Squares
 
 - `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `5`).
 - `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
@@ -48,7 +48,7 @@ A collection of the most important parameters in `NEOs.jl` functions.
 - `jtlsmask::Bool`: whether to use `isjtlsfit` to skip bad-conditioned
     preliminary orbits in `jtls` (default: `true`).
 
-## Outlier Rejection
+# Outlier Rejection
 
 - `outrej::Bool`: whether to perform outlier rejection during least squares
     iterations (default: `false`).

@@ -1,115 +1,145 @@
-@doc raw"""
-    ODProblem{D, T <: Real, WT <: AbstractWeightingScheme{T},
-        DT <: AbstractDebiasingScheme{T}}
+"""
+    AbstractODProblem{D, T <: Real}
+
+Supertye for the orbit determination problems interface.
+"""
+abstract type AbstractODProblem{D, T <: Real} end
+
+"""
+    ODProblem{D, T,
+              O <: AbstractOpticalVector{T},
+              R <: Union{Nothing, AbstractRadarVector{T}},
+              WT <: AbstractWeightingScheme{T},
+              DT <: AbstractDebiasingScheme{T}} <: AbstractODProblem{D, T}
 
 An orbit determination problem.
 
-## Fields
+# Fields
 
 - `dynamics::D`: dynamical model.
-- `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
-- `tracklets::Vector{Tracklet{T}}`: vector of tracklets.
-- `w8s::WT`: weighting scheme.
-- `bias::DT`: debiasing scheme.
+- `optical::O`: vector of optical astrometry.
+- `tracklets::TrackletVector{T}`: vector of optical tracklets.
+- `radar::R`: vector of radar astrometry.
+- `weights::WT`: optical astrometry weighting scheme.
+- `debias::DT`: optical astrometry debiasing scheme.
 """
-mutable struct ODProblem{D, T <: Real, WT <: AbstractWeightingScheme{T},
-    DT <: AbstractDebiasingScheme{T}}
+mutable struct ODProblem{D, T,
+                         O <: AbstractOpticalVector{T},
+                         R <: Union{Nothing, AbstractRadarVector{T}},
+                         WT <: AbstractWeightingScheme{T},
+                         DT <: AbstractDebiasingScheme{T}} <: AbstractODProblem{D, T}
     dynamics::D
-    radec::Vector{RadecMPC{T}}
-    tracklets::Vector{Tracklet{T}}
-    w8s::WT
-    bias::DT
-    @doc raw"""
-        ODProblem(dynamics::D, radec::Vector{RadecMPC{T}} [,
-            w8s::WT [, bias::DT]]) where {D, T <: Real, WT, DT}
-
-    Return an orbit determination problem.
-
-    ## Arguments
-
-    - `dynamics::D`: dynamical model.
-    - `radec::Vector{RadecMPC{T}}`: vector of optical astrometry.
-    - `w8s::WT`: weighting scheme (default: `Veres17`).
-    - `bias::DT`: debiasing scheme (default: `Eggl20`).
-    """
-    function ODProblem(dynamics::D, radec::Vector{RadecMPC{T}},
-        w8s::WT = Veres17, bias::DT = Eggl20) where {D, T <: Real, WT, DT}
-        # Reduce tracklets by polynomial regression
-        tracklets = reduce_tracklets(radec)
-        # Build weighting scheme
-        _w8s_ = w8s(radec)
-        # Build debiasing scheme
-        _bias_ = bias(radec)
-        # Consistency check
-        @assert length(radec) == sum(nobs, tracklets; init = 0) ==
-            length(_w8s_.w8s) == length(_bias_.bias)
-        # Assemble orbit determination problem
-        new{D, T, typeof(_w8s_), typeof(_bias_)}(dynamics, radec, tracklets,
-            _w8s_, _bias_)
-    end
+    optical::O
+    tracklets::TrackletVector{T}
+    radar::R
+    weights::WT
+    debias::DT
 end
 
-const ODProblem{D, T} = ODProblem{D, T, WT, DT} where {D, T <: Real,
-    WT <: AbstractWeightingScheme{T}, DT <: AbstractDebiasingScheme{T}}
+# Abbreviations
+const OpticalODProblem{D, T, O} = ODProblem{D, T, O, Nothing, WT, DT} where {WT, DT}
+const MixedODProblem{D, T, O, R} = ODProblem{D, T, O, R, WT, DT} where {WT, DT}
+
+# Constructor
+"""
+    ODProblem(dynamics, optical [, radar]; kwargs...)
+
+Return an orbit determination problem given a dynamical model `dynamics`,
+a vector of optical astrometry `optical` and an optional vector of radar
+astrometry `radar`.
+
+# Keyword arguments
+
+- `weights`: optical astrometry weighting scheme (default: `Veres17`).
+- `debias`: optical astrometry debiasing scheme (default: `Eggl20`).
+"""
+function ODProblem(dynamics::D, optical::O, radar::R = nothing; weights::Type{WT} = Veres17,
+                   debias::Type{DT} = Eggl20) where {D, T <: Real, O <: AbstractOpticalVector{T},
+                   R <: Union{Nothing, AbstractRadarVector{T}}, WT <: AbstractWeightingScheme,
+                   DT <: AbstractDebiasingScheme}
+    # Group optical astrometry in tracklets
+    tracklets = reduce_tracklets(optical)
+    return ODProblem{D, T, O, R, WT{T}, DT{T}}(dynamics, optical, tracklets, radar,
+                                               weights(optical), debias(optical))
+end
 
 # Print method for ODProblem
-function show(io::IO, p::ODProblem)
-    t = "    "
-    print(io, "Orbit determination problem:\n")
-    print(io, t, rpad("Dynamical model:", 21), p.dynamics, "\n")
-    print(io, t, rpad("Astrometry:", 21), length(p.radec),
-        " optical observations (", length(p.tracklets), " tracklets)\n")
-    print(io, t, rpad("Weighting scheme:", 21), getid(p.w8s), "\n")
-    print(io, t, rpad("Debiasing scheme:", 21), getid(p.bias), "\n")
+function show(io::IO, x::ODProblem)
+    t = repeat(' ', 4)
+    print(io,
+        "Orbit determination problem\n",
+        t, rpad("Dynamical model:", 21), x.dynamics, "\n",
+        t, rpad("Optical astrometry:", 21), noptical(x), " observations of type ",
+            opticaltype(x), "\n",
+        t, rpad("Radar astrometry:", 21), hasradar(x) ? "$(nradar(x)) observations \
+            of type $(radartype(x))" : "None", "\n",
+        t, rpad("Weighting scheme:", 21), getid(x.weights), "\n",
+        t, rpad("Debiasing scheme:", 21), getid(x.debias), "\n"
+    )
 end
 
-# Override update!
-function update!(p::ODProblem{D, T}, radec::Vector{RadecMPC{T}}) where {D, T <: Real}
+# AbstractODProblem interface
+scalartype(x::AbstractODProblem{D, T}) where {D, T} = T
+opticaltype(x::ODProblem) = eltype(x.optical)
+radartype(x::ODProblem) = hasradar(x) ? eltype(x.radar) : Nothing
+
+hasradar(x::ODProblem) = !isnothing(x.radar)
+optical(x::ODProblem) = x.optical
+radar(x::ODProblem) = x.radar
+
+noptical(x::ODProblem) = length(x.optical)
+nradar(x::ODProblem) = hasradar(x) ? length(x.radar) : 0
+nobs(x::ODProblem) = noptical(x) + nradar(x)
+
+opticalindices(x::ODProblem) = eachindex(x.optical)
+radarindices(x::MixedODProblem) = eachindex(x.radar)
+
+opticaloutliers(x::ODProblem) = fill(false, noptical(x))
+radaroutliers(x::MixedODProblem) = fill(false, nradar(x))
+
+function minmaxdates(x::ODProblem)
+    t0, tf = minmaxdates(x.optical)
+    if hasradar(x)
+        _t0_, _tf_ = minmaxdates(x.radar)
+        t0, tf = min(t0, _t0_), max(tf, _tf_)
+    end
+    return t0, tf
+end
+
+function update!(x::AbstractODProblem{D, T},
+                 optical::AbstractOpticalVector{T}) where {D, T <: Real}
     # Update ODProblem fields
-    p.radec = radec
-    p.tracklets = reduce_tracklets(radec)
-    update!(p.w8s, radec)
-    update!(p.bias, radec)
-    # Consistency check
-    @assert length(p.radec) == sum(nobs, p.tracklets; init = 0) ==
-        length(p.w8s.w8s) == length(p.bias.bias)
+    x.optical = optical
+    x.tracklets = reduce_tracklets(optical)
+    update!(x.weights, optical)
+    update!(x.debias, optical)
     return nothing
 end
 
-# Override nobs
-nobs(od::ODProblem) = length(od.radec)
-
-# Special PropagationBuffer constructor
-function PropagationBuffer(od::ODProblem{D, T}, jd0::V, k0::Int, kf::Int, q0::Vector{U},
-    params::Parameters{T}) where {D, T <: Real, U <: Number, V <: Number}
-    t0 = dtutc2days(date(od.radec[k0]))
-    tf = dtutc2days(date(od.radec[kf]))
-    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
-    buffer = PropagationBuffer(od.dynamics, jd0, tlim, q0, params)
-
-    return buffer
+function init_optical_residuals(::Type{U}, od::ODProblem, idxs = opticalindices(od),
+                                outliers = opticaloutliers(od)) where {U <: Number}
+    optical = view(od.optical, idxs)
+    weights = view(od.weights.w8s, idxs)
+    debias = view(od.debias.bias, idxs)
+    return init_optical_residuals(U, optical, weights, debias, outliers)
 end
 
-function init_residuals(
-        ::Type{U}, od::ODProblem{D, T},
-        idxs::AbstractVector{Int} =  eachindex(od.radec),
-        outliers::AbstractVector{Bool} = fill(false, length(idxs))
-    ) where {D, T <: Real, U <: Number}
-    radec = view(od.radec, idxs)
-    w8s = view(od.w8s.w8s, idxs)
-    bias = view(od.bias.bias, idxs)
-    return init_residuals(U, radec, w8s, bias, outliers)
+function init_radar_residuals(::Type{U}, od::MixedODProblem, idxs = radarindices(od),
+                              outliers = radaroutliers(od)) where {U <: Number}
+    radar = view(od.radar, idxs)
+    return init_radar_residuals(U, radar, outliers)
 end
 
-function set_od_order(::Type{T}, varorder::Int) where {T <: Real}
-    if get_order() < varorder || get_numvars() < 6
-        set_variables(T, "dx"; order = varorder, numvars = 6)
+function set_od_order(::Type{T}, varorder::Int, numvars::Int = 6) where {T <: Real}
+    if get_order() < varorder || get_numvars() != numvars
+        set_variables(T, "dx"; order = varorder, numvars = numvars)
     end
     return nothing
 end
-function set_od_order(params::Parameters{T}) where {T <: Real}
+
+function set_od_order(params::Parameters{T}, numvars::Int = 6) where {T <: Real}
     @unpack tsaorder, gaussorder, jtlsorder = params
     varorder = max(tsaorder, gaussorder, jtlsorder)
-    set_od_order(T, varorder)
+    set_od_order(T, varorder, numvars)
     return nothing
 end

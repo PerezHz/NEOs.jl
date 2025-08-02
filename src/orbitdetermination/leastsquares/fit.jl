@@ -1,9 +1,9 @@
-@doc raw"""
+"""
     LeastSquaresFit{T} <: AbstractLeastSquares{T}
 
 A least squares fit.
 
-## Fields
+# Fields
 
 - `success::Bool`: whether the routine converged or not.
 - `x::Vector{T}`: deltas that minimize the objective function.
@@ -15,9 +15,6 @@ A least squares fit.
     x::Vector{T}
     Γ::Matrix{T}
     routine::Type{<:AbstractLeastSquaresMethod}
-    # Inner constructor
-    LeastSquaresFit(success::Bool, x::Vector{T}, Γ::Matrix{T},
-        routine::Type{<:AbstractLeastSquaresMethod}) where {T <: Real} = new{T}(success, x, Γ, routine)
 end
 
 # Outer constructor
@@ -25,46 +22,53 @@ LeastSquaresFit(::Type{T}, method::Type{<:AbstractLeastSquaresMethod}) where {T 
     LeastSquaresFit(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), method)
 
 # Definition of zero LeastSquaresFit{T}
-zero(::Type{LeastSquaresFit{T}}) where {T <: Real} =
-    LeastSquaresFit(false, Vector{T}(undef, 0), Matrix{T}(undef, 0, 0),
-    AbstractLeastSquaresMethod)
+zero(::Type{LeastSquaresFit{T}}) where {T <: Real} = LeastSquaresFit(false,
+    Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), AbstractLeastSquaresMethod)
 
 # Print method for LeastSquaresFit
-# Examples:
-# Succesful Newton
-# Succesful Differential Corrections
-function show(io::IO, fit::LeastSquaresFit)
-    success_s = fit.success ? "Succesful" : "Unsuccesful"
-    routine_s = string(fit.routine)
+function show(io::IO, x::LeastSquaresFit)
+    success_s = x.success ? "Succesful" : "Unsuccesful"
+    routine_s = string(x.routine)
     print(io, success_s, " ", routine_s)
 end
 
-@doc raw"""
-    project(y::Vector{TaylorN{T}}, fit::LeastSquaresFit{T}) where {T <: Real}
+project(::AbstractVector{T}, Γ::AbstractMatrix{T}) where {T <: Real} =
+    fill(T(NaN), size(Γ))
 
-Project the covariance matrix of `fit` into `y`.
-"""
-function project(y::Vector{TaylorN{T}}, fit::LeastSquaresFit{T}) where {T <: Real}
-    J = Matrix{T}(undef, get_numvars(), length(y))
+function project(y::AbstractVector{TaylorN{T}}, Γ::AbstractMatrix{T}) where {T <: Real}
+    J = Matrix{TaylorN{T}}(undef, get_numvars(), length(y))
     for i in eachindex(y)
-        J[:, i] = TS.gradient(y[i])(fit.x)
+        J[:, i] = TS.gradient(y[i])
     end
-    return (J') * fit.Γ * J
+    return (J') * Γ * J
 end
 
+function project(y::AbstractVector{TaylorN{T}}, x::AbstractVector{T},
+                 Γ::AbstractMatrix{T}) where {T <: Real}
+    J = Matrix{T}(undef, get_numvars(), length(y))
+    for i in eachindex(y)
+        J[:, i] = TS.gradient(y[i])(x)
+    end
+    return (J') * Γ * J
+end
+
+"""
+    project(y, fit)
+
+Project the covariance matrix of a least squares `fit` into a vector `y`.
+"""
+project(y::Vector{TaylorN{T}}, fit::LeastSquaresFit{T}) where {T <: Real} =
+    project(y, fit.x, fit.Γ)
+
 # Target functions
-chi2(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    fit::LeastSquaresFit{T}) where {T <: Real} = chi2(res(fit.x))
-
-nms(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    fit::LeastSquaresFit{T}) where {T <: Real} = nms(res(fit.x))
-
-nrms(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    fit::LeastSquaresFit{T}) where {T <: Real} = nrms(res(fit.x))
+chi2(res::AbstractResidualVector, fit::LeastSquaresFit) = chi2(res(fit.x))
+chi2(res::Tuple{O, R}, fit::LeastSquaresFit) where {O, R} = chi2(res[1], fit) + chi2(res[2], fit)
+nms(x::AbstractResidualSet, fit::LeastSquaresFit) = chi2(x, fit) / notoutobs(x)
+nrms(x::AbstractResidualSet, fit::LeastSquaresFit) = sqrt(nms(x, fit))
 
 # Chi-square critical value
 function critical_value(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    fit::LeastSquaresFit{T}) where {T <: Real}
+                        fit::LeastSquaresFit{T}) where {T <: Real}
     # Evaluate residuals
     _res_ = res(fit.x)
     # Chi square distribution with N degrees of freedom
@@ -76,7 +80,7 @@ function critical_value(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
 end
 
 # NMS threshold
-function nms_threshold(N::Int, significance::T) where {T <: Real}
+function nms_threshold(N::Int, significance::Real)
     # Chi-square distribution
     dist = Chisq(N)
     # Find Q for which cdf(dist, Q) == significance

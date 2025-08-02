@@ -1,22 +1,21 @@
-@doc raw"""
+"""
     AdmissibleRegion{T <: Real}
 
-Subset of topocentric range × range-rate space defined by
-the following constraints:
+Subset of topocentric range × range-rate space defined by the following constraints:
 - heliocentric energy ≤ `k_gauss^2/(2a_max)`,
 - absolute magnitude ≤ `H_max`,
 - geocentric energy ≥ `0`.
 
-## Fields
+# Fields
 
 - `date::DateTime`: time of observation.
-- `α::T`: right ascension.
-- `δ::T`: declination.
-- `v_α::T`: right ascension velocity.
-- `v_δ::T`: declination velocity.
+- `ra::T`: right ascension.
+- `dec::T`: declination.
+- `vra::T`: right ascension velocity.
+- `vdec::T`: declination velocity.
 - `H_max::T`: maximum absolute magnitude.
 - `a_max::T`: maximum semimajor axis.
-- `ρ_unit, ρ_α, ρ_δ::Vector{T}`: topocentric unit vector and its partials.
+- `ρ_unit/ρ_α/ρ_δ::Vector{T}`: topocentric unit vector and its partials.
 - `q::Vector{T}`: heliocentric position of observer.
 - `coeffs::Vector{T}`: polynomial coefficients.
 - `ρ_domain::Vector{T}`: range domain.
@@ -25,15 +24,17 @@ the following constraints:
 - `observatory::ObservatoryMPC{T}`: observing station.
 
 !!! reference
-    See Chapter 8 of https://doi.org/10.1017/CBO9781139175371, or
-    https://doi.org/10.1007/s10569-004-6593-5.
+    See Chapter 8 of:
+    - https://doi.org/10.1017/CBO9781139175371
+    or
+    - https://doi.org/10.1007/s10569-004-6593-5
 """
 @auto_hash_equals struct AdmissibleRegion{T <: Real}
     date::DateTime
-    α::T
-    δ::T
-    v_α::T
-    v_δ::T
+    ra::T
+    dec::T
+    vra::T
+    vdec::T
     H_max::T
     a_max::T
     ρ_unit::Vector{T}
@@ -52,7 +53,7 @@ zero(::Type{AdmissibleRegion{T}}) where {T <: Real} = AdmissibleRegion{T}(
     DateTime(2000), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
     Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
     Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
-    Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs()
+    Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs(T)
 )
 
 iszero(x::AdmissibleRegion{T}) where {T <: Real} = x == zero(AdmissibleRegion{T})
@@ -60,28 +61,33 @@ iszero(x::AdmissibleRegion{T}) where {T <: Real} = x == zero(AdmissibleRegion{T}
 # Print method for AdmissibleRegion
 function show(io::IO, A::AdmissibleRegion{T}) where {T <: Real}
     v = string(
-        @sprintf("%.5f", rad2deg(A.α)), ", ",
-        @sprintf("%.5f", rad2deg(A.δ)), ", ",
-        @sprintf("%.5f", rad2deg(A.v_α)), ", ",
-        @sprintf("%.5f", rad2deg(A.v_δ)), "",
+        @sprintf("%.5f", rad2deg(A.ra)), ", ",
+        @sprintf("%.5f", rad2deg(A.dec)), ", ",
+        @sprintf("%.5f", rad2deg(A.vra)), ", ",
+        @sprintf("%.5f", rad2deg(A.vdec)), "",
     )
     print(io, "AE: [", v, "]", " t: ", A.date, " obs: ", A.observatory.name)
 end
 
-# Outer constructor
-function AdmissibleRegion(tracklet::Tracklet{T}, params::Parameters{T}) where {T <: Real}
+"""
+    AdmissibleRegion(::OpticalTracklet, ::Parameters)
+
+Return the admissible region associated to an optical tracklet. For a list of
+parameters, see the `Minimization over the MOV` section of [`Parameters`](@ref).
+"""
+function AdmissibleRegion(tracklet::OpticalTracklet{T},
+                          params::Parameters{T}) where {T <: Real}
     # Unpack
-    @unpack observatory, date, α, δ, v_α, v_δ, mag = tracklet
-    @unpack H_max, a_max = params
+    @unpack observatory, date, ra, dec, vra, vdec, mag = tracklet
+    @unpack eph_ea, eph_su, H_max, a_max = params
     # Topocentric unit vector and partials
-    ρ, ρ_α, ρ_δ = topounitpdv(α, δ)
+    ρ, ρ_α, ρ_δ = topounitpdv(ra, dec)
     # Time of observation [days (et seconds) since J2000]
     t_days, t_et = dtutc2days(date), dtutc2et(date)
     # Heliocentric position of the observer
-    q = params.eph_ea(t_days) + kmsec2auday(obsposvelECI(observatory, t_et)) -
-        params.eph_su(t_days)
+    q = eph_ea(t_days) + kmsec2auday(obsposvelECI(observatory, t_et)) - eph_su(t_days)
     # Admissible region coefficients
-    coeffs = arcoeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
+    coeffs = arcoeffs(ra, dec, vra, vdec, ρ, ρ_α, ρ_δ, q)
     # Maximum range (heliocentric energy constraint)
     ρ_max = _helmaxrange(coeffs, a_max)
     iszero(ρ_max) && return zero(AdmissibleRegion{T})
@@ -107,21 +113,14 @@ function AdmissibleRegion(tracklet::Tracklet{T}, params::Parameters{T}) where {T
     Fs[2, :] .= [ρ_min, v_ρ_max]
     Fs[3, :] .= [ρ_max, v_ρ_mid]
 
-    return AdmissibleRegion{T}(date, α, δ, v_α, v_δ, H_max, a_max,
+    return AdmissibleRegion{T}(date, ra, dec, vra, vdec, H_max, a_max,
         ρ, ρ_α, ρ_δ, q, coeffs, ρ_domain, v_ρ_domain, Fs, observatory)
 end
 
-@doc raw"""
-    arcoeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
-             ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
-
-Return the polynomial coefficients for an [`AdmissibleRegion`](@ref).
-
-!!! reference
-    See equation (8.8) of https://doi.org/10.1017/CBO9781139175371.
-"""
-function arcoeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
-                  ρ_α::Vector{T}, ρ_δ::Vector{T}, q::Vector{T}) where {T <: Number}
+# Return the polynomial coefficients for an [`AdmissibleRegion`](@ref).
+# See equation (8.8) of https://doi.org/10.1017/CBO9781139175371
+function arcoeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T}, ρ_α::Vector{T},
+                  ρ_δ::Vector{T}, q::AbstractVector{T}) where {T <: Number}
     coeffs = Vector{T}(undef, 6)
     coeffs[1] = dot(q[1:3], q[1:3])
     coeffs[2] = 2 *  dot(q[4:6], ρ)
@@ -132,93 +131,52 @@ function arcoeffs(α::T, δ::T, v_α::T, v_δ::T, ρ::Vector{T},
     return coeffs
 end
 
-@doc raw"""
-    topounitpdv(α::T, δ::T) where {T <: Number}
-
-Return the topocentric line-of-sight unit vector and its
-partial derivatives with respect to `α` and `δ`.
-
-!!! reference
-    See between equations (8.5) and (8.6) of
-    https://doi.org/10.1017/CBO9781139175371.
-"""
+# Return the topocentric line-of-sight unit vector and its
+# partial derivatives with respect to `α` and `δ`.
+# See between equations (8.5) and (8.6) of https://doi.org/10.1017/CBO9781139175371
 function topounitpdv(α::T, δ::T) where {T <: Number}
     sin_α, cos_α = sincos(α)
     sin_δ, cos_δ = sincos(δ)
 
     ρ = [cos_δ * cos_α, cos_δ * sin_α, sin_δ]
-    ρ_α = [-sin_α * cos_δ, cos_α * cos_δ, zero(T)]
+    ρ_α = [-sin_α * cos_δ, cos_α * cos_δ, zero(α)]
     ρ_δ = [-cos_α * sin_δ, -sin_α * sin_δ, cos_δ]
 
     return ρ, ρ_α, ρ_δ
 end
 
-@doc raw"""
-    arW(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
+# W function of an [`AdmissibleRegion`](@ref).
+# See equation (8.9) of https://doi.org/10.1017/CBO9781139175371
+arW(A::AdmissibleRegion, ρ::Number) = arW(A.coeffs, ρ)
+arW(coeffs::AbstractVector, ρ::Number) = coeffs[3] * ρ^2 + coeffs[4] * ρ + coeffs[5]
 
-W function of an [`AdmissibleRegion`](@ref).
+# S function of an [`AdmissibleRegion`](@ref).
+# See equation (8.9) of https://doi.org/10.1017/CBO9781139175371
+arS(A::AdmissibleRegion, ρ::Number) = arS(A.coeffs, ρ)
+arS(coeffs::AbstractVector, ρ::Number) = ρ^2 + coeffs[6] * ρ + coeffs[1]
 
-!!! reference
-    See equation (8.9) of https://doi.org/10.1017/CBO9781139175371.
-"""
-function arW(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
-    return coeffs[3] * ρ^2 + coeffs[4] * ρ + coeffs[5]
-end
-arW(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}  = arW(A.coeffs, ρ)
-
-@doc raw"""
-    arS(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
-
-S function of an [`AdmissibleRegion`](@ref).
-
-!!! reference
-    See equation (8.9) of https://doi.org/10.1017/CBO9781139175371.
-"""
-function arS(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
-    return ρ^2 + coeffs[6] * ρ + coeffs[1]
-end
-arS(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arS(A.coeffs, ρ)
-
-@doc raw"""
-    arG(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
-
-Auxiliary function to compute the root of G ([`AdmissibleRegion`](@ref)) from
-an [`AdmissibleRegion`](@ref).
-"""
-G⁻¹0(coeffs::Vector) = cbrt(2 * k_gauss^2 * μ_ES / coeffs[3])
+# Auxiliary function to compute the root of G(::AdmissibleRegion)
 G⁻¹0(A::AdmissibleRegion) = G⁻¹0(A.coeffs)
+G⁻¹0(coeffs::AbstractVector) = cbrt(2 * k_gauss^2 * μ_ES / coeffs[3])
 
-@doc raw"""
-    arG(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number}
+# G function of an [`AdmissibleRegion`](@ref).
+# See equation (8.13) of https://doi.org/10.1017/CBO9781139175371
+arG(A::AdmissibleRegion, ρ::Number) = arG(A.coeffs, ρ)
 
-G function of an [`AdmissibleRegion`](@ref).
-
-!!! reference
-    See equation (8.13) of https://doi.org/10.1017/CBO9781139175371.
-"""
-function arG(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
+function arG(coeffs::AbstractVector, ρ::Number)
     if ρ == G⁻¹0(coeffs)
         return zero(coeffs[3] * ρ)
     else
         return 2 * k_gauss^2 * μ_ES / ρ - coeffs[3] * ρ^2
     end
 end
-arG(A::AdmissibleRegion{T}, ρ::S) where {T <: Real, S <: Number} = arG(A.coeffs, ρ)
 
-
-@doc raw"""
-    arenergycoeffs(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T <: Real, S <: Number}
-
-Return the coefficients of `A`'s energy as a quadratic function
-of the topocentric range-rate evaluated at range `ρ`. `boundary`
-chooses between the `:outer` (default) or `:inner` boundary.
-
-!!! reference
-    See between equations (8.9)-(8.10) and (8.12)-(8.13)
-    of https://doi.org/10.1017/CBO9781139175371.
-"""
-function arenergycoeffs(A::AdmissibleRegion{T}, ρ::S,
-                        boundary::Symbol = :outer) where {T <: Real, S <: Number}
+# Return the coefficients of `A`'s energy as a quadratic function
+# of the topocentric range-rate evaluated at range `ρ`. `boundary`
+# chooses between the `:outer` (default) or `:inner` boundary.
+# See between equations (8.9)-(8.10) and (8.12)-(8.13)
+# of https://doi.org/10.1017/CBO9781139175371
+function arenergycoeffs(A::AdmissibleRegion, ρ::Number, boundary::Symbol = :outer)
     if boundary == :outer
         return _arhelenergycoeffs(A.coeffs, A.a_max, ρ)
     elseif boundary == :inner
@@ -228,56 +186,44 @@ function arenergycoeffs(A::AdmissibleRegion{T}, ρ::S,
     end
 end
 
-function _arhelenergycoeffs(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: Real, S <: Number}
+function _arhelenergycoeffs(coeffs::Vector{T}, a_max::T, ρ::Number) where {T <: Real}
     a = one(T)
     b = coeffs[2]
     c = arW(coeffs, ρ) + k_gauss^2 * (1/a_max - 2/sqrt(arS(coeffs, ρ)))
     return a, b, c
 end
 
-function _argeoenergycoeffs(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
+function _argeoenergycoeffs(coeffs::Vector{T}, ρ::Number) where {T <: Real}
     a = one(T)
     b = zero(T)
     c = -arG(coeffs, ρ)
     return a, b, c
 end
 
-@doc raw"""
-    arenergydis(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T <: Real, S <: Number}
-
-Return the discriminant of `A`'s energy as a quadratic function
-of the topocentric range-rate evaluated at range `ρ`. `boundary`
-chooses between the `:outer` (default) or `:inner` boundary.
-
-!!! reference
-    See between equations (8.9)-(8.10) and (8.12)-(8.13)
-    of https://doi.org/10.1017/CBO9781139175371.
-"""
-function arenergydis(A::AdmissibleRegion{T}, ρ::S,
-                     boundary::Symbol = :outer) where {T <: Real, S <: Number}
+# Return the discriminant of `A`'s energy as a quadratic function
+# of the topocentric range-rate evaluated at range `ρ`. `boundary`
+# chooses between the `:outer` (default) or `:inner` boundary.
+# See between equations (8.9)-(8.10) and (8.12)-(8.13)
+# of https://doi.org/10.1017/CBO9781139175371
+function arenergydis(A::AdmissibleRegion, ρ::Number, boundary::Symbol = :outer)
     a, b, c = arenergycoeffs(A, ρ, boundary)
     return b^2 - 4*a*c
 end
 
-function _arhelenergydis(coeffs::Vector{T}, a_max::T, ρ::S) where {T <: Real, S <: Number}
+function _arhelenergydis(coeffs::Vector{T}, a_max::T, ρ::Number) where {T <: Real}
     a, b, c = _arhelenergycoeffs(coeffs, a_max, ρ)
     return b^2 - 4*a*c
 end
 
-function _argeoenergydis(coeffs::Vector{T}, ρ::S) where {T <: Real, S <: Number}
+function _argeoenergydis(coeffs::Vector{T}, ρ::Number) where {T <: Real}
     a, b, c = _argeoenergycoeffs(coeffs, ρ)
     return b^2 - 4*a*c
 end
 
-@doc raw"""
-    rangerates(A::AdmissibleRegion{T}, ρ::S, [boundary::Symbol]) where {T, S <: Real}
-
-Return  a vector with the range-rates in the boundary of `A`
-for a given range `ρ`. `boundary` chooses between the `:outer`
-(default) or `:inner` boundary.
-"""
-function rangerates(A::AdmissibleRegion{T}, ρ::S,
-                   boundary::Symbol = :outer) where {T, S <: Real}
+# Return  a vector with the range-rates in the boundary of `A`
+# for a given range `ρ`. `boundary` chooses between the `:outer`
+# (default) or `:inner` boundary.
+function rangerates(A::AdmissibleRegion, ρ::Number, boundary::Symbol = :outer)
     if boundary == :outer
         return _helrangerates(A.coeffs, A.a_max, ρ)
     elseif boundary == :inner
@@ -287,7 +233,7 @@ function rangerates(A::AdmissibleRegion{T}, ρ::S,
     end
 end
 
-function _helrangerates(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: Real}
+function _helrangerates(coeffs::Vector{T}, a_max::T, ρ::Number) where {T <: Real}
     a, b, c = _arhelenergycoeffs(coeffs, a_max, ρ)
     d = b^2 - 4*a*c
     # The number of solutions depends on the discriminant
@@ -300,7 +246,7 @@ function _helrangerates(coeffs::Vector{T}, a_max::T, ρ::S) where {T, S <: Real}
     end
 end
 
-function _georangerates(coeffs::Vector{T}, ρ::S) where {T, S <: Real}
+function _georangerates(coeffs::Vector{T}, ρ::Number) where {T}
     ρ0 = min(R_SI, G⁻¹0(coeffs))
     !(0 < ρ <= ρ0) && return Vector{T}(undef, 0)
     a, b, c = _argeoenergycoeffs(coeffs, ρ)
@@ -315,15 +261,10 @@ function _georangerates(coeffs::Vector{T}, ρ::S) where {T, S <: Real}
     end
 end
 
-@doc raw"""
-    rangerate(A::AdmissibleRegion{T}, ρ::T, m::Symbol, [boundary::Symbol]) where {T <: Real}
-
-Return a range-rate in the boundary of `A` for a given range `ρ`.
-`m = :min/:max` chooses which rate to return, while `boundary`
-chooses between the `:outer`(default) or `:inner` boundary.
-"""
-function rangerate(A::AdmissibleRegion{T}, ρ::S, m::Symbol,
-                   boundary::Symbol = :outer) where {T, S <: Real}
+# Return a range-rate in the boundary of `A` for a given range `ρ`.
+# `m = :min/:max` chooses which rate to return, while `boundary`
+# chooses between the `:outer`(default) or `:inner` boundary.
+function rangerate(A::AdmissibleRegion, ρ::Number, m::Symbol, boundary::Symbol = :outer)
     if boundary == :outer
         return _helrangerate(A.coeffs, A.a_max, ρ, m)
     elseif boundary == :inner
@@ -336,7 +277,8 @@ end
 function _helrangerate(coeffs::Vector{T}, a_max::T, ρ::T, m::Symbol) where {T <: Real}
     a, b, c = _arhelenergycoeffs(coeffs, a_max, ρ)
     d = b^2 - 4*a*c
-    @assert d > 0 "Less than two solutions, use rangerate(::AdmissibleRegion, ::Real, :outer) instead"
+    @assert d > 0 "Less than two solutions, use rangerate(::AdmissibleRegion, ::Real,\
+                   :outer) instead"
     # Choose min or max solution
     if m == :min
         return (-b - sqrt(d))/(2a)
@@ -352,7 +294,8 @@ function _georangerate(coeffs::Vector{T}, ρ::T, m::Symbol) where {T <: Real}
     @assert 0 < ρ <= ρ0 "No solutions for geocentric energy outside 0 < ρ <= ρ0"
     a, b, c = _argeoenergycoeffs(coeffs, ρ)
     d = b^2 - 4*a*c
-    @assert d > 0 "Less than two solutions, use rangerate(::AdmissibleRegion, ::Real, :inner) instead"
+    @assert d > 0 "Less than two solutions, use rangerate(::AdmissibleRegion, ::Real,\
+                   :inner) instead"
     # Choose min or max solution
     if m == :min
         return -sqrt(arG(coeffs, ρ))
@@ -363,18 +306,11 @@ function _georangerate(coeffs::Vector{T}, ρ::T, m::Symbol) where {T <: Real}
     end
 end
 
-@doc raw"""
-    argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
-                   [boundary::Symbol,] [tol::T]) where {T <: Real}
-
-Use golden section search to find the `m = :min/:max` range-rate in the
-boundary of `A` in the interval `[ρmin, ρmax]`. `boundary` chooses
-between the `:outer`(default) or `:inner` boundary and `tol` is the
-absolute tolerance (default: `1e-5`).
-
-!!! reference
-    Adapted from https://en.wikipedia.org/wiki/Golden-section_search.
-"""
+# Use golden section search to find the `m = :min/:max` range-rate in the
+# boundary of `A` in the interval `[ρmin, ρmax]`. `boundary` chooses
+# between the `:outer`(default) or `:inner` boundary and `tol` is the
+# absolute tolerance (default: `1e-5`).
+# Adapted from https://en.wikipedia.org/wiki/Golden-section_search
 function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
                         boundary::Symbol = :outer, tol::T = 1e-5) where {T <: Real}
     # 1 / φ
@@ -425,13 +361,9 @@ function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
     return ρ, rangerate(A, ρ, m, boundary)
 end
 
-@doc raw"""
-    _helmaxrange(coeffs::Vector{T}, a_max::T) where {T <: Real}
-
-Return the maximum possible range in the outer boundary of
-an admissible region with coefficients `coeffs` and maximum
-semimajor axis `a_max`.
-"""
+# Return the maximum possible range in the outer boundary of
+# an admissible region with coefficients `coeffs` and maximum
+# semimajor axis `a_max`.
 function _helmaxrange(coeffs::Vector{T}, a_max::T) where {T <: Real}
     # Initial guess
     sol = find_zeros(s -> _arhelenergydis(coeffs, a_max, s), R_EA, 100.0)
@@ -439,7 +371,8 @@ function _helmaxrange(coeffs::Vector{T}, a_max::T) where {T <: Real}
     ρ_max = sol[1]
     # Make sure U(ρ) ≥ 0 and there is at least one _helrangerate solution
     niter = 0
-    while _arhelenergydis(coeffs, a_max, ρ_max) < 0 || length(_helrangerates(coeffs, a_max, ρ_max)) == 0
+    while _arhelenergydis(coeffs, a_max, ρ_max) < 0 ||
+          length(_helrangerates(coeffs, a_max, ρ_max)) == 0
         niter += 1
         ρ_max = prevfloat(ρ_max)
         niter > 1_000 && break
@@ -448,18 +381,15 @@ function _helmaxrange(coeffs::Vector{T}, a_max::T) where {T <: Real}
     return ρ_max
 end
 
-@doc raw"""
-    _geomaxrange(coeffs::Vector{T}) where {T <: Real}
-
-Return the maximum possible range in the inner boundary of
-an admissible region with coefficients `coeffs`.
-"""
+# Return the maximum possible range in the inner boundary of
+# an admissible region with coefficients `coeffs`.
 function _geomaxrange(coeffs::Vector{T}) where {T <: Real}
     # Initial guess
     ρ_max = min(R_SI, G⁻¹0(coeffs))
     # Make sure G(ρ) ≥ 0 and there is at least one _georangerate solution
     niter = 0
-    while _argeoenergydis(coeffs, ρ_max) < 0 || length(_georangerates(coeffs, ρ_max)) == 0
+    while _argeoenergydis(coeffs, ρ_max) < 0 ||
+          length(_georangerates(coeffs, ρ_max)) == 0
         niter += 1
         ρ_max = prevfloat(ρ_max)
         niter > 1_000 && break
@@ -468,18 +398,13 @@ function _geomaxrange(coeffs::Vector{T}) where {T <: Real}
     return ρ_max
 end
 
-@doc raw"""
-    arboundary(A::AdmissibleRegion{T}, t::S, [boundary::Symbol,
-        ρscale::Symbol]) where {T <: Real, S <: Number}
-
-Parametrization of `A`'s
-- `:outer` boundary (default) with `t ∈ [0, 3]`, or
-- `:inner` boundary with `t ∈ [0, 2]`.
-`ρscale` sets the horizontal axis scale to `:linear` (default)
-or `:log`.
-"""
-function arboundary(A::AdmissibleRegion{T}, t::S, boundary::Symbol = :outer,
-        ρscale = :linear) where {T <: Real, S <: Number}
+# Parametrization of `A`'s
+# - `:outer` boundary (default) with `t ∈ [0, 3]`, or
+# - `:inner` boundary with `t ∈ [0, 2]`.
+# `ρscale` sets the horizontal axis scale to `:linear` (default)
+# or `:log`.
+function arboundary(A::AdmissibleRegion, t::Number,
+                    boundary::Symbol = :outer, ρscale = :linear)
     if boundary == :outer
         return _arhelboundary(A, t, ρscale)
     elseif boundary == :inner
@@ -489,8 +414,7 @@ function arboundary(A::AdmissibleRegion{T}, t::S, boundary::Symbol = :outer,
     end
 end
 
-function _arhelboundary(A::AdmissibleRegion{T}, t::S,
-        ρscale::Symbol = :linear) where {T <: Real, S <: Number}
+function _arhelboundary(A::AdmissibleRegion, t::Number, ρscale::Symbol = :linear)
     # Parametrization domain
     @assert 0.0 <= t <= 3.0
     # Lower (upper) bounds
@@ -520,8 +444,7 @@ function _arhelboundary(A::AdmissibleRegion{T}, t::S,
     return [x, v_ρ]
 end
 
-function _argeoboundary(A::AdmissibleRegion{T}, t::S,
-        ρscale::Symbol = :linear) where {T <: Real, S <: Number}
+function _argeoboundary(A::AdmissibleRegion, t::Number, ρscale::Symbol = :linear)
     # Parametrization domain
     @assert 0.0 <= t <= 2.0
     # Lower (upper) bounds
@@ -548,11 +471,7 @@ function _argeoboundary(A::AdmissibleRegion{T}, t::S,
     return [x, v_ρ]
 end
 
-@doc raw"""
-    boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <: Real}
-
-Project `[ρ, v_ρ]` into `A`'s outer boundary.
-"""
+# Project `[ρ, v_ρ]` into `A`'s outer boundary.
 function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <: Real}
     # Project range
     ρ = clamp(ρ,  A.ρ_domain[1], A.ρ_domain[2])
@@ -588,55 +507,56 @@ for U in (:(AbstractVector{T}), :(Tuple{T, T}))
     end
 end
 
-@doc raw"""
-    topo2bary(A::AdmissibleRegion{T}, ρ::U, v_ρ::U) where {T <: Real, U <: Number}
-
-Convert topocentric range/range-rate `[ρ, v_ρ]` to barycentric cartesian coordinates.
-`A` fixes the line of sight.
 """
-function topo2bary(A::AdmissibleRegion{T}, ρ::U, v_ρ::U) where {T <: Real, U <: Number}
+    topo2bary(::AdmissibleRegion, ρ, v_ρ)
+
+Convert topocentric range `ρ` and range-rate `v_ρ` to barycentric cartesian coordinates.
+The admissible region fixes the line of sight.
+"""
+function topo2bary(A::AdmissibleRegion, ρ::Number, v_ρ::Number)
     # Barycentric position
     r = A.q[1:3] + ρ * A.ρ_unit + sseph(su, dtutc2days(A.date))[1:3]
     # Barycentric velocity
-    v = A.q[4:6] + v_ρ * A.ρ_unit + ρ * A.v_α * A.ρ_α + ρ * A.v_δ * A.ρ_δ
+    v = A.q[4:6] + v_ρ * A.ρ_unit + ρ * A.vra * A.ρ_α + ρ * A.vdec * A.ρ_δ
         + sseph(su, dtutc2days(A.date))[4:6]
     # Barycentric state vector
     return vcat(r, v)
 end
 
-@doc raw"""
-    bary2topo(A::AdmissibleRegion{T}, q0::Vector{U}) where {T <: Real, U <: Number}
-
-Convert barycentric cartesian coordinates `q0` to topocentric range/range-rate.
-`A` fixes the line of sight.
 """
-function bary2topo(A::AdmissibleRegion{T}, q0::Vector{U}) where {T <: Real, U <: Number}
+    bary2topo(::AdmissibleRegion, q0)
+
+Convert barycentric cartesian coordinates `q0` to topocentric range and range-rate.
+The admissible region fixes the line of sight.
+"""
+function bary2topo(A::AdmissibleRegion, q0::Vector{<:Number})
     # Heliocentric state vector
     r = q0 - sseph(su, dtutc2days(A.date))
     # Topocentric range
     ρ = euclid3D(r - A.q)
     # Topocentric range rate
-    v_ρ = dot3D(r[4:6], A.ρ_unit) - dot3D(A.q[4:6], A.ρ_unit) - ρ * A.v_α * dot3D(A.ρ_α, A.ρ_unit)
-          - ρ * A.v_δ * dot3D(A.ρ_δ, A.ρ_unit)
+    v_ρ = dot3D(r[4:6], A.ρ_unit) - dot3D(A.q[4:6], A.ρ_unit) - ρ * A.vra * dot3D(A.ρ_α, A.ρ_unit)
+          - ρ * A.vdec * dot3D(A.ρ_δ, A.ρ_unit)
 
     return ρ, v_ρ
 end
 
-@doc raw"""
-    attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
-              params::Parameters{T}) where {T <: Real, U <: Number}
+"""
+    attr2bary(::AdmissibleRegion, a, ::Parameters)
 
 Convert attributable elements `a` to barycentric cartesian coordinates.
+The admissible region fixes the reference epoch and the parameters provide
+Sun and Earth's ephemerides.
 """
 function attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
                    params::Parameters{T}) where {T <: Real, U <: Number}
     # Unfold
     α, δ, v_α, v_δ, ρ, v_ρ = a
     # Light-time correction to epoch
-    t = dtutc2days(A.date) - ρ/c_au_per_day
-    # TO DO: `et::TaylorN` is too slow for `adam` due to
+    t = dtutc2days(A.date) -  ρ / c_au_per_day
+    # TO DO: `et::TaylorN` is too slow for `mmov` due to
     # SatelliteToolboxTransformations overloads in src/observations/topocentric.jl
-    et = dtutc2et(A.date) - cte(cte(ρ))/c_au_per_sec
+    et = dtutc2et(A.date) - cte(cte(ρ)) / c_au_per_sec
     # Line of sight vectors
     ρ_unit, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Heliocentric position of the observer
