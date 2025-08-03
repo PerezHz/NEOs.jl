@@ -83,8 +83,8 @@ using InteractiveUtils: methodswith
         optical_2023DW = read_optical_mpc80(joinpath(pkgdir(NEOs), "test", "data",
             "2023DW_OPTICAL.dat"))
         # Make weigths and debiasing corrections
-        w8s = Veres17(optical_2023DW).w8s
-        bias = Eggl20(optical_2023DW).bias
+        w8s = weights(Veres17(optical_2023DW))
+        bias = debias(Eggl20(optical_2023DW))
 
         # Compute normalized residuals
         _res_ = NEOs.residuals(
@@ -183,8 +183,8 @@ using InteractiveUtils: methodswith
         optical_Apophis = read_optical_mpc80(joinpath(pkgdir(NEOs), "test", "data",
             "99942_Tholen_etal_2013.dat"))
         # Make weights and debiasing corrections
-        w8s = Veres17(optical_Apophis).w8s
-        bias = Eggl20(optical_Apophis).bias
+        w8s = weights(Veres17(optical_Apophis))
+        bias = debias(Eggl20(optical_Apophis))
 
         # Compute optical astrometry residuals
         res_optical = NEOs.residuals(
@@ -378,8 +378,8 @@ using InteractiveUtils: methodswith
         optical_Apophis = read_optical_mpc80(joinpath(pkgdir(NEOs), "test", "data",
             "99942_Tholen_etal_2013.dat"))
         # Make weights and debiasing corrections
-        w8s = Veres17(optical_Apophis).w8s
-        bias = Eggl20(optical_Apophis).bias
+        w8s = weights(Veres17(optical_Apophis))
+        bias = debias(Eggl20(optical_Apophis))
 
         # Compute optical astrometry residuals
         res_optical = NEOs.residuals(optical_Apophis, w8s, bias;

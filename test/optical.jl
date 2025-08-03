@@ -550,36 +550,54 @@ using Test
         w12 = SourceWeights(optical1)
         w13 = Veres17(optical1)
 
-        @test length(w11.w8s) == length(w12.w8s) == length(w13.w8s)
-        @test all(==((1.0, 1.0)), w11.w8s)
-        @test all(==((1.0, 1.0)), w12.w8s)
+        @test length(weights(w11)) == length(weights(w12)) == length(weights(w13))
+        @test all(==((1.0, 1.0)), weights(w11))
+        @test all(==((1.0, 1.0)), weights(w12))
+
+        @test length(corr(w11)) == length(corr(w12)) == length(corr(w13))
+        @test all(iszero, corr(w11))
+        @test all(iszero, corr(w12))
+        @test all(iszero, corr(w13))
 
         w21 = UniformWeights(optical2)
         w22 = SourceWeights(optical2)
         w23 = Veres17(optical2)
 
-        @test length(w21.w8s) == length(w22.w8s) == length(w23.w8s)
-        @test all(==((1.0, 1.0)), w21.w8s)
-        @test all(map(w22.w8s, optical2) do w, x
+        @test length(weights(w21)) == length(weights(w22)) == length(weights(w23))
+        @test all(==((1.0, 1.0)), weights(w21))
+        @test all(map(weights(w22), optical2) do w, x
             σx = rms(x)
             w == (1 / σx[1], 1 / σx[2])
         end)
 
-        all( @. w22.w8s == tuple(1 / getfield(optical2, :ra_rms),
+        all( @. $weights(w22) == tuple(1 / getfield(optical2, :ra_rms),
             1 / getfield(optical2, :dec_rms)) )
+
+        @test length(corr(w21)) == length(corr(w22)) == length(corr(w23))
+        @test all(iszero, corr(w21))
+        @test all(iszero, corr(w22))
+        @test all(iszero, corr(w23))
 
         w31 = UniformWeights(optical3)
         w32 = SourceWeights(optical3)
         w33 = Veres17(optical3)
 
-        @test length(w31.w8s) == length(w32.w8s) == length(w33.w8s)
-        @test all(==((1.0, 1.0)), w31.w8s)
-        @test all(map(w32.w8s, optical3) do w, x
+        @test length(weights(w31)) == length(weights(w32)) == length(weights(w33))
+        @test all(==((1.0, 1.0)), weights(w31))
+        @test all(map(weights(w32), optical3) do w, x
             σx = rms(x)
             w == (1 / σx[1], 1 / σx[2])
         end)
 
-        @test w13.w8s == w23.w8s == w33.w8s
+        @test length(corr(w31)) == length(corr(w32)) == length(corr(w33))
+        @test all(iszero, corr(w31))
+        @test all(map(corr(w32), optical3) do ρ, x
+            ρ == (isnan(x.rmscorr) ? 0.0 : x.rmscorr)
+        end)
+        @test all(iszero, corr(w33))
+
+        @test weights(w13) == weights(w23) == weights(w33)
+        @test corr(w13) == corr(w23) == corr(w33)
 
     end
 
@@ -591,34 +609,34 @@ using Test
         d13 = Farnocchia15(optical1)
         d14 = Eggl20(optical1)
 
-        @test length(d11.bias) == length(d12.bias) == length(d13.bias) == length(d14.bias)
-        @test all(==((0.0, 0.0)), d11.bias)
-        @test all(==((0.0, 0.0)), d12.bias)
+        @test length(debias(d11)) == length(debias(d12)) == length(debias(d13)) == length(debias(d14))
+        @test all(==((0.0, 0.0)), debias(d11))
+        @test all(==((0.0, 0.0)), debias(d12))
 
         d21 = ZeroDebiasing(optical2)
         d22 = SourceDebiasing(optical2)
         d23 = Farnocchia15(optical2)
         d24 = Eggl20(optical2)
 
-        @test length(d21.bias) == length(d22.bias) == length(d23.bias) == length(d24.bias)
-        @test all(==((0.0, 0.0)), d21.bias)
-        @test all(@. d22.bias == tuple(getfield(optical2, :ra_bias), getfield(optical2, :dec_bias)))
+        @test length(debias(d21)) == length(debias(d22)) == length(debias(d23)) == length(debias(d24))
+        @test all(==((0.0, 0.0)), debias(d21))
+        @test all(@. $debias(d22) == tuple(getfield(optical2, :ra_bias), getfield(optical2, :dec_bias)))
 
         d31 = ZeroDebiasing(optical3)
         d32 = SourceDebiasing(optical3)
         d33 = Farnocchia15(optical3)
         d34 = Eggl20(optical3)
 
-        @test length(d31.bias) == length(d32.bias) == length(d33.bias) == length(d34.bias)
-        @test all(==((0.0, 0.0)), d31.bias)
-        @test all(==((0.0, 0.0)), d32.bias)
+        @test length(debias(d31)) == length(debias(d32)) == length(debias(d33)) == length(debias(d34))
+        @test all(==((0.0, 0.0)), debias(d31))
+        @test all(==((0.0, 0.0)), debias(d32))
 
-        @test d13.bias == d23.bias
-        @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), d13.bias, d33.bias)) < 0.79
-        @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), d23.bias, d33.bias)) < 0.79
-        @test d14.bias == d24.bias
-        @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), d14.bias, d34.bias)) < 0.95
-        @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), d24.bias, d34.bias)) < 0.95
+        @test debias(d13) == debias(d23)
+        @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), debias(d13), debias(d33))) < 0.79
+        @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), debias(d23), debias(d33))) < 0.79
+        @test debias(d14) == debias(d24)
+        @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), debias(d14), debias(d34))) < 0.95
+        @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), debias(d24), debias(d34))) < 0.95
 
     end
 

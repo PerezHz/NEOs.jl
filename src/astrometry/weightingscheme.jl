@@ -64,8 +64,8 @@ end
 function SourceWeights(optical::AbstractOpticalVector{T}) where {T <: Real}
     σs = rms.(optical)
     weights = @. tuple(1 / first(σs), 1 / last(σs))
-    corr = corr.(optical)
-    return SourceWeights{T}(weights, corr)
+    corrs = corr.(optical)
+    return SourceWeights{T}(weights, corrs)
 end
 
 # Override weights
