@@ -3,7 +3,7 @@ struct OutlierRejectionCache{T} <: AbstractLeastSquaresCache{T}
     eval_res::Vector{OpticalResidual{T, T}}
     χ2s::Vector{T}
     ξ::MVector{2, T}
-    γ::SMatrix{2, 2, T, 4}
+    γ::MMatrix{2, 2, T, 4}
     A::Matrix{T}
     γ_ξ::MMatrix{2, 2, T, 4}
     L::Int
@@ -15,7 +15,7 @@ function OutlierRejectionCache(::Type{T}, L::Int) where {T <: Real}
     eval_res = Vector{OpticalResidual{T, T}}(undef, L)
     χ2s = Vector{T}(undef, L)
     ξ = MVector{2, T}(zero(T), zero(T))
-    γ = SMatrix{2, 2, T}(I)
+    γ = MMatrix{2, 2, T}(I)
     A = Matrix{T}(undef, get_numvars(), 2)
     γ_ξ = MMatrix{2, 2, T}(I)
     return OutlierRejectionCache{T}(mask, eval_res, χ2s, ξ, γ, A, γ_ξ, L)
@@ -61,12 +61,17 @@ function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     χ2_max = zero(T)
     # Compute χ2s
     @inbounds for i in eachindex(χ2s)
+        # Skip degenerate observations
+        if abs(corr(res[i])) ≥ 1
+            χ2s[i] = T(Inf)
+            continue
+        end
         # Outlier flag
         outlier = mask[i]
         # Current observation covariance matrix
         # Note: since the residuals are already normalized, the single
-        # observation covariance matrix is the 2x2 identity. Otherwise:
-        # γ = [σ_α^2 0; 0 σ_δ^2]
+        # observation covariance matrix is:
+        γ[1], γ[2], γ[3], γ[4] = one(T), corr(res[i]), corr(res[i]), one(T)
         # Current model matrix
         A[:, 1] = TS.gradient(ra(res[i]))(x)
         A[:, 2] = TS.gradient(dec(res[i]))(x)
@@ -97,12 +102,12 @@ function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
         # Reject
         if χ2s[i] > χ2_rej && N_drop < max_drop && !mask[i]
             res[i] = OpticalResidual{T, TaylorN{T}}(ra(res[i]), dec(res[i]), wra(res[i]),
-                                     wdec(res[i]), dra(res[i]), ddec(res[i]), true)
+                wdec(res[i]), dra(res[i]), ddec(res[i]), corr(res[i]), true)
             N_drop += 1
         # Recover
         elseif χ2s[i] < χ2_rec && mask[i]
             res[i] = OpticalResidual{T, TaylorN{T}}(ra(res[i]), dec(res[i]), wra(res[i]),
-                                     wdec(res[i]), dra(res[i]), ddec(res[i]), false)
+                wdec(res[i]), dra(res[i]), ddec(res[i]), corr(res[i]), false)
             N_drop -= 1
         end
     end

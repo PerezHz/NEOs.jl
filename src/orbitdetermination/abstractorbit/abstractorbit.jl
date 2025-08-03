@@ -91,8 +91,8 @@ function init_optical_residuals(::Type{V}, orbit::AbstractOrbit{D, T, U}) where 
     res = Vector{OpticalResidual{T, V}}(undef, noptical(orbit))
     for i in eachindex(res)
         ra, dec = zero(V), zero(V)
-        @unpack wra, wdec, dra, ddec, outlier = orbit.res[i]
-        res[i] = OpticalResidual{T, V}(ra, dec, wra, wdec, dra, ddec, outlier)
+        @unpack wra, wdec, dra, ddec, corr, outlier = orbit.res[i]
+        res[i] = OpticalResidual{T, V}(ra, dec, wra, wdec, dra, ddec, corr, outlier)
     end
 
     return res

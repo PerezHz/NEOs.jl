@@ -64,10 +64,10 @@ Return a `PropagationBuffer` object with pre-allocated memory for `propagate`.
 - `dynamics`: dynamical model function.
 - `q0::Vector{<:Number}`: vector of initial conditions.
 - `jd0::Number`: initial Julian date (TDB).
-- `tlim::Tuple{Real, Real}`: ephemeris timespan [days since J2000].
+- `tlim::NTuple{2, <:Real}`: ephemeris timespan [days since J2000].
 - `params::Parameters{<:Real}`: see the `Propagation` section of [`Parameters`](@ref).
 """
-function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::Tuple{T, T},
+function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::NTuple{2, T},
                            params::Parameters{T}) where {D, T <: Real, U <: Number,
                            V <: Number}
     # Unpack parameters
