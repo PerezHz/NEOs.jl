@@ -497,7 +497,7 @@ using Test
         @test isa(trks1, Vector{OpticalTracklet{Float64}})
         @test isa(trks2, Vector{OpticalTracklet{Float64}})
         @test isa(trks3, Vector{OpticalTracklet{Float64}})
-        @test length(trks1) == length(trks2) == length(trks3)
+        @test length(trks1) == length(trks2) > length(trks3)
 
         @test nobs(trks1) == length(optical1)
         @test nobs(trks2) == length(optical2)
@@ -508,22 +508,33 @@ using Test
         @test indices(trks3) == collect(eachindex(optical3))
 
         @test maximum(datediff.(trks1, trks2)) == 0
-        @test maximum(datediff.(trks1, trks3)) == 316
-        @test maximum(datediff.(trks2, trks3)) == 316
-
         @test maximum(abs, ra.(trks1) - ra.(trks2)) == 0.0
-        @test maximum(abs, ra.(trks1) - ra.(trks3)) < 2.8e-7
-        @test maximum(abs, ra.(trks2) - ra.(trks3)) < 2.8e-7
-
         @test maximum(abs, dec.(trks1) - dec.(trks2)) == 0.0
-        @test maximum(abs, dec.(trks1) - dec.(trks3)) < 2.1e-7
-        @test maximum(abs, dec.(trks2) - dec.(trks3)) < 2.1e-7
-
         @test all(x -> isnan(x) || iszero(x), mag.(trks1) - mag.(trks2))
-        @test all(x -> isnan(x) || iszero(x), mag.(trks1) - mag.(trks3))
-        @test all(x -> isnan(x) || iszero(x), mag.(trks2) - mag.(trks3))
+        @test observatory.(trks1) == observatory.(trks2)
 
-        @test observatory.(trks1) == observatory.(trks2) == observatory.(trks3)
+        mask13 = @. !isnothing($indexin(trks1, trks3))
+        mask23 = @. !isnothing($indexin(trks2, trks3))
+        mask31 = @. !isnothing($indexin(trks3, trks1))
+        mask32 = @. !isnothing($indexin(trks3, trks2))
+        @test mask13 == mask23
+        @test mask31 == mask32
+        @test count(mask13) == count(mask23) == count(mask31) == count(mask32)
+
+        @test maximum(datediff.(trks1[mask13], trks3[mask31])) == 0
+        @test maximum(datediff.(trks2[mask23], trks3[mask32])) == 0
+
+        @test maximum(abs, ra.(trks1[mask13]) - ra.(trks3[mask31])) < 2.8e-7
+        @test maximum(abs, ra.(trks2[mask23]) - ra.(trks3[mask32])) < 2.8e-7
+
+        @test maximum(abs, dec.(trks1[mask13]) - dec.(trks3[mask31])) < 2.1e-7
+        @test maximum(abs, dec.(trks2[mask23]) - dec.(trks3[mask32])) < 2.1e-7
+
+        @test all(x -> isnan(x) || iszero(x), mag.(trks1[mask13]) - mag.(trks3[mask31]))
+        @test all(x -> isnan(x) || iszero(x), mag.(trks2[mask23]) - mag.(trks3[mask32]))
+
+        @test observatory.(trks1[mask13]) == observatory.(trks3[mask31])
+        @test observatory.(trks2[mask23]) == observatory.(trks3[mask32])
 
         @test all(isunknown, catalogue.(trks1))
         @test all(isunknown, catalogue.(trks2))
