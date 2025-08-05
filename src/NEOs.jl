@@ -72,7 +72,7 @@ export elements, iselliptic, ishyperbolic, cartesian2osculating, yarkp2adot
 export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
-export epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, osculating,
+export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, osculating,
        uncertaintyparameter
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,

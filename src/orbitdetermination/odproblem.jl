@@ -82,6 +82,7 @@ end
 scalartype(x::AbstractODProblem{D, T}) where {D, T} = T
 opticaltype(x::ODProblem) = eltype(x.optical)
 radartype(x::ODProblem) = hasradar(x) ? eltype(x.radar) : Nothing
+dof(x::ODProblem) = dof(Val(x.dynamics))
 
 hasradar(x::ODProblem) = !isnothing(x.radar)
 optical(x::ODProblem) = x.optical
@@ -94,8 +95,8 @@ nobs(x::ODProblem) = noptical(x) + nradar(x)
 opticalindices(x::ODProblem) = eachindex(x.optical)
 radarindices(x::MixedODProblem) = eachindex(x.radar)
 
-opticaloutliers(x::ODProblem) = fill(false, noptical(x))
-radaroutliers(x::MixedODProblem) = fill(false, nradar(x))
+opticaloutliers(x::ODProblem) = falses(noptical(x))
+radaroutliers(x::MixedODProblem) = falses(nradar(x))
 
 weights(x::ODProblem) = weights(x.weights)
 debias(x::ODProblem) = debias(x.debias)

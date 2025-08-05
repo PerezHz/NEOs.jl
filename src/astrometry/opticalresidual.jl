@@ -183,7 +183,7 @@ See also [`OpticalResidual`](@ref) and [`compute_radec`](@ref).
 - `corrs::AbstractVector{T}`: correlations (default:
     `zeros(T, length(optical))`).
 - `outliers::AbstractVector{Bool}`: outlier flags (default:
-    `fill(false, length(optical))`).
+    `falses(length(optical))`).
 
 # Keyword arguments
 
@@ -199,7 +199,7 @@ function residuals(optical::AbstractOpticalVector{T},
                    w8s::AbstractVector{NTuple{2, T}},
                    bias::AbstractVector{NTuple{2, T}},
                    corrs::AbstractVector{T} = zeros(T, length(optical)),
-                   outliers::AbstractVector{Bool} = fill(false, length(optical));
+                   outliers::AbstractVector{Bool} = falses(length(optical));
                    xva::AstEph, kwargs...) where {AstEph, T <: Real}
     # UTC time of first optical observation
     utc1 = date(optical[1])

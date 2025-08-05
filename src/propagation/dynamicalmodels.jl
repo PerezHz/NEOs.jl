@@ -20,8 +20,8 @@ Dynamical effects considered are:
     (14)-(15) in page 9 and equations (34)-(35) in page 16 of
     https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract.
 
-- Non-gravitational accelerations acting upon the asteroid (radiation pressure and
-    Yarkovsky effect with ``d = 2``).
+- Non-gravitational accelerations model (Marsden et al., 1973). See equations (1)-(5) in
+    pages (211)-(212) of https://articles.adsabs.harvard.edu/pdf/1973AJ.....78..211M.
 
 To improve performance, some internal loops are multi-threaded via `Threads.@threads for`.
 
@@ -51,6 +51,12 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     local Nm1 = N-1
     # Vector of mass parameters GM's
     local μ = params.μ
+    # Marsden et al. (1973) radial function constants
+    local marsden_α = params.marsden_radial[1]
+    local marsden_r₀ = params.marsden_radial[2]
+    local marsden_m = -params.marsden_radial[3]
+    local marsden_n = params.marsden_radial[4]
+    local marsden_k = -params.marsden_radial[5]
 
     # zero(q[1])
     local zero_q_1 = auxzero(q[1])
@@ -558,18 +564,24 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     postNewtonZ = pntempZ*c_m2     # Z-axis component
 
     #=
-    Compute non-gravitational acceleration
+    Compute non-gravitational acceleration (Marsden et al., 1973)
     =#
 
-    # Angular momentum per unit mass
-    hx = (Y[1]*W[1])-(Z[1]*V[1])   # X-axis component
-    hy = (Z[1]*U[1])-(X[1]*W[1])   # Y-axis component
-    hz = (X[1]*V[1])-(Y[1]*U[1])   # Z-axis component
+    # Angular momentum per unit mass (normal vector)
+    h_x = (Y[1]*W[1])-(Z[1]*V[1])   # X-axis component
+    h_y = (Z[1]*U[1])-(X[1]*W[1])   # Y-axis component
+    h_z = (X[1]*V[1])-(Y[1]*U[1])   # Z-axis component
+    # Norm of normal vector
+    h_norm = sqrt( ((h_x^2)+(h_y^2))+(h_z^2) )
+    # Cartesian components of normal unit vector
+    h_x_unit = h_x/h_norm
+    h_y_unit = h_y/h_norm
+    h_z_unit = h_z/h_norm
 
     # Cartesian components of transversal vector t = h × (\mathbf{r}_Sun - \mathbf{r}_asteroid)
-    t_x = (hz*Y[1]) - (hy*Z[1])    # Note: Y[1] = y_Sun - y_asteroid, etc.
-    t_y = (hx*Z[1]) - (hz*X[1])
-    t_z = (hy*X[1]) - (hx*Y[1])
+    t_x = (h_z*Y[1]) - (h_y*Z[1])    # Note: Y[1] = y_Sun - y_asteroid, etc.
+    t_y = (h_x*Z[1]) - (h_z*X[1])
+    t_z = (h_y*X[1]) - (h_x*Y[1])
     # Norm of transversal vector
     t_norm = sqrt( ((t_x^2)+(t_y^2))+(t_z^2) )
     # Cartesian components of transversal unit vector
@@ -582,15 +594,21 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     r_y_unit = -(Y[1]/r_p1d2[1])
     r_z_unit = -(Z[1]/r_p1d2[1])
 
-    # Evaluate non-grav acceleration (solar radiation pressure, Yarkovsky)
-    g_r = r_p2[1]           # Distance Sun-asteroid
-    A2_t_g_r = q[7]/g_r     # Yarkovsky effect
-    A1_t_g_r = q[8]/g_r     # Radiation pressure
+    # Marsden et al. (1973) radial function
+    g_r_quotient = r_p1d2[1] / marsden_r₀
+    g_r_A = marsden_α * (g_r_quotient^marsden_m)
+    g_r_B = (1 + (g_r_quotient^marsden_n))^marsden_k
+    g_r = g_r_A * g_r_B
 
-    # Non gravitational acceleration: Yarkovsky + radiation pressure
-    NGAx = (A2_t_g_r*t_x_unit) + (A1_t_g_r*r_x_unit)
-    NGAy = (A2_t_g_r*t_y_unit) + (A1_t_g_r*r_y_unit)
-    NGAz = (A2_t_g_r*t_z_unit) + (A1_t_g_r*r_z_unit)
+    # Evaluate non-grav acceleration
+    A2_t_g_r = g_r*q[7]     # Yarkovsky effect
+    A1_t_g_r = g_r*q[8]     # Radiation pressure
+    A3_t_g_r = g_r*q[9]     # Normal non-gravitational component
+
+    # Non gravitational acceleration: Yarkovsky + radiation pressure + normal component
+    NGAx = ((A2_t_g_r*t_x_unit) + (A1_t_g_r*r_x_unit)) + (A3_t_g_r)*h_x_unit
+    NGAy = ((A2_t_g_r*t_y_unit) + (A1_t_g_r*r_y_unit)) + (A3_t_g_r)*h_y_unit
+    NGAz = ((A2_t_g_r*t_z_unit) + (A1_t_g_r*r_z_unit)) + (A3_t_g_r)*h_z_unit
 
     # Fill dq[4:6] with accelerations
     # Post-Newton point mass + Extended body + Non-gravitational
@@ -600,6 +618,7 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
     # Nongrav acceleration coefficients do not change in time
     dq[7] = zero_q_1
     dq[8] = zero_q_1
+    dq[9] = zero_q_1
 
     nothing
 end
@@ -1287,4 +1306,10 @@ end
 # Number of degrees of freedom for each dynamical model
 dof(::Val{newtonian!}) = 6
 dof(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}) = 6
-dof(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}) = 8
+dof(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}) = 9
+
+# Number of jet transport variables for each dynamical model
+numvars(::Val{newtonian!}, _) = 6
+numvars(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, _) = 6
+numvars(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}, params::Parameters) =
+    6 + count(!iszero, params.marsden_scalings)

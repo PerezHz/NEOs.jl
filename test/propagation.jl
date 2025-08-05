@@ -155,7 +155,7 @@ using InteractiveUtils: methodswith
         # JPL #199 solution for Apophis at June 1st, 2004
         q0 = [-1.0506628055913627, -0.06064314196134998, -0.04997102228887035,
               0.0029591421121582077, -0.01423233538611057, -0.005218412537773594,
-              -5.592839897872e-14, 0.0]
+              -5.592839897872e-14, 0.0, 0.0]
         # Propagation parameters
         params = Parameters(maxsteps = 1, order = 25, abstol = 1e-20, parse_eqs = true)
 
@@ -332,10 +332,10 @@ using InteractiveUtils: methodswith
         # 7-DOF nominal solution from pha/apophis.jl script at epoch 2004-06-01T00:00:00.000 (TDB)
         q00 = [-1.0506627988664696, -0.060643124245514164, -0.0499709975200415,
                0.0029591416313078838, -0.014232335581939919, -0.0052184125285361415,
-               -2.898870403031058e-14, 0.0]
+               -2.898870403031058e-14, 0.0, 0.0]
         scalings = vcat(fill(1e-8, 6), 1e-14)
         dq = scaled_variables("δx", scalings, order = varorder)
-        q0 = q00 + vcat(dq, zero(dq[1]))
+        q0 = q00 + vcat(dq, zero(dq[1]), zero(dq[1]))
 
         # Test parsed vs non-parsed propagation: gravity-only model
         params = Parameters(maxsteps = 10, order = 25, abstol = 1e-20, parse_eqs = true)
