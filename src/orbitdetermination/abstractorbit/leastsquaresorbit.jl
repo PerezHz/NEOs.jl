@@ -165,7 +165,10 @@ function LeastSquaresOrbit(od::OpticalODProblem{D, T, O}, q00::Vector{T}, jd0::T
     Npar = numvars(Val(dynamics), params)
     set_od_order(T, 2, Npar)
     # Jet transport initial condition
-    variables = vcat(1:6, findall(!iszero, params.marsden_scalings) .+ 6)
+    variables = collect(1:6)
+    if Ndof > 6
+        variables = vcat(variables, findall(!iszero, marsden_scalings) .+ 6)
+    end
     q00 = initialcondition(q00, variables, Ndof, params)
     dq = jtperturbation(fill(1e-8, 6), variables, Ndof, 2, params)
     q0 = q00 + dq
@@ -178,9 +181,9 @@ function LeastSquaresOrbit(od::OpticalODProblem{D, T, O}, q00::Vector{T}, jd0::T
     Γ = inv(C)
     fit = LeastSquaresFit{T}(true, x0, Γ, Newton{T})
     # Residuals space to barycentric coordinates jacobian
-    jacobian = Matrix(TS.jacobian(dq, fit.x))
+    jacobian = Matrix(TS.jacobian(dq[variables], fit.x))
     # History of initial conditions and target function
-    qs = reshape(q00, Npar, 1)
+    qs = reshape(q00[variables], Npar, 1)
     Qs = [nrms(res, fit)]
 
     return evalfit(LeastSquaresOrbit(
@@ -199,7 +202,10 @@ function LeastSquaresOrbit(od::MixedODProblem{D, T, O, R}, q00::Vector{T}, jd0::
     Npar = numvars(Val(dynamics), params)
     set_od_order(T, 2, Npar)
     # Jet transport initial condition
-    variables = vcat(1:6, findall(!iszero, params.marsden_scalings) .+ 6)
+    variables = collect(1:6)
+    if Ndof > 6
+        variables = vcat(variables, findall(!iszero, marsden_scalings) .+ 6)
+    end
     q00 = initialcondition(q00, variables, Ndof, params)
     dq = jtperturbation(fill(1e-8, 6), variables, Ndof, 2, params)
     q0 = q00 + dq
@@ -212,9 +218,9 @@ function LeastSquaresOrbit(od::MixedODProblem{D, T, O, R}, q00::Vector{T}, jd0::
     Γ = inv(C)
     fit = LeastSquaresFit{T}(true, x0, Γ, Newton{T})
     # Residuals space to barycentric coordinates jacobian
-    jacobian = Matrix(TS.jacobian(dq, fit.x))
+    jacobian = Matrix(TS.jacobian(dq[variables], fit.x))
     # History of initial conditions and target function
-    qs = reshape(q00, Npar, 1)
+    qs = reshape(q00[variables], Npar, 1)
     Qs = [nrms(res, fit)]
 
     return evalfit(LeastSquaresOrbit(
