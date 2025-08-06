@@ -43,6 +43,7 @@ observatory(::NEOCPObject{T}) where {T} = unknownobs(T)
 catalogue(::NEOCPObject) = unknowncat()
 rms(::NEOCPObject{T}) where {T <: Real} = (T(NaN), T(NaN))
 debias(::NEOCPObject{T}) where {T <: Real} = (T(NaN), T(NaN))
+corr(::NEOCPObject{T}) where {T <: Real} = T(NaN)
 
 # Print method for NEOCPObject
 function show(io::IO, x::NEOCPObject)

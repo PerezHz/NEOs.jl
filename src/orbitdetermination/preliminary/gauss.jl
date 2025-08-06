@@ -169,6 +169,7 @@ function gaussmethod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where
     # Unpack
     @unpack safegauss, gaussorder, eph_su = params
     @unpack dynamics, optical, tracklets = od
+    variables = collect(1:6)
     # Find best triplet of observations
     observatories, dates, α, δ = gausstriplet(Val(safegauss), optical, tracklets)
     # Julian day of middle observation
@@ -202,9 +203,10 @@ function gaussmethod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where
         # Residuals space to barycentric coordinates jacobian
         jacobian = Matrix(TS.jacobian(q0 - cte.(q0)))
         # Update orbit
-        orbits[i] = evaldeltas(GaussOrbit(dynamics, optical, tracklets, bwd, fwd,
-            res, covariance, jacobian, τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b,
-            c, r_2s[i], r_vec[:, :, i], ρ[:, i]))
+        orbits[i] = evaldeltas(GaussOrbit(
+            dynamics, variables, optical, tracklets, bwd, fwd, res, covariance, jacobian,
+            τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2s[i], r_vec[:, :, i], ρ[:, i]
+        ))
     end
     # Sort orbits by nms
     sort!(orbits, by = nms)
@@ -318,6 +320,11 @@ function gaussiod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where {D
     # Unpack
     @unpack safegauss, significance, verbose = params
     @unpack optical, tracklets = od
+    # Set jet transport variables
+    Npar = numvars(Val(od.dynamics), params)
+    @assert Npar == 6 "Gauss method is not defined for dynamical models with \
+        more than 6 degrees of freedom"
+    set_od_order(params, Npar)
     # Pre-allocate orbit
     orbit = zero(LeastSquaresOrbit{D, T, T, O, Nothing, Nothing})
     # This function requires...
@@ -328,8 +335,6 @@ function gaussiod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where {D
         # at least 3 observations
         length(optical) < 3 && return orbit
     end
-    # Set jet transport variables
-    set_od_order(params)
     # Preliminary orbits
     porbits = gaussmethod(od, params)
     # Filter preliminary orbits

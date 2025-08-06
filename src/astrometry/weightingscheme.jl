@@ -1,21 +1,21 @@
-# Optical astrometry weighting schemes API
-# All weighting schemes `W{T}` must:
-# 1. be mutable subtypes of `AbstractWeightingScheme{T}`,
-# 2. have a `w8s::Vector{Tuple{T, T}}` field,
-# 3. implement a `W(::AbstractOpticalVector{T})` constructor,
-# 4. override `getid(::W)`,
-# 5. override `update!(::W{T}, ::AbstractOpticalVector{T})`.
-
 """
     AbstractWeightingScheme{T} <: AbstractAstrometryErrorModel{T}
 
-Supertype for the optical astrometry weighting schemes API.
+Supertype for the optical astrometry weighting schemes interface.
+
+Every weighting scheme `W{T}` must:
+- be a mutable subtype of `AbstractWeightingScheme{T}`,
+- implement a `W(::AbstractOpticalVector{T})` constructor,
+- override `weights(::W)`,
+- override `corr(::W)`,
+- override `getid(::W)`,
+- override `update!(::W{T}, ::AbstractOpticalVector{T})`.
 """
 abstract type AbstractWeightingScheme{T} <: AbstractAstrometryErrorModel{T} end
 
 # Print method for AbstractWeightingScheme
-show(io::IO, w::AbstractWeightingScheme) = print(io, getid(w),
-    " weighting scheme with ", length(w.w8s), " observations")
+show(io::IO, x::AbstractWeightingScheme) = print(io, getid(x),
+    " weighting scheme with ", length(weights(x)), " observations")
 
 """
     UniformWeights{T} <: AbstractWeightingScheme{T}
@@ -23,21 +23,30 @@ show(io::IO, w::AbstractWeightingScheme) = print(io, getid(w),
 Uniform optical astrometry weighting scheme.
 """
 mutable struct UniformWeights{T} <: AbstractWeightingScheme{T}
-    w8s::Vector{Tuple{T, T}}
+    weights::Vector{NTuple{2, T}}
+    corr::Vector{T}
 end
 
 # Constructor
 function UniformWeights(optical::AbstractOpticalVector{T}) where {T <: Real}
-    w8s = [(one(T), one(T)) for _ in eachindex(optical)]
-    return UniformWeights{T}(w8s)
+    weights = [(one(T), one(T)) for _ in eachindex(optical)]
+    corr = [zero(T) for _ in eachindex(optical)]
+    return UniformWeights{T}(weights, corr)
 end
+
+# Override weights
+weights(x::UniformWeights) = x.weights
+
+# Override corr
+corr(x::UniformWeights) = x.corr
 
 # Override getid
 getid(::UniformWeights) = "Uniform"
 
 # Override update!
-function update!(w::UniformWeights{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
-    w.w8s = [(one(T), one(T)) for _ in eachindex(optical)]
+function update!(x::UniformWeights{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
+    x.weights = [(one(T), one(T)) for _ in eachindex(optical)]
+    x.corr = [zero(T) for _ in eachindex(optical)]
     return nothing
 end
 
@@ -47,23 +56,32 @@ end
 Source optical astrometry weighting scheme.
 """
 mutable struct SourceWeights{T} <: AbstractWeightingScheme{T}
-    w8s::Vector{Tuple{T, T}}
+    weights::Vector{NTuple{2, T}}
+    corr::Vector{T}
 end
 
 # Constructors
 function SourceWeights(optical::AbstractOpticalVector{T}) where {T <: Real}
     σs = rms.(optical)
-    w8s = @. tuple(1 / first(σs), 1 / last(σs))
-    return SourceWeights{T}(w8s)
+    weights = @. tuple(1 / first(σs), 1 / last(σs))
+    corrs = corr.(optical)
+    return SourceWeights{T}(weights, corrs)
 end
+
+# Override weights
+weights(x::SourceWeights) = x.weights
+
+# Override corr
+corr(x::SourceWeights) = x.corr
 
 # Override getid
 getid(::SourceWeights) = "Source"
 
 # Override update!
-function update!(w::SourceWeights{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
+function update!(x::SourceWeights{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
     σs = rms.(optical)
-    w.w8s = @. tuple(1 / first(σs), 1 / last(σs))
+    x.weights = @. tuple(1 / first(σs), 1 / last(σs))
+    x.corr = corr.(optical)
     return nothing
 end
 
@@ -77,20 +95,30 @@ Veres et al. (2017) optical astrometry weighting scheme.
     - https://doi.org/10.1016/j.icarus.2017.05.021.
 """
 mutable struct Veres17{T} <: AbstractWeightingScheme{T}
-    w8s::Vector{Tuple{T, T}}
+    weights::Vector{NTuple{2, T}}
+    corr::Vector{T}
 end
 
 # Constructor
 function Veres17(optical::AbstractOpticalVector{T}) where {T <: Real}
-    return Veres17{T}(w8sveres17(optical))
+    weights = w8sveres17(optical)
+    corr = [zero(T) for _ in eachindex(optical)]
+    return Veres17{T}(weights, corr)
 end
+
+# Override weights
+weights(x::Veres17) = x.weights
+
+# Override corr
+corr(x::Veres17) = x.corr
 
 # Override getid
 getid(::Veres17) = "Veres et al. (2017)"
 
 # Override update!
-function update!(w::Veres17{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
-    w.w8s = w8sveres17(optical)
+function update!(x::Veres17{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
+    x.weights = w8sveres17(optical)
+    x.corr = [zero(T) for _ in eachindex(optical)]
     return nothing
 end
 

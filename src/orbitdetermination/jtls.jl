@@ -1,24 +1,3 @@
-# Scalar initial condition for jtls
-function jtlsinitcond(orbit::AbstractOrbit, Npar::Int)
-    q00 = orbit()
-    if length(q00) == Npar
-        return q00
-    else
-        T = eltype(q00)
-        return vcat(q00, zero(T), zero(T))
-    end
-end
-
-# Scaling factors for jtls
-function jtlsscalings(orbit::AbstractOrbit, Npar::Int)
-    scalings = all(>(0), variances(orbit)) ? sigmas(orbit) : fill(1e-8, 6)
-    if length(scalings) == Npar
-        return scalings
-    else
-        return vcat(scalings, 1e-14, 1e-15)
-    end
-end
-
 # Initial subset of optical astrometry for jtls
 function _initialtracklets(trksa::AbstractTrackletVector{T},
                            trksb::AbstractTrackletVector{T}) where {T <: Real}
@@ -198,20 +177,25 @@ function jtls(
     ) where {D, T <: Real, O <: AbstractOpticalVector{T}}
     # Unpack parameters
     @unpack jtlsorder, lsiter, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
-            fudge, max_per = params
+            fudge, max_per, marsden_scalings = params
+    # Number of degrees of freedom
+    Ndof = dof(od)
     # Set jet transport variables
-    Npar = dof(Val(od.dynamics))
+    Npar = numvars(Val(od.dynamics), params)
     set_od_order(params, Npar)
     # Reference epoch [Julian days TDB]
     jd0 = epoch(orbit) + PE.J2000
     # Pre-allocate memory
     orbits = zeros(OpticalLeastSquaresOrbit{D, T, T, O}, jtlsiter)
-    q00s = Matrix{T}(undef, Npar, jtlsiter+1)
+    q00s = Matrix{T}(undef, Ndof, jtlsiter+1)
     Qs = fill(T(Inf), jtlsiter+1)
     # Jet transport initial condition
-    q00s[:, 1] = jtlsinitcond(orbit, Npar)
-    scalings = jtlsscalings(orbit, Npar)
-    dq = [scalings[i] * TaylorN(i, order = jtlsorder) for i in 1:Npar]
+    q00s[:, 1] = initialcondition(orbit, Ndof, params)
+    variables = collect(1:6)
+    if Ndof > 6
+        variables = vcat(variables, findall(!iszero, marsden_scalings) .+ 6)
+    end
+    dq = jtperturbation(orbit, variables, Ndof, jtlsorder, params)
     q0 = q00s[:, 1] + dq
     # Initialize buffer and set of residuals
     buffer = PropresBuffer(od, q0, jd0, params)
@@ -246,7 +230,7 @@ function jtls(
         oidxs, fit = addoptical!(Val(mode), oidxs, fit, lscache, lsmethods,
                                  trksin, trksout, res, x0, params)
         # Residuals space to barycentric coordinates jacobian
-        jacobian = Matrix(TS.jacobian(dq, fit.x))
+        jacobian = Matrix(TS.jacobian(dq[variables], fit.x))
         all(>(0), diag(jacobian * fit.Γ * jacobian')) || break
         # Outlier rejection
         if outrej
@@ -255,8 +239,10 @@ function jtls(
         end
         # Update solution
         Qs[i] = nrms(res, fit)
-        orbits[i] = evalfit(LeastSquaresOrbit(od.dynamics, od.optical[oidxs], trksin,
-            nothing, bwd, fwd, res[oidxs], nothing, fit, jacobian, q00s[:, 1:i], Qs[1:i]))
+        orbits[i] = evalfit(LeastSquaresOrbit(
+            od.dynamics, variables, od.optical[oidxs], trksin, nothing, bwd, fwd,
+            res[oidxs], nothing, fit, jacobian, q00s[variables, 1:i], Qs[1:i]
+        ))
         if outrej
             outs[i] = notout(res)
         end
@@ -289,20 +275,25 @@ function jtls(
     ) where {D, T <: Real, O <: AbstractOpticalVector{T}, R <: AbstractRadarVector{T}}
     # Unpack parameters
     @unpack jtlsorder, lsiter, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
-            fudge, max_per = params
+            fudge, max_per, marsden_scalings = params
+    # Number of degrees of freedom
+    Ndof = dof(od)
     # Set jet transport variables
-    Npar = dof(Val(od.dynamics))
+    Npar = numvars(Val(od.dynamics), params)
     set_od_order(params, Npar)
     # Reference epoch [Julian days TDB]
     jd0 = epoch(orbit) + PE.J2000
     # Pre-allocate memory
     orbits = zeros(MixedLeastSquaresOrbit{D, T, T, O, R}, jtlsiter)
-    q00s = Matrix{T}(undef, Npar, jtlsiter+1)
+    q00s = Matrix{T}(undef, Ndof, jtlsiter+1)
     Qs = fill(T(Inf), jtlsiter+1)
     # Jet transport initial condition
-    q00s[:, 1] = jtlsinitcond(orbit, Npar)
-    scalings = jtlsscalings(orbit, Npar)
-    dq = [scalings[i] * TaylorN(i, order = jtlsorder) for i in 1:Npar]
+    q00s[:, 1] = initialcondition(orbit, Ndof, params)
+    variables = collect(1:6)
+    if Ndof > 6
+        variables = vcat(variables, findall(!iszero, marsden_scalings) .+ 6)
+    end
+    dq = jtperturbation(orbit, variables, Ndof, jtlsorder, params)
     q0 = q00s[:, 1] + dq
     # Initialize buffer and set of residuals
     buffer = PropresBuffer(od, q0, jd0, params)
@@ -339,7 +330,7 @@ function jtls(
         oidxs, ridxs, fit = addobservations!(od, oidxs, ridxs, fit, lscache, lsmethods,
             trksin, trksout, radarin, radarout, res, x0, params)
         # Residuals space to barycentric coordinates jacobian
-        jacobian = Matrix(TS.jacobian(dq, fit.x))
+        jacobian = Matrix(TS.jacobian(dq[variables], fit.x))
         all(>(0), diag(jacobian * fit.Γ * jacobian')) || break
         # Outlier rejection
         if outrej
@@ -348,9 +339,10 @@ function jtls(
         end
         # Update solution
         Qs[i] = nrms(res, fit)
-        orbits[i] = evalfit(LeastSquaresOrbit(od.dynamics, od.optical[oidxs], trksin,
-            od.radar[ridxs], bwd, fwd, res[1][oidxs], res[2][ridxs], fit, jacobian,
-            q00s[:, 1:i], Qs[1:i]))
+        orbits[i] = evalfit(LeastSquaresOrbit(
+            od.dynamics, variables, od.optical[oidxs], trksin, od.radar[ridxs], bwd, fwd,
+            res[1][oidxs], res[2][ridxs], fit, jacobian, q00s[variables, 1:i], Qs[1:i]
+        ))
         if outrej
             outs[i] = notout(res[1]) + notout(res[2])
         end

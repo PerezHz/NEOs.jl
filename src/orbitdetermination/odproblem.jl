@@ -82,6 +82,7 @@ end
 scalartype(x::AbstractODProblem{D, T}) where {D, T} = T
 opticaltype(x::ODProblem) = eltype(x.optical)
 radartype(x::ODProblem) = hasradar(x) ? eltype(x.radar) : Nothing
+dof(x::ODProblem) = dof(Val(x.dynamics))
 
 hasradar(x::ODProblem) = !isnothing(x.radar)
 optical(x::ODProblem) = x.optical
@@ -94,8 +95,12 @@ nobs(x::ODProblem) = noptical(x) + nradar(x)
 opticalindices(x::ODProblem) = eachindex(x.optical)
 radarindices(x::MixedODProblem) = eachindex(x.radar)
 
-opticaloutliers(x::ODProblem) = fill(false, noptical(x))
-radaroutliers(x::MixedODProblem) = fill(false, nradar(x))
+opticaloutliers(x::ODProblem) = falses(noptical(x))
+radaroutliers(x::MixedODProblem) = falses(nradar(x))
+
+weights(x::ODProblem) = weights(x.weights)
+debias(x::ODProblem) = debias(x.debias)
+corr(x::ODProblem) = corr(x.weights)
 
 function minmaxdates(x::ODProblem)
     t0, tf = minmaxdates(x.optical)
@@ -119,9 +124,10 @@ end
 function init_optical_residuals(::Type{U}, od::ODProblem, idxs = opticalindices(od),
                                 outliers = opticaloutliers(od)) where {U <: Number}
     optical = view(od.optical, idxs)
-    weights = view(od.weights.w8s, idxs)
-    debias = view(od.debias.bias, idxs)
-    return init_optical_residuals(U, optical, weights, debias, outliers)
+    w8s = view(weights(od), idxs)
+    bias = view(debias(od), idxs)
+    corrs = view(corr(od), idxs)
+    return init_optical_residuals(U, optical, w8s, bias, corrs, outliers)
 end
 
 function init_radar_residuals(::Type{U}, od::MixedODProblem, idxs = radarindices(od),

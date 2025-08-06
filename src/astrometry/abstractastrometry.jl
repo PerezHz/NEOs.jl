@@ -83,6 +83,7 @@ Every optical observation `x` has a:
 - `catalogue(x)`: reference star catalogue.
 - `rms(x)`: a-priori formal RMS [arcsec].
 - `debias(x)`: debiasing factor [arcsec].
+- `corr(x)`: correlation.
 """
 abstract type AbstractOpticalAstrometry{T} <: AbstractAstrometryObservation{T} end
 

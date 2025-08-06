@@ -5,6 +5,7 @@ Supertype for the orbits interface.
 
 Every orbit has:
 - a dynamical function of type `D`,
+- a vector of variables of type `Vector{Int}`,
 - a vector of optical astrometry of type `O <: AbstractOpticalVector{T}`,
 - a vector of optical tracklets of type `TrackletVector{T}`,
 - a backward and a forward integration, both of type `DensePropagation2{T, U}`,
@@ -19,6 +20,10 @@ numtypes(::AbstractOrbit{D, T, U}) where {D, T, U} = T, U
 
 # Degrees of freedom
 dof(x::AbstractOrbit) = dof(Val(x.dynamics))
+
+# Variables
+variables(x::AbstractOrbit) = x.variables
+numvars(x::AbstractOrbit) = length(x.variables)
 
 """
     epoch(::AbstractOrbit)
@@ -67,6 +72,46 @@ radar(x::AbstractOrbit) = hasradar(x) ? x.radar : nothing
 # Evaluation in time method
 (x::AbstractOrbit)(t = epoch(x)) = t <= epoch(x) ? x.bwd(t) : x.fwd(t)
 
+# Initial condition and jet transport perturbation
+function initialcondition(q00::AbstractVector{T}, variables::AbstractVector{Int},
+                          dof::Int, params::Parameters{T}) where {T <: Real}
+    if length(q00) == dof
+        return q00
+    elseif length(q00) < dof
+        q0 = zeros(T, dof)
+        q0[variables] .= q00
+        for i in 7:9
+            q0[i] = iszero(q0[i]) ? params.marsden_coeffs[i-6] : q0[i]
+        end
+        return q0
+    else
+        throw(ArgumentError("The number of degrees of freedom `dof` cannot be smaller \
+            than the length of the preliminary initial condition `q00`"))
+    end
+end
+
+initialcondition(orbit::AbstractOrbit, dof::Int, params::Parameters) =
+    initialcondition(orbit(), variables(orbit), dof, params)
+
+function jtperturbation(sigmas::AbstractVector{T}, variables::AbstractVector{Int},
+                        dof::Int, order::Int, params::Parameters{T}) where {T <: Real}
+    scalings = zeros(T, dof)
+    jtvariables = get_variables(T, order)
+    dq = [zero(jtvariables[1]) for _ in 1:dof]
+    dq[variables] .= jtvariables
+    for i in 1:6
+        scalings[i] = isnan(sigmas[i]) ? 1e-8 : sigmas[i]
+    end
+    for i in 7:dof
+        scalings[i] = params.marsden_scalings[i-6]
+    end
+    dq .*= scalings
+    return dq
+end
+
+jtperturbation(orbit::AbstractOrbit, variables::AbstractVector{Int}, dof::Int, order::Int,
+    params::Parameters) = jtperturbation(sigmas(orbit), variables, dof, order, params)
+
 # Number of outlier / non-outlier residuals
 function nout(x::AbstractOrbit)
     y = nout(x.ores)
@@ -91,8 +136,8 @@ function init_optical_residuals(::Type{V}, orbit::AbstractOrbit{D, T, U}) where 
     res = Vector{OpticalResidual{T, V}}(undef, noptical(orbit))
     for i in eachindex(res)
         ra, dec = zero(V), zero(V)
-        @unpack wra, wdec, dra, ddec, outlier = orbit.res[i]
-        res[i] = OpticalResidual{T, V}(ra, dec, wra, wdec, dra, ddec, outlier)
+        @unpack wra, wdec, dra, ddec, corr, outlier = orbit.res[i]
+        res[i] = OpticalResidual{T, V}(ra, dec, wra, wdec, dra, ddec, corr, outlier)
     end
 
     return res
@@ -228,7 +273,7 @@ See also [`cartesian2osculating`](@ref).
 function osculating(orbit::AbstractOrbit{D, T, T},
                     params::Parameters{T}) where {D, T <: Real}
     # Set jet transport variables
-    Npar = dof(orbit)
+    Npar = numvars(orbit)
     set_od_order(T, 2, Npar)
     # Reference epoch [MJD TDB]
     t = epoch(orbit)
@@ -259,14 +304,15 @@ Return the Minor Planet Center uncertainty parameter of an `orbit`.
 function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
                               params::Parameters{T}) where {D, T <: Real}
     # Set jet transport variables
-    set_od_order(T, 2)
+    Npar = numvars(orbit)
+    set_od_order(T, 2, Npar)
     # Reference epoch [MJD TDB]
     t = epoch(orbit)
     mjd0 = t + MJD2000
     # Jet transport initial condition
     q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
     # Origin
-    x0 = zeros(T, 6)
+    x0 = zeros(T, Npar)
     # Osculating keplerian elements
     osc = cartesian2osculating(q0 - params.eph_su(t), mjd0; μ = μ_S, frame = :ecliptic,
                                Γ_car = covariance(orbit))
@@ -309,9 +355,10 @@ function summary(orbit::AbstractOrbit)
     q0, σ0 = orbit(), sigmas(orbit)
     sq0 = [rpad(@sprintf("%+.12E", q0[i]), 25) for i in eachindex(q0)]
     sσ0 = [rpad(@sprintf("%+.12E", σ0[i]), 25) for i in eachindex(σ0)]
-    names = ["x", "y", "z", "vx", "vy", "vz", "A2", "A1"]
-    units = ["au", "au", "au", "au/day", "au/day", "au/day", "au/day²", "au/day²"]
-    s = string(
+    names = ["x", "y", "z", "vx", "vy", "vz", "A2", "A1", "A3"]
+    units = ["au", "au", "au", "au/day", "au/day", "au/day", "au/day²",
+             "au/day²", "au/day²"]
+    s1 = string(
         "$O{$T, $U}\n",
         repeat('-', 69), "\n",
         "Dynamical model: $D\n",
@@ -320,18 +367,10 @@ function summary(orbit::AbstractOrbit)
         "NRMS: $Q\n",
         repeat('-', 69), "\n",
         "Variable    Nominal value            Uncertainty              Units\n",
-        rpad(names[1], 12), sq0[1], sσ0[1], units[1], "\n",
-        rpad(names[2], 12), sq0[2], sσ0[2], units[2], "\n",
-        rpad(names[3], 12), sq0[3], sσ0[3], units[3], "\n",
-        rpad(names[4], 12), sq0[4], sσ0[4], units[4], "\n",
-        rpad(names[5], 12), sq0[5], sσ0[5], units[5], "\n",
-        rpad(names[6], 12), sq0[6], sσ0[6], units[6], "\n",
     )
-    if dof(Val(D)) > 6
-        s = string(s,
-        rpad(names[7], 12), sq0[7], sσ0[7], units[7], "\n",
-        rpad(names[8], 12), sq0[8], sσ0[8], units[8], "\n",
-        )
+    s2 = Vector{String}(undef, numvars(orbit))
+    for (i, k) in enumerate(variables(orbit))
+        s2[i] = string(rpad(names[k], 12), sq0[i], sσ0[i], units[k], "\n")
     end
-    return s
+    return string(s1, join(s2))
 end

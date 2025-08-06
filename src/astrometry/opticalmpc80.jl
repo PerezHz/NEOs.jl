@@ -91,6 +91,7 @@ observatory(x::OpticalMPC80) = x.observatory
 catalogue(x::OpticalMPC80) = x.catalogue
 rms(::OpticalMPC80{T}) where {T <: Real} = (one(T), one(T))
 debias(::OpticalMPC80{T}) where {T <: Real} = (zero(T), zero(T))
+corr(::OpticalMPC80{T}) where {T <: Real} = zero(T)
 
 isdiscovery(x::OpticalMPC80) = x.discovery == '*'
 

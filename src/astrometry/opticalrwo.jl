@@ -146,6 +146,7 @@ end
 function debias(x::OpticalRWO{T}) where {T <: Real}
     return (isnan(x.ra_bias) ? zero(T) : x.ra_bias, isnan(x.dec_bias) ? zero(T) : x.dec_bias)
 end
+corr(::OpticalRWO{T}) where {T <: Real} = zero(T)
 
 # Print method for OpticalRWO
 show(io::IO, o::OpticalRWO) = print(io, o.design, " α: ", @sprintf("%.5f",

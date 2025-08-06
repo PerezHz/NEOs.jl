@@ -1,5 +1,5 @@
 @doc raw"""
-    Parameters([params::Parameters{T};] kwargs...) where {T <: Real}
+    Parameters([::Parameters{T};] kwargs...) where {T <: Real}
 
 A collection of the most important parameters in `NEOs.jl` functions.
 
@@ -20,6 +20,17 @@ A collection of the most important parameters in `NEOs.jl` functions.
 - `bwdoffset/fwdoffset::T`: days to propagate beyond first (bwd) / last (fwd) observation
     (default: `0.5`).
 - `coeffstol::T`: maximum size of the coefficients (default: `10.0`).
+
+The following parameters are only used when propagating the Marsden et al. (1973)
+nongravitational accelerations model:
+
+- `marsden_coeffs::NTuple{3, T}`: Yarkovsky effect (A2), solar radiation pressure (A1),
+    and normal component (A3) coefficients (default: `(0.0, 0.0, 0.0)`).
+- `marsden_scalings::NTuple{3, T}`: scaling factors for the jet transport perturbation
+    to the coefficients above (default: `(0.0, 0.0, 0.0)`).
+- `marsden_radial::NTuple{5, T}`: radial function constants; i.e. coefficient
+    `α`, normalizing distance `r₀` [au], and exponents `m`, `n` and `k` (default:
+    `(1.0, 1.0, 2.0, 0.0, 0.0)`)
 
 # Gauss Method
 
@@ -69,6 +80,9 @@ A collection of the most important parameters in `NEOs.jl` functions.
     bwdoffset::T = 0.5
     fwdoffset::T = 0.5
     coeffstol::T = 10.0
+    marsden_coeffs::NTuple{3, T} = (0.0, 0.0, 0.0)
+    marsden_scalings::NTuple{3, T} = (0.0, 0.0, 0.0)
+    marsden_radial::NTuple{5, T} = (1.0, 1.0, 2.0, 0.0, 0.0)
     # Sun (earth) ephemeris
     eph_su::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephsu()
     eph_ea::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephea()

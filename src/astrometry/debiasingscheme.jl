@@ -1,21 +1,20 @@
-# Optical astrometry debiasing schemes API
-# All debiasing schemes `D{T}` must:
-# 1. be mutable subtypes of `AbstractDebiasingScheme{T}`,
-# 2. have a `bias::Vector{Tuple{T, T}}` field,
-# 3. implement a `D(::AbstractOpticalVector{T})` constructor,
-# 4. override `getid(::D)`,
-# 5. override `update!(::D{T}, ::AbstractOpticalVector{T})`.
-
 """
     AbstractDebiasingScheme{T} <: AbstractAstrometryErrorModel{T}
 
-Supertype for the optical astrometry debiasing schemes API.
+Supertype for the optical astrometry debiasing schemes interface.
+
+Every debiasing scheme `D{T}` must:
+- be a mutable subtype of `AbstractDebiasingScheme{T}`,
+- implement a `D(::AbstractOpticalVector{T})` constructor,
+- override `debias(::D)`,
+- override `getid(::D)`,
+- override `update!(::D{T}, ::AbstractOpticalVector{T})`.
 """
 abstract type AbstractDebiasingScheme{T} <: AbstractAstrometryErrorModel{T} end
 
 # Print method for AbstractDebiasingScheme
-show(io::IO, d::AbstractDebiasingScheme) = print(io, getid(d),
-    " debiasing scheme with ", length(d.bias), " observations")
+show(io::IO, x::AbstractDebiasingScheme) = print(io, getid(x),
+    " debiasing scheme with ", length(debias(x)), " observations")
 
 """
     ZeroDebiasing{T} <: AbstractDebiasingScheme{T}
@@ -23,21 +22,23 @@ show(io::IO, d::AbstractDebiasingScheme) = print(io, getid(d),
 Zero optical astrometry debiasing scheme.
 """
 mutable struct ZeroDebiasing{T} <: AbstractDebiasingScheme{T}
-    bias::Vector{Tuple{T, T}}
+    debias::Vector{NTuple{2, T}}
 end
 
 # Constructor
 function ZeroDebiasing(optical::AbstractOpticalVector{T}) where {T <: Real}
-    bias = [(zero(T), zero(T)) for _ in eachindex(optical)]
-    return ZeroDebiasing{T}(bias)
+    return ZeroDebiasing{T}([(zero(T), zero(T)) for _ in eachindex(optical)])
 end
+
+# Override debias
+debias(x::ZeroDebiasing) = x.debias
 
 # Override getid
 getid(::ZeroDebiasing) = "Zero"
 
 # Override update!
-function update!(d::ZeroDebiasing{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
-    d.bias = [(zero(T), zero(T)) for _ in eachindex(optical)]
+function update!(x::ZeroDebiasing{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
+    x.debias = [(zero(T), zero(T)) for _ in eachindex(optical)]
     return nothing
 end
 
@@ -47,21 +48,23 @@ end
 Source optical astrometry debiasing scheme.
 """
 mutable struct SourceDebiasing{T} <: AbstractDebiasingScheme{T}
-    bias::Vector{Tuple{T, T}}
+    debias::Vector{NTuple{2, T}}
 end
 
 # Constructors
 function SourceDebiasing(optical::AbstractOpticalVector{T}) where {T <: Real}
-    bias = debias.(optical)
-    return SourceDebiasing{T}(bias)
+    return SourceDebiasing{T}(debias.(optical))
 end
+
+# Override debias
+debias(x::SourceDebiasing) = x.debias
 
 # Override getid
 getid(::SourceDebiasing) = "Source"
 
 # Override update!
-function update!(d::SourceDebiasing{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
-    d.bias = debias.(optical)
+function update!(x::SourceDebiasing{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
+    x.debias = debias.(optical)
     return nothing
 end
 
@@ -75,7 +78,7 @@ Farnocchia et al. (2015) optical astrometry debiasing scheme.
     - https://doi.org/10.1016/j.icarus.2014.07.033
 """
 mutable struct Farnocchia15{T} <: AbstractDebiasingScheme{T}
-    bias::Vector{Tuple{T, T}}
+    debias::Vector{NTuple{2, T}}
     catcodes::Vector{Char}
     truth::String
     resol::Resolution
@@ -85,16 +88,19 @@ end
 # Constructor
 function Farnocchia15(optical::AbstractOpticalVector{T}) where {T <: Real}
     catcodes, truth, resol, table = select_debiasing_table("2014")
-    bias = debiasing(optical, catcodes, truth, resol, table)
-    return Farnocchia15{T}(bias, catcodes, truth, resol, table)
+    debias = debiasing(optical, catcodes, truth, resol, table)
+    return Farnocchia15{T}(debias, catcodes, truth, resol, table)
 end
+
+# Override debias
+debias(x::Farnocchia15) = x.debias
 
 # Override getid
 getid(::Farnocchia15) = "Farnocchia et al. (2015)"
 
 # Override update!
-function update!(d::Farnocchia15{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
-    d.bias = debiasing(optical, d.catcodes, d.truth, d.resol, d.table)
+function update!(x::Farnocchia15{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
+    x.debias = debiasing(optical, x.catcodes, x.truth, x.resol, x.table)
     return nothing
 end
 
@@ -108,7 +114,7 @@ Eggl et al. (2020) optical astrometry debiasing scheme.
     - https://doi.org/10.1016/j.icarus.2019.113596
 """
 mutable struct Eggl20{T} <: AbstractDebiasingScheme{T}
-    bias::Vector{Tuple{T, T}}
+    debias::Vector{NTuple{2, T}}
     hires::Bool
     catcodes::Vector{Char}
     truth::String
@@ -120,16 +126,19 @@ end
 function Eggl20(optical::AbstractOpticalVector{T}, hires::Bool = false) where {T <: Real}
     id = hires ? "hires2018" : "2018"
     catcodes, truth, resol, table = select_debiasing_table(id)
-    bias = debiasing(optical, catcodes, truth, resol, table)
-    return Eggl20{T}(bias, hires, catcodes, truth, resol, table)
+    debias = debiasing(optical, catcodes, truth, resol, table)
+    return Eggl20{T}(debias, hires, catcodes, truth, resol, table)
 end
 
+# Override debias
+debias(x::Eggl20) = x.debias
+
 # Override getid
-getid(d::Eggl20) = string("Eggl et al. (2020)", d.hires ? " [high resolution]" : "")
+getid(x::Eggl20) = string("Eggl et al. (2020)", x.hires ? " [high resolution]" : "")
 
 # Override update!
-function update!(d::Eggl20{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
-    d.bias = debiasing(optical, d.catcodes, d.truth, d.resol, d.table)
+function update!(x::Eggl20{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
+    x.debias = debiasing(optical, x.catcodes, x.truth, x.resol, x.table)
     return nothing
 end
 
@@ -198,11 +207,11 @@ end
 function debiasing(obs::AbstractOpticalVector{T}, catcodes::Vector{Char}, truth::String,
                    resol::Resolution, table::Matrix{T}) where {T <: Real}
     # Allocate memory
-    bias = Vector{Tuple{T, T}}(undef, length(obs))
+    debias = Vector{NTuple{2, T}}(undef, length(obs))
     warncodes = Vector{Int}(undef, length(obs))
     # Fill
     for i in eachindex(obs)
-        bias[i], warncodes[i] = debiasing(obs[i], catcodes, truth, resol, table)
+        debias[i], warncodes[i] = debiasing(obs[i], catcodes, truth, resol, table)
     end
     # Print warnings
     I1 = findall(==(1), warncodes)
@@ -218,7 +227,7 @@ function debiasing(obs::AbstractOpticalVector{T}, catcodes::Vector{Char}, truth:
     !isempty(I3) && @warn "Catalogues $C3 do not correspond to an MPC catalogue code.\n\
         Setting debiasing corrections equal to zero in $N3 observations."
 
-    return bias
+    return debias
 end
 
 function debiasing(obs::AbstractOpticalAstrometry{T}, catcodes::Vector{Char},

@@ -5,6 +5,7 @@ Supertype for the preliminary orbits interface.
 
 Every preliminary orbit has:
 - a dynamical function of type `D`,
+- a vector of variables of type `Vector{Int}`,
 - a vector of optical astrometry of type `O <: AbstractOpticalVector{T}`,
 - a vector of optical tracklets of type `TrackletVector{T}`,
 - a backward and a forward integration, both of type `DensePropagation2{T, U}`,
@@ -38,6 +39,7 @@ A preliminary orbit computed by Gauss method.
 # Fields
 
 - `dynamics::D`: dynamical model.
+- `variables::Vector{Int}`: vector of variables.
 - `optical::O`: vector of optical astrometry.
 - `tracklets::TrackletVector{T}`: vector of optical tracklets.
 - `bwd/fwd::DensePropagation2{T, U}`: backward (forward) integration.
@@ -58,6 +60,7 @@ A preliminary orbit computed by Gauss method.
                                     O <: AbstractOpticalVector{T}
                                     } <: AbstractPreliminaryOrbit{D, T, U}
     dynamics::D
+    variables::Vector{Int}
     optical::O
     tracklets::TrackletVector{T}
     bwd::DensePropagation2{T, U}
@@ -79,7 +82,7 @@ A preliminary orbit computed by Gauss method.
     ρ::Vector{U}
     # Inner constructor
     function GaussOrbit{D, T, U, O}(
-            dynamics::D, optical::O, tracklets::TrackletVector{T},
+            dynamics::D, variables::Vector{Int}, optical::O, tracklets::TrackletVector{T},
             bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
             ores::Vector{OpticalResidual{T, U}}, covariance::Matrix{T},
             jacobian::Matrix{T}, τ_1::T, τ_3::T, ρ_vec::Matrix{U}, R_vec::Matrix{T},
@@ -92,23 +95,23 @@ A preliminary orbit computed by Gauss method.
             match number of residuals"
         _bwd_ = TaylorInterpolant(bwd.t0, bwd.t, collect(bwd.x))
         _fwd_ = TaylorInterpolant(fwd.t0, fwd.t, collect(fwd.x))
-        return new{D, T, U, O}(dynamics, optical, tracklets, _bwd_, _fwd_, ores,
-            covariance, jacobian, τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c,
+        return new{D, T, U, O}(dynamics, variables, optical, tracklets, _bwd_, _fwd_,
+            ores, covariance, jacobian, τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c,
             r_2, r_vec, ρ)
     end
 end
 
 # Outer constructor
 function GaussOrbit(
-    dynamics::D, optical::O, tracklets::TrackletVector{T},
+    dynamics::D, variables::Vector{Int}, optical::O, tracklets::TrackletVector{T},
     bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
     ores::Vector{OpticalResidual{T, U}}, covariance::Matrix{T},
     jacobian::Matrix{T}, τ_1::T, τ_3::T, ρ_vec::Matrix{U}, R_vec::Matrix{T},
     D_0::U, D_mat::Matrix{U}, a::U, b::U, c::U, r_2::U, r_vec::Matrix{U},
     ρ::Vector{U}
 ) where {D, T <: Real, U <: Number, O <: AbstractOpticalVector{T}}
-    return GaussOrbit{D, T, U, O}(dynamics, optical, tracklets, bwd, fwd, ores,
-        covariance, jacobian, τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2,
+    return GaussOrbit{D, T, U, O}(dynamics, variables, optical, tracklets, bwd, fwd,
+        ores, covariance, jacobian, τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2,
         r_vec, ρ)
 end
 
@@ -119,6 +122,7 @@ show(io::IO, x::GaussOrbit) = print(io, "Gauss preliminary orbit with ", nobs(x)
 # Definition of zero GaussOrbit
 function zero(::Type{GaussOrbit{D, T, U, O}}) where {D, T, U, O}
     dynamics = D.instance
+    variables = Vector{Int}(undef, 0)
     optical = O()
     tracklets = TrackletVector{T}()
     bwd = zero(DensePropagation2{T, U})
@@ -136,7 +140,7 @@ function zero(::Type{GaussOrbit{D, T, U, O}}) where {D, T, U, O}
     r_vec = Matrix{U}(undef, 0, 0)
     ρ = Vector{U}(undef, 0)
 
-    return GaussOrbit{D, T, U, O}(dynamics, optical, tracklets, bwd, fwd, ores,
+    return GaussOrbit(dynamics, variables, optical, tracklets, bwd, fwd, ores,
         covariance, jacobian, τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2,
         r_vec, ρ)
 end
@@ -178,10 +182,12 @@ function evaldeltas(orbit::GaussOrbit{D, T, TaylorN{T}, O},
     new_r_vec = orbit.r_vec(δs)
     new_ρ = orbit.ρ(δs)
 
-    return GaussOrbit{D, T, T, O}(orbit.dynamics, orbit.optical, orbit.tracklets,
-        new_bwd, new_fwd, new_ores, orbit.covariance, orbit.jacobian, orbit.τ_1,
-        orbit.τ_3, new_ρ_vec, orbit.R_vec, new_D_0, new_D_mat, new_a, new_b, new_c,
-        new_r_2, new_r_vec, new_ρ)
+    return GaussOrbit(
+        orbit.dynamics, orbit.variables, orbit.optical, orbit.tracklets, new_bwd,
+        new_fwd, new_ores, orbit.covariance, orbit.jacobian, orbit.τ_1, orbit.τ_3,
+        new_ρ_vec, orbit.R_vec, new_D_0, new_D_mat, new_a, new_b, new_c, new_r_2,
+        new_r_vec, new_ρ
+    )
 end
 
 """
@@ -194,6 +200,7 @@ A preliminary orbit computed by the minimization over the MOV method.
 # Fields
 
 - `dynamics::D`: dynamical model.
+- `variables::Vector{Int}`: vector of variables.
 - `optical::O`: vector of optical astrometry.
 - `tracklets::TrackletVector{T}`: vector of optical tracklets.
 - `bwd/fwd::DensePropagation2{T, U}`: backward (forward) integration.
@@ -207,6 +214,7 @@ A preliminary orbit computed by the minimization over the MOV method.
                                    O <: AbstractOpticalVector{T}
                                    } <: AbstractPreliminaryOrbit{D, T, U}
     dynamics::D
+    variables::Vector{Int}
     optical::O
     tracklets::TrackletVector{T}
     bwd::DensePropagation2{T, U}
@@ -218,7 +226,7 @@ A preliminary orbit computed by the minimization over the MOV method.
     Qs::Vector{T}
     # Inner constructor
     function MMOVOrbit{D, T, U, O}(
-            dynamics::D, optical::O, tracklets::TrackletVector{T},
+            dynamics::D, variables::Vector{Int}, optical::O, tracklets::TrackletVector{T},
             bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
             ores::Vector{OpticalResidual{T, U}}, covariance::Matrix{T},
             jacobian::Matrix{T}, aes::Matrix{T}, Qs::Vector{T}
@@ -229,21 +237,21 @@ A preliminary orbit computed by the minimization over the MOV method.
             match number of residuals"
         # @assert size(aes, 1) == 6
         # @assert size(aes, 2) == length(Qs)
-        _bwd_ = TaylorInterpolant(bwd.t0, bwd.t, collect(bwd.x))
-        _fwd_ = TaylorInterpolant(fwd.t0, fwd.t, collect(fwd.x))
-        return new{D, T, U, O}(dynamics, optical, tracklets, _bwd_, _fwd_,
+        _bwd_ = TaylorInterpolant(bwd.t0, bwd.t, collect(view(bwd.x, :, variables)))
+        _fwd_ = TaylorInterpolant(fwd.t0, fwd.t, collect(view(fwd.x, :, variables)))
+        return new{D, T, U, O}(dynamics, variables, optical, tracklets, _bwd_, _fwd_,
                                ores, covariance, jacobian, aes, Qs)
     end
 end
 
 # Outer constructor
 function MMOVOrbit(
-        dynamics::D, optical::O, tracklets::TrackletVector{T},
+        dynamics::D, variables::Vector{Int}, optical::O, tracklets::TrackletVector{T},
         bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
         ores::Vector{OpticalResidual{T, U}}, covariance::Matrix{T},
         jacobian::Matrix{T}, aes::Matrix{T}, Qs::Vector{T}
     ) where {D, T <: Real, U <: Number, O <: AbstractOpticalVector{T}}
-    return MMOVOrbit{D, T, U, O}(dynamics, optical, tracklets, bwd, fwd,
+    return MMOVOrbit{D, T, U, O}(dynamics, variables, optical, tracklets, bwd, fwd,
                                  ores, covariance, jacobian, aes, Qs)
 end
 
@@ -254,6 +262,7 @@ show(io::IO, x::MMOVOrbit) = print(io, "Minimization over the MOV preliminary or
 # Definition of zero MMOVOrbit
 function zero(::Type{MMOVOrbit{D, T, U, O}}) where {D, T, U, O}
     dynamics = D.instance
+    variables = Vector{Int}(undef, 0)
     optical = O()
     tracklets = TrackletVector{T}()
     bwd = zero(DensePropagation2{T, U})
@@ -264,8 +273,8 @@ function zero(::Type{MMOVOrbit{D, T, U, O}}) where {D, T, U, O}
     aes = Matrix{T}(undef, 0, 0)
     Qs = Vector{T}(undef, 0)
 
-    return MMOVOrbit{D, T, U, O}(dynamics, optical, tracklets, bwd, fwd,
-                                 ores, covariance, jacobian, aes, Qs)
+    return MMOVOrbit(dynamics, variables, optical, tracklets, bwd, fwd,
+                     ores, covariance, jacobian, aes, Qs)
 end
 
 iszero(x::MMOVOrbit{D, T, U, O}) where {D, T, U, O} = x == zero(MMOVOrbit{D, T, U, O})
@@ -281,7 +290,8 @@ function evaldeltas(orbit::MMOVOrbit{D, T, TaylorN{T}, O},
     # Evaluate residuals
     new_ores = orbit.ores(δs)
 
-    return MMOVOrbit{D, T, T, O}(orbit.dynamics, orbit.optical, orbit.tracklets, new_bwd,
-                                 new_fwd, new_ores, orbit.covariance, orbit.jacobian,
-                                 orbit.aes, orbit.Qs)
+    return MMOVOrbit(
+        orbit.dynamics, orbit.variables, orbit.optical, orbit.tracklets, new_bwd,
+        new_fwd, new_ores, orbit.covariance, orbit.jacobian, orbit.aes, orbit.Qs
+    )
 end
