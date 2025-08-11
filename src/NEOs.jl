@@ -63,7 +63,7 @@ export fetch_radar_jpl, read_radar_jpl, write_radar_jpl
 export fetch_radar_rwo, read_radar_rwo, write_radar_rwo
 export compute_delay, radar_astrometry
 # Propagation
-export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!, newtonian!
+export nongravs!, gravityonly!, newtonian!
 export loadpeeph, rvelea, scaled_variables, propagate, propagate_lyap, propagate_root
 # Orbit determination
 export ODProblem, LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,

@@ -1,8 +1,13 @@
 """
-    RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
+    nongravs!
 
-Asteroid dynamical model. Bodies considered in the model are: the Sun, the eight planets,
-the Moon and Ceres, as well as the asteroid of interest as a test particle with null mass.
+Asteroid dynamical model specially suited for long-term integrations and impact monitoring.
+
+The model considers the asteroid of interest as a test particle with null mass. Perturbing
+bodies included in the model are: the Sun, the eight planets, the Moon, Pluto and the 16
+most massive asteroids. Planetary ephemerides are provided by `PlanetaryEphemeris.jl`,
+which is based on the JPL DE430 model.
+
 Dynamical effects considered are:
 
 - Post-Newtonian point-mass accelerations between all bodies. See equation (35) in page
@@ -23,11 +28,11 @@ Dynamical effects considered are:
 - Non-gravitational accelerations model (Marsden et al., 1973). See equations (1)-(5) in
     pages (211)-(212) of https://articles.adsabs.harvard.edu/pdf/1973AJ.....78..211M.
 
-To improve performance, some internal loops are multi-threaded via `Threads.@threads for`.
+To improve performance, some internal loops are multi-threaded via `@threads`.
 
-See also [`RNp1BP_pN_A_J23E_J2S_eph_threads!`](@ref) and [`newtonian!`](@ref).
+For other dynamical models, see [`gravityonly!`](@ref) and [`newtonian!`](@ref).
 """
-function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
+function nongravs!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
@@ -624,10 +629,16 @@ function RNp1BP_pN_A_J23E_J2S_ng_eph_threads!(dq, q, params, t)
 end
 
 """
-    RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
+    gravityonly!
 
-Asteroid dynamical model. Bodies considered in the model are: the Sun, the eight planets,
-the Moon and Ceres, as well as the asteroid of interest as a test particle with null mass.
+Asteroid dynamical model specially suited for long-term integrations and multi-arc orbit
+determination.
+
+The model considers the asteroid of interest as a test particle with null mass. Perturbing
+bodies included in the model are: the Sun, the eight planets, the Moon, Pluto and the 16
+most massive asteroids. Planetary ephemerides are provided by `PlanetaryEphemeris.jl`,
+which is based on the JPL DE430 model.
+
 Dynamical effects considered are:
 
 - Post-Newtonian point-mass accelerations between all bodies. See equation (35) in page
@@ -645,11 +656,11 @@ Dynamical effects considered are:
     (14)-(15) in page 9 and equations (34)-(35) in page 16 of
     https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract.
 
-To improve performance, some internal loops are multi-threaded via `Threads.@threads for`.
+To improve performance, some internal loops are multi-threaded via `@threads`.
 
-See also [`RNp1BP_pN_A_J23E_J2S_ng_eph_threads!`](@ref) and [`newtonian!`](@ref).
+For other dynamical models, see [`nongravs!`](@ref) and [`newtonian!`](@ref).
 """
-function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
+function gravityonly!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
@@ -1189,18 +1200,23 @@ function RNp1BP_pN_A_J23E_J2S_eph_threads!(dq, q, params, t)
 end
 
 """
-    newtonian!(dq, q, params, t)
+    newtonian!
 
-Asteroid dynamical model. Bodies considered in the model are: the Sun, the eight planets,
-the Moon, as well as the asteroid of interest as a test particle with null mass.
+Asteroid dynamical model specially suited for short-term integrations and initial
+orbit determination.
+
+The model considers the asteroid of interest as a test particle with null mass.
+Perturbing bodies included in the model are: the Sun, the eight planets and the
+Moon. Planetary ephemerides are provided by `PlanetaryEphemeris.jl`, which is
+based on the JPL DE430 model.
+
 Dynamical effects considered are:
 
 - Newtonian point-mass accelerations between all bodies.
 
-To improve performance, some internal loops are multi-threaded via `Threads.@threads for`.
+To improve performance, some internal loops are multi-threaded via `@threads`.
 
-See also [`RNp1BP_pN_A_J23E_J2S_ng_eph_threads!`](@ref) and
-[`RNp1BP_pN_A_J23E_J2S_eph_threads`](@ref).
+For other dynamical models, see [`nongravs!`](@ref) and [`gravityonly!`](@ref).
 """
 function newtonian!(dq, q, params, t)
     # Julian date (TDB) of start time
@@ -1305,11 +1321,10 @@ end
 
 # Number of degrees of freedom for each dynamical model
 dof(::Val{newtonian!}) = 6
-dof(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}) = 6
-dof(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}) = 9
+dof(::Val{gravityonly!}) = 6
+dof(::Val{nongravs!}) = 9
 
 # Number of jet transport variables for each dynamical model
 numvars(::Val{newtonian!}, _) = 6
-numvars(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, _) = 6
-numvars(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}, params::Parameters) =
-    6 + count(!iszero, params.marsden_scalings)
+numvars(::Val{gravityonly!}, _) = 6
+numvars(::Val{nongravs!}, params::Parameters) = 6 + count(!iszero, params.marsden_scalings)

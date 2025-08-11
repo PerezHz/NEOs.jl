@@ -11,8 +11,8 @@
 # julia> x, y = TaylorIntegration._make_parsed_jetcoeffs(ex)
 # 3.- Paste `x` and `y` in this file
 
-# RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
-function TaylorIntegration._allocate_jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params) where {_T <: Real, _S <: Number, _N}
+# nongravs!
+function TaylorIntegration._allocate_jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params) where {_T <: Real, _S <: Number, _N}
     order = t.order
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
@@ -787,7 +787,7 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_ng_ep
     return TaylorIntegration.RetAlloc{Taylor1{_S}}([tmp763, tmp765, tmp766, tmp768, tmp831, tmp832, tmp834, tmp835, tmp837, tmp838, tmp841, tmp843, tmp844, tmp846, tmp847, tmp852, tmp853, tmp855, tmp856, tmp858, tmp859, tmp862, tmp864, tmp865, tmp867, tmp868, tmp873, tmp875, tmp877, tmp880, tmp883, tmp884, tmp890, tmp891, tmp892, tmp893, tmp895, tmp896, tmp897, tmp898, tmp900, tmp901, tmp902, tmp903, tmp905, tmp907, tmp909, pntempX, pntempY, pntempZ, accX, accY, accZ, tmp925, tmp926, tmp927, postNewtonX, postNewtonY, postNewtonZ, h_x, h_y, h_z, tmp929, tmp930, tmp931, h_norm, h_x_unit, h_y_unit, h_z_unit, t_x, t_y, t_z, tmp932, tmp933, tmp934, t_norm, t_x_unit, t_y_unit, t_z_unit, r_x_unit, r_y_unit, r_z_unit, g_r_quotient, tmp935, g_r_A, tmp936, g_r_B, tmp937, g_r, A2_t_g_r, A1_t_g_r, A3_t_g_r, NGAx, NGAy, NGAz], [X, Y, Z, r_p2, r_p1d2, r_p3d2, r_p7d2, newtonianCoeff, ui, vi, wi, U, V, W, _4dq, _4U_m_3X, _4V_m_3Y, _4W_m_3Z, UU, VV, WW, newtonian1b_Potential, newtonianNb_Potential, newton_acc_X, newton_acc_Y, newton_acc_Z, v2, vi_dot_vj, pn2, U_t_pn2, V_t_pn2, W_t_pn2, pn3, pNX_t_pn3, pNY_t_pn3, pNZ_t_pn3, _4ϕj, ϕi_plus_4ϕj, sj2_plus_2si2_minus_4vivj, ϕs_and_vs, pn1t1_7, pNX_t_X, pNY_t_Y, pNZ_t_Z, pn1, X_t_pn1, Y_t_pn1, Z_t_pn1, t31, t32, t33, r_sin_ϕ, sin_ϕ, ϕ, cos_ϕ, sin2_ϕ, sin3_ϕ, F_J2_x, F_J2_y, F_J2_z, F_J2_x1, F_J2_y1, F_J2_z1, F_J2_x2, F_J2_y2, F_J2_z2, temp_accX_i, temp_accY_i, temp_accZ_i, P_2_sin_ϕ, ∂P_2_sin_ϕ, P_3_sin_ϕ, ∂P_3_sin_ϕ, m_c_ϕ_∂P_2, m_c_ϕ_∂P_3, Λ2j_div_r4, Λ3j_div_r5, F_J_ξ, F_J_ζ, F_J2_ξ, F_J2_ζ, F_J3_ξ, F_J3_ζ, ξx, ξy, ξz, ηx, ηy, ηz, ηx1, ηy1, ηz1, ηx2, ηy2, ηz2, ζx, ζy, ζz, ζx1, ζy1, ζz1, ζx2, ζy2, ζz2, tmp629, tmp632, tmp635, pn2x, pn2y, pn2z, tmp643, tmp646, tmp911, tmp648, tmp912, tmp649, tmp651, tmp913, tmp914, tmp915, tmp659, tmp660, tmp671, tmp673, tmp675, tmp677, tmp916, tmp917, tmp918, tmp919, tmp687, tmp693, tmp695, tmp699, tmp702, tmp920, tmp703, tmp706, tmp921, tmp707, tmp709, tmp711, tmp714, tmp718, tmp721, tmp723, tmp725, tmp755, tmp922, tmp757, tmp923, tmp758, tmp760, tmp924, temp_004, tmp771, tmp773, tmp775, tmp781, tmp783, tmp784, Xij_t_Ui, Yij_t_Vi, Zij_t_Wi, tmp790, Rij_dot_Vi, tmp793, tmp928, pn1t7, tmp796, pn1t2_7, tmp803, tmp804, tmp805, tmp813, termpnx, sumpnx, tmp816, termpny, sumpny, tmp819, termpnz, sumpnz], [Array{Taylor1{_S}, 2}(undef, 0, 0)], [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)])
 end
 
-function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
+function TaylorIntegration.jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
     order = t.order
     tmp763 = __ralloc.v0[1]
     tmp765 = __ralloc.v0[2]
@@ -1395,8 +1395,8 @@ function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
     return nothing
 end
 
-# RNp1BP_pN_A_J23E_J2S_eph_threads!
-function TaylorIntegration._allocate_jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params) where {_T <: Real, _S <: Number, _N}
+# gravityonly!
+function TaylorIntegration._allocate_jetcoeffs!(::Val{gravityonly!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params) where {_T <: Real, _S <: Number, _N}
     order = t.order
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
@@ -2084,7 +2084,7 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_t
     return TaylorIntegration.RetAlloc{Taylor1{_S}}([tmp1406, tmp1408, tmp1409, tmp1411, pntempX, pntempY, pntempZ, accX, accY, accZ, tmp1491, tmp1492, tmp1493, postNewtonX, postNewtonY, postNewtonZ], [X, Y, Z, r_p2, r_p1d2, r_p3d2, r_p7d2, newtonianCoeff, ui, vi, wi, U, V, W, _4dq, _4U_m_3X, _4V_m_3Y, _4W_m_3Z, UU, VV, WW, newtonian1b_Potential, newtonianNb_Potential, newton_acc_X, newton_acc_Y, newton_acc_Z, v2, vi_dot_vj, pn2, U_t_pn2, V_t_pn2, W_t_pn2, pn3, pNX_t_pn3, pNY_t_pn3, pNZ_t_pn3, _4ϕj, ϕi_plus_4ϕj, sj2_plus_2si2_minus_4vivj, ϕs_and_vs, pn1t1_7, pNX_t_X, pNY_t_Y, pNZ_t_Z, pn1, X_t_pn1, Y_t_pn1, Z_t_pn1, t31, t32, t33, r_sin_ϕ, sin_ϕ, ϕ, cos_ϕ, sin2_ϕ, sin3_ϕ, F_J2_x, F_J2_y, F_J2_z, F_J2_x1, F_J2_y1, F_J2_z1, F_J2_x2, F_J2_y2, F_J2_z2, temp_accX_i, temp_accY_i, temp_accZ_i, P_2_sin_ϕ, ∂P_2_sin_ϕ, P_3_sin_ϕ, ∂P_3_sin_ϕ, m_c_ϕ_∂P_2, m_c_ϕ_∂P_3, Λ2j_div_r4, Λ3j_div_r5, F_J_ξ, F_J_ζ, F_J2_ξ, F_J2_ζ, F_J3_ξ, F_J3_ζ, ξx, ξy, ξz, ηx, ηy, ηz, ηx1, ηy1, ηz1, ηx2, ηy2, ηz2, ζx, ζy, ζz, ζx1, ζy1, ζz1, ζx2, ζy2, ζz2, tmp1272, tmp1275, tmp1278, pn2x, pn2y, pn2z, tmp1286, tmp1289, tmp1477, tmp1291, tmp1478, tmp1292, tmp1294, tmp1479, tmp1480, tmp1481, tmp1302, tmp1303, tmp1314, tmp1316, tmp1318, tmp1320, tmp1482, tmp1483, tmp1484, tmp1485, tmp1330, tmp1336, tmp1338, tmp1342, tmp1345, tmp1486, tmp1346, tmp1349, tmp1487, tmp1350, tmp1352, tmp1354, tmp1357, tmp1361, tmp1364, tmp1366, tmp1368, tmp1398, tmp1488, tmp1400, tmp1489, tmp1401, tmp1403, tmp1490, temp_004, tmp1414, tmp1416, tmp1418, tmp1424, tmp1426, tmp1427, Xij_t_Ui, Yij_t_Vi, Zij_t_Wi, tmp1433, Rij_dot_Vi, tmp1436, tmp1494, pn1t7, tmp1439, pn1t2_7, tmp1446, tmp1447, tmp1448, tmp1456, termpnx, sumpnx, tmp1459, termpny, sumpny, tmp1462, termpnz, sumpnz], [Array{Taylor1{_S}, 2}(undef, 0, 0)], [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)])
 end
 
-function TaylorIntegration.jetcoeffs!(::Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
+function TaylorIntegration.jetcoeffs!(::Val{gravityonly!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
     order = t.order
     tmp1406 = __ralloc.v0[1]
     tmp1408 = __ralloc.v0[2]

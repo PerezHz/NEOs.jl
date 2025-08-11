@@ -15,11 +15,11 @@ using InteractiveUtils: methodswith
 
         using TaylorIntegration: jetcoeffs!, _allocate_jetcoeffs!
 
-        @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}, jetcoeffs!))
-        @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}, _allocate_jetcoeffs!))
+        @test !isempty(methodswith(Val{nongravs!}, jetcoeffs!))
+        @test !isempty(methodswith(Val{nongravs!}, _allocate_jetcoeffs!))
 
-        @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, jetcoeffs!))
-        @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, _allocate_jetcoeffs!))
+        @test !isempty(methodswith(Val{gravityonly!}, jetcoeffs!))
+        @test !isempty(methodswith(Val{gravityonly!}, _allocate_jetcoeffs!))
 
         @test !isempty(methodswith(Val{newtonian!}, jetcoeffs!))
         @test !isempty(methodswith(Val{newtonian!}, _allocate_jetcoeffs!))
@@ -33,7 +33,7 @@ using InteractiveUtils: methodswith
     @testset "Orbit propagation without nongravs: 2023 DW" begin
 
         # Dynamical function
-        dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
+        dynamics = gravityonly!
         # Initial time [Julian date TDB]
         jd0 = datetime2julian(DateTime(2023, 2, 25, 0, 0, 0))
         # Time of integration [years]
@@ -147,7 +147,7 @@ using InteractiveUtils: methodswith
         using NEOs: isdelay, isdoppler
 
         # Dynamical function
-        dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
+        dynamics = nongravs!
         # Initial time [Julian date TDB]
         jd0 = datetime2julian(DateTime(2004, 6, 1))
         # Time of integration [years]
@@ -265,7 +265,7 @@ using InteractiveUtils: methodswith
         # Test integration (Apophis)
 
         # Dynamical function
-        dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
+        dynamics = gravityonly!
         # Initial date of integration [Julian date TDB]
         jd0 = dtutc2jdtdb(DateTime(2029, 4, 13, 20))
         # Time of integration [years]
@@ -322,8 +322,8 @@ using InteractiveUtils: methodswith
         using NEOs: isdelay, isdoppler
 
         # Dynamical functions
-        dynamicsg  = RNp1BP_pN_A_J23E_J2S_eph_threads!
-        dynamicsng = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
+        dynamicsg  = gravityonly!
+        dynamicsng = nongravs!
         # Integration parameters
         nyears = 10.0
         varorder = 1
