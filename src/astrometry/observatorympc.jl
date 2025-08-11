@@ -113,13 +113,10 @@ function ObservatoryMPC(pair)
     else # observations_type == "roving"
         frame = "WGS84"
     end
-    x = astrometryparse(Float64, dict["longitude"])
-    y = astrometryparse(Float64, dict["rhocosphi"])
-    z = astrometryparse(Float64, dict["rhosinphi"])
+    x = isnothing(dict["longitude"]) ? NaN : astrometryparse(Float64, dict["longitude"])
+    y = isnothing(dict["rhocosphi"]) ? NaN : astrometryparse(Float64, dict["rhocosphi"])
+    z = isnothing(dict["rhosinphi"]) ? NaN : astrometryparse(Float64, dict["rhosinphi"])
     coords = SVector{3, Float64}(x, y, z)
-    if uses_two_line_observations && all(iszero, coords)
-        coords = SVector{3, Float64}(NaN, NaN, NaN)
-    end
 
     return ObservatoryMPC{Float64}(code, frame, coords, name,
         uses_two_line_observations, observations_type)
