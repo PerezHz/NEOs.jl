@@ -14,6 +14,7 @@ mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
     UJ_interaction::Union{Nothing, Vector{Bool}}
     N::Int
     μ::Vector{T}
+    marsden_radial::NTuple{5, T}
 end
 
 """
@@ -64,14 +65,14 @@ Return a `PropagationBuffer` object with pre-allocated memory for `propagate`.
 - `dynamics`: dynamical model function.
 - `q0::Vector{<:Number}`: vector of initial conditions.
 - `jd0::Number`: initial Julian date (TDB).
-- `tlim::Tuple{Real, Real}`: ephemeris timespan [days since J2000].
+- `tlim::NTuple{2, <:Real}`: ephemeris timespan [days since J2000].
 - `params::Parameters{<:Real}`: see the `Propagation` section of [`Parameters`](@ref).
 """
-function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::Tuple{T, T},
+function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::NTuple{2, T},
                            params::Parameters{T}) where {D, T <: Real, U <: Number,
                            V <: Number}
     # Unpack parameters
-    @unpack order, μ_ast, maxsteps = params
+    @unpack order, μ_ast, maxsteps, marsden_radial = params
     # Check order
     @assert order <= SSEPHORDER "order ($order) must be less or equal than SS ephemeris \
         order ($SSEPHORDER)"
@@ -100,13 +101,13 @@ function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::Tuple{T, T}
         _accepht = [zero(x) for _ in axes(_acceph.x, 2)]
         _poteph = convert(T, loadpeeph(poteph, days_0, days_f))
         _potepht = [zero(x) for _ in axes(_poteph.x, 2)]
-        UJ_interaction = fill(false, N)
+        UJ_interaction = falses(N)
         # Turn on Earth interaction
         UJ_interaction[ea] = true
     end
     # Dynamical parameters for `propagate`
     dparams = DynamicalParameters{T, U, V}(_sseph, _ssepht, _acceph, _accepht,
-        _poteph, _potepht, jd0, UJ_interaction, N, μ)
+        _poteph, _potepht, jd0, UJ_interaction, N, μ, marsden_radial)
     # TaylorIntegration cache
     cache = init_cache(Val(true), zero(T), q0, maxsteps, order, dynamics, dparams)
 

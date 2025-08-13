@@ -703,7 +703,7 @@ See also [`RadarResidual`](@ref) and [`radar_astrometry`](@ref).
 
 - `radar::AbstractRadarVector{T}`: radar astrometry.
 - `outliers::AbstractVector{Bool}`: outlier flags (default:
-    `fill(false, length(radar))`).
+    `falses(length(radar))`).
 
 # Keyword arguments
 
@@ -722,7 +722,7 @@ All ephemeris must take [et seconds since J2000] and return [barycentric
 position in km and velocity in km/sec].
 """
 function residuals(radar::AbstractRadarVector{T},
-                   outliers::AbstractVector{Bool} = fill(false, length(radar));
+                   outliers::AbstractVector{Bool} = falses(length(radar));
                    xva::AstEph, kwargs...) where {AstEph, T <: Real}
     # UTC time of first radar observation
     utc1 = date(radar[1])

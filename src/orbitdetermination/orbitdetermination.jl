@@ -112,6 +112,9 @@ function orbitdetermination(od::OpticalODProblem{D, T, O}, orbit::AbstractOrbit,
         )
         return orbit1
     end
+    # Number of degrees of freedom
+    Ndof = dof(Val(od.dynamics))
+    Ndof > 6 && return orbit1
     # Refine via minimization over the MOV
     j = closest_tracklet(epoch(orbit), tracklets)
     for scale in (:log, :linear)

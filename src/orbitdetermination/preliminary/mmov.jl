@@ -28,6 +28,7 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
     # Unpack
     @unpack adamiter, adammode, adamQtol, significance = params
     @unpack dynamics = od
+    variables = collect(1:6)
     # Initial time of integration [julian days TDB]
     jd0 = dtutc2jdtdb(A.date)
     # Pre-allocate memory
@@ -102,8 +103,10 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
         # Residuals space to barycentric coordinates jacobian
         jacobian = Matrix(TS.jacobian(q - cte.(q), x1))
         # Update orbit
-        orbits[t] = evaldeltas(MMOVOrbit(dynamics, optical, tracklets, bwd, fwd, res,
-                               covariance, jacobian, aes[:, 1:t], Qs[1:t]), x1)
+        orbits[t] = evaldeltas(MMOVOrbit(
+            dynamics, variables, optical, tracklets, bwd, fwd,
+            res, covariance, jacobian, aes[:, 1:t], Qs[1:t]
+        ), x1)
         # Convergence conditions
         if t > 1
             (Qs[t-1] < Qthreshold < Qs[t]) && (Nsawtooth += 1)
@@ -191,10 +194,13 @@ function tsaiod(od::OpticalODProblem{D, T, O}, params::Parameters{T};
     # Unpack
     @unpack tsaorder, adammode, significance, verbose = params
     @unpack optical, tracklets = od
+    # Set jet transport variables
+    Npar = numvars(Val(od.dynamics), params)
+    @assert Npar == 6 "Minimization over the MOV is not defined for dynamical models with \
+        more than 6 degrees of freedom"
+    set_od_order(params, Npar)
     # Pre-allocate orbit
     orbit = zero(LeastSquaresOrbit{D, T, T, O, Nothing, Nothing})
-    # Set jet transport variables
-    set_od_order(params)
     # Iterate tracklets
     for i in eachindex(tracklets)
         # Minimization over the MOV requires a minimum of 2 observations

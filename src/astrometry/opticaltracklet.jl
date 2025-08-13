@@ -41,6 +41,7 @@ observatory(x::OpticalTracklet) = x.observatory
 catalogue(::OpticalTracklet) = unknowncat()
 rms(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
 debias(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
+corr(::OpticalTracklet{T}) where {T <: Real} = T(NaN)
 
 nobs(x::OpticalTracklet) = x.nobs
 nobs(x::AbstractTrackletVector) = sum(nobs, x; init = 0)
@@ -100,6 +101,9 @@ function polyfit(x::AbstractVector{T}, y::AbstractVector{T};
     end
 end
 
+# Compute the mean of a vector, but skip NaNs
+skipnanmean(x::AbstractVector) = mean(filter(!isnan, x))
+
 # Return the coefficients of the derivative of a polynomial with coefficients `x`
 function diffcoeffs(x::AbstractVector{T}) where {T <: Real}
     y = Vector{T}(undef, length(x)-1)
@@ -111,13 +115,15 @@ end
 
 # Outer constructor
 function OpticalTracklet(df::AbstractDataFrame)
-    # Defining quantities of a Tracklet
-    observatory = df.observatory[1]
-    night = df.TimeOfDay[1]
+    # Number of observations
     nobs = nrow(df)
+    # Indices
     indices = getfield(df, :rows)
+
     # Only one observation
     if isone(nobs)
+        observatory = df.observatory[1]
+        night = df.TimeOfDay[1]
         date = df.date[1]
         ra, dec = df.ra[1], df.dec[1]
         vra, vdec = zero(ra), zero(dec)
@@ -125,9 +131,11 @@ function OpticalTracklet(df::AbstractDataFrame)
         return OpticalTracklet(observatory, night, date, ra, dec,
                                vra, vdec, mag, nobs, indices)
     end
+
     # Make sure there are no repeated dates
     gdf = groupby(df, :date)
-    df = combine(gdf, [:ra, :dec, :mag] .=> mean, renamecols = false)
+    df = combine(gdf, [:ra, :dec] .=> mean, :observatory, :mag => skipnanmean,
+                 :TimeOfDay, renamecols = false)
     # Julian days of observation
     df.t_julian = dtutc2jdtdb.(df.date)
     # Days of observation [relative to first observation]
@@ -150,14 +158,25 @@ function OpticalTracklet(df::AbstractDataFrame)
     ra_coef = polyfit(df.t_rel, df.ra)
     dec_coef = polyfit(df.t_rel, df.dec)
 
-    # Evaluate polynomials at mean date
-    ra = mod2pi(polymodel(t_mean, ra_coef))
-    dec = polymodel(t_mean, dec_coef)
-    vra = polymodel(t_mean, diffcoeffs(ra_coef))
-    vdec = polymodel(t_mean, diffcoeffs(dec_coef))
-
-    # Mean apparent magnitude
-    mag = mean(filter(!isnan, df.mag))
+    # All observations are from a non Earth-fixed observatory
+    if all(istwoliner, df.observatory)
+        i = argmin(@. abs(datediff(date, df.date)))
+        observatory = df.observatory[i]
+        night = df.TimeOfDay[i]
+        date = df.date[i]
+        ra, dec = df.ra[i], df.dec[i]
+        vra = polymodel(df.t_rel[i], diffcoeffs(ra_coef))
+        vdec = polymodel(df.t_rel[i], diffcoeffs(dec_coef))
+        mag = df.mag[i]
+    else
+        observatory = df.observatory[1]
+        night = df.TimeOfDay[1]
+        ra = mod2pi(polymodel(t_mean, ra_coef))
+        dec = polymodel(t_mean, dec_coef)
+        vra = polymodel(t_mean, diffcoeffs(ra_coef))
+        vdec = polymodel(t_mean, diffcoeffs(dec_coef))
+        mag = skipnanmean(df.mag)
+    end
 
     return OpticalTracklet(observatory, night, date, ra, dec,
                            vra, vdec, mag, nobs, indices)
@@ -177,7 +196,12 @@ function reduce_tracklets(optical::AbstractOpticalVector{T}) where {T <: Real}
     # Compute TimeOfDay
     df.TimeOfDay = tmap(TimeOfDay, optical)
     # Group by observatory and TimeOfDay
-    gdf = groupby(df, [:observatory, :TimeOfDay])
+    if hasfield(eltype(optical), :trkid)
+        df.trkid = getfield.(optical, :trkid)
+        gdf = groupby(df, [:trkid])
+    else
+        gdf = groupby(df, [:observatory, :TimeOfDay])
+    end
     # Reduce tracklets
     tracklets = TrackletVector{T}(undef, gdf.ngroups)
     Threads.@threads for i in eachindex(tracklets)

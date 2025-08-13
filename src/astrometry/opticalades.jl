@@ -118,6 +118,7 @@ function rms(x::OpticalADES{T}) where {T <: Real}
     return (isnan(x.rmsra) ? one(T) : x.rmsra, isnan(x.rmsdec) ? one(T) : x.rmsdec)
 end
 debias(x::OpticalADES{T}) where {T <: Real} = (zero(T), zero(T))
+corr(x::OpticalADES{T}) where {T <: Real} = isnan(x.rmscorr) ? zero(T) : x.rmscorr
 
 # Print method for OpticalADES
 function show(io::IO, o::OpticalADES)

@@ -15,11 +15,11 @@ using InteractiveUtils: methodswith
 
         using TaylorIntegration: jetcoeffs!, _allocate_jetcoeffs!
 
-        @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}, jetcoeffs!))
-        @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_ng_eph_threads!}, _allocate_jetcoeffs!))
+        @test !isempty(methodswith(Val{nongravs!}, jetcoeffs!))
+        @test !isempty(methodswith(Val{nongravs!}, _allocate_jetcoeffs!))
 
-        @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, jetcoeffs!))
-        @test !isempty(methodswith(Val{RNp1BP_pN_A_J23E_J2S_eph_threads!}, _allocate_jetcoeffs!))
+        @test !isempty(methodswith(Val{gravityonly!}, jetcoeffs!))
+        @test !isempty(methodswith(Val{gravityonly!}, _allocate_jetcoeffs!))
 
         @test !isempty(methodswith(Val{newtonian!}, jetcoeffs!))
         @test !isempty(methodswith(Val{newtonian!}, _allocate_jetcoeffs!))
@@ -33,7 +33,7 @@ using InteractiveUtils: methodswith
     @testset "Orbit propagation without nongravs: 2023 DW" begin
 
         # Dynamical function
-        dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
+        dynamics = gravityonly!
         # Initial time [Julian date TDB]
         jd0 = datetime2julian(DateTime(2023, 2, 25, 0, 0, 0))
         # Time of integration [years]
@@ -83,8 +83,8 @@ using InteractiveUtils: methodswith
         optical_2023DW = read_optical_mpc80(joinpath(pkgdir(NEOs), "test", "data",
             "2023DW_OPTICAL.dat"))
         # Make weigths and debiasing corrections
-        w8s = Veres17(optical_2023DW).w8s
-        bias = Eggl20(optical_2023DW).bias
+        w8s = weights(Veres17(optical_2023DW))
+        bias = debias(Eggl20(optical_2023DW))
 
         # Compute normalized residuals
         _res_ = NEOs.residuals(
@@ -147,7 +147,7 @@ using InteractiveUtils: methodswith
         using NEOs: isdelay, isdoppler
 
         # Dynamical function
-        dynamics = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
+        dynamics = nongravs!
         # Initial time [Julian date TDB]
         jd0 = datetime2julian(DateTime(2004, 6, 1))
         # Time of integration [years]
@@ -155,7 +155,7 @@ using InteractiveUtils: methodswith
         # JPL #199 solution for Apophis at June 1st, 2004
         q0 = [-1.0506628055913627, -0.06064314196134998, -0.04997102228887035,
               0.0029591421121582077, -0.01423233538611057, -0.005218412537773594,
-              -5.592839897872e-14, 0.0]
+              -5.592839897872e-14, 0.0, 0.0]
         # Propagation parameters
         params = Parameters(maxsteps = 1, order = 25, abstol = 1e-20, parse_eqs = true)
 
@@ -183,8 +183,8 @@ using InteractiveUtils: methodswith
         optical_Apophis = read_optical_mpc80(joinpath(pkgdir(NEOs), "test", "data",
             "99942_Tholen_etal_2013.dat"))
         # Make weights and debiasing corrections
-        w8s = Veres17(optical_Apophis).w8s
-        bias = Eggl20(optical_Apophis).bias
+        w8s = weights(Veres17(optical_Apophis))
+        bias = debias(Eggl20(optical_Apophis))
 
         # Compute optical astrometry residuals
         res_optical = NEOs.residuals(
@@ -265,7 +265,7 @@ using InteractiveUtils: methodswith
         # Test integration (Apophis)
 
         # Dynamical function
-        dynamics = RNp1BP_pN_A_J23E_J2S_eph_threads!
+        dynamics = gravityonly!
         # Initial date of integration [Julian date TDB]
         jd0 = dtutc2jdtdb(DateTime(2029, 4, 13, 20))
         # Time of integration [years]
@@ -322,8 +322,8 @@ using InteractiveUtils: methodswith
         using NEOs: isdelay, isdoppler
 
         # Dynamical functions
-        dynamicsg  = RNp1BP_pN_A_J23E_J2S_eph_threads!
-        dynamicsng = RNp1BP_pN_A_J23E_J2S_ng_eph_threads!
+        dynamicsg  = gravityonly!
+        dynamicsng = nongravs!
         # Integration parameters
         nyears = 10.0
         varorder = 1
@@ -332,10 +332,10 @@ using InteractiveUtils: methodswith
         # 7-DOF nominal solution from pha/apophis.jl script at epoch 2004-06-01T00:00:00.000 (TDB)
         q00 = [-1.0506627988664696, -0.060643124245514164, -0.0499709975200415,
                0.0029591416313078838, -0.014232335581939919, -0.0052184125285361415,
-               -2.898870403031058e-14, 0.0]
+               -2.898870403031058e-14, 0.0, 0.0]
         scalings = vcat(fill(1e-8, 6), 1e-14)
         dq = scaled_variables("δx", scalings, order = varorder)
-        q0 = q00 + vcat(dq, zero(dq[1]))
+        q0 = q00 + vcat(dq, zero(dq[1]), zero(dq[1]))
 
         # Test parsed vs non-parsed propagation: gravity-only model
         params = Parameters(maxsteps = 10, order = 25, abstol = 1e-20, parse_eqs = true)
@@ -378,8 +378,8 @@ using InteractiveUtils: methodswith
         optical_Apophis = read_optical_mpc80(joinpath(pkgdir(NEOs), "test", "data",
             "99942_Tholen_etal_2013.dat"))
         # Make weights and debiasing corrections
-        w8s = Veres17(optical_Apophis).w8s
-        bias = Eggl20(optical_Apophis).bias
+        w8s = weights(Veres17(optical_Apophis))
+        bias = debias(Eggl20(optical_Apophis))
 
         # Compute optical astrometry residuals
         res_optical = NEOs.residuals(optical_Apophis, w8s, bias;

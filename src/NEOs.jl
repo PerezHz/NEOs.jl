@@ -48,8 +48,8 @@ export MPC, NEOCP, NEOCC, NEODyS2, JPL
 export UniformWeights, SourceWeights, Veres17
 export ZeroDebiasing, SourceDebiasing, Farnocchia15, Eggl20
 export numberofdays, unpacknum, packnum, unpackdesig, packdesig
-export date, measure, observatory, rms, debias, ra, dec, mag, band, catalogue, frequency,
-       residual, weight, isoutlier, nout, notout, notoutobs
+export date, measure, observatory, rms, debias, corr, ra, dec, mag, band, catalogue,
+       frequency, residual, weight, weights, isoutlier, nout, notout, notoutobs
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
 export update_observatories_mpc, search_observatory_code, fetch_observatory_information
@@ -63,7 +63,7 @@ export fetch_radar_jpl, read_radar_jpl, write_radar_jpl
 export fetch_radar_rwo, read_radar_rwo, write_radar_rwo
 export compute_delay, radar_astrometry
 # Propagation
-export RNp1BP_pN_A_J23E_J2S_ng_eph_threads!, RNp1BP_pN_A_J23E_J2S_eph_threads!, newtonian!
+export nongravs!, gravityonly!, newtonian!
 export loadpeeph, rvelea, scaled_variables, propagate, propagate_lyap, propagate_root
 # Orbit determination
 export ODProblem, LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
@@ -72,7 +72,7 @@ export elements, iselliptic, ishyperbolic, cartesian2osculating, yarkp2adot
 export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
-export epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, osculating,
+export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, osculating,
        uncertaintyparameter
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,

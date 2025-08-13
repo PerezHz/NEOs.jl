@@ -489,7 +489,7 @@ function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <:
 end
 
 # Check whether P is inside A's boundary
-for U in (:(AbstractVector{T}), :(Tuple{T, T}))
+for U in (:(AbstractVector{T}), :(NTuple{2, T}))
     @eval begin
         function in(P::$U, A::AdmissibleRegion{T}) where {T <: Real}
             @assert length(P) == 2 "Points in admissible region are of dimension 2"

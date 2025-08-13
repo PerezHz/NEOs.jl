@@ -5,6 +5,7 @@ Supertype for the least squares orbits interface.
 
 Every least squares orbit has:
 - a dynamical function of type `D`,
+- a vector of variables of type `Vector{Int}`,
 - a vector of optical astrometry of type `O <: AbstractOpticalVector{T}`,
 - a vector of optical tracklets of type `TrackletVector{T}`,
 - a backward and a forward integration, both of type `DensePropagation2{T, U}`,
@@ -30,16 +31,19 @@ function init_optical_residuals(::Type{U}, od::ODProblem,
     # Optical astrometry
     optical1, optical2 = optical(od), optical(orbit)
     # Weights and debiasing factors
-    w8s, bias = od.weights.w8s, od.debias.bias
+    w8s, bias = weights(od), debias(od)
+    # Correlations
+    corrs = corr(od)
     # Initialize vector of optical residuals
     res = Vector{OpticalResidual{T, U}}(undef, length(optical1))
     for i in eachindex(optical1)
         ra, dec = zero(U), zero(U)
-        wra, wdec = w8s[i]
+        wra, wdec, = w8s[i]
         dra, ddec = bias[i]
+        corr = corrs[i]
         j = findfirst(==(optical1[i]), optical2)
         outlier = isnothing(j) ? false : isoutlier(orbit.ores[j])
-        res[i] = OpticalResidual{T, U}(ra, dec, wra, wdec, dra, ddec, outlier)
+        res[i] = OpticalResidual{T, U}(ra, dec, wra, wdec, dra, ddec, corr, outlier)
     end
 
     return res
@@ -79,6 +83,7 @@ An asteroid least squares orbit.
 # Fields
 
 - `dynamics::D`: dynamical model.
+- `variables::Vector{Int}`: vector of variables.
 - `optical::O`: vector of optical astrometry.
 - `tracklets::TrackletVector{T}`: vector of optical tracklets.
 - `radar::R`: vector of radar astrometry.
@@ -96,6 +101,7 @@ An asteroid least squares orbit.
                                            RR <: Union{Nothing, Vector{RadarResidual{T, U}}}
                                            } <: AbstractLeastSquaresOrbit{D, T, U}
     dynamics::D
+    variables::Vector{Int}
     optical::O
     tracklets::TrackletVector{T}
     radar::R
@@ -109,8 +115,8 @@ An asteroid least squares orbit.
     Qs::Vector{T}
     # Inner constructor
     function LeastSquaresOrbit{D, T, U, O, R, RR}(
-            dynamics::D, optical::O, tracklets::TrackletVector{T}, radar::R,
-            bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
+            dynamics::D, variables::Vector{Int}, optical::O, tracklets::TrackletVector{T},
+            radar::R, bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
             ores::Vector{OpticalResidual{T, U}}, rres::RR, fit::LeastSquaresFit{T},
             jacobian::Matrix{T}, qs::Matrix{T}, Qs::Vector{T}
         ) where {
@@ -122,10 +128,11 @@ An asteroid least squares orbit.
             times must match"
         @assert length(optical) == length(ores) "Number of observations must \
             match number of residuals"
-        _bwd_ = TaylorInterpolant(bwd.t0, bwd.t, collect(bwd.x))
-        _fwd_ = TaylorInterpolant(fwd.t0, fwd.t, collect(fwd.x))
-        return new{D, T, U, O, R, RR}(dynamics, optical, tracklets, radar, _bwd_,
-                                      _fwd_, ores, rres, fit, jacobian, qs, Qs)
+        cols = length(variables) < size(bwd.x, 2) ? variables : axes(bwd.x, 2)
+        _bwd_ = TaylorInterpolant(bwd.t0, bwd.t, collect(view(bwd.x, :, cols)))
+        _fwd_ = TaylorInterpolant(fwd.t0, fwd.t, collect(view(fwd.x, :, cols)))
+        return new{D, T, U, O, R, RR}(dynamics, variables, optical, tracklets, radar,
+                                      _bwd_, _fwd_, ores, rres, fit, jacobian, qs, Qs)
     end
 end
 
@@ -135,8 +142,8 @@ const MixedLeastSquaresOrbit{D, T, U, O, R} = LeastSquaresOrbit{D, T, U, O, R, V
 
 # Outer constructor
 function LeastSquaresOrbit(
-        dynamics::D, optical::O, tracklets::TrackletVector{T}, radar::R,
-        bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
+        dynamics::D, variables::Vector{Int}, optical::O, tracklets::TrackletVector{T},
+        radar::R, bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
         ores::Vector{OpticalResidual{T, U}}, rres::RR, fit::LeastSquaresFit{T},
         jacobian::Matrix{T}, qs::Matrix{T}, Qs::Vector{T}
     ) where {
@@ -144,8 +151,8 @@ function LeastSquaresOrbit(
         R <: Union{Nothing, AbstractRadarVector{T}},
         RR <: Union{Nothing, Vector{RadarResidual{T, U}}}
     }
-    return LeastSquaresOrbit{D, T, U, O, R, RR}(dynamics, optical, tracklets, radar, bwd,
-                                                fwd, ores, rres, fit, jacobian, qs, Qs)
+    return LeastSquaresOrbit{D, T, U, O, R, RR}(dynamics, variables, optical, tracklets, radar,
+                                                bwd, fwd, ores, rres, fit, jacobian, qs, Qs)
 end
 
 function LeastSquaresOrbit(od::OpticalODProblem{D, T, O}, q00::Vector{T}, jd0::T,
@@ -153,17 +160,17 @@ function LeastSquaresOrbit(od::OpticalODProblem{D, T, O}, q00::Vector{T}, jd0::T
     # Unpack
     @unpack dynamics, optical, tracklets, radar = od
     # Number of degrees of freedom
-    Npar = dof(Val(od.dynamics))
-    # Jet transport initial condition
+    Ndof = dof(od)
+    # Set jet transport variables
+    Npar = numvars(Val(dynamics), params)
     set_od_order(T, 2, Npar)
-    if length(q00) < Npar
-        q00 = vcat(q00, zero(T), zero(T))
+    # Jet transport initial condition
+    variables = collect(1:6)
+    if Ndof > 6
+        variables = vcat(variables, findall(!iszero, marsden_scalings) .+ 6)
     end
-    scalings = fill(1e-8, 6)
-    if Npar == 8
-        scalings = vcat(scalings, 1e-14, 1e-15)
-    end
-    dq = scalings .* get_variables(T, 2)
+    q00 = initialcondition(q00, variables, Ndof, params)
+    dq = jtperturbation(fill(1e-8, 6), variables, Ndof, 2, params)
     q0 = q00 + dq
     # Propagation and residuals
     bwd, fwd, res = propres(od, q0, jd0, params)
@@ -174,13 +181,15 @@ function LeastSquaresOrbit(od::OpticalODProblem{D, T, O}, q00::Vector{T}, jd0::T
     Γ = inv(C)
     fit = LeastSquaresFit{T}(true, x0, Γ, Newton{T})
     # Residuals space to barycentric coordinates jacobian
-    jacobian = Matrix(TS.jacobian(dq, fit.x))
+    jacobian = Matrix(TS.jacobian(dq[variables], fit.x))
     # History of initial conditions and target function
-    qs = reshape(q00, Npar, 1)
+    qs = reshape(q00[variables], Npar, 1)
     Qs = [nrms(res, fit)]
 
-    return evalfit(LeastSquaresOrbit{D, T, TaylorN{T}, O, Nothing, Nothing}(dynamics,
-        optical, tracklets, nothing, bwd, fwd, res, nothing, fit, jacobian, qs, Qs))
+    return evalfit(LeastSquaresOrbit(
+        dynamics, variables, optical, tracklets, nothing, bwd, fwd, res, nothing,
+        fit, jacobian, qs, Qs
+    ))
 end
 
 function LeastSquaresOrbit(od::MixedODProblem{D, T, O, R}, q00::Vector{T}, jd0::T,
@@ -188,17 +197,17 @@ function LeastSquaresOrbit(od::MixedODProblem{D, T, O, R}, q00::Vector{T}, jd0::
     # Unpack
     @unpack dynamics, optical, tracklets, radar = od
     # Number of degrees of freedom
-    Npar = dof(Val(od.dynamics))
-    # Jet transport initial condition
+    Ndof = dof(od)
+    # Set jet transport variables
+    Npar = numvars(Val(dynamics), params)
     set_od_order(T, 2, Npar)
-    if length(q00) < Npar
-        q00 = vcat(q00, zero(T), zero(T))
+    # Jet transport initial condition
+    variables = collect(1:6)
+    if Ndof > 6
+        variables = vcat(variables, findall(!iszero, params.marsden_scalings) .+ 6)
     end
-    scalings = fill(1e-8, 6)
-    if Npar == 8
-        scalings = vcat(scalings, 1e-14, 1e-15)
-    end
-    dq = scalings .* get_variables(T, 2)
+    q00 = initialcondition(q00, variables, Ndof, params)
+    dq = jtperturbation(fill(1e-8, 6), variables, Ndof, 2, params)
     q0 = q00 + dq
     # Propagation and residuals
     bwd, fwd, res = propres(od, q0, jd0, params)
@@ -209,13 +218,15 @@ function LeastSquaresOrbit(od::MixedODProblem{D, T, O, R}, q00::Vector{T}, jd0::
     Γ = inv(C)
     fit = LeastSquaresFit{T}(true, x0, Γ, Newton{T})
     # Residuals space to barycentric coordinates jacobian
-    jacobian = Matrix(TS.jacobian(dq, fit.x))
+    jacobian = Matrix(TS.jacobian(dq[variables], fit.x))
     # History of initial conditions and target function
-    qs = reshape(q00, Npar, 1)
+    qs = reshape(q00[variables], Npar, 1)
     Qs = [nrms(res, fit)]
 
-    return evalfit(LeastSquaresOrbit{D, T, TaylorN{T}, O, R, Vector{RadarResidual{T, TaylorN{T}}}}(
-        dynamics, optical, tracklets, radar, bwd, fwd, res[1], res[2], fit, jacobian, qs, Qs))
+    return evalfit(LeastSquaresOrbit(
+        dynamics, variables, optical, tracklets, radar, bwd, fwd, res[1], res[2],
+        fit, jacobian, qs, Qs
+    ))
 end
 
 # Print method for LeastSquaresOrbit
@@ -225,6 +236,7 @@ show(io::IO, x::LeastSquaresOrbit) = print(io, "Least squares orbit with ", nobs
 # Definition of zero LeastSquaresOrbit
 function zero(::Type{LeastSquaresOrbit{D, T, U, O, R, RR}}) where {D, T, U, O, R, RR}
     dynamics = D.instance
+    variables = Vector{Int}(undef, 0)
     optical = O()
     tracklets = TrackletVector{T}()
     radar = R == Nothing ? nothing : R()
@@ -236,8 +248,8 @@ function zero(::Type{LeastSquaresOrbit{D, T, U, O, R, RR}}) where {D, T, U, O, R
     jacobian = Matrix{T}(undef, 0, 0)
     qs = Matrix{T}(undef, 0, 0)
     Qs = Vector{T}(undef, 0)
-    return LeastSquaresOrbit{D, T, U, O, R, RR}(dynamics, optical, tracklets, radar, bwd,
-                                                fwd, ores, rres, fit, jacobian, qs, Qs)
+    return LeastSquaresOrbit(dynamics, variables, optical, tracklets, radar, bwd, fwd,
+                             ores, rres, fit, jacobian, qs, Qs)
 end
 
 iszero(x::LeastSquaresOrbit{D, T, U, O, R, RR}) where {D, T, U, O, R, RR} =
@@ -255,9 +267,11 @@ function evalfit(orbit::OpticalLeastSquaresOrbit{D, T, TaylorN{T}, O}) where {D,
     # Evaluate residuals
     new_ores = orbit.ores(δs)
 
-    return LeastSquaresOrbit{D, T, T, O, Nothing, Nothing}(orbit.dynamics,
-        orbit.optical, orbit.tracklets, nothing, new_bwd, new_fwd, new_ores, nothing,
-        orbit.fit, orbit.jacobian, orbit.qs, orbit.Qs)
+    return LeastSquaresOrbit(
+        orbit.dynamics, orbit.variables, orbit.optical, orbit.tracklets,
+        orbit.radar, new_bwd, new_fwd, new_ores, orbit.rres, orbit.fit,
+        orbit.jacobian, orbit.qs, orbit.Qs
+    )
 end
 
 function evalfit(orbit::MixedLeastSquaresOrbit{D, T, TaylorN{T}, O, R}) where {D, T, O, R}
@@ -272,7 +286,9 @@ function evalfit(orbit::MixedLeastSquaresOrbit{D, T, TaylorN{T}, O, R}) where {D
     new_ores = orbit.ores(δs)
     new_rres = orbit.rres(δs)
 
-    return LeastSquaresOrbit{D, T, T, O, R, Vector{RadarResidual{T, T}}}(orbit.dynamics,
-        orbit.optical, orbit.tracklets, orbit.radar, new_bwd, new_fwd, new_ores, new_rres,
-        orbit.fit, orbit.jacobian, orbit.qs, orbit.Qs)
+    return LeastSquaresOrbit(
+        orbit.dynamics, orbit.variables, orbit.optical, orbit.tracklets,
+        orbit.radar, new_bwd, new_fwd, new_ores, new_rres, orbit.fit,
+        orbit.jacobian, orbit.qs, orbit.Qs
+    )
 end
