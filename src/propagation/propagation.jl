@@ -130,19 +130,19 @@ end
 # Return `true` and the asteroid's radial velocity with respect to the Earth
 function rvelea(dx, x, params, t)
     # Julian date (TDB) of start time
-    jd0 = params.jd0
+    # jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
-    dsj2k = t + (jd0 - JD_J2000)
+    # dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
     ss16asteph_t = params.ssepht
-    evaleph!(ss16asteph_t, params.sseph, dsj2k)
+    # evaleph!(ss16asteph_t, params.sseph, dsj2k)
     # Total number of bodies
     N = params.N
     # Earth's ephemeris
     xe = ss16asteph_t[nbodyind(N-1, ea)]
+    xae = x - xe
     # Geocentric radial velocity
-    return true, (x[1]-xe[1])*(x[4]-xe[4]) + (x[2]-xe[2])*(x[5]-xe[5]) +
-        (x[3]-xe[3])*(x[6]-xe[6])
+    return euclid3D(cte(xae[1:3])) < 0.1, dot3D(xae[1:3], xae[4:6])
 end
 
 """

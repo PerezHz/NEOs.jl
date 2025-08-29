@@ -273,7 +273,7 @@ function nongravs!(dq, q, params, t)
     # Rotations to and from Earth, Sun and Moon pole-oriented frames
     local M_ = Array{S}(undef, 3, 3, N)
 
-    local M_[:, :, ea] = t2c_jpl_de430(dsj2k) .+ zero_q_1
+    local M_[:, :, ea] = seval(dsj2k, zero_q_1)
 
     # Fill first 3 elements of dq with velocities
     dq[1] = q[4]
@@ -895,7 +895,7 @@ function gravityonly!(dq, q, params, t)
     # Rotations to and from Earth, Sun and Moon pole-oriented frames
     local M_ = Array{S}(undef, 3, 3, N)
 
-    local M_[:, :, ea] = t2c_jpl_de430(dsj2k) .+ zero_q_1
+    local M_[:, :, ea] = seval(dsj2k, zero_q_1)
 
     # Fill first 3 elements of dq with velocities
     dq[1] = q[4]
