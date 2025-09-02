@@ -37,6 +37,7 @@ in(σ::Real, x::CloseApproach) = x.domain[1] ≤ σ ≤ x.domain[2]
 
 lbound(x::CloseApproach) = x.domain[1]
 ubound(x::CloseApproach) = x.domain[2]
+width(x::CloseApproach) = x.domain[2] - x.domain[1]
 
 nominaltime(x::CloseApproach) = cte(x.t)
 nominalstate(x::CloseApproach) = [cte(x.x), cte(x.y), cte(x.z)]
@@ -60,6 +61,50 @@ function distance(x::CloseApproach{T}, σ::T) where {T <: Real}
     @assert σ in x "`σ` is outside the domain of `x`"
     dσ = (σ - x.σ) / domain_radius(x)
     return hypot(x.x(dσ), x.y(dσ)) - x.z(dσ)
+end
+
+function mindistance(x::CloseApproach{T}, tol::T = width(x) / 1E3) where {T <: Real}
+    # 1 / φ
+    invphi = (sqrt(5) - 1) / 2
+    # 1 / φ^2
+    invphi2 = (3 - sqrt(5)) / 2
+    # Interval bounds
+    a, b = x.domain
+    # Interval width
+    h = b - a
+    # Termination condition
+    h <= tol && return distance(x, (a + b) / 2)
+    # Required steps to achieve tolerance
+    n = ceil(Int, log(tol/h) / log(invphi))
+    # Initialize center points
+    c = a + invphi2 * h
+    d = a + invphi * h
+    yc = distance(x, c)
+    yd = distance(x, d)
+    # Main loop
+    for _ in 1:n
+        if yc < yd
+            b = d
+            d = c
+            yd = yc
+            h = invphi * h
+            c = a + invphi2 * h
+            yc = distance(x, c)
+        else
+            a = c
+            c = d
+            yc = yd
+            h = invphi * h
+            d = a + invphi * h
+            yd = distance(x, d)
+        end
+    end
+
+    if yc < yd
+        return distance(x, (a + d) / 2)
+    else
+        return distance(x, (c + b) / 2)
+    end
 end
 
 function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},

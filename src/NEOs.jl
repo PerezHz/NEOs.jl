@@ -32,6 +32,7 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea
       argperi, timeperipass, meanmotion, meananomaly, nbodyind, numberofbodies, selecteph,
       getinterpindex, pole_rotation, t2c_jpl_de430
 using Roots: find_zeros
+using SpecialFunctions: erf
 using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!
@@ -79,7 +80,7 @@ export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination
        orbitdetermination
 # Postprocessing
 export absolutemagnitude, crosssection, valsecchi_circle, bopik, mtp
-export LOV, CloseApproach
+export LOV, CloseApproach, VirtualAsteroid
 
 include("constants.jl")
 include("units.jl")
