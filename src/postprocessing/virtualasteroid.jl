@@ -18,13 +18,34 @@ width(x::VirtualAsteroid) = x.domain[2] - x.domain[1]
 
 isconvergent(x::VirtualAsteroid, ϵ::Real) = all(Base.Fix2(isconvergent, ϵ), x.CAs)
 
+convergence_domain(x::VirtualAsteroid, ϵ::Real) =
+    (convergence_domain(x.CAs[1], ϵ)[1], convergence_domain(x.CAs[end], ϵ)[2])
+
 closeapproaches(x::VirtualAsteroid) = x.CAs
 
 meantime(x::VirtualAsteroid) = mean(nominaltime, x.CAs)
 
-function distance(x::VirtualAsteroid, σ::Real)
+function distance(x::VirtualAsteroid, σ::Real, ϵ::Real)
+    d = convergence_domain(x, ϵ)
+    @assert d[1] ≤ σ ≤ d[2] "`σ` is outside the convergence domain domain of `x`"
     i = findfirst(Base.Fix1(in, σ), x.CAs)
-    return distance(x.CAs[i], σ)
+    # Normal evaluation of the Taylor polynomials
+    if isconvergent(x.CAs[i], ϵ) ||
+        (i == 1 && d[1] ≤ σ ≤ x.CAs[1].σ) ||
+        (i == length(x.CAs) && x.CAs[end].σ ≤ σ ≤ d[2])
+        return distance(x.CAs[i], σ)
+    end
+    # Exponentially decaying average
+    i = findlast( y -> y.σ < σ, x.CAs)
+    j = findfirst(y -> σ < y.σ, x.CAs)
+    CAi, CAj = x.CAs[i], x.CAs[j]
+    dσi = abs(σ - CAi.σ) / (convergence_radius(CAi, ϵ) * domain_radius(CAi))
+    dσj = abs(σ - CAj.σ) / (convergence_radius(CAj, ϵ) * domain_radius(CAj))
+    wi = 1 / 10^(dσi - 1)
+    wj = 1 / 10^(dσj - 1)
+    di = distance(CAi, σ)
+    dj = distance(CAj, σ)
+    return (wi * di + wj * dj) / (wi + wj)
 end
 
 function mindistance(x::VirtualAsteroid{T}, tol::T = width(x) / 1E3) where {T <: Real}
@@ -95,18 +116,18 @@ function virtualasteroids(x::AbstractVector{CloseApproach{T}}) where {T <: Real}
     return VAs
 end
 
-function impact_domain(x::VirtualAsteroid{T}) where {T <: Real}
-    a, b = x.domain
-    rs = find_zeros(Base.Fix1(distance, x), a, b, no_pts = 1_000)
+impact_probability(a, b) = erf(a/sqrt(2), b/sqrt(2)) / 2
+
+function impact_probability(x::VirtualAsteroid{T}, ϵ::T) where {T <: Real}
+    a, b = convergence_domain(x, ϵ)
+    rs = find_zeros(σ -> distance(x, σ, ϵ), a, b, no_pts = 100)
     if isempty(rs)
-        return distance(x, (a+b)/2) <= 0 ? (a, b) : (b, a)
-    elseif length(rs) == 1
-        return (distance(x, a) < 0 && distance(x, b) > 0) ? (a, rs[1]) : (rs[1], b)
+        return zero(T)
     elseif length(rs) == 2
-        return (rs[1], rs[2])
+        return impact_probability(rs[1], rs[2])
+    elseif length(rs) == 4
+        return impact_probability(rs[1], rs[2]) + impact_probability(rs[3], rs[4])
     else
-        throw(ArgumentError("Cannot process more than two roots"))
+        throw(ArgumentError("Cannot process $(length(rs)) roots"))
     end
 end
-
-impact_probability(a, b) = erf(a/sqrt(2), b/sqrt(2)) / 2
