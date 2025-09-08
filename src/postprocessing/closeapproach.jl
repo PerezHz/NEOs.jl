@@ -205,16 +205,17 @@ function closeapproaches(f!::D, q0::Vector{Taylor1{T}}, jd0::T, nyears::T,
                 # Earth's heliocentric state vector
                 xes = params.eph_ea(t_CA) - params.eph_su(t_CA)
                 # Öpik's coordinates
-                B = bopik(xae, xes)
-                X, Y, Z = B.ξ, B.ζ, B.b
-                coords = :bopik
+                Bplane = bopik(xae, xes)
+                # Close approach
+                CA = CloseApproach{T}(σ, domain, t_CA, Bplane.ξ, Bplane.ζ,
+                                      Bplane.b, :bopik)
             else
                 # Modified target plane
-                X, Y = mtp(xae)
-                Z = 1.0 * one(x)
-                coords = :mtp
+                Mplane = mtp(xae)
+                # Close approach
+                CA = CloseApproach{T}(σ, domain, t_CA, Mplane[1], Mplane[2],
+                                      1.0 * one(Mplane[1]), :mtp)
             end
-            CA = CloseApproach{T}(σ, domain, t_CA, X, Y, Z, coords)
             push!(CAs, CA)
             !isconvergent(CA, ϵ) && break
         end
