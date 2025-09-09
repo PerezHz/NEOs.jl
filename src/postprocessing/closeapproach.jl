@@ -136,8 +136,7 @@ function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},
     return CloseApproach{T}(σ, domain, t, x, y, z, coords)
 end
 
-using TaylorIntegration: update_cache!, taylorstep!, set_psol!, findroot!,
-                         surfacecrossing
+using TaylorIntegration: update_cache!, taylorstep!, set_psol!, findroot!
 
 function closeapproaches(f!::D, q0::Vector{Taylor1{T}}, jd0::T, nyears::T,
                          buffer::PropagationBuffer{T, Taylor1{T}, T},
@@ -149,14 +148,38 @@ function closeapproaches(f!::D, q0::Vector{Taylor1{T}}, jd0::T, nyears::T,
     @unpack cache, dparams = buffer
     # Update reference epoch
     dparams.jd0 = jd0
-    # Initial and final time
-    t0, tmax = zero(T), nyears * yr
+    # Find close approaches
+    CAs = lov_taylorinteg!(Val(true), f!, rvelea, q0, zero(T), nyears * yr, abstol, cache,
+                         dparams, params, σ, domain, ϵ; maxsteps, eventorder, newtoniter, nrabstol)
 
-    # @assert order ≥ eventorder "`eventorder` must be less than or equal to `order`"
+    return CAs
+end
+
+function lov_taylorinteg!(
+    dense::Val{D},
+    f!,
+    g,
+    q0::Array{U,1},
+    t0::T,
+    tmax::T,
+    abstol::T,
+    cache::VectorCache,
+    dparams,
+    params,
+    σ::T,
+    domain::NTuple{2, T},
+    ϵ::T;
+    maxsteps::Int = 500,
+    eventorder::Int = 0,
+    newtoniter::Int = 10,
+    nrabstol::T = eps(T),
+) where {T<:Real,U<:Number,D}
 
     @unpack tv, xv, psol, xaux, t, x, dx, rv, parse_eqs = cache
+    @unpack jd0 = dparams
 
     # Initial conditions
+    epoch0 = jd0 - JD_J2000
     x0 = deepcopy(q0)
     update_cache!(cache, t0, x0)
     @inbounds tv[1] = t0
@@ -164,7 +187,7 @@ function closeapproaches(f!::D, q0::Vector{Taylor1{T}}, jd0::T, nyears::T,
     sign_tstep = copysign(1, tmax - t0)
 
     # Some auxiliary arrays for root-finding/event detection/Poincaré surface of section evaluation
-    g_tupl = rvelea(dx, x, dparams, t)
+    g_tupl = (false, g(dx, x, dparams, t)[2])
     g_tupl_old = deepcopy(g_tupl)
     δt = zero(x[1])
     δt_old = zero(x[1])
@@ -174,7 +197,7 @@ function closeapproaches(f!::D, q0::Vector{Taylor1{T}}, jd0::T, nyears::T,
     x_dx_val = TS.evaluate(x_dx)
     g_dg_val = vcat(TS.evaluate(g_tupl[2]), TS.evaluate(g_tupl_old[2]))
 
-    tvS = Array{Taylor1{T}}(undef, maxsteps + 1)
+    tvS = Array{U}(undef, maxsteps + 1)
     xvS = similar(xv)
     gvS = similar(tvS)
 
@@ -188,17 +211,35 @@ function closeapproaches(f!::D, q0::Vector{Taylor1{T}}, jd0::T, nyears::T,
         δt = taylorstep!(Val(parse_eqs), f!, t, x, dx, xaux, abstol, dparams, rv) # δt is positive!
         # Below, δt has the proper sign according to the direction of the integration
         δt = sign_tstep * min(δt, sign_tstep * (tmax - t0))
-        evaluate!(x, δt, x0) # new initial condition
-        set_psol!(Val(true), psol, nsteps, x) # Store the Taylor polynomial solution
-        g_tupl = rvelea(dx, x, dparams, t)
-        nevents = findroot!(t, x, dx, g_tupl_old, g_tupl, eventorder, tvS, xvS,
-                            gvS, t0, δt_old, x_dx, x_dx_val, g_dg, g_dg_val,
-                            nrabstol, newtoniter, nevents)
-        if surfacecrossing(g_tupl_old, g_tupl, eventorder)
+        TS.evaluate!(x, δt, x0) # new initial condition
+        set_psol!(dense, psol, nsteps, x) # Store the Taylor polynomial solution
+        g_tupl = g(dx, x, dparams, t)
+        nevents_old = nevents
+        nevents = findroot!(
+            t,
+            x,
+            dx,
+            g_tupl_old,
+            g_tupl,
+            eventorder,
+            tvS,
+            xvS,
+            gvS,
+            t0,
+            δt_old,
+            x_dx,
+            x_dx_val,
+            g_dg,
+            g_dg_val,
+            nrabstol,
+            newtoniter,
+            nevents,
+        )
+        if nevents > nevents_old
             # Time at close approach
-            t_CA = tvS[nevents-1] + (jd0 - JD_J2000)
+            t_CA = epoch0 + tvS[nevents-1]
             # Asteroid's geocentric state vector
-            xae = x(tvS[nevents-1] - t0) - params.eph_ea(t_CA)
+            xae = psol[:, nsteps-1]( t_CA - epoch0 - tv[nsteps-1] ) - params.eph_ea(t_CA)
             # Asteroid's geocentric semimajor axis
             a = semimajoraxis(xae..., PE.μ[ea], zero(T))
             if a < 0
@@ -208,13 +249,13 @@ function closeapproaches(f!::D, q0::Vector{Taylor1{T}}, jd0::T, nyears::T,
                 Bplane = bopik(xae, xes)
                 # Close approach
                 CA = CloseApproach{T}(σ, domain, t_CA, Bplane.ξ, Bplane.ζ,
-                                      Bplane.b, :bopik)
+                                    Bplane.b, :bopik)
             else
                 # Modified target plane
                 Mplane = mtp(xae)
                 # Close approach
                 CA = CloseApproach{T}(σ, domain, t_CA, Mplane[1], Mplane[2],
-                                      1.0 * one(Mplane[1]), :mtp)
+                                    1.0 * one(Mplane[1]), :mtp)
             end
             push!(CAs, CA)
             !isconvergent(CA, ϵ) && break
