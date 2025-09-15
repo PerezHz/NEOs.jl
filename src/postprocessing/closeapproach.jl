@@ -35,6 +35,7 @@ end
 
 in(σ::Real, x::CloseApproach) = x.domain[1] ≤ σ ≤ x.domain[2]
 
+center(x::CloseApproach) = x.σ
 lbound(x::CloseApproach) = x.domain[1]
 ubound(x::CloseApproach) = x.domain[2]
 width(x::CloseApproach) = x.domain[2] - x.domain[1]
@@ -60,7 +61,28 @@ isconvergent(x::CloseApproach, ϵ::Real) = convergence_radius(x, ϵ) > 1
 function convergence_domain(x::CloseApproach{T}, ϵ::T) where {T <: Real}
     d = domain_radius(x)
     r = convergence_radius(x, ϵ)
-    return (max(lbound(x), x.σ - r*d), min(ubound(x), x.σ + r*d))
+    return (x.σ - r*d, x.σ + r*d)
+end
+
+function time(x::CloseApproach{T}, σ::T) where {T <: Real}
+    # @assert σ in x "`σ` is outside the domain of `x`"
+    dσ = (σ - x.σ) / domain_radius(x)
+    return x.t(dσ)
+end
+
+function targetplane(x::CloseApproach{T}, σ::T) where {T <: Real}
+    # @assert σ in x "`σ` is outside the domain of `x`"
+    dσ = (σ - x.σ) / domain_radius(x)
+    return [x.x(dσ), x.y(dσ), x.z(dσ)]
+end
+
+function targetplanederivatives(x::CloseApproach{T}, σ::T) where {T <: Real}
+    # @assert σ in x "`σ` is outside the domain of `x`"
+    dσ = (σ - x.σ) / domain_radius(x)
+    dξ = TS.differentiate(x.x)(dσ)
+    dζ = TS.differentiate(x.y)(dσ)
+    db = TS.differentiate(x.z)(dσ)
+    return [dξ, dζ, db]
 end
 
 function distance(x::CloseApproach{T}, σ::T) where {T <: Real}
@@ -69,48 +91,33 @@ function distance(x::CloseApproach{T}, σ::T) where {T <: Real}
     return hypot(x.x(dσ), x.y(dσ)) - x.z(dσ)
 end
 
-function mindistance(x::CloseApproach{T}, tol::T = width(x) / 1E3) where {T <: Real}
-    # 1 / φ
-    invphi = (sqrt(5) - 1) / 2
-    # 1 / φ^2
-    invphi2 = (3 - sqrt(5)) / 2
-    # Interval bounds
-    a, b = x.domain
-    # Interval width
-    h = b - a
-    # Termination condition
-    h <= tol && return distance(x, (a + b) / 2)
-    # Required steps to achieve tolerance
-    n = ceil(Int, log(tol/h) / log(invphi))
-    # Initialize center points
-    c = a + invphi2 * h
-    d = a + invphi * h
-    yc = distance(x, c)
-    yd = distance(x, d)
-    # Main loop
-    for _ in 1:n
-        if yc < yd
-            b = d
-            d = c
-            yd = yc
-            h = invphi * h
-            c = a + invphi2 * h
-            yc = distance(x, c)
-        else
-            a = c
-            c = d
-            yc = yd
-            h = invphi * h
-            d = a + invphi * h
-            yd = distance(x, d)
-        end
-    end
+# TO DO: Use Horner's rule to evaluate derivatives
+function rvelea(x::CloseApproach{T}, σ::T) where {T <: Real}
+    # @assert σ in x "`σ` is outside the domain of `x`"
+    dσ = (σ - x.σ) / domain_radius(x)
+    ξ, ζ = x.x(dσ), x.y(dσ)
+    dξ, dζ = TS.differentiate(x.x)(dσ), TS.differentiate(x.y)(dσ)
+    return (ξ*dξ + ζ*dζ) / domain_radius(x)
+end
 
-    if yc < yd
-        return distance(x, (a + d) / 2)
-    else
-        return distance(x, (c + b) / 2)
-    end
+function concavity(x::CloseApproach{T}, σ::T) where {T <: Real}
+    # @assert σ in x "`σ` is outside the domain of `x`"
+    dσ = (σ - x.σ) / domain_radius(x)
+    ξ, ζ = x.x(dσ), x.y(dσ)
+    dξ, dζ = TS.differentiate(x.x)(dσ), TS.differentiate(x.y)(dσ)
+    d2ξ, d2ζ = TS.differentiate(x.x, 2)(dσ), TS.differentiate(x.y, 2)(dσ)
+    return (ξ*d2ξ + dξ^2 + ζ*d2ζ + dζ^2) / domain_radius(x)^2
+end
+
+function distance_derivatives(x::CloseApproach{T}, σ::T) where {T <: Real}
+    # @assert σ in x "`σ` is outside the domain of `x`"
+    dσ = (σ - x.σ) / domain_radius(x)
+    ξ, ζ = x.x(dσ), x.y(dσ)
+    dξ, dζ = TS.differentiate(x.x)(dσ), TS.differentiate(x.y)(dσ)
+    d2ξ, d2ζ = TS.differentiate(x.x, 2)(dσ), TS.differentiate(x.y, 2)(dσ)
+    return hypot(x.x(dσ), x.y(dσ)) - x.z(dσ),
+           (ξ*dξ + ζ*dζ) / domain_radius(x),
+           (ξ*d2ξ + dξ^2 + ζ*d2ζ + dζ^2) / domain_radius(x)^2
 end
 
 function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},
