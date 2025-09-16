@@ -25,6 +25,17 @@ using Test
 
     # Values by Sep 16, 2025
 
+    # Line of variations
+    order, σmax = 12, 5.0
+    lov = lineofvariations(od, orbit, params; order, σmax)
+    @test lov.dynamics == od.dynamics
+    @test epoch(lov) == epoch(orbit) + PE.J2000
+    @test lov.domain == (-σmax, σmax)
+    @test -σmax in lov
+    @test 0.0 in lov
+    @test σmax in lov
+    @test lov(0.0) == orbit()
+
     # Time of close approach
     params = Parameters(params; fwdoffset = 0.3)
     bwd, fwd, res = propres(od, orbit(), epoch(orbit) + J2000, params)

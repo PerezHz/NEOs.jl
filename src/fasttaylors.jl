@@ -27,10 +27,34 @@ function auday2kmsec!(y::Vector{TaylorN{T}}) where {T <: Real}
     return nothing
 end
 
+function auday2kmsec!(y::Vector{Taylor1{T}}) where {T <: Real}
+    for i in eachindex(y)
+        k = i <= 3 ? au : au/daysec
+        y[i].coeffs .*= k
+    end
+    return nothing
+end
+
 # Warning: functions euclid3D(x) and dot3D(x) assume length(x) >= 3
 euclid3D(x::AbstractVector{T}) where {T <: Real} = sqrt(dot3D(x, x))
 
 function euclid3D(x::AbstractVector{TaylorN{T}}) where {T <: Real}
+    z, w = zero(x[1]), zero(x[1])
+    @inbounds for i in 1:3
+        TS.zero!(w)
+        for k in eachindex(x[i])
+            TS.mul!(w, x[i], x[i], k)
+            TS.add!(z, z, w, k)
+        end
+    end
+    TS.zero!(w)
+    for k in eachindex(z)
+        TS.sqrt!(w, z, k)
+    end
+    return w
+end
+
+function euclid3D(x::AbstractVector{Taylor1{T}}) where {T <: Real}
     z, w = zero(x[1]), zero(x[1])
     @inbounds for i in 1:3
         TS.zero!(w)
@@ -62,6 +86,20 @@ function dot3D(x::Vector{TaylorN{T}}, y::Vector{U}) where {T <: Real, U <: Numbe
 end
 
 dot3D(x::Vector{T}, y::Vector{TaylorN{T}}) where {T <: Real} = dot3D(y, x)
+
+function dot3D(x::Vector{Taylor1{T}}, y::Vector{U}) where {T <: Number, U <: Number}
+    z, w = zero(x[1]), zero(x[1])
+    @inbounds for i in 1:3
+        TS.zero!(w)
+        for k in eachindex(x[i])
+            TS.mul!(w, x[i], y[i], k)
+            TS.add!(z, z, w, k)
+        end
+    end
+    return z
+end
+
+dot3D(x::Vector{T}, y::Vector{Taylor1{T}}) where {T <: Number} = dot3D(y, x)
 
 # TO DO: move this methods to TaylorSeries' Static Arrays extension,
 # in order to avoid type piracy
@@ -118,6 +156,18 @@ function evaleph!(y::Vector{Taylor1{TaylorN{T}}}, eph::TaylorInterpolant{T, T, 2
     return nothing
 end
 
+function evaleph!(y::Vector{Taylor1{Taylor1{T}}}, eph::TaylorInterpolant{T, T, 2},
+                  t::Taylor1{T}) where {T <: Real}
+    eph_t = tpeeval(eph, t)
+    @inbounds for i in eachindex(eph_t)
+        TS.zero!(y[i])
+        for k in eachindex(y[i])
+            y[i][k][0] = eph_t[i][k]
+        end
+    end
+    return nothing
+end
+
 function evaleph!(y::Vector{Taylor1{T}}, eph::TaylorInterpolant{T, T, 2},
                   t::Taylor1{T}) where {T <: Real}
     eph_t = tpeeval(eph, t)
@@ -130,6 +180,21 @@ function evaleph!(y::Vector{Taylor1{T}}, eph::TaylorInterpolant{T, T, 2},
 end
 
 function evaleph!(c::TaylorN{T}, a::Taylor1{TaylorN{T}}, dx::Number) where {T <: Real}
+    TS.zero!(c)
+    d = zero(c)
+    @inbounds for k in reverse(eachindex(a))
+        TS.zero!(d)
+        for ord in eachindex(c)
+            TS.mul!(d, c, dx, ord)
+        end
+        for ord in eachindex(c)
+            TS.add!(c, d, a[k], ord)
+        end
+    end
+    return nothing
+end
+
+function evaleph!(c::Taylor1{T}, a::Taylor1{Taylor1{T}}, dx::Number) where {T <: Real}
     TS.zero!(c)
     d = zero(c)
     @inbounds for k in reverse(eachindex(a))
@@ -218,4 +283,17 @@ function evaleph!(y::Vector{T}, et::T, bwd::DensePropagation2{T, T},
     auday2kmsec!(y)
 
     return nothing
+end
+
+t2c_jpl_de430(dsj2k::Taylor1{T}, zero_q::Taylor1{T}) where {T <: Real} =
+    t2c_jpl_de430(dsj2k) .+ zero_q
+
+t2c_jpl_de430(dsj2k::Taylor1{T}, zero_q::Taylor1{TaylorN{T}}) where {T <: Real} =
+    t2c_jpl_de430(dsj2k) .+ zero_q
+
+function t2c_jpl_de430(dsj2k::Taylor1{T}, zero_q::Taylor1{Taylor1{T}}) where {T <: Real}
+    M = t2c_jpl_de430(dsj2k)
+    one_q = one(zero_q.coeffs[1])
+    _M_ = @. Taylor1(getfield(M, :coeffs) * one_q)
+    return _M_
 end

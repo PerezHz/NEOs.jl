@@ -4,7 +4,8 @@ module NEOs
 import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination, argperi,
-       longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly
+       longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly,
+       t2c_jpl_de430
 
 
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
@@ -79,6 +80,7 @@ export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination
        orbitdetermination
 # Impact monitoring
 export BPlane, MTP, bopik, mtp, targetplane, crosssection, valsecchi_circle
+export LOV, lineofvariations
 
 include("constants.jl")
 include("units.jl")
