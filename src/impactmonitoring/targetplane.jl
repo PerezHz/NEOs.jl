@@ -1,53 +1,63 @@
-@doc raw"""
-    crosssection(μ_P, R_P, vinf)
-
-Return the effective cross section [planet radii] of a planet with gravitational
-parameter `μ_P` [au³/day²] and physical radius `R_P` [au], considering an object
-approaching with asymptotic inbound velocity `vinf` [au/day].
-
-!!! reference
-    See equations (13)-(14) in pages 4-5 of:
-    - https://doi.org/10.1007/s10569-019-9914-4
-
-# Extended help
-
-The effective cross section ``B`` is derived from the conservation of energy and
-angular momentum; it represents the impact parameter corresponding to a grazing
-impact in a hyperbolic close encounter. ``B`` is given by:
-```math
-B = \sqrt{1 + \frac{2\mu_P}{R_P v_\infty^2}},
-```
-where ``\mu_P`` is the planet's gravitational parameter, ``R_P`` is the planet's
-physical radius and ``v_\infty`` is the asymptotic inbound velocity. If actual ``B``
-is equal or less to this, then impact happens.
 """
-crosssection(μ_P, R_P, vinf) = sqrt( 1 + (2μ_P)/(R_P*(vinf)^2) )
+    AbstractTargetPlane{U <: Number} <: AbstractImpactMonitoring
+
+Supertype for the target planes interface.
+"""
+abstract type AbstractTargetPlane{U <: Number} <: AbstractImpactMonitoring end
+
+numtype(::AbstractTargetPlane{U}) where {U} = U
+
+# Print method for AbstractTargetPlane
+show(io::IO, x::AbstractTargetPlane) = print(io, typeof(x), " with coordinates ",
+    cte(targetplane(x)))
+
+"""
+    BPlane{U} <: AbstractTargetPlane{U}
+
+B-Plane in Öpik's coordinates for a hyperbolic planetary close encounter.
+
+# Fields
+
+- `ξ/ζ::U`: Öpik's coordinates [planet radii].
+- `b::U`: planet's impact cross section ("critical B") [planet radii].
+- `U_y/U_norm::U`: y-component and norm of the planetocentric velocity vector [km/s].
+"""
+struct BPlane{U} <: AbstractTargetPlane{U}
+    ξ::U
+    ζ::U
+    b::U
+    U_y::U
+    U_norm::U
+end
+
+targetplane(x::BPlane) = [x.ξ, x.ζ, x.b]
 
 @doc raw"""
     bopik(xae, xes)
 
-Compute the Öpik's coordinates of a hyperbolic planetary close encounter, where
-`xae` is the asteroid's planetocentric cartesian state vector at close approach
-[au, day], and `xes` is the planet's heliocentric cartesian state vector at close
-approach [au, day].
-
-Returns a named tuple with the following fields:
-- `ξ` = ``\mathbf{B}\cdot\hat{\mathbf{\xi}}/R_E`` and `ζ` = ``\mathbf{B}\cdot
-    \hat{\mathbf{\zeta}}/R_E``, where ``\mathbf{B}`` is the impact parameter vector,
-    ``(\hat{\mathbf{\xi}}, \hat{\mathbf{\zeta}})`` is Öpik's frame and ``R_E`` is the
-    planet's radius [au].
-
-- `U` is another named tuple with fields `y` = ``U_y`` and `norm` = ``||\mathbf{U}||``,
-    where ``\mathbf{U}`` is the planetocentric velocity vector [km/s].
-
-- `b` = ``b_E``, where ``b_E`` is the planet's impact cross section ("critical B").
-    See [`crosssection`](@ref).
+Return the [`BPlane`](@ref) of a hyperbolic planetary close encounter. `xae`
+is the asteroid's planetocentric cartesian state vector at close approach
+[au, day], and `xes` is the planet's heliocentric cartesian state vector at
+close approach [au, day].
 
 !!! reference
     See equations (37)-(38) in page 14 of:
     - https://doi.org/10.1007/s10569-019-9914-4
+
+# Extended help
+
+Öpik's coordinates are given by:
+```math
+ξ = \mathbf{B}\cdot\hat{\mathbf{\xi}}/R_E \quad \text{and} \quad
+ζ = \mathbf{B}\cdot\hat{\mathbf{\zeta}}/R_E,
+```
+where ``\mathbf{B}`` is the impact parameter vector, ``(\hat{\mathbf{\xi}},
+\hat{\mathbf{\zeta}})`` is Öpik's frame and ``R_E`` is the planet's radius [au].
+
+For the computation of the planet's impact cross section ("critical B"), see
+[`crosssection`](@ref).
 """
-function bopik(xae, xes)
+function bopik(xae::AbstractVector{U}, xes::AbstractVector{U}) where {U <: Number}
 
     # Computation of Öpik's frame (\mathbf{ξ}, \mathbf{ζ})
     # See equations (37)-(38) in page 14 of https://doi.org/10.1007/s10569-019-9914-4
@@ -108,20 +118,85 @@ function bopik(xae, xes)
     # angle between Y-axis and \vec{U}
     cosθ = dot(S_v, ves_unit)
     v_infty_kms = v_infty*au/daysec # Asteroid unperturbed speed, km/sec
-    # @show v_infty_kms()
     # The norm of \vec{U} in appropriate units
     U_unit = ves_norm # 1 U = v_ast/v_pl
     U_norm = v_infty/U_unit
     # U_y
     U_y = U_norm*cosθ
-    # @show U_y U_norm
 
     # Earth impact cross section ("critical B")
     b_E = crosssection(μ_E, RE/au, v_infty)
-    # @show b_E
 
-    return (ξ=B_dot_ξ*au/RE, ζ=B_dot_ζ*au/RE, U=(y=U_y, norm=U_norm), b=b_E)
+    return BPlane{U}(B_dot_ξ*au/RE, B_dot_ζ*au/RE, b_E, U_y, U_norm)
 end
+
+"""
+    MTP{U} <: AbstractTargetPlane{U}
+
+Modified Target Plane for a planetary close encounter.
+
+# Fields
+
+- `X/Y::U`: target plane cartesian coordinates [planet radii].
+"""
+struct MTP{U} <: AbstractTargetPlane{U}
+    X::U
+    Y::U
+end
+
+targetplane(x::MTP) = [x.X, x.Y, one(x.X)]
+
+"""
+    mtp(xae)
+
+Return the [`MTP`](@ref) of a planetary close encounter. `xae` is the asteroid's
+planetocentric cartesian state vector at close approach [au, day].
+
+!!! reference
+    See equations (43)-(44) in page 15 of:
+    - https://doi.org/10.1007/s10569-019-9914-4
+"""
+function mtp(xae::Vector{U}) where {U <: Number}
+    # Unfold geocentric position and velocity
+    r, v = xae[1:3], xae[4:6]
+    # Reference direction
+    V = [0, 0, -1]
+    # Unit vectors
+    ez = v ./ euclid3D(v)
+    _ey_ = cross(V, ez)
+    ey = _ey_ ./ euclid3D(_ey_)
+    ex = cross(ey, ez)
+    # Cartesian coordinates [Earth radii]
+    X = dot3D(r, ex)*au/RE
+    Y = dot3D(r, ey)*au/RE
+
+    return MTP{U}(X, Y)
+end
+
+@doc raw"""
+    crosssection(μ_P, R_P, vinf)
+
+Return the effective cross section [planet radii] of a planet with gravitational
+parameter `μ_P` [au³/day²] and physical radius `R_P` [au], considering an object
+approaching with asymptotic inbound velocity `vinf` [au/day].
+
+!!! reference
+    See equations (13)-(14) in pages 4-5 of:
+    - https://doi.org/10.1007/s10569-019-9914-4
+
+# Extended help
+
+The effective cross section ``B`` is derived from the conservation of energy and
+angular momentum; it represents the impact parameter corresponding to a grazing
+impact in a hyperbolic close encounter. ``B`` is given by:
+```math
+B = \sqrt{1 + \frac{2\mu_P}{R_P v_\infty^2}},
+```
+where ``\mu_P`` is the planet's gravitational parameter, ``R_P`` is the planet's
+physical radius and ``v_\infty`` is the asymptotic inbound velocity. If actual ``B``
+is equal or less to this, then impact happens.
+"""
+crosssection(μ_P, R_P, vinf) = sqrt( 1 + (2μ_P)/(R_P*(vinf)^2) )
 
 @doc raw"""
     valsecchi_circle(a, e, i, k, h; kwargs...)
@@ -163,9 +238,8 @@ function valsecchi_circle(a, e, i, k, h; m_pl=3.003489614915764e-6)
     U_y = sqrt( a*(1-(e^2)) )*cos(i) - 1
     # U_z = sqrt( a*(1-(e^2)) )*sin(i) # TODO: CHECK SIGN
     U_norm = sqrt( 3 - (1/a) - 2*sqrt(a*(1-(e^2)))*cos(i) )
-    # Expression below should be equal to asteroid heliocentric elliptic semimamajor axis
-    # in au units
-    # @show 1/(1-U_^2-2U_y)
+    # The following expression should be equal to asteroid heliocentric elliptic
+    # semimamajor axis in au units: 1/(1-U_^2-2U_y)
     return valsecchi_circle(U_y, U_norm, k, h, m_pl=m_pl)
 end
 
@@ -229,32 +303,4 @@ function valsecchi_circle(U_y, U_norm, k, h; m_pl=3.003489614915764e-6, a_pl=1.0
     D0 = c*sinθ/(cosθ0p-cosθ)
 
     return R0, D0
-end
-
-"""
-    mtp(xae)
-
-Return the cartesian coordinates [planet radii] on the modified target
-plane of a planetary close encounter, where `xae` is the asteroid's
-planetocentric cartesian state vector at close approach [au, day].
-
-!!! reference
-    See equations (43)-(44) in page 15 of:
-    - https://doi.org/10.1007/s10569-019-9914-4
-"""
-function mtp(xae::Vector{U}) where {U <: Number}
-    # Unfold geocentric position and velocity
-    r, v = xae[1:3], xae[4:6]
-    # Reference direction
-    V = [0, 0, -1]
-    # Unit vectors
-    ez = v ./ euclid3D(v)
-    _ey_ = cross(V, ez)
-    ey = _ey_ ./ euclid3D(_ey_)
-    ex = cross(ey, ez)
-    # Cartesian coordinates [Earth radii]
-    X = dot3D(r, ex)*au/RE
-    Y = dot3D(r, ey)*au/RE
-
-    return X, Y
 end

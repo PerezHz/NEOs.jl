@@ -6,21 +6,24 @@ using LinearAlgebra
 using Roots
 using Test
 
-using NEOs: rvelea
-
-@testset "B-plane" begin
+@testset "Impact monitoring" begin
 
     # Fetch optical astrometry
-    radec = fetch_optical_mpc80("2018 LA", MPC)
+    optical = fetch_optical_mpc80("2018 LA", MPC)
     # Parameters
-    params = Parameters(coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007)
+    params = Parameters(
+        coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
+        tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
+        jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+        significance = 0.99, outrej = false
+    )
     # Orbit determination problem
-    od = ODProblem(newtonian!, radec)
+    od = ODProblem(newtonian!, optical)
 
     # Initial Orbit Determination
     orbit = initialorbitdetermination(od, params)
 
-    # Values by Jul 4, 2025
+    # Values by Sep 16, 2025
 
     # Time of close approach
     params = Parameters(params; fwdoffset = 0.3)
@@ -33,13 +36,15 @@ using NEOs: rvelea
 
     # Öpik's coordinates
     B = bopik(xae, xes)
+    BP = targetplane(B)
     # Modified Target Plane
-    X, Y = mtp(xae)
+    M = mtp(xae)
+    MP = targetplane(M)
 
     # Impact parameter
-    @test B.b >= 1.0
+    @test BP[3] >= MP[3] == 1.0
     # Impact condition
-    @test hypot(B.ξ, B.ζ) <= B.b
-    @test hypot(X, Y) <= 1
+    @test hypot(BP[1], BP[2]) <= BP[3]
+    @test hypot(MP[1], MP[2]) <= MP[3]
 
 end

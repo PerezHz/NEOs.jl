@@ -73,12 +73,12 @@ export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
 export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, osculating,
-       uncertaintyparameter
+       uncertaintyparameter, absolutemagnitude
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
        orbitdetermination
-# Postprocessing
-export absolutemagnitude, crosssection, valsecchi_circle, bopik, mtp
+# Impact monitoring
+export BPlane, MTP, bopik, mtp, targetplane, crosssection, valsecchi_circle
 
 include("constants.jl")
 include("units.jl")
@@ -88,7 +88,7 @@ include("fasttaylors.jl")
 include("astrometry/astrometry.jl")
 include("propagation/propagation.jl")
 include("orbitdetermination/orbitdetermination.jl")
-include("postprocessing/postprocessing.jl")
+include("impactmonitoring/impactmonitoring.jl")
 include("init.jl")
 include("deprecated.jl")
 
