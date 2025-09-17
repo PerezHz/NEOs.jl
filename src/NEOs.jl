@@ -35,7 +35,8 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea
 using Roots: find_zeros
 using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
-using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!
+using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update_cache!,
+      taylorstep!, set_psol!, findroot!
 
 # Common
 export Parameters
@@ -81,6 +82,7 @@ export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination
 # Impact monitoring
 export BPlane, MTP, bopik, mtp, targetplane, crosssection, valsecchi_circle
 export LOV, lineofvariations
+export CloseApproach, closeapproaches
 
 include("constants.jl")
 include("units.jl")
