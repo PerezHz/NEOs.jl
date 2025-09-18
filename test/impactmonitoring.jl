@@ -1,12 +1,15 @@
 # This file is part of the NEOs.jl package; MIT licensed
 
 using NEOs
+using Dates
+using TaylorSeries
 using PlanetaryEphemeris
-using LinearAlgebra
-using Roots
 using Test
 
 @testset "Impact monitoring" begin
+
+    using NEOs: center, lbound, ubound, nominaltime, nominalstate, domain_radius,
+          convergence_radius, isconvergent, timeofca
 
     # Fetch optical astrometry
     optical = fetch_optical_mpc80("2018 LA", MPC)
@@ -23,11 +26,12 @@ using Test
     # Initial Orbit Determination
     orbit = initialorbitdetermination(od, params)
 
-    # Values by Sep 16, 2025
+    # Values by Sep 18, 2025
 
     # Line of variations
     order, σmax = 12, 5.0
     lov = lineofvariations(od, orbit, params; order, σmax)
+
     @test lov.dynamics == od.dynamics
     @test epoch(lov) == epoch(orbit) + PE.J2000
     @test lov.domain == (-σmax, σmax)
@@ -35,27 +39,25 @@ using Test
     @test 0.0 in lov
     @test σmax in lov
     @test lov(0.0) == orbit()
+    @test get_order(lov) == order
 
-    # Time of close approach
-    params = Parameters(params; fwdoffset = 0.3)
-    bwd, fwd, res = propres(od, orbit(), epoch(orbit) + J2000, params)
-    t_CA = find_zeros(t -> rvelea(fwd, params, t), fwd.t0, fwd.t0 + fwd.t[end-1])[1]
-    # Asteroid's geocentric state vector
-    xae = fwd(t_CA) - params.eph_ea(t_CA)
-    # Earth's heliocentric state vector
-    xes = params.eph_ea(t_CA) - params.eph_su(t_CA)
+    # Close approaches
+    σ, domain = 0.0, (-1.0, 1.0)
+    nyears = 0.4 / yr
+    ctol = 0.01
+    CAs = closeapproaches(lov, σ, domain, nyears, params; ctol)
+    @test length(CAs) == 1
+    CA = CAs[1]
 
-    # Öpik's coordinates
-    B = bopik(xae, xes)
-    BP = targetplane(B)
-    # Modified Target Plane
-    M = mtp(xae)
-    MP = targetplane(M)
-
-    # Impact parameter
-    @test BP[3] >= MP[3] == 1.0
-    # Impact condition
-    @test hypot(BP[1], BP[2]) <= BP[3]
-    @test hypot(MP[1], MP[2]) <= MP[3]
+    @test σ in CA
+    @test center(CA) == σ
+    @test lbound(CA) == -1.0
+    @test ubound(CA) == 1.0
+    @test nominaltime(CA) == timeofca(CA, σ)
+    @test nominalstate(CA) == targetplane(CA, σ)
+    @test convergence_radius(CA, ctol) > domain_radius(CA) == 1.0
+    @test isconvergent(CA, ctol)
+    @test CA.tp == BPlane{Taylor1{Float64}}
+    @test hypot(CA.x(), CA.y()) < CA.z()
 
 end

@@ -6,10 +6,9 @@ import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination, argperi,
        longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly,
        t2c_jpl_de430
-
-
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import Tables: Schema, istable, rowaccess, rows, schema
+import TaylorSeries: get_order
 
 using AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON, LazyArtifacts,
       LinearAlgebra, Printf, SatelliteToolboxTransformations, Scratch, SPICE,

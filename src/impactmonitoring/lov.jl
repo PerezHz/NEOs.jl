@@ -38,6 +38,8 @@ epoch(x::LOV) = x.epoch
 
 in(σ::Real, x::LOV) = x.domain[1] ≤ σ ≤ x.domain[2]
 
+get_order(x::LOV) = get_order(first(x.bwd.x))
+
 (x::LOV)(σ::Number) = σ >= 0 ? x.fwd(σ) : x.bwd(σ)
 
 # Return the Taylor expansion of the covariance matrix of an initial condition,
