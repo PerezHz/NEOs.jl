@@ -99,7 +99,7 @@ function dot3D(x::Vector{Taylor1{T}}, y::Vector{U}) where {T <: Number, U <: Num
     return z
 end
 
-dot3D(x::Vector{T}, y::Vector{Taylor1{T}}) where {T <: Number} = dot3D(y, x)
+dot3D(x::Vector{T}, y::Vector{Taylor1{T}}) where {T <: Real} = dot3D(y, x)
 
 # TO DO: move this methods to TaylorSeries' Static Arrays extension,
 # in order to avoid type piracy
