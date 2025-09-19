@@ -42,6 +42,8 @@ end
 
 in(σ::Real, x::CloseApproach) = x.domain[1] ≤ σ ≤ x.domain[2]
 
+get_order(x::CloseApproach) = get_order(x.t)
+
 center(x::CloseApproach) = x.σ
 lbound(x::CloseApproach) = x.domain[1]
 ubound(x::CloseApproach) = x.domain[2]
@@ -53,7 +55,7 @@ nominalstate(x::CloseApproach) = [cte(x.x), cte(x.y), cte(x.z)]
 domain_radius(x::CloseApproach) = max(x.domain[2] - x.σ, x.σ - x.domain[1])
 
 function convergence_radius(x::CloseApproach, ϵ::Real)
-    order = get_order(x.x)
+    order = get_order(x)
     return min(
         (ϵ / norm(x.x[end], Inf))^(1/order),
         (ϵ / norm(x.y[end], Inf))^(1/order),
