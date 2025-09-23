@@ -47,10 +47,14 @@ get_order(x::CloseApproach) = get_order(x.t)
 center(x::CloseApproach) = x.σ
 lbound(x::CloseApproach) = x.domain[1]
 ubound(x::CloseApproach) = x.domain[2]
-width(x::CloseApproach) = x.domain[2] - x.domain[1]
+
+width(x::NTuple{2, T}) where {T <: Real} = x[2] - x[1]
+width(x::CloseApproach) = width(x.domain)
 
 nominaltime(x::CloseApproach) = cte(x.t)
 nominalstate(x::CloseApproach) = [cte(x.x), cte(x.y), cte(x.z)]
+
+difft(x::CloseApproach, y::CloseApproach) = abs(nominaltime(x) - nominaltime(y))
 
 domain_radius(x::CloseApproach) = max(x.domain[2] - x.σ, x.σ - x.domain[1])
 
@@ -61,6 +65,12 @@ function convergence_radius(x::CloseApproach, ϵ::Real)
         (ϵ / norm(x.y[end], Inf))^(1/order),
         (ϵ / norm(x.z[end], Inf))^(1/order)
     )
+end
+
+function convergence_domain(x::CloseApproach, ϵ::Real)
+    d = domain_radius(x)
+    r = convergence_radius(x, ϵ)
+    return (x.σ - r*d, x.σ + r*d)
 end
 
 isconvergent(x::CloseApproach, ϵ::Real) = convergence_radius(x, ϵ) > 1
@@ -75,6 +85,27 @@ end
 function targetplane(x::CloseApproach, σ::Real)
     dσ = deltasigma(x, σ)
     return [x.x(dσ), x.y(dσ), x.z(dσ)]
+end
+
+function distance(x::CloseApproach, σ::Real)
+    dσ = deltasigma(x, σ)
+    return hypot(x.x(dσ), x.y(dσ)) - x.z(dσ)
+end
+
+# TO DO: Use Horner's rule to evaluate derivatives
+function rvelea(x::CloseApproach, σ::Real)
+    dσ = deltasigma(x, σ)
+    ξ, ζ = x.x(dσ), x.y(dσ)
+    dξ, dζ = TS.differentiate(x.x)(dσ), TS.differentiate(x.y)(dσ)
+    return (ξ*dξ + ζ*dζ) / domain_radius(x)
+end
+
+function concavity(x::CloseApproach, σ::Real)
+    dσ = deltasigma(x, σ)
+    ξ, ζ = x.x(dσ), x.y(dσ)
+    dξ, dζ = TS.differentiate(x.x)(dσ), TS.differentiate(x.y)(dσ)
+    d2ξ, d2ζ = TS.differentiate(x.x, 2)(dσ), TS.differentiate(x.y, 2)(dσ)
+    return (ξ*d2ξ + dξ^2 + ζ*d2ζ + dζ^2) / domain_radius(x)^2
 end
 
 function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},

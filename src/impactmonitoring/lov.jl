@@ -38,6 +38,9 @@ epoch(x::LOV) = x.epoch
 
 in(σ::Real, x::LOV) = x.domain[1] ≤ σ ≤ x.domain[2]
 
+lbound(x::LOV) = x.domain[1]
+ubound(x::LOV) = x.domain[2]
+
 get_order(x::LOV) = get_order(first(x.bwd.x))
 
 (x::LOV)(σ::Number) = σ >= 0 ? x.fwd(σ) : x.bwd(σ)

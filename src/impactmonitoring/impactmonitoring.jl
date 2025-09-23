@@ -8,3 +8,5 @@ abstract type AbstractImpactMonitoring end
 include("targetplane.jl")
 include("lov.jl")
 include("closeapproach.jl")
+include("virtualasteroid.jl")
+include("virtualimpactor.jl")

@@ -1,7 +1,8 @@
 module NEOs
 
 # __precompile__(false)
-import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary
+import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary,
+       lastindex
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination, argperi,
        longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly,
@@ -31,7 +32,9 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea
       c_au_per_sec, c_cm_per_sec, semimajoraxis, eccentricity, inclination, longascnode,
       argperi, timeperipass, meanmotion, meananomaly, nbodyind, numberofbodies, selecteph,
       getinterpindex, pole_rotation, t2c_jpl_de430
-using Roots: find_zeros
+using QuadGK: quadgk
+using Roots: Bisection, find_zero, find_zeros
+using SpecialFunctions: erf
 using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update_cache!,
@@ -82,6 +85,8 @@ export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination
 export BPlane, MTP, bopik, mtp, targetplane, crosssection, valsecchi_circle
 export LOV, lineofvariations
 export CloseApproach, closeapproaches
+export VirtualAsteroid, virtualasteroids
+export VirtualImpactor, virtualimpactors, impactor_table
 
 include("constants.jl")
 include("units.jl")
