@@ -68,8 +68,9 @@ RadarJPL(r::DataFrameRow) = RadarJPL{Float64}(
 function parse_radar_jpl(text::AbstractString)
     # Parse JSON
     dict = JSON.parse(text)
-    # NOTE: As of Sep 18th 2025, Ceduna (30-m, UTAS) [-74] has no MPC code
-    filter!(x -> x[7] != "-74" && x[8] != "-74", dict["data"])
+    # NOTE: As of Sep 24th 2025, Ceduna (30-m, UTAS) [-74] and
+    # Usuda (64-m) [-86] have no MPC code
+    filter!(x -> !(x[7] in ("-74", "-86") || x[8] in ("-74", "-86")), dict["data"])
     L = length(dict["data"])
     iszero(L) && return RadarJPL{Float64}[]
     # Construct DataFrame
