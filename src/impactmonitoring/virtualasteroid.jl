@@ -72,7 +72,7 @@ for f in (:(timeofca), :(distance), :(rvelea), :(concavity))
     @eval begin
         function $f(x::VirtualAsteroid, σ::Real, ϵ::Real)
             d = convergence_domain(x, ϵ)
-            @assert d[1] ≤ σ ≤ d[2] "`σ` is outside the convergence domain domain of `x`"
+            @assert d[1] ≤ σ ≤ d[2] "`σ` is outside the convergence domain of `x`"
             i = findsigma(x, σ, ϵ)
             # Normal evaluation of the Taylor polynomials
             if isconvergent(x[i], ϵ) ||
@@ -117,5 +117,13 @@ function virtualasteroids(x::AbstractVector{CloseApproach{T}},
         push!(VAs, VirtualAsteroid{T}(domain, CAs))
     end
 
+    return VAs
+end
+
+function virtualasteroids(x::Vector{Vector{CloseApproach{T}}},
+                          Δt::Real = 45.0) where {T <: Real}
+    CAs = reduce(vcat, x)
+    sort!(CAs, by = nominaltime)
+    VAs = virtualasteroids(CAs, Δt)
     return VAs
 end

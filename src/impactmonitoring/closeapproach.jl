@@ -124,7 +124,7 @@ function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},
         # Modified target plane
         tp = mtp(xae)
     end
-    return CloseApproach{T}(σ, domain, t, targetplane(TP)..., typeof(TP))
+    return CloseApproach{T}(σ, domain, t, targetplane(tp)..., typeof(tp))
 end
 
 """

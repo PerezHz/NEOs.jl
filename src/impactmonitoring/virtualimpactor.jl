@@ -32,6 +32,8 @@ function show(io::IO, x::VirtualImpactor)
     print(io, "VI at ", t, " with probability ", ip)
 end
 
+ismarginal(x::VirtualImpactor) = isempty(x.covariance)
+
 width(x::VirtualImpactor) = width(x.domain)
 isoutlov(x::VirtualImpactor) = iszero(width(x))
 
@@ -92,6 +94,12 @@ function VirtualImpactor(lov::LOV{D, T}, od::AbstractODProblem{D, T},
     # Forward propagation
     nyears = (t + 2 + PE.J2000 - jd0) / yr
     fwd, tvS, _, _ = propagate_root(lov.dynamics, q0, epoch(lov), nyears, params)
+    # Marginal close approach
+    if any(isnan, fwd.t)
+        Γ_B = Matrix{T}(undef, 0, 0)
+        ip = T(NaN)
+        return VirtualImpactor{T}(σ, t, ip, domain, Γ_B)
+    end
     # Close approach
     t_CA = fwd.t0 + tvS[end]
     xae = fwd(t_CA) - params.eph_ea(t_CA)
@@ -101,13 +109,13 @@ function VirtualImpactor(lov::LOV{D, T}, od::AbstractODProblem{D, T},
         # Earth's heliocentric state vector
         xes = params.eph_ea(t_CA) - params.eph_su(t_CA)
         # Öpik's coordinates
-        B = bopik(xae, xes)
-        X, Y, Z = B.ξ, B.ζ, B.b
+        tp = bopik(xae, xes)
     else
         # Modified target plane
-        X, Y = mtp(xae)
-        Z = 1.0 * one(x)
+        tp = mtp(xae)
     end
+    # Target plane coordinates
+    X, Y, Z = targetplane(tp)
     # Target plane covariance matrix at close approach
     Γ_B = project([X, Y], zeros(6), Γ)
     # Impact probability
@@ -169,6 +177,29 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ϵ::Real) where {T <:
     return is, σs, ts, ds
 end
 
+impactinglbound(CA::CloseApproach, σ::Real) = distance(CA, lbound(CA)) > 0 && lbound(CA) < σ
+impactingubound(CA::CloseApproach, σ::Real) = distance(CA, ubound(CA)) > 0 && σ < ubound(CA)
+
+function impactingdomain(VA::VirtualAsteroid, ϵ::Real, σ::Real, d::Real)
+    if d < 0
+        a, b = convergence_domain(VA, ϵ)
+        if lbound(VA[1]) < σ
+            i = findlast(Base.Fix2(impactinglbound, σ), VA.CAs)
+            a = max(a, lbound(VA[i]))
+        end
+        if σ < ubound(VA[end])
+            i = findfirst(Base.Fix2(impactingubound, σ), VA.CAs)
+            b = min(b, ubound(VA[i]))
+        end
+        a = find_zero(x -> distance(VA, x, ϵ), (a, σ), Bisection())
+        b = find_zero(x -> distance(VA, x, ϵ), (σ, b), Bisection())
+        domain = (a, b)
+    else
+        domain = (σ, σ)
+    end
+    return domain
+end
+
 """
     virtualimpactors(VAs, ctol, lov, od, orbit, params; kwargs...)
 
@@ -195,26 +226,11 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ϵ::Real, lov::LOV{D,
     VIs = Vector{VirtualImpactor{T}}(undef, 0)
     for k in 1:min(N, length(ds))
         i, σ, t, d = is[k], σs[k], ts[k], ds[k]
-        VA = VAs[i]
-        if d < 0
-            a, b = convergence_domain(VA, ϵ)
-            if lbound(VA[1]) < σ
-                a = max(a, lbound(VA[findlast(CA -> distance(CA, lbound(CA)) > 0 &&
-                        lbound(CA) < σ, VA.CAs)]))
-            end
-            if σ < ubound(VA[end])
-                b = min(b, ubound(VA[findfirst(CA -> distance(CA, ubound(CA)) > 0 &&
-                        σ < ubound(CA), VA.CAs)]))
-            end
-            a = find_zero(x -> distance(VA, x, ϵ), (a, σ), Bisection())
-            b = find_zero(x -> distance(VA, x, ϵ), (σ, b), Bisection())
-            domain = (a, b)
-        else
-            domain = (σ, σ)
+        domain = impactingdomain(VAs[i], ϵ, σ, d)
+        VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
+        if !ismarginal(VI)
+            push!(VIs, VI)
         end
-        @time VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
-        @show VI
-        push!(VIs, VI)
     end
     # Sort by time of impact
     sort!(VIs, by = nominaltime)
