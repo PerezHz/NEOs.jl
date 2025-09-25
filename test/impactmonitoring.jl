@@ -7,7 +7,8 @@ using PlanetaryEphemeris
 using Test
 
 using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
-      convergence_domain, isconvergent, timeofca, distance, rvelea, concavity
+      convergence_domain, isconvergent, timeofca, distance, rvelea,
+      concavity, width, ismarginal, isoutlov
 
 @testset "Impact monitoring" begin
 
@@ -37,6 +38,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test sigma(lov) == 0.0
         @test lbound(lov) == -σmax
         @test ubound(lov) == σmax
+        @test width(lov) == 2σmax
 
         @test lov.dynamics == od.dynamics
         @test nominaltime(lov) == epoch(lov) == epoch(orbit)
@@ -82,6 +84,21 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Virtual impactors
         VIs = virtualimpactors(VAs, ctol, lov, od, orbit, params)
         @test isempty(VIs)
+
+        VI1 = VirtualImpactor(lov, od, orbit, params, σ, nominaltime(VA), domain)
+        VI2 = VirtualImpactor(lov, od, orbit, params, σ, nominaltime(VA), (σ, σ))
+
+        @test date(VI1) == date(VI2) == date(CA) == date(VA)
+        @test sigma(VI1) == sigma(VI2) == σ
+        @test impact_probability(VI1) ≈ impact_probability(VI2) atol = 0.01
+        @test width(VI1) == 2σmax
+        @test width(VI2) == 0.0
+        @test !ismarginal(VI1) && !ismarginal(VI2)
+        @test !isoutlov(VI1) && isoutlov(VI2)
+
+        VIs = [VI1, VI2]
+        impactor_table(VIs)
+        @test isa(summary(VIs), String)
     end
 
     @testset "Modified target plane" begin
@@ -111,6 +128,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test sigma(lov) == 0.0
         @test lbound(lov) == -σmax
         @test ubound(lov) == σmax
+        @test width(lov) == 2σmax
 
         @test lov.dynamics == od.dynamics
         @test nominaltime(lov) == epoch(lov) == epoch(orbit)
@@ -156,6 +174,21 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Virtual impactors
         VIs = virtualimpactors(VAs, ctol, lov, od, orbit, params)
         @test isempty(VIs)
+
+        VI1 = VirtualImpactor(lov, od, orbit, params, σ, nominaltime(VA), domain)
+        VI2 = VirtualImpactor(lov, od, orbit, params, σ, nominaltime(VA), (σ, σ))
+
+        @test date(VI1) == date(VI2) == date(CA) == date(VA)
+        @test sigma(VI1) == sigma(VI2) == σ
+        @test impact_probability(VI1) > impact_probability(VI2) == 0.0
+        @test width(VI1) == 2σmax
+        @test width(VI2) == 0.0
+        @test !ismarginal(VI1) && !ismarginal(VI2)
+        @test !isoutlov(VI1) && isoutlov(VI2)
+
+        VIs = [VI1, VI2]
+        impactor_table(VIs)
+        @test isa(summary(VIs), String)
     end
 
 end
