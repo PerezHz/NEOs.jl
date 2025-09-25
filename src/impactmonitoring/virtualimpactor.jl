@@ -243,7 +243,7 @@ function summary(VIs::AbstractVector{VirtualImpactor{T}}) where {T <: Real}
         ip = rpad(@sprintf("%+.2E", VI.ip) * asterisk, 11)
         s2[i] = string(t, σ, ip, "\n")
     end
-    return join(s1, join(s2))
+    return string(s1, join(s2))
 end
 
 impactor_table(x::AbstractVector{VirtualImpactor{T}}) where {T <: Real} = println(summary(x))
