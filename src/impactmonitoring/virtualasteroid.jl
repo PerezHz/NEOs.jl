@@ -1,65 +1,52 @@
 """
-    AbstractVirtualAsteroid{T <: Real} <: AbstractImpactMonitoring
-
-Supertype for the virtual asteroids interface.
-"""
-abstract type AbstractVirtualAsteroid{T <: Real} <: AbstractImpactMonitoring end
-
-"""
-    VirtualAsteroid{T} <: AbstractVirtualAsteroid{T}
+    VirtualAsteroid{T} <: AbstractLineOfVariations{T}
 
 A set of [`CloseApproach`](@ref)s with subsequent domains over the line
-of variations (LOV) and nominal times within a given time window.
+of variations and nominal dates within a given time window.
 
 # Fields
 
-- `domain::NTuple{2, T}`: segment of the LOV.
+- `domain::NTuple{2, T}`: segment of the line of variations.
 - `CAs::Vector{CloseApproach{T}}`: vector of close approaches.
 """
-struct VirtualAsteroid{T} <: AbstractVirtualAsteroid{T}
+struct VirtualAsteroid{T} <: AbstractLineOfVariations{T}
     domain::NTuple{2, T}
     CAs::Vector{CloseApproach{T}}
 end
 
 function show(io::IO, x::VirtualAsteroid)
-    t = days2dtutc(nominaltime(x))
+    t = date(x)
     N = length(x.CAs)
     domain = x.domain
     print(io, "VA at ", t, " with ", N, " CAs covering ", domain)
 end
 
-in(σ::Real, x::VirtualAsteroid) = x.domain[1] ≤ σ ≤ x.domain[2]
+nominaltime(x::VirtualAsteroid) = mean(nominaltime, x.CAs)
+
+sigma(x::VirtualAsteroid) = (lbound(x) + ubound(x)) / 2
+
+get_order(x::VirtualAsteroid) = get_order(x[1])
 
 getindex(x::VirtualAsteroid, i::Int) = x.CAs[i]
 lastindex(x::VirtualAsteroid) = lastindex(x.CAs)
 
-get_order(x::VirtualAsteroid) = get_order(x[1])
-
-center(x::VirtualAsteroid) = (lbound(x) + ubound(x)) / 2
-lbound(x::VirtualAsteroid) = x.domain[1]
-ubound(x::VirtualAsteroid) = x.domain[2]
-
-width(x::VirtualAsteroid) = width(x.domain)
-
-nominaltime(x::VirtualAsteroid) = mean(nominaltime, x.CAs)
-
 closeapproaches(x::VirtualAsteroid) = x.CAs
 
-isconvergent(x::VirtualAsteroid, ϵ::Real) = all(Base.Fix2(isconvergent, ϵ), x.CAs)
+isconvergent(x::VirtualAsteroid, ctol::Real) = all(Base.Fix2(isconvergent, ctol), x.CAs)
 
-function convergence_domain(x::VirtualAsteroid, ϵ::Real)
-    ds = convergence_domain.(x.CAs, ϵ)
+function convergence_domain(x::VirtualAsteroid, ctol::Real)
+    ds = convergence_domain.(x.CAs, ctol)
     return (minimum(first, ds), maximum(last, ds))
 end
 
-function exponential_weights(x::CloseApproach, σ::Real, ϵ::Real)
-    dσ = abs(σ - center(x)) / (convergence_radius(x, ϵ) * domain_radius(x))
+function exponential_weights(x::CloseApproach, σ::Real, ctol::Real)
+    dσ = deltasigma(x, σ) / convergence_radius(x, ctol)
     w = 1 / 10^(dσ - 1)
     return w
 end
 
-function findsigma(x::VirtualAsteroid, σ::Real, ϵ::Real)
-    a, b = convergence_domain(x, ϵ)
+function findsigma(x::VirtualAsteroid, σ::Real, ctol::Real)
+    a, b = convergence_domain(x, ctol)
     a ≤ σ ≤ ubound(x[1]) && return 1
     lbound(x[end]) ≤ σ ≤ b && return lastindex(x)
     for i in 2:lastindex(x)-1
@@ -68,22 +55,24 @@ function findsigma(x::VirtualAsteroid, σ::Real, ϵ::Real)
     return 0
 end
 
-for f in (:(timeofca), :(distance), :(rvelea), :(concavity))
+nominalstate(x::VirtualAsteroid, ctol::Real) = targetplane(x, sigma(x), ctol)
+
+for f in (:(targetplane), :(timeofca), :(distance), :(rvelea), :(concavity))
     @eval begin
-        function $f(x::VirtualAsteroid, σ::Real, ϵ::Real)
-            d = convergence_domain(x, ϵ)
+        function $f(x::VirtualAsteroid, σ::Real, ctol::Real)
+            d = convergence_domain(x, ctol)
             @assert d[1] ≤ σ ≤ d[2] "`σ` is outside the convergence domain of `x`"
-            i = findsigma(x, σ, ϵ)
+            i = findsigma(x, σ, ctol)
             # Normal evaluation of the Taylor polynomials
-            if isconvergent(x[i], ϵ) ||
-                (i == 1 && d[1] ≤ σ ≤ center(x[1])) ||
-                (i == length(x.CAs) && center(x[end]) ≤ σ ≤ d[2])
+            if isconvergent(x[i], ctol) ||
+                (i == 1 && d[1] ≤ σ ≤ sigma(x[1])) ||
+                (i == length(x.CAs) && sigma(x[end]) ≤ σ ≤ d[2])
                 return $f(x[i], σ)
             end
             # Exponentially decaying average
-            i = findlast( y -> y.σ < σ, x.CAs)
-            j = findfirst(y -> σ < y.σ, x.CAs)
-            wi, wj = exponential_weights(x[i], σ, ϵ), exponential_weights(x[j], σ, ϵ)
+            i = findlast( y -> sigma(y) < σ, x.CAs)
+            j = findfirst(y -> σ < sigma(y), x.CAs)
+            wi, wj = exponential_weights(x[i], σ, ctol), exponential_weights(x[j], σ, ctol)
             return (wi * $f(x[i], σ) + wj * $f(x[j], σ)) / (wi + wj)
         end
     end
@@ -93,7 +82,7 @@ end
     virtualasteroids(CAs [, Δt])
 
 Aggregate a vector of [`CloseApproach`](@ref)s into a vector of
-[`VirtualAsteroid`](@ref)s given a time window `Δt` (default: `45.0`).
+[`VirtualAsteroid`](@ref)s given a time window `Δt` [days] (default: `45.0`).
 """
 function virtualasteroids(x::AbstractVector{CloseApproach{T}},
                           Δt::Real = 45.0) where {T <: Real}

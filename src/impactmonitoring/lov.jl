@@ -1,25 +1,16 @@
 """
-    AbstractLOV{D, T <: Real} <: AbstractImpactMonitoring
+    LineOfVariations{D, T} <: AbstractLineOfVariations{T}
 
-Supertype for the line of variations (LOV) interface.
-"""
-abstract type AbstractLOV{D, T <: Real} <: AbstractImpactMonitoring end
-
-numtypes(::AbstractLOV{D, T}) where {D, T} = D, T
-
-"""
-    LOV{D, T} <: AbstractLOV{D, T}
-
-A parametrization of the line of variations (LOV).
+A parametrization of the line of variations.
 
 # Fields
 
 - `dynamics::D`: dynamical model.
-- `epoch::T`: reference epoch [julian days TDB].
+- `epoch::T`: reference epoch [days since J2000 TDB].
 - `domain::NTuple{2, T}`: integrated domain.
 - `bwd/fwd::DensePropagation2{T, T}`: backward (forward) integration.
 """
-struct LOV{D, T} <: AbstractLOV{D, T}
+struct LineOfVariations{D, T} <: AbstractLineOfVariations{T}
     dynamics::D
     epoch::T
     domain::NTuple{2, T}
@@ -27,23 +18,23 @@ struct LOV{D, T} <: AbstractLOV{D, T}
     fwd::DensePropagation2{T, T}
 end
 
-function show(io::IO, x::LOV)
+function show(io::IO, x::LineOfVariations)
     D, T = numtypes(x)
-    epoch = days2dtutc(x.epoch - PE.J2000)
+    t = date(x)
     domain = x.domain
-    print(io, "LOV{", D.instance, ", ", T, "} at ", epoch, " over ", domain)
+    print(io, "LineOfVariations{", D.instance, ", ", T, "} at ", t, " over ", domain)
 end
 
-epoch(x::LOV) = x.epoch
+numtypes(::LineOfVariations{D, T}) where {D, T} = D, T
 
-in(σ::Real, x::LOV) = x.domain[1] ≤ σ ≤ x.domain[2]
+epoch(x::LineOfVariations) = x.epoch
+nominaltime(x::LineOfVariations) = x.epoch
 
-lbound(x::LOV) = x.domain[1]
-ubound(x::LOV) = x.domain[2]
+sigma(::LineOfVariations{D, T}) where {D, T} = zero(T)
 
-get_order(x::LOV) = get_order(first(x.bwd.x))
+get_order(x::LineOfVariations) = get_order(first(x.bwd.x))
 
-(x::LOV)(σ::Number) = σ >= 0 ? x.fwd(σ) : x.bwd(σ)
+(x::LineOfVariations)(σ::Number) = σ >= 0 ? x.fwd(σ) : x.bwd(σ)
 
 # Return the Taylor expansion of the covariance matrix of an initial condition,
 # with respect to the normalized direction of the eigenvector associated to the
@@ -82,7 +73,7 @@ function lovcovariance(
     # Greatest eigenpair
     E = eigen(Γ_c)
     k1, v1 = sqrt(E.values[end]), E.vectors[:, end]
-    # LOV initial condition
+    # Line of variations initial condition
     q0T1 = q00 + k1 * v1 * Taylor1(order)
     # Propagation and residuals
     propres!(resT1, od, q0T1, jd0, params; buffer = bufferT1)
@@ -141,7 +132,7 @@ end
 """
     lov!
 
-Definition of the line of variations (LOV) as a differential equation.
+Definition of the line of variations as a differential equation.
 
 !!! reference
     See equation (10.2) in section 10.1:
@@ -200,9 +191,9 @@ function TaylorIntegration.jetcoeffs!(::Val{lov!}, t::Taylor1{_T}, q::AbstractAr
 end
 
 """
-    lineofvariations(od, orbit, params)
+    lineofvariations(od, orbit, params; kwargs...)
 
-Return a parametrization of the line of variations (LOV) associated to an
+Return a parametrization of the line of variations associated to an
 orbit determination problem `od` and a reference `orbit`.
 
 # Keyword arguments
@@ -225,13 +216,13 @@ function lineofvariations(od::AbstractODProblem{D, T}, orbit::AbstractOrbit,
     q00 = orbit()
     q0TN = q00 + sigmas(orbit) .* get_variables(T, 2)
     q0T1 = q00 + sigmas(orbit) .* Taylor1(order)
-    # LOV parameters
+    # Line of variations parameters
     resTN = init_optical_residuals(TaylorN{T}, od, orbit)
     resT1 = init_optical_residuals(Taylor1{T}, od, orbit)
     bufferTN = PropresBuffer(od, q0TN, jd0, params)
     bufferT1 = PropresBuffer(od, q0T1, jd0, params)
     lovparams = (resTN, resT1, od, jd0, params, bufferTN, bufferT1, order)
-    # Taylor expansion of the LOV
+    # Taylor expansion of the line of variations
     domain = (-σmax, σmax)
     _bwd_ = taylorinteg(lov!, q00, zero(T), -σmax, order, abstol, lovparams;
                         maxsteps, dense = true)
@@ -240,5 +231,5 @@ function lineofvariations(od::AbstractODProblem{D, T}, orbit::AbstractOrbit,
     bwd = TaylorInterpolant{T, T, 2}(zero(T), _bwd_.t, _bwd_.p)
     fwd = TaylorInterpolant{T, T, 2}(zero(T), _fwd_.t, _fwd_.p)
 
-    return LOV{D, T}(od.dynamics, jd0, domain, bwd, fwd)
+    return LineOfVariations{D, T}(od.dynamics, epoch(orbit), domain, bwd, fwd)
 end

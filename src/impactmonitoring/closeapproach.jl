@@ -1,27 +1,20 @@
 """
-    AbstractCloseApproach{T <: Real} <: AbstractImpactMonitoring
-
-Supertype for the close approaches interface.
-"""
-abstract type AbstractCloseApproach{T <: Real} <: AbstractImpactMonitoring end
-
-"""
-    CloseApproach{T} <: AbstractCloseApproach{T}
+    CloseApproach{T} <: AbstractLineOfVariations{T}
 
 The projection over the target plane of a segment of the line of variations
-(LOV) at close approach with respect to a planet.
+at close approach with respect to a planet.
 
 # Fields
 
 - `σ::T`: center of the Taylor expansions.
-- `domain::NTuple{2, T}`: segment of the LOV.
+- `domain::NTuple{2, T}`: segment of the line of variations.
 - `t::Taylor1{T}`: time of close approach [days since J2000 TDB].
 - `x/y::Taylor1{T}`: coordinates on the target plane [planet radii].
 - `z::Taylor1{T}`: impact parameter [planet radii].
 - `tp::Type{<:AbstractTargetPlane}`: type of target plane, either
     [`BPlane`](@ref) or [`MTP`](@ref).
 """
-struct CloseApproach{T} <: AbstractCloseApproach{T}
+struct CloseApproach{T} <: AbstractLineOfVariations{T}
     σ::T
     domain::NTuple{2, T}
     t::Taylor1{T}
@@ -33,49 +26,43 @@ end
 
 function show(io::IO, x::CloseApproach)
     tp = x.tp.name.wrapper
-    σ = center(x)
-    t = days2dtutc(nominaltime(x))
+    σ = sigma(x)
+    t = date(x)
     r = nominalstate(x)
 
     print(io, tp, " σ: ", σ, " t: ", t, " coords: ", r)
 end
 
-in(σ::Real, x::CloseApproach) = x.domain[1] ≤ σ ≤ x.domain[2]
+nominaltime(x::CloseApproach) = cte(x.t)
+
+sigma(x::CloseApproach) = x.σ
 
 get_order(x::CloseApproach) = get_order(x.t)
 
-center(x::CloseApproach) = x.σ
-lbound(x::CloseApproach) = x.domain[1]
-ubound(x::CloseApproach) = x.domain[2]
-
-width(x::NTuple{2, T}) where {T <: Real} = x[2] - x[1]
-width(x::CloseApproach) = width(x.domain)
-
-nominaltime(x::CloseApproach) = cte(x.t)
 nominalstate(x::CloseApproach) = [cte(x.x), cte(x.y), cte(x.z)]
 
 difft(x::CloseApproach, y::CloseApproach) = abs(nominaltime(x) - nominaltime(y))
 
-domain_radius(x::CloseApproach) = max(x.domain[2] - x.σ, x.σ - x.domain[1])
+domain_radius(x::CloseApproach) = max(ubound(x) - sigma(x), sigma(x) - lbound(x))
 
-function convergence_radius(x::CloseApproach, ϵ::Real)
+function convergence_radius(x::CloseApproach, ctol::Real)
     order = get_order(x)
     return min(
-        (ϵ / norm(x.x[end], Inf))^(1/order),
-        (ϵ / norm(x.y[end], Inf))^(1/order),
-        (ϵ / norm(x.z[end], Inf))^(1/order)
+        (ctol / norm(x.x[end], Inf))^(1/order),
+        (ctol / norm(x.y[end], Inf))^(1/order),
+        (ctol / norm(x.z[end], Inf))^(1/order)
     )
 end
 
-function convergence_domain(x::CloseApproach, ϵ::Real)
+function convergence_domain(x::CloseApproach, ctol::Real)
     d = domain_radius(x)
-    r = convergence_radius(x, ϵ)
-    return (x.σ - r*d, x.σ + r*d)
+    r = convergence_radius(x, ctol)
+    return (sigma(x) - r*d, sigma(x) + r*d)
 end
 
-isconvergent(x::CloseApproach, ϵ::Real) = convergence_radius(x, ϵ) > 1
+isconvergent(x::CloseApproach, ctol::Real) = convergence_radius(x, ctol) > 1
 
-deltasigma(x::CloseApproach, σ::Real) = (σ - center(x)) / domain_radius(x)
+deltasigma(x::CloseApproach, σ::Real) = (σ - sigma(x)) / domain_radius(x)
 
 function timeofca(x::CloseApproach, σ::Real)
     dσ = deltasigma(x, σ)
@@ -145,7 +132,7 @@ section of [`Parameters`](@ref).
 - `buffer::Union{Nothing, PropagationBuffer}`: pre-allocated memory (default: `nothing`).
 """
 function closeapproaches(
-        lov::LOV{D, T}, σ::T, domain::NTuple{2, T}, nyears::T,
+        lov::LineOfVariations{D, T}, σ::T, domain::NTuple{2, T}, nyears::T,
         params::Parameters{T}; lovorder::Int = min(6, get_order(lov)),
         ctol::T = 0.01, newtoniter::Int = 10, nrabstol::T = eps(T),
         buffer::Union{Nothing, PropagationBuffer{T, Taylor1{T}, T}} = nothing
@@ -155,8 +142,8 @@ function closeapproaches(
     # Dynamical model
     dynamics = lov.dynamics
     # Reference epoch
-    jd0 = epoch(lov)
-    d0 = jd0 - JD_J2000
+    d0 = epoch(lov)
+    jd0 = d0 + JD_J2000
     # Initial conditions
     t0, tmax = zero(T), nyears * yr
     q0 = lov(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(lovorder))
@@ -167,7 +154,7 @@ function closeapproaches(
     end
     @unpack cache, dparams = buffer
     @unpack tv, xv, psol, xaux, t, x, dx, rv, parse_eqs = cache
-    dparams.jd0 = epoch(lov)
+    dparams.jd0 = jd0
 
     # Specialized version of the root-finding method of taylorinteg
     x0 = deepcopy(q0)

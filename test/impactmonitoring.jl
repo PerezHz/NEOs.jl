@@ -6,8 +6,8 @@ using TaylorSeries
 using PlanetaryEphemeris
 using Test
 
-using NEOs: center, lbound, ubound, nominaltime, nominalstate, domain_radius,
-          convergence_radius, isconvergent, timeofca
+using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
+      convergence_domain, isconvergent, timeofca, distance, rvelea, concavity
 
 @testset "Impact monitoring" begin
 
@@ -27,14 +27,19 @@ using NEOs: center, lbound, ubound, nominaltime, nominalstate, domain_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Sep 19, 2025
+        # Values by Sep 25, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
         lov = lineofvariations(od, orbit, params; order, σmax)
 
+        @test round(date(lov), Minute) == DateTime(2018, 06, 02, 09, 34)
+        @test sigma(lov) == 0.0
+        @test lbound(lov) == -σmax
+        @test ubound(lov) == σmax
+
         @test lov.dynamics == od.dynamics
-        @test epoch(lov) == epoch(orbit) + PE.J2000
+        @test nominaltime(lov) == epoch(lov) == epoch(orbit)
         @test lov.domain == (-σmax, σmax)
         @test -σmax in lov
         @test 0.0 in lov
@@ -43,23 +48,40 @@ using NEOs: center, lbound, ubound, nominaltime, nominalstate, domain_radius,
         @test get_order(lov) == order
 
         # Close approaches
-        σ, domain = 0.0, (-1.0, 1.0)
+        σ, domain = 0.0, (-σmax, σmax)
         nyears = 0.4 / yr
+        lovorder = 6
         ctol = 0.01
-        CAs = closeapproaches(lov, σ, domain, nyears, params; ctol)
+        CAs = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
         @test length(CAs) == 1
         CA = CAs[1]
 
-        @test σ in CA
-        @test center(CA) == σ
-        @test lbound(CA) == -1.0
-        @test ubound(CA) == 1.0
-        @test nominaltime(CA) == timeofca(CA, σ)
-        @test nominalstate(CA) == targetplane(CA, σ)
-        @test convergence_radius(CA, ctol) > domain_radius(CA) == 1.0
-        @test isconvergent(CA, ctol)
+        # Virtual asteroids
+        VAs = virtualasteroids(CAs)
+        @test length(VAs) == 1
+        VA = VAs[1]
+
+        @test round(date(CA), Minute) == round(date(VA), Minute) == DateTime(2018, 06, 02, 16, 49)
+        @test sigma(CA) == sigma(VA) == σ
+        @test lbound(CA) == lbound(VA) == -σmax
+        @test ubound(CA) == ubound(VA) == σmax
+
+        @test σ in CA && σ in VA
+        @test get_order(CA) == get_order(VA) == lovorder
+        @test nominaltime(CA) == nominaltime(VA) == timeofca(CA, σ) == timeofca(VA, σ, ctol)
+        @test nominalstate(CA) == nominalstate(VA, ctol) == targetplane(CA, σ) == targetplane(VA, σ, ctol)
+        @test domain_radius(CA) == σmax
+        @test convergence_radius(CA, ctol) > 1
+        @test convergence_domain(CA, ctol) == convergence_domain(CA, ctol)
+        @test isconvergent(CA, ctol) && isconvergent(CA, ctol)
         @test CA.tp == BPlane{Taylor1{Float64}}
-        @test hypot(CA.x(), CA.y()) < CA.z()
+        @test distance(CA, σ) == distance(VA, σ, ctol) < 0
+        @test rvelea(CA, σ) == rvelea(VA, σ, ctol)
+        @test concavity(CA, σ) == concavity(VA, σ, ctol) > 0
+
+        # Virtual impactors
+        VIs = virtualimpactors(VAs, ctol, lov, od, orbit, params)
+        @test isempty(VIs)
     end
 
     @testset "Modified target plane" begin
@@ -79,14 +101,19 @@ using NEOs: center, lbound, ubound, nominaltime, nominalstate, domain_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Sep 19, 2025
+        # Values by Sep 25, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
         lov = lineofvariations(od, orbit, params; order, σmax)
 
+        @test round(date(lov), Minute) == DateTime(2024, 10, 04, 20, 08)
+        @test sigma(lov) == 0.0
+        @test lbound(lov) == -σmax
+        @test ubound(lov) == σmax
+
         @test lov.dynamics == od.dynamics
-        @test epoch(lov) == epoch(orbit) + PE.J2000
+        @test nominaltime(lov) == epoch(lov) == epoch(orbit)
         @test lov.domain == (-σmax, σmax)
         @test -σmax in lov
         @test 0.0 in lov
@@ -95,23 +122,40 @@ using NEOs: center, lbound, ubound, nominaltime, nominalstate, domain_radius,
         @test get_order(lov) == order
 
         # Close approaches
-        σ, domain = 0.0, (-1.0, 1.0)
+        σ, domain = 0.0, (-σmax, σmax)
         nyears = 26 / yr
+        lovorder = 6
         ctol = 0.01
-        CAs = closeapproaches(lov, σ, domain, nyears, params; ctol)
+        CAs = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
         @test length(CAs) == 1
         CA = CAs[1]
 
-        @test σ in CA
-        @test center(CA) == σ
-        @test lbound(CA) == -1.0
-        @test ubound(CA) == 1.0
-        @test nominaltime(CA) == timeofca(CA, σ)
-        @test nominalstate(CA) == targetplane(CA, σ)
-        @test convergence_radius(CA, ctol) > domain_radius(CA) == 1.0
-        @test isconvergent(CA, ctol)
+        # Virtual asteroids
+        VAs = virtualasteroids(CAs)
+        @test length(VAs) == 1
+        VA = VAs[1]
+
+        @test round(date(CA), Minute) == round(date(VA), Minute) == DateTime(2024, 10, 28, 23, 41)
+        @test sigma(CA) == sigma(VA) == σ
+        @test lbound(CA) == lbound(VA) == -σmax
+        @test ubound(CA) == ubound(VA) == σmax
+
+        @test σ in CA && σ in VA
+        @test get_order(CA) == get_order(VA) == lovorder
+        @test nominaltime(CA) == nominaltime(VA) == timeofca(CA, σ) == timeofca(VA, σ, ctol)
+        @test nominalstate(CA) == nominalstate(VA, ctol) == targetplane(CA, σ) == targetplane(VA, σ, ctol)
+        @test domain_radius(CA) == σmax
+        @test convergence_radius(CA, ctol) > 1
+        @test convergence_domain(CA, ctol) == convergence_domain(CA, ctol)
+        @test isconvergent(CA, ctol) && isconvergent(CA, ctol)
         @test CA.tp == MTP{Taylor1{Float64}}
-        @test hypot(CA.x(), CA.y()) > CA.z()
+        @test distance(CA, σ) == distance(VA, σ, ctol) > 0
+        @test rvelea(CA, σ) == rvelea(VA, σ, ctol)
+        @test concavity(CA, σ) == concavity(VA, σ, ctol) < 0
+
+        # Virtual impactors
+        VIs = virtualimpactors(VAs, ctol, lov, od, orbit, params)
+        @test isempty(VIs)
     end
 
 end

@@ -1,17 +1,4 @@
 """
-    AbstractTargetPlane{U <: Number} <: AbstractImpactMonitoring
-
-Supertype for the target planes interface.
-"""
-abstract type AbstractTargetPlane{U <: Number} <: AbstractImpactMonitoring end
-
-numtype(::AbstractTargetPlane{U}) where {U} = U
-
-# Print method for AbstractTargetPlane
-show(io::IO, x::AbstractTargetPlane) = print(io, typeof(x), " with coordinates ",
-    cte(targetplane(x)))
-
-"""
     BPlane{U} <: AbstractTargetPlane{U}
 
 B-Plane in Öpik's coordinates for a hyperbolic planetary close encounter.

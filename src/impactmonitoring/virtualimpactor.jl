@@ -1,21 +1,14 @@
 """
-    AbstractVirtualImpactor{T <: Real} <: AbstractImpactMonitoring
-
-Supertype for the virtual impactors interface.
-"""
-abstract type AbstractVirtualImpactor{T <: Real} <: AbstractImpactMonitoring end
-
-"""
     VirtualImpactor{T} <: AbstractVirtualImpactor{T}
 
-A segment of the line of variations (LOV) that impacts the Earth.
+A segment of the line of variations that impacts the Earth.
 
 # Fields
 
-- `σ::T`: coordinate on the LOV.
+- `σ::T`: coordinate on the line of variations.
 - `t::T`: time of impact [days since J2000 TDB].
 - `ip::T`: impact probability.
-- `domain::NTuple{2, T}`: segment of the LOV.
+- `domain::NTuple{2, T}`: segment of the line of variations.
 - `covariance::Matrix{T}`: target plane covariance matrix.
 """
 struct VirtualImpactor{T} <: AbstractVirtualImpactor{T}
@@ -26,20 +19,17 @@ struct VirtualImpactor{T} <: AbstractVirtualImpactor{T}
     covariance::Matrix{T}
 end
 
-function show(io::IO, x::VirtualImpactor)
-    t = days2dtutc(nominaltime(x))
-    ip = @sprintf("%.1E", impact_probability(x))
-    print(io, "VI at ", t, " with probability ", ip)
-end
+nominaltime(x::VirtualImpactor) = x.t
+date(x::VirtualImpactor) = days2dtutc(nominaltime(x))
+
+sigma(x::VirtualImpactor) = x.σ
+
+impact_probability(x::VirtualImpactor) = x.ip
 
 ismarginal(x::VirtualImpactor) = isempty(x.covariance)
 
 width(x::VirtualImpactor) = width(x.domain)
 isoutlov(x::VirtualImpactor) = iszero(width(x))
-
-nominaltime(x::VirtualImpactor) = x.t
-
-impact_probability(x::VirtualImpactor) = x.ip
 
 impact_probability(a::Real, b::Real) = erf(a/sqrt(2), b/sqrt(2)) / 2
 
@@ -69,14 +59,14 @@ function mangelintegrand(v::T, params::NTuple{8, T}) where {T <: Real}
     return exp(-v^2/2) * erf(Sminus(σ_X * v + m_X, params), Splus(σ_X*v + m_X, params))
 end
 
-function VirtualImpactor(lov::LOV{D, T}, od::AbstractODProblem{D, T},
+function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T},
                          orbit::AbstractOrbit, params::Parameters{T},
                          σ::T, t::T, domain::NTuple{2, T}) where {D, T <: Real}
     # Set jet transport variables
     Npar = numvars(orbit)
     set_od_order(T, 2, Npar)
     # Scalar initial condition
-    jd0 = epoch(lov)
+    jd0 = epoch(lov) + PE.J2000
     q00 = lov(σ)
     # Second order jet transport initial condition
     q0 = q00 + sigmas(orbit) .* get_variables(T, 2)
@@ -93,7 +83,7 @@ function VirtualImpactor(lov::LOV{D, T}, od::AbstractODProblem{D, T},
     q0 = q00 + sigmas(orbit) .* get_variables(T, 1)
     # Forward propagation
     nyears = (t + 2 + PE.J2000 - jd0) / yr
-    fwd, tvS, _, _ = propagate_root(lov.dynamics, q0, epoch(lov), nyears, params)
+    fwd, tvS, _, _ = propagate_root(lov.dynamics, q0, jd0, nyears, params)
     # Marginal close approach
     if any(isnan, fwd.t)
         Γ_B = Matrix{T}(undef, 0, 0)
@@ -139,7 +129,7 @@ end
 Return the indices, sigmas, times and distances of all the minima of [`distance`](@ref)
 found in a vector of virtual asteroids `VAs` given a convergence tolerance `ctol`.
 """
-function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ϵ::Real) where {T <: Real}
+function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T <: Real}
     # Find all the minima of distance over VAs
     is = Vector{Int}(undef, 0)
     σs = Vector{T}(undef, 0)
@@ -147,15 +137,15 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ϵ::Real) where {T <:
     ds = Vector{T}(undef, 0)
     for i in eachindex(VAs)
         VA = VAs[i]
-        rs = find_zeros(σ -> rvelea(VA, σ, ϵ), convergence_domain(VA, ϵ),
+        rs = find_zeros(σ -> rvelea(VA, σ, ctol), convergence_domain(VA, ctol),
                         no_pts = max(10, length(VA.CAs)))
         for j in eachindex(rs)
             # Skip non-minima critical points
-            concavity(VA, rs[j], ϵ) > 0 || continue
+            concavity(VA, rs[j], ctol) > 0 || continue
             push!(is, i)
             push!(σs, rs[j])
-            push!(ts, timeofca(VA, rs[j], ϵ))
-            push!(ds, distance(VA, rs[j], ϵ))
+            push!(ts, timeofca(VA, rs[j], ctol))
+            push!(ds, distance(VA, rs[j], ctol))
         end
     end
     # Sort by distance
@@ -180,9 +170,9 @@ end
 impactinglbound(CA::CloseApproach, σ::Real) = distance(CA, lbound(CA)) > 0 && lbound(CA) < σ
 impactingubound(CA::CloseApproach, σ::Real) = distance(CA, ubound(CA)) > 0 && σ < ubound(CA)
 
-function impactingdomain(VA::VirtualAsteroid, ϵ::Real, σ::Real, d::Real)
+function impactingdomain(VA::VirtualAsteroid, ctol::Real, σ::Real, d::Real)
     if d < 0
-        a, b = convergence_domain(VA, ϵ)
+        a, b = convergence_domain(VA, ctol)
         if lbound(VA[1]) < σ
             i = findlast(Base.Fix2(impactinglbound, σ), VA.CAs)
             a = max(a, lbound(VA[i]))
@@ -191,8 +181,8 @@ function impactingdomain(VA::VirtualAsteroid, ϵ::Real, σ::Real, d::Real)
             i = findfirst(Base.Fix2(impactingubound, σ), VA.CAs)
             b = min(b, ubound(VA[i]))
         end
-        a = find_zero(x -> distance(VA, x, ϵ), (a, σ), Bisection())
-        b = find_zero(x -> distance(VA, x, ϵ), (σ, b), Bisection())
+        a = find_zero(x -> distance(VA, x, ctol), (a, σ), Bisection())
+        b = find_zero(x -> distance(VA, x, ctol), (σ, b), Bisection())
         domain = (a, b)
     else
         domain = (σ, σ)
@@ -211,11 +201,12 @@ orbit and parameters are needed to compute the target plane covariance matrix.
 
 - `N::Int`: maximum number of virtual impactors to compute (default: `10`).
 """
-function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ϵ::Real, lov::LOV{D, T},
-                          od::AbstractODProblem, orbit::AbstractOrbit, params::Parameters;
+function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real,
+                          lov::LineOfVariations{D, T}, od::AbstractODProblem,
+                          orbit::AbstractOrbit, params::Parameters;
                           N::Int = 10) where {D, T <: Real}
     # Find all minima of distance over VAs
-    is, σs, ts, ds = virtualimpactors(VAs, ϵ)
+    is, σs, ts, ds = virtualimpactors(VAs, ctol)
     # Eliminate conditions outside the domain of lov
     mask = @. !($lbound(lov) ≤ σs ≤ $ubound(lov))
     deleteat!(is, mask)
@@ -226,7 +217,7 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ϵ::Real, lov::LOV{D,
     VIs = Vector{VirtualImpactor{T}}(undef, 0)
     for k in 1:min(N, length(ds))
         i, σ, t, d = is[k], σs[k], ts[k], ds[k]
-        domain = impactingdomain(VAs[i], ϵ, σ, d)
+        domain = impactingdomain(VAs[i], ctol, σ, d)
         VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
         if !ismarginal(VI)
             push!(VIs, VI)
@@ -238,7 +229,7 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ϵ::Real, lov::LOV{D,
     return VIs
 end
 
-function impactor_table(VIs::Vector{VirtualImpactor{T}}) where {T <: Real}
+function summary(VIs::AbstractVector{VirtualImpactor{T}}) where {T <: Real}
     s1 = string(
         "Impactor table{$T}\n",
         repeat('-', 56), "\n",
@@ -246,11 +237,13 @@ function impactor_table(VIs::Vector{VirtualImpactor{T}}) where {T <: Real}
     )
     s2 = Vector{String}(undef, length(VIs))
     for (i, VI) in enumerate(VIs)
-        t = rpad(string(days2dtutc(nominaltime(VI))), 27)
-        σ = rpad(@sprintf("%+.4f", VI.σ), 11)
+        t = rpad(string(date(VI)), 27)
+        σ = rpad(@sprintf("%+.4f", sigma(VI)), 11)
         asterisk = isoutlov(VI) ? " *" : "  "
         ip = rpad(@sprintf("%+.2E", VI.ip) * asterisk, 11)
         s2[i] = string(t, σ, ip, "\n")
     end
-    println(s1, join(s2))
+    return join(s1, join(s2))
 end
+
+impactor_table(x::AbstractVector{VirtualImpactor{T}}) where {T <: Real} = println(summary(x))
