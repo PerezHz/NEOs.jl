@@ -46,7 +46,8 @@ export d_EM_km, d_EM_au, MJD2000
 export julian2etsecs, etsecs2julian, dtutc2et, et2dtutc, dtutc2jdtdb, jdtdb2dtutc,
        et_to_200X, days_to_200X, dtutc_to_200X, dtutc2days, days2dtutc, rad2arcsec,
        arcsec2rad, mas2rad, range2delay, rangerate2doppler, chi2, nms, nrms
-export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199
+export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199,
+       tt_tdb, dtt_tdb
 # Minor bodies astrometry interface
 export MPC, NEOCP, NEOCC, NEODyS2, JPL
 export UniformWeights, SourceWeights, Veres17
