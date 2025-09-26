@@ -72,7 +72,7 @@ function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::NTuple{2, T
                            params::Parameters{T}) where {D, T <: Real, U <: Number,
                            V <: Number}
     # Unpack parameters
-    @unpack order, μ_ast, maxsteps, marsden_radial = params
+    @unpack order, μ_ast, maxsteps, parse_eqs, marsden_radial = params
     # Check order
     @assert order <= SSEPHORDER "order ($order) must be less or equal than SS ephemeris \
         order ($SSEPHORDER)"
@@ -109,7 +109,8 @@ function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::NTuple{2, T
     dparams = DynamicalParameters{T, U, V}(_sseph, _ssepht, _acceph, _accepht,
         _poteph, _potepht, jd0, UJ_interaction, N, μ, marsden_radial)
     # TaylorIntegration cache
-    cache = init_cache(Val(true), zero(T), q0, maxsteps, order, dynamics, dparams)
+    cache = init_cache(Val(true), zero(T), q0, maxsteps, order, dynamics, dparams;
+                       parse_eqs)
 
     return PropagationBuffer{T, U, V}(cache, dparams)
 end
@@ -289,10 +290,11 @@ function propagate_lyap(f::D, q0::Vector{U}, jd0::Number, tmax::T,
     tlim = minmax(_jd0_, _jd0_ + tmax * yr) .- JD_J2000
     buffer = PropagationBuffer(f, q0, jd0, tlim, params)
     # Unpack
-    @unpack order, abstol, maxsteps = params
+    @unpack order, abstol, maxsteps, parse_eqs = params
     @unpack dparams = buffer
     # Propagate orbit
-    orbit = lyap_taylorinteg(f, q0, zero(T), tmax * yr, order, abstol, dparams; maxsteps)
+    orbit = lyap_taylorinteg(f, q0, zero(T), tmax * yr, order, abstol, dparams;
+                             maxsteps, parse_eqs)
 
     return orbit.t, orbit.x, orbit.λ
 end
