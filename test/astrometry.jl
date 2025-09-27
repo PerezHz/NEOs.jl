@@ -224,7 +224,7 @@ using NEOs: SCRATCH_PATH
         @test obs["rhocosphi"] == "0.845107"
         @test obs["rhosinphi"] == "0.533611"
         @test obs["short_name"] == "Mt. Lemmon Survey"
-        @test obs["updated_at"] == "Wed, 17 Sep 2025 18:08:55 GMT"
+        @test obs["updated_at"] == "Tue, 15 Apr 2025 20:52:50 GMT"
         @test obs["uses_two_line_observations"] == false
         @test obs["web_link"] == "http://www.lpl.arizona.edu/css/"
 
