@@ -5,16 +5,18 @@ A segment of the line of variations that impacts the Earth.
 
 # Fields
 
-- `σ::T`: coordinate on the line of variations.
 - `t::T`: time of impact [days since J2000 TDB].
+- `σ::T`: coordinate on the line of variations.
 - `ip::T`: impact probability.
+- `a::T`: geocentric semimajor axis [au].
 - `domain::NTuple{2, T}`: segment of the line of variations.
 - `covariance::Matrix{T}`: target plane covariance matrix.
 """
 struct VirtualImpactor{T} <: AbstractVirtualImpactor{T}
-    σ::T
     t::T
+    σ::T
     ip::T
+    a::T
     domain::NTuple{2, T}
     covariance::Matrix{T}
 end
@@ -26,10 +28,122 @@ sigma(x::VirtualImpactor) = x.σ
 
 impact_probability(x::VirtualImpactor) = x.ip
 
-ismarginal(x::VirtualImpactor) = isempty(x.covariance)
+semimajoraxis(x::VirtualImpactor) = x.a
+function vinf(x::VirtualImpactor{T}) where {T <: Real} # km/s
+    if ishyperbolic(x)
+        return sqrt( PE.μ[ea] / (-semimajoraxis(x)) ) * (au/daysec)
+    else
+        return zero(T)
+    end
+end
 
 width(x::VirtualImpactor) = width(x.domain)
+
 isoutlov(x::VirtualImpactor) = iszero(width(x))
+ishyperbolic(x::VirtualImpactor) = semimajoraxis(x) < 0
+ismarginal(x::VirtualImpactor) = isempty(x.covariance)
+
+"""
+    impactenergy(VI, orbit, params; kwargs...)
+
+Return the impact energy [Mt] of a virtual impactor `VI` associated
+to an `orbit`.
+
+# Keyword arguments
+
+- `ρ::Real`: density [kg/m³] (default: `2_600`).
+- `p::Real`: albedo (default: `0.14`).
+
+!!! reference
+    - https://doi.org/10.1006/icar.2002.6910
+"""
+function impactenergy(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters;
+                      ρ::Real = 2_600, p::Real = 0.14)
+    # Object's mass [kg]
+    M = mass(orbit, params, ρ, p)
+    # Impact velocity^2 [km^2/s^2]
+    V2 = vinf(VI)^2 + EARTH_ESCAPE_VELOCITY^2
+    # Impact energy [Mt]
+    return 0.5 * M * V2 / 4.184E+9
+end
+
+"""
+    palermoscale(VI, orbit, params; kwargs)
+
+Return the Palermo Scale of a virtual impactor `VI` associated to an `orbit`.
+
+# Keyword arguments
+
+- `ρ::Real`: density [kg/m³] (default: `2_600`).
+- `p::Real`: albedo (default: `0.14`).
+
+!!! reference
+    - https://doi.org/10.1006/icar.2002.6910
+"""
+function palermoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters;
+                      ρ::Real = 2_600, p::Real = 0.14)
+    # Impact probability
+    IP = impact_probability(VI)
+    # Background impact frequency [yr⁻¹]
+    fb = 0.03 * impactenergy(VI, orbit, params; ρ, p)^(-0.8)
+    # Time until impact [yr]
+    ΔT = (nominaltime(VI) - epoch(orbit)) / yr
+    # Palermo scale
+    return log10(IP / (fb * ΔT))
+end
+
+"""
+    torinoscale(VI, orbit, params; kwargs)
+
+Return the Torino Scale of a virtual impactor `VI` associated to an `orbit`.
+
+# Keyword arguments
+
+- `ρ::Real`: density [kg/m³] (default: `2_600`).
+- `p::Real`: albedo (default: `0.14`).
+
+!!! reference
+    - https://doi.org/10.1016/S0032-0633(00)00006-4
+"""
+function torinoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters;
+                     ρ::Real = 2_600, p::Real = 0.14)
+    # Impact probability
+    IP = impact_probability(VI)
+    # Impact energy [Mt]
+    E = impactenergy(VI, orbit, params; ρ, p)
+    # Logarithms
+    logE, logIP = log10(E), log10(IP)
+    # Torino scale
+    if (logE+1)/3 + (logIP+2)/2 < 0 || logE < 0
+        return 0
+    elseif logIP < -2 && logE ≥ 0
+        if (logE+1)/3 + (logIP+2)/2 ≥ 0 && (logE-2)/3 + (logIP+2)/2 < 0
+            return 1
+        elseif (logE-2)/3 + (logIP+2)/2 ≥ 0 && (logE-5)/3 + (logIP+2)/2 < 0
+            return 2
+        elseif (logE-5)/3 + (logIP+2)/2 ≥ 0 && logIP < -2
+            return 6
+        end
+    elseif -2 ≤ logIP && IP < 0.99
+        if 0 ≤ logE < 2
+            return 3
+        elseif logE ≥ 2 && (logE-5)/3 + (logIP+2)/2 < 0
+            return 4
+        elseif logE < 5 && (logE-5)/3 + (logIP+2)/2 ≥ 0
+            return 5
+        elseif logE ≥ 5
+            return 7
+        end
+    elseif IP ≥ 0.99
+        if 0 ≤ logE < 2
+            return 8
+        elseif 2 ≤ logE < 5
+            return 9
+        elseif logE ≥ 5
+            return 10
+        end
+    end
+end
 
 impact_probability(a::Real, b::Real) = erf(a/sqrt(2), b/sqrt(2)) / 2
 
@@ -57,6 +171,12 @@ end
 function mangelintegrand(v::T, params::NTuple{8, T}) where {T <: Real}
     m_X, σ_X = params[3], params[5]
     return exp(-v^2/2) * erf(Sminus(σ_X * v + m_X, params), Splus(σ_X*v + m_X, params))
+end
+
+function impact_probability(σ::T, params::NTuple{8, T}) where {T <: Real}
+    C = exp(-σ^2/2) / (2 * sqrt(2π))
+    a, b = mangelbounds(params)
+    return C * quadgk(Base.Fix2(mangelintegrand, params), a, b)[1]
 end
 
 function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T},
@@ -87,8 +207,8 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     # Marginal close approach
     if any(isnan, fwd.t)
         Γ_B = Matrix{T}(undef, 0, 0)
-        ip = T(NaN)
-        return VirtualImpactor{T}(σ, t, ip, domain, Γ_B)
+        ip, a = T(NaN), T(NaN)
+        return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_B)
     end
     # Close approach
     t_CA = fwd.t0 + tvS[end]
@@ -114,13 +234,12 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     σ_X, σ_Y = sqrt.(diag(Γ_B))
     iparams = (r, ρ, m_X, m_Y, σ_X, σ_Y, x_C, y_C)
     if iszero(width(domain))
-        a, b = mangelbounds(iparams)
-        ip = ( exp(-σ^2/2) / (2 * sqrt(2π)) ) * quadgk(Base.Fix2(mangelintegrand, iparams), a, b)[1]
+        ip = impact_probability(σ, iparams)
     else
         ip = impact_probability(domain[1], domain[2])
     end
 
-    return VirtualImpactor{T}(σ, t, ip, domain, Γ_B)
+    return VirtualImpactor{T}(t, σ, ip, cte(a), domain, Γ_B)
 end
 
 """

@@ -86,7 +86,8 @@ export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination
 export BPlane, MTP, bopik, mtp, targetplane, crosssection, valsecchi_circle
 export LineOfVariations, CloseApproach, VirtualAsteroid, lineofvariations, closeapproaches,
        virtualasteroids, sigma, lbound, ubound
-export VirtualImpactor, virtualimpactors, impact_probability, impactor_table
+export VirtualImpactor, virtualimpactors, impact_probability, impactor_table, impactenergy,
+       palermoscale, torinoscale
 
 include("constants.jl")
 include("units.jl")

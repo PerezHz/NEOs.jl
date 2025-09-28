@@ -8,7 +8,7 @@ using Test
 
 using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
       convergence_domain, isconvergent, timeofca, distance, rvelea,
-      concavity, width, ismarginal, isoutlov
+      concavity, width, ismarginal, isoutlov, vinf
 
 @testset "Impact monitoring" begin
 
@@ -28,7 +28,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Sep 25, 2025
+        # Values by Sep 28, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
@@ -96,6 +96,13 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test !ismarginal(VI1) && !ismarginal(VI2)
         @test !isoutlov(VI1) && isoutlov(VI2)
 
+        @test semimajoraxis(VI1) == semimajoraxis(VI2) < 0
+        @test vinf(VI1) == vinf(VI2) > 0
+        @test ishyperbolic(VI1) && ishyperbolic(VI2)
+        @test impactenergy(VI1, orbit, params) == impactenergy(VI2, orbit, params) > 0
+        @test palermoscale(VI1, orbit, params) ≈ palermoscale(VI2, orbit, params) atol=0.01
+        @test torinoscale(VI1, orbit, params) == torinoscale(VI1, orbit, params) == 0
+
         VIs = [VI1, VI2]
         impactor_table(VIs)
         @test isa(summary(VIs), String)
@@ -118,7 +125,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Sep 25, 2025
+        # Values by Sep 28, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
@@ -185,6 +192,13 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test width(VI2) == 0.0
         @test !ismarginal(VI1) && !ismarginal(VI2)
         @test !isoutlov(VI1) && isoutlov(VI2)
+
+        @test semimajoraxis(VI1) == semimajoraxis(VI2) > 0
+        @test vinf(VI1) == vinf(VI2) == 0.0
+        @test !ishyperbolic(VI1) && !ishyperbolic(VI2)
+        @test impactenergy(VI1, orbit, params) == impactenergy(VI2, orbit, params) > 0
+        @test palermoscale(VI1, orbit, params) > palermoscale(VI2, orbit, params) == -Inf
+        @test torinoscale(VI1, orbit, params) == torinoscale(VI1, orbit, params) == 0
 
         VIs = [VI1, VI2]
         impactor_table(VIs)
