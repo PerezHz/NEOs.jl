@@ -78,7 +78,7 @@ export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
 export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, osculating,
-       uncertaintyparameter, absolutemagnitude
+       uncertaintyparameter, absolutemagnitude, diameter, mass
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
        orbitdetermination

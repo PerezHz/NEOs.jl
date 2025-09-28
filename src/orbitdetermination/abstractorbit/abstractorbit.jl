@@ -391,6 +391,52 @@ function absolutemagnitude(orbit::AbstractOrbit, params::Parameters)
     return H, dH
 end
 
+"""
+    diameter(H, p)
+
+Return the diameter [m] of an object with absolute magnitude `H`
+and albedo `p`.
+
+!!! reference
+    - https://doi.org/10.1006/icar.2002.6910
+"""
+diameter(H::Real, p::Real) = 1.329E6 * 10^(-0.2H) / sqrt(p)
+
+"""
+    diameter(orbit, params [, p])
+
+Return the diameter [m] of an object given its `orbit` and albedo `p`
+(default: `0.14`).
+
+!!! reference
+    - https://doi.org/10.1006/icar.2002.6910
+"""
+diameter(orbit::AbstractOrbit, params::Parameters, p::Real = 0.14) =
+    diameter(absolutemagnitude(orbit, params)[1], p)
+
+"""
+    mass(ρ, D)
+
+Return the mass [kg] of an object with density `ρ` [km/m³] and
+diameter `D` [m], assuming a homogeneous spherical object.
+
+!!! reference
+    - https://doi.org/10.1006/icar.2002.6910
+"""
+mass(ρ::Real, D::Real) = (π/6) * ρ * D^3
+
+"""
+    mass(orbit, params [, ρ [, p]])
+
+Return the mass [kg] of an object, given its `orbit`, density `ρ`
+[kg/m³] (default: `2_600`) and albedo `p` (default: `0.14`).
+
+!!! reference
+    - https://doi.org/10.1006/icar.2002.6910
+"""
+mass(orbit::AbstractOrbit, params::Parameters, ρ::Real = 2_600, p::Real = 0.14) =
+    mass(ρ, diameter(orbit, params, p))
+
 function summary(orbit::AbstractOrbit)
     O = nameof(typeof(orbit))
     T, U = numtypes(orbit)
