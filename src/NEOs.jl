@@ -1,14 +1,15 @@
 module NEOs
 
 # __precompile__(false)
-import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary
+import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary,
+       lastindex
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination, argperi,
-       longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly
-
-
+       longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly,
+       t2c_jpl_de430
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import Tables: Schema, istable, rowaccess, rows, schema
+import TaylorSeries: get_order
 
 using AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON, LazyArtifacts,
       LinearAlgebra, Printf, SatelliteToolboxTransformations, Scratch, SPICE,
@@ -31,10 +32,13 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea
       c_au_per_sec, c_cm_per_sec, semimajoraxis, eccentricity, inclination, longascnode,
       argperi, timeperipass, meanmotion, meananomaly, nbodyind, numberofbodies, selecteph,
       getinterpindex, pole_rotation, t2c_jpl_de430
-using Roots: find_zeros
+using QuadGK: quadgk
+using Roots: Bisection, find_zero, find_zeros
+using SpecialFunctions: erf
 using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
-using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!
+using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update_cache!,
+      taylorstep!, set_psol!, findroot!
 
 # Common
 export Parameters
@@ -42,7 +46,8 @@ export d_EM_km, d_EM_au, MJD2000
 export julian2etsecs, etsecs2julian, dtutc2et, et2dtutc, dtutc2jdtdb, jdtdb2dtutc,
        et_to_200X, days_to_200X, dtutc_to_200X, dtutc2days, days2dtutc, rad2arcsec,
        arcsec2rad, mas2rad, range2delay, rangerate2doppler, chi2, nms, nrms
-export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199
+export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199,
+       tt_tdb, dtt_tdb
 # Minor bodies astrometry interface
 export MPC, NEOCP, NEOCC, NEODyS2, JPL
 export UniformWeights, SourceWeights, Veres17
@@ -73,12 +78,16 @@ export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
 export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, osculating,
-       uncertaintyparameter
+       uncertaintyparameter, absolutemagnitude, diameter, mass
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
        orbitdetermination
-# Postprocessing
-export absolutemagnitude, crosssection, valsecchi_circle, bopik, mtp
+# Impact monitoring
+export BPlane, MTP, bopik, mtp, targetplane, crosssection, valsecchi_circle
+export LineOfVariations, CloseApproach, VirtualAsteroid, lineofvariations, closeapproaches,
+       virtualasteroids, sigma, lbound, ubound
+export VirtualImpactor, virtualimpactors, impact_probability, impactor_table, impactenergy,
+       palermoscale, torinoscale
 
 include("constants.jl")
 include("units.jl")
@@ -88,7 +97,7 @@ include("fasttaylors.jl")
 include("astrometry/astrometry.jl")
 include("propagation/propagation.jl")
 include("orbitdetermination/orbitdetermination.jl")
-include("postprocessing/postprocessing.jl")
+include("impactmonitoring/impactmonitoring.jl")
 include("init.jl")
 include("deprecated.jl")
 

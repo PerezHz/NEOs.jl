@@ -37,7 +37,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 31, 2025
+        # Values by Sep 28, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -97,6 +97,12 @@ end
         @test H - dH ≤ 24.3 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit, params) == 10
+        # Diameter
+        Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
+        @test 34.3 < Da < Db < 76.9
+        # Mass
+        Ma, Mb = minmax(mass(orbit, params, 2_600, 0.05), mass(orbit, params, 2_600, 0.25))
+        @test 5.5E7 < Ma < Mb < 6.2E8
 
         # Add observations
         suboptical = iodsuboptical(optical, 15)
@@ -159,6 +165,12 @@ end
         @test H - dH ≤ 24.3 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit1, params) == 7
+        # Diameter
+        Da, Db = minmax(diameter(orbit1, params, 0.05), diameter(orbit1, params, 0.25))
+        @test 36.3 < Da < Db < 81.3
+        # Mass
+        Ma, Mb = minmax(mass(orbit1, params, 2_600, 0.05), mass(orbit1, params, 2_600, 0.25))
+        @test 6.5E7 < Ma < Mb < 7.3E8
     end
 
     @testset "Unsafe Gauss Method" begin
@@ -180,7 +192,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 31, 2025
+        # Values by Sep 28, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -240,6 +252,12 @@ end
         @test H - dH ≤ 24.0 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit, params) == 10
+        # Diameter
+        Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
+        @test 41.2 < Da < Db < 92.2
+        # Mass
+        Ma, Mb = minmax(mass(orbit, params, 2_600, 0.05), mass(orbit, params, 2_600, 0.25))
+        @test 9.5E7 < Ma < Mb < 1.1E9
     end
 
     @testset "Gauss Method with ADAM refinement" begin
@@ -263,7 +281,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by Jul 31, 2025
+        # Values by Sep 28, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -323,6 +341,12 @@ end
         @test H - dH ≤ 21.7 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit, params) == 9
+        # Diameter
+        Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
+        @test 120.3 < Da < Db < 269.1
+        # Mass
+        Ma, Mb = minmax(mass(orbit, params, 2_600, 0.05), mass(orbit, params, 2_600, 0.25))
+        @test 2.3E9 < Ma < Mb < 2.7E10
     end
 
     @testset "Admissible region" begin
@@ -340,7 +364,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by Jul 31, 2025
+        # Values by Sep 28, 2025
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -454,7 +478,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 31, 2025
+        # Values by Sep 28, 2025
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -520,6 +544,12 @@ end
         @test H - dH ≤ 29.6 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit, params) == 10
+        # Diameter
+        Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
+        @test 3.2 < Da < Db < 7.2
+        # Mass
+        Ma, Mb = minmax(mass(orbit, params, 2_600, 0.05), mass(orbit, params, 2_600, 0.25))
+        @test 4.4E4 < Ma < Mb < 5.0E5
     end
 
     @testset "Outlier Rejection" begin
@@ -540,7 +570,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 31, 2025
+        # Values by Sep 28, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -600,6 +630,12 @@ end
         @test H - dH ≤ 26.7 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit, params) == 10
+        # Diameter
+        Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
+        @test 12.0 < Da < Db < 27.0
+        # Mass
+        Ma, Mb = minmax(mass(orbit, params, 2_600, 0.05), mass(orbit, params, 2_600, 0.25))
+        @test 2.3E6 < Ma < Mb < 2.7E7
 
         # Add remaining observations
         NEOs.update!(od, optical)
@@ -663,6 +699,12 @@ end
         @test H - dH ≤ 26.7 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit1, params) == 9
+        # Diameter
+        Da, Db = minmax(diameter(orbit1, params, 0.05), diameter(orbit1, params, 0.25))
+        @test 11.9 < Da < Db < 26.7
+        # Mass
+        Ma, Mb = minmax(mass(orbit1, params, 2_600, 0.05), mass(orbit1, params, 2_600, 0.25))
+        @test 2.3E6 < Ma < Mb < 2.6E7
     end
 
     @testset "Interesting NEOs" begin
@@ -688,7 +730,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 31, 2025
+        # Values by Sep 28, 2025
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -754,6 +796,12 @@ end
         @test H - dH ≤ 30.9 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit, params) == 10
+        # Diameter
+        Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
+        @test 1.7 < Da < Db < 3.9
+        # Mass
+        Ma, Mb = minmax(mass(orbit, params, 2_600, 0.05), mass(orbit, params, 2_600, 0.25))
+        @test 7.1E3 < Ma < Mb < 8.0E4
 
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
@@ -774,7 +822,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jul 31, 2025
+        # Values by Sep 28, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -834,6 +882,12 @@ end
         @test H - dH ≤ 30.4 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit, params) == 8
+        # Diameter
+        Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
+        @test 2.1 < Da < Db < 4.9
+        # Mass
+        Ma, Mb = minmax(mass(orbit, params, 2_600, 0.05), mass(orbit, params, 2_600, 0.25))
+        @test 1.4E4 < Ma < Mb < 1.6E5
 
         # Add observations
         suboptical = iodsuboptical(optical, 10)
@@ -900,9 +954,15 @@ end
         # @test nrms(orbit1) < nrms(orbit)
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit1, params) == 5
+        # Diameter
+        Da, Db = minmax(diameter(orbit1, params, 0.05), diameter(orbit1, params, 0.25))
+        @test 2.4 < Da < Db < 5.4
+        # Mass
+        Ma, Mb = minmax(mass(orbit1, params, 2_600, 0.05), mass(orbit1, params, 2_600, 0.25))
+        @test 1.9E4 < Ma < Mb < 2.2E5
     end
 
-    @testset "research/Celestial Mech. Dyn. Astron. 2025/orbitdetermination.jl" begin
+    @testset "research/2025CMDA/orbitdetermination.jl" begin
         using NEOs: iodinitcond, issatellite, hascoord
 
         function opticalfilter(optical::AbstractOpticalVector)
@@ -947,7 +1007,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Jul 31, 2025
+        # Values by Sep 28, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -1008,6 +1068,12 @@ end
         @test H - dH ≤ 18.5 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit, params) == 10
+        # Diameter
+        Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
+        @test 558.9 < Da < Db < 1250.0
+        # Mass
+        Ma, Mb = minmax(mass(orbit, params, 2_600, 0.05), mass(orbit, params, 2_600, 0.25))
+        @test 2.3E11 < Ma < Mb < 2.7E12
     end
 
     @testset "Radar astrometry" begin
@@ -1045,7 +1111,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by Jul 31, 2025
+        # Values by Sep 28, 2025
 
         # Check type
         @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -1113,6 +1179,12 @@ end
         @test H - dH ≤ 18.93 ≤ H + dH
         # MPC Uncertainty Parameter
         @test uncertaintyparameter(orbit1, params) == 5
+        # Diameter
+        Da, Db = minmax(diameter(orbit1, params, 0.05), diameter(orbit1, params, 0.25))
+        @test 433.6 < Da < Db < 969.7
+        # Mass
+        Ma, Mb = minmax(mass(orbit1, params, 2_600, 0.05), mass(orbit1, params, 2_600, 0.25))
+        @test 1.1E11 < Ma < Mb < 1.3E12
     end
 
 end

@@ -303,3 +303,7 @@ const PHASE_INTEGRAL_A1 = 3.33
 const PHASE_INTEGRAL_A2 = 1.87
 const PHASE_INTEGRAL_B1 = 0.63
 const PHASE_INTEGRAL_B2 = 1.22
+
+# Earth escape velocity
+# See https://doi.org/10.1006/icar.2002.6910
+const EARTH_ESCAPE_VELOCITY = 11.18 # km/s

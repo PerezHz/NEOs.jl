@@ -343,6 +343,100 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
     return clamp(U, 0, 10)
 end
 
+# Observed magnitude model
+# h = H + 5 * log10(d_BS * d_BO) - 2.5 * log10(qs)
+hmodel(t, p) = @. p[1] + t
+
+"""
+    absolutemagnitude(::AbstractOrbit, ::Parameters)
+
+Return the absolute magnitude of an orbit, as well as its standard error.
+This function uses the linear H and G model for asteroids.
+
+!!! reference
+    See:
+    - https://minorplanetcenter.net/iau/ECS/MPCArchive/1985/MPC_19851227.pdf
+"""
+function absolutemagnitude(orbit::AbstractOrbit, params::Parameters)
+    # Extract optical astrometry
+    optical = orbit.optical
+    # Observation times
+    ts = @. dtutc2days(date(optical))
+    # Observed magnitudes and bands
+    hs, bands = @. mag(optical), band.(optical)
+    # Convert magnitudes to V band
+    hs .+= getindex.(Ref(V_BAND_CORRECTION), bands)
+    # Asteroid, Earth and Sun positions
+    xa = [orbit(t)[1:3] for t in ts]
+    xe = [params.eph_ea(t)[1:3] for t in ts]
+    xs = [params.eph_su(t)[1:3] for t in ts]
+    # Distances
+    d_BS = @. norm(xa - xs)     # Asteroid-Sun
+    d_OS = @. norm(xe - xs)     # Earth-Sun
+    d_BO = @. norm(xa - xe)     # Asteroid-Earth
+    # Phase angles
+    αs = @. acos((d_BO^2 + d_BS^2 - d_OS^2) / (2 * d_BO * d_BS))
+    # Phase integrals
+    ϕ1s = @. exp(-PHASE_INTEGRAL_A1 * tan(αs/2)^PHASE_INTEGRAL_B1)
+    ϕ2s = @. exp(-PHASE_INTEGRAL_A2 * tan(αs/2)^PHASE_INTEGRAL_B2)
+    qs = (1 - SLOPE_PARAMETER) * ϕ1s + SLOPE_PARAMETER * ϕ2s
+    # Absolute magnitude
+    tdata = @. 5 * log10(d_BS * d_BO) - 2.5 * log10(qs)
+    mask = @. !isnan(tdata) && !isnan(hs)
+    H0 = [mean(view(hs, mask))]
+    fit = curve_fit(hmodel, view(tdata, mask), view(hs, mask), H0)
+    H = fit.param[1]
+    dH = stderror(fit)[1]
+
+    return H, dH
+end
+
+"""
+    diameter(H, p)
+
+Return the diameter [m] of an object with absolute magnitude `H`
+and albedo `p`.
+
+!!! reference
+    - https://doi.org/10.1006/icar.2002.6910
+"""
+diameter(H::Real, p::Real) = 1.329E6 * 10^(-0.2H) / sqrt(p)
+
+"""
+    diameter(orbit, params [, p])
+
+Return the diameter [m] of an object given its `orbit` and albedo `p`
+(default: `0.14`).
+
+!!! reference
+    - https://doi.org/10.1006/icar.2002.6910
+"""
+diameter(orbit::AbstractOrbit, params::Parameters, p::Real = 0.14) =
+    diameter(absolutemagnitude(orbit, params)[1], p)
+
+"""
+    mass(ρ, D)
+
+Return the mass [kg] of an object with density `ρ` [km/m³] and
+diameter `D` [m], assuming a homogeneous spherical object.
+
+!!! reference
+    - https://doi.org/10.1006/icar.2002.6910
+"""
+mass(ρ::Real, D::Real) = (π/6) * ρ * D^3
+
+"""
+    mass(orbit, params [, ρ [, p]])
+
+Return the mass [kg] of an object, given its `orbit`, density `ρ`
+[kg/m³] (default: `2_600`) and albedo `p` (default: `0.14`).
+
+!!! reference
+    - https://doi.org/10.1006/icar.2002.6910
+"""
+mass(orbit::AbstractOrbit, params::Parameters, ρ::Real = 2_600, p::Real = 0.14) =
+    mass(ρ, diameter(orbit, params, p))
+
 function summary(orbit::AbstractOrbit)
     O = nameof(typeof(orbit))
     T, U = numtypes(orbit)
