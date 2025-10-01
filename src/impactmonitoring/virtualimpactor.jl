@@ -205,7 +205,7 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     nyears = (t + 2 + PE.J2000 - jd0) / yr
     fwd, tvS, _, _ = propagate_root(lov.dynamics, q0, jd0, nyears, params)
     # Marginal close approach
-    if any(isnan, fwd.t)
+    if any(isnan, fwd.t) || isempty(tvS)
         Γ_B = Matrix{T}(undef, 0, 0)
         ip, a = T(NaN), T(NaN)
         return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_B)
