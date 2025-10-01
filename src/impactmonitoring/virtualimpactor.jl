@@ -286,29 +286,28 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T 
     return is, σs, ts, ds
 end
 
-function impactinglbound(VA::VirtualAsteroid, σ::Real, ctol::Real)
-    for (i, CA) in Iterators.reverse(enumerate(VA.CAs))
-        distance(VA, lbound(CA), ctol) > 0 && lbound(CA) < σ && return lbound(VA[i])
+function impactingbounds(VA::VirtualAsteroid, σ::Real, ctol::Real)
+    a, b = convergence_domain(VA, ctol)
+    for CA in Iterators.reverse(VA.CAs)
+        a ≤ lbound(CA) || break
+        if distance(VA, lbound(CA), ctol) > 0 && lbound(CA) < σ
+            a = max(a, lbound(CA))
+            break
+        end
     end
-    return lbound(VA[1])
-end
-
-function impactingubound(VA::VirtualAsteroid, σ::Real, ctol::Real)
-    for (i, CA) in enumerate(VA.CAs)
-        distance(VA, ubound(CA), ctol) > 0 && σ < ubound(CA) && return ubound(VA[i])
+    for CA in VA.CAs
+        ubound(CA) ≤ b || break
+        if distance(VA, ubound(CA), ctol) > 0 && σ < ubound(CA)
+            b = min(b, ubound(CA))
+            break
+        end
     end
-    return ubound(VA[end])
+    return a, b
 end
 
 function impactingdomain(VA::VirtualAsteroid, ctol::Real, σ::Real, d::Real)
     if d < 0
-        a, b = convergence_domain(VA, ctol)
-        if lbound(VA[1]) < σ
-            a = max(a, impactinglbound(VA, σ, ctol))
-        end
-        if σ < ubound(VA[end])
-            b = min(b, impactingubound(VA, σ, ctol))
-        end
+        a, b = impactingbounds(VA, σ, ctol)
         a = find_zero(x -> distance(VA, x, ctol), (a, σ), Bisection())
         b = find_zero(x -> distance(VA, x, ctol), (σ, b), Bisection())
         domain = (a, b)
