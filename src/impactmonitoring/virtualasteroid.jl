@@ -35,8 +35,9 @@ closeapproaches(x::VirtualAsteroid) = x.CAs
 isconvergent(x::VirtualAsteroid, ctol::Real) = all(Base.Fix2(isconvergent, ctol), x.CAs)
 
 function convergence_domain(x::VirtualAsteroid, ctol::Real)
-    ds = convergence_domain.(x.CAs, ctol)
-    return (minimum(first, ds), maximum(last, ds))
+    a, _ = convergence_domain(x[1], ctol)
+    _, b = convergence_domain(x[end], ctol)
+    return (a, b)
 end
 
 function exponential_weights(x::CloseApproach, σ::Real, ctol::Real)
@@ -78,6 +79,9 @@ for f in (:(targetplane), :(timeofca), :(distance), :(rvelea), :(concavity))
     end
 end
 
+issameva(x::CloseApproach, y::CloseApproach, Δt::Real) = (x.tp == y.tp) &&
+    ubound(x) == lbound(y) && difft(x, y) < Δt
+
 """
     virtualasteroids(CAs [, Δt])
 
@@ -91,13 +95,13 @@ function virtualasteroids(x::AbstractVector{CloseApproach{T}},
     while !isempty(y)
         CAs = splice!(y, 1:1)
         for _ in eachindex(y)
-            j = findfirst(z -> ubound(z) == lbound(CAs[1]) && difft(z, CAs[1]) < Δt, y)
+            j = findfirst(z -> issameva(z, CAs[1], Δt), y)
             isnothing(j) && break
             z = popat!(y, j)
             pushfirst!(CAs, z)
         end
         for _ in eachindex(y)
-            j = findfirst(z -> ubound(CAs[end]) == lbound(z) && difft(CAs[end], z) < Δt, y)
+            j = findfirst(z -> issameva(CAs[end], z, Δt), y)
             isnothing(j) && break
             z = popat!(y, j)
             push!(CAs, z)
