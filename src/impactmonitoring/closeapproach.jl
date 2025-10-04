@@ -79,20 +79,42 @@ function distance(x::CloseApproach, σ::Real)
     return hypot(x.x(dσ), x.y(dσ)) - x.z(dσ)
 end
 
-# TO DO: Use Horner's rule to evaluate derivatives
 function rvelea(x::CloseApproach, σ::Real)
     dσ = deltasigma(x, σ)
-    ξ, ζ = x.x(dσ), x.y(dσ)
-    dξ, dζ = TS.differentiate(x.x)(dσ), TS.differentiate(x.y)(dσ)
-    return (ξ*dξ + ζ*dζ) / domain_radius(x)
+    n = get_order(x)
+    ξ, ζ, b = x.x[end], x.y[end], x.z[end]
+    dξ, dζ, db = zero(ξ), zero(ζ), zero(b)
+    for i in n-1:-1:0
+        dξ = ξ + dσ * dξ
+        dζ = ζ + dσ * dζ
+        db = b + dσ * db
+        ξ = x.x[i] + dσ * ξ
+        ζ = x.y[i] + dσ * ζ
+        b = x.z[i] + dσ * b
+    end
+    return (ξ*dξ + ζ*dζ - b*db) / domain_radius(x)
 end
 
 function concavity(x::CloseApproach, σ::Real)
     dσ = deltasigma(x, σ)
-    ξ, ζ = x.x(dσ), x.y(dσ)
-    dξ, dζ = TS.differentiate(x.x)(dσ), TS.differentiate(x.y)(dσ)
-    d2ξ, d2ζ = TS.differentiate(x.x, 2)(dσ), TS.differentiate(x.y, 2)(dσ)
-    return (ξ*d2ξ + dξ^2 + ζ*d2ζ + dζ^2) / domain_radius(x)^2
+    n = get_order(x)
+    ξ = x.x[end-1] + dσ * x.x[end]
+    ζ = x.y[end-1] + dσ * x.y[end]
+    b = x.z[end-1] + dσ * x.z[end]
+    dξ, dζ, db = x.x[end], x.y[end], x.z[end]
+    d2ξ, d2ζ, d2b = zero(ξ), zero(ζ), zero(b)
+    for i in n-2:-1:0
+        d2ξ = 2dξ + dσ * d2ξ
+        d2ζ = 2dζ + dσ * d2ζ
+        d2b = 2db + dσ * d2b
+        dξ = ξ + dσ * dξ
+        dζ = ζ + dσ * dζ
+        db = b + dσ * db
+        ξ = x.x[i] + dσ * ξ
+        ζ = x.y[i] + dσ * ζ
+        b = x.z[i] + dσ * b
+    end
+    return (ξ*d2ξ + dξ^2 + ζ*d2ζ + dζ^2 - b*d2b - db^2) / domain_radius(x)^2
 end
 
 function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},
