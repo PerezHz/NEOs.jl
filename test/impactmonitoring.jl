@@ -28,7 +28,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Sep 28, 2025
+        # Values by Oct 4, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
@@ -83,9 +83,9 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
 
         # Virtual impactors
         VIs = virtualimpactors(VAs, ctol, lov, od, orbit, params)
-        @test isempty(VIs)
+        @test length(VIs) == 1
 
-        VI1 = VirtualImpactor(lov, od, orbit, params, σ, nominaltime(VA), domain)
+        VI1 = VIs[1]
         VI2 = VirtualImpactor(lov, od, orbit, params, σ, nominaltime(VA), (σ, σ))
 
         @test date(VI1) == date(VI2) == date(CA) == date(VA)
@@ -125,7 +125,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Sep 28, 2025
+        # Values by Oct 4, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
