@@ -14,7 +14,7 @@ at close approach with respect to a planet.
 - `tp::Type{<:AbstractTargetPlane}`: type of target plane, either
     [`BPlane`](@ref) or [`MTP`](@ref).
 """
-struct CloseApproach{T} <: AbstractLineOfVariations{T}
+@auto_hash_equals struct CloseApproach{T} <: AbstractLineOfVariations{T}
     σ::T
     domain::NTuple{2, T}
     t::Taylor1{T}

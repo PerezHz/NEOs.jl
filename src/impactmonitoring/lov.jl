@@ -10,7 +10,7 @@ A parametrization of the line of variations.
 - `domain::NTuple{2, T}`: integrated domain.
 - `bwd/fwd::DensePropagation2{T, T}`: backward (forward) integration.
 """
-struct LineOfVariations{D, T} <: AbstractLineOfVariations{T}
+@auto_hash_equals struct LineOfVariations{D, T} <: AbstractLineOfVariations{T}
     dynamics::D
     epoch::T
     domain::NTuple{2, T}

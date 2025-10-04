@@ -9,7 +9,7 @@ of variations and nominal dates within a given time window.
 - `domain::NTuple{2, T}`: segment of the line of variations.
 - `CAs::Vector{CloseApproach{T}}`: vector of close approaches.
 """
-struct VirtualAsteroid{T} <: AbstractLineOfVariations{T}
+@auto_hash_equals struct VirtualAsteroid{T} <: AbstractLineOfVariations{T}
     domain::NTuple{2, T}
     CAs::Vector{CloseApproach{T}}
 end

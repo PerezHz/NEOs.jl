@@ -12,7 +12,7 @@ A segment of the line of variations that impacts the Earth.
 - `domain::NTuple{2, T}`: segment of the line of variations.
 - `covariance::Matrix{T}`: target plane covariance matrix.
 """
-struct VirtualImpactor{T} <: AbstractVirtualImpactor{T}
+@auto_hash_equals struct VirtualImpactor{T} <: AbstractVirtualImpactor{T}
     t::T
     σ::T
     ip::T
@@ -310,7 +310,7 @@ given a convergence tolerance `ctol`.
 """
 function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T <: Real}
     # Find all the impacting conditions over VAs
-    ics = Vector{Tuple{Int, T, NTuple{2, T}, T, T}}
+    ics = Vector{Tuple{Int, T, Tuple{T, T}, T, T}}(undef, 0)
     for i in eachindex(VAs)
         VA = VAs[i]
         a, b = convergence_domain(VA, ctol)
@@ -355,7 +355,7 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T 
             mask[k+1] = true
         end
     end
-    deleteat!(ics, Ref(mask))
+    deleteat!(ics, mask)
 
     return ics
 end
@@ -377,13 +377,13 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real,
                           N::Int = 10) where {D, T <: Real}
     # Find all the impacting conditions over VAs
     ics = virtualimpactors(VAs, ctol)
-    Nic = minimum(length, ics)
+    Nic = length(ics)
     # Compute virtual impactors
     VIs = Vector{VirtualImpactor{T}}(undef, 0)
     for k in 1:min(N, Nic)
         i, σ, domain, t, _ = ics[k]
         # Condition is outside the domain of lov
-        if !(-σmax ≤ σ ≤ σmax)
+        if !(σ in lov)
             σ = (domain[1] + domain[2]) / 2
             t = timeofca(VAs[i], σ, ctol)
         end
