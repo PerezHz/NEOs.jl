@@ -280,6 +280,7 @@ function impactingcondition(::Val{true}, VA::VirtualAsteroid{T},
     elseif da < 0 && db < 0
         σ = sigma(VA)
         domain = (a, b)
+    # The radial distance is always positive in [a, b]
     else
         σ, domain = T(NaN), (T(NaN), T(NaN))
     end
@@ -294,8 +295,9 @@ function impactingcondition(::Val{false}, VA::VirtualAsteroid{T},
         domain = (σ, σ)
     else
         a, b = impactingbounds(VA, σ, ctol)
-        _, da = impactingcondition(Val(true), VA, (a, σ), ctol)
-        _, db = impactingcondition(Val(true), VA, (σ, b), ctol)
+        σa, da = impactingcondition(Val(true), VA, (a, σ), ctol)
+        σb, db = impactingcondition(Val(true), VA, (σ, b), ctol)
+        σ = (isnan(σa) || isnan(σb)) ? T(NaN) : σ
         domain = (da[1], db[2])
     end
     return σ, domain
@@ -331,7 +333,9 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T 
                 concavity(VA, σ, ctol) > 0 || continue
                 t, d = timeofca(VA, σ, ctol), distance(VA, σ, ctol)
                 σ, domain = impactingcondition(Val(false), VA, (σ, d), ctol)
-                push!(ics, (i, σ, domain, t, d))
+                if !isnan(σ)
+                    push!(ics, (i, σ, domain, t, d))
+                end
             end
         end
     end
