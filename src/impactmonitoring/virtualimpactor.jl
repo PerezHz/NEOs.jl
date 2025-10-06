@@ -389,6 +389,7 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real,
         # Condition is outside the domain of lov
         if !(σ in lov)
             σ = (domain[1] + domain[2]) / 2
+            σ in lov || continue
             t = timeofca(VAs[i], σ, ctol)
         end
         VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
