@@ -392,7 +392,7 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real,
             σ = (domain[1] + domain[2]) / 2
             t = timeofca(VAs[i], σ, ctol)
         end
-        (-σmax ≤ σ ≤ σmax && 0.0 ≤ t ≤ 36525.0 ) || continue
+        (σ in lov && 0.0 ≤ t ≤ 36525.0 ) || continue
         VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
         # Marginal virtual impactor
         if !ismarginal(VI)
