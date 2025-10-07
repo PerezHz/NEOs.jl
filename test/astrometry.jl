@@ -103,10 +103,10 @@ using NEOs: SCRATCH_PATH
         @test allunique(OBSERVATORIES_MPC[])
         @test issorted(OBSERVATORIES_MPC[])
         @test isa(OBSERVATORIES_MPC[], Vector{ObservatoryMPC{Float64}})
-        @test count(isoptical, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 35
+        @test count(isoptical, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 38
         @test count(isoccultation, OBSERVATORIES_MPC[]) == 2
         @test count(issatellite, OBSERVATORIES_MPC[]) == 19
-        @test count(isradar, OBSERVATORIES_MPC[]) == 12
+        @test count(isradar, OBSERVATORIES_MPC[]) == 15
         @test count(isroving, OBSERVATORIES_MPC[]) == 2
         @test count(isgeocentric, OBSERVATORIES_MPC[]) == 2
         @test count(hascoord, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 22
@@ -168,10 +168,10 @@ using NEOs: SCRATCH_PATH
         @test allunique(OBSERVATORIES_MPC[])
         @test issorted(OBSERVATORIES_MPC[])
         @test isa(OBSERVATORIES_MPC[], Vector{ObservatoryMPC{Float64}})
-        @test count(isoptical, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 35
+        @test count(isoptical, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 38
         @test count(isoccultation, OBSERVATORIES_MPC[]) == 2
         @test count(issatellite, OBSERVATORIES_MPC[]) == 19
-        @test count(isradar, OBSERVATORIES_MPC[]) == 12
+        @test count(isradar, OBSERVATORIES_MPC[]) == 15
         @test count(isroving, OBSERVATORIES_MPC[]) == 2
         @test count(isgeocentric, OBSERVATORIES_MPC[]) == 2
         @test count(hascoord, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 22

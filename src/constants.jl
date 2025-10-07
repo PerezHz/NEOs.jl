@@ -137,12 +137,15 @@ const JPL_TO_MPC_OBSCODES = Dict(
     "-9"  => "256",	# Green Bank
     "-13" => "252",	# Goldstone DSS 13, Fort Irwin
     "-14" => "253",	# Goldstone DSS 14, Fort Irwin
+    "-34" => "272", # Canberra DSS 34
     "-35" => "263", # Canberra DSS 35
     "-36" => "264", # Canberra DSS 36
     "-38" => "255",	# Yevpatoriya
     "-43" => "265", # Canberra DSS 43
     "-47" => "271", # ATCA DSS 47
     "-73" => "259",	# EISCAT Tromso UHF
+    "-74" => "287", # Ceduna 30, UTAS
+    "-86" => "308", # Usuda DSS 64
 )
 
 const MPC_TO_JPL_OBSCODES = Dict(value => key for (key, value) in JPL_TO_MPC_OBSCODES)
