@@ -202,12 +202,13 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     # First order jet transport initial condition
     q0 = q00 + sigmas(orbit) .* get_variables(T, 1)
     # Forward propagation
-    nyears = (t + 2 + PE.J2000 - jd0) / yr
+    nyears = min(t + 2 + PE.J2000 - jd0, dtutc2days(DateTime(2099, 12, 31))) / yr
     fwd, tvS, _, _ = propagate_root(lov.dynamics, q0, jd0, nyears, params)
     # Marginal close approach
     if any(isnan, fwd.t) || isempty(tvS)
+        ip = iszero(width(domain)) ? T(NaN) : impact_probability(domain[1], domain[2])
+        a = T(NaN)
         Γ_B = Matrix{T}(undef, 0, 0)
-        ip, a = T(NaN), T(NaN)
         return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_B)
     end
     # Close approach
@@ -386,12 +387,12 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real,
     VIs = Vector{VirtualImpactor{T}}(undef, 0)
     for k in 1:min(N, Nic)
         i, σ, domain, t, _ = ics[k]
-        # Condition is outside the domain of lov
+        # Eliminate conditions outside time or lov domain
         if !(σ in lov)
             σ = (domain[1] + domain[2]) / 2
-            σ in lov || continue
             t = timeofca(VAs[i], σ, ctol)
         end
+        (-σmax ≤ σ ≤ σmax && 0.0 ≤ t ≤ 36525.0 ) || continue
         VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
         # Marginal virtual impactor
         if !ismarginal(VI)
