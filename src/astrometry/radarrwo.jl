@@ -110,9 +110,9 @@ function frequency(observatory::ObservatoryMPC{T}, date::DateTime) where {T <: R
                 freq = 8560.0
             end
         end
-    # Canberra DSS 35, DSS 36 and DSS 43 accumulate 36 observations between 2019 and 2024
-    # all in 7159.45 MHz
-    elseif code in ("263", "264", "265")
+    # Canberra DSS 34, DSS 35, DSS 36 and DSS 43 accumulate 38 observations
+    # between 2019 and 2025 all in 7159.45 MHz
+    elseif code in ("272", "263", "264", "265")
         freq = 7159.45
     # Yevpatoriya has no observations as the transmitter antenna
     # elseif code == "255"
@@ -120,6 +120,8 @@ function frequency(observatory::ObservatoryMPC{T}, date::DateTime) where {T <: R
     # EISCAT Tromso UHF only has one 367943 observation in 929.6 MHz (2013-02-15)
     elseif code == "259"
         freq = 929.6
+    # Ceduna 30, UTAS and Usuda DSS 64 have no observations as the transmitter antenna
+    # elseif code in ("287", "308")
     # Unknown observatory
     else
         freq = T(NaN)
