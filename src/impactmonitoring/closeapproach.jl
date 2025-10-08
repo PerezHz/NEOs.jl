@@ -92,7 +92,9 @@ function rvelea(x::CloseApproach, σ::Real)
         ζ = x.y[i] + dσ * ζ
         b = x.z[i] + dσ * b
     end
-    return (ξ*dξ + ζ*dζ - b*db) / domain_radius(x)
+    r = hypot(ξ, ζ)
+    rv = ξ*dξ + ζ*dζ
+    return (rv/r - db) / domain_radius(x)
 end
 
 function concavity(x::CloseApproach, σ::Real)
@@ -114,7 +116,10 @@ function concavity(x::CloseApproach, σ::Real)
         ζ = x.y[i] + dσ * ζ
         b = x.z[i] + dσ * b
     end
-    return (ξ*d2ξ + dξ^2 + ζ*d2ζ + dζ^2 - b*d2b - db^2) / domain_radius(x)^2
+    r = hypot(ξ, ζ)
+    rv = ξ*dξ + ζ*dζ
+    ra = ξ*d2ξ + dξ^2 + ζ*d2ζ + dζ^2
+    return ( ra / r - rv^2 / r^3 - d2b) / domain_radius(x)^2
 end
 
 function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},

@@ -42,7 +42,7 @@ end
 
 function exponential_weights(x::CloseApproach, σ::Real, ctol::Real)
     dσ = deltasigma(x, σ) / convergence_radius(x, ctol)
-    w = 1 / 10^(abs(dσ) - 1)
+    w = 1 / 1000^(abs(dσ) - 1)
     return w
 end
 
