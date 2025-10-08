@@ -93,8 +93,8 @@ An optical astrometric observation in the RWO format.
 - `catalogue::CatalogueMPC`: star catalogue used for astrometric reduction.
 - `observatory::ObservatoryMPC{T}`: observation station.
 - `chi::T`: chi-squared value of the observation residuals.
-- `sel_A::Bool`: astrometry selection flag.
-- `sel_M::Bool`: photometry selection flag.
+- `sel_A::Int`: astrometry selection flag.
+- `sel_M::Int`: photometry selection flag.
 - `source::String`: original record.
 - `header::String`: file header.
 
@@ -129,8 +129,8 @@ An optical astrometric observation in the RWO format.
     catalogue::CatalogueMPC
     observatory::ObservatoryMPC{T}
     chi::T
-    sel_A::Bool
-    sel_M::Bool
+    sel_A::Int
+    sel_M::Int
     source::String
     header::String
 end
