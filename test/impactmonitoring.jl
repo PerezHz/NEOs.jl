@@ -44,7 +44,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test domains2[1][1] == domain[1]
         @test domains2[end][end] == domain[2]
         @test all(domains2[i][end] == domains2[i+1][1] for i in 1:N-1)
-        ps = @. cdf(d2, last(domains2)) - cdf(d, first(domains2))
+        ps = @. cdf(d2, last(domains2)) - cdf(d2, first(domains2))
         @test all(Base.Fix1(isapprox, ps[1]), ps)
     end
 
