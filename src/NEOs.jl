@@ -20,7 +20,7 @@ using DataFrames: AbstractDataFrame, DataFrame, DataFrameRow, nrow, eachrow, eac
       groupby, combine
 using Dates: epochms2datetime
 using DelimitedFiles: readdlm
-using Distributions: Chisq, cdf
+using Distributions: Chisq, Normal, Uniform, cdf, quantile
 using Healpix: Resolution, ang2pixRing
 using HORIZONS: smb_spk
 using LinearAlgebra: inv!

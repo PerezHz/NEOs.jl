@@ -62,6 +62,26 @@ end
 
 isconvergent(x::CloseApproach, ctol::Real) = convergence_radius(x, ctol) > 1
 
+function refine(σ::T, domain::NTuple{2, T}, N::Int,
+                dist::Symbol = :uniform) where {T <: Real}
+    @assert N ≥ 1 && isodd(N) "N must be at least one and odd to have an \
+        expansion around the domain center"
+    if dist == :uniform
+        d = Uniform{T}(domain[1], domain[2])
+    elseif dist == :normal
+        d = Normal{T}(zero(T), one(T))
+    else
+        throw(ArgumentError("dist must be either :uniform or :normal"))
+    end
+    xs = LinRange(cdf(d, domain[1]), cdf(d, domain[2]), N+1)
+    endpoints = quantile.(d, xs)
+    endpoints[1], endpoints[end] = domain[1], domain[2]
+    domains = [(endpoints[i], endpoints[i+1]) for i in 1:N]
+    σs = [(domains[i][1] + domains[i][2]) / 2 for i in eachindex(domains)]
+    σs[(N ÷ 2) + 1] = σ
+    return σs, domains
+end
+
 deltasigma(x::CloseApproach, σ::Real) = (σ - sigma(x)) / domain_radius(x)
 
 function timeofca(x::CloseApproach, σ::Real)

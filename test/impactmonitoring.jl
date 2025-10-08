@@ -2,6 +2,7 @@
 
 using NEOs
 using Dates
+using Distributions
 using TaylorSeries
 using PlanetaryEphemeris
 using Test
@@ -11,6 +12,41 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
       concavity, width, ismarginal, isoutlov, vinf
 
 @testset "Impact monitoring" begin
+
+    @testset "Common" begin
+        using NEOs: refine
+
+        σ = 0.0
+        domain = (-5.0, 5.0)
+        N = 11
+
+        @test_throws AssertionError refine(σ, domain, 0)
+        @test_throws AssertionError refine(σ, domain, 2)
+        @test_throws ArgumentError refine(σ, domain, N, :exp)
+
+        σs1, domains1 = refine(σ, domain, 1, :uniform)
+        σs2, domains2 = refine(σ, domain, 1, :normal)
+        @test σs1 == σs2 == [σ]
+        @test domains1 == domains2 == [domain]
+
+        d1 = Uniform(domain[1], domain[2])
+        σs1, domains1 = refine(σ, domain, N, :uniform)
+        @test σs1[(N ÷ 2) + 1] == σ
+        @test domains1[1][1] == domain[1]
+        @test domains1[end][end] == domain[2]
+        @test all(domains1[i][end] == domains1[i+1][1] for i in 1:N-1)
+        ps = @. cdf(d1, last(domains1)) - cdf(d1, first(domains1))
+        @test all(Base.Fix1(isapprox, ps[1]), ps)
+
+        d2 = Normal(0.0, 1.0)
+        σs2, domains2 = refine(σ, domain, N, :normal)
+        @test σs2[(N ÷ 2) + 1] == σ
+        @test domains2[1][1] == domain[1]
+        @test domains2[end][end] == domain[2]
+        @test all(domains2[i][end] == domains2[i+1][1] for i in 1:N-1)
+        ps = @. cdf(d2, last(domains2)) - cdf(d, first(domains2))
+        @test all(Base.Fix1(isapprox, ps[1]), ps)
+    end
 
     @testset "BPlane" begin
         # Fetch optical astrometry
