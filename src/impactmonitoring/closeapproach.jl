@@ -78,7 +78,9 @@ function refine(σ::T, domain::NTuple{2, T}, N::Int,
     endpoints[1], endpoints[end] = domain[1], domain[2]
     domains = [(endpoints[i], endpoints[i+1]) for i in 1:N]
     σs = [(domains[i][1] + domains[i][2]) / 2 for i in eachindex(domains)]
-    σs[(N ÷ 2) + 1] = σ
+    if iszero(σ) || dist == :uniform
+        σs[(N ÷ 2) + 1] = σ
+    end
     return σs, domains
 end
 
