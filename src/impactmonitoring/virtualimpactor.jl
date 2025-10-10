@@ -345,19 +345,21 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T 
     # Merge duplicated impacting conditions
     Nic = length(ics)
     mask = falses(Nic)
-    for k in 1:Nic-1
-        ia, σa, domaina, ta, _ = ics[k]
-        ib, σb, domainb, tb, _ = ics[k+1]
-        # Same index and domain
-        if ia == ib && domaina == domainb
-            i, domain = ia, domaina
-            σ = (domain[1] + domain[2]) / 2
-            t, d = timeofca(VAs[i], σ, ctol), distance(VAs[i], σ, ctol)
-            ics[k] = (i, σ, domain, t, d)
-            mask[k+1] = true
-        # Different index, similar sigma and time of impact
-        elseif abs( (σa - σb) / σa) < 0.01 && abs((ta - tb) / ta) < 0.01
-            mask[k+1] = true
+    for i in 1:Nic-1
+        for j in i+1:Nic
+            ka, σa, domaina, ta, _ = ics[i]
+            kb, σb, domainb, tb, _ = ics[j]
+            # Same index and domain
+            if ka == kb && domaina == domainb
+                k, domain = ka, domaina
+                σ = (domain[1] + domain[2]) / 2
+                t, d = timeofca(VAs[k], σ, ctol), distance(VAs[k], σ, ctol)
+                ics[i] = (k, σ, domain, t, d)
+                mask[j] = true
+            # Different index, similar sigma and time of impact
+            elseif abs( (σa - σb) / σa) < 0.01 && abs((ta - tb) / ta) < 0.01
+                mask[j] = true
+            end
         end
     end
     deleteat!(ics, mask)
