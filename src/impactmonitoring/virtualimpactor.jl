@@ -325,14 +325,17 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T 
                 t, d = timeofca(VA, σ, ctol), distance(VA, σ, ctol)
                 push!(ics, (i, σ, domain, t, d))
             end
-        # The radial velocity has at least one root in [a, b], so the radial distance is not
-        # monotonic
+        # The radial velocity has at least one root in [a, b], so the radial distance
+        # is not monotonic
         else
             for j in eachindex(rs)
                 σ = rs[j]
-                # Skip non-minima critical points
-                concavity(VA, σ, ctol) > 0 || continue
-                t, d = timeofca(VA, σ, ctol), distance(VA, σ, ctol)
+                d, c = distance(VA, σ, ctol), concavity(VA, σ, ctol)
+                # Skip maxima outside the impact cross section
+                if c < 0 && d > 0
+                    continue
+                end
+                t = timeofca(VA, σ, ctol)
                 σ, domain = impactingcondition(Val(false), VA, (σ, d), ctol)
                 if !isnan(σ)
                     push!(ics, (i, σ, domain, t, d))
