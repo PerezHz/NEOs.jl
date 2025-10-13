@@ -45,12 +45,15 @@ difft(x::CloseApproach, y::CloseApproach) = abs(nominaltime(x) - nominaltime(y))
 
 domain_radius(x::CloseApproach) = max(ubound(x) - sigma(x), sigma(x) - lbound(x))
 
+convergence_radius(x::Taylor1, ctol::Real) = (ctol / norm(x[end], Inf))^(1 / get_order(x))
+
+convergence_radius(x::AbstractVector, ctol::Real) = minimum(convergence_radius.(x, ctol))
+
 function convergence_radius(x::CloseApproach, ctol::Real)
-    order = get_order(x)
     return min(
-        (ctol / norm(x.x[end], Inf))^(1/order),
-        (ctol / norm(x.y[end], Inf))^(1/order),
-        (ctol / norm(x.z[end], Inf))^(1/order)
+        convergence_radius(x.x, ctol),
+        convergence_radius(x.y, ctol),
+        convergence_radius(x.z, ctol),
     )
 end
 
@@ -60,7 +63,7 @@ function convergence_domain(x::CloseApproach, ctol::Real)
     return (sigma(x) - r*d, sigma(x) + r*d)
 end
 
-isconvergent(x::CloseApproach, ctol::Real) = convergence_radius(x, ctol) > 1
+isconvergent(x, ctol::Real) = convergence_radius(x, ctol) > 1
 
 function refine(σ::T, domain::NTuple{2, T}, N::Int,
                 dist::Symbol = :uniform) where {T <: Real}
@@ -166,10 +169,15 @@ end
 """
     closeapproaches(lov, σ, domain, nyears, params; kwargs...)
 
-Return the vector of close approaches obtained by integrating the expansion of `lov`
-at `σ`, with scaling factors such that `domain` is mapped into the interval `[-1, 1]`,
+Compute the close approaches of the initial condition obtained by expanding `lov` at
+`σ`, with scaling factors such that `domain` is mapped into the interval `[-1, 1]`,
 for a period of `nyears` [years]. For a list of parameters see the `Propagation`
 section of [`Parameters`](@ref).
+
+The integration will stop before the final time if either a close approach or the
+current state vector do not converge under the tolerance `ctol`. Thus, the function
+returns (i) the vector of detected close approaches and (ii) a bool indicating
+whether the integration was terminated prematurely.
 
 # Keyword arguments
 
@@ -187,14 +195,14 @@ function closeapproaches(
         buffer::Union{Nothing, PropagationBuffer{T, Taylor1{T}, T}} = nothing
     ) where {D, T <: Real}
     # Unpack parameters
-    @unpack abstol, maxsteps = params
+    @unpack abstol, maxsteps, order = params
     # Dynamical model
     dynamics = lov.dynamics
     # Reference epoch
     d0 = epoch(lov)
     jd0 = d0 + JD_J2000
     # Initial conditions
-    t0, tmax = zero(T), nyears * yr
+    tpre, t0, tmax = zero(T), zero(T), nyears * yr
     q0 = lov(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(lovorder))
     # Propagation buffer
     if isnothing(buffer)
@@ -202,14 +210,14 @@ function closeapproaches(
         buffer = PropagationBuffer(dynamics, q0, jd0, tlim, params)
     end
     @unpack cache, dparams = buffer
-    @unpack tv, xv, psol, xaux, t, x, dx, rv, parse_eqs = cache
+    @unpack psol, xaux, t, x, dx, rv, parse_eqs = cache
     dparams.jd0 = jd0
 
     # Specialized version of the root-finding method of taylorinteg
     x0 = deepcopy(q0)
     update_cache!(cache, t0, x0)
-    @inbounds tv[1] = t0
-    @inbounds xv[:, 1] .= deepcopy(q0)
+    psol[:, 1] .= zero.(x)
+    psol[:, 2] .= zero.(x)
     sign_tstep = copysign(1, tmax - t0)
 
     # Some auxiliary arrays for root-finding/event detection/Poincaré
@@ -225,7 +233,7 @@ function closeapproaches(
     g_dg_val = vcat(TS.evaluate(g_tupl[2]), TS.evaluate(g_tupl_old[2]))
 
     tvS = Array{Taylor1{T}}(undef, maxsteps + 1)
-    xvS = similar(xv)
+    xvS = Array{Taylor1{T}}(undef, length(q0), maxsteps + 1)
     gvS = similar(tvS)
 
     CAs = Vector{CloseApproach{T}}(undef, 0)
@@ -238,8 +246,15 @@ function closeapproaches(
         δt = taylorstep!(Val(parse_eqs), dynamics, t, x, dx, xaux, abstol, dparams, rv) # δt is positive!
         # Below, δt has the proper sign according to the direction of the integration
         δt = sign_tstep * min(δt, sign_tstep * (tmax - t0))
-        TS.evaluate!(x, δt, x0) # new initial condition
-        set_psol!(Val(true), psol, nsteps, x) # Store the Taylor polynomial solution
+        # New initial condition
+        TS.evaluate!(x, δt, x0)
+        # Store the Taylor polynomial solution
+        for i in eachindex(x)
+            for k in eachindex(x[i])
+                TS.identity!(psol[:, 1][i], psol[:, 2][i], k)
+                TS.identity!(psol[:, 2][i], x[i], k)
+            end
+        end
         g_tupl = rvelea(dx, x, dparams, t)
         nevents_old = nevents
         nevents = findroot!(t, x, dx, g_tupl_old, g_tupl, 0, tvS, xvS, gvS,
@@ -249,7 +264,7 @@ function closeapproaches(
             # Time at close approach
             t_CA = d0 + tvS[nevents-1]
             # Asteroid's geocentric state vector
-            xae = psol[:, nsteps-1]( t_CA - d0 - tv[nsteps-1] ) - params.eph_ea(t_CA)
+            xae = psol[:, 1]( t_CA - d0 - tpre ) - params.eph_ea(t_CA)
             # Asteroid's geocentric semimajor axis
             a = semimajoraxis(xae..., PE.μ[ea], zero(T))
             if a < 0
@@ -267,11 +282,13 @@ function closeapproaches(
             !isconvergent(CA, ctol) && break
         end
         g_tupl_old = deepcopy(g_tupl)
+        # Update time
+        tpre = t0
         t0 += δt
         update_cache!(cache, t0, x0)
         nsteps += 1
-        @inbounds tv[nsteps] = t0
-        @inbounds xv[:, nsteps] .= deepcopy(x0)
+        # Break conditions
+        !isconvergent(x0, ctol) && break
         if nsteps > maxsteps
             @warn("""
             Maximum number of integration steps reached; exiting.
@@ -279,6 +296,7 @@ function closeapproaches(
             break
         end
     end
+    flag = sign_tstep * t0 >= sign_tstep * tmax
 
-    return CAs
+    return CAs, flag
 end

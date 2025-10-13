@@ -64,7 +64,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Oct 4, 2025
+        # Values by Oct 13, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
@@ -90,9 +90,10 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         nyears = 0.4 / yr
         lovorder = 6
         ctol = 0.01
-        CAs = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
+        CAs, flag = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
         @test length(CAs) == 1
         CA = CAs[1]
+        @test flag
 
         # Virtual asteroids
         VAs = virtualasteroids(CAs)
@@ -161,7 +162,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Oct 4, 2025
+        # Values by Oct 13, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
@@ -187,9 +188,10 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         nyears = 26 / yr
         lovorder = 6
         ctol = 0.01
-        CAs = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
+        CAs, flag = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
         @test length(CAs) == 1
         CA = CAs[1]
+        @test flag
 
         # Virtual asteroids
         VAs = virtualasteroids(CAs)
