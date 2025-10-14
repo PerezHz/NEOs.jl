@@ -266,7 +266,6 @@ end
 function impactingcondition(::Val{true}, VA::VirtualAsteroid{T},
                             domain::NTuple{2, T}, ctol::T) where {T <: Real}
     a, b = domain
-    a, b = max(a, lbound(VA)), min(b, ubound(VA))
     da, db = distance(VA, a, ctol), distance(VA, b, ctol)
     # The radial distance changes sign in [a, b], so there is a root
     if da * db < 0
@@ -317,7 +316,7 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T 
     for i in eachindex(VAs)
         VA = VAs[i]
         a, b = convergence_domain(VA, ctol)
-        rs = find_zeros(σ -> rvelea(VA, σ, ctol), (a, b), no_pts = max(10, length(VA.CAs)))
+        rs = find_zeros(σ -> rvelea(VA, σ, ctol), (a, b), no_pts = max(10, 2length(VA.CAs)))
         # The radial velocity has no roots in [a, b], so the radial distance is monotonic
         if isempty(rs)
             σ, domain = impactingcondition(Val(true), VA, (a, b), ctol)
@@ -352,16 +351,17 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T 
         for j in i+1:Nic
             ka, σa, domaina, ta, _ = ics[i]
             kb, σb, domainb, tb, _ = ics[j]
-            # Same index and domain
-            if ka == kb && domaina == domainb
-                k, domain = ka, domaina
+            # The intersection of domaina and domainb is not empty
+            if (domaina[1] ≤ domainb[2]) && (domainb[1] ≤ domaina[2])
+                domain = (min(domaina[1], domainb[1]), max(domaina[2], domainb[2]))
                 σ = (domain[1] + domain[2]) / 2
+                k = domaina[1] ≤ σ ≤ domaina[2] ? ka : kb
                 t, d = timeofca(VAs[k], σ, ctol), distance(VAs[k], σ, ctol)
                 ics[i] = (k, σ, domain, t, d)
                 mask[j] = true
-            # Different index, similar sigma and time of impact
-            elseif abs( (σa - σb) / σa) < 0.01 && abs((ta - tb) / ta) < 0.01
-                mask[j] = true
+            # The intersection of domaina and domainb is empty
+            else
+                mask[j] = abs( (σa - σb) / σa) < 0.01 && abs((ta - tb) / ta) < 0.01
             end
         end
     end
