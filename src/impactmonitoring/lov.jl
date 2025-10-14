@@ -48,16 +48,13 @@ function lovcovariance(
         bufferT1::Union{Nothing, PropresBuffer{T, Taylor1{T}, T}} = nothing,
         order::Int = 6
     ) where {D, T <: Real, O}
-    # Number of degrees of freedom
+    # Set jet transport variables
     Npar = dof(Val(od.dynamics))
-    # Jet transpot initial condition
     set_od_order(T, 2, Npar)
-    if length(q00) < Npar
-        q00 = vcat(q00, zero(T), zero(T))
-    end
+    # Jet transpot initial condition
     scalings = fill(1e-8, 6)
-    if Npar == 8
-        scalings = vcat(scalings, 1e-14, 1e-15)
+    if Npar == 9
+        scalings = vcat(scalings, params.marsden_scalings...)
     end
     dq = scalings .* get_variables(T, 2)
     q0TN = q00 + dq
