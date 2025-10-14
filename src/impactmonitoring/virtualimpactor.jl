@@ -394,6 +394,7 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real,
         i, σ, domain, t, _ = ics[k]
         # Eliminate conditions outside time or lov domain
         if !(σ in lov)
+            domain = (max(domain[1], lbound(lov)), min(domain[2], ubound(lov)))
             σ = (domain[1] + domain[2]) / 2
             t = timeofca(VAs[i], σ, ctol)
         end

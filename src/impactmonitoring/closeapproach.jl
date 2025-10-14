@@ -174,10 +174,10 @@ Compute the close approaches of the initial condition obtained by expanding `lov
 for a period of `nyears` [years]. For a list of parameters see the `Propagation`
 section of [`Parameters`](@ref).
 
-The integration will stop before the final time if either a close approach or the
-current state vector do not converge under the tolerance `ctol`. Thus, the function
-returns (i) the vector of detected close approaches and (ii) a bool indicating
-whether the integration was terminated prematurely.
+The propagation will stop before the final time if a close approach does not converge
+under the tolerance `ctol`. Thus, the function returns (i) the vector of detected
+close approaches, (ii) the convergence radius at the last timestep and (iii) a
+bool indicating whether the integration reached the final time.
 
 # Keyword arguments
 
@@ -294,7 +294,8 @@ function closeapproaches(
             break
         end
     end
-    flag = ( sign_tstep * t0 >= sign_tstep * tmax ) && isconvergent(x0, ctol)
+    flag = sign_tstep * t0 >= sign_tstep * tmax
+    r = flag ? convergence_radius(x0, ctol) : convergence_radius(CAs[end], ctol)
 
-    return CAs, flag
+    return CAs, r, flag
 end
