@@ -287,8 +287,6 @@ function closeapproaches(
         t0 += δt
         update_cache!(cache, t0, x0)
         nsteps += 1
-        # Break conditions
-        !isconvergent(x0, ctol) && break
         if nsteps > maxsteps
             @warn("""
             Maximum number of integration steps reached; exiting.
@@ -296,7 +294,7 @@ function closeapproaches(
             break
         end
     end
-    flag = sign_tstep * t0 >= sign_tstep * tmax
+    flag = ( sign_tstep * t0 >= sign_tstep * tmax ) && isconvergent(x0, ctol)
 
     return CAs, flag
 end
