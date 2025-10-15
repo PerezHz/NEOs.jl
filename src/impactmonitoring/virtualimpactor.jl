@@ -392,13 +392,16 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real,
     VIs = Vector{VirtualImpactor{T}}(undef, 0)
     for k in 1:min(N, Nic)
         i, σ, domain, t, _ = ics[k]
-        # Eliminate conditions outside time or lov domain
-        if !(σ in lov)
+        # The intersection of domain and lov is not empty
+        if (domain[1] ≤ ubound(lov)) && (lbound(lov) ≤ domain[2])
             domain = (max(domain[1], lbound(lov)), min(domain[2], ubound(lov)))
             σ = (domain[1] + domain[2]) / 2
             t = timeofca(VAs[i], σ, ctol)
+            (σ in lov && 0.0 ≤ t ≤ 36525.0 ) || continue
+        # The intersection of domain and lov is empty
+        else
+            continue
         end
-        (σ in lov && 0.0 ≤ t ≤ 36525.0 ) || continue
         VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
         # Marginal virtual impactor
         if !ismarginal(VI)
