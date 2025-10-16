@@ -340,7 +340,7 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
     C = log(648_000) / 9
     U = floor(Int, log(runoff) / C) + 1
 
-    return clamp(U, 0, 10)
+    return clamp(U, 0, 9)
 end
 
 # Observed magnitude model
