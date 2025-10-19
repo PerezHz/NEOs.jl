@@ -228,7 +228,7 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     # Target plane coordinates
     X, Y, Z = targetplane(tp)
     # Target plane covariance matrix at close approach
-    Γ_B = project([X, Y], zeros(6), Γ)
+    Γ_B = project([X, Y], zeros(Npar), Γ)
     # Impact probability
     ρ, x_C, y_C = zero(T), zero(T), zero(T)
     m_X, m_Y, r = cte(X), cte(Y), cte(Z)
