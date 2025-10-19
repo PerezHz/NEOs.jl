@@ -264,7 +264,7 @@ function closeapproaches(
             # Time at close approach
             t_CA = d0 + tvS[nevents-1]
             # Asteroid's geocentric state vector
-            xae = psol[:, 1]( t_CA - d0 - tpre ) - params.eph_ea(t_CA)
+            xae = psol[1:6, 1]( t_CA - d0 - tpre ) - params.eph_ea(t_CA)
             # Asteroid's geocentric semimajor axis
             a = semimajoraxis(xae..., PE.μ[ea], zero(T))
             if a < 0

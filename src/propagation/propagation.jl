@@ -142,7 +142,7 @@ function rvelea(dx, x, params, t)
     # Earth's ephemeris
     xe = ss16asteph_t[nbodyind(N-1, ea)]
     # Asteroid's geocentric state vector
-    xae = x - xe
+    xae = x[1:6] - xe
     # Geocentric radial velocity
     return euclid3D(cte(xae[1:3])) < 0.1, dot3D(xae[1:3], xae[4:6])
 end

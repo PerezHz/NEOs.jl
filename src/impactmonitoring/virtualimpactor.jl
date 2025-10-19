@@ -213,7 +213,7 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     end
     # Close approach
     t_CA = fwd.t0 + tvS[end]
-    xae = fwd(t_CA) - params.eph_ea(t_CA)
+    xae = fwd(t_CA)[1:6] - params.eph_ea(t_CA)
     # Asteroid's geocentric semimajor axis
     a = semimajoraxis(xae..., PE.μ[ea], zero(T))
     if a < 0
