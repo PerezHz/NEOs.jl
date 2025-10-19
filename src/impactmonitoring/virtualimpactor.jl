@@ -41,7 +41,7 @@ width(x::VirtualImpactor) = width(x.domain)
 
 isoutlov(x::VirtualImpactor) = iszero(width(x))
 ishyperbolic(x::VirtualImpactor) = semimajoraxis(x) < 0
-ismarginal(x::VirtualImpactor) = isempty(x.covariance)
+ismarginal(x::VirtualImpactor) = isempty(x.covariance) || any(<(0), diag(x.covariance))
 
 """
     impactenergy(VI, orbit, params; kwargs...)
@@ -229,6 +229,10 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     X, Y, Z = targetplane(tp)
     # Target plane covariance matrix at close approach
     Γ_B = project([X, Y], zeros(Npar), Γ)
+    if any(<(0), diag(Γ_B))
+        ip = iszero(width(domain)) ? T(NaN) : impact_probability(domain[1], domain[2])
+        return VirtualImpactor{T}(t, σ, ip, cte(a), domain, Γ_B)
+    end
     # Impact probability
     ρ, x_C, y_C = zero(T), zero(T), zero(T)
     m_X, m_Y, r = cte(X), cte(Y), cte(Z)
