@@ -21,6 +21,11 @@ A segment of the line of variations that impacts the Earth.
     covariance::Matrix{T}
 end
 
+# Definition of zero VirtualImpactor
+zero(::Type{VirtualImpactor{T}}) where {T} = VirtualImpactor(zero(T), zero(T),
+    zero(T), zero(T), (zero(T), zero(T)), Matrix{T}(undef, 0, 0))
+iszero(x::VirtualImpactor{T}) where {T} = x == zero(VirtualImpactor{T})
+
 nominaltime(x::VirtualImpactor) = x.t
 date(x::VirtualImpactor) = days2dtutc(nominaltime(x))
 
@@ -41,7 +46,9 @@ width(x::VirtualImpactor) = width(x.domain)
 
 isoutlov(x::VirtualImpactor) = iszero(width(x))
 ishyperbolic(x::VirtualImpactor) = semimajoraxis(x) < 0
-ismarginal(x::VirtualImpactor) = isempty(x.covariance) || any(<(0), diag(x.covariance))
+
+semiwidth(x::VirtualImpactor) = sqrt(first(eigvals(x.covariance)))
+stretching(x::VirtualImpactor) = sqrt(last(eigvals(x.covariance)))
 
 """
     impactenergy(VI, orbit, params; kwargs...)
@@ -68,6 +75,22 @@ function impactenergy(VI::VirtualImpactor, orbit::AbstractOrbit, params::Paramet
 end
 
 """
+    palermoscale(E, IP, ΔT)
+
+Return the Palermo Scale of a virtual impactor with energy `E` [Mt],
+impact probability `IP` and time until impact `ΔT` [yr].
+
+!!! reference
+    - https://doi.org/10.1006/icar.2002.6910
+"""
+function palermoscale(E::Real, IP::Real, ΔT::Real)
+    # Background impact frequency [yr⁻¹]
+    fb = 0.03 * E^(-0.8)
+    # Palermo scale
+    return log10(IP / (fb * ΔT))
+end
+
+"""
     palermoscale(VI, orbit, params; kwargs)
 
 Return the Palermo Scale of a virtual impactor `VI` associated to an `orbit`.
@@ -82,35 +105,26 @@ Return the Palermo Scale of a virtual impactor `VI` associated to an `orbit`.
 """
 function palermoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters;
                       ρ::Real = 2_600, p::Real = 0.14)
+    # Impact energy [Mt]
+    E = impactenergy(VI, orbit, params; ρ, p)
     # Impact probability
     IP = impact_probability(VI)
-    # Background impact frequency [yr⁻¹]
-    fb = 0.03 * impactenergy(VI, orbit, params; ρ, p)^(-0.8)
     # Time until impact [yr]
     ΔT = (nominaltime(VI) - epoch(orbit)) / yr
     # Palermo scale
-    return log10(IP / (fb * ΔT))
+    return palermoscale(E, IP, ΔT)
 end
 
 """
-    torinoscale(VI, orbit, params; kwargs)
+    torinoscale(E, IP)
 
-Return the Torino Scale of a virtual impactor `VI` associated to an `orbit`.
-
-# Keyword arguments
-
-- `ρ::Real`: density [kg/m³] (default: `2_600`).
-- `p::Real`: albedo (default: `0.14`).
+Return the Torino Scale of a virtual impactor with energy `E` [Mt]
+and impact probability `IP`.
 
 !!! reference
     - https://doi.org/10.1016/S0032-0633(00)00006-4
 """
-function torinoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters;
-                     ρ::Real = 2_600, p::Real = 0.14)
-    # Impact probability
-    IP = impact_probability(VI)
-    # Impact energy [Mt]
-    E = impactenergy(VI, orbit, params; ρ, p)
+function torinoscale(E::Real, IP::Real)
     # Logarithms
     logE, logIP = log10(E), log10(IP)
     # Torino scale
@@ -145,38 +159,56 @@ function torinoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Paramete
     end
 end
 
+"""
+    torinoscale(VI, orbit, params; kwargs)
+
+Return the Torino Scale of a virtual impactor `VI` associated to an `orbit`.
+
+# Keyword arguments
+
+- `ρ::Real`: density [kg/m³] (default: `2_600`).
+- `p::Real`: albedo (default: `0.14`).
+
+!!! reference
+    - https://doi.org/10.1016/S0032-0633(00)00006-4
+"""
+function torinoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters;
+                     ρ::Real = 2_600, p::Real = 0.14)
+    # Impact energy [Mt]
+    E = impactenergy(VI, orbit, params; ρ, p)
+    # Impact probability
+    IP = impact_probability(VI)
+    # Torino scale
+    return torinoscale(E, IP)
+end
+
 impact_probability(a::Real, b::Real) = erf(a/sqrt(2), b/sqrt(2)) / 2
 
-function Splus(x::T, params::NTuple{8, T}) where {T <: Real}
-    r, ρ, m_X, m_Y, σ_X, σ_Y, x_C, y_C = params
-    C = 1 / sqrt(2 * (1 - ρ^2))
-    A = (y_C + sqrt(r^2 - (x - x_C)^2) - m_Y) / σ_Y
-    B = ρ * ( (x - m_X) / σ_X)
-    return C * (A - B)
+function impact_probability(params::NTuple{6, T}) where {T <: Real}
+    w = params[5]
+    C = 1 / (2w*sqrt(2π))
+    rmin, rmax = milani2005bounds(params)
+    if rmin < rmax
+        return C * quadgk(Base.Fix2(milani2005integrand, params), rmin, rmax)[1]
+    else
+        return zero(T)
+    end
 end
 
-function Sminus(x::T, params::NTuple{8, T}) where {T <: Real}
-    r, ρ, m_X, m_Y, σ_X, σ_Y, x_C, y_C = params
-    C = 1 / sqrt(2 * (1 - ρ^2))
-    A = (y_C - sqrt(r^2 - (x - x_C)^2) - m_Y) / σ_Y
-    B = ρ * ( (x - m_X) / σ_X)
-    return C * (A - B)
+function milani2005bounds(params::NTuple{6, T}) where {T <: Real}
+    _X_, _Z_, w = params[1], params[3], params[5]
+    rmin = max(-_Z_, _X_ - 8w)
+    rmax = min(+_Z_, _X_ + 8w)
+    return rmin, rmax
 end
 
-function mangelbounds(params::NTuple{8, T}) where {T <: Real}
-    r, m_X, σ_X, x_C = params[1], params[3], params[5], params[7]
-    return (x_C - r - m_X) / σ_X, (x_C + r - m_X) / σ_X
-end
-
-function mangelintegrand(v::T, params::NTuple{8, T}) where {T <: Real}
-    m_X, σ_X = params[3], params[5]
-    return exp(-v^2/2) * erf(Sminus(σ_X * v + m_X, params), Splus(σ_X*v + m_X, params))
-end
-
-function impact_probability(σ::T, params::NTuple{8, T}) where {T <: Real}
-    C = exp(-σ^2/2) / (2 * sqrt(2π))
-    a, b = mangelbounds(params)
-    return C * quadgk(Base.Fix2(mangelintegrand, params), a, b)[1]
+function milani2005integrand(u::T, params::NTuple{6, T}) where {T <: Real}
+    _X_, _Y_, _Z_, σ, w, Λ = params
+    A = (u - _X_) / w
+    C = (_Y_ - Λ*σ) / (sqrt(2)*Λ)
+    Splus  = C + sqrt(_Z_^2 - u^2) / (sqrt(2)*Λ)
+    Sminus = C - sqrt(_Z_^2 - u^2) / (sqrt(2)*Λ)
+    return exp(-A^2/2) * erf(Sminus, Splus)
 end
 
 function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T},
@@ -205,12 +237,7 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     nyears = min(t + 2 + PE.J2000 - jd0, dtutc2days(DateTime(2099, 12, 31))) / yr
     fwd, tvS, _, _ = propagate_root(lov.dynamics, q0, jd0, nyears, params)
     # Marginal close approach
-    if any(isnan, fwd.t) || isempty(tvS)
-        ip = iszero(width(domain)) ? T(NaN) : impact_probability(domain[1], domain[2])
-        a = T(NaN)
-        Γ_B = Matrix{T}(undef, 0, 0)
-        return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_B)
-    end
+    (any(isnan, fwd.t) || isempty(tvS)) && return zero(VirtualImpactor{T})
     # Close approach
     t_CA = fwd.t0 + tvS[end]
     xae = fwd(t_CA)[1:6] - params.eph_ea(t_CA)
@@ -228,23 +255,28 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     # Target plane coordinates
     X, Y, Z = targetplane(tp)
     # Target plane covariance matrix at close approach
-    Γ_B = project([X, Y], zeros(Npar), Γ)
-    if any(<(0), diag(Γ_B))
-        ip = iszero(width(domain)) ? T(NaN) : impact_probability(domain[1], domain[2])
-        return VirtualImpactor{T}(t, σ, ip, cte(a), domain, Γ_B)
-    end
+    Γ_tp = project([X, Y], zeros(Npar), Γ)
+    any(<(0), diag(Γ_tp)) && return zero(VirtualImpactor{T})
     # Impact probability
-    ρ, x_C, y_C = zero(T), zero(T), zero(T)
-    m_X, m_Y, r = cte(X), cte(Y), cte(Z)
-    σ_X, σ_Y = sqrt.(diag(Γ_B))
-    iparams = (r, ρ, m_X, m_Y, σ_X, σ_Y, x_C, y_C)
-    if iszero(width(domain))
-        ip = impact_probability(σ, iparams)
-    else
+    if width(domain) > 0
         ip = impact_probability(domain[1], domain[2])
+    else
+        # Eigenpairs of TP covariance matrix
+        E_tp = eigen(Γ_tp)
+        # Semi-width and stretching
+        w, Λ = sqrt.(E_tp.values)
+        # Angle between the semimajor axis of the TP covariance ellipse and the Y-axis
+        α = angle(E_tp.vectors[:, 2], [zero(T), one(T)])
+        # Rotate TP coordinates by an angle of -α
+        _X_ = cte(X) * cos(-α) - cte(Y) * sin(-α)
+        _Y_ = cte(X) * sin(-α) + cte(Y) * cos(-α)
+        _Z_ = cte(Z)
+        # Approximate the impact probability using the formula from Milani et al. (2005)
+        iparams = (_X_, _Y_, _Z_, σ, w, Λ)
+        ip = impact_probability(iparams)
     end
 
-    return VirtualImpactor{T}(t, σ, ip, cte(a), domain, Γ_B)
+    return VirtualImpactor{T}(t, σ, ip, cte(a), domain, Γ_tp)
 end
 
 function impactingbounds(VA::VirtualAsteroid, σ::Real, ctol::Real)
@@ -408,7 +440,7 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real,
         end
         VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
         # Marginal virtual impactor
-        if !ismarginal(VI)
+        if !iszero(VI)
             push!(VIs, VI)
         end
     end
@@ -421,16 +453,19 @@ end
 function summary(VIs::AbstractVector{VirtualImpactor{T}}) where {T <: Real}
     s1 = string(
         "Impactor table{$T}\n",
-        repeat('-', 56), "\n",
-        "Date (UTC)                 Sigma      Impact probability\n",
+        repeat('-', 80), "\n",
+        "Date (UTC)          Sigma      Semi-width [RE]    Stretching [RE]    IP\n",
     )
     s2 = Vector{String}(undef, length(VIs))
     for (i, VI) in enumerate(VIs)
-        t = rpad(string(date(VI)), 27)
+        d = round(date(VI), Minute)
+        t = rpad(Dates.format(d, "yyyy-mm-dd HH:MM"), 20)
         σ = rpad(@sprintf("%+.4f", sigma(VI)), 11)
+        w = rpad(@sprintf("%.3f", semiwidth(VI)), 19)
+        Λ = rpad(@sprintf("%.2E", stretching(VI)), 19)
         asterisk = isoutlov(VI) ? " *" : "  "
-        ip = rpad(@sprintf("%+.2E", VI.ip) * asterisk, 11)
-        s2[i] = string(t, σ, ip, "\n")
+        ip = rpad(@sprintf("%.2E", VI.ip) * asterisk, 11)
+        s2[i] = string(t, σ, w, Λ, ip, "\n")
     end
     return string(s1, join(s2))
 end

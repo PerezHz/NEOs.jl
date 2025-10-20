@@ -9,13 +9,29 @@ using Test
 
 using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
       convergence_domain, isconvergent, timeofca, distance, rvelea,
-      concavity, width, ismarginal, isoutlov, vinf
+      concavity, width, isoutlov, vinf
 
 @testset "Impact monitoring" begin
 
     @testset "Common" begin
         using NEOs: refine
 
+        @test iszero(zero(VirtualImpactor{Float64}))
+
+        # Impact monitoring scales
+        Es  = [1E2,  1E4,  1E5,  1E1,  1E3,  1E4,  1E7,  1E7,  1E1,   1E4,   1E7] # Mt
+        IPs = [1E-6, 1E-4, 1E-3, 1E-1, 1E-1, 1E-1, 1E-3, 1E-1, 0.999, 0.999, 0.999]
+        ΔT = 50.0
+
+        TS = torinoscale.(Es, IPs)
+        @test issorted(TS)
+        @test TS == collect(0:10)
+
+        PS = palermoscale.(Es, IPs, Ref(ΔT))
+        perm = sortperm(@. IPs / Es^(-0.8))
+        @test issorted(PS[perm])
+
+        # Domain refinement
         σ = 0.0
         domain = (-5.0, 5.0)
         N = 11
@@ -64,7 +80,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Oct 14, 2025
+        # Values by Oct 20, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
@@ -131,9 +147,11 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test impact_probability(VI1) ≈ impact_probability(VI2) atol = 0.01
         @test width(VI1) == 2σmax
         @test width(VI2) == 0.0
-        @test !ismarginal(VI1) && !ismarginal(VI2)
+        @test !iszero(VI1) && !iszero(VI2)
         @test !isoutlov(VI1) && isoutlov(VI2)
 
+        @test semiwidth(VI1) == semiwidth(VI2) > 0
+        @test stretching(VI1) == stretching(VI2) > 0
         @test semimajoraxis(VI1) == semimajoraxis(VI2) < 0
         @test vinf(VI1) == vinf(VI2) > 0
         @test ishyperbolic(VI1) && ishyperbolic(VI2)
@@ -163,7 +181,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Oct 14, 2025
+        # Values by Oct 20, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
@@ -230,9 +248,11 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test impact_probability(VI1) > impact_probability(VI2) == 0.0
         @test width(VI1) == 2σmax
         @test width(VI2) == 0.0
-        @test !ismarginal(VI1) && !ismarginal(VI2)
+        @test !iszero(VI1) && !iszero(VI2)
         @test !isoutlov(VI1) && isoutlov(VI2)
 
+        @test semiwidth(VI1) == semiwidth(VI2) > 0
+        @test stretching(VI1) == stretching(VI2) > 0
         @test semimajoraxis(VI1) == semimajoraxis(VI2) > 0
         @test vinf(VI1) == vinf(VI2) == 0.0
         @test !ishyperbolic(VI1) && !ishyperbolic(VI2)

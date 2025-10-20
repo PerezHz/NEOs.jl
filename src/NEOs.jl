@@ -11,9 +11,9 @@ import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to
 import Tables: Schema, istable, rowaccess, rows, schema
 import TaylorSeries: get_order
 
-using AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON, LazyArtifacts,
-      LinearAlgebra, Printf, SatelliteToolboxTransformations, Scratch, SPICE,
-      TaylorIntegration, TaylorSeries, XML
+using AngleBetweenVectors, AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON,
+      LazyArtifacts, LinearAlgebra, Printf, SatelliteToolboxTransformations, Scratch,
+      SPICE, TaylorIntegration, TaylorSeries, XML
 
 using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
 using DataFrames: AbstractDataFrame, DataFrame, DataFrameRow, nrow, eachrow, eachcol,
@@ -87,7 +87,7 @@ export BPlane, MTP, bopik, mtp, targetplane, crosssection, valsecchi_circle
 export LineOfVariations, CloseApproach, VirtualAsteroid, lineofvariations, closeapproaches,
        virtualasteroids, sigma, lbound, ubound
 export VirtualImpactor, virtualimpactors, impact_probability, impactor_table, impactenergy,
-       palermoscale, torinoscale
+       palermoscale, torinoscale, semiwidth, stretching
 
 include("constants.jl")
 include("units.jl")

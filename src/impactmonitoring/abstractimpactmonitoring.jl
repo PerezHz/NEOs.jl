@@ -59,7 +59,9 @@ Every instance `x` of `AbstractVirtualImpactor` has a:
 abstract type AbstractVirtualImpactor{T <: Real} <: AbstractImpactMonitoring end
 
 function show(io::IO, x::AbstractVirtualImpactor)
-    t = date(x)
+    d = round(date(x), Minute)
+    t = Dates.format(d, "yyyy-mm-dd HH:MM")
     ip = @sprintf("%.2E", impact_probability(x))
-    print(io, "VI at ", t, " with probability ", ip)
+    asterisk = isoutlov(x) ? " *" : ""
+    print(io, "VI at ", t, " with probability ", ip, asterisk)
 end
