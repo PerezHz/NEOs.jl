@@ -271,23 +271,23 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     # Target plane coordinates
     X, Y, Z = targetplane(tp)
     # Target plane covariance matrix at close approach
-    Γ_tp = project([X, Y], zeros(Npar), Γ)
-    if any(<(0), diag(Γ_tp))
+    Γ_tp = Symmetric(project([X, Y], zeros(Npar), Γ))
+    # Eigenpairs of the target plane covariance matrix
+    E_tp = eigen(Γ_tp)
+    if any(<(0), E_tp.values)
         @warn string(
             "The following virtual impactor was detected but the target plane \
             covariance matrix was not positive definite\n",
             "Date (UTC)          Sigma      IP\n",
             rpad(Dates.format(days2dtutc(t), "yyyy-mm-dd HH:MM"), 20),
             rpad(@sprintf("%+.4f", σ), 11),
-            @sprintf("%.2E", ip), 11,
+            @sprintf("%.2E", ip),
             width(domain) > 0 ? "" : " *"
         )
         return zero(VirtualImpactor{T})
     end
     # Approximate the impact probability using the formula from Milani et al (2005)
     if iszero(width(domain))
-        # Eigenpairs of TP covariance matrix
-        E_tp = eigen(Γ_tp)
         # Semi-width and stretching
         w, Λ = sqrt.(E_tp.values)
         # Angle between the semimajor axis of the TP covariance ellipse and the Y-axis
