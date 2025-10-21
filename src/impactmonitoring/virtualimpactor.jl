@@ -47,8 +47,13 @@ width(x::VirtualImpactor) = width(x.domain)
 isoutlov(x::VirtualImpactor) = iszero(width(x))
 ishyperbolic(x::VirtualImpactor) = semimajoraxis(x) < 0
 
-semiwidth(x::VirtualImpactor) = sqrt(first(eigvals(x.covariance)))
-stretching(x::VirtualImpactor) = sqrt(last(eigvals(x.covariance)))
+covariance(x::VirtualImpactor) = x.covariance
+
+semiwidth(x::VirtualImpactor{T}) where {T <: Real} =
+    iszero(x) ? T(NaN) : sqrt(first(eigvals(covariance(x))))
+
+stretching(x::VirtualImpactor{T}) where {T <: Real} =
+    iszero(x) ? T(NaN) : sqrt(last(eigvals(covariance(x))))
 
 """
     impactenergy(VI, orbit, params; kwargs...)
@@ -214,6 +219,8 @@ end
 function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T},
                          orbit::AbstractOrbit, params::Parameters{T},
                          σ::T, t::T, domain::NTuple{2, T}) where {D, T <: Real}
+    # A-priori impact probability
+    ip = impact_probability(domain[1], domain[2])
     # Set jet transport variables
     Npar = numvars(orbit)
     set_od_order(T, 2, Npar)
@@ -236,13 +243,22 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     # Forward propagation
     nyears = min(t + 2 + PE.J2000 - jd0, dtutc2days(DateTime(2099, 12, 31))) / yr
     fwd, tvS, _, _ = propagate_root(lov.dynamics, q0, jd0, nyears, params)
-    # Marginal close approach
-    (any(isnan, fwd.t) || isempty(tvS)) && return zero(VirtualImpactor{T})
+    if any(isnan, fwd.t) || isempty(tvS)
+        @warn string(
+            "The following virtual impactor was detected but integration failed\n",
+            "Date (UTC)          Sigma      IP\n",
+            rpad(Dates.format(days2dtutc(t), "yyyy-mm-dd HH:MM"), 20),
+            rpad(@sprintf("%+.4f", σ), 11),
+            @sprintf("%.2E", ip),
+            width(domain) > 0 ? "" : " *"
+        )
+        return zero(VirtualImpactor{T})
+    end
     # Close approach
     t_CA = fwd.t0 + tvS[end]
     xae = fwd(t_CA)[1:6] - params.eph_ea(t_CA)
     # Asteroid's geocentric semimajor axis
-    a = semimajoraxis(xae..., PE.μ[ea], zero(T))
+    a = cte(semimajoraxis(xae..., PE.μ[ea], zero(T)))
     if a < 0
         # Earth's heliocentric state vector
         xes = params.eph_ea(t_CA) - params.eph_su(t_CA)
@@ -256,11 +272,20 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     X, Y, Z = targetplane(tp)
     # Target plane covariance matrix at close approach
     Γ_tp = project([X, Y], zeros(Npar), Γ)
-    any(<(0), diag(Γ_tp)) && return zero(VirtualImpactor{T})
-    # Impact probability
-    if width(domain) > 0
-        ip = impact_probability(domain[1], domain[2])
-    else
+    if any(<(0), diag(Γ_tp))
+        @warn string(
+            "The following virtual impactor was detected but the target plane \
+            covariance matrix was not positive definite\n",
+            "Date (UTC)          Sigma      IP\n",
+            rpad(Dates.format(days2dtutc(t), "yyyy-mm-dd HH:MM"), 20),
+            rpad(@sprintf("%+.4f", σ), 11),
+            @sprintf("%.2E", ip), 11,
+            width(domain) > 0 ? "" : " *"
+        )
+        return zero(VirtualImpactor{T})
+    end
+    # Approximate the impact probability using the formula from Milani et al (2005)
+    if iszero(width(domain))
         # Eigenpairs of TP covariance matrix
         E_tp = eigen(Γ_tp)
         # Semi-width and stretching
@@ -271,12 +296,12 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
         _X_ = cte(X) * cos(-α) - cte(Y) * sin(-α)
         _Y_ = cte(X) * sin(-α) + cte(Y) * cos(-α)
         _Z_ = cte(Z)
-        # Approximate the impact probability using the formula from Milani et al. (2005)
+        # Compute the 2D integral
         iparams = (_X_, _Y_, _Z_, σ, w, Λ)
         ip = impact_probability(iparams)
     end
 
-    return VirtualImpactor{T}(t, σ, ip, cte(a), domain, Γ_tp)
+    return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
 end
 
 function impactingbounds(VA::VirtualAsteroid, σ::Real, ctol::Real)
@@ -458,8 +483,7 @@ function summary(VIs::AbstractVector{VirtualImpactor{T}}) where {T <: Real}
     )
     s2 = Vector{String}(undef, length(VIs))
     for (i, VI) in enumerate(VIs)
-        d = round(date(VI), Minute)
-        t = rpad(Dates.format(d, "yyyy-mm-dd HH:MM"), 20)
+        t = rpad(Dates.format(date(VI), "yyyy-mm-dd HH:MM"), 20)
         σ = rpad(@sprintf("%+.4f", sigma(VI)), 11)
         w = rpad(@sprintf("%.3f", semiwidth(VI)), 19)
         Λ = rpad(@sprintf("%.2E", stretching(VI)), 19)
