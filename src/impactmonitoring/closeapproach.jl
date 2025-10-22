@@ -169,15 +169,13 @@ end
 """
     closeapproaches(lov, σ, domain, nyears, params; kwargs...)
 
-Compute the close approaches of the initial condition obtained by expanding `lov` at
-`σ`, with scaling factors such that `domain` is mapped into the interval `[-1, 1]`,
-for a period of `nyears` [years]. For a list of parameters see the `Propagation`
-section of [`Parameters`](@ref).
+Return the vector of close approaches of the initial condition obtained by expanding
+`lov` at `σ`, with scaling factors such that `domain` is mapped into the `[-1, 1]`,
+interval for a period of `nyears` [years]. For a list of parameters see the
+`Propagation` section of [`Parameters`](@ref).
 
-The propagation will stop before the final time if a close approach does not converge
-under the tolerance `ctol`. Thus, the function returns (i) the vector of detected
-close approaches, (ii) the convergence radius at the last timestep and (iii) a
-bool indicating whether the integration reached the final time.
+The propagation will stop before the final time if it finds a close approach that
+does not converge under the tolerance `ctol`.
 
 # Keyword arguments
 
@@ -294,8 +292,6 @@ function closeapproaches(
             break
         end
     end
-    flag = sign_tstep * t0 >= sign_tstep * tmax
-    r = flag ? convergence_radius(x0, ctol) : convergence_radius(CAs[end], ctol)
 
-    return CAs, r, flag
+    return CAs
 end

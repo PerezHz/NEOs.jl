@@ -21,10 +21,11 @@ A segment of the line of variations that impacts the Earth.
     covariance::Matrix{T}
 end
 
-# Definition of zero VirtualImpactor
-zero(::Type{VirtualImpactor{T}}) where {T} = VirtualImpactor(zero(T), zero(T),
-    zero(T), zero(T), (zero(T), zero(T)), Matrix{T}(undef, 0, 0))
-iszero(x::VirtualImpactor{T}) where {T} = x == zero(VirtualImpactor{T})
+# Outer constructor
+function VirtualImpactor(t::T, σ::T, ip::T, a::T, domain::NTuple{2, T},
+                         Γ_tp::Matrix{T} = Matrix{T}(undef, 0, 0)) where {T <: Real}
+    return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
+end
 
 nominaltime(x::VirtualImpactor) = x.t
 date(x::VirtualImpactor) = days2dtutc(nominaltime(x))
@@ -34,8 +35,12 @@ sigma(x::VirtualImpactor) = x.σ
 impact_probability(x::VirtualImpactor) = x.ip
 
 semimajoraxis(x::VirtualImpactor) = x.a
+
 function vinf(x::VirtualImpactor{T}) where {T <: Real} # km/s
-    if ishyperbolic(x)
+    a = semimajoraxis(x)
+    if isnan(a)
+        return T(NaN)
+    elseif ishyperbolic(x)
         return sqrt( PE.μ[ea] / (-semimajoraxis(x)) ) * (au/daysec)
     else
         return zero(T)
@@ -49,11 +54,15 @@ ishyperbolic(x::VirtualImpactor) = semimajoraxis(x) < 0
 
 covariance(x::VirtualImpactor) = x.covariance
 
+# A marginal virtual impactor is one that was detected
+# but could not be verified
+ismarginal(x::VirtualImpactor) = isempty(covariance(x))
+
 semiwidth(x::VirtualImpactor{T}) where {T <: Real} =
-    iszero(x) ? T(NaN) : sqrt(first(eigvals(covariance(x))))
+    ismarginal(x) ? T(NaN) : sqrt(first(eigvals(covariance(x))))
 
 stretching(x::VirtualImpactor{T}) where {T <: Real} =
-    iszero(x) ? T(NaN) : sqrt(last(eigvals(covariance(x))))
+    ismarginal(x) ? T(NaN) : sqrt(last(eigvals(covariance(x))))
 
 """
     impactenergy(VI, orbit, params; kwargs...)
@@ -219,7 +228,7 @@ end
 function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T},
                          orbit::AbstractOrbit, params::Parameters{T},
                          σ::T, t::T, domain::NTuple{2, T}) where {D, T <: Real}
-    # A-priori impact probability
+    # A priori impact probability
     ip = impact_probability(domain[1], domain[2])
     # Set jet transport variables
     Npar = numvars(orbit)
@@ -252,7 +261,7 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
             @sprintf("%.2E", ip),
             width(domain) > 0 ? "" : " *"
         )
-        return zero(VirtualImpactor{T})
+        return VirtualImpactor(t, σ, ip, T(NaN), domain)
     end
     # Close approach
     t_CA = fwd.t0 + tvS[end]
@@ -284,7 +293,7 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
             @sprintf("%.2E", ip),
             width(domain) > 0 ? "" : " *"
         )
-        return zero(VirtualImpactor{T})
+        return VirtualImpactor(t, σ, ip, a, domain)
     end
     # Approximate the impact probability using the formula from Milani et al (2005)
     if iszero(width(domain))
@@ -464,8 +473,7 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real,
             continue
         end
         VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
-        # Marginal virtual impactor
-        if !iszero(VI)
+        if impact_probability(VI) > 0
             push!(VIs, VI)
         end
     end

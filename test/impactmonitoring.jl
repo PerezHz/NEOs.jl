@@ -9,15 +9,11 @@ using Test
 
 using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
       convergence_domain, isconvergent, timeofca, distance, rvelea,
-      concavity, width, isoutlov, vinf
+      concavity, width, isoutlov, vinf, ismarginal, refine
 
 @testset "Impact monitoring" begin
 
     @testset "Common" begin
-        using NEOs: refine
-
-        @test iszero(zero(VirtualImpactor{Float64}))
-
         # Impact monitoring scales
         Es  = [1E2,  1E4,  1E5,  1E1,  1E3,  1E4,  1E7,  1E7,  1E1,   1E4,   1E7] # Mt
         IPs = [1E-6, 1E-4, 1E-3, 1E-1, 1E-1, 1E-1, 1E-3, 1E-1, 0.999, 0.999, 0.999]
@@ -80,7 +76,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Oct 20, 2025
+        # Values by Oct 22, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
@@ -106,11 +102,9 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         nyears = 0.4 / yr
         lovorder = 6
         ctol = 0.01
-        CAs, r, flag = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
+        CAs = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
         @test length(CAs) == 1
         CA = CAs[1]
-        @test r > 1
-        @test flag
 
         # Virtual asteroids
         VAs = virtualasteroids(CAs)
@@ -147,7 +141,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test impact_probability(VI1) ≈ impact_probability(VI2) atol = 0.01
         @test width(VI1) == 2σmax
         @test width(VI2) == 0.0
-        @test !iszero(VI1) && !iszero(VI2)
+        @test !ismarginal(VI1) && !ismarginal(VI2)
         @test !isoutlov(VI1) && isoutlov(VI2)
 
         @test semiwidth(VI1) == semiwidth(VI2) > 0
@@ -181,7 +175,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Oct 20, 2025
+        # Values by Oct 22, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
@@ -207,11 +201,9 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         nyears = 26 / yr
         lovorder = 6
         ctol = 0.01
-        CAs, r, flag = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
+        CAs = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
         @test length(CAs) == 1
         CA = CAs[1]
-        @test r > 1
-        @test flag
 
         # Virtual asteroids
         VAs = virtualasteroids(CAs)
@@ -248,7 +240,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test impact_probability(VI1) > impact_probability(VI2) == 0.0
         @test width(VI1) == 2σmax
         @test width(VI2) == 0.0
-        @test !iszero(VI1) && !iszero(VI2)
+        @test !ismarginal(VI1) && !ismarginal(VI2)
         @test !isoutlov(VI1) && isoutlov(VI2)
 
         @test semiwidth(VI1) == semiwidth(VI2) > 0
