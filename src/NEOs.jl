@@ -8,6 +8,7 @@ import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination
        longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly,
        t2c_jpl_de430
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
+import StatsBase: weights
 import Tables: Schema, istable, rowaccess, rows, schema
 import TaylorSeries: get_order
 
