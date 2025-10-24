@@ -419,10 +419,11 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T 
     mask = falses(Nic)
     for i in 1:Nic-1
         for j in i+1:Nic
+            (mask[i] || mask[j]) && continue
             ka, σa, domaina, ta, _ = ics[i]
             kb, σb, domainb, tb, _ = ics[j]
             # The intersection of domaina and domainb is not empty
-            if (domaina[1] ≤ domainb[2]) && (domainb[1] ≤ domaina[2])
+            if overlap(domaina, domainb)
                 domain = (min(domaina[1], domainb[1]), max(domaina[2], domainb[2]))
                 σ = (domain[1] + domain[2]) / 2
                 k = domaina[1] ≤ σ ≤ domaina[2] ? ka : kb
@@ -430,8 +431,8 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T 
                 ics[i] = (k, σ, domain, t, d)
                 mask[j] = true
             # The intersection of domaina and domainb is empty
-            else
-                mask[j] = abs( (σa - σb) / σa) < 0.01 && abs((ta - tb) / ta) < 0.01
+            elseif abs( (σa - σb) / σa) < 0.01 && abs((ta - tb) / ta) < 0.01
+                mask[j] = true
             end
         end
     end
@@ -463,18 +464,15 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real,
     for k in 1:min(N, Nic)
         i, σ, domain, t, _ = ics[k]
         # The intersection of domain and lov is not empty
-        if (domain[1] ≤ ubound(lov)) && (lbound(lov) ≤ domain[2])
+        if overlap(domain, lov.domain)
             domain = (max(domain[1], lbound(lov)), min(domain[2], ubound(lov)))
             σ = (domain[1] + domain[2]) / 2
             t = timeofca(VAs[i], σ, ctol)
             (σ in lov && 0.0 ≤ t ≤ 36525.0 ) || continue
-        # The intersection of domain and lov is empty
-        else
-            continue
-        end
-        VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
-        if impact_probability(VI) > 0
-            push!(VIs, VI)
+            VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
+            if impact_probability(VI) > 0
+                push!(VIs, VI)
+            end
         end
     end
     # Sort by time of impact

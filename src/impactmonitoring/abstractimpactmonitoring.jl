@@ -58,6 +58,9 @@ Every instance `x` of `AbstractVirtualImpactor` has a:
 """
 abstract type AbstractVirtualImpactor{T <: Real} <: AbstractImpactMonitoring end
 
+overlap(a::NTuple{2, T}, b::NTuple{2, T}) where {T <: Real} =
+    (a[1] ≤ b[2]) && (b[1] ≤ a[2])
+
 function show(io::IO, x::AbstractVirtualImpactor)
     d = round(date(x), Minute)
     t = Dates.format(d, "yyyy-mm-dd HH:MM")
