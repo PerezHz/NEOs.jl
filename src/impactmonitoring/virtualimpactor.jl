@@ -27,6 +27,10 @@ function VirtualImpactor(t::T, σ::T, ip::T, a::T, domain::NTuple{2, T},
     return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
 end
 
+# Abbreviations
+const VirtualAsteroids{T} = AbstractVector{VirtualAsteroid{T}}
+const ImpactCondition{T} = Tuple{Int, T, Tuple{T, T}, T, T}
+
 nominaltime(x::VirtualImpactor) = x.t
 date(x::VirtualImpactor) = days2dtutc(nominaltime(x))
 
@@ -313,7 +317,7 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
 end
 
-function impactingbounds(VA::VirtualAsteroid, σ::Real, ctol::Real)
+function impactbounds(VA::VirtualAsteroid, σ::Real, ctol::Real)
     a, b = convergence_domain(VA, ctol)
     for CA in Iterators.reverse(VA.CAs)
         a ≤ lbound(CA) || break
@@ -333,8 +337,8 @@ function impactingbounds(VA::VirtualAsteroid, σ::Real, ctol::Real)
 end
 
 # Val{true}: The radial distance function is monotonic over domain
-function impactingcondition(::Val{true}, VA::VirtualAsteroid{T},
-                            domain::NTuple{2, T}, ctol::T) where {T <: Real}
+function impactcondition(::Val{true}, VA::VirtualAsteroid{T},
+                         domain::NTuple{2, T}, ctol::T) where {T <: Real}
     a, b = domain
     da, db = distance(VA, a, ctol), distance(VA, b, ctol)
     # The radial distance changes sign in [a, b], so there is a root
@@ -358,40 +362,35 @@ function impactingcondition(::Val{true}, VA::VirtualAsteroid{T},
 end
 
 # Val{false}: The radial distance function is not monotonic around σ
-function impactingcondition(::Val{false}, VA::VirtualAsteroid{T},
-                            domain::NTuple{2, T}, ctol::T) where {T <: Real}
+function impactcondition(::Val{false}, VA::VirtualAsteroid{T},
+                         domain::NTuple{2, T}, ctol::T) where {T <: Real}
     σ, d = domain
     if d > 0
         domain = (σ, σ)
     else
-        a, b = impactingbounds(VA, σ, ctol)
-        σa, da = impactingcondition(Val(true), VA, (a, σ), ctol)
-        σb, db = impactingcondition(Val(true), VA, (σ, b), ctol)
+        a, b = impactbounds(VA, σ, ctol)
+        σa, da = impactcondition(Val(true), VA, (a, σ), ctol)
+        σb, db = impactcondition(Val(true), VA, (σ, b), ctol)
         σ = (isnan(σa) || isnan(σb)) ? T(NaN) : σ
         domain = (da[1], db[2])
     end
     return σ, domain
 end
 
-"""
-    virtualimpactors(VAs, ctol)
-
-Return the indices, sigmas, domains, times and distances of all the
-impacting conditions found in a vector of virtual asteroids `VAs`
-given a convergence tolerance `ctol`.
-"""
-function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T <: Real}
-    # Find all the impacting conditions over VAs
-    ics = Vector{Tuple{Int, T, Tuple{T, T}, T, T}}(undef, 0)
+function impactconditions(VAs::VirtualAsteroids{T}, ctol::Real; no_pts::Int = 100,
+                          dmax::Real = 236.0) where {T <: Real}
+    # Find all the impact conditions over VAs
+    ics = Vector{ImpactCondition{T}}(undef, 0)
     for i in eachindex(VAs)
         VA = VAs[i]
         a, b = convergence_domain(VA, ctol)
-        rs = find_zeros(σ -> rvelea(VA, σ, ctol), (a, b), no_pts = max(10, 2length(VA.CAs)))
+        rs = find_zeros(σ -> rvelea(VA, σ, ctol), (a, b); no_pts)
         # The radial velocity has no roots in [a, b], so the radial distance is monotonic
         if isempty(rs)
-            σ, domain = impactingcondition(Val(true), VA, (a, b), ctol)
-            if !isnan(σ)
-                t, d = timeofca(VA, σ, ctol), distance(VA, σ, ctol)
+            σ, domain = impactcondition(Val(true), VA, (a, b), ctol)
+            isnan(σ) && continue
+            t, d = timeofca(VA, σ, ctol), distance(VA, σ, ctol)
+            if 0 ≤ t ≤ 36525.0 && d < dmax
                 push!(ics, (i, σ, domain, t, d))
             end
         # The radial velocity has at least one root in [a, b], so the radial distance
@@ -404,39 +403,93 @@ function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real) where {T 
                 if c < 0 && d > 0
                     continue
                 end
-                t = timeofca(VA, σ, ctol)
-                σ, domain = impactingcondition(Val(false), VA, (σ, d), ctol)
-                if !isnan(σ)
+                σ, domain = impactcondition(Val(false), VA, (σ, d), ctol)
+                isnan(σ) && continue
+                t, d = timeofca(VA, σ, ctol), distance(VA, σ, ctol)
+                if 0 ≤ t ≤ 36525.0 && d < dmax
                     push!(ics, (i, σ, domain, t, d))
                 end
             end
         end
     end
     # Sort by distance
-    sort!(ics, by = Base.Fix2(getindex, 5))
-    # Merge duplicated impacting conditions
-    Nic = length(ics)
-    mask = falses(Nic)
-    for i in 1:Nic-1
-        for j in i+1:Nic
-            (mask[i] || mask[j]) && continue
-            ka, σa, domaina, ta, _ = ics[i]
-            kb, σb, domainb, tb, _ = ics[j]
-            # The intersection of domaina and domainb is not empty
-            if overlap(domaina, domainb)
-                domain = (min(domaina[1], domainb[1]), max(domaina[2], domainb[2]))
-                σ = (domain[1] + domain[2]) / 2
-                k = domaina[1] ≤ σ ≤ domaina[2] ? ka : kb
-                t, d = timeofca(VAs[k], σ, ctol), distance(VAs[k], σ, ctol)
-                ics[i] = (k, σ, domain, t, d)
-                mask[j] = true
-            # The intersection of domaina and domainb is empty
-            elseif abs( (σa - σb) / σa) < 0.01 && abs((ta - tb) / ta) < 0.01
-                mask[j] = true
+    sort!(ics, by = last)
+
+    return ics
+end
+
+# This function assumes that all the impact conditions in `ics` have negative distance
+function merge(ics::AbstractVector{ImpactCondition{T}},
+               VAs::VirtualAsteroids{T}, ctol::T) where {T <: Real}
+    isempty(ics) && return Vector{ImpactCondition{T}}(undef, 0)
+    # Sort by domain
+    sort!(ics, by = Base.Fix2(getindex, 3))
+    # Merge impact conditions
+    newics = [ics[1]]
+    for ic in Iterators.drop(ics, 1)
+        ka, _, domaina, ta, _ = newics[end]
+        kb, _, domainb, tb, _ = ic
+        # The intersection of domaina and domainb is not empty
+        if overlap(domaina, domainb)
+            domain = (min(domaina[1], domainb[1]), max(domaina[2], domainb[2]))
+            σ = (domain[1] + domain[2]) / 2
+            flaga, flagb = domaina[1] ≤ σ ≤ domaina[2], domainb[1] ≤ σ ≤ domainb[2]
+            if flaga && flagb
+                k = ta < tb ? ka : kb
+            else
+                k = flaga ? ka : kb
+            end
+            t, d = timeofca(VAs[k], σ, ctol), distance(VAs[k], σ, ctol)
+            newics[end] = (k, σ, domain, t, d)
+        # The intersection of domaina and domainb is empty
+        else
+            push!(newics, ic)
+        end
+    end
+    # Sort by distance
+    sort!(newics, by = last)
+
+    return newics
+end
+
+"""
+    virtualimpactors(VAs, ctol; kwargs...)
+
+Return the indices, sigmas, domains, times and distances of all the
+impact conditions found in a vector of virtual asteroids `VAs` given
+a convergence tolerance `ctol`.
+
+# Keyword arguments
+
+- `no_pts::Int`: number of points used to find the roots of `rvelea`
+    in each virtual asteroid (default: `100`).
+- `dmax::Real`: maximum allowed value of [`distance`](@ref) (default: `236.0`).
+"""
+function virtualimpactors(VAs::VirtualAsteroids{T}, ctol::Real;
+                          no_pts::Int = 100, dmax::Real = 236.0) where {T <: Real}
+    # Find all the impact conditions over VAs
+    ics = impactconditions(VAs, ctol; no_pts, dmax)
+    # Separate impact conditions with negative and positive distances
+    k = findlast(x -> x[end] < 0, ics)
+    isnothing(k) && return ics
+    icsa, icsb = ics[1:k], ics[k+1:end]
+    # Merge impact conditions
+    icsa = merge(icsa, VAs, ctol)
+    mask = falses(length(icsb))
+    for i in eachindex(icsb)
+        σb = icsb[i][2]
+        for j in eachindex(icsa)
+            domaina = icsa[j][3]
+            if domaina[1] ≤ σb ≤ domaina[2]
+                mask[i] = true
+                break
             end
         end
     end
-    deleteat!(ics, mask)
+    deleteat!(icsb, mask)
+    ics = vcat(icsa, icsb)
+    # Sort by distance
+    sort!(ics, by = last)
 
     return ics
 end
@@ -450,18 +503,22 @@ orbit and parameters are needed to compute the target plane covariance matrix.
 
 # Keyword arguments
 
-- `N::Int`: maximum number of virtual impactors to compute (default: `10`).
+- `Nmax::Int`: maximum number of virtual impactors to compute (default: `10`).
+- `no_pts::Int`: number of points used to find the roots of `rvelea`
+    in each virtual asteroid (default: `100`).
+- `dmax::Real`: maximum allowed value of [`distance`](@ref) (default: `236.0`).
 """
-function virtualimpactors(VAs::Vector{VirtualAsteroid{T}}, ctol::Real,
+function virtualimpactors(VAs::VirtualAsteroids{T}, ctol::Real,
                           lov::LineOfVariations{D, T}, od::AbstractODProblem,
                           orbit::AbstractOrbit, params::Parameters;
-                          N::Int = 10) where {D, T <: Real}
-    # Find all the impacting conditions over VAs
-    ics = virtualimpactors(VAs, ctol)
+                          Nmax::Int = 10, no_pts::Int = 100,
+                          dmax::Real = 236.0) where {D, T <: Real}
+    # Find all the impact conditions over VAs
+    ics = virtualimpactors(VAs, ctol; no_pts, dmax)
     Nic = length(ics)
     # Compute virtual impactors
     VIs = Vector{VirtualImpactor{T}}(undef, 0)
-    for k in 1:min(N, Nic)
+    for k in 1:min(Nmax, Nic)
         i, σ, domain, t, _ = ics[k]
         # The intersection of domain and lov is not empty
         if overlap(domain, lov.domain)
