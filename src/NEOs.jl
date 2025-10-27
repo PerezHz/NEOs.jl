@@ -70,7 +70,7 @@ export fetch_radar_rwo, read_radar_rwo, write_radar_rwo
 export compute_delay, radar_astrometry
 # Propagation
 export nongravs!, gravityonly!, newtonian!
-export loadpeeph, rvelea, scaled_variables, propagate, propagate_lyap, propagate_root
+export rvelea, scaled_variables, propagate, propagate_lyap, propagate_root
 # Orbit determination
 export ODProblem, LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
        GaussOrbit, MMOVOrbit, LeastSquaresOrbit, AdmissibleRegion
