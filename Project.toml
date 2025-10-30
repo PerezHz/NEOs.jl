@@ -47,7 +47,7 @@ RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 NEOsRecipesBaseExt = "RecipesBase"
 
 [compat]
-AngleBetweenVectors = "0"
+AngleBetweenVectors = "0.3"
 Artifacts = "1"
 AstroAngles = "0.1"
 AutoHashEquals = "2"
