@@ -314,7 +314,7 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
     # Origin
     x0 = zeros(T, Npar)
     # Osculating keplerian elements
-    osc = cartesian2osculating(q0 - params.eph_su(t), mjd0; μ = μ_S, frame = :ecliptic,
+    osc = cartesian2osculating(q0[1:6] - params.eph_su(t), mjd0; μ = μ_S, frame = :ecliptic,
                                Γ_car = covariance(orbit))
     # Uncertainty parameter is not defined for hyperbolic orbits
     ishyperbolic(osc) && throw(ArgumentError("Uncertainty parameter is not defined for \
@@ -340,7 +340,7 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
     C = log(648_000) / 9
     U = floor(Int, log(runoff) / C) + 1
 
-    return clamp(U, 0, 10)
+    return clamp(U, 0, 9)
 end
 
 # Observed magnitude model

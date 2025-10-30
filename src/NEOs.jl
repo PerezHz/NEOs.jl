@@ -2,25 +2,26 @@ module NEOs
 
 # __precompile__(false)
 import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary,
-       lastindex
+       lastindex, merge
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination, argperi,
        longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly,
        t2c_jpl_de430
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
+import StatsBase: weights
 import Tables: Schema, istable, rowaccess, rows, schema
 import TaylorSeries: get_order
 
-using AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON, LazyArtifacts,
-      LinearAlgebra, Printf, SatelliteToolboxTransformations, Scratch, SPICE,
-      TaylorIntegration, TaylorSeries, XML
+using AngleBetweenVectors, AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON,
+      LazyArtifacts, LinearAlgebra, Printf, SatelliteToolboxTransformations, Scratch,
+      SPICE, TaylorIntegration, TaylorSeries, XML
 
 using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
 using DataFrames: AbstractDataFrame, DataFrame, DataFrameRow, nrow, eachrow, eachcol,
       groupby, combine
 using Dates: epochms2datetime
 using DelimitedFiles: readdlm
-using Distributions: Chisq, cdf
+using Distributions: Chisq, Normal, Uniform, cdf, quantile
 using Healpix: Resolution, ang2pixRing
 using HORIZONS: smb_spk
 using LinearAlgebra: inv!
@@ -69,7 +70,7 @@ export fetch_radar_rwo, read_radar_rwo, write_radar_rwo
 export compute_delay, radar_astrometry
 # Propagation
 export nongravs!, gravityonly!, newtonian!
-export loadpeeph, rvelea, scaled_variables, propagate, propagate_lyap, propagate_root
+export rvelea, scaled_variables, propagate, propagate_lyap, propagate_root
 # Orbit determination
 export ODProblem, LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
        GaussOrbit, MMOVOrbit, LeastSquaresOrbit, AdmissibleRegion
@@ -87,7 +88,7 @@ export BPlane, MTP, bopik, mtp, targetplane, crosssection, valsecchi_circle
 export LineOfVariations, CloseApproach, VirtualAsteroid, lineofvariations, closeapproaches,
        virtualasteroids, sigma, lbound, ubound
 export VirtualImpactor, virtualimpactors, impact_probability, impactor_table, impactenergy,
-       palermoscale, torinoscale
+       palermoscale, torinoscale, semiwidth, stretching
 
 include("constants.jl")
 include("units.jl")

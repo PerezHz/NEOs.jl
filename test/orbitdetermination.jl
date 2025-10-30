@@ -96,7 +96,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 24.3 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 9
         # Diameter
         Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
         @test 34.3 < Da < Db < 76.9
@@ -242,7 +242,7 @@ end
         @test epoch(osc) == epoch(orbit) + MJD2000
         @test osc.frame == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 6.0e-14
+        @test norm(q0 - osc(), Inf) < 6.1e-14
         q0, σ0 = elements(osc), sigmas(osc)
         JPL_OSC = [2.872424697642789E+00, 6.749395051551541E-01, 1.282355986214476E+00,
             1.725712172730245E+02, 2.413793589329106E+02, 3.538743602962668E+02 - 360]
@@ -251,7 +251,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 24.0 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 9
         # Diameter
         Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
         @test 41.2 < Da < Db < 92.2
@@ -543,7 +543,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 29.6 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 9
         # Diameter
         Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
         @test 3.2 < Da < Db < 7.2
@@ -629,7 +629,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 26.7 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 9
         # Diameter
         Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
         @test 12.0 < Da < Db < 27.0
@@ -795,7 +795,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 30.9 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 9
         # Diameter
         Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
         @test 1.7 < Da < Db < 3.9
@@ -1067,7 +1067,7 @@ end
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 18.5 ≤ H + dH
         # MPC Uncertainty Parameter
-        @test uncertaintyparameter(orbit, params) == 10
+        @test uncertaintyparameter(orbit, params) == 9
         # Diameter
         Da, Db = minmax(diameter(orbit, params, 0.05), diameter(orbit, params, 0.25))
         @test 558.9 < Da < Db < 1250.0

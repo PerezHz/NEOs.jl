@@ -9,7 +9,7 @@ B-Plane in Öpik's coordinates for a hyperbolic planetary close encounter.
 - `b::U`: planet's impact cross section ("critical B") [planet radii].
 - `U_y/U_norm::U`: y-component and norm of the planetocentric velocity vector [km/s].
 """
-struct BPlane{U} <: AbstractTargetPlane{U}
+@auto_hash_equals struct BPlane{U} <: AbstractTargetPlane{U}
     ξ::U
     ζ::U
     b::U
@@ -126,7 +126,7 @@ Modified Target Plane for a planetary close encounter.
 
 - `X/Y::U`: target plane cartesian coordinates [planet radii].
 """
-struct MTP{U} <: AbstractTargetPlane{U}
+@auto_hash_equals struct MTP{U} <: AbstractTargetPlane{U}
     X::U
     Y::U
 end

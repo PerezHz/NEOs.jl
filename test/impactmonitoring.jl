@@ -2,15 +2,63 @@
 
 using NEOs
 using Dates
+using Distributions
 using TaylorSeries
 using PlanetaryEphemeris
 using Test
 
 using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
       convergence_domain, isconvergent, timeofca, distance, rvelea,
-      concavity, width, ismarginal, isoutlov, vinf
+      concavity, width, isoutlov, vinf, ismarginal, refine
 
 @testset "Impact monitoring" begin
+
+    @testset "Common" begin
+        # Impact monitoring scales
+        Es  = [1E2,  1E4,  1E5,  1E1,  1E3,  1E4,  1E7,  1E7,  1E1,   1E4,   1E7] # Mt
+        IPs = [1E-6, 1E-4, 1E-3, 1E-1, 1E-1, 1E-1, 1E-3, 1E-1, 0.999, 0.999, 0.999]
+        ΔT = 50.0
+
+        TS = torinoscale.(Es, IPs)
+        @test issorted(TS)
+        @test TS == collect(0:10)
+
+        PS = palermoscale.(Es, IPs, Ref(ΔT))
+        perm = sortperm(@. IPs / Es^(-0.8))
+        @test issorted(PS[perm])
+
+        # Domain refinement
+        σ = 0.0
+        domain = (-5.0, 5.0)
+        N = 11
+
+        @test_throws AssertionError refine(σ, domain, 0)
+        @test_throws AssertionError refine(σ, domain, 2)
+        @test_throws ArgumentError refine(σ, domain, N, :exp)
+
+        σs1, domains1 = refine(σ, domain, 1, :uniform)
+        σs2, domains2 = refine(σ, domain, 1, :normal)
+        @test σs1 == σs2 == [σ]
+        @test domains1 == domains2 == [domain]
+
+        d1 = Uniform(domain[1], domain[2])
+        σs1, domains1 = refine(σ, domain, N, :uniform)
+        @test σs1[(N ÷ 2) + 1] == σ
+        @test domains1[1][1] == domain[1]
+        @test domains1[end][end] == domain[2]
+        @test all(domains1[i][end] == domains1[i+1][1] for i in 1:N-1)
+        ps = @. cdf(d1, last(domains1)) - cdf(d1, first(domains1))
+        @test all(Base.Fix1(isapprox, ps[1]), ps)
+
+        d2 = Normal(0.0, 1.0)
+        σs2, domains2 = refine(σ, domain, N, :normal)
+        @test σs2[(N ÷ 2) + 1] == σ
+        @test domains2[1][1] == domain[1]
+        @test domains2[end][end] == domain[2]
+        @test all(domains2[i][end] == domains2[i+1][1] for i in 1:N-1)
+        ps = @. cdf(d2, last(domains2)) - cdf(d2, first(domains2))
+        @test all(Base.Fix1(isapprox, ps[1]), ps)
+    end
 
     @testset "BPlane" begin
         # Fetch optical astrometry
@@ -28,7 +76,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Sep 28, 2025
+        # Values by Oct 22, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
@@ -83,9 +131,9 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
 
         # Virtual impactors
         VIs = virtualimpactors(VAs, ctol, lov, od, orbit, params)
-        @test isempty(VIs)
+        @test length(VIs) == 1
 
-        VI1 = VirtualImpactor(lov, od, orbit, params, σ, nominaltime(VA), domain)
+        VI1 = VIs[1]
         VI2 = VirtualImpactor(lov, od, orbit, params, σ, nominaltime(VA), (σ, σ))
 
         @test date(VI1) == date(VI2) == date(CA) == date(VA)
@@ -96,6 +144,8 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test !ismarginal(VI1) && !ismarginal(VI2)
         @test !isoutlov(VI1) && isoutlov(VI2)
 
+        @test semiwidth(VI1) == semiwidth(VI2) > 0
+        @test stretching(VI1) == stretching(VI2) > 0
         @test semimajoraxis(VI1) == semimajoraxis(VI2) < 0
         @test vinf(VI1) == vinf(VI2) > 0
         @test ishyperbolic(VI1) && ishyperbolic(VI2)
@@ -125,7 +175,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Sep 28, 2025
+        # Values by Oct 22, 2025
 
         # Line of variations
         order, σmax = 12, 5.0
@@ -193,6 +243,8 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test !ismarginal(VI1) && !ismarginal(VI2)
         @test !isoutlov(VI1) && isoutlov(VI2)
 
+        @test semiwidth(VI1) == semiwidth(VI2) > 0
+        @test stretching(VI1) == stretching(VI2) > 0
         @test semimajoraxis(VI1) == semimajoraxis(VI2) > 0
         @test vinf(VI1) == vinf(VI2) == 0.0
         @test !ishyperbolic(VI1) && !ishyperbolic(VI2)

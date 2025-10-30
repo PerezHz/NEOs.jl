@@ -14,7 +14,7 @@ at close approach with respect to a planet.
 - `tp::Type{<:AbstractTargetPlane}`: type of target plane, either
     [`BPlane`](@ref) or [`MTP`](@ref).
 """
-struct CloseApproach{T} <: AbstractLineOfVariations{T}
+@auto_hash_equals struct CloseApproach{T} <: AbstractLineOfVariations{T}
     σ::T
     domain::NTuple{2, T}
     t::Taylor1{T}
@@ -45,12 +45,15 @@ difft(x::CloseApproach, y::CloseApproach) = abs(nominaltime(x) - nominaltime(y))
 
 domain_radius(x::CloseApproach) = max(ubound(x) - sigma(x), sigma(x) - lbound(x))
 
+convergence_radius(x::Taylor1, ctol::Real) = (ctol / norm(x[end], Inf))^(1 / get_order(x))
+
+convergence_radius(x::AbstractVector, ctol::Real) = minimum(convergence_radius.(x, ctol))
+
 function convergence_radius(x::CloseApproach, ctol::Real)
-    order = get_order(x)
     return min(
-        (ctol / norm(x.x[end], Inf))^(1/order),
-        (ctol / norm(x.y[end], Inf))^(1/order),
-        (ctol / norm(x.z[end], Inf))^(1/order)
+        convergence_radius(x.x, ctol),
+        convergence_radius(x.y, ctol),
+        convergence_radius(x.z, ctol),
     )
 end
 
@@ -60,7 +63,29 @@ function convergence_domain(x::CloseApproach, ctol::Real)
     return (sigma(x) - r*d, sigma(x) + r*d)
 end
 
-isconvergent(x::CloseApproach, ctol::Real) = convergence_radius(x, ctol) > 1
+isconvergent(x, ctol::Real) = convergence_radius(x, ctol) > 1
+
+function refine(σ::T, domain::NTuple{2, T}, N::Int,
+                dist::Symbol = :uniform) where {T <: Real}
+    @assert N ≥ 1 && isodd(N) "N must be at least one and odd to have an \
+        expansion around the domain center"
+    if dist == :uniform
+        d = Uniform{T}(domain[1], domain[2])
+    elseif dist == :normal
+        d = Normal{T}(zero(T), one(T))
+    else
+        throw(ArgumentError("dist must be either :uniform or :normal"))
+    end
+    xs = LinRange(cdf(d, domain[1]), cdf(d, domain[2]), N+1)
+    endpoints = quantile.(d, xs)
+    endpoints[1], endpoints[end] = domain[1], domain[2]
+    domains = [(endpoints[i], endpoints[i+1]) for i in 1:N]
+    σs = [(domains[i][1] + domains[i][2]) / 2 for i in eachindex(domains)]
+    if iszero(σ) || dist == :uniform
+        σs[(N ÷ 2) + 1] = σ
+    end
+    return σs, domains
+end
 
 deltasigma(x::CloseApproach, σ::Real) = (σ - sigma(x)) / domain_radius(x)
 
@@ -79,20 +104,47 @@ function distance(x::CloseApproach, σ::Real)
     return hypot(x.x(dσ), x.y(dσ)) - x.z(dσ)
 end
 
-# TO DO: Use Horner's rule to evaluate derivatives
 function rvelea(x::CloseApproach, σ::Real)
     dσ = deltasigma(x, σ)
-    ξ, ζ = x.x(dσ), x.y(dσ)
-    dξ, dζ = TS.differentiate(x.x)(dσ), TS.differentiate(x.y)(dσ)
-    return (ξ*dξ + ζ*dζ) / domain_radius(x)
+    n = get_order(x)
+    ξ, ζ, b = x.x[end], x.y[end], x.z[end]
+    dξ, dζ, db = zero(ξ), zero(ζ), zero(b)
+    for i in n-1:-1:0
+        dξ = ξ + dσ * dξ
+        dζ = ζ + dσ * dζ
+        db = b + dσ * db
+        ξ = x.x[i] + dσ * ξ
+        ζ = x.y[i] + dσ * ζ
+        b = x.z[i] + dσ * b
+    end
+    r = hypot(ξ, ζ)
+    rv = ξ*dξ + ζ*dζ
+    return (rv/r - db) / domain_radius(x)
 end
 
 function concavity(x::CloseApproach, σ::Real)
     dσ = deltasigma(x, σ)
-    ξ, ζ = x.x(dσ), x.y(dσ)
-    dξ, dζ = TS.differentiate(x.x)(dσ), TS.differentiate(x.y)(dσ)
-    d2ξ, d2ζ = TS.differentiate(x.x, 2)(dσ), TS.differentiate(x.y, 2)(dσ)
-    return (ξ*d2ξ + dξ^2 + ζ*d2ζ + dζ^2) / domain_radius(x)^2
+    n = get_order(x)
+    ξ = x.x[end-1] + dσ * x.x[end]
+    ζ = x.y[end-1] + dσ * x.y[end]
+    b = x.z[end-1] + dσ * x.z[end]
+    dξ, dζ, db = x.x[end], x.y[end], x.z[end]
+    d2ξ, d2ζ, d2b = zero(ξ), zero(ζ), zero(b)
+    for i in n-2:-1:0
+        d2ξ = 2dξ + dσ * d2ξ
+        d2ζ = 2dζ + dσ * d2ζ
+        d2b = 2db + dσ * d2b
+        dξ = ξ + dσ * dξ
+        dζ = ζ + dσ * dζ
+        db = b + dσ * db
+        ξ = x.x[i] + dσ * ξ
+        ζ = x.y[i] + dσ * ζ
+        b = x.z[i] + dσ * b
+    end
+    r = hypot(ξ, ζ)
+    rv = ξ*dξ + ζ*dζ
+    ra = ξ*d2ξ + dξ^2 + ζ*d2ζ + dζ^2
+    return ( ra / r - rv^2 / r^3 - d2b) / domain_radius(x)^2
 end
 
 function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},
@@ -117,10 +169,13 @@ end
 """
     closeapproaches(lov, σ, domain, nyears, params; kwargs...)
 
-Return the vector of close approaches obtained by integrating the expansion of `lov`
-at `σ`, with scaling factors such that `domain` is mapped into the interval `[-1, 1]`,
-for a period of `nyears` [years]. For a list of parameters see the `Propagation`
-section of [`Parameters`](@ref).
+Return the vector of close approaches of the initial condition obtained by expanding
+`lov` at `σ`, with scaling factors such that `domain` is mapped into the `[-1, 1]`,
+interval for a period of `nyears` [years]. For a list of parameters see the
+`Propagation` section of [`Parameters`](@ref).
+
+The propagation will stop before the final time if it finds a close approach that
+does not converge under the tolerance `ctol`.
 
 # Keyword arguments
 
@@ -138,14 +193,14 @@ function closeapproaches(
         buffer::Union{Nothing, PropagationBuffer{T, Taylor1{T}, T}} = nothing
     ) where {D, T <: Real}
     # Unpack parameters
-    @unpack abstol, maxsteps = params
+    @unpack abstol, maxsteps, order = params
     # Dynamical model
     dynamics = lov.dynamics
     # Reference epoch
     d0 = epoch(lov)
     jd0 = d0 + JD_J2000
     # Initial conditions
-    t0, tmax = zero(T), nyears * yr
+    tpre, t0, tmax = zero(T), zero(T), nyears * yr
     q0 = lov(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(lovorder))
     # Propagation buffer
     if isnothing(buffer)
@@ -153,14 +208,14 @@ function closeapproaches(
         buffer = PropagationBuffer(dynamics, q0, jd0, tlim, params)
     end
     @unpack cache, dparams = buffer
-    @unpack tv, xv, psol, xaux, t, x, dx, rv, parse_eqs = cache
+    @unpack psol, xaux, t, x, dx, rv, parse_eqs = cache
     dparams.jd0 = jd0
 
     # Specialized version of the root-finding method of taylorinteg
     x0 = deepcopy(q0)
     update_cache!(cache, t0, x0)
-    @inbounds tv[1] = t0
-    @inbounds xv[:, 1] .= deepcopy(q0)
+    psol[:, 1] .= zero.(x)
+    psol[:, 2] .= zero.(x)
     sign_tstep = copysign(1, tmax - t0)
 
     # Some auxiliary arrays for root-finding/event detection/Poincaré
@@ -176,7 +231,7 @@ function closeapproaches(
     g_dg_val = vcat(TS.evaluate(g_tupl[2]), TS.evaluate(g_tupl_old[2]))
 
     tvS = Array{Taylor1{T}}(undef, maxsteps + 1)
-    xvS = similar(xv)
+    xvS = Array{Taylor1{T}}(undef, length(q0), maxsteps + 1)
     gvS = similar(tvS)
 
     CAs = Vector{CloseApproach{T}}(undef, 0)
@@ -189,8 +244,15 @@ function closeapproaches(
         δt = taylorstep!(Val(parse_eqs), dynamics, t, x, dx, xaux, abstol, dparams, rv) # δt is positive!
         # Below, δt has the proper sign according to the direction of the integration
         δt = sign_tstep * min(δt, sign_tstep * (tmax - t0))
-        TS.evaluate!(x, δt, x0) # new initial condition
-        set_psol!(Val(true), psol, nsteps, x) # Store the Taylor polynomial solution
+        # New initial condition
+        TS.evaluate!(x, δt, x0)
+        # Store the Taylor polynomial solution
+        for i in eachindex(x)
+            for k in eachindex(x[i])
+                TS.identity!(psol[:, 1][i], psol[:, 2][i], k)
+                TS.identity!(psol[:, 2][i], x[i], k)
+            end
+        end
         g_tupl = rvelea(dx, x, dparams, t)
         nevents_old = nevents
         nevents = findroot!(t, x, dx, g_tupl_old, g_tupl, 0, tvS, xvS, gvS,
@@ -200,7 +262,7 @@ function closeapproaches(
             # Time at close approach
             t_CA = d0 + tvS[nevents-1]
             # Asteroid's geocentric state vector
-            xae = psol[:, nsteps-1]( t_CA - d0 - tv[nsteps-1] ) - params.eph_ea(t_CA)
+            xae = psol[1:6, 1]( t_CA - d0 - tpre ) - params.eph_ea(t_CA)
             # Asteroid's geocentric semimajor axis
             a = semimajoraxis(xae..., PE.μ[ea], zero(T))
             if a < 0
@@ -218,11 +280,11 @@ function closeapproaches(
             !isconvergent(CA, ctol) && break
         end
         g_tupl_old = deepcopy(g_tupl)
+        # Update time
+        tpre = t0
         t0 += δt
         update_cache!(cache, t0, x0)
         nsteps += 1
-        @inbounds tv[nsteps] = t0
-        @inbounds xv[:, nsteps] .= deepcopy(x0)
         if nsteps > maxsteps
             @warn("""
             Maximum number of integration steps reached; exiting.

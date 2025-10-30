@@ -144,41 +144,6 @@ evaleph(eph::NTuple{2, DensePropagation2{T, U}}, et::Number) where {T, U} =
 evaleph(eph::AstEph, et::Number) where {AstEph} = eph(et)
 
 # In-place methods of evaleph
-function evaleph!(y::Vector{Taylor1{TaylorN{T}}}, eph::TaylorInterpolant{T, T, 2},
-                  t::Taylor1{T}) where {T <: Real}
-    eph_t = tpeeval(eph, t)
-    @inbounds for i in eachindex(eph_t)
-        TS.zero!(y[i])
-        for k in eachindex(y[i])
-            y[i][k][0][1] = eph_t[i][k]
-        end
-    end
-    return nothing
-end
-
-function evaleph!(y::Vector{Taylor1{Taylor1{T}}}, eph::TaylorInterpolant{T, T, 2},
-                  t::Taylor1{T}) where {T <: Real}
-    eph_t = tpeeval(eph, t)
-    @inbounds for i in eachindex(eph_t)
-        TS.zero!(y[i])
-        for k in eachindex(y[i])
-            y[i][k][0] = eph_t[i][k]
-        end
-    end
-    return nothing
-end
-
-function evaleph!(y::Vector{Taylor1{T}}, eph::TaylorInterpolant{T, T, 2},
-                  t::Taylor1{T}) where {T <: Real}
-    eph_t = tpeeval(eph, t)
-    @inbounds for i in eachindex(eph_t)
-        for k in eachindex(y[i])
-            TS.identity!(y[i], eph_t[i], k)
-        end
-    end
-    return nothing
-end
-
 function evaleph!(c::TaylorN{T}, a::Taylor1{TaylorN{T}}, dx::Number) where {T <: Real}
     TS.zero!(c)
     d = zero(c)

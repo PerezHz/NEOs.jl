@@ -1,119 +1,6 @@
+include("buffer.jl")
 include("dynamicalmodels.jl")
 include("jetcoeffs.jl")
-
-# Internal types used in the propagate* functions
-# TO DO: ¿Merge these two structures into one?
-mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
-    sseph::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}
-    ssepht::Vector{Taylor1{U}}
-    acceph::Union{Nothing, TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}}
-    accepht::Union{Nothing, Vector{Taylor1{U}}}
-    poteph::Union{Nothing, TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}}}
-    potepht::Union{Nothing, Vector{Taylor1{U}}}
-    jd0::V
-    UJ_interaction::Union{Nothing, Vector{Bool}}
-    N::Int
-    μ::Vector{T}
-    marsden_radial::NTuple{5, T}
-end
-
-"""
-    PropagationBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
-
-Pre-allocated memory for the propagation functions: [`propagate`](@ref),
-[`propagate_root`](@ref) and [`propagate_lyap`](@ref).
-
-# Fields
-
-- `cache::VectorCache{...}`: `TaylorIntegration` cache.
-- `dparams::DynamicalParameters{T, U, V}`: parameters used by the dynamical model.
-"""
-struct PropagationBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
-    cache::VectorCache{Vector{T}, Matrix{U}, Matrix{Taylor1{U}}, Vector{Taylor1{U}},
-        Taylor1{T}, Vector{Taylor1{U}}, Vector{Taylor1{U}}, RetAlloc{Taylor1{U}}, Bool}
-    dparams::DynamicalParameters{T, U, V}
-end
-
-"""
-    loadpeeph(eph, t0, tf)
-
-Return a copy of `eph` in timerange `[t0, tf]`, where both times must have units
-of TDB days since J2000. Currently, the only available options for `eph` are:
-- `NEOs.sseph`: solar system ephemeris,
-- `NEOs.acceph`: accelerations ephemeris,
-- `NEOs.poteph`: newtonian potentials ephemeris.
-
-!!! warning
-    Running this function for the first time will download the `sseph_p100` artifact
-    (885 MB) which can take several minutes.
-"""
-function loadpeeph(eph::TaylorInterpolant = sseph, t0::Real = sseph.t0,
-                   tf::Real = sseph.t0 + sseph.t[end])
-    @assert 0.0 ≤ t0 ≤ tf ≤ 36_525.0
-    j0 = searchsortedlast(eph.t, t0)
-    jf = searchsortedfirst(eph.t, tf)
-    return TaylorInterpolant(eph.t0, eph.t[j0:jf], eph.x[j0:jf-1, :])
-end
-
-"""
-    PropagationBuffer(dynamics, q0, jd0, tlim, params)
-
-Return a `PropagationBuffer` object with pre-allocated memory for `propagate`.
-
-# Arguments
-
-- `dynamics`: dynamical model function.
-- `q0::Vector{<:Number}`: vector of initial conditions.
-- `jd0::Number`: initial Julian date (TDB).
-- `tlim::NTuple{2, <:Real}`: ephemeris timespan [days since J2000].
-- `params::Parameters{<:Real}`: see the `Propagation` section of [`Parameters`](@ref).
-"""
-function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::NTuple{2, T},
-                           params::Parameters{T}) where {D, T <: Real, U <: Number,
-                           V <: Number}
-    # Unpack parameters
-    @unpack order, μ_ast, maxsteps, parse_eqs, marsden_radial = params
-    # Check order
-    @assert order <= SSEPHORDER "order ($order) must be less or equal than SS ephemeris \
-        order ($SSEPHORDER)"
-    # Time limits [days since J2000]
-    days_0, days_f = minmax(tlim[1], tlim[2])
-    # Load Solar System ephemeris [au, au/day]
-    x = Taylor1( q0[1], order )
-    _sseph = convert(T, loadpeeph(sseph, days_0, days_f))
-    _ssepht = [zero(x) for _ in axes(_sseph.x, 2)]
-    # Number of massive bodies
-    Nm1 = numberofbodies(_sseph)
-    # Number of bodies, including NEA
-    N = Nm1 + 1
-    # Vector of G*m values
-    μ = convert(Vector{T}, vcat( μ_DE430[1:11], μ_ast[1:Nm1-11], zero(T) ) )
-    # Check: number of SS bodies (N) in ephemeris must be equal to length of GM vector (μ)
-    @assert N == length(μ) "Total number of bodies in ephemeris must be equal to length \
-        of GM vector μ"
-    # Accelerations, Newtonian potentials and interaction matrix with flattened bodies
-    if dynamics == newtonian!
-        _acceph, _accepht = nothing, nothing
-        _poteph, _potepht = nothing, nothing
-        UJ_interaction = nothing
-    else
-        _acceph = convert(T, loadpeeph(acceph, days_0, days_f))
-        _accepht = [zero(x) for _ in axes(_acceph.x, 2)]
-        _poteph = convert(T, loadpeeph(poteph, days_0, days_f))
-        _potepht = [zero(x) for _ in axes(_poteph.x, 2)]
-        UJ_interaction = falses(N)
-        # Turn on Earth interaction
-        UJ_interaction[ea] = true
-    end
-    # Dynamical parameters for `propagate`
-    dparams = DynamicalParameters{T, U, V}(_sseph, _ssepht, _acceph, _accepht,
-        _poteph, _potepht, jd0, UJ_interaction, N, μ, marsden_radial)
-    # TaylorIntegration cache
-    cache = init_cache(Val(true), zero(T), q0, maxsteps, order, dynamics, dparams;
-                       parse_eqs)
-
-    return PropagationBuffer{T, U, V}(cache, dparams)
-end
 
 """
     rvelea(eph, params, t)
@@ -135,14 +22,14 @@ function rvelea(dx, x, params, t)
     # Days since J2000.0 = 2.451545e6
     # dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    ss16asteph_t = params.ssepht
+    ss16asteph_t = params.sseph.ephU
     # evaleph!(ss16asteph_t, params.sseph, dsj2k)
     # Total number of bodies
     N = params.N
     # Earth's ephemeris
     xe = ss16asteph_t[nbodyind(N-1, ea)]
     # Asteroid's geocentric state vector
-    xae = x - xe
+    xae = x[1:6] - xe
     # Geocentric radial velocity
     return euclid3D(cte(xae[1:3])) < 0.1, dot3D(xae[1:3], xae[4:6])
 end

@@ -197,8 +197,8 @@ using Test
         @test apophis.catalogue == catalogue(apophis) == search_catalogue_code('o')
         @test apophis.observatory == observatory(apophis) == search_observatory_code("691")
         @test apophis.chi == 0.43
-        @test apophis.sel_A == true
-        @test apophis.sel_M == false
+        @test apophis.sel_A == 1
+        @test apophis.sel_M == 0
         @test apophis.source == apophis_s[492:end]
         @test apophis.header == apophis_s[1:81]
         @test measure(apophis) == (1.0739650841580173, 0.2952738332250385)
