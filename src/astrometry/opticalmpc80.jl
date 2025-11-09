@@ -5,7 +5,7 @@ end
 function is_mpc80_two_liner(line::AbstractString)
     line[15] == 'S' && return true
     obscode = view(line, 78:80)
-    return obscode == "248" || obscode == "270"
+    return obscode == "247" || obscode == "270"
 end
 
 function MPC80FileReader(text::AbstractString)
@@ -154,6 +154,8 @@ function parse_optical_mpc80(text::AbstractString)
     # Two line observations
     mask = findall(istwoliner, df.observatory)
     for i in mask
+        # Skip observations with a 'x' note (e.g. 2010 BO127)
+        df.note2[i] == 'x' && continue
         obs = df.observatory[i]
         line = view(reader.optical[i], 82:162)
         I1, I2, I3 = isroving(obs) ? (35:44, 46:55, 57:61) : (35:45, 47:57, 59:69)

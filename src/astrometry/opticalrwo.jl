@@ -7,7 +7,7 @@ end
 function is_rwo_two_liner(line::AbstractString)
     line[12] == 'S' && return true
     obscode = view(line, 181:183)
-    return obscode == "248" || obscode == "270"
+    return obscode == "247" || obscode == "270"
 end
 
 function RWOFileReader(text::AbstractString)
@@ -222,6 +222,8 @@ function parse_optical_rwo(text::AbstractString)
     # Two-line observations
     mask = findall(istwoliner, df.observatory)
     for i in mask
+        # Skip observations with a 'x' note (e.g. 2010 BO127)
+        df.T[i] == 'x' && continue
         obs = df.observatory[i]
         line = view(reader.optical[i], 199:length(reader.optical[i]))
         if isoccultation(obs) || issatellite(obs)
