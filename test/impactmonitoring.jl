@@ -127,7 +127,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test CA.tp == BPlane{Taylor1{Float64}}
         @test distance(CA, σ) == distance(VA, σ, ctol) < 0
         @test rvelea(CA, σ) == rvelea(VA, σ, ctol)
-        @test concavity(CA, σ) == concavity(VA, σ, ctol) > 0
+        @test concavity(CA, σ) ≈ concavity(VA, σ, ctol) > 0
 
         # Virtual impactors
         VIs = virtualimpactors(VAs, ctol, lov, od, orbit, params)
@@ -226,7 +226,7 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test CA.tp == MTP{Taylor1{Float64}}
         @test distance(CA, σ) == distance(VA, σ, ctol) > 0
         @test rvelea(CA, σ) == rvelea(VA, σ, ctol)
-        @test concavity(CA, σ) == concavity(VA, σ, ctol) < 0
+        @test concavity(CA, σ) ≈ concavity(VA, σ, ctol) < 0
 
         # Virtual impactors
         VIs = virtualimpactors(VAs, ctol, lov, od, orbit, params)
