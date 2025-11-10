@@ -48,7 +48,8 @@ numtypes(::OsculatingElements{T, U}) where {T, U} = T, U
 epoch(x::OsculatingElements) = x.epoch
 elements(x::OsculatingElements) = x.elements
 covariance(x::OsculatingElements) = x.covariance
-sigmas(x::OsculatingElements) = sqrt.(diag(covariance(x)))
+variances(x::OsculatingElements) = diag(covariance(x))
+sigmas(osc::OsculatingElements) = [x < 0 ? (NaN * x) : sqrt(x) for x in variances(osc)]
 
 iscircular(x::OsculatingElements) = iszero(x.elements[2])
 iselliptic(x::OsculatingElements) = 0 < x.elements[2] < 1
@@ -71,7 +72,7 @@ function show(io::IO, x::OsculatingElements)
     d0 = julian2datetime(t0 + JD_J2000 - MJD2000)
     frame = x.frame
     e0 = cte.(x.elements)
-    σ0 = sqrt.(diag(x.covariance))
+    σ0 = sigmas(x)
     se0 = [rpad(@sprintf("%+.12E", e0[i]), 25) for i in eachindex(e0)]
     sσ0 = [rpad(@sprintf("%+.12E", σ0[i]), 25) for i in eachindex(σ0)]
     names = [flag ? "a" : "q", "e", "i", "ω", "Ω", flag ? "M" : "tp"]

@@ -1,4 +1,4 @@
-# This file is part of the NEOs.jacobianl package; MIT licensed
+# This file is part of the NEOs.jl package; MIT licensed
 
 using NEOs
 using Dates
