@@ -7,6 +7,7 @@ An optical astrometric observation in the Minor Planet Center ADES format.
 
 - `permid::String`: IAU permanent designation.
 - `provid::String`: MPC unpacked provisional designation.
+- `trksub::String`: observer-assigned tracklet identifier.
 - `obsid::String`: globally unique observation identifier.
 - `trkid::String`: globally unique tracklet identifier.
 - `mode::String`: mode of instrumentation.
@@ -57,6 +58,7 @@ An optical astrometric observation in the Minor Planet Center ADES format.
     # Identification Group Elements
     permid::String
     provid::String
+    trksub::String
     obsid::String
     trkid::String
     mode::String
@@ -123,7 +125,13 @@ corr(x::OpticalADES{T}) where {T <: Real} = isnan(x.rmscorr) ? zero(T) : x.rmsco
 # Print method for OpticalADES
 function show(io::IO, o::OpticalADES)
     # If there is no number, use temporary designation
-    id_str = isempty(o.permid) ? o.provid : o.permid
+    if !isempty(o.permid)
+        id_str = o.permid
+    elseif !isempty(o.provid)
+        id_str = o.provid
+    else
+        id_str = o.trksub
+    end
 
     print(io, id_str, " α: ", @sprintf("%.5f", rad2deg(o.ra)), "° δ: ", @sprintf("%.5f",
         rad2deg(o.dec)), "° t: ", o.obstime, " obs: ", o.stn.name)
@@ -161,7 +169,7 @@ function adesparse(name, ::Type{T}, x) where {T <: Real}
 end
 
 OpticalADES(r::DataFrameRow) = OpticalADES{Float64}(
-    r.permid, r.provid, r.obsid, r.trkid, r.mode, r.stn, r.sys, r.ctr,
+    r.permid, r.provid, r.trksub, r.obsid, r.trkid, r.mode, r.stn, r.sys, r.ctr,
     r.pos1, r.pos2, r.pos3, r.vel1, r.vel2, r.vel3, r.poscov11, r.poscov12,
     r.poscov13, r.poscov22, r.poscov23, r.poscov33, r.prog, r.obstime,
     r.rmstime, r.ra, r.dec, r.rastar, r.decstar, r.deltara, r.deltadec,
@@ -184,7 +192,9 @@ function parse_optical_ades(text::String)
             name = Symbol(lowercase(tag(child)))
             if name in names
                 type = fieldtype(R, name)
-                x = strip(XML.value(first(child)))
+                v = XML.value(first(child))
+                isnothing(v) && continue
+                x = strip(v)
                 df[i, name] = adesparse(name, type, x)
             end
         end
