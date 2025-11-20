@@ -1,7 +1,7 @@
 name = "NEOs"
 uuid = "b41c07a2-2abb-11e9-070a-c3c1b239e7df"
 authors = ["Jorge A. Pérez Hernández", "Luis Benet", "Luis Eduardo Ramírez Montoya"]
-version = "0.18.1"
+version = "0.18.2"
 
 [deps]
 AngleBetweenVectors = "ec570357-d46e-52ed-9726-18773498274d"
