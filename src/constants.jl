@@ -301,7 +301,6 @@ const V_BAND_CORRECTION = Dict{Char, Float64}(
 
 # Parameters of the Bowell et al (1989) H-G photometric model for asteroids
 # See https://ui.adsabs.harvard.edu/abs/1989aste.conf..524B/abstract
-const SLOPE_PARAMETER = 0.15
 const PHASE_INTEGRAL_A1 = 3.332
 const PHASE_INTEGRAL_A2 = 1.862
 const PHASE_INTEGRAL_B1 = 0.631
