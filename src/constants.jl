@@ -299,13 +299,14 @@ const V_BAND_CORRECTION = Dict{Char, Float64}(
     'u' => +2.5
 )
 
-# Parameters of the linear H and G magnitude system for asteroids
-# See https://minorplanetcenter.net/iau/ECS/MPCArchive/1985/MPC_19851227.pdf
-const SLOPE_PARAMETER = 0.15
-const PHASE_INTEGRAL_A1 = 3.33
-const PHASE_INTEGRAL_A2 = 1.87
-const PHASE_INTEGRAL_B1 = 0.63
-const PHASE_INTEGRAL_B2 = 1.22
+# Parameters of the Bowell et al (1989) H-G photometric model for asteroids
+# See https://ui.adsabs.harvard.edu/abs/1989aste.conf..524B/abstract
+const PHASE_INTEGRAL_A1 = 3.332
+const PHASE_INTEGRAL_A2 = 1.862
+const PHASE_INTEGRAL_B1 = 0.631
+const PHASE_INTEGRAL_B2 = 1.218
+const PHASE_INTEGRAL_C1 = 0.986
+const PHASE_INTEGRAL_C2 = 0.238
 
 # Earth escape velocity
 # See https://doi.org/10.1006/icar.2002.6910

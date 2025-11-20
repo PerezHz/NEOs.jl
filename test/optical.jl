@@ -295,6 +295,7 @@ using Test
         apophis = first(apophis_p)
         @test apophis.permid == "99942"
         @test apophis.provid == "2004 MN4"
+        @test apophis.trksub == "K04M04N"
         @test apophis.obsid == "JqcHxe000000DaKP010000001"
         @test apophis.trkid == "000002w-NJ"
         @test apophis.mode == "CCD"

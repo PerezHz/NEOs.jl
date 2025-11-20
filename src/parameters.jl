@@ -67,6 +67,12 @@ nongravitational accelerations model:
 - `χ2_rej::T`: rejection threshold (default: `8.0`).
 - `fudge::T`: rejection fudge term coefficient (default: `400.0`).
 - `max_per::T`: maximum allowed rejection percentage (default: `10.0`).
+
+# Physical properties
+
+- `slope::T`: slope parameter (default: `0.15`).
+- `albedo::T`: albedo (default: `0.14`).
+- `density::T`: density [kg/m³] (default: `2_600.0`).
 """
 @with_kw struct Parameters{T <: Real}
     # Common
@@ -109,6 +115,10 @@ nongravitational accelerations model:
     χ2_rej::T = 8.0
     fudge::T = 400.0
     max_per::T = 10.0
+    # Physical properties
+    slope::T = 0.15
+    albedo::T = 0.14
+    density::T = 2_600.0
 end
 
 # Load Sun (Earth) ephemeris

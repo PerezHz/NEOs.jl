@@ -69,23 +69,18 @@ stretching(x::VirtualImpactor{T}) where {T <: Real} =
     ismarginal(x) ? T(NaN) : sqrt(last(eigvals(covariance(x))))
 
 """
-    impactenergy(VI, orbit, params; kwargs...)
+    impactenergy(VI, orbit, params)
 
-Return the impact energy [Mt] of a virtual impactor `VI` associated
-to an `orbit`.
-
-# Keyword arguments
-
-- `ρ::Real`: density [kg/m³] (default: `2_600`).
-- `p::Real`: albedo (default: `0.14`).
+Return the impact energy [Mt] of a virtual impactor `VI` associated to
+an `orbit`. For a list of parameters, see the `Physical properties`
+section of [`Parameters`](@ref).
 
 !!! reference
     - https://doi.org/10.1006/icar.2002.6910
 """
-function impactenergy(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters;
-                      ρ::Real = 2_600, p::Real = 0.14)
+function impactenergy(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters)
     # Object's mass [kg]
-    M = mass(orbit, params, ρ, p)
+    M = mass(orbit, params)
     # Impact velocity^2 [km^2/s^2]
     V2 = vinf(VI)^2 + EARTH_ESCAPE_VELOCITY^2
     # Impact energy [Mt]
@@ -109,22 +104,18 @@ function palermoscale(E::Real, IP::Real, ΔT::Real)
 end
 
 """
-    palermoscale(VI, orbit, params; kwargs)
+    palermoscale(VI, orbit, params)
 
-Return the Palermo Scale of a virtual impactor `VI` associated to an `orbit`.
-
-# Keyword arguments
-
-- `ρ::Real`: density [kg/m³] (default: `2_600`).
-- `p::Real`: albedo (default: `0.14`).
+Return the Palermo Scale of a virtual impactor `VI` associated to
+an `orbit`. For a list of parameters, see the `Physical properties`
+section of [`Parameters`](@ref).
 
 !!! reference
     - https://doi.org/10.1006/icar.2002.6910
 """
-function palermoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters;
-                      ρ::Real = 2_600, p::Real = 0.14)
+function palermoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters)
     # Impact energy [Mt]
-    E = impactenergy(VI, orbit, params; ρ, p)
+    E = impactenergy(VI, orbit, params)
     # Impact probability
     IP = impact_probability(VI)
     # Time until impact [yr]
@@ -178,22 +169,18 @@ function torinoscale(E::Real, IP::Real)
 end
 
 """
-    torinoscale(VI, orbit, params; kwargs)
+    torinoscale(VI, orbit, params)
 
-Return the Torino Scale of a virtual impactor `VI` associated to an `orbit`.
-
-# Keyword arguments
-
-- `ρ::Real`: density [kg/m³] (default: `2_600`).
-- `p::Real`: albedo (default: `0.14`).
+Return the Torino Scale of a virtual impactor `VI` associated to
+an `orbit`. For a list of parameters, see the `Physical properties`
+section of [`Parameters`](@ref).
 
 !!! reference
     - https://doi.org/10.1016/S0032-0633(00)00006-4
 """
-function torinoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters;
-                     ρ::Real = 2_600, p::Real = 0.14)
+function torinoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters)
     # Impact energy [Mt]
-    E = impactenergy(VI, orbit, params; ρ, p)
+    E = impactenergy(VI, orbit, params)
     # Impact probability
     IP = impact_probability(VI)
     # Torino scale
