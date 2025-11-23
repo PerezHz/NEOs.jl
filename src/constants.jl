@@ -299,6 +299,29 @@ const V_BAND_CORRECTION = Dict{Char, Float64}(
     'u' => +2.5
 )
 
+# Conversion from ADES band to MPC80 band
+# See https://github.com/IAU-ADES/ADES-Master/Python/ades/xmltompc80col.py
+const ADES_TO_MPC80_BAND = Dict(
+    "Vj" => 'V',
+    "Rc" => 'R',
+    "Ic" => 'I',
+    "Bj" => 'B',
+    "Uj" => 'U',
+    "Sg" => 'g',
+    "Sr" => 'r',
+    "Si" => 'i',
+    "Sz" => 'z',
+    "Pg" => 'g',
+    "Pr" => 'r',
+    "Pi" => 'i',
+    "Pz" => 'z',
+    "Pw" => 'w',
+    "Ao" => 'o',
+    "Ac" => 'c',
+    "Gb" => 'G',
+    "Gr" => 'G'
+)
+
 # Parameters of the Bowell et al (1989) H-G photometric model for asteroids
 # See https://ui.adsabs.harvard.edu/abs/1989aste.conf..524B/abstract
 const PHASE_INTEGRAL_A1 = 3.332
