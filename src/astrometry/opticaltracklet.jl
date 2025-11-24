@@ -39,6 +39,7 @@ const AbstractTrackletVector{T} = AbstractVector{OpticalTracklet{T}} where {T}
 date(x::OpticalTracklet) = x.date
 observatory(x::OpticalTracklet) = x.observatory
 catalogue(::OpticalTracklet) = unknowncat()
+band(x::OpticalTracklet) = ' '
 rms(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
 debias(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
 corr(::OpticalTracklet{T}) where {T <: Real} = T(NaN)
