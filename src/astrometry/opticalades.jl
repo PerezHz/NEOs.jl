@@ -113,7 +113,15 @@ end
 
 # AbstractAstrometryObservation interface
 date(x::OpticalADES) = x.obstime
-band(x::OpticalADES) = first(x.band)
+function band(x::OpticalADES)
+    if isempty(x.band)
+        return ' '
+    elseif haskey(ADES_TO_MPC80_BAND, x.band)
+        return ADES_TO_MPC80_BAND[x.band]
+    else
+        return last(x.band)
+    end
+end
 observatory(x::OpticalADES) = x.stn
 catalogue(x::OpticalADES) = x.astcat
 function rms(x::OpticalADES{T}) where {T <: Real}

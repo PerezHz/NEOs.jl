@@ -29,7 +29,7 @@ using Test
         @test apophis.dec == dec(apophis) == 0.2952738332250385
         @test apophis.info1 == ""
         @test isnan(apophis.mag) && isnan(mag(apophis))
-        @test apophis.band == ' '
+        @test apophis.band == band(apophis) == ' '
         @test apophis.catalogue == catalogue(apophis) == search_catalogue_code('o')
         @test apophis.info2 == "m6394"
         @test apophis.observatory == observatory(apophis) == search_observatory_code("691")
@@ -38,6 +38,10 @@ using Test
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)
         @test corr(apophis) == 0.0
+
+        # Custom show
+        @test string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
+                                  obs: Steward Observatory, Kitt Peak-Spacewatch"
 
         # OpticalMPC80 equality
         @test apophis == apophis
@@ -111,7 +115,8 @@ using Test
         @test X85177.date == date(X85177) == DateTime("2025-05-24T14:24:00")
         @test X85177.ra == ra(X85177) == 4.10286764571071
         @test X85177.dec == dec(X85177) == -0.1217646405946364
-        @test X85177.V #= == mag(X85177) =# == 21.5
+        @test X85177.V == mag(X85177) == 21.5
+        @test band(X85177) == ' '
         @test X85177.updated == "Updated June 13.68 UT"
         @test X85177.nobs == 3
         @test X85177.arc == 0.03
@@ -124,6 +129,9 @@ using Test
         @test all(isnan, rms(X85177))
         @test all(isnan, debias(X85177))
         @test isnan(corr(X85177))
+
+        # Custom show
+        @test string(X85177) == "X85177 α: 235.07700° δ: -6.97660° t: 2025-05-24T14:24:00"
 
         # NEOCPObject equality
         @test X85177 == X85177
@@ -191,7 +199,7 @@ using Test
         @test apophis.dec_bias == 0.14
         @test apophis.dec_resid == -0.07
         @test isnan(apophis.mag) && isnan(mag(apophis))
-        @test apophis.mag_band == ' '
+        @test apophis.mag_band == band(apophis) == ' '
         @test isnan(apophis.mag_rms)
         @test isnan(apophis.mag_resid)
         @test apophis.catalogue == catalogue(apophis) == search_catalogue_code('o')
@@ -205,6 +213,10 @@ using Test
         @test rms(apophis) == (0.612, 0.612)
         @test debias(apophis) == (-0.247, 0.14)
         @test corr(apophis) == 0.0
+
+        # Custom show
+        string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
+                            obs: Steward Observatory, Kitt Peak-Spacewatch"
 
         # OpticalRWO equality
         @test apophis == apophis
@@ -329,7 +341,7 @@ using Test
         @test apophis.astcat == catalogue(apophis) == search_catalogue_code('o')
         @test isnan(apophis.mag) && isnan(mag(apophis))
         @test isnan(apophis.rmsmag)
-        @test apophis.band == ""
+        @test apophis.band == "" && band(apophis) == ' '
         @test apophis.photcat == unknowncat()
         @test apophis.ref == "MPS   126394"
         @test apophis.disc == ""
@@ -346,6 +358,10 @@ using Test
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)
         @test corr(apophis) == 0.0
+
+        # Custom show
+        string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
+                            obs: Steward Observatory, Kitt Peak-Spacewatch"
 
         # OpticalRWO equality
         @test apophis == apophis
@@ -513,6 +529,7 @@ using Test
         @test maximum(abs, dec.(trks1) - dec.(trks2)) == 0.0
         @test all(x -> isnan(x) || iszero(x), mag.(trks1) - mag.(trks2))
         @test observatory.(trks1) == observatory.(trks2)
+        @test string.(trks1) == string.(trks2)
 
         mask13 = @. !isnothing($indexin(trks1, trks3))
         mask23 = @. !isnothing($indexin(trks2, trks3))
@@ -534,6 +551,10 @@ using Test
         @test all(x -> isnan(x) || iszero(x), mag.(trks1[mask13]) - mag.(trks3[mask31]))
         @test all(x -> isnan(x) || iszero(x), mag.(trks2[mask23]) - mag.(trks3[mask32]))
 
+        @test all(==(' '), band.(trks1))
+        @test all(==(' '), band.(trks2))
+        @test all(==(' '), band.(trks3))
+
         @test observatory.(trks1[mask13]) == observatory.(trks3[mask31])
         @test observatory.(trks2[mask23]) == observatory.(trks3[mask32])
 
@@ -552,6 +573,9 @@ using Test
         @test all(isnan, corr.(trks1))
         @test all(isnan, corr.(trks2))
         @test all(isnan, corr.(trks3))
+
+        @test string.(trks1[mask13]) == string.(trks3[mask31])
+        @test string.(trks2[mask23]) == string.(trks3[mask32])
 
     end
 
