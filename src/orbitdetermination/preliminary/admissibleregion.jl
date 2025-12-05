@@ -552,11 +552,13 @@ function attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
                    params::Parameters{T}) where {T <: Real, U <: Number}
     # Unfold
     α, δ, v_α, v_δ, ρ, v_ρ = a
-    # Light-time correction to epoch
-    t = dtutc2days(A.date) -  ρ / c_au_per_day
+    # Admissible region reference epoch
+    # Note: we concluded both t and et should not include the relativistic
+    # correction -ρ/c for consistency (05/12/2025)
+    t = dtutc2days(A.date) # - ρ / c_au_per_day
     # TO DO: `et::TaylorN` is too slow for `mmov` due to
     # SatelliteToolboxTransformations overloads in src/observations/topocentric.jl
-    et = dtutc2et(A.date) - cte(cte(ρ)) / c_au_per_sec
+    et = dtutc2et(A.date) # - cte(cte(ρ)) / c_au_per_sec
     # Line of sight vectors
     ρ_unit, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Heliocentric position of the observer

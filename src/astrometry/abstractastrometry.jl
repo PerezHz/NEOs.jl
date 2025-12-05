@@ -52,6 +52,7 @@ const AbstractObservationVector{T} = AbstractVector{<:AbstractAstrometryObservat
 # Order in AbstractAstrometryObservation is given by date
 isless(a::AbstractAstrometryObservation, b::AbstractAstrometryObservation) = date(a) < date(b)
 
+dtutc2days(x::AbstractAstrometryObservation) = dtutc2days(date(x))
 dtutc2et(x::AbstractAstrometryObservation) = dtutc2et(date(x))
 
 function numberofdays(x::AbstractObservationVector)

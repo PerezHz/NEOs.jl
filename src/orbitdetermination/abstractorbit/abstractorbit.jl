@@ -283,8 +283,10 @@ function osculating(orbit::AbstractOrbit{D, T, T},
     # Origin
     x0 = zeros(T, Npar)
     # Osculating orbital elements
-    osc = cartesian2osculating(q0[1:6] - params.eph_su(t), mjd0; μ = μ_S,
-                               frame = :ecliptic, Γ_car = covariance(orbit))
+    elements = cartesian2osculating(q0[1:6] - params.eph_su(t), mjd0; μ = μ_S,
+                                    frame = :ecliptic)
+    Γ_osc = project(elements, covariance(orbit))
+    osc = OsculatingElements{T, TaylorN{T}}(μ_S, mjd0, :ecliptic, elements, Γ_osc)
 
     return evaldeltas(osc, x0)
 end
@@ -314,8 +316,10 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
     # Origin
     x0 = zeros(T, Npar)
     # Osculating keplerian elements
-    osc = cartesian2osculating(q0[1:6] - params.eph_su(t), mjd0; μ = μ_S, frame = :ecliptic,
-                               Γ_car = covariance(orbit))
+    elements = cartesian2osculating(q0[1:6] - params.eph_su(t), mjd0; μ = μ_S,
+                                    frame = :ecliptic)
+    Γ_osc = project(elements, covariance(orbit))
+    osc = OsculatingElements{T, TaylorN{T}}(μ_S, mjd0, :ecliptic, elements, Γ_osc)
     # Uncertainty parameter is not defined for hyperbolic orbits
     ishyperbolic(osc) && throw(ArgumentError("Uncertainty parameter is not defined for \
         hyperbolic orbits"))
