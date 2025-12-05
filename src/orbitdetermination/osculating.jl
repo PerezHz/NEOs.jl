@@ -189,11 +189,9 @@ Convert a cartesian state vector `xas` [au, au/day], referred to an `epoch`
 
 - `μ::Real`: gravitational parameter of the central body [au³/day²] (default: `μ_S`).
 - `frame::Symbol`: reference plane, either `:equatorial` (default) or `:ecliptic`.
-- `Γ_car::AbstractMatrix`: covariance matrix of `xas`.
 """
 function cartesian2osculating(xas::AbstractVector{U}, epoch::T; μ::Real = μ_S,
-                              frame::Symbol = :equatorial,
-                              Γ_car::AbstractMatrix{T}) where {T <: Real, U <: Number}
+                              frame::Symbol = :equatorial) where {T <: Real, U <: Number}
     if frame == :ecliptic
         xas = equatorial2ecliptic(xas)
     end
@@ -254,10 +252,8 @@ function cartesian2osculating(xas::AbstractVector{U}, epoch::T; μ::Real = μ_S,
     elseif e > 1
         elements = SVector{6, U}(q, e, i, ω, Ω, tp)
     end
-    # Covariance matrix
-    Γ_osc = project(elements, Γ_car)
 
-    return OsculatingElements{T, U}(μ, epoch, frame, elements, Γ_osc)
+    return elements
 end
 
 # Return the cartesian state vector of x at time t [MJD TDB]
