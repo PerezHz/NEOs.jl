@@ -299,6 +299,26 @@ const V_BAND_CORRECTION = Dict{Char, Float64}(
     'u' => +2.5
 )
 
+# Conversion from ADES band to MPC80 band
+# See https://github.com/IAU-ADES/ADES-Master/Python/ades/xmltompc80col.py
+# This set of band-conversion maps captures the subset of bands that need special
+# handling when creating an obs80 string. By default, single-character ADES bands
+# are passed through unmodified, and multi-character ADES bands are mapped to
+# the second character (e.g., `Sg` => `g`). Currently, all of the exceptions in
+# this table are two-character bands where we use the first character instead of
+# the second, but this table can be used to define any mapping that needs to take
+# precedence over the default logic.
+const ADES_TO_MPC80_BAND = Dict(
+    "Vj" => 'V',
+    "VR" => 'V',
+    "Rc" => 'R',
+    "Ic" => 'I',
+    "Bj" => 'B',
+    "Uj" => 'U',
+    "Gb" => 'G',
+    "Gr" => 'G',
+)
+
 # Parameters of the Bowell et al (1989) H-G photometric model for asteroids
 # See https://ui.adsabs.harvard.edu/abs/1989aste.conf..524B/abstract
 const PHASE_INTEGRAL_A1 = 3.332

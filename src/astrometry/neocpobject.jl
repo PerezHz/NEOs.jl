@@ -41,6 +41,8 @@ end
 date(x::NEOCPObject) = x.date
 observatory(::NEOCPObject{T}) where {T} = unknownobs(T)
 catalogue(::NEOCPObject) = unknowncat()
+mag(x::NEOCPObject) = x.V
+band(x::NEOCPObject) = ' '
 rms(::NEOCPObject{T}) where {T <: Real} = (T(NaN), T(NaN))
 debias(::NEOCPObject{T}) where {T <: Real} = (T(NaN), T(NaN))
 corr(::NEOCPObject{T}) where {T <: Real} = T(NaN)
