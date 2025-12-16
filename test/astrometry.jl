@@ -78,12 +78,15 @@ using NEOs: SCRATCH_PATH
         @test CATALOGUES_MPC[] == cats
 
         # Update catalogues file
-        update_catalogues_mpc()
-        @test allunique(CATALOGUES_MPC[])
-        @test issorted(CATALOGUES_MPC[])
-        @test isa(CATALOGUES_MPC[], Vector{CatalogueMPC})
-        @test count(isdeprecated, CATALOGUES_MPC[]) == 42
-        @test count(isunknown, CATALOGUES_MPC[]) == 1
+        # Note: the tests below have been commented as they break consistently
+        # in Github because the MPC's website rejects the HTTP request needed
+        # to download the catalogues file (16/12/2025)
+        # update_catalogues_mpc()
+        # @test allunique(CATALOGUES_MPC[])
+        # @test issorted(CATALOGUES_MPC[])
+        # @test isa(CATALOGUES_MPC[], Vector{CatalogueMPC})
+        # @test count(isdeprecated, CATALOGUES_MPC[]) == 42
+        # @test count(isunknown, CATALOGUES_MPC[]) == 1
 
         # Search catalogue code and value
         cat = search_catalogue_code('6')

@@ -4,6 +4,8 @@
 const SRC_PATH = dirname(pathof(NEOs))
 # Path to scratch space
 const SCRATCH_PATH = Ref{String}("")
+# Path to catalogues file
+const CATALOGUES_PATH = joinpath(dirname(SRC_PATH), "data", "astCat_photCat.json")
 
 ## Minor bodies astrometry interface
 
