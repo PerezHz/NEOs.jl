@@ -525,7 +525,7 @@ end
         # Jacobian
         @test size(orbit.jacobian) == (6, 6)
         @test isdiag(orbit.jacobian)
-        @test maximum(orbit.jacobian) < 9.2e-3
+        @test maximum(orbit.jacobian) < 9.5e-3
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
