@@ -15,9 +15,8 @@ function __init__()
     global CATALOGUES_MPC[] = read_catalogues_mpc(path)
     # Load observatories
     path = joinpath(SCRATCH_PATH[], "observatoriesmpc.json")
-    if isfile(path)
-        global OBSERVATORIES_MPC[] = read_observatories_mpc(path)
-    else
-        update_observatories_mpc()
+    if !isfile(path)
+        write(path, read(OBSERVATORIES_PATH))
     end
+    global OBSERVATORIES_MPC[] = read_observatories_mpc(path)
 end
