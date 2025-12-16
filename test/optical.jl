@@ -137,10 +137,13 @@ using Test
         @test X85177 == X85177
 
         # Fetch NEOCPObject
-        objects1 = fetch_neocp_objects()
-        @test isa(objects1, Vector{NEOCPObject{Float64}})
-        @test issorted(objects1)
-        @test allunique(objects1)
+        # Note: the tests below have been commented as they break consistently
+        # in Github because the MPC's website rejects the HTTP request needed
+        # to download the NEOCP file (16/12/2025)
+        # objects1 = fetch_neocp_objects()
+        # @test isa(objects1, Vector{NEOCPObject{Float64}})
+        # @test issorted(objects1)
+        # @test allunique(objects1)
 
         # Read/write NEOCPObject file
         filename = joinpath(pkgdir(NEOs), "test", "data", "neocp.txt")
