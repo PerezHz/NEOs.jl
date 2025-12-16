@@ -24,10 +24,12 @@ using Aqua
 end
 
 @testset "Aqua tests (additional)" begin
+    Aqua.test_persistent_tasks(NEOs, broken = true)
     Aqua.test_ambiguities(NEOs, broken = true)
     Aqua.test_piracies(NEOs, broken = true)
     Aqua.test_all(
         NEOs;
+        persistent_tasks = false,
         ambiguities = false,
         piracies = false
     )
