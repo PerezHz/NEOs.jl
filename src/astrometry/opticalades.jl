@@ -210,7 +210,7 @@ function parse_optical_ades(text::String)
     # Satellite observatories
     mask = findall(istwoliner, df.stn)
     for i in mask
-        frame = df.sys[i]
+        frame = isempty(df.sys[i]) ? df.stn[i].frame : df.sys[i]
         coords = SVector{3, Float64}(df.pos1[i], df.pos2[i], df.pos3[i])
         df.stn[i] = ObservatoryMPC(df.stn[i]; frame, coords)
     end

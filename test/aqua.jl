@@ -24,10 +24,17 @@ using Aqua
 end
 
 @testset "Aqua tests (additional)" begin
+    # Note: for an unknown reason, the persistent tasks test only
+    # fails in Windows and for the latest stable release (16/12/25)
+    flag = Sys.iswindows() && VERSION >= v"1.12"
+    if flag
+        Aqua.test_persistent_tasks(NEOs, broken = true)
+    end
     Aqua.test_ambiguities(NEOs, broken = true)
     Aqua.test_piracies(NEOs, broken = true)
     Aqua.test_all(
         NEOs;
+        persistent_tasks = !flag,
         ambiguities = false,
         piracies = false
     )

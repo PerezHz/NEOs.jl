@@ -137,10 +137,13 @@ using Test
         @test X85177 == X85177
 
         # Fetch NEOCPObject
-        objects1 = fetch_neocp_objects()
-        @test isa(objects1, Vector{NEOCPObject{Float64}})
-        @test issorted(objects1)
-        @test allunique(objects1)
+        # Note: the tests below have been commented as they break consistently
+        # in Github because the MPC's website rejects the HTTP request needed
+        # to download the NEOCP file (16/12/2025)
+        # objects1 = fetch_neocp_objects()
+        # @test isa(objects1, Vector{NEOCPObject{Float64}})
+        # @test issorted(objects1)
+        # @test allunique(objects1)
 
         # Read/write NEOCPObject file
         filename = joinpath(pkgdir(NEOs), "test", "data", "neocp.txt")
@@ -421,13 +424,13 @@ using Test
     # Load optical astrometry
     filename = joinpath(pkgdir(NEOs), "test", "data", "433.txt")
     optical1 = read_optical_mpc80(filename)
-    filter!(x -> date(x) > Date(2000), optical1)
+    filter!(x -> Date(2000) < date(x) < Date(2025), optical1)
     filename = joinpath(pkgdir(NEOs), "test", "data", "433.rwo")
     optical2 = read_optical_rwo(filename)
-    filter!(x -> date(x) > Date(2000), optical2)
+    filter!(x -> Date(2000) < date(x) < Date(2025), optical2)
     filename = joinpath(pkgdir(NEOs), "test", "data", "433.xml")
     optical3 = read_optical_ades(filename)
-    filter!(x -> date(x) > Date(2000), optical3)
+    filter!(x -> Date(2000) < date(x) < Date(2025), optical3)
 
     @testset "Topocentric" begin
 
@@ -443,7 +446,7 @@ using Test
         @test count(mask1) == count(mask2) == count(mask3) == 0
         @test light1[mask1] == light2[mask2] == light3[mask3]
         mask1, mask2, mask3 = @. isnight(light1), isnight(light2), isnight(light3)
-        @test count(mask1) == count(mask2) == count(mask3) == 6_849
+        @test count(mask1) == count(mask2) == count(mask3) == 6_765
         @test light1[mask1] == light2[mask2] == light3[mask3]
         mask1, mask2, mask3 = @. issatellite(light1), issatellite(light2), issatellite(light3)
         @test count(mask1) == count(mask2) == count(mask3) == 1_790

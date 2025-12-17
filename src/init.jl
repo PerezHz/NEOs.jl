@@ -9,16 +9,14 @@ function __init__()
     global SCRATCH_PATH[] = @get_scratch!("NEOs")
     # Load catalogues
     path = joinpath(SCRATCH_PATH[], "astCat_photCat.json")
-    if isfile(path)
-        global CATALOGUES_MPC[] = read_catalogues_mpc(path)
-    else
-        update_catalogues_mpc()
+    if !isfile(path)
+        write(path, read(CATALOGUES_PATH))
     end
+    global CATALOGUES_MPC[] = read_catalogues_mpc(path)
     # Load observatories
     path = joinpath(SCRATCH_PATH[], "observatoriesmpc.json")
-    if isfile(path)
-        global OBSERVATORIES_MPC[] = read_observatories_mpc(path)
-    else
-        update_observatories_mpc()
+    if !isfile(path)
+        write(path, read(OBSERVATORIES_PATH))
     end
+    global OBSERVATORIES_MPC[] = read_observatories_mpc(path)
 end
