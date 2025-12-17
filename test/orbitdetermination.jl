@@ -8,7 +8,7 @@ using StaticArraysCore
 using Test
 
 using NEOs: AbstractOpticalVector, KeplerianElements, μ_S, indices, equatorial2ecliptic,
-      numtypes
+      numtypes, sseph
 using Statistics: mean
 
 function iodsuboptical(optical::AbstractOpticalVector, N::Int = 3)
@@ -73,7 +73,8 @@ end
     @test conicsection(kep) == :elliptic
 
     X = kep()
-    Y = equatorial2ecliptic(rv - params.eph_su(jd0 - J2000))
+
+    Y = equatorial2ecliptic(rv - sseph(su, jd0 - J2000))
     @test maximum(@. abs((X - Y) / drv)) < 1.1E-2
 end
 
