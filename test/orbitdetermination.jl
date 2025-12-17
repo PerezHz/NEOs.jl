@@ -4,9 +4,11 @@ using NEOs
 using Dates
 using PlanetaryEphemeris
 using LinearAlgebra
+using StaticArraysCore
 using Test
 
-using NEOs: AbstractOpticalVector, μ_S, indices, equatorial2ecliptic
+using NEOs: AbstractOpticalVector, KeplerianElements, μ_S, indices, equatorial2ecliptic,
+      numtypes
 using Statistics: mean
 
 function iodsuboptical(optical::AbstractOpticalVector, N::Int = 3)
@@ -14,6 +16,65 @@ function iodsuboptical(optical::AbstractOpticalVector, N::Int = 3)
     idxs = indices(tracklets[1:N])
     suboptical = optical[idxs]
     return suboptical
+end
+
+@testset "AbstractOsculatingElements" begin
+    # Pérez-Hernández & Benet 2022 Apophis OR7 orbit
+    # See Tables 2 and 3 of the Supplementary Information in
+    # https://doi.org/10.1038/s43247-021-00337-x
+
+    # Reference epoch [JDTDB]
+    jd0 = 2459200.5                      # JDTDB
+
+    # Cartesian state vector [au, au/day]
+    rv = [−0.18034828526, 0.94069105951, 0.34573599029,
+          −0.0162659397882, 4.39154800E−5, −0.000395204013]
+    drv = [7.12E−9, 1.94E−9, 5.41E−9, 4.79E−11, 6.72E−11, 1.38E−10]
+
+    # Keplerian orbital elements
+    e, de = 0.19150886716, 1.60E-9
+    q, dq = 0.74585305033, 1.54E−9       # au
+    tp, dtp = 2459101.04092537, 1.17E−6  # JDTDB
+    Ω, dΩ = 204.04199116, 8.81E−6        # deg
+    ω, dω = 126.65396094, 9.37E−6        # deg
+    i, di = 3.336773201, 1.74E−7         # deg
+    A2, dA2 = -2.8988E-14, 2.48E-16      # au/day^2
+    adot, dadot = −199.0, 1.5            # m/yr
+
+    # Semimajor axis [au] and mean anomaly [deg]
+    a, da = q / (1 - e), hypot(dq/(1-e), q*de/(1-e)^2)
+    M = rad2deg(sqrt(μ_S / a^3)) * (jd0 - tp)
+    dM = hypot(-3*M*da/(2a), -M*dtp/(jd0 - tp))
+
+    # Average semimajor axis drift [m/yr]
+    _adot_ = 1E3au * yr * yarkp2adot(A2, a, e)
+    _dadot_ = hypot(_adot_*dA2/A2, -_adot_*da/(2a), 2*_adot_*e*de/(1 - e^2))
+    @test abs((adot - _adot_) / adot) < 1.6E-4
+    @test abs((dadot - _dadot_) / dadot) < 1.4E-1
+
+    # Keplerian orbital elements
+    kep = KeplerianElements(μ_S, jd0 - J2000 + MJD2000, :ecliptic,
+        SVector{6}(a, e, i, ω, Ω, M),
+        SMatrix{6, 6}(diagm([da^2, de^2, di^2, dω^2, dΩ^2, dM^2]))
+    )
+
+    @test numtypes(kep) == (Float64, Float64)
+    @test gm(kep) == μ_S
+    @test epoch(kep) == 59200.0
+    @test date(kep) == DateTime(2020, 12, 17, 00, 00)
+    @test frame(kep) == :ecliptic
+    @test sigmas(kep) ≈ [da, de, di, dω, dΩ, dM]
+    @test isa(string(kep), String)
+
+    @test !iscircular(kep)
+    @test iselliptic(kep)
+    @test !isparabolic(kep)
+    @test !ishyperbolic(kep)
+    @test conicsection(kep) == :elliptic
+
+    X = kep()
+    Y = equatorial2ecliptic(rv - params.eph_su(jd0 - J2000))
+    @test maximum(@. abs((X - Y) / drv)) < 1.1E-2
 end
 
 @testset "Orbit Determination" begin
