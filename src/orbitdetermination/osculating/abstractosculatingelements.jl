@@ -69,7 +69,7 @@ function show(io::IO, x::AbstractOsculatingElements)
     )
 end
 
-function evaldeltas(y::KeplerianElements{T, TaylorN{T}},
+function evaldeltas(y::AbstractOsculatingElements{T, TaylorN{T}},
                     dx::Vector{T} = zeros(T, get_numvars())) where {T <: Real}
     O = typeof(y).name.wrapper
     return O{T, T}(gm(y), epoch(y), frame(y), elements(y)(dx), covariance(y)(dx))
