@@ -74,11 +74,12 @@ export rvelea, scaled_variables, propagate, propagate_lyap, propagate_root
 # Orbit determination
 export ODProblem, LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
        GaussOrbit, MMOVOrbit, LeastSquaresOrbit, AdmissibleRegion
-export elements, iselliptic, ishyperbolic, cartesian2osculating, yarkp2adot
+export gm, frame, elements, iscircular, iselliptic, isparabolic, ishyperbolic, conicsection,
+       yarkp2adot, cartesian2keplerian
 export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
-export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, osculating,
+export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, keplerian,
        uncertaintyparameter, absolutemagnitude, diameter, mass
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,

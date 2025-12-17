@@ -38,7 +38,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Nov 15, 2025
+        # Values by Dec 17, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -81,15 +81,15 @@ end
         JPL_CAR = [-0.9867704701732631, 0.3781890325424674, 0.14094513213009532,
             -0.008773157203087259, -0.00947109649687576, -0.005654229864757284]
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 0.76)
-        # Osculating orbital elements
-        osc = osculating(orbit, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 4.0e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 4.0e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         JPL_OSC = [8.198835710815939E-01, 3.962989389356275E-01, 5.807184452352074E+00,
             4.045356567755751E+01, 3.261403954217091E+02, 1.216665112960870E+02]
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.83)
@@ -153,15 +153,15 @@ end
         # Compatibility with JPL
         q0, σ0 = orbit1(), sigmas(orbit1)
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 0.31)
-        # Osculating orbital elements
-        osc = osculating(orbit1, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit1) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit1, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit1) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit1() - params.eph_su(epoch(orbit1)))
-        @test norm(q0 - osc(), Inf) < 3.8e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 3.8e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.31)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
@@ -197,7 +197,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Nov 15, 2025
+        # Values by Dec 17, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -240,15 +240,15 @@ end
         JPL_CAR = [1.0042569058151192, 0.2231639040146286, 0.11513854178693468,
             -0.010824212819531798, 0.017428798232689943, 0.0071046780555307385]
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 5.6e-3)
-        # Osculating orbital elements
-        osc = osculating(orbit, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 6.1e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 6.1e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         JPL_OSC = [2.872424697642789E+00, 6.749395051551541E-01, 1.282355986214476E+00,
             1.725712172730245E+02, 2.413793589329106E+02, 3.538743602962668E+02 - 360]
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 5.5e-3)
@@ -288,7 +288,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by Nov 15, 2025
+        # Values by Dec 17, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -331,15 +331,15 @@ end
         JPL_CAR = [-0.12722461679828806, -0.9466098076903212, -0.4526816007640767,
             0.02048875631534963, -0.00022720097573790754, 0.00321302850930331]
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 0.16)
-        # Osculating orbital elements
-        osc = osculating(orbit, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 8.0e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 8.0e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         JPL_OSC = [2.232655272359251E+00, 5.480018648354085E-01, 8.456325272115306E+00,
             1.322293305412568E+01, 2.778787985886902E+02, 3.530120962605258E+02 - 360]
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.17)
@@ -373,7 +373,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by Nov 15, 2025
+        # Values by Dec 17, 2025
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -487,7 +487,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Nov 15, 2025
+        # Values by Dec 17, 2025
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -536,15 +536,15 @@ end
         JPL_CAR = [-0.9698405495747651, 0.24035304578776012, 0.10288276585828428,
             -0.009512301266159554, -0.01532548565855646, -0.00809464581680694]
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 0.013)
-        # Osculating orbital elements
-        osc = osculating(orbit, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 5.2e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 5.2e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         JPL_OSC = [1.484448954296998E+00, 3.966995063832199E-01, 3.961868860866990E+00,
             1.294946774085543E+02, 3.442349856198504E+02, 2.206164242012555E+01]
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.013)
@@ -581,7 +581,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Nov 15, 2025
+        # Values by Dec 17, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -624,15 +624,15 @@ end
         JPL_CAR = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
             -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 0.08)
-        # Osculating orbital elements
-        osc = osculating(orbit, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 3.6e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 3.6e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         JPL_OSC = [1.776244846691859E+00, 4.381984418639090E-01, 7.819612775042287E-01,
             9.751283439586027E+01, 2.742918197067644E+02, 1.116208224849003E+01]
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.07)
@@ -697,15 +697,15 @@ end
         # Compatibility with JPL
         q0, σ0 = orbit1(), sigmas(orbit1)
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 6.9e-4)
-        # Osculating orbital elements
-        osc = osculating(orbit1, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit1) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit1, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit1) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit1() - params.eph_su(epoch(orbit1)))
-        @test norm(q0 - osc(), Inf) < 4.0e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 4.0e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 6.9e-4)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
@@ -745,7 +745,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Nov 15, 2025
+        # Values by Dec 17, 2025
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -794,15 +794,15 @@ end
         JPL_CAR = [-0.1793421909678032, 0.8874121750891107, 0.3841434101167349,
             -0.017557851117612377, -0.005781634223099801, -0.0020075106081869185]
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 0.30)
-        # Osculating orbital elements
-        osc = osculating(orbit, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 6.2e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 6.2e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         JPL_OSC = [1.163575955666616E+00, 2.128185264087166E-01, 1.423597471953649E+00,
             5.237781301766019E+01, 1.016022028285875E+02, 3.243429036265208E+02 - 360]
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.38)
@@ -839,7 +839,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Nov 15, 2025
+        # Values by Dec 17, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -882,15 +882,15 @@ end
         JPL_CAR = [0.9739760787551061, 0.21541704400792083, 0.09401075290627411,
             -0.00789675674941779, 0.0160619782715116, 0.006135361409943397]
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 0.20)
-        # Osculating orbital elements
-        osc = osculating(orbit, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 5.0e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 5.0e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         JPL_OSC = [1.273091758414584E+00, 2.870222798582721E-01, 2.341999526552296E+00,
             2.339645303327229E+02, 1.941265709953888E+02, 3.288450951861228E+02 - 360]
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.09)
@@ -954,15 +954,15 @@ end
         # Compatibility with JPL
         q0, σ0 = orbit1(), sigmas(orbit1)
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 0.17)
-        # Osculating orbital elements
-        osc = osculating(orbit1, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit1) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit1, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit1) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit1() - params.eph_su(epoch(orbit1)))
-        @test norm(q0 - osc(), Inf) < 5.8e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 5.8e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.13)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
@@ -1028,7 +1028,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Nov 15, 2025
+        # Values by Dec 17, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -1072,15 +1072,15 @@ end
         JPL_CAR = [0.827266656726981, -0.8060653913101916, -0.6506187674672722,
             0.01660013577219304, -0.005614737443087259, 0.002899489877794496]
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 0.59)
-        # Osculating orbital elements
-        osc = osculating(orbit, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit() - params.eph_su(epoch(orbit)))
-        @test norm(q0 - osc(), Inf) < 6.0e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 6.0e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         JPL_OSC = [2.279881958167905E+00, 7.595854924208774E-01, 3.859999487009846E+01,
             2.293324466168822E+02, 3.254353160068554E+02, 2.033836565098925E+01]
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.59)
@@ -1134,7 +1134,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by Nov 15, 2025
+        # Values by Dec 17, 2025
 
         # Check type
         @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -1185,15 +1185,15 @@ end
         JPL_CAR = [-5.229992130937651E-01, 8.689454573480734E-01, 3.096174868699621E-01,
             -1.413639580483663E-02, -5.510379552549767E-03, -2.413003153288419E-03]
         @test all(@. abs(q0 - JPL_CAR) / σ0 < 4.5)
-        # Osculating orbital elements
-        osc = osculating(orbit1, params)
-        @test iselliptic(osc)
-        @test osc.mu == μ_S
-        @test epoch(osc) == epoch(orbit1) + MJD2000
-        @test osc.frame == :ecliptic
+        # Keplerian orbital elements
+        kep = keplerian(orbit1, params)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == epoch(orbit1) + MJD2000
+        @test frame(kep) == :ecliptic
         q0 = equatorial2ecliptic(orbit1() - params.eph_su(epoch(orbit1)))
-        @test norm(q0 - osc(), Inf) < 6.0e-14
-        q0, σ0 = elements(osc), sigmas(osc)
+        @test norm(q0 - kep(), Inf) < 6.0e-14
+        q0, σ0 = elements(kep), sigmas(kep)
         JPL_OSC = [9.223295977030230E-01, 1.911190963976789E-01, 3.330797253820763E+00,
             1.263744754026979E+02, 2.044798558304837E+02, 1.361032871672047E+02]
         @test all(@. abs(q0 - JPL_OSC) / σ0 < 0.65)
