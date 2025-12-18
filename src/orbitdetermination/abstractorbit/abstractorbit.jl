@@ -292,6 +292,38 @@ function keplerian(orbit::AbstractOrbit{D, T, T},
 end
 
 """
+    equinoctial(orbit, params)
+
+Return the heliocentric ecliptic equinoctial elements of an `orbit`
+at its reference epoch.
+
+See also [`cartesian2equinoctial`](@ref).
+
+!!! warning
+    This function may change the (global) `TaylorSeries` variables.
+"""
+function equinoctial(orbit::AbstractOrbit{D, T, T},
+                     params::Parameters{T}) where {D, T <: Real}
+    # Set jet transport variables
+    Npar = numvars(orbit)
+    set_od_order(T, 2, Npar)
+    # Reference epoch [MJD TDB]
+    t = epoch(orbit)
+    mjd0 = t + MJD2000
+    # Jet transport initial condition
+    q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
+    # Origin
+    x0 = zeros(T, Npar)
+    # Equinoctial orbital elements
+    elements = cartesian2equinoctial(q0[1:6] - params.eph_su(t), mjd0; μ = μ_S,
+                                     frame = :ecliptic)
+    Γ_osc = project(elements, covariance(orbit))
+    osc = EquinoctialElements{T, TaylorN{T}}(μ_S, mjd0, :ecliptic, elements, Γ_osc)
+
+    return evaldeltas(osc, x0)
+end
+
+"""
     uncertaintyparameter(orbit, params)
 
 Return the Minor Planet Center uncertainty parameter of an `orbit`.

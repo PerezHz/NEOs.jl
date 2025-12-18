@@ -176,7 +176,7 @@ function cartesian2keplerian(x::AbstractVector{U}, t::T; μ::Real = μ_S,
     end
     # Mean anomaly [rad]
     if 0 < e < 1
-        M = E - e * sin(E)
+        M = mod2pi(E - e * sin(E))
     elseif e > 1
         M = e * sinh(E) - E
     end
@@ -223,5 +223,5 @@ function (x::KeplerianElements)(t::Number = epoch(x))
     # State vector [au, au/day]
     pv_i = vcat(r_i, v_i)
 
-    return  pv_i
+    return pv_i
 end
