@@ -13,8 +13,8 @@ import Tables: Schema, istable, rowaccess, rows, schema
 import TaylorSeries: get_order
 
 using AngleBetweenVectors, AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON,
-      LazyArtifacts, LinearAlgebra, Printf, SatelliteToolboxTransformations, Scratch,
-      SPICE, TaylorIntegration, TaylorSeries, XML
+      LazyArtifacts, LinearAlgebra, Printf, Scratch, SPICE, TaylorIntegration,
+      TaylorSeries, XML
 
 using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
 using DataFrames: AbstractDataFrame, DataFrame, DataFrameRow, nrow, eachrow, eachcol,
@@ -35,6 +35,10 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea
       getinterpindex, pole_rotation, t2c_jpl_de430
 using QuadGK: quadgk
 using Roots: Bisection, find_zero, find_zeros
+using SatelliteToolboxTransformations: DCM, EARTH_ANGULAR_SPEED, EopIau1980, EopIau2000A,
+      GCRF, ITRF, J2000, JD_J2000, OrbitStateVector, PEF, TIRS, T_ECIs, T_ECIs_IAU_2006,
+      fetch_iers_eop, geodetic_to_ecef, get_Δat, r_ecef_to_ecef, r_ecef_to_eci,
+      sv_eci_to_ecef
 using SpecialFunctions: erf
 using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
@@ -74,12 +78,14 @@ export rvelea, scaled_variables, propagate, propagate_lyap, propagate_root
 # Orbit determination
 export ODProblem, LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
        GaussOrbit, MMOVOrbit, LeastSquaresOrbit, AdmissibleRegion
-export elements, iselliptic, ishyperbolic, cartesian2osculating, yarkp2adot
+export gm, frame, elements, iscircular, iselliptic, isparabolic, ishyperbolic, conicsection,
+       yarkp2adot, cartesian2keplerian, cartesian2equinoctial, keplerian2equinoctial,
+       equinoctial2keplerian
 export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
-export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, osculating,
-       uncertaintyparameter, absolutemagnitude, diameter, mass
+export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, keplerian,
+       equinoctial, uncertaintyparameter, absolutemagnitude, diameter, mass
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
        orbitdetermination

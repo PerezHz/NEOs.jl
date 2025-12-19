@@ -113,6 +113,12 @@ evaluate(y::SVector{N, TaylorN{T}}, x::Vector{<:Number}) where {N, T <: Number} 
 
 (y::SVector{N, TaylorN{T}})(x::Vector{T}) where {N, T <: Number} = evaluate(y, x)
 
+evaluate(y::SMatrix{S1, S2, TaylorN{T}, L}, x::Vector{<:Number}) where {S1, S2,
+    T <: Number, L} = [y[i, j](x) for i in axes(y, 1), j in axes(y, 2)]
+
+(y::SMatrix{S1, S2, TaylorN{T}, L})(x::Vector{T}) where {S1, S2, T <: Number, L} =
+    evaluate(y, x)
+
 # Evaluate `y` at time `t` using `OhMyThreads.tmap`
 # This function is a multithreaded version of
 # (::TaylorInterpolant{T, U, 2})(t::TT) where {T, U, TT<:TaylorInterpCallingArgs{T,U}}

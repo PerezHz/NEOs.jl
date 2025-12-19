@@ -219,7 +219,7 @@ end
 for EOP in (:Nothing, :EopIau1980, :EopIau2000A)
     @eval begin
 
-        function SatelliteToolboxTransformations.sv_ecef_to_ecef(
+        function sv_ecef_to_ecef(
             sv::OrbitStateVector,
             T_ECEF1::Val{:ITRF},
             T_ECEF2::Val{:TIRS},
@@ -236,7 +236,7 @@ for EOP in (:Nothing, :EopIau1980, :EopIau2000A)
             return OrbitStateVector(sv.t, r_ecef, v_ecef, a_ecef)
         end
 
-        function SatelliteToolboxTransformations.sv_ecef_to_eci(
+        function sv_ecef_to_eci(
             sv::OrbitStateVector,
             T_ECEF::Union{Val{:PEF}, Val{:TIRS}},
             T_ECI::Union{T_ECIs, T_ECIs_IAU_2006},
