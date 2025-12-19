@@ -160,6 +160,7 @@ Convert a cartesian state vector `x` [au, au/day], referred to an epoch `t`
 """
 function cartesian2equinoctial(x::AbstractVector{U}, t::T; μ::Real = μ_S,
                                frame::Symbol = :equatorial) where {T <: Real, U <: Number}
+    # If necessary, rotate state vector from equatorial to ecliptic plane
     if frame == :ecliptic
         x = equatorial2ecliptic(x)
     end

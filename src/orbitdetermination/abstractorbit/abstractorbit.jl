@@ -324,6 +324,39 @@ function equinoctial(orbit::AbstractOrbit{D, T, T},
 end
 
 """
+    attributable(orbit, params)
+
+Return the geocentric equatorial attributable elements of an `orbit`
+at its reference epoch.
+
+See also [`cartesian2attributable`](@ref).
+
+!!! warning
+    This function may change the (global) `TaylorSeries` variables.
+"""
+function attributable(orbit::AbstractOrbit{D, T, T},
+                      params::Parameters{T}) where {D, T <: Real}
+    # Set jet transport variables
+    Npar = numvars(orbit)
+    set_od_order(T, 2, Npar)
+    # Reference epoch [MJD TDB]
+    t = epoch(orbit)
+    mjd0 = t + MJD2000
+    # Jet transport initial condition
+    q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
+    # Origin
+    x0 = zeros(T, Npar)
+    # Attributable elements
+    q0 = q0[1:6] - params.eph_ea(t)
+    elements = cartesian2attributable(q0; frame = :equatorial)
+    Γ_attr = project(elements, covariance(orbit))
+    attr = AttributableElements{T, TaylorN{T}}(PE.μ[ea], mjd0,
+           :equatorial, elements, Γ_attr)
+
+    return evaldeltas(attr, x0)
+end
+
+"""
     uncertaintyparameter(orbit, params)
 
 Return the Minor Planet Center uncertainty parameter of an `orbit`.
