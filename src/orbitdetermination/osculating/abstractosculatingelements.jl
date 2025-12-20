@@ -1,13 +1,13 @@
 """
     AbstractOsculatingElements{T <: Real, U <: Number}
 
-Supertype for the osculating orbital elements interface.
+Supertype for the osculating elements interface.
 
 Every set of osculating elements `x` has a:
 - `gm(x)`: gravitational parameter.
 - `epoch(x)`: reference epoch.
 - `frame(x)`: reference plane, either `:equatorial` or `:ecliptic`.
-- `elements(x)`: set of six osculating orbital elements.
+- `elements(x)`: set of six osculating elements.
 - `covariance(x)`: covariance matrix.
 """
 abstract type AbstractOsculatingElements{T <: Real, U <: Number} end
@@ -54,11 +54,11 @@ function show(io::IO, x::AbstractOsculatingElements)
     units = elementsunits(x)
     print(io,
         "$O{$T, $U} $(conicsection(x)) osculating elements\n",
-        repeat("-", 67), "\n",
+        repeat("-", 70), "\n",
         "Mu: $(gm(x)) au³/day²\n",
         "Epoch: $(epoch(x)) MJD ($(date(x)) TDB)\n",
         "Frame: $(frame(x))\n",
-        repeat("-", 67), "\n",
+        repeat("-", 70), "\n",
         "Variable    Nominal value            Uncertainty              Units\n",
         rpad(names[1], 12), se0[1], sσ0[1], units[1], "\n",
         rpad(names[2], 12), se0[2], sσ0[2], units[2], "\n",

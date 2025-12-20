@@ -280,15 +280,15 @@ function keplerian(orbit::AbstractOrbit{D, T, T},
     mjd0 = t + MJD2000
     # Jet transport initial condition
     q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
+    q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
     # Origin
     x0 = zeros(T, Npar)
     # Keplerian orbital elements
-    elements = cartesian2keplerian(q0[1:6] - params.eph_su(t), mjd0; μ = μ_S,
-                                   frame = :ecliptic)
-    Γ_osc = project(elements, covariance(orbit))
-    osc = KeplerianElements{T, TaylorN{T}}(μ_S, mjd0, :ecliptic, elements, Γ_osc)
+    elements = cartesian2keplerian(q0, mjd0; μ = μ_S)
+    Γ_kep = project(elements, covariance(orbit))
+    kep = KeplerianElements{T, TaylorN{T}}(μ_S, mjd0, :ecliptic, elements, Γ_kep)
 
-    return evaldeltas(osc, x0)
+    return evaldeltas(kep, x0)
 end
 
 """
@@ -312,15 +312,15 @@ function equinoctial(orbit::AbstractOrbit{D, T, T},
     mjd0 = t + MJD2000
     # Jet transport initial condition
     q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
+    q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
     # Origin
     x0 = zeros(T, Npar)
     # Equinoctial orbital elements
-    elements = cartesian2equinoctial(q0[1:6] - params.eph_su(t), mjd0; μ = μ_S,
-                                     frame = :ecliptic)
-    Γ_osc = project(elements, covariance(orbit))
-    osc = EquinoctialElements{T, TaylorN{T}}(μ_S, mjd0, :ecliptic, elements, Γ_osc)
+    elements = cartesian2equinoctial(q0; μ = μ_S)
+    Γ_eqn = project(elements, covariance(orbit))
+    eqn = EquinoctialElements{T, TaylorN{T}}(μ_S, mjd0, :ecliptic, elements, Γ_eqn)
 
-    return evaldeltas(osc, x0)
+    return evaldeltas(eqn, x0)
 end
 
 """
@@ -344,11 +344,11 @@ function attributable(orbit::AbstractOrbit{D, T, T},
     mjd0 = t + MJD2000
     # Jet transport initial condition
     q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
+    q0 = q0[1:6] - params.eph_ea(t)
     # Origin
     x0 = zeros(T, Npar)
     # Attributable elements
-    q0 = q0[1:6] - params.eph_ea(t)
-    elements = cartesian2attributable(q0; frame = :equatorial)
+    elements = cartesian2attributable(q0)
     Γ_attr = project(elements, covariance(orbit))
     attr = AttributableElements{T, TaylorN{T}}(PE.μ[ea], mjd0,
            :equatorial, elements, Γ_attr)
@@ -378,20 +378,20 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
     mjd0 = t + MJD2000
     # Jet transport initial condition
     q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
+    q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
     # Origin
     x0 = zeros(T, Npar)
     # Keplerian orbital elements
-    elements = cartesian2keplerian(q0[1:6] - params.eph_su(t), mjd0; μ = μ_S,
-                                   frame = :ecliptic)
-    Γ_osc = project(elements, covariance(orbit))
-    osc = KeplerianElements{T, TaylorN{T}}(μ_S, mjd0, :ecliptic, elements, Γ_osc)
+    elements = cartesian2keplerian(q0, mjd0; μ = μ_S)
+    Γ_kep = project(elements, covariance(orbit))
+    kep = KeplerianElements{T, TaylorN{T}}(μ_S, mjd0, :ecliptic, elements, Γ_kep)
     # Uncertainty parameter is not defined for hyperbolic orbits
-    ishyperbolic(osc) && throw(ArgumentError("Uncertainty parameter is not defined for \
+    ishyperbolic(kep) && throw(ArgumentError("Uncertainty parameter is not defined for \
         hyperbolic orbits"))
     # Semimajor axis [au], eccentricity and time of perihelion passage [MJD TDB]
-    a = semimajoraxis(osc)
-    e = eccentricity(osc)
-    tp::TaylorN{T} = timeperipass(osc)
+    a = semimajoraxis(kep)
+    e = eccentricity(kep)
+    tp::TaylorN{T} = timeperipass(kep)
     # Gauss gravitational constant [deg]
     k_0 = 180 * k_gauss / π
     # Orbital period [days]

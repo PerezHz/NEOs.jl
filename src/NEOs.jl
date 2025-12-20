@@ -80,7 +80,8 @@ export ODProblem, LeastSquaresCache, Newton, DifferentialCorrections, LevenbergM
        GaussOrbit, MMOVOrbit, LeastSquaresOrbit, AdmissibleRegion
 export gm, frame, elements, iscircular, iselliptic, isparabolic, ishyperbolic, conicsection,
        yarkp2adot, cartesian2keplerian, cartesian2equinoctial, cartesian2attributable,
-       attributable2cartesian, keplerian2equinoctial, equinoctial2keplerian
+       keplerian2cartesian, equinoctial2cartesian, attributable2cartesian,
+       keplerian2equinoctial, equinoctial2keplerian
 export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value

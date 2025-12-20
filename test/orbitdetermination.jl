@@ -29,7 +29,7 @@ function jpl_compatibility_tests(orbit, params, bounds, JPL_CAR, JPL_KEP, JPL_EQ
         # Barycentric cartesian sate vector
         q0, σ0 = orbit(), sigmas(orbit)
         @test mre(q0, JPL_CAR, σ0) < bounds[1]
-        # Osculating orbital elements
+        # Osculating elements
         kep = keplerian(orbit, params)
         eqn = equinoctial(orbit, params)
         @test conicsection(kep) == conicsection(eqn) == :elliptic
@@ -40,12 +40,12 @@ function jpl_compatibility_tests(orbit, params, bounds, JPL_CAR, JPL_KEP, JPL_EQ
         eqn0, σeqn0 = elements(eqn), sigmas(eqn)
         @test mre(kep0, JPL_KEP, σkep0) < bounds[2]
         @test mre(eqn0, JPL_EQN, σeqn0) < bounds[2]
-        q0 = q0 - params.eph_su(t0)
-        JPL_CAR = JPL_CAR - params.eph_su(t0)
-        @test mre(equatorial2ecliptic(q0), kep(), σ0) < bounds[3]
-        @test mre(equatorial2ecliptic(q0), eqn(), σ0) < bounds[3]
-        @test mre(cartesian2keplerian(JPL_CAR, mjd0; μ = μ_S, frame = :ecliptic), JPL_KEP, σkep0) < bounds[4]
-        @test mre(cartesian2equinoctial(JPL_CAR, mjd0; μ = μ_S, frame = :ecliptic), JPL_EQN, σeqn0) < bounds[4]
+        q0 = equatorial2ecliptic(q0 - params.eph_su(t0))
+        JPL_CAR = equatorial2ecliptic(JPL_CAR - params.eph_su(t0))
+        @test mre(q0, kep(), σ0) < bounds[3]
+        @test mre(q0, eqn(), σ0) < bounds[3]
+        @test mre(cartesian2keplerian(JPL_CAR, mjd0; μ = μ_S), JPL_KEP, σkep0) < bounds[4]
+        @test mre(cartesian2equinoctial(JPL_CAR; μ = μ_S), JPL_EQN, σeqn0) < bounds[4]
         @test mre(keplerian2equinoctial(JPL_KEP, mjd0; μ = μ_S), JPL_EQN, σkep0) < bounds[5]
         @test mre(equinoctial2keplerian(JPL_EQN, mjd0; μ = μ_S), JPL_KEP, σeqn0) < bounds[5]
     end
@@ -64,7 +64,7 @@ end
           −0.0162659397882, 4.39154800E−5, −0.000395204013]
     drv = [7.12E−9, 1.94E−9, 5.41E−9, 4.79E−11, 6.72E−11, 1.38E−10]
 
-    # Keplerian orbital elements
+    # Keplerian elements
     e, de = 0.19150886716, 1.60E-9
     q, dq = 0.74585305033, 1.54E−9       # au
     tp, dtp = 2459101.04092537, 1.17E−6  # JDTDB
@@ -85,7 +85,7 @@ end
     @test abs((adot - _adot_) / adot) < 1.6E-4
     @test abs((dadot - _dadot_) / dadot) < 1.4E-1
 
-    # Keplerian orbital elements
+    # Keplerian elements
     kep = KeplerianElements(μ_S, jd0 - J2000 + MJD2000, :ecliptic,
         SVector{6}(a, e, i, ω, Ω, M),
         SMatrix{6, 6}(diagm([da^2, de^2, di^2, dω^2, dΩ^2, dM^2]))

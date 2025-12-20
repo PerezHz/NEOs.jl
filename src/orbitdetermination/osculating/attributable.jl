@@ -60,21 +60,12 @@ function eccentricity(x::AttributableElements)
 end
 
 """
-    cartesian2attributable(x; kwargs...)
+    cartesian2attributable(x)
 
 Convert a cartesian state vector `x` [au, au/day] to
 attributable elements [deg, au, day].
-
-# Keyword arguments
-
-- `frame::Symbol`: reference plane, either `:equatorial` (default) or `:ecliptic`.
 """
-function cartesian2attributable(X::AbstractVector{U};
-                                frame::Symbol = :equatorial) where {U <: Number}
-    # If necessary, rotate state vector from equatorial to ecliptic plane
-    if frame == :ecliptic
-        X = equatorial2ecliptic(X)
-    end
+function cartesian2attributable(X::AbstractVector{U}) where {U <: Number}
     # Cartesian coordinates [au, au/day]
     x, y, z, v_x, v_y, v_z = X
     # Range [au]
