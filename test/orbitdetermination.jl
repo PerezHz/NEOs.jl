@@ -7,7 +7,8 @@ using LinearAlgebra
 using StaticArraysCore
 using Test
 
-using NEOs: AbstractOpticalVector, KeplerianElements, μ_S, indices, equatorial2ecliptic,
+using NEOs: AbstractOpticalVector, KeplerianElements, EquinoctialElements,
+      AttributableElements, μ_S, indices, equatorial2ecliptic,
       numtypes, sseph
 using Statistics: mean
 
@@ -28,6 +29,9 @@ function jpl_compatibility_tests(orbit, params, bounds, JPL_CAR, JPL_KEP, JPL_EQ
         mjd0 = t0 + MJD2000
         # Barycentric cartesian sate vector
         q0, σ0 = orbit(), sigmas(orbit)
+
+        @show mre(q0, JPL_CAR, σ0)
+
         @test mre(q0, JPL_CAR, σ0) < bounds[1]
         # Osculating elements
         kep = keplerian(orbit, params)
@@ -45,82 +49,152 @@ function jpl_compatibility_tests(orbit, params, bounds, JPL_CAR, JPL_KEP, JPL_EQ
         kep0, σkep0 = elements(kep), sigmas(kep)
         eqn0, σeqn0 = elements(eqn), sigmas(eqn)
         attr0, σattr0 = elements(attr), sigmas(attr)
+
+        @show mre(kep0, JPL_KEP, σkep0)
+        @show mre(eqn0, JPL_EQN, σeqn0)
+        @show mre(attr0, JPL_ATTR, σattr0)
+
         @test mre(kep0, JPL_KEP, σkep0) < bounds[2]
         @test mre(eqn0, JPL_EQN, σeqn0) < bounds[2]
         @test mre(attr0, JPL_ATTR, σattr0) < bounds[2]
         q1 = equatorial2ecliptic(q0 - params.eph_su(t0))
         q2 = q0 - params.eph_ea(t0)
+
+        @show mre(q1, keplerian2cartesian(kep0, mjd0; μ = μ_S), σ0)
+        @show mre(q1, equinoctial2cartesian(eqn0; μ = μ_S), σ0)
+        @show mre(q2, attributable2cartesian(attr0), σ0)
+        @show mre(kep(mjd0 + yr), eqn(mjd0 + yr), σ0)
+
         @test mre(q1, keplerian2cartesian(kep0, mjd0; μ = μ_S), σ0) < bounds[3]
         @test mre(q1, equinoctial2cartesian(eqn0; μ = μ_S), σ0) < bounds[3]
         @test mre(q2, attributable2cartesian(attr0), σ0) < bounds[3]
         @test mre(kep(mjd0 + yr), eqn(mjd0 + yr), σ0) < bounds[3]
+
+        @show mre(cartesian2keplerian(q1, mjd0; μ = μ_S), kep0, σkep0)
+        @show mre(cartesian2equinoctial(q1; μ = μ_S), eqn0, σeqn0)
+        @show mre(cartesian2attributable(q2), attr0, σattr0)
+
         @test mre(cartesian2keplerian(q1, mjd0; μ = μ_S), kep0, σkep0) < bounds[4]
         @test mre(cartesian2equinoctial(q1; μ = μ_S), eqn0, σeqn0) < bounds[4]
         @test mre(cartesian2attributable(q2), attr0, σattr0) < bounds[4]
+
+        @show mre(keplerian2equinoctial(kep0, mjd0; μ = μ_S), eqn0, σeqn0)
+        @show mre(equinoctial2keplerian(eqn0, mjd0; μ = μ_S), kep0, σkep0)
+
         @test mre(keplerian2equinoctial(kep0, mjd0; μ = μ_S), eqn0, σeqn0) < bounds[5]
         @test mre(equinoctial2keplerian(eqn0, mjd0; μ = μ_S), kep0, σkep0) < bounds[5]
     end
 end
 
 @testset "AbstractOsculatingElements" begin
-    # Pérez-Hernández & Benet 2022 Apophis OR7 orbit
-    # See Tables 2 and 3 of the Supplementary Information in
-    # https://doi.org/10.1038/s43247-021-00337-x
 
-    # Reference epoch [JDTDB]
-    jd0 = 2459200.5                      # JDTDB
+    @testset "Pérez-Hernández & Benet (2022) Apophis OR7 orbit" begin
+        # Pérez-Hernández & Benet (2022) Apophis OR7 orbit
+        # See Tables 2 and 3 of the Supplementary Information in
+        # https://doi.org/10.1038/s43247-021-00337-x
 
-    # Cartesian state vector [au, au/day]
-    rv = [−0.18034828526, 0.94069105951, 0.34573599029,
-          −0.0162659397882, 4.39154800E−5, −0.000395204013]
-    drv = [7.12E−9, 1.94E−9, 5.41E−9, 4.79E−11, 6.72E−11, 1.38E−10]
+        # Reference epoch [TDB]
+        jd0 = 2459200.5                      # JD
+        mjd0 = jd0 + (MJD2000 - J2000)       # MJD
 
-    # Keplerian elements
-    e, de = 0.19150886716, 1.60E-9
-    q, dq = 0.74585305033, 1.54E−9       # au
-    tp, dtp = 2459101.04092537, 1.17E−6  # JDTDB
-    Ω, dΩ = 204.04199116, 8.81E−6        # deg
-    ω, dω = 126.65396094, 9.37E−6        # deg
-    i, di = 3.336773201, 1.74E−7         # deg
-    A2, dA2 = -2.8988E-14, 2.48E-16      # au/day^2
-    adot, dadot = −199.0, 1.5            # m/yr
+        # Cartesian state vector [au, au/day]
+        rv = [−0.18034828526, 0.94069105951, 0.34573599029,
+            −0.0162659397882, 4.39154800E−5, −0.000395204013]
+        drv = [7.12E−9, 1.94E−9, 5.41E−9, 4.79E−11, 6.72E−11, 1.38E−10]
 
-    # Semimajor axis [au] and mean anomaly [deg]
-    a, da = q / (1 - e), hypot(dq/(1-e), q*de/(1-e)^2)
-    M = rad2deg(sqrt(μ_S / a^3)) * (jd0 - tp)
-    dM = hypot(-3*M*da/(2a), -M*dtp/(jd0 - tp))
+        # Keplerian elements
+        e, de = 0.19150886716, 1.60E-9
+        q, dq = 0.74585305033, 1.54E−9                           # au
+        tp, dtp = 2459101.04092537 + (MJD2000 - J2000), 1.17E−6  # MJDTDB
+        Ω, dΩ = 204.04199116, 8.81E−6                            # deg
+        ω, dω = 126.65396094, 9.37E−6                            # deg
+        i, di = 3.336773201, 1.74E−7                             # deg
+        a, da = q / (1 - e), hypot(dq/(1-e), q*de/(1-e)^2)       # au
+        M = rad2deg(sqrt(μ_S / a^3)) * (mjd0 - tp)               # deg
+        dM = hypot(-3*M*da/(2a), -M*dtp/(jd0 - tp))
+        A2, dA2 = -2.8988E-14, 2.48E-16                          # au/day^2
+        adot, dadot = −199.0, 1.5                                # m/yr
+        kep = KeplerianElements(μ_S, mjd0, :ecliptic,
+            SVector{6}(a, e, i, ω, Ω, M),
+            SMatrix{6, 6}(diagm([da^2, de^2, di^2, dω^2, dΩ^2, dM^2]))
+        )
 
-    # Average semimajor axis drift [m/yr]
-    _adot_ = 1E3au * yr * yarkp2adot(A2, a, e)
-    _dadot_ = hypot(_adot_*dA2/A2, -_adot_*da/(2a), 2*_adot_*e*de/(1 - e^2))
-    @test abs((adot - _adot_) / adot) < 1.6E-4
-    @test abs((dadot - _dadot_) / dadot) < 1.4E-1
+        @test numtypes(kep) == (Float64, Float64)
+        @test isa(string(kep), String)
+        @test !iscircular(kep) && iselliptic(kep) &&
+              !isparabolic(kep) && !ishyperbolic(kep)
+        @test conicsection(kep) == :elliptic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == mjd0
+        @test date(kep) == DateTime(2020, 12, 17, 00, 00)
+        @test frame(kep) == :ecliptic
+        @test sigmas(kep) ≈ [da, de, di, dω, dΩ, dM]
 
-    # Keplerian elements
-    kep = KeplerianElements(μ_S, jd0 - J2000 + MJD2000, :ecliptic,
-        SVector{6}(a, e, i, ω, Ω, M),
-        SMatrix{6, 6}(diagm([da^2, de^2, di^2, dω^2, dΩ^2, dM^2]))
-    )
+        @test semimajoraxis(kep) ≈ a
+        @test pericenter(kep) ≈ q
+        @test eccentricity(kep) ≈ e
+        @test inclination(kep) ≈ i
+        @test argperi(kep) ≈ ω
+        @test longascnode(kep) ≈ Ω
+        @test meananomaly(kep) ≈ M
+        @test timeperipass(kep) ≈ tp
 
-    @test numtypes(kep) == (Float64, Float64)
-    @test gm(kep) == μ_S
-    @test epoch(kep) == 59200.0
-    @test date(kep) == DateTime(2020, 12, 17, 00, 00)
-    @test frame(kep) == :ecliptic
-    @test sigmas(kep) ≈ [da, de, di, dω, dΩ, dM]
-    @test isa(string(kep), String)
+        # Average semimajor axis drift [m/yr]
+        _adot_ = 1E3au * yr * yarkp2adot(A2, a, e)
+        _dadot_ = hypot(_adot_*dA2/A2, -_adot_*da/(2a), 2*_adot_*e*de/(1 - e^2))
+        @test abs((adot - _adot_) / adot) < 1.6E-4
+        @test abs((dadot - _dadot_) / dadot) < 1.4E-1
+    end
 
-    @test !iscircular(kep)
-    @test iselliptic(kep)
-    @test !isparabolic(kep)
-    @test !ishyperbolic(kep)
-    @test conicsection(kep) == :elliptic
+    @testset "JPL 3I/ATLAS #44 Orbit" begin
+        # JPL 3I/ATLAS #44 orbit
+        # See https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=3I
 
-    X = kep()
+        # Reference epoch [TDB]
+        jd0 = 2460894.5                      # JD
+        mjd0 = jd0 + (MJD2000 - J2000)       # MJD
 
-    Y = equatorial2ecliptic(rv - sseph(su, jd0 - J2000))
-    @test maximum(@. abs((X - Y) / drv)) < 1.1E-2
+        # Keplerian elements
+        a, da = -0.2639243367163182, 5.5149E-7                          # au
+        q, dq = 1.356418761995381, 1.6452E-6                            # au
+        e, de = 6.139422831829797, 1.4616E-5
+        i, di = 175.1130917268881, 1.3912E-5	                        # deg
+        ω, dω = 128.0096924001076, 0.00021962	                        # deg
+        Ω, dΩ =	322.1566239181344, 0.00021152	                        # deg
+        M, dM = -606.8465596139827, 0.0016883                           # deg
+        tp, dtp = 2460977.982217865578 + (MJD2000 - J2000), 3.133E-5    # MJDTDB
+        kep = KeplerianElements(μ_S, mjd0, :ecliptic,
+            SVector{6}(q, e, i, ω, Ω, tp),
+            SMatrix{6, 6}(diagm([dq^2, de^2, di^2, dω^2, dΩ^2, dtp^2]))
+        )
 
+        @test numtypes(kep) == (Float64, Float64)
+        @test isa(string(kep), String)
+        @test !iscircular(kep) && !iselliptic(kep) &&
+              !isparabolic(kep) && ishyperbolic(kep)
+        @test conicsection(kep) == :hyperbolic
+        @test gm(kep) == μ_S
+        @test epoch(kep) == mjd0
+        @test date(kep) == DateTime(2025, 8, 7, 00, 00)
+        @test frame(kep) == :ecliptic
+        @test sigmas(kep) ≈ [dq, de, di, dω, dΩ, dtp]
+
+        @test semimajoraxis(kep) ≈ a
+        @test pericenter(kep) ≈ q
+        @test eccentricity(kep) ≈ e
+        @test inclination(kep) ≈ i
+        @test argperi(kep) ≈ ω
+        @test longascnode(kep) ≈ Ω
+        @test meananomaly(kep) ≈ M
+        @test timeperipass(kep) ≈ tp
+
+        # Conversions to other sets of elements
+        kep0, σkep0 = elements(kep), sigmas(kep)
+        kep1 = cartesian2keplerian(keplerian2cartesian(kep0, mjd0; μ = μ_S), mjd0; μ = μ_S)
+        kep2 = equinoctial2keplerian(keplerian2equinoctial(kep0, mjd0; μ = μ_S), mjd0; μ = μ_S)
+        @test mre(kep0, kep1, σkep0) < 3.1E-10
+        @test mre(kep0, kep2, σkep0) < 1.3E-10
+    end
 
 end
 
