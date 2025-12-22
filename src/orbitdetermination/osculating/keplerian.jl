@@ -84,7 +84,7 @@ end
 function timeperipass(x::KeplerianElements)
     ishyperbolic(x) && return x.elements[end]
     # Mean motion [deg] and mean anomaly [deg]
-    n, M = semimajoraxis(x), meananomaly(x)
+    n, M = meanmotion(x), meananomaly(x)
     # Time of pericenter passage [MJD TDB]
     tp = epoch(x) - M / n
     return tp
@@ -101,14 +101,14 @@ for V in (:(true), :(false))
 
         function eccentricanomaly(e::Number, M::Number, ::Val{$V})
             # Curtis (2020) initial estimate
-            M = mod2pi(M)
             if $V
+                M = mod2pi(M)
                 E0 = M < π ? M + e/2 : M - e/2
             else
                 E0 = M
             end
             # Successive approximations via Newtons' method
-            for _ in 0:10
+            for _ in 0:20
                 # TODO: implement modified Newton's method for Kepler's equation (Murray-Dermott)
                 E1 = E0 - (keplerequation(e, E0, Val($V)) - M) / keplerderivative(e, E0, Val($V))
                 E0 = E1

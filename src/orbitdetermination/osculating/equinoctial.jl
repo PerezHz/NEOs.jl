@@ -46,7 +46,7 @@ function eccentriclongitude(h::Number, k::Number, λ::Number)
     # Initial estimate
     F0 = λ
     # Successive approximations via Newtons' method
-    for _ in 0:10
+    for _ in 0:20
         F1 = F0 - (keplerequation(h, k, F0) - λ) / keplerderivative(h, k, F0)
         F0 = F1
     end
@@ -124,7 +124,7 @@ function equinoctial2keplerian(x::AbstractVector{U}, t::T;
     # Argument of periapsis [rad]
     ω = mod2pi(ζ - Ω)
     # Mean anomaly [rad]
-    M = λ - ζ
+    M = λ - (ω + Ω)
     if 0 < e < 1
         M = mod2pi(M)
     end
