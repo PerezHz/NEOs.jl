@@ -75,6 +75,6 @@ function AdmissibleRegion(date::DateTime, α::T, δ::T, v_α::T, v_δ::T,
     Fs[2, :] .= [ρ_min, v_ρ_max]
     Fs[3, :] .= [ρ_max, v_ρ_mid]
 
-    return AdmissibleRegion{T}(date, ra, dec, vra, vdec, H_max, a_max,
+    return AdmissibleRegion{T}(date, α, δ, v_α, v_δ, H_max, a_max,
         ρ, ρ_α, ρ_δ, q, coeffs, ρ_domain, v_ρ_domain, Fs, observatory)
 end

@@ -159,6 +159,45 @@ function addobservations!(od::MixedODProblem, oidxs::Vector{Int}, ridxs::Vector{
     return oidxs, ridxs, fit
 end
 
+function updateorbit(orbit::AbstractOrbit{D, T, TaylorN{T}},
+                     lsmethods::Vector{AbstractLeastSquaresMethod{T}},
+                     params::Parameters{T}) where {D, T <: Real}
+    # Unpack parameters
+    @unpack jtlsproject, H_max = params
+    # Projection onto the admissible region
+    if jtlsproject
+        # Reference epoch
+        t0 = epoch(orbit)
+        # Lest squares fit
+        @unpack fit = orbit
+        # Barycentric initial condition
+        q0 = orbit()
+        # Geocentric attributable elements
+        attr = cartesian2attributable(q0(fit.x) - params.eph_ea(t0))
+        α, δ, v_α, v_δ, ρ, v_ρ = attr
+        h = H_max + 5 * log10(R_EA)
+        # Admissible region
+        A = AdmissibleRegion(days2dtutc(t0), α, δ, v_α, v_δ, h,
+                             search_observatory_code("500"), params)
+        # Projection onto the admissible region
+        if !((ρ, v_ρ) in A)
+            ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
+            # Barycentric initial condition
+            q1 = attributable2cartesian(SVector{6, T}(α, δ, v_α, v_δ, ρ, v_ρ)) +
+                                        params.eph_ea(t0)
+            # New deltas and covariance matrix
+            @. fit.x = (q1 - cte(q0)) / $diag(orbit.jacobian)
+            for method in lsmethods
+                if typeof(method) == fit.routine
+                    fit.Γ .= inv(normalmatrix(method, fit.x))
+                end
+            end
+        end
+    end
+    # Evaluate deltas
+    return evalfit(orbit)
+end
+
 """
     jtls(od, orbit, params [, mode::Bool])
 
@@ -237,14 +276,14 @@ function jtls(
             outlier_rejection!(view(res, oidxs), fit.x, fit.Γ, orcache;
                 χ2_rec, χ2_rej, fudge, max_per)
         end
-        # Update solution
-        Qs[i] = nrms(res, fit)
-        orbits[i] = evalfit(LeastSquaresOrbit(
+        # Update orbit
+        orbits[i] = updateorbit(LeastSquaresOrbit(
             od.dynamics, variables, od.optical[oidxs], trksin, nothing, bwd, fwd,
             res[oidxs], nothing, fit, jacobian, q00s[variables, 1:i], Qs[1:i]
-        ))
+        ), lsmethods, params)
+        Qs[i] = orbits[i].Qs[end] = nrms(res, orbits[i].fit)
         if outrej
-            outs[i] = notout(res)
+            outs[i] = notout(orbits[i])
         end
         # Convergence conditions
         if i > 1
@@ -254,7 +293,7 @@ function jtls(
         end
         i > 2 && issorted(view(Qs, i-2:i)) && break
         # Update initial condition
-        q00s[:, i+1] .= q0(fit.x)
+        q00s[:, i+1] .= q0(orbits[i].fit.x)
     end
     # Find complete solutions
     mask = findall(o -> nobs(o) == nobs(od), orbits)
@@ -337,14 +376,14 @@ function jtls(
             outlier_rejection!(view(res[1], oidxs), fit.x, fit.Γ, orcache;
                 χ2_rec, χ2_rej, fudge, max_per)
         end
-        # Update solution
-        Qs[i] = nrms(res, fit)
-        orbits[i] = evalfit(LeastSquaresOrbit(
+        # Update orbit
+        orbits[i] = updateorbit(LeastSquaresOrbit(
             od.dynamics, variables, od.optical[oidxs], trksin, od.radar[ridxs], bwd, fwd,
             res[1][oidxs], res[2][ridxs], fit, jacobian, q00s[variables, 1:i], Qs[1:i]
-        ))
+        ), lsmethods, params)
+        Qs[i] = orbits[i].Qs[end] = nrms(res, orbits[i].fit)
         if outrej
-            outs[i] = notout(res[1]) + notout(res[2])
+            outs[i] = notout(orbits[i])
         end
         # Convergence conditions
         if i > 1
@@ -354,7 +393,7 @@ function jtls(
         end
         i > 2 && issorted(view(Qs, i-2:i)) && break
         # Update initial condition
-        q00s[:, i+1] .= q0(fit.x)
+        q00s[:, i+1] .= q0(orbits[i].fit.x)
     end
     # Find complete solutions
     mask = findall(o -> nobs(o) == nobs(od), orbits)
