@@ -174,17 +174,19 @@ function updateorbit(orbit::AbstractOrbit{D, T, TaylorN{T}},
         q0 = orbit()
         # Geocentric attributable elements
         attr = cartesian2attributable(q0(fit.x) - params.eph_ea(t0))
-        α, δ, v_α, v_δ, ρ, v_ρ = attr
+        ρ, v_ρ = attr[5], attr[6]
         h = H_max + 5 * log10(R_EA)
         # Admissible region
-        A = AdmissibleRegion(days2dtutc(t0), α, δ, v_α, v_δ, h,
-                             search_observatory_code("500"), params)
+        A = AdmissibleRegion(
+            days2dtutc(t0), deg2rad(attr[1]), deg2rad(attr[2]), deg2rad(attr[3]),
+            deg2rad(attr[4]), h, search_observatory_code("500"), params
+        )
         # Projection onto the admissible region
         if !((ρ, v_ρ) in A)
             ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
             # Barycentric initial condition
-            q1 = attributable2cartesian(SVector{6, T}(α, δ, v_α, v_δ, ρ, v_ρ)) +
-                                        params.eph_ea(t0)
+            q1 = attributable2cartesian(SVector{6, T}(attr[1], attr[2], attr[3],
+                 attr[4], ρ, v_ρ)) + params.eph_ea(t0)
             # New deltas and covariance matrix
             @. fit.x = (q1 - cte(q0)) / $diag(orbit.jacobian)
             for method in lsmethods
