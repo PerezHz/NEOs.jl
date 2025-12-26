@@ -34,19 +34,22 @@ end
 Return the admissible region associated to an optical tracklet. For a list of
 parameters, see the `Minimization over the MOV` section of [`Parameters`](@ref).
 """
-function AdmissibleRegion(tracklet::OpticalTracklet{T},
+AdmissibleRegion(x::OpticalTracklet, params::Parameters) = AdmissibleRegion(
+    date(x), ra(x), dec(x), vra(x), vdec(x), mag(x), observatory(x), params)
+
+function AdmissibleRegion(date::DateTime, α::T, δ::T, v_α::T, v_δ::T,
+                          mag::T, observatory::ObservatoryMPC{T},
                           params::Parameters{T}) where {T <: Real}
-    # Unpack
-    @unpack observatory, date, ra, dec, vra, vdec, mag = tracklet
+    # Unpack parameters
     @unpack eph_ea, eph_su, H_max, a_max = params
     # Topocentric unit vector and partials
-    ρ, ρ_α, ρ_δ = topounitpdv(ra, dec)
+    ρ, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Time of observation [days (et seconds) since J2000]
     t_days, t_et = dtutc2days(date), dtutc2et(date)
     # Heliocentric position of the observer
     q = eph_ea(t_days) + kmsec2auday(obsposvelECI(observatory, t_et)) - eph_su(t_days)
     # Admissible region coefficients
-    coeffs = arcoeffs(ra, dec, vra, vdec, ρ, ρ_α, ρ_δ, q)
+    coeffs = arcoeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
     # Maximum range (heliocentric energy constraint)
     ρ_max = _helmaxrange(coeffs, a_max)
     iszero(ρ_max) && return zero(AdmissibleRegion{T})

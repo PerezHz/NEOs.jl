@@ -48,6 +48,8 @@ nongravitational accelerations model:
 - `adammode::Bool`: whether to perform ADAM iterations with all the observations
     (default: `true`).
 - `adamQtol::T`: target function relative tolerance (default: `0.001`).
+- `mmovproject::Bool`: whether to project the orbits onto the admissible region
+    (default: `true`).
 - `tsaorder::Int`: order of the jet transport perturbation (default: `6`).
 
 # Least Squares
@@ -58,6 +60,8 @@ nongravitational accelerations model:
 - `significance::T`: chi-square significance level (default: `0.99`).
 - `jtlsmask::Bool`: whether to use `isjtlsfit` to skip bad-conditioned
     preliminary orbits in `jtls` (default: `true`).
+- `jtlsproject::Bool`: whether to project the orbits onto the admissible region
+    (default: `false`).
 
 # Outlier Rejection
 
@@ -102,6 +106,7 @@ nongravitational accelerations model:
     adamiter::Int = 200
     adammode::Bool = true
     adamQtol::T = 0.001
+    mmovproject::Bool = true
     tsaorder::Int = 6
     # Least Squares
     lsiter::Int = 5
@@ -109,6 +114,7 @@ nongravitational accelerations model:
     jtlsorder::Int = 6
     significance::T = 0.99
     jtlsmask::Bool = true
+    jtlsproject::Bool = false
     # Outlier Rejection
     outrej::Bool = false
     χ2_rec::T = 7.0
