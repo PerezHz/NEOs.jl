@@ -197,7 +197,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 22, 2025
+        # Values by Dec 27, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -338,7 +338,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 22, 2025
+        # Values by Dec 27, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -421,7 +421,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by Dec 22, 2025
+        # Values by Dec 27, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -486,7 +486,8 @@ end
     @testset "Admissible region" begin
         using NEOs: AdmissibleRegion, arenergydis, rangerate, rangerates,
             argoldensearch, arboundary, _helmaxrange, R_SI, k_gauss, μ_ES,
-            topo2bary, bary2topo
+            boundary_projection, topo2bary, bary2topo, arW, ardW, ard2W,
+            arS, ardS, ard2S, arG
 
         # Fetch optical astrometry
         optical = fetch_optical_mpc80("2024 BX1", MPC)
@@ -498,7 +499,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by Dec 22, 2025
+        # Values by Dec 27, 2025
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -508,6 +509,16 @@ end
         # Coefficients
         @test length(A.coeffs) == 6
         @test A.coeffs[3] == A.vra^2 * cos(A.dec)^2 + A.vdec^2  # proper motion squared
+        # Boundary functions
+        xmin, xmax = A.ρ_domain
+        @test arW(A, xmin) * arW(A, xmax) > 0
+        @test ardW(A, xmin) * ardW(A, xmax) < 0
+        @test ard2W(A, xmin) * ard2W(A, xmax) > 0
+        @test arS(A, xmin) * arS(A, xmax) > 0
+        @test ardS(A, xmin) * ardS(A, xmax) > 0
+        @test ard2S(A, xmin) * ard2S(A, xmax) > 0
+        @test ard2S(A, xmin) * ard2S(A, xmax) > 0
+        @test arG(A, xmin) * arG(A, xmax) < 0
         # Energy discriminant
         @test arenergydis(A, A.ρ_domain[1], :outer) > 0
         @test arenergydis(A, A.ρ_domain[1], :inner) > 0
@@ -590,6 +601,30 @@ end
         @test all( abs.(C) ./ σ_C .> 0.02)
         χ2 = C' * inv(Γ_C) * C
         @test χ2 > 2.7
+        # Boundary projection
+        xmin, xmax = A.ρ_domain
+        ymin, ymax = A.v_ρ_domain
+        xmid, ymid = (xmin + xmax) / 2, (ymin + ymax) / 2
+        function distance(A, x, ρ, v_ρ)
+            m = v_ρ > ymid ? :max : :min
+            y = rangerate(A, x, m)
+            return hypot(x - ρ, y - v_ρ)
+        end
+        ρs = [10^(-3.5), xmid, 1.0]
+        v_ρs = [-0.02, ymid, 0.03]
+        for (ρ, v_ρ) in Iterators.product(ρs, v_ρs)
+            x, y = boundary_projection(A, ρ, v_ρ)
+            if (ρ, v_ρ) in A
+                @test x == ρ && y == v_ρ
+            elseif ρ ≤ xmin
+                @test x == xmin && ymin ≤ y ≤ ymax
+            elseif ρ ≥ xmax
+                @test x == xmax && y == ymid
+            else
+                @test distance(A, x, ρ, v_ρ) < distance(A, x - 1E-4, ρ, v_ρ)
+                @test distance(A, x, ρ, v_ρ) < distance(A, x + 1E-4, ρ, v_ρ)
+            end
+        end
     end
 
     @testset "Too Short Arc" begin
@@ -612,7 +647,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 22, 2025
+        # Values by Dec 27, 2025
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -698,7 +733,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 22, 2025
+        # Values by Dec 27, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -844,7 +879,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 22, 2025
+        # Values by Dec 27, 2025
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -930,7 +965,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 22, 2025
+        # Values by Dec 27, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -1101,7 +1136,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Dec 22, 2025
+        # Values by Dec 27, 2025
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -1199,7 +1234,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by Dec 22, 2025
+        # Values by Dec 27, 2025
 
         # Check type
         @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
