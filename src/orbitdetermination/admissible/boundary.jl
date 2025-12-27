@@ -4,10 +4,22 @@
 arW(A::AdmissibleRegion, ρ::Number) = arW(A.coeffs, ρ)
 arW(coeffs::AbstractVector, ρ::Number) = coeffs[3] * ρ^2 + coeffs[4] * ρ + coeffs[5]
 
+ardW(A::AdmissibleRegion, ρ::Number) = ardW(A.coeffs, ρ)
+ardW(coeffs::AbstractVector, ρ::Number) = 2 * coeffs[3] * ρ + coeffs[4]
+
+ard2W(A::AdmissibleRegion, ρ::Number) = ard2W(A.coeffs, ρ)
+ard2W(coeffs::AbstractVector, ρ::Number) = 2 * coeffs[3]
+
 # S function of an [`AdmissibleRegion`](@ref).
 # See equation (8.9) of https://doi.org/10.1017/CBO9781139175371
 arS(A::AdmissibleRegion, ρ::Number) = arS(A.coeffs, ρ)
 arS(coeffs::AbstractVector, ρ::Number) = ρ^2 + coeffs[6] * ρ + coeffs[1]
+
+ardS(A::AdmissibleRegion, ρ::Number) = ardS(A.coeffs, ρ)
+ardS(coeffs::AbstractVector, ρ::Number) = 2 * ρ + coeffs[6]
+
+ard2S(A::AdmissibleRegion, ρ::Number) = ard2S(A.coeffs, ρ)
+ard2S(coeffs::AbstractVector, ρ::Number) = 2
 
 # Auxiliary function to compute the root of G(::AdmissibleRegion)
 G⁻¹0(A::AdmissibleRegion) = G⁻¹0(A.coeffs)
@@ -47,6 +59,19 @@ function _arhelenergycoeffs(coeffs::Vector{T}, a_max::T, ρ::Number) where {T <:
     return a, b, c
 end
 
+function _arhelenergycoeffs_derivatives(coeffs::Vector{T}, a_max::T,
+                                        ρ::Number) where {T <: Real}
+    a = one(T)
+    b = coeffs[2]
+    W, dW, d2W = arW(coeffs, ρ), ardW(coeffs, ρ), ard2W(coeffs, ρ)
+    S, dS, d2S = arS(coeffs, ρ), ardS(coeffs, ρ), ard2S(coeffs, ρ)
+    sqrtS = sqrt(S)
+    c = W + k_gauss^2 * (1/a_max - 2/sqrtS)
+    dc = dW + k_gauss^2 * dS / sqrtS^3
+    d2c = d2W + k_gauss^2 * (d2S / sqrtS^3 - 3 * dS^2 / (2 * sqrtS^5))
+    return a, b, c, dc, d2c
+end
+
 function _argeoenergycoeffs(coeffs::Vector{T}, ρ::Number) where {T <: Real}
     a = one(T)
     b = zero(T)
@@ -60,6 +85,8 @@ end
 # See between equations (8.9)-(8.10) and (8.12)-(8.13)
 # of https://doi.org/10.1017/CBO9781139175371
 discriminant(a::Number, b::Number, c::Number) = b^2 - 4 * a * c
+discriminant_derivatives(a::Number, b::Number, c::Number, dc::Number, d2c::Number) =
+    discriminant(a, b, c), -4 * a * dc, -4 * a * d2c
 
 arenergydis(A::AdmissibleRegion, ρ::Number, boundary::Symbol = :outer) =
     discriminant(arenergycoeffs(A, ρ, boundary)...)
@@ -137,6 +164,29 @@ function _helrangerate(coeffs::Vector{T}, a_max::T, ρ::T, m::Symbol) where {T <
     else
         throw(ArgumentError("Argument `m` must be either `:min` or `:max`"))
     end
+end
+
+function _helrangerate_derivatives(coeffs::Vector{T}, a_max::T, ρ::T,
+                                   m::Symbol) where {T <: Real}
+    # Choose between min or max sign
+    if m == :min
+        sgn = -1
+    elseif m == :max
+        sgn = +1
+    else
+        throw(ArgumentError("Argument `m` must be either `:min` or `:max`"))
+    end
+    # Outer boundary coefficients and its derivatives
+    a, b, c, dc, d2c = _arhelenergycoeffs_derivatives(coeffs, a_max, ρ)
+    # Discriminant and its derivatives
+    dis, ddis, d2dis = discriminant_derivatives(a, b, c, dc, d2c)
+    sqrtdis = sqrt(dis)
+    # Range rate and its derivatives
+    v_ρ = (-b + sgn * sqrtdis) / (2a)
+    C = sign / (4a)
+    dv_ρ = C * ddis / sqrtdis
+    d2v_ρ = C * (d2dis / sqrtdis - ddis^2 / (2sqrtdis^3))
+    return v_ρ, dv_ρ, d2v_ρ
 end
 
 function _georangerate(coeffs::Vector{T}, ρ::T, m::Symbol) where {T <: Real}
