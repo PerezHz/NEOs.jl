@@ -37,6 +37,8 @@ const AbstractTrackletVector{T} = AbstractVector{OpticalTracklet{T}} where {T}
 
 # AbstractAstrometryObservation interface
 date(x::OpticalTracklet) = x.date
+vra(x::OpticalTracklet) = x.vra
+vdec(x::OpticalTracklet) = x.vdec
 observatory(x::OpticalTracklet) = x.observatory
 catalogue(::OpticalTracklet) = unknowncat()
 band(x::OpticalTracklet) = ' '

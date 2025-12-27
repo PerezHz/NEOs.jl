@@ -26,7 +26,7 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
               μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2) where {D,
               T <: Real, O <: AbstractOpticalVector{T}}
     # Unpack
-    @unpack adamiter, adammode, adamQtol, significance = params
+    @unpack adamiter, adammode, adamQtol, mmovproject, significance = params
     @unpack dynamics = od
     variables = collect(1:6)
     # Initial time of integration [julian days TDB]
@@ -127,7 +127,9 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
         # Update attributable elements
         aes[:, t+1] .= AE(x1)
         # Projection
-        aes[5:6, t+1] .= boundary_projection(A, aes[5, t+1], aes[6, t+1])
+        if mmovproject
+            aes[5:6, t+1] .= boundary_projection(A, aes[5, t+1], aes[6, t+1])
+        end
     end
     # Find orbit with smallest Q
     _, t = findmin(nms, orbits)
@@ -158,7 +160,9 @@ function mmov(od::ODProblem, orbit::AbstractOrbit, i::Int, params::Parameters;
     # Range and range rate
     ρ, v_ρ = bary2topo(A, q0)
     # Boundary projection
-    ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
+    if params.mmovproject
+        ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
+    end
     # Minimization over the MOV
     orbit1 = mmov(od, A, ρ, v_ρ, params; i, scale)
 
