@@ -183,7 +183,7 @@ function _helrangerate_derivatives(coeffs::Vector{T}, a_max::T, ρ::T,
     sqrtdis = sqrt(dis)
     # Range rate and its derivatives
     v_ρ = (-b + sgn * sqrtdis) / (2a)
-    C = sign / (4a)
+    C = sgn / (4a)
     dv_ρ = C * ddis / sqrtdis
     d2v_ρ = C * (d2dis / sqrtdis - ddis^2 / (2sqrtdis^3))
     return v_ρ, dv_ρ, d2v_ρ

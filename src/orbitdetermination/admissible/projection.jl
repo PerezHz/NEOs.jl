@@ -3,23 +3,22 @@ function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <:
     # Outer boundary limits
     xmin, xmax = A.ρ_domain
     ymin, ymax = A.v_ρ_domain
+    ymid = (ymin + ymax) / 2
     # Projection onto the outer boundary
     if ρ ≤ xmin
-        if v_ρ > ymax
-            return xmin, ymax
-        elseif ymin ≤ v_ρ ≤ ymax
-            return xmin, v_ρ
-        else # v_ρ < ymin
-            return xmin, ymin
-        end
-    else # ρ > xmin
-        ymid = (ymin + ymax) / 2
+        return xmin, clamp(v_ρ, ymin, ymax)
+    elseif ρ ≥ xmax
+        return xmax, ymid
+    else # xmin < ρ < xmax
+        ymin ≤ v_ρ ≤ ymax && return ρ, v_ρ
         m = v_ρ > ymid ? :max : :min
         x = clamp(ρ, xmin, xmax)
         y, dy, d2y = _helrangerate_derivatives(A.coeffs, A.a_max, x, m)
-        for _ in 1:20
-            x = x - (x - ρ + (y - v_ρ) * dy) / (1 + (y - v_ρ) * d2y + dy^2)
+        for _ in 1:25
+            dx = (x - ρ + (y - v_ρ) * dy) / (1 + (y - v_ρ) * d2y + dy^2)
+            x = clamp(x - dx, xmin, xmax)
             y, dy, d2y = _helrangerate_derivatives(A.coeffs, A.a_max, x, m)
+            abs(dx) < eps(T) && break
         end
         return x, y
     end
