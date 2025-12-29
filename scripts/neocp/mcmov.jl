@@ -46,6 +46,9 @@ function parse_commandline()
         "--scout"
             help = "Fetch JPL Scout data and save it into a .csv file"
             action = :store_true
+        "--neoscan"
+            help = "Fetch NEODyS NEOScan data and save it into a .mov_sample file"
+            action = :store_true
     end
 
     return parse_args(s)
@@ -68,6 +71,36 @@ end
           NOpp   Arc    r.m.s.       Orbit ID"
 
     computationtime(x::DateTime, y::DateTime) = (y - x).value / 60_000
+
+    function fetch_scout_orbits(input::AbstractString)
+        uri = HTTP.URI(
+            scheme = "https",
+            host   = "ssd-api.jpl.nasa.gov",
+            path   = "/scout.api",
+            query  = "tdes=$(input)&orbits=1"
+        )
+        response_scout = HTTP.get(string(uri) #=, require_ssl_verification = false=#)
+        orbits_data = JSON3.read(response_scout.body)["orbits"]["data"]
+        rows = [collect(row) for row in orbits_data]
+        orbits_fields = JSON3.read(response_scout.body)["orbits"]["fields"]
+        mat = vcat([permutedims(r) for r in rows]...)  # or hcat(rows...)' as another option
+        df = DataFrame(mat, orbits_fields)
+        CSV.write("$(input).csv", df)
+        println("• Fetched Scout data; saved to: $(input).csv")
+        return nothing
+    end
+
+    function fetch_neoscan_orbits(input::AbstractString)
+        uri = HTTP.URI(
+            scheme = "https",
+            host   = "newton.spacedys.com",
+            path   = "/neodys/NEOScan/scan_neocp/$input/$input.mov_sample"
+        )
+        response_neoscan = HTTP.get(string(uri) #=, require_ssl_verification = false=#)
+        write("$input.mov_sample", response_neoscan.body)
+        println("• Fetched NEOScan data; saved to: $(input).mov_sample")
+        return nothing
+    end
 
     function fetch_neodys_weights(desig::AbstractString)
         url = "https://newton.spacedys.com/neodys/NEOScan/scan_neocp/$desig/$desig.rwo"
@@ -284,23 +317,14 @@ function main()
     fetch_scout = parsed_args["scout"]
     println("• Fetch Scout data?: ", fetch_scout)
 
+    # Fetch NEODyS NEOScan data?
+    fetch_neoscan = parsed_args["neoscan"]
+    println("• Fetch NEOScan data?: ", fetch_neoscan)
+
     # Get JPL Scout data for same object, if requested by user
-    if fetch_scout
-        uri = HTTP.URI(
-            scheme = "https",
-            host   = "ssd-api.jpl.nasa.gov",
-            path   = "/scout.api",
-            query  = "tdes=$(input)&orbits=1"
-        )
-        response_scout = HTTP.get(string(uri) #=, require_ssl_verification = false=#)
-        orbits_data = JSON3.read(response_scout.body)["orbits"]["data"]
-        rows = [collect(row) for row in orbits_data]
-        orbits_fields = JSON3.read(response_scout.body)["orbits"]["fields"]
-        mat = vcat([permutedims(r) for r in rows]...)  # or hcat(rows...)' as another option
-        df = DataFrame(mat, orbits_fields)
-        CSV.write("$(input).csv", df)
-        println("• Fetched Scout data; saved to: $(input).csv")
-    end
+    fetch_scout && fetch_scout_orbits(input)
+    # Get NEODyS NEOScan data for same object, if requested by user
+    fetch_neoscan && fetch_neoscan_orbits(input)
 
     # Fetch optical astrometry
     optical_all = fetch_optical_ades(input, NEOCP)
