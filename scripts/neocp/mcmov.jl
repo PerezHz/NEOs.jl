@@ -43,6 +43,10 @@ function parse_commandline()
             help = "χ value threshold"
             arg_type = Float64
             default = 5.0
+        "--nominal"
+            help = "Whether to compute a nominal orbit"
+            arg_type = Bool
+            default = true
         "--scout"
             help = "Fetch JPL Scout data and save it into a .csv file"
             action = :store_true
@@ -305,13 +309,13 @@ function main()
     Nx::Int, Ny::Int = parsed_args["Nx"], parsed_args["Ny"]
     println("• Number of points in x (y): ", Nx, " (", Ny, ")")
 
-    # Initial time
-    initial_time = now()
-    println("• Run started at ", initial_time)
-
     # χ value threshold
     χ_max::Float64 = parsed_args["maxchi"]
     println("• χ threshold: ", χ_max)
+
+    # Compute a nominal orbit?
+    compute_nominal = parsed_args["nominal"]
+    println("• Compute nominal orbit?: ", compute_nominal)
 
     # Fetching JPl Scout data?
     fetch_scout = parsed_args["scout"]
@@ -320,6 +324,10 @@ function main()
     # Fetch NEODyS NEOScan data?
     fetch_neoscan = parsed_args["neoscan"]
     println("• Fetch NEOScan data?: ", fetch_neoscan)
+
+    # Initial time
+    initial_time = now()
+    println("• Run started at ", initial_time)
 
     # Get JPL Scout data for same object, if requested by user
     fetch_scout && fetch_scout_orbits(input)
@@ -348,7 +356,7 @@ function main()
     bwdoffset = params.bwdoffset + A.ρ_domain[2] / c_au_per_day
     # Forward correction must be at least 1 day to evaluate the right ascension
     # and declination median
-    fwdoffset = params.fwdoffset + 1.0
+    fwdoffset = params.fwdoffset + compute_nominal * 1.0
     params = Parameters(params; bwdoffset, fwdoffset)
 
     # Global box
@@ -407,11 +415,15 @@ function main()
     keepat!(orbits, χs .≤ χ_max)
     println("• ", length(orbits), " / ", Npoints, " points with χ ≤ χ_max = $(χ_max)")
 
-    # Find nominal orbit
-    i = nominalorbit(orbits)
-    # Sort orbits
-    orbits[1], orbits[i] = orbits[i], orbits[1]
-    sort!(view(orbits, 2:length(orbits)), by = nms)
+    if compute_nominal
+        # Find nominal orbit
+        i = nominalorbit(orbits)
+        # Sort orbits
+        orbits[1], orbits[i] = orbits[i], orbits[1]
+        sort!(view(orbits, 2:length(orbits)), by = nms)
+    else
+        sort!(orbits, by = nms)
+    end
 
     # Save results
     write_neocp_orbits(orbits, output)
