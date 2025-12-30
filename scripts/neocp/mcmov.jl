@@ -154,7 +154,6 @@ end
         orbits = [zero(VariantOrbit{T}) for _ in eachindex(points)]
         # Iterate mov points
         for (i, point) in enumerate(points)
-            println(i)
             # Attributable elements (plain)
             ae[5:6] .= point
             # Attributable elements (JT)
