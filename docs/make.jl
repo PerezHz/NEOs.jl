@@ -13,6 +13,15 @@ makedocs(
     checkdocs = :none,
     pages = [
         "Home" => "index.md",
+        "Overview" => "overview.md",
+        "Astrometry" => "astrometry.md",
+        "Propagation" => "propagation.md",
+        "Orbit determination" => "orbitdetermination.md",
+        "Impact monitoring" => "impactmonitoring.md",
+        "Examples" => [
+            "NEOCP" => "neocp.md",
+            "3I/ATLAS" => "3i.md",
+        ],
     ],
     plugins = [bib]
 )
