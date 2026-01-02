@@ -40,7 +40,7 @@ pkg> add NEOs
     NEOs requires Julia 1.10 or later.
 
 !!! info "Tested Julia versions"
-    NEOs is currently tested on Julia 1.10 and 1.11.
+    NEOs is currently tested on Julia 1.10 and 1.12.
 
 ### Acknowledgments
 
