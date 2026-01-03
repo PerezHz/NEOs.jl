@@ -22,6 +22,7 @@ makedocs(
             "NEOCP" => "neocp.md",
             "3I/ATLAS" => "3i.md",
         ],
+        "References" => "references.md",
     ],
     plugins = [bib]
 )

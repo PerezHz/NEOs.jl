@@ -5,7 +5,7 @@ it recognizes two types of astrometry: optical and radar. Each astrometry type i
 in various formats, depending on the source. Hence, NEOs defines an interface to work
 with different formats in a uniform way.
 
-## Optical astrometry
+## [Optical astrometry](@id OpticalAstrometry)
 
 An optical observation is a tuple of topocentric right ascension and declination. NEOs can
 parse optical astrometry in three different formats:

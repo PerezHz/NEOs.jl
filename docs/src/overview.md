@@ -3,11 +3,8 @@
 This documentation and the code in NEOs is divided into four blocks, each one representing a different aspect of the study of Near-Earth Objects:
 - The [astrometry](@ref Astrometry) section is dedicated to fetch, read and write optical and radar observations of Near-Earth objects in a variety of formats.
 - The [propagation](@ref Propagation) section is meant to integrate in time an initial condition using various dynamical models.
-- The **orbit determination** section is used to determine the orbit of an asteroid, either from scratch or starting from a pre-existing orbit.
-- The **impact monitoring** section deals with the computation of the probability that a given object collides with a planet.
-
-!!! warning "Impact monitoring section"
-    The impact monitoring code is currently being developed, so the corresponding section in this documentation is still pending.
+- The [orbit determination](@ref OrbitDetermination) section is used to determine the orbit of an asteroid, either from scratch or starting from a pre-existing orbit.
+- The [impact monitoring](@ref ImpactMonitoring) section deals with the computation of the probability that a given object collides with a planet.
 
 ## Parameters
 

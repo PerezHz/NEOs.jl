@@ -2,7 +2,7 @@
 
 NEOs uses an adaptive-step Taylor method [Jorba2005](@cite) to propagate an initial condition in time; for details, see the [`TaylorIntegration.jl`](https://github.com/PerezHz/TaylorIntegration.jl) documentation. Below, we explain how to propagate an initial condition using Apophis as an example.
 
-## Dynamical model
+## [Dynamical model](@id DynamicalModel)
 
 First, we need to choose a dynamical model. Currently, NEOs supports three different models: `newtonian!`, `gravityonly!` and `nongravs!`. All of the former:
 - treat the object of interest as a test particle with null mass,
@@ -124,4 +124,6 @@ plot!()
 
 ## References
 ```@bibliography
+Pages = ["propagation.md"]
+Canonical = false
 ```
