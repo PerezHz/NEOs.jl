@@ -76,7 +76,7 @@ nongravitational accelerations model:
 
 - `slope::T`: slope parameter (default: `0.15`).
 - `albedo::T`: albedo (default: `0.14`).
-- `density::T`: density [kg/m³] (default: `2_600.0`).
+- `density::T`: density in kg/m³ (default: `2_600.0`).
 """
 @with_kw struct Parameters{T <: Real}
     # Common
