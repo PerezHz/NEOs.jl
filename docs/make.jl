@@ -18,9 +18,8 @@ makedocs(
         "Propagation" => "propagation.md",
         "Orbit determination" => "orbitdetermination.md",
         "Impact monitoring" => "impactmonitoring.md",
-        "Examples" => [
+        "Advanced examples" => [
             "NEOCP" => "neocp.md",
-            "3I/ATLAS" => "3i.md",
         ],
         "References" => "references.md",
     ],
