@@ -6,6 +6,13 @@ Supertye for the impact monitoring interface.
 abstract type AbstractImpactMonitoring end
 
 """
+    AbstractImpactTarget{T <: Real} <: AbstractImpactMonitoring
+
+Supertye for the impact targets interface.
+"""
+abstract type AbstractImpactTarget{T <: Real} <: AbstractImpactMonitoring end
+
+"""
     AbstractTargetPlane{U <: Number} <: AbstractImpactMonitoring
 
 Supertype for the target planes interface.

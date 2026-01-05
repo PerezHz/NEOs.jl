@@ -94,8 +94,8 @@ nongravitational accelerations model:
     marsden_scalings::NTuple{3, T} = (0.0, 0.0, 0.0)
     marsden_radial::NTuple{5, T} = (1.0, 1.0, 2.0, 0.0, 0.0)
     # Sun (earth) ephemeris
-    eph_su::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephsu()
-    eph_ea::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadephea()
+    eph_su::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadeph(su)
+    eph_ea::TaylorInterpolant{T, T, 2, Vector{T}, Matrix{Taylor1{T}}} = _loadeph(ea)
     # Gauss' Method
     safegauss::Bool = true
     refscale::Symbol = :log
@@ -127,13 +127,8 @@ nongravitational accelerations model:
     density::T = 2_600.0
 end
 
-# Load Sun (Earth) ephemeris
-function _loadephsu()
-    _su = selecteph(sseph, su)
-    return TaylorInterpolant(_su.t0, _su.t, collect(_su.x))
-end
-
-function _loadephea()
-    _ea = selecteph(sseph, ea)
-    return TaylorInterpolant(_ea.t0, _ea.t, collect(_ea.x))
+# Load the ephemeris of a solar system body
+function _loadeph(i::Int)
+    eph = selecteph(sseph, i)
+    return TaylorInterpolant(eph.t0, eph.t, collect(eph.x))
 end

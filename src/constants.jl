@@ -332,6 +332,23 @@ const PHASE_INTEGRAL_B2 = 1.218
 const PHASE_INTEGRAL_C1 = 0.986
 const PHASE_INTEGRAL_C2 = 0.238
 
+# Equatorial radii of planets [au]
+# See Tables 9-11 in pages 50-51 of https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract
+# See https://ssd.jpl.nasa.gov/planets/phys_par.html
+const PLANET_RADII = [
+    696_000.0000,   # Sun
+      2_440.5300,   # Mercury
+      6_051.8000,   # Venus
+      6_378.1366,   # Earth
+      1_738.0000,   # Moon
+      3_396.1900,   # Mars
+     71_492.0000,   # Jupiter
+     60_268.0000,   # Saturn
+     25_559.0000,   # Uranus
+     24_764.0000,   # Nepture
+      1_188.3000,   # Pluto
+] / au
+
 # Earth escape velocity
 # See https://doi.org/10.1006/icar.2002.6910
 const EARTH_ESCAPE_VELOCITY = 11.18 # km/s

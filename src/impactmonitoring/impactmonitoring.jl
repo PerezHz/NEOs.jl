@@ -1,5 +1,7 @@
 # Common interface
 include("abstractimpactmonitoring.jl")
+# AbstractImpactTarget
+include("impacttarget.jl")
 # AbstractTargetPlane
 include("targetplane.jl")
 # AbstractLineOfVariations
