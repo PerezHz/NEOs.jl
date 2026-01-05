@@ -12,6 +12,10 @@ Supertye for the impact targets interface.
 """
 abstract type AbstractImpactTarget{T <: Real} <: AbstractImpactMonitoring end
 
+# Print method for AbstractImpactTarget
+show(io::IO, x::AbstractImpactTarget) = print(io, typeof(x), " with gm ",
+    @sprintf("%.2E", gm(x)), " au³/day² and radius ", @sprintf("%.2E", radius(x)), " au")
+
 """
     AbstractTargetPlane{U <: Number} <: AbstractImpactMonitoring
 
