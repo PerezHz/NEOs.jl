@@ -12,10 +12,6 @@ Supertye for the impact targets interface.
 """
 abstract type AbstractImpactTarget{T <: Real} <: AbstractImpactMonitoring end
 
-# Print method for AbstractImpactTarget
-show(io::IO, x::AbstractImpactTarget) = print(io, typeof(x), " with gm ",
-    @sprintf("%.2E", gm(x)), " au³/day² and radius ", @sprintf("%.2E", radius(x)), " au")
-
 """
     AbstractTargetPlane{U <: Number} <: AbstractImpactMonitoring
 
@@ -32,6 +28,13 @@ numtype(::AbstractTargetPlane{U}) where {U} = U
 # Print method for AbstractTargetPlane
 show(io::IO, x::AbstractTargetPlane) = print(io, typeof(x), " with coordinates ",
     cte(targetplane(x)))
+
+"""
+    AbstractIMProblem{D, T <: Real} <: AbstractImpactMonitoring
+
+Supertye for the impact monitoring problems interface.
+"""
+abstract type AbstractIMProblem{D, T <: Real} <: AbstractImpactMonitoring end
 
 """
     AbstractLineOfVariations{T <: Real} <: AbstractImpactMonitoring

@@ -24,5 +24,9 @@ ImpactTarget(i::Int) = ImpactTarget(PE.μ[i], PLANET_RADII[i], _loadeph(i))
 gm(x::ImpactTarget) = x.gm
 radius(x::ImpactTarget) = x.radius
 
+# Print method for ImpactTarget
+show(io::IO, x::ImpactTarget) = print(io, "Impact target with gm ",
+    @sprintf("%.2E", gm(x)), " au³/day² and radius ", @sprintf("%.2E", radius(x)), " au")
+
 # Evaluation in time method
 (x::ImpactTarget)(t) = x.eph(t)

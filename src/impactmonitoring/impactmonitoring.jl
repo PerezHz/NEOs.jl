@@ -4,6 +4,8 @@ include("abstractimpactmonitoring.jl")
 include("impacttarget.jl")
 # AbstractTargetPlane
 include("targetplane.jl")
+# AbstractIMProblem
+include("improblem.jl")
 # AbstractLineOfVariations
 include("lov.jl")
 include("closeapproach.jl")
