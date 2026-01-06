@@ -42,14 +42,14 @@ get_order(x::LineOfVariations) = get_order(first(x.bwd.x))
 function lovcovariance(
         resTN::Vector{OpticalResidual{T, TaylorN{T}}},
         resT1::Vector{OpticalResidual{T, Taylor1{T}}},
-        od::OpticalODProblem{D, T, O}, q00::Vector{T},
+        IM::AbstractIMProblem{D, T}, q00::Vector{T},
         jd0::T, params::Parameters{T};
         bufferTN::Union{Nothing, PropresBuffer{T, TaylorN{T}, T}} = nothing,
         bufferT1::Union{Nothing, PropresBuffer{T, Taylor1{T}, T}} = nothing,
         order::Int = 6
-    ) where {D, T <: Real, O}
+    ) where {D, T <: Real}
     # Set jet transport variables
-    Npar = dof(Val(od.dynamics))
+    Npar = dof(IM)
     set_od_order(T, 2, Npar)
     # Jet transpot initial condition
     scalings = fill(1e-8, 6)
@@ -59,7 +59,7 @@ function lovcovariance(
     dq = scalings .* get_variables(T, 2)
     q0TN = q00 + dq
     # Propagation and residuals
-    propres!(resTN, od, q0TN, jd0, params; buffer = bufferTN)
+    propres!(resTN, IM, q0TN, jd0, params; buffer = bufferTN)
     # Covariance matrix in residuals space
     QTN = nms(resTN)
     C = notout(resTN) * TS.hessian(QTN)
@@ -73,7 +73,7 @@ function lovcovariance(
     # Line of variations initial condition
     q0T1 = q00 + k1 * v1 * Taylor1(order)
     # Propagation and residuals
-    propres!(resT1, od, q0T1, jd0, params; buffer = bufferT1)
+    propres!(resT1, IM, q0T1, jd0, params; buffer = bufferT1)
     # Covariance matrix in residuals space
     QT1 = nms(resT1)
     dQT1, d2QT1 = zero(QT1), zero(QT1)
@@ -188,23 +188,24 @@ function TaylorIntegration.jetcoeffs!(::Val{lov!}, t::Taylor1{_T}, q::AbstractAr
 end
 
 """
-    lineofvariations(od, orbit, params; kwargs...)
+    lineofvariations(IM, params; kwargs...)
 
 Return a parametrization of the line of variations associated to an
-orbit determination problem `od` and a reference `orbit`.
+impact monitoring problem `IM`. For a list of parameters, see the
+`Propagation` section of [`Parameters`](@ref).
 
 # Keyword arguments
 
 - `order::Int`: order of Taylor expansions wrt sigma (default: `6`).
 - `σmax::Real`: maximum (absolute) value of sigma (default: `5.0`).
 """
-function lineofvariations(od::AbstractODProblem{D, T}, orbit::AbstractOrbit,
-                          params::Parameters{T}; order::Int = 6,
-                          σmax::T = 5.0) where {D, T <: Real}
-    # Unpack parameters
+function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
+                          order::Int = 6, σmax::Real = 5.0) where {D, T <: Real}
+    # Unpack
+    @unpack orbit = IM
     @unpack maxsteps, abstol, parse_eqs = params
     # Number of degrees of freedom
-    Npar = dof(Val(od.dynamics))
+    Npar = dof(IM)
     # Jet transpot initial condition
     set_od_order(T, 2, Npar)
     # Refence epoch [julian date TDB]
@@ -214,11 +215,11 @@ function lineofvariations(od::AbstractODProblem{D, T}, orbit::AbstractOrbit,
     q0TN = q00 + sigmas(orbit) .* get_variables(T, 2)
     q0T1 = q00 + sigmas(orbit) .* Taylor1(order)
     # Line of variations parameters
-    resTN = init_optical_residuals(TaylorN{T}, od, orbit)
-    resT1 = init_optical_residuals(Taylor1{T}, od, orbit)
-    bufferTN = PropresBuffer(od, q0TN, jd0, params)
-    bufferT1 = PropresBuffer(od, q0T1, jd0, params)
-    lovparams = (resTN, resT1, od, jd0, params, bufferTN, bufferT1, order)
+    resTN = init_optical_residuals(TaylorN{T}, IM)
+    resT1 = init_optical_residuals(Taylor1{T}, IM)
+    bufferTN = PropresBuffer(IM, q0TN, jd0, params)
+    bufferT1 = PropresBuffer(IM, q0T1, jd0, params)
+    lovparams = (resTN, resT1, IM, jd0, params, bufferTN, bufferT1, order)
     # Taylor expansion of the line of variations
     domain = (-σmax, σmax)
     _bwd_ = taylorinteg(lov!, q00, zero(T), -σmax, order, abstol, lovparams;
@@ -228,5 +229,5 @@ function lineofvariations(od::AbstractODProblem{D, T}, orbit::AbstractOrbit,
     bwd = TaylorInterpolant{T, T, 2}(zero(T), _bwd_.t, _bwd_.p)
     fwd = TaylorInterpolant{T, T, 2}(zero(T), _fwd_.t, _fwd_.p)
 
-    return LineOfVariations{D, T}(od.dynamics, epoch(orbit), domain, bwd, fwd)
+    return LineOfVariations{D, T}(dynamicalmodel(IM), epoch(orbit), domain, bwd, fwd)
 end

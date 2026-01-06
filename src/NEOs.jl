@@ -91,6 +91,7 @@ export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
        orbitdetermination
 # Impact monitoring
+export ImpactTarget, IMProblem
 export BPlane, MTP, bopik, mtp, targetplane, crosssection, valsecchi_circle
 export LineOfVariations, CloseApproach, VirtualAsteroid, lineofvariations, closeapproaches,
        virtualasteroids, sigma, lbound, ubound
