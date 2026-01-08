@@ -27,6 +27,8 @@ end
 
 numtypes(::LineOfVariations{D, T}) where {D, T} = D, T
 
+dynamicalmodel(x::LineOfVariations) = x.dynamics
+
 epoch(x::LineOfVariations) = x.epoch
 nominaltime(x::LineOfVariations) = x.epoch
 

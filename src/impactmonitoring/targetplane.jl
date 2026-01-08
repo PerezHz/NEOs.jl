@@ -122,6 +122,9 @@ function bopik(xae::AbstractVector{U}, xes::AbstractVector{U};
     return BPlane{U}(B_dot_ξ / R, B_dot_ζ / R, b, U_y, U_norm)
 end
 
+bopik(xae::AbstractVector, xes::AbstractVector, target::ImpactTarget) =
+    bopik(xae, xes; μ = gm(target), R = radius(target))
+
 """
     MTP{U} <: AbstractTargetPlane{U}
 
@@ -152,7 +155,7 @@ planetocentric cartesian state vector at close approach [au, au/day].
     See equations (43)-(44) in page 15 of:
     - https://doi.org/10.1007/s10569-019-9914-4
 """
-function mtp(xae::Vector{U}; R::Real = PLANET_RADII[ea]) where {U <: Number}
+function mtp(xae::AbstractVector{U}; R::Real = PLANET_RADII[ea]) where {U <: Number}
     # Unfold geocentric position and velocity
     r, v = xae[1:3], xae[4:6]
     # Reference direction
@@ -168,6 +171,8 @@ function mtp(xae::Vector{U}; R::Real = PLANET_RADII[ea]) where {U <: Number}
 
     return MTP{U}(X, Y)
 end
+
+mtp(xae::AbstractVector, target::ImpactTarget) = mtp(xae; R = radius(target))
 
 @doc raw"""
     crosssection(μ, R, vinf)

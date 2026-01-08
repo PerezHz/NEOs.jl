@@ -272,7 +272,7 @@ const R_EA = 4.24e-5
 # Ratio between the mass of the Earth and the mass of the Sun
 const μ_ES = PE.μ[ea] / PE.μ[su] # 1 / 328_900.5614
 
-# Postprocessing
+# Absolute magnitude
 
 # Conversion to V band used by MPC
 # See https://minorplanetcenter.net/iau/info/BandConversion.txt
@@ -332,6 +332,8 @@ const PHASE_INTEGRAL_B2 = 1.218
 const PHASE_INTEGRAL_C1 = 0.986
 const PHASE_INTEGRAL_C2 = 0.238
 
+# Impact monitoring
+
 # Equatorial radii of planets [au]
 # See Tables 9-11 in pages 50-51 of https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract
 # See https://ssd.jpl.nasa.gov/planets/phys_par.html
@@ -345,9 +347,24 @@ const PLANET_RADII = [
      71_492.0000,   # Jupiter
      60_268.0000,   # Saturn
      25_559.0000,   # Uranus
-     24_764.0000,   # Nepture
+     24_764.0000,   # Neptune
       1_188.3000,   # Pluto
 ] / au
+
+# Conversion from planet name to DE430 index
+const PLANET_NAMES_TO_INDEX = Dict{String, Int}(
+    "sun" => 1,
+    "mercury" => 2,
+    "venus" => 3,
+    "earth" => 4,
+    "moon" => 5,
+    "mars" => 6,
+    "jupiter" => 7,
+    "saturn" => 8,
+    "uranus" => 9,
+    "neptune" => 10,
+    "pluto" => 11,
+)
 
 # Earth escape velocity
 # See https://doi.org/10.1006/icar.2002.6910
