@@ -47,7 +47,7 @@ end
 
 nominalstate(x::VirtualAsteroid, ctol::Real) = targetplane(x, sigma(x), ctol)
 
-for f in (:(targetplane), :(timeofca), :(distance), :(rvelea), :(concavity))
+for f in (:(targetplane), :(timeofca), :(distance), :(radialvelocity), :(concavity))
     @eval begin
         function $f(x::VirtualAsteroid, σ::Real, ctol::Real)
             d = convergence_domain(x, ctol)

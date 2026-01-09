@@ -38,6 +38,14 @@ get_order(x::LineOfVariations) = get_order(first(x.bwd.x))
 
 (x::LineOfVariations)(σ::Number) = σ >= 0 ? x.fwd(σ) : x.bwd(σ)
 
+function (x::LineOfVariations)(σ::Number, domain::NTuple{2, <:Number}, k::Int)
+    @assert 0 ≤ k ≤ get_order(x) "Expansion order must be 0 ≤ k ≤ get_order(x)"
+    t = Taylor1(k)
+    iszero(k) && return x(σ) .+ t
+    q = x(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(get_order(x)))
+    return one(t) * q
+end
+
 # Return the Taylor expansion of the covariance matrix of an initial condition,
 # with respect to the normalized direction of the eigenvector associated to the
 # largest eigenvalue

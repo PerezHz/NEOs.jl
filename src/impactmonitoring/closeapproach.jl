@@ -65,28 +65,6 @@ end
 
 isconvergent(x, ctol::Real) = convergence_radius(x, ctol) > 1
 
-function refine(σ::T, domain::NTuple{2, T}, N::Int,
-                dist::Symbol = :uniform) where {T <: Real}
-    @assert N ≥ 1 && isodd(N) "N must be at least one and odd to have an \
-        expansion around the domain center"
-    if dist == :uniform
-        d = Uniform{T}(domain[1], domain[2])
-    elseif dist == :normal
-        d = Normal{T}(zero(T), one(T))
-    else
-        throw(ArgumentError("dist must be either :uniform or :normal"))
-    end
-    xs = LinRange(cdf(d, domain[1]), cdf(d, domain[2]), N+1)
-    endpoints = quantile.(d, xs)
-    endpoints[1], endpoints[end] = domain[1], domain[2]
-    domains = [(endpoints[i], endpoints[i+1]) for i in 1:N]
-    σs = [(domains[i][1] + domains[i][2]) / 2 for i in eachindex(domains)]
-    if iszero(σ) || dist == :uniform
-        σs[(N ÷ 2) + 1] = σ
-    end
-    return σs, domains
-end
-
 deltasigma(x::CloseApproach, σ::Real) = (σ - sigma(x)) / domain_radius(x)
 
 function timeofca(x::CloseApproach, σ::Real)
@@ -180,7 +158,7 @@ function radialvelocity(x, target, params, t)
     # Asteroid's planetocentric state vector
     xae = x[1:6] - xe
     # Planetocentric radial velocity
-    return euclid3D(cte(xae[1:3])) < 0.1, dot3D(xae[1:3], xae[4:6])
+    return euclid3D(cte(xae[1:3])) < 0.2, dot3D(xae[1:3], xae[4:6])
 end
 
 """
@@ -221,7 +199,7 @@ function closeapproaches(
     jd0 = d0 + JD_J2000
     # Initial conditions
     tpre, t0, tmax = zero(T), zero(T), nyears * yr
-    q0 = lov(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(lovorder))
+    q0 = lov(σ, domain, lovorder)
     # Propagation buffer
     tlim = (d0, d0 + tmax)
     if isnothing(buffer)

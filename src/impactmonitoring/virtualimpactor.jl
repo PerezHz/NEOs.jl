@@ -371,7 +371,7 @@ function impactconditions(VAs::VirtualAsteroids{T}, ctol::Real; no_pts::Int = 10
     for i in eachindex(VAs)
         VA = VAs[i]
         a, b = convergence_domain(VA, ctol)
-        rs = find_zeros(σ -> rvelea(VA, σ, ctol), (a, b); no_pts)
+        rs = find_zeros(σ -> radialvelocity(VA, σ, ctol), (a, b); no_pts)
         # The radial velocity has no roots in [a, b], so the radial distance is monotonic
         if isempty(rs)
             σ, domain = impactcondition(Val(true), VA, (a, b), ctol)
@@ -448,7 +448,7 @@ a convergence tolerance `ctol`.
 
 # Keyword arguments
 
-- `no_pts::Int`: number of points used to find the roots of `rvelea`
+- `no_pts::Int`: number of points used to find the roots of `radialvelocity`
     in each virtual asteroid (default: `100`).
 - `dmax::Real`: maximum allowed value of [`distance`](@ref) (default: `236.0`).
 """
@@ -491,7 +491,7 @@ orbit and parameters are needed to compute the target plane covariance matrix.
 # Keyword arguments
 
 - `Nmax::Int`: maximum number of virtual impactors to compute (default: `10`).
-- `no_pts::Int`: number of points used to find the roots of `rvelea`
+- `no_pts::Int`: number of points used to find the roots of `radialvelocity`
     in each virtual asteroid (default: `100`).
 - `dmax::Real`: maximum allowed value of [`distance`](@ref) (default: `236.0`).
 """
