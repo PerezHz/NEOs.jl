@@ -39,13 +39,12 @@ abstract type AbstractIMProblem{D, T <: Real} <: AbstractImpactMonitoring end
 """
     AbstractLineOfVariations{T <: Real} <: AbstractImpactMonitoring
 
-Supertype for the line of variations nterface.
+Supertype for the line of variations (LOV) interface.
 
 Every instance `x` of `AbstractLineOfVariations` has a:
-- `date(x)`: nominal date [UTC].
-- `sigma(x)`: center of expansion.
-- `lbound(x)`: domain lower bound.
-- `ubound(x)`: domain upper bound.
+- `nominaltime(x)`: nominal time [days since J2000 TDB].
+- `sigma(x)`: LOV index.
+- `domain::NTuple{2, T}` field.
 """
 abstract type AbstractLineOfVariations{T <: Real} <: AbstractImpactMonitoring end
 
@@ -56,60 +55,11 @@ ubound(x::AbstractLineOfVariations) = x.domain[2]
 
 in(σ::Real, x::AbstractLineOfVariations) = lbound(x) ≤ σ ≤ ubound(x)
 
-width(x::NTuple{2, T}) where {T <: Real} = x[2] - x[1]
+width(x::NTuple{2, <:Real}) = x[2] - x[1]
 width(x::AbstractLineOfVariations) = ubound(x) - lbound(x)
 midpoint(x::NTuple{2, <:Real}) = (x[1] + x[2]) / 2
 
-function ceilodd(x::Real)
-    N = ceil(Int, x)
-    return N + iseven(N)
-end
-
-refine(σ::T, domain::NTuple{2, T}, N::Int, dist::Symbol = :mixed) where {T <: Real} =
-    refine(Val(dist), σ, domain, N)
-
-function refine(::Val{:uniform}, σ::T, domain::NTuple{2, T}, N::Int) where {T <: Real}
-    endpoints = LinRange(domain[1], domain[2], N+1)
-    domains = [(endpoints[i], endpoints[i+1]) for i in 1:N]
-    σs = midpoint.(domains)
-    if isodd(N)
-        σs[(N ÷ 2) + 1] = σ
-    end
-    return σs, domains
-end
-
-function refine(::Val{:normal}, σ::T, domain::NTuple{2, T}, N::Int) where {T <: Real}
-    d = Normal{T}(zero(T), one(T))
-    xs = LinRange(cdf(d, domain[1]), cdf(d, domain[2]), N+1)
-    endpoints = quantile.(d, xs)
-    endpoints[1], endpoints[end] = domain[1], domain[2]
-    domains = [(endpoints[i], endpoints[i+1]) for i in 1:N]
-    σs = midpoint.(domains)
-    if iszero(σ) && isodd(N)
-        σs[(N ÷ 2) + 1] = σ
-    end
-    return σs, domains
-end
-
-function refine(::Val{:mixed}, σ::T, domain::NTuple{2, T}, N::Int) where {T <: Real}
-    σs, domains = refine(Val(:normal), σ, domain, N)
-    Δσmax = width(domain) / N
-    mask = @. σs < σ && width(domains) > Δσmax
-    idxs = findfirst(mask):findlast(mask)
-    subdomain = (first(domains[first(idxs)]), last(domains[last(idxs)]))
-    subσs, subdomains = refine(midpoint(subdomain), subdomain,
-        ceilodd(width(subdomain) / Δσmax), :uniform)
-    splice!(σs, idxs, subσs)
-    splice!(domains, idxs, subdomains)
-    mask = @. σs > σ && width(domains) > Δσmax
-    idxs = findfirst(mask):findlast(mask)
-    subdomain = (first(domains[first(idxs)]), last(domains[last(idxs)]))
-    subσs, subdomains = refine(midpoint(subdomain), subdomain,
-        ceilodd(width(subdomain) / Δσmax), :uniform)
-    splice!(σs, idxs, subσs)
-    splice!(domains, idxs, subdomains)
-    return σs, domains
-end
+lovdensity(x::Real) = exp(-x^2/2) / sqrt(2π)
 
 """
     AbstractVirtualImpactor{T <: Real} <: AbstractImpactMonitoring

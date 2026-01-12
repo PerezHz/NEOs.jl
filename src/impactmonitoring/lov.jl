@@ -1,7 +1,7 @@
 """
     LineOfVariations{D, T} <: AbstractLineOfVariations{T}
 
-A parametrization of the line of variations.
+A parametrization of the line of variations (LOV).
 
 # Fields
 
@@ -18,6 +18,7 @@ A parametrization of the line of variations.
     fwd::DensePropagation2{T, T}
 end
 
+# Print method for LineOfVariations
 function show(io::IO, x::LineOfVariations)
     D, T = numtypes(x)
     t = date(x)
@@ -25,6 +26,7 @@ function show(io::IO, x::LineOfVariations)
     print(io, "LineOfVariations{", D.instance, ", ", T, "} at ", t, " over ", domain)
 end
 
+# AbstractLineOfVariations interface
 numtypes(::LineOfVariations{D, T}) where {D, T} = D, T
 
 dynamicalmodel(x::LineOfVariations) = x.dynamics
@@ -38,13 +40,8 @@ get_order(x::LineOfVariations) = get_order(first(x.bwd.x))
 
 (x::LineOfVariations)(σ::Number) = σ >= 0 ? x.fwd(σ) : x.bwd(σ)
 
-function (x::LineOfVariations)(σ::Number, domain::NTuple{2, <:Number}, k::Int)
-    @assert 0 ≤ k ≤ get_order(x) "Expansion order must be 0 ≤ k ≤ get_order(x)"
-    t = Taylor1(k)
-    iszero(k) && return x(σ) .+ t
-    q = x(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(get_order(x)))
-    return one(t) * q
-end
+(x::LineOfVariations)(σ::Number, domain::NTuple{2, <:Number}) =
+    x(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(get_order(x)))
 
 # Return the Taylor expansion of the covariance matrix of an initial condition,
 # with respect to the normalized direction of the eigenvector associated to the

@@ -91,12 +91,12 @@ export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
        orbitdetermination
 # Impact monitoring
-export ImpactTarget, IMProblem
-export BPlane, MTP, bopik, mtp, targetplane, crosssection, valsecchi_circle
-export LineOfVariations, CloseApproach, VirtualAsteroid, lineofvariations, closeapproaches,
-       virtualasteroids, sigma, lbound, ubound
-export VirtualImpactor, virtualimpactors, impact_probability, impactor_table, impactenergy,
-       palermoscale, torinoscale, semiwidth, stretching
+export ImpactTarget, IMProblem, BPlane, MTP, bopik, mtp, targetplane, crosssection,
+       valsecchi_circle
+export LineOfVariations, VirtualAsteroid, CloseApproach, lineofvariations, virtualasteroids,
+       closeapproaches, sigma, lbound, ubound
+# export VirtualImpactor, virtualimpactors, impact_probability, impactor_table, impactenergy,
+#       palermoscale, torinoscale, semiwidth, stretching
 
 include("constants.jl")
 include("units.jl")

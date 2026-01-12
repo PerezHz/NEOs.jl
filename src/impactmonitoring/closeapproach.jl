@@ -1,12 +1,12 @@
 """
     CloseApproach{T} <: AbstractLineOfVariations{T}
 
-The projection over the target plane of a segment of the line of variations
-at close approach with respect to a planet.
+The projection over the target plane of a virtual asteroid at
+close approach with respect to a planet.
 
 # Fields
 
-- `σ::T`: center of the Taylor expansions.
+- `σ::T`: LOV index.
 - `domain::NTuple{2, T}`: segment of the line of variations.
 - `t::Taylor1{T}`: time of close approach [days since J2000 TDB].
 - `x/y::Taylor1{T}`: coordinates on the target plane [planet radii].
@@ -24,6 +24,39 @@ at close approach with respect to a planet.
     tp::Type{<:AbstractTargetPlane}
 end
 
+# Outer constructors
+function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},
+                       x::Taylor1{T}, y::Taylor1{T}, z::Taylor1{T},
+                       tp::Type{<:AbstractTargetPlane}) where {T <: Real}
+    return CloseApproach{T}(σ, domain, t, x, y, z, tp)
+end
+
+CloseApproach(VA::VirtualAsteroid, t::Taylor1, x::Taylor1, y::Taylor1, z::Taylor1, tp) =
+    CloseApproach(sigma(VA), VA.domain, t, x, y, z, tp)
+
+function CloseApproach(IM::AbstractIMProblem{D, T}, σ::T, domain::NTuple{2, T},
+                       t::Taylor1{T}, eph::DensePropagation2{T, Taylor1{T}},
+                       params::Parameters{T}) where {D, T <: Real}
+    # Unpack
+    @unpack target = IM
+    @unpack eph_su = params
+    # Asteroid's planetocentric state vector
+    xae = eph(t) - target(t)
+    # Asteroid's planetocentric semimajor axis
+    a = semimajoraxis(xae..., gm(target), zero(T))
+    if a < 0
+        # Planet's heliocentric state vector
+        xes = target(t) - eph_su(t)
+        # B-Plane in Öpik's coordinates
+        tp = bopik(xae, xes, target)
+    else
+        # Modified target plane
+        tp = mtp(xae, target)
+    end
+    return CloseApproach{T}(σ, domain, t, targetplane(tp)..., typeof(tp))
+end
+
+# Print method for CloseApproach
 function show(io::IO, x::CloseApproach)
     tp = x.tp.name.wrapper
     σ = sigma(x)
@@ -33,6 +66,7 @@ function show(io::IO, x::CloseApproach)
     print(io, tp, " σ: ", σ, " t: ", t, " coords: ", r)
 end
 
+# AbstractLineOfVariations interface
 nominaltime(x::CloseApproach) = cte(x.t)
 
 sigma(x::CloseApproach) = x.σ
@@ -125,28 +159,6 @@ function concavity(x::CloseApproach, σ::Real)
     return ( ra / r - rv^2 / r^3 - d2b) / domain_radius(x)^2
 end
 
-function CloseApproach(IM::AbstractIMProblem{D, T}, σ::T, domain::NTuple{2, T},
-                       t::Taylor1{T}, eph::DensePropagation2{T, Taylor1{T}},
-                       params::Parameters{T}) where {D, T <: Real}
-    # Unpack
-    @unpack target = IM
-    @unpack eph_su = params
-    # Asteroid's planetocentric state vector
-    xae = eph(t) - target(t)
-    # Asteroid's planetocentric semimajor axis
-    a = semimajoraxis(xae..., gm(target), zero(T))
-    if a < 0
-        # Planet's heliocentric state vector
-        xes = target(t) - eph_su(t)
-        # B-Plane in Öpik's coordinates
-        tp = bopik(xae, xes, target)
-    else
-        # Modified target plane
-        tp = mtp(xae, target)
-    end
-    return CloseApproach{T}(σ, domain, t, targetplane(tp)..., typeof(tp))
-end
-
 # Asteroid's radial velocity with respect to a planet
 function radialvelocity(x, target, params, t)
     # Julian date (TDB) of start time
@@ -162,44 +174,45 @@ function radialvelocity(x, target, params, t)
 end
 
 """
-    closeapproaches(IM, lov, σ, domain, nyears, params; kwargs...)
+    closeapproaches(IM, VA, nyears, params; kwargs...)
 
-Return the vector of close approaches under the impact monitoring problem `IM`,
-corresponding to the expansion of `lov` at `σ`, with scaling factors such that
-`domain` is mapped into the `[-1, 1]` interval, propagated for a period of
-`nyears` [years]. For a list of parameters see the `Propagation` section of
- [`Parameters`](@ref).
+Return the vector of close approaches, under the impact monitoring problem
+`IM`, of a virtual asteroid `VA` for a period of `nyears` [years]. For a
+list of parameters see the `Propagation` section of  [`Parameters`](@ref).
 
-The propagation will stop before the final time if it finds a close approach that
-does not converge under the tolerance `ctol`.
+The propagation will stop before the final time if it finds a close approach
+that does not converge under the tolerance `ctol`.
 
 # Keyword arguments
 
-- `lovorder::Int`: order of the expansion of `lov` (default: `min(6, get_order(lov))`).
-- `ctol::Real`: convergence tolerance (default: `0.01`); the integration will stop at
-    the first close approach not converging under `ctol`.
-- `newtoniter::Int`: maximum Newton-Raphson iterations per detected event (default: `10`).
-- `nrabstol::Real`: allowed tolerance for the Newton-Raphson process (default: `eps()`).
-- `buffer::Union{Nothing, PropagationBuffer}`: pre-allocated memory (default: `nothing`).
+- `vaorder::Int`: order of the Taylor expansions wrt the LOV index
+    (default: `get_order(VA)`).
+- `ctol::Real`: convergence tolerance (default: `0.01`); the integration
+    will stop at the first close approach not converging under `ctol`.
+- `newtoniter::Int`: maximum Newton-Raphson iterations per detected event
+    (default: `10`).
+- `nrabstol::Real`: allowed tolerance for the Newton-Raphson process
+    (default: `eps()`).
+- `buffer::Union{Nothing, PropagationBuffer}`: pre-allocated memory
+    (default: `nothing`).
 """
 function closeapproaches(
-        IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T}, σ::T,
-        domain::NTuple{2, T}, nyears::T, params::Parameters{T};
-        lovorder::Int = min(6, get_order(lov)), ctol::T = 0.01,
-        newtoniter::Int = 10, nrabstol::T = eps(T),
+        IM::AbstractIMProblem{D, T}, VA::VirtualAsteroid{T}, nyears::T,
+        params::Parameters{T}; vaorder::Int = get_order(VA),
+        ctol::T = 0.01, newtoniter::Int = 10, nrabstol::T = eps(T),
         buffer::Union{Nothing, PropagationBuffer{T, Taylor1{T}, T}} = nothing
     ) where {D, T <: Real}
     # Unpack
     @unpack target = IM
     @unpack abstol, maxsteps, order, eph_su = params
     # Dynamical model
-    dynamics = dynamicalmodel(lov)
+    dynamics = dynamicalmodel(IM)
     # Reference epoch
-    d0 = epoch(lov)
+    d0 = epoch(VA)
     jd0 = d0 + JD_J2000
     # Initial conditions
     tpre, t0, tmax = zero(T), zero(T), nyears * yr
-    q0 = lov(σ, domain, lovorder)
+    q0 = initialcondition(VA) * one(Taylor1(vaorder))
     # Propagation buffer
     tlim = (d0, d0 + tmax)
     if isnothing(buffer)
@@ -274,7 +287,7 @@ function closeapproaches(
                 tp = mtp(xae, target)
             end
             # Close approach
-            CA = CloseApproach{T}(σ, domain, t_CA, targetplane(tp)..., typeof(tp))
+            CA = CloseApproach(VA, t_CA, targetplane(tp)..., typeof(tp))
             push!(CAs, CA)
             !isconvergent(CA, ctol) && break
         end
