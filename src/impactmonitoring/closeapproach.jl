@@ -160,13 +160,13 @@ function concavity(x::CloseApproach, σ::Real)
 end
 
 # Asteroid's radial velocity with respect to a planet
-function radialvelocity(x, target, params, t)
+function radialvelocity(x, teph, params, t)
     # Julian date (TDB) of start time
     jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     dsj2k = t + (jd0 - JD_J2000)
     # Planet ephemeris at dsj2k
-    xe = target(dsj2k)
+    xe = teph(dsj2k)
     # Asteroid's planetocentric state vector
     xae = x[1:6] - xe
     # Planetocentric radial velocity
@@ -193,14 +193,14 @@ that does not converge under the tolerance `ctol`.
     (default: `10`).
 - `nrabstol::Real`: allowed tolerance for the Newton-Raphson process
     (default: `eps()`).
-- `buffer::Union{Nothing, PropagationBuffer}`: pre-allocated memory
+- `buffer::Union{Nothing, ImpactMonitoringBuffer}`: pre-allocated memory
     (default: `nothing`).
 """
 function closeapproaches(
         IM::AbstractIMProblem{D, T}, VA::VirtualAsteroid{T}, nyears::T,
         params::Parameters{T}; vaorder::Int = get_order(VA),
         ctol::T = 0.01, newtoniter::Int = 10, nrabstol::T = eps(T),
-        buffer::Union{Nothing, PropagationBuffer{T, Taylor1{T}, T}} = nothing
+        buffer::Union{Nothing, ImpactMonitoringBuffer{T}} = nothing
     ) where {D, T <: Real}
     # Unpack
     @unpack target = IM
@@ -212,13 +212,13 @@ function closeapproaches(
     jd0 = d0 + JD_J2000
     # Initial conditions
     tpre, t0, tmax = zero(T), zero(T), nyears * yr
-    q0 = initialcondition(VA) * one(Taylor1(vaorder))
-    # Propagation buffer
-    tlim = (d0, d0 + tmax)
+    q0 = reduceorder.(initialcondition(VA), vaorder)
+    # Impact monitoring buffer
     if isnothing(buffer)
-        buffer = PropagationBuffer(dynamics, q0, jd0, tlim, params)
+        buffer = ImpactMonitoringBuffer(IM, params)
     end
-    @unpack cache, dparams = buffer
+    @unpack prop, teph, tvS, xvS, gvS = buffer
+    @unpack cache, dparams = prop
     @unpack psol, xaux, t, x, dx, rv, parse_eqs = cache
     dparams.jd0 = jd0
 
@@ -231,8 +231,7 @@ function closeapproaches(
 
     # Some auxiliary arrays for root-finding/event detection/Poincaré
     # surface of section evaluation
-    pbuffer = EphemerisEvaluationBuffer(target.eph, tlim, order, q0)
-    g_tupl = (false, radialvelocity(x, pbuffer, dparams, t)[2])
+    g_tupl = (false, radialvelocity(x, teph, dparams, t)[2])
     g_tupl_old = deepcopy(g_tupl)
     δt = zero(x[1])
     δt_old = zero(x[1])
@@ -241,10 +240,6 @@ function closeapproaches(
     g_dg = vcat(g_tupl[2], g_tupl_old[2])
     x_dx_val = TS.evaluate(x_dx)
     g_dg_val = vcat(TS.evaluate(g_tupl[2]), TS.evaluate(g_tupl_old[2]))
-
-    tvS = Array{Taylor1{T}}(undef, maxsteps + 1)
-    xvS = Array{Taylor1{T}}(undef, length(q0), maxsteps + 1)
-    gvS = similar(tvS)
 
     CAs = Vector{CloseApproach{T}}(undef, 0)
 
@@ -265,7 +260,7 @@ function closeapproaches(
                 TS.identity!(psol[:, 2][i], x[i], k)
             end
         end
-        g_tupl = radialvelocity(x, pbuffer, dparams, t)
+        g_tupl = radialvelocity(x, teph, dparams, t)
         nevents_old = nevents
         nevents = findroot!(t, x, dx, g_tupl_old, g_tupl, 0, tvS, xvS, gvS,
                             t0, δt_old, x_dx, x_dx_val, g_dg, g_dg_val, nrabstol,
