@@ -30,9 +30,14 @@ end
 # AbstractIMProblem interface
 dynamicalmodel(x::IMProblem) = x.orbit.dynamics
 dof(x::IMProblem) = dof(Val(dynamicalmodel(x)))
+epoch(x::IMProblem) = epoch(x.orbit)
 
 noptical(x::IMProblem) = length(x.orbit.optical)
 opticalindices(x::IMProblem) = eachindex(x.orbit.optical)
+
+gm(x::IMProblem) = gm(x.target)
+mass(x::IMProblem, params::Parameters) = mass(x.orbit, params)
+escapevelocity(x::IMProblem) = escapevelocity(x.target)
 
 function minmaxdates(x::IMProblem)
     t0, tf = minmaxdates(x.orbit.optical)

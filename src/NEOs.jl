@@ -95,8 +95,8 @@ export ImpactTarget, IMProblem, BPlane, MTP, bopik, mtp, targetplane, crosssecti
        valsecchi_circle
 export LineOfVariations, VirtualAsteroid, CloseApproach, Return, lineofvariations,
        virtualasteroids, closeapproaches, showersnreturns, sigma, lbound, ubound
-# export VirtualImpactor, virtualimpactors, impact_probability, impactor_table, impactenergy,
-#       palermoscale, torinoscale, semiwidth, stretching
+export VirtualImpactor, virtualimpactors, impact_probability, impactor_table, impactenergy,
+       palermoscale, torinoscale, semiwidth, stretching
 
 include("constants.jl")
 include("units.jl")

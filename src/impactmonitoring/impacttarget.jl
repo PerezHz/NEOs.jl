@@ -25,6 +25,7 @@ ImpactTarget(s::Symbol) = ImpactTarget(string(s))
 
 gm(x::ImpactTarget) = x.gm
 radius(x::ImpactTarget) = x.radius
+escapevelocity(x::ImpactTarget) = sqrt(2 * gm(x) / radius(x)) * (au/daysec)
 
 # Print method for ImpactTarget
 show(io::IO, x::ImpactTarget) = print(io, "Impact target with gm ",
