@@ -8,7 +8,7 @@ using StaticArraysCore
 using Test
 
 using NEOs: AbstractOpticalVector, KeplerianElements, EquinoctialElements,
-      AttributableElements, μ_S, indices, equatorial2ecliptic,
+      AttributableElements, μ_S, indices, equatorial2ecliptic, ecliptic2equatorial,
       numtypes, sseph
 using Statistics: mean
 
@@ -64,6 +64,20 @@ function jpl_compatibility_tests(orbit, params, bounds, JPL_CAR, JPL_KEP, JPL_EQ
 end
 
 @testset "AbstractOsculatingElements" begin
+
+    @testset "Rotation between the equatorial plane and the ecliptic" begin
+        using NEOs: eq2ecl, ecl2eq, ϵ0_deg
+
+        rv = [−0.18034828526, 0.94069105951, 0.34573599029,
+              −0.0162659397882, 4.39154800E−5, −0.000395204013]
+        drv = [7.12E−9, 1.94E−9, 5.41E−9, 4.79E−11, 6.72E−11, 1.38E−10]
+
+        @test eq2ecl() * ecl2eq() ≈ I
+        @test eq2ecl(-ϵ0_deg) * ecl2eq(-ϵ0_deg) ≈ I
+
+        _rv_ = ecliptic2equatorial(equatorial2ecliptic(rv))
+        @test mre(rv, _rv_, drv) < 6E-8
+    end
 
     @testset "Pérez-Hernández & Benet (2022) Apophis OR7 orbit" begin
         # Pérez-Hernández & Benet (2022) Apophis OR7 orbit
