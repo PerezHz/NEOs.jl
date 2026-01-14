@@ -19,7 +19,6 @@ The components of `elements` are given by:
 - `λ::U`: mean longitude [deg].
 - `p/q::U`: components of the ascending node vector.
 """
-
 @auto_hash_equals struct EquinoctialElements{T, U} <: AbstractOsculatingElements{T, U}
     gm::T
     epoch::T
@@ -196,6 +195,17 @@ function cartesian2equinoctial(x::AbstractVector{U}; μ::Real = μ_S) where {U <
     return elements
 end
 
+"""
+    equinoctial2cartesian(x; kwargs...)
+
+Convert a set of equinoctial elements `x` [deg, au] to a
+cartesian state vector [au, au/day].
+
+# Keyword arguments
+
+- `μ::Real`: gravitational parameter of the central body
+    [au³/day²] (default: `μ_S`).
+"""
 function equinoctial2cartesian(x::AbstractVector{U}; μ::Real = μ_S) where {U <: Number}
     # Equinoctial elements [rad, au]
     a, h, k, λ, p, q = x[1], x[2], x[3], deg2rad(x[4]), x[5], x[6]
