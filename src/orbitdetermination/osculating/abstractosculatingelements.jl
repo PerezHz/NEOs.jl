@@ -75,14 +75,32 @@ function evaldeltas(y::AbstractOsculatingElements{T, TaylorN{T}},
     return O{T, T}(gm(y), epoch(y), frame(y), elements(y)(dx), covariance(y)(dx))
 end
 
+# Rotation matrix from equatorial plane to the ecliptic
+function eq2ecl(ϵ::Number = ϵ0_deg)
+    # Rotation matrix (only positions)
+    m_eq2ecl = Rx(deg2rad(ϵ))
+    # Rotational matrix (positions + velocities)
+    m_xv_eq2ecl = hcat(vcat(m_eq2ecl, zeros(3, 3)), vcat(zeros(3, 3), m_eq2ecl))
+    return m_xv_eq2ecl
+end
+
 # Rotate state vector `xas` from equatorial plane to the ecliptic
 function equatorial2ecliptic(xas::AbstractVector)
-    # Rotation matrix (only positions)
-    m_eq2ecl = Rx(deg2rad(ϵ0_deg))
-    # Rotational matrix (positions + velocities)
-    m_xv_eq2ecl = hcat(vcat(m_eq2ecl, zeros(3,3)), vcat(zeros(3,3), m_eq2ecl))
+    # Rotation matrix
+    m_xv_eq2ecl = eq2ecl(ϵ0_deg)
     # Rotated state vector
     return m_xv_eq2ecl * xas
+end
+
+# Rotation matrix from the ecliptic to the equatorial plane
+ecl2eq(ϵ::Number = ϵ0_deg) = eq2ecl(ϵ)'
+
+# Rotate state vector `xas` from the ecliptic to the equatorial plane
+function ecliptic2equatorial(xas::AbstractVector)
+    # Rotation matrix
+    m_xv_ecl2eq = ecl2eq(ϵ0_deg)
+    # Rotated state vector
+    return m_xv_ecl2eq * xas
 end
 
 @doc raw"""
