@@ -1,7 +1,7 @@
 using Distributed, ArgParse
 
 function parse_commandline()
-    s = ArgParseSettings(add_version = true, version = v"0.2")
+    s = ArgParseSettings(add_version = true, version = "0.2")
 
     # Program name (for usage & help screen)
     s.prog = "mcmov.jl"
@@ -44,9 +44,12 @@ function parse_commandline()
             arg_type = Float64
             default = 5.0
         "--nominal"
-            help = "Whether to compute a nominal orbit"
+            help = "Compute a nominal orbit"
             arg_type = Bool
             default = true
+        "--refine"
+            help = "Refine the first grid"
+            action = :store_true
         "--scout"
             help = "Fetch JPL Scout data and save it into a .csv file"
             action = :store_true
@@ -78,6 +81,21 @@ end
     computationtime(x::DateTime, y::DateTime) = (y - x).value / 60_000
 
     initialcondition(x::AbstractOrbit) = x(), epoch(x) + PE.J2000
+
+    generate_grid(B::AbstractVector, Nx::Int, Ny::Int) =
+        Iterators.product(LinRange(B[1], B[2], Nx), LinRange(B[3], B[4], Ny))
+
+    function printitle(s::AbstractString, d::AbstractString)
+        l = repeat(d, length(s))
+        println(l, '\n', s, '\n', l)
+    end
+
+    function chi(x::AbstractVector{VariantOrbit{T}}) where {T <: Real}
+        Qmin, i = findmin(nms, x)
+        nobs = 2 * noptical(x[i])
+        χs = @. sqrt(nobs * ( nms(x) - Qmin ))
+        return χs
+    end
 
     function fetch_scout_orbits(input::AbstractString)
         uri = HTTP.URI(
@@ -116,6 +134,54 @@ end
         optical = parse_optical_rwo(text)
         σs = rms.(optical)
         return @. tuple(1 / first(σs), 1 / last(σs))
+    end
+
+    function global_box(A::AdmissibleRegion, scale::Symbol)
+        ρmin, ρmax = A.ρ_domain
+        if scale == :log
+            xmin, xmax = log10(ρmin), log10(ρmax)
+        elseif scale == :linear
+            xmin, xmax = ρmin, ρmax
+        end
+        ymin = argoldensearch(A, ρmin, ρmax, :min, :outer, 1e-20)[2]
+        ymin = min(ymin, A.v_ρ_domain[1])
+        ymax = argoldensearch(A, ρmin, ρmax, :max, :outer, 1e-20)[2]
+        ymax = max(ymax, A.v_ρ_domain[2])
+        bounds = [xmin, xmax, ymin, ymax]
+        return bounds
+    end
+
+    function refined_box(mask::AbstractVector{Bool}, scale::Symbol,
+                         points::Vector{Vector{NTuple{2, T}}}) where {T <: Real}
+        xmin, xmax = typemax(T), typemin(T)
+        ymin, ymax = typemax(T), typemin(T)
+        for (i, point) in enumerate(Iterators.flatten(points))
+            if mask[i]
+                ρ, v_ρ = point
+                xmin, xmax = min(xmin, ρ), max(xmax, ρ)
+                ymin, ymax = min(ymin, v_ρ), max(ymax, v_ρ)
+            end
+        end
+        if scale == :log
+            xmin, xmax = log10(xmin), log10(xmax)
+        end
+        return [xmin, xmax, ymin, ymax]
+    end
+
+    function distribute_points(A::AdmissibleRegion, Nworkers::Int, scale::Symbol, points)
+        points_per_worker = [NTuple{2, Float64}[] for _ in 1:Nworkers]
+        k = 1
+        for point in points
+            # Check if point is inside the admissible region
+            if scale == :log && (10^point[1], point[2]) in A
+                push!(points_per_worker[k], (10^point[1], point[2]))
+                k = mod1(k+1, Nworkers)
+            elseif scale == :linear && (point[1], point[2]) in A
+                push!(points_per_worker[k], (point[1], point[2]))
+                k = mod1(k+1, Nworkers)
+            end
+        end
+        return points_per_worker
     end
 
     function mcmov(points::AbstractVector{NTuple{2, T}}) where {T <: Real}
@@ -290,7 +356,8 @@ function main()
     parsed_args = parse_commandline()
 
     # Print header
-    println("Manifold of variations sampling for NEOCP objects")
+    printitle("Manifold of variations sampling for NEOCP objects", "=")
+    printitle("Parameters", "-")
 
     # Number of workers and threads
     Nworkers, Nthreads = nworkers(), Threads.nthreads()
@@ -321,6 +388,10 @@ function main()
     compute_nominal = parsed_args["nominal"]
     println("• Compute nominal orbit?: ", compute_nominal)
 
+    # Refine the first grid?
+    refine_grid = parsed_args["refine"]
+    println("• Refine the first grid?: ", refine_grid)
+
     # Fetching JPl Scout data?
     fetch_scout = parsed_args["scout"]
     println("• Fetch Scout data?: ", fetch_scout)
@@ -331,6 +402,7 @@ function main()
 
     # Initial time
     initial_time = now()
+    printitle("Computation", "-")
     println("• Run started at ", initial_time)
 
     # Get JPL Scout data for same object, if requested by user
@@ -361,37 +433,8 @@ function main()
     params = Parameters(params; bwdoffset)
 
     # Global box
-    ρmin, ρmax = A.ρ_domain
-    if scale == :log
-        xmin, xmax = log10(ρmin), log10(ρmax)
-    elseif scale == :linear
-        xmin, xmax = ρmin, ρmax
-    end
-    ymin = argoldensearch(A, ρmin, ρmax, :min, :outer, 1e-20)[2]
-    ymin = min(ymin, A.v_ρ_domain[1])
-    ymax = argoldensearch(A, ρmin, ρmax, :max, :outer, 1e-20)[2]
-    ymax = max(ymax, A.v_ρ_domain[2])
-    bounds = [xmin, xmax, ymin, ymax]
-
-    # Grid of domain points
-    side_x = LinRange(xmin, xmax, Nx)
-    side_y = LinRange(ymin, ymax, Ny)
-    points = Iterators.product(side_x, side_y)
-    # Distribute domain points over workers
-    points_per_worker = [NTuple{2, Float64}[] for _ in 1:Nworkers]
-    k = 1
-    for point in points
-        # Check if point is inside the admissible region
-        if scale == :log && (10^point[1], point[2]) in A
-            push!(points_per_worker[k], (10^point[1], point[2]))
-            k = mod1(k+1, Nworkers)
-        elseif scale == :linear && (point[1], point[2]) in A
-            push!(points_per_worker[k], (point[1], point[2]))
-            k = mod1(k+1, Nworkers)
-        end
-    end
-    Npoints = sum(length, points_per_worker)
-    println("• ", Npoints, " points in the manifold of variations")
+    bounds = global_box(A, scale)
+    println("• Global box: ", bounds)
 
     # Declare constants in all workers
     @everywhere begin
@@ -407,14 +450,39 @@ function main()
         const OBSERVER = observatory(TRACKLET)
     end
 
+    # Grid of domain points
+    points = generate_grid(bounds, Nx, Ny)
+    # Distribute domain points over workers
+    points_per_worker = distribute_points(A, Nworkers, scale, points)
+    Npoints = sum(length, points_per_worker)
+    println("• ", Npoints, " points in the manifold of variations")
+
     # Manifold of variations
     orbits = reduce(vcat, pmap(mcmov, points_per_worker))
     # Eliminate orbits with χ > 5
-    nobs = 2 * length(optical)
-    Qmin = minimum(nms, orbits)
-    χs = @. sqrt(nobs * ( nms(orbits) - Qmin ))
-    keepat!(orbits, χs .≤ χ_max)
+    χs = chi(orbits)
+    mask = χs .≤ χ_max
+    keepat!(orbits, mask)
     println("• ", length(orbits), " / ", Npoints, " points with χ ≤ χ_max = $(χ_max)")
+
+    if refine_grid
+        # Global box
+        bounds .= refined_box(mask, scale, points_per_worker)
+        @everywhere bounds .= $bounds
+        println("• Refined box: ", bounds)
+        # Grid of domain points
+        points = generate_grid(bounds, Nx, Ny)
+        # Distribute domain points over workers
+        points_per_worker = distribute_points(A, Nworkers, scale, points)
+        Npoints = sum(length, points_per_worker)
+        println("• ", Npoints, " points in the manifold of variations")
+        # Manifold of variations
+        orbits = reduce(vcat, pmap(mcmov, points_per_worker))
+        # Eliminate orbits with χ > 5
+        χs = chi(orbits)
+        keepat!(orbits, χs .≤ χ_max)
+        println("• ", length(orbits), " / ", Npoints, " points with χ ≤ χ_max = $(χ_max)")
+    end
 
     if compute_nominal
         # Right ascension and declination one day after REFERENCE_EPOCH
