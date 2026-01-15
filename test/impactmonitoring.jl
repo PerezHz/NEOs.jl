@@ -10,12 +10,12 @@ using Test
 using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
       initialcondition, nominalstate, difft, domain_radius, convergence_radius,
       convergence_domain, isconvergent, timeofca, distance, radialvelocity,
-      concavity, width, isoutlov, vinf, ismarginal
+      concavity, width, isoutlov, vinf, ismarginal, closeapproaches, issamereturn
 
 @testset "Impact monitoring" begin
 
     @testset "Common" begin
-        using NEOs: PLANET_NAMES_TO_INDEX, PLANET_RADII, escapevelocity, sseph
+        using NEOs: PLANET_NAMES_TO_INDEX, PLANET_RADII, escapevelocity, sseph, numtype
 
         # Impact monitoring scales
         Es  = [1E2,  1E4,  1E5,  1E1,  1E3,  1E4,  1E7,  1E7,  1E1,   1E4,   1E7] # Mt
@@ -40,6 +40,17 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
             @test escapevelocity(target) == sqrt(2 * gm(target) / radius(target)) * (au/daysec)
             @test target(t) == sseph(i, t)
         end
+
+        # Target plane
+        TP1 = BPlane(rand(5)...)
+        TP2 = MTP(rand(2)...)
+
+        @test numtype(TP1) == numtype(TP2) == Float64
+        @test isa(string(TP1), String)
+        @test isa(string(TP2), String)
+
+        R, D = valsecchi_circle(1.0, 0.5, 0.0, 1, 1)
+        @test isinf(R) && isinf(D)
     end
 
     @testset "BPlane" begin
@@ -160,6 +171,13 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test length(RTs) == 1
         RT = RTs[1]
 
+        @test isa(string(RT), String)
+        @test RT[1] == CA
+        @test closeapproaches(RT) == RT[1:end] == [CA]
+        @test firstindex(RT) == lastindex(RT) == 1
+        @test !issamereturn(CA, CA, 45.0)
+        @test showersnreturns(CAs) == showersnreturns([CAs])
+
         @test round(date(CA), Minute) == round(date(RT), Minute) == DateTime(2018, 06, 02, 16, 49)
         @test sigma(RT) == sigma(CA)
         @test lbound(RT) == lbound(CA)
@@ -204,6 +222,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         VIs = [VI1, VI2]
         impactor_table(VIs)
         @test isa(summary(VIs), String)
+        @test isa(string(VI1), String) && isa(string(VI2), String)
     end
 
     @testset "Modified target plane" begin
@@ -325,6 +344,13 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test length(RTs) == 1
         RT = RTs[1]
 
+        @test isa(string(RT), String)
+        @test RT[1] == CA
+        @test closeapproaches(RT) == RT[1:end] == [CA]
+        @test firstindex(RT) == lastindex(RT) == 1
+        @test !issamereturn(CA, CA, 45.0)
+        @test showersnreturns(CAs) == showersnreturns([CAs])
+
         @test round(date(CA), Minute) == round(date(RT), Minute) == DateTime(2024, 10, 28, 23, 41)
         @test sigma(RT) == sigma(CA)
         @test lbound(RT) == lbound(CA)
@@ -369,6 +395,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         VIs = [VI1, VI2]
         impactor_table(VIs)
         @test isa(summary(VIs), String)
+        @test isa(string(VI1), String) && isa(string(VI2), String)
     end
 
 end
