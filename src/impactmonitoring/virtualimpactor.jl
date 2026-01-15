@@ -245,7 +245,7 @@ function VirtualImpactor(
     # Second order jet transport initial condition
     q0 = q00 + sigmas(orbit) .* get_variables(T, 2)
     # O-C residuals
-    res = init_residuals(TaylorN{T}, IM)
+    res = init_optical_residuals(TaylorN{T}, IM)
     propres!(res, IM, q0, jd0, params)
     # Covariance matrix at reference epoch
     Q = nms(res)

@@ -215,7 +215,7 @@ function closeapproaches(
     q0 = reduceorder.(initialcondition(VA), vaorder)
     # Impact monitoring buffer
     if isnothing(buffer)
-        buffer = ImpactMonitoringBuffer(IM, params)
+        buffer = ImpactMonitoringBuffer(IM, nyears, vaorder, params)
     end
     @unpack prop, teph, tvS, xvS, gvS = buffer
     @unpack cache, dparams = prop
