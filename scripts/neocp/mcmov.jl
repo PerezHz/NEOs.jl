@@ -1,7 +1,7 @@
 using Distributed, ArgParse
 
 function parse_commandline()
-    s = ArgParseSettings()
+    s = ArgParseSettings(add_version = true, version = v"0.2")
 
     # Program name (for usage & help screen)
     s.prog = "mcmov.jl"
@@ -62,11 +62,12 @@ end
 
 @everywhere begin
     using NEOs, Dates, TaylorSeries, PlanetaryEphemeris, JLD2, HTTP, Statistics,
-          StaticArraysCore, DataFrames, CSV, JSON3
-    using NEOs: PropresBuffer, OpticalBuffer, OpticalADES, AbstractOrbit,
-                KeplerianElements, parse_optical_rwo, argoldensearch, evaldeltas,
-                init_optical_residuals, indices, _lsmethods, μ_S, equatorial2ecliptic
-    import NEOs: keplerian
+          ChunkSplitters, StaticArraysCore, DataFrames, CSV, JSON3
+    using NEOs: PropresBuffer, PropagationBuffer, OpticalBuffer, OpticalADES,
+                AbstractOrbit, KeplerianElements, parse_optical_rwo, argoldensearch,
+                evaldeltas, init_optical_residuals, indices, _lsmethods, μ_S,
+                equatorial2ecliptic, _propagate
+    import NEOs: keplerian, initialcondition
 
     const VariantOrbit{T} = MMOVOrbit{typeof(newtonian!), T, T, Vector{OpticalADES{T}}}
 
@@ -75,6 +76,8 @@ end
           NOpp   Arc    r.m.s.       Orbit ID"
 
     computationtime(x::DateTime, y::DateTime) = (y - x).value / 60_000
+
+    initialcondition(x::AbstractOrbit) = x(), epoch(x) + PE.J2000
 
     function fetch_scout_orbits(input::AbstractString)
         uri = HTTP.URI(
@@ -193,21 +196,23 @@ end
         return orbits
     end
 
-    function nominalorbit(orbits::AbstractVector{VariantOrbit{T}}) where {T <: Real}
-        αs = Vector{T}(undef, length(orbits))
-        δs = Vector{T}(undef, length(orbits))
-        Threads.@threads for i in eachindex(orbits)
-            orbit = orbits[i]
-            buffer = OpticalBuffer(zero(T))
-            αs[i], δs[i] = compute_radec(OBSERVER, DAY_AFTER_EPOCH, buffer;
+    function radec_next_day(orbits::AbstractVector{VariantOrbit{T}}) where {T <: Real}
+        radec = Vector{NTuple{2, T}}(undef, length(orbits))
+        q0, jd0 = initialcondition(orbits[1])
+        t0 = minimum(epoch, orbits) - params.bwdoffset
+        tf = dtutc2days(DAY_AFTER_EPOCH) + params.fwdoffset
+        pbuffer = PropagationBuffer(newtonian!, q0, jd0, (t0, tf), params);
+        for (i, orbit) in enumerate(orbits)
+            q0, jd0 = initialcondition(orbit)
+            tmax = ( tf + PE.J2000 - jd0 ) / yr
+            fwd = _propagate(newtonian!, q0, jd0, tmax, pbuffer, params)
+            obuffer = OpticalBuffer(zero(T))
+            radec[i] = compute_radec(OBSERVER, DAY_AFTER_EPOCH, obuffer;
                 xvs = params.eph_su, xve = params.eph_ea,
-                xva = (orbit.bwd, orbit.fwd)
+                xva = (orbit.bwd, fwd)
             )
         end
-        αmedian, δmedian = median(αs), median(δs)
-        i = argmin(@. hypot(αs - αmedian, δs - δmedian))
-
-        return i
+        return radec
     end
 
     function keplerian(orbit::VariantOrbit{T}, t::T,
@@ -353,10 +358,7 @@ function main()
     # Backward offset must take into consideration the -ρ/c relativistic
     # correction to the epoch
     bwdoffset = params.bwdoffset + A.ρ_domain[2] / c_au_per_day
-    # Forward correction must be at least 1 day to evaluate the right ascension
-    # and declination median
-    fwdoffset = params.fwdoffset + compute_nominal * 1.0
-    params = Parameters(params; bwdoffset, fwdoffset)
+    params = Parameters(params; bwdoffset)
 
     # Global box
     ρmin, ρmax = A.ρ_domain
@@ -415,8 +417,12 @@ function main()
     println("• ", length(orbits), " / ", Npoints, " points with χ ≤ χ_max = $(χ_max)")
 
     if compute_nominal
-        # Find nominal orbit
-        i = nominalorbit(orbits)
+        # Right ascension and declination one day after REFERENCE_EPOCH
+        radec = reduce(vcat, pmap(radec_next_day, chunks(orbits, n = Nworkers)))
+        αs, δs = @. first(radec), last(radec)
+        # Find closest orbit to the median
+        αmedian, δmedian = median(αs), median(δs)
+        i = argmin(@. hypot(αs - αmedian, δs - δmedian))
         # Sort orbits
         orbits[1], orbits[i] = orbits[i], orbits[1]
         sort!(view(orbits, 2:length(orbits)), by = nms)
