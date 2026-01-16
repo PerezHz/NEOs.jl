@@ -518,16 +518,16 @@ function main()
         sort!(view(orbits, 2:length(orbits)), by = nms)
         # Nominal orbit
         norbit = jtls(od, orbits[1], params)
+        norbits = iszero(norbit) ? view(orbits, 1:1) : [norbit]
     else
         # Sort orbits by nms
         sort!(orbits, by = nms)
         # Nominal orbit
-        norbit = orbits[1]
+        norbits = view(orbits, 1:1)
     end
 
     # Save results
-    norbits, vorbits = [norbit], view(orbits, 2:length(orbits))
-    write_neocp_orbits(norbits, vorbits, output)
+    write_neocp_orbits(norbits, view(orbits, 2:length(orbits)), output)
     println("• Output saved to: ", output)
 
     # Final time
