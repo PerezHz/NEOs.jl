@@ -6,7 +6,7 @@ A segment of the line of variations that impacts the Earth.
 # Fields
 
 - `t::T`: time of impact [days since J2000 TDB].
-- `σ::T`: coordinate on the line of variations.
+- `σ::T`: LOV index.
 - `ip::T`: impact probability.
 - `a::T`: geocentric semimajor axis [au].
 - `domain::NTuple{2, T}`: segment of the line of variations.
@@ -28,9 +28,10 @@ function VirtualImpactor(t::T, σ::T, ip::T, a::T, domain::NTuple{2, T},
 end
 
 # Abbreviations
-const VirtualAsteroids{T} = AbstractVector{VirtualAsteroid{T}}
-const ImpactCondition{T} = Tuple{Int, T, Tuple{T, T}, T, T}
+const Shower{T} = AbstractVector{Return{T}}
+const ImpactCondition{T} = Tuple{Int, T, NTuple{2, T}, T, T}
 
+# AbstractVirtualImpactor interface
 nominaltime(x::VirtualImpactor) = x.t
 date(x::VirtualImpactor) = days2dtutc(nominaltime(x))
 
@@ -39,17 +40,6 @@ sigma(x::VirtualImpactor) = x.σ
 impact_probability(x::VirtualImpactor) = x.ip
 
 semimajoraxis(x::VirtualImpactor) = x.a
-
-function vinf(x::VirtualImpactor{T}) where {T <: Real} # km/s
-    a = semimajoraxis(x)
-    if isnan(a)
-        return T(NaN)
-    elseif ishyperbolic(x)
-        return sqrt( PE.μ[ea] / (-semimajoraxis(x)) ) * (au/daysec)
-    else
-        return zero(T)
-    end
-end
 
 width(x::VirtualImpactor) = width(x.domain)
 
@@ -68,23 +58,43 @@ semiwidth(x::VirtualImpactor{T}) where {T <: Real} =
 stretching(x::VirtualImpactor{T}) where {T <: Real} =
     ismarginal(x) ? T(NaN) : sqrt(last(eigvals(covariance(x))))
 
-"""
-    impactenergy(VI, orbit, params)
+# Impact monitoring scales
+function vinf(IM::IMProblem, VI::VirtualImpactor) # km/s
+    a = semimajoraxis(VI)
+    if isnan(a)
+        return a
+    elseif ishyperbolic(VI)
+        return sqrt( gm(IM) / (-a) ) * (au/daysec)
+    else
+        return zero(a)
+    end
+end
 
-Return the impact energy [Mt] of a virtual impactor `VI` associated to
-an `orbit`. For a list of parameters, see the `Physical properties`
-section of [`Parameters`](@ref).
+"""
+    impactenergy(M, V2)
+
+Return the impact energy [Mt] of a virtual impactor with mass `M`
+and squared impact velocity `V2`.
+"""
+impactenergy(M::Real, V2::Real) = 0.5 * M * V2 / 4.184E+9
+
+"""
+    impactenergy(IM, VI, params)
+
+Return the impact energy [Mt], under the impact monitoring problem `IM`,
+of a virtual impactor `VI`. For a list of parameters, see the `Physical
+properties` section of [`Parameters`](@ref).
 
 !!! reference
     - https://doi.org/10.1006/icar.2002.6910
 """
-function impactenergy(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters)
+function impactenergy(IM::IMProblem, VI::VirtualImpactor, params::Parameters)
     # Object's mass [kg]
-    M = mass(orbit, params)
+    M = mass(IM, params)
     # Impact velocity^2 [km^2/s^2]
-    V2 = vinf(VI)^2 + EARTH_ESCAPE_VELOCITY^2
+    V2 = vinf(IM, VI)^2 + escapevelocity(IM)^2
     # Impact energy [Mt]
-    return 0.5 * M * V2 / 4.184E+9
+    return impactenergy(M, V2)
 end
 
 """
@@ -104,22 +114,22 @@ function palermoscale(E::Real, IP::Real, ΔT::Real)
 end
 
 """
-    palermoscale(VI, orbit, params)
+    palermoscale(IM, VI, params)
 
-Return the Palermo Scale of a virtual impactor `VI` associated to
-an `orbit`. For a list of parameters, see the `Physical properties`
-section of [`Parameters`](@ref).
+Return the Palermo Scale, under the impact monitoring problem `IM`,
+of a virtual impactor `VI`. For a list of parameters, see the
+`Physical properties` section of [`Parameters`](@ref).
 
 !!! reference
     - https://doi.org/10.1006/icar.2002.6910
 """
-function palermoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters)
+function palermoscale(IM::IMProblem, VI::VirtualImpactor, params::Parameters)
     # Impact energy [Mt]
-    E = impactenergy(VI, orbit, params)
+    E = impactenergy(IM, VI, params)
     # Impact probability
     IP = impact_probability(VI)
     # Time until impact [yr]
-    ΔT = (nominaltime(VI) - epoch(orbit)) / yr
+    ΔT = (nominaltime(VI) - epoch(IM)) / yr
     # Palermo scale
     return palermoscale(E, IP, ΔT)
 end
@@ -169,24 +179,25 @@ function torinoscale(E::Real, IP::Real)
 end
 
 """
-    torinoscale(VI, orbit, params)
+    torinoscale(IM, VI, params)
 
-Return the Torino Scale of a virtual impactor `VI` associated to
-an `orbit`. For a list of parameters, see the `Physical properties`
-section of [`Parameters`](@ref).
+Return the Torino Scale, under the impact monitoring problem `IM`,
+of a virtual impactor `VI`. For a list of parameters, see the
+`Physical properties` section of [`Parameters`](@ref).
 
 !!! reference
     - https://doi.org/10.1016/S0032-0633(00)00006-4
 """
-function torinoscale(VI::VirtualImpactor, orbit::AbstractOrbit, params::Parameters)
+function torinoscale(IM::IMProblem, VI::VirtualImpactor, params::Parameters)
     # Impact energy [Mt]
-    E = impactenergy(VI, orbit, params)
+    E = impactenergy(IM, VI, params)
     # Impact probability
     IP = impact_probability(VI)
     # Torino scale
     return torinoscale(E, IP)
 end
 
+# Impact probability computation
 impact_probability(a::Real, b::Real) = erf(a/sqrt(2), b/sqrt(2)) / 2
 
 function impact_probability(params::NTuple{6, T}) where {T <: Real}
@@ -216,9 +227,13 @@ function milani2005integrand(u::T, params::NTuple{6, T}) where {T <: Real}
     return exp(-A^2/2) * erf(Sminus, Splus)
 end
 
-function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T},
-                         orbit::AbstractOrbit, params::Parameters{T},
-                         σ::T, t::T, domain::NTuple{2, T}) where {D, T <: Real}
+# Virtual impactors search
+function VirtualImpactor(
+        IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
+        params::Parameters{T}, σ::T, t::T, domain::NTuple{2, T}
+    ) where {D, T <: Real}
+    # Unpack
+    @unpack orbit, target = IM
     # A priori impact probability
     ip = impact_probability(domain[1], domain[2])
     # Set jet transport variables
@@ -230,8 +245,8 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     # Second order jet transport initial condition
     q0 = q00 + sigmas(orbit) .* get_variables(T, 2)
     # O-C residuals
-    res = init_residuals(TaylorN{T}, od, orbit)
-    propres!(res, od, q0, jd0, params)
+    res = init_optical_residuals(TaylorN{T}, IM)
+    propres!(res, IM, q0, jd0, params)
     # Covariance matrix at reference epoch
     Q = nms(res)
     C = notout(res) * TS.hessian(Q)
@@ -242,7 +257,7 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     q0 = q00 + sigmas(orbit) .* get_variables(T, 1)
     # Forward propagation
     nyears = min(t + 2 + PE.J2000 - jd0, dtutc2days(DateTime(2099, 12, 31))) / yr
-    fwd, tvS, _, _ = propagate_root(lov.dynamics, q0, jd0, nyears, params)
+    fwd, tvS, _, _ = propagate_root(dynamicalmodel(IM), q0, jd0, nyears, params)
     if any(isnan, fwd.t) || isempty(tvS)
         @warn string(
             "The following virtual impactor was detected but integration failed\n",
@@ -256,12 +271,12 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     end
     # Close approach
     t_CA = fwd.t0 + tvS[end]
-    xae = fwd(t_CA)[1:6] - params.eph_ea(t_CA)
-    # Asteroid's geocentric semimajor axis
-    a = cte(semimajoraxis(xae..., PE.μ[ea], zero(T)))
+    xae = fwd(t_CA)[1:6] - target(t_CA)
+    # Asteroid's planetocentric semimajor axis
+    a = cte(semimajoraxis(xae..., gm(target), zero(T)))
     if a < 0
-        # Earth's heliocentric state vector
-        xes = params.eph_ea(t_CA) - params.eph_su(t_CA)
+        # Planet's heliocentric state vector
+        xes = target(t_CA) - params.eph_su(t_CA)
         # Öpik's coordinates
         tp = bopik(xae, xes)
     else
@@ -304,18 +319,18 @@ function VirtualImpactor(lov::LineOfVariations{D, T}, od::AbstractODProblem{D, T
     return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
 end
 
-function impactbounds(VA::VirtualAsteroid, σ::Real, ctol::Real)
-    a, b = convergence_domain(VA, ctol)
-    for CA in Iterators.reverse(VA.CAs)
+function impactbounds(RT::Return, σ::Real, ctol::Real)
+    a, b = convergence_domain(RT, ctol)
+    for CA in Iterators.reverse(RT.CAs)
         a ≤ lbound(CA) || break
-        if distance(VA, lbound(CA), ctol) > 0 && lbound(CA) < σ
+        if distance(RT, lbound(CA), ctol) > 0 && lbound(CA) < σ
             a = max(a, lbound(CA))
             break
         end
     end
-    for CA in VA.CAs
+    for CA in RT.CAs
         ubound(CA) ≤ b || break
-        if distance(VA, ubound(CA), ctol) > 0 && σ < ubound(CA)
+        if distance(RT, ubound(CA), ctol) > 0 && σ < ubound(CA)
             b = min(b, ubound(CA))
             break
         end
@@ -324,13 +339,13 @@ function impactbounds(VA::VirtualAsteroid, σ::Real, ctol::Real)
 end
 
 # Val{true}: The radial distance function is monotonic over domain
-function impactcondition(::Val{true}, VA::VirtualAsteroid{T},
+function impactcondition(::Val{true}, RT::Return{T},
                          domain::NTuple{2, T}, ctol::T) where {T <: Real}
     a, b = domain
-    da, db = distance(VA, a, ctol), distance(VA, b, ctol)
+    da, db = distance(RT, a, ctol), distance(RT, b, ctol)
     # The radial distance changes sign in [a, b], so there is a root
     if da * db < 0
-        σ = find_zero(σ -> distance(VA, σ, ctol), (a, b), Bisection())
+        σ = find_zero(σ -> distance(RT, σ, ctol), (a, b), Bisection())
         if da < 0 && db > 0
             domain = (a, σ)
         else
@@ -339,7 +354,7 @@ function impactcondition(::Val{true}, VA::VirtualAsteroid{T},
         σ = (domain[1] + domain[2]) / 2
     # The radial distance is always negative in [a, b]
     elseif da < 0 && db < 0
-        σ = sigma(VA)
+        σ = sigma(RT)
         domain = (a, b)
     # The radial distance is always positive in [a, b]
     else
@@ -349,34 +364,34 @@ function impactcondition(::Val{true}, VA::VirtualAsteroid{T},
 end
 
 # Val{false}: The radial distance function is not monotonic around σ
-function impactcondition(::Val{false}, VA::VirtualAsteroid{T},
+function impactcondition(::Val{false}, RT::Return{T},
                          domain::NTuple{2, T}, ctol::T) where {T <: Real}
     σ, d = domain
     if d > 0
         domain = (σ, σ)
     else
-        a, b = impactbounds(VA, σ, ctol)
-        σa, da = impactcondition(Val(true), VA, (a, σ), ctol)
-        σb, db = impactcondition(Val(true), VA, (σ, b), ctol)
+        a, b = impactbounds(RT, σ, ctol)
+        σa, da = impactcondition(Val(true), RT, (a, σ), ctol)
+        σb, db = impactcondition(Val(true), RT, (σ, b), ctol)
         σ = (isnan(σa) || isnan(σb)) ? T(NaN) : σ
         domain = (da[1], db[2])
     end
     return σ, domain
 end
 
-function impactconditions(VAs::VirtualAsteroids{T}, ctol::Real; no_pts::Int = 100,
+function impactconditions(RTs::Shower{T}, ctol::Real; no_pts::Int = 100,
                           dmax::Real = 236.0) where {T <: Real}
-    # Find all the impact conditions over VAs
+    # Find all the impact conditions over RTs
     ics = Vector{ImpactCondition{T}}(undef, 0)
-    for i in eachindex(VAs)
-        VA = VAs[i]
-        a, b = convergence_domain(VA, ctol)
-        rs = find_zeros(σ -> rvelea(VA, σ, ctol), (a, b); no_pts)
+    for i in eachindex(RTs)
+        RT = RTs[i]
+        a, b = convergence_domain(RT, ctol)
+        rs = find_zeros(σ -> radialvelocity(RT, σ, ctol), (a, b); no_pts)
         # The radial velocity has no roots in [a, b], so the radial distance is monotonic
         if isempty(rs)
-            σ, domain = impactcondition(Val(true), VA, (a, b), ctol)
+            σ, domain = impactcondition(Val(true), RT, (a, b), ctol)
             isnan(σ) && continue
-            t, d = timeofca(VA, σ, ctol), distance(VA, σ, ctol)
+            t, d = timeofca(RT, σ, ctol), distance(RT, σ, ctol)
             if 0 ≤ t ≤ 36525.0 && d < dmax
                 push!(ics, (i, σ, domain, t, d))
             end
@@ -385,14 +400,14 @@ function impactconditions(VAs::VirtualAsteroids{T}, ctol::Real; no_pts::Int = 10
         else
             for j in eachindex(rs)
                 σ = rs[j]
-                d, c = distance(VA, σ, ctol), concavity(VA, σ, ctol)
+                d, c = distance(RT, σ, ctol), concavity(RT, σ, ctol)
                 # Skip maxima outside the impact cross section
                 if c < 0 && d > 0
                     continue
                 end
-                σ, domain = impactcondition(Val(false), VA, (σ, d), ctol)
+                σ, domain = impactcondition(Val(false), RT, (σ, d), ctol)
                 isnan(σ) && continue
-                t, d = timeofca(VA, σ, ctol), distance(VA, σ, ctol)
+                t, d = timeofca(RT, σ, ctol), distance(RT, σ, ctol)
                 if 0 ≤ t ≤ 36525.0 && d < dmax
                     push!(ics, (i, σ, domain, t, d))
                 end
@@ -407,7 +422,7 @@ end
 
 # This function assumes that all the impact conditions in `ics` have negative distance
 function merge(ics::AbstractVector{ImpactCondition{T}},
-               VAs::VirtualAsteroids{T}, ctol::T) where {T <: Real}
+               RTs::Shower{T}, ctol::T) where {T <: Real}
     isempty(ics) && return Vector{ImpactCondition{T}}(undef, 0)
     # Sort by domain
     sort!(ics, by = Base.Fix2(getindex, 3))
@@ -426,7 +441,7 @@ function merge(ics::AbstractVector{ImpactCondition{T}},
             else
                 k = flaga ? ka : kb
             end
-            t, d = timeofca(VAs[k], σ, ctol), distance(VAs[k], σ, ctol)
+            t, d = timeofca(RTs[k], σ, ctol), distance(RTs[k], σ, ctol)
             newics[end] = (k, σ, domain, t, d)
         # The intersection of domaina and domainb is empty
         else
@@ -440,28 +455,29 @@ function merge(ics::AbstractVector{ImpactCondition{T}},
 end
 
 """
-    virtualimpactors(VAs, ctol; kwargs...)
+    virtualimpactors(RTs, ctol; kwargs...)
 
-Return the indices, sigmas, domains, times and distances of all the
-impact conditions found in a vector of virtual asteroids `VAs` given
-a convergence tolerance `ctol`.
+Return the indices, sigmas, domains, times and distances of all
+the impact conditions found in a vector of returns `RTs` given a
+convergence tolerance `ctol`.
 
 # Keyword arguments
 
-- `no_pts::Int`: number of points used to find the roots of `rvelea`
-    in each virtual asteroid (default: `100`).
-- `dmax::Real`: maximum allowed value of [`distance`](@ref) (default: `236.0`).
+- `no_pts::Int`: number of points used to find the roots of
+    `radialvelocity` in each return (default: `100`).
+- `dmax::Real`: maximum allowed value of [`distance`](@ref)
+    (default: `236.0`).
 """
-function virtualimpactors(VAs::VirtualAsteroids{T}, ctol::Real;
-                          no_pts::Int = 100, dmax::Real = 236.0) where {T <: Real}
-    # Find all the impact conditions over VAs
-    ics = impactconditions(VAs, ctol; no_pts, dmax)
+function virtualimpactors(RTs::Shower{T}, ctol::Real; no_pts::Int = 100,
+                          dmax::Real = 236.0) where {T <: Real}
+    # Find all the impact conditions over RTs
+    ics = impactconditions(RTs, ctol; no_pts, dmax)
     # Separate impact conditions with negative and positive distances
     k = findlast(x -> x[end] < 0, ics)
     isnothing(k) && return ics
     icsa, icsb = ics[1:k], ics[k+1:end]
     # Merge impact conditions
-    icsa = merge(icsa, VAs, ctol)
+    icsa = merge(icsa, RTs, ctol)
     mask = falses(length(icsb))
     for i in eachindex(icsb)
         σb = icsb[i][2]
@@ -482,26 +498,27 @@ function virtualimpactors(VAs::VirtualAsteroids{T}, ctol::Real;
 end
 
 """
-    virtualimpactors(VAs, ctol, lov, od, orbit, params; kwargs...)
+    virtualimpactors(IM, lov, RTs, ctol, params; kwargs...)
 
-Return the virtual impactors found in a vector of virtual asteroids `VAs` given
-a convergence tolerance `ctol`. A line of variations, orbit determination problem,
-orbit and parameters are needed to compute the target plane covariance matrix.
+Return the virtual impactors, under the impact monitoring problem `IM`
+with line of variations `lov`, found in a vector of returns `RTs` given
+a convergence tolerance `ctol`. For a list of parameters, see the
+`Propagation` section of  [`Parameters`](@ref).
 
 # Keyword arguments
 
-- `Nmax::Int`: maximum number of virtual impactors to compute (default: `10`).
-- `no_pts::Int`: number of points used to find the roots of `rvelea`
-    in each virtual asteroid (default: `100`).
-- `dmax::Real`: maximum allowed value of [`distance`](@ref) (default: `236.0`).
+- `Nmax::Int`: maximum number of virtual impactors to compute
+    (default: `10`).
+- `no_pts::Int`: number of points used to find the roots of
+    `radialvelocity` in each return (default: `100`).
+- `dmax::Real`: maximum allowed value of [`distance`](@ref)
+    (default: `236.0`).
 """
-function virtualimpactors(VAs::VirtualAsteroids{T}, ctol::Real,
-                          lov::LineOfVariations{D, T}, od::AbstractODProblem,
-                          orbit::AbstractOrbit, params::Parameters;
-                          Nmax::Int = 10, no_pts::Int = 100,
-                          dmax::Real = 236.0) where {D, T <: Real}
-    # Find all the impact conditions over VAs
-    ics = virtualimpactors(VAs, ctol; no_pts, dmax)
+function virtualimpactors(IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
+                          RTs::Shower{T}, ctol::Real, params::Parameters; Nmax::Int = 10,
+                          no_pts::Int = 100, dmax::Real = 236.0) where {D, T <: Real}
+    # Find all the impact conditions over RTs
+    ics = virtualimpactors(RTs, ctol; no_pts, dmax)
     Nic = length(ics)
     # Compute virtual impactors
     VIs = Vector{VirtualImpactor{T}}(undef, 0)
@@ -511,9 +528,9 @@ function virtualimpactors(VAs::VirtualAsteroids{T}, ctol::Real,
         if overlap(domain, lov.domain)
             domain = (max(domain[1], lbound(lov)), min(domain[2], ubound(lov)))
             σ = (domain[1] + domain[2]) / 2
-            t = timeofca(VAs[i], σ, ctol)
+            t = timeofca(RTs[i], σ, ctol)
             (σ in lov && 0.0 ≤ t ≤ 36525.0 ) || continue
-            VI = VirtualImpactor(lov, od, orbit, params, σ, t, domain)
+            VI = VirtualImpactor(IM, lov, params, σ, t, domain)
             if impact_probability(VI) > 0
                 push!(VIs, VI)
             end
@@ -525,6 +542,7 @@ function virtualimpactors(VAs::VirtualAsteroids{T}, ctol::Real,
     return VIs
 end
 
+# Impactor table
 function summary(VIs::AbstractVector{VirtualImpactor{T}}) where {T <: Real}
     s1 = string(
         "Impactor table{$T}\n",

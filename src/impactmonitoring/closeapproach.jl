@@ -1,12 +1,12 @@
 """
     CloseApproach{T} <: AbstractLineOfVariations{T}
 
-The projection over the target plane of a segment of the line of variations
-at close approach with respect to a planet.
+The projection over the target plane of a virtual asteroid at
+close approach with respect to a planet.
 
 # Fields
 
-- `σ::T`: center of the Taylor expansions.
+- `σ::T`: LOV index.
 - `domain::NTuple{2, T}`: segment of the line of variations.
 - `t::Taylor1{T}`: time of close approach [days since J2000 TDB].
 - `x/y::Taylor1{T}`: coordinates on the target plane [planet radii].
@@ -24,6 +24,39 @@ at close approach with respect to a planet.
     tp::Type{<:AbstractTargetPlane}
 end
 
+# Outer constructors
+function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},
+                       x::Taylor1{T}, y::Taylor1{T}, z::Taylor1{T},
+                       tp::Type{<:AbstractTargetPlane}) where {T <: Real}
+    return CloseApproach{T}(σ, domain, t, x, y, z, tp)
+end
+
+CloseApproach(VA::VirtualAsteroid, t::Taylor1, x::Taylor1, y::Taylor1, z::Taylor1, tp) =
+    CloseApproach(sigma(VA), VA.domain, t, x, y, z, tp)
+
+function CloseApproach(IM::AbstractIMProblem{D, T}, σ::T, domain::NTuple{2, T},
+                       t::Taylor1{T}, eph::DensePropagation2{T, Taylor1{T}},
+                       params::Parameters{T}) where {D, T <: Real}
+    # Unpack
+    @unpack target = IM
+    @unpack eph_su = params
+    # Asteroid's planetocentric state vector
+    xae = eph(t) - target(t)
+    # Asteroid's planetocentric semimajor axis
+    a = semimajoraxis(xae..., gm(target), zero(T))
+    if a < 0
+        # Planet's heliocentric state vector
+        xes = target(t) - eph_su(t)
+        # B-Plane in Öpik's coordinates
+        tp = bopik(xae, xes, target)
+    else
+        # Modified target plane
+        tp = mtp(xae, target)
+    end
+    return CloseApproach{T}(σ, domain, t, targetplane(tp)..., typeof(tp))
+end
+
+# Print method for CloseApproach
 function show(io::IO, x::CloseApproach)
     tp = x.tp.name.wrapper
     σ = sigma(x)
@@ -33,6 +66,7 @@ function show(io::IO, x::CloseApproach)
     print(io, tp, " σ: ", σ, " t: ", t, " coords: ", r)
 end
 
+# AbstractLineOfVariations interface
 nominaltime(x::CloseApproach) = cte(x.t)
 
 sigma(x::CloseApproach) = x.σ
@@ -65,28 +99,6 @@ end
 
 isconvergent(x, ctol::Real) = convergence_radius(x, ctol) > 1
 
-function refine(σ::T, domain::NTuple{2, T}, N::Int,
-                dist::Symbol = :uniform) where {T <: Real}
-    @assert N ≥ 1 && isodd(N) "N must be at least one and odd to have an \
-        expansion around the domain center"
-    if dist == :uniform
-        d = Uniform{T}(domain[1], domain[2])
-    elseif dist == :normal
-        d = Normal{T}(zero(T), one(T))
-    else
-        throw(ArgumentError("dist must be either :uniform or :normal"))
-    end
-    xs = LinRange(cdf(d, domain[1]), cdf(d, domain[2]), N+1)
-    endpoints = quantile.(d, xs)
-    endpoints[1], endpoints[end] = domain[1], domain[2]
-    domains = [(endpoints[i], endpoints[i+1]) for i in 1:N]
-    σs = [(domains[i][1] + domains[i][2]) / 2 for i in eachindex(domains)]
-    if iszero(σ) || dist == :uniform
-        σs[(N ÷ 2) + 1] = σ
-    end
-    return σs, domains
-end
-
 deltasigma(x::CloseApproach, σ::Real) = (σ - sigma(x)) / domain_radius(x)
 
 function timeofca(x::CloseApproach, σ::Real)
@@ -104,7 +116,7 @@ function distance(x::CloseApproach, σ::Real)
     return hypot(x.x(dσ), x.y(dσ)) - x.z(dσ)
 end
 
-function rvelea(x::CloseApproach, σ::Real)
+function radialvelocity(x::CloseApproach, σ::Real)
     dσ = deltasigma(x, σ)
     n = get_order(x)
     ξ, ζ, b = x.x[end], x.y[end], x.z[end]
@@ -147,67 +159,66 @@ function concavity(x::CloseApproach, σ::Real)
     return ( ra / r - rv^2 / r^3 - d2b) / domain_radius(x)^2
 end
 
-function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},
-                       eph::DensePropagation2{T, Taylor1{T}},
-                       params::Parameters{T}) where {T <: Real}
-    # Asteroid's geocentric state vector
-    xae = eph(t) - params.eph_ea(t)
-    # Asteroid's geocentric semimajor axis
-    a = semimajoraxis(xae..., PE.μ[ea], zero(T))
-    if a < 0
-        # Earth's heliocentric state vector
-        xes = params.eph_ea(t) - params.eph_su(t)
-        # B-Plane in Öpik's coordinates
-        tp = bopik(xae, xes)
-    else
-        # Modified target plane
-        tp = mtp(xae)
-    end
-    return CloseApproach{T}(σ, domain, t, targetplane(tp)..., typeof(tp))
+# Asteroid's radial velocity with respect to a planet
+function radialvelocity(x, teph, params, t)
+    # Julian date (TDB) of start time
+    jd0 = params.jd0
+    # Days since J2000.0 = 2.451545e6
+    dsj2k = t + (jd0 - JD_J2000)
+    # Planet ephemeris at dsj2k
+    xe = teph(dsj2k)
+    # Asteroid's planetocentric state vector
+    xae = x[1:6] - xe
+    # Planetocentric radial velocity
+    return euclid3D(cte(xae[1:3])) < 0.2, dot3D(xae[1:3], xae[4:6])
 end
 
 """
-    closeapproaches(lov, σ, domain, nyears, params; kwargs...)
+    closeapproaches(IM, VA, nyears, params; kwargs...)
 
-Return the vector of close approaches of the initial condition obtained by expanding
-`lov` at `σ`, with scaling factors such that `domain` is mapped into the `[-1, 1]`,
-interval for a period of `nyears` [years]. For a list of parameters see the
-`Propagation` section of [`Parameters`](@ref).
+Return the vector of close approaches, under the impact monitoring problem
+`IM`, of a virtual asteroid `VA` for a period of `nyears` [years]. For a
+list of parameters see the `Propagation` section of  [`Parameters`](@ref).
 
-The propagation will stop before the final time if it finds a close approach that
-does not converge under the tolerance `ctol`.
+The propagation will stop before the final time if it finds a close approach
+that does not converge under the tolerance `ctol`.
 
 # Keyword arguments
 
-- `lovorder::Int`: order of the expansion of `lov` (default: `min(6, get_order(lov))`).
-- `ctol::Real`: convergence tolerance (default: `0.01`); the integration will stop at
-    the first close approach not converging under `ctol`.
-- `newtoniter::Int`: maximum Newton-Raphson iterations per detected event (default: `10`).
-- `nrabstol::Real`: allowed tolerance for the Newton-Raphson process (default: `eps()`).
-- `buffer::Union{Nothing, PropagationBuffer}`: pre-allocated memory (default: `nothing`).
+- `vaorder::Int`: order of the Taylor expansions wrt the LOV index
+    (default: `get_order(VA)`).
+- `ctol::Real`: convergence tolerance (default: `0.01`); the integration
+    will stop at the first close approach not converging under `ctol`.
+- `newtoniter::Int`: maximum Newton-Raphson iterations per detected event
+    (default: `10`).
+- `nrabstol::Real`: allowed tolerance for the Newton-Raphson process
+    (default: `eps()`).
+- `buffer::Union{Nothing, ImpactMonitoringBuffer}`: pre-allocated memory
+    (default: `nothing`).
 """
 function closeapproaches(
-        lov::LineOfVariations{D, T}, σ::T, domain::NTuple{2, T}, nyears::T,
-        params::Parameters{T}; lovorder::Int = min(6, get_order(lov)),
+        IM::AbstractIMProblem{D, T}, VA::VirtualAsteroid{T}, nyears::T,
+        params::Parameters{T}; vaorder::Int = get_order(VA),
         ctol::T = 0.01, newtoniter::Int = 10, nrabstol::T = eps(T),
-        buffer::Union{Nothing, PropagationBuffer{T, Taylor1{T}, T}} = nothing
+        buffer::Union{Nothing, ImpactMonitoringBuffer{T}} = nothing
     ) where {D, T <: Real}
-    # Unpack parameters
-    @unpack abstol, maxsteps, order = params
+    # Unpack
+    @unpack target = IM
+    @unpack abstol, maxsteps, order, eph_su = params
     # Dynamical model
-    dynamics = lov.dynamics
+    dynamics = dynamicalmodel(IM)
     # Reference epoch
-    d0 = epoch(lov)
+    d0 = epoch(VA)
     jd0 = d0 + JD_J2000
     # Initial conditions
     tpre, t0, tmax = zero(T), zero(T), nyears * yr
-    q0 = lov(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(lovorder))
-    # Propagation buffer
+    q0 = reduceorder.(initialcondition(VA), vaorder)
+    # Impact monitoring buffer
     if isnothing(buffer)
-        tlim = (d0, d0 + tmax)
-        buffer = PropagationBuffer(dynamics, q0, jd0, tlim, params)
+        buffer = ImpactMonitoringBuffer(IM, nyears, vaorder, params)
     end
-    @unpack cache, dparams = buffer
+    @unpack prop, teph, tvS, xvS, gvS = buffer
+    @unpack cache, dparams = prop
     @unpack psol, xaux, t, x, dx, rv, parse_eqs = cache
     dparams.jd0 = jd0
 
@@ -220,7 +231,7 @@ function closeapproaches(
 
     # Some auxiliary arrays for root-finding/event detection/Poincaré
     # surface of section evaluation
-    g_tupl = (false, rvelea(dx, x, dparams, t)[2])
+    g_tupl = (false, radialvelocity(x, teph, dparams, t)[2])
     g_tupl_old = deepcopy(g_tupl)
     δt = zero(x[1])
     δt_old = zero(x[1])
@@ -229,10 +240,6 @@ function closeapproaches(
     g_dg = vcat(g_tupl[2], g_tupl_old[2])
     x_dx_val = TS.evaluate(x_dx)
     g_dg_val = vcat(TS.evaluate(g_tupl[2]), TS.evaluate(g_tupl_old[2]))
-
-    tvS = Array{Taylor1{T}}(undef, maxsteps + 1)
-    xvS = Array{Taylor1{T}}(undef, length(q0), maxsteps + 1)
-    gvS = similar(tvS)
 
     CAs = Vector{CloseApproach{T}}(undef, 0)
 
@@ -253,7 +260,7 @@ function closeapproaches(
                 TS.identity!(psol[:, 2][i], x[i], k)
             end
         end
-        g_tupl = rvelea(dx, x, dparams, t)
+        g_tupl = radialvelocity(x, teph, dparams, t)
         nevents_old = nevents
         nevents = findroot!(t, x, dx, g_tupl_old, g_tupl, 0, tvS, xvS, gvS,
                             t0, δt_old, x_dx, x_dx_val, g_dg, g_dg_val, nrabstol,
@@ -261,21 +268,21 @@ function closeapproaches(
         if nevents > nevents_old
             # Time at close approach
             t_CA = d0 + tvS[nevents-1]
-            # Asteroid's geocentric state vector
-            xae = psol[1:6, 1]( t_CA - d0 - tpre ) - params.eph_ea(t_CA)
-            # Asteroid's geocentric semimajor axis
-            a = semimajoraxis(xae..., PE.μ[ea], zero(T))
+            # Asteroid's planetocentric state vector
+            xae = psol[1:6, 1]( t_CA - d0 - tpre ) - target(t_CA)
+            # Asteroid's planetocentric semimajor axis
+            a = semimajoraxis(xae..., gm(target), zero(T))
             if a < 0
-                # Earth's heliocentric state vector
-                xes = params.eph_ea(t_CA) - params.eph_su(t_CA)
+                # Planet's heliocentric state vector
+                xes = target(t_CA) - eph_su(t_CA)
                 # BPlane in Öpik's coordinates
-                tp = bopik(xae, xes)
+                tp = bopik(xae, xes, target)
             else
                 # Modified target plane
-                tp = mtp(xae)
+                tp = mtp(xae, target)
             end
             # Close approach
-            CA = CloseApproach{T}(σ, domain, t_CA, targetplane(tp)..., typeof(tp))
+            CA = CloseApproach(VA, t_CA, targetplane(tp)..., typeof(tp))
             push!(CAs, CA)
             !isconvergent(CA, ctol) && break
         end

@@ -6,6 +6,13 @@ Supertye for the impact monitoring interface.
 abstract type AbstractImpactMonitoring end
 
 """
+    AbstractImpactTarget{T <: Real} <: AbstractImpactMonitoring
+
+Supertye for the impact targets interface.
+"""
+abstract type AbstractImpactTarget{T <: Real} <: AbstractImpactMonitoring end
+
+"""
     AbstractTargetPlane{U <: Number} <: AbstractImpactMonitoring
 
 Supertype for the target planes interface.
@@ -23,15 +30,21 @@ show(io::IO, x::AbstractTargetPlane) = print(io, typeof(x), " with coordinates "
     cte(targetplane(x)))
 
 """
+    AbstractIMProblem{D, T <: Real} <: AbstractImpactMonitoring
+
+Supertye for the impact monitoring problems interface.
+"""
+abstract type AbstractIMProblem{D, T <: Real} <: AbstractImpactMonitoring end
+
+"""
     AbstractLineOfVariations{T <: Real} <: AbstractImpactMonitoring
 
-Supertype for the line of variations nterface.
+Supertype for the line of variations (LOV) interface.
 
 Every instance `x` of `AbstractLineOfVariations` has a:
-- `date(x)`: nominal date [UTC].
-- `sigma(x)`: center of expansion.
-- `lbound(x)`: domain lower bound.
-- `ubound(x)`: domain upper bound.
+- `nominaltime(x)`: nominal time [days since J2000 TDB].
+- `sigma(x)`: LOV index.
+- `domain::NTuple{2, T}` field.
 """
 abstract type AbstractLineOfVariations{T <: Real} <: AbstractImpactMonitoring end
 
@@ -42,8 +55,11 @@ ubound(x::AbstractLineOfVariations) = x.domain[2]
 
 in(σ::Real, x::AbstractLineOfVariations) = lbound(x) ≤ σ ≤ ubound(x)
 
-width(x::NTuple{2, T}) where {T <: Real} = x[2] - x[1]
+width(x::NTuple{2, <:Real}) = x[2] - x[1]
 width(x::AbstractLineOfVariations) = ubound(x) - lbound(x)
+midpoint(x::NTuple{2, <:Real}) = (x[1] + x[2]) / 2
+
+lovdensity(x::Real) = exp(-x^2/2) / sqrt(2π)
 
 """
     AbstractVirtualImpactor{T <: Real} <: AbstractImpactMonitoring

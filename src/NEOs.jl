@@ -2,7 +2,7 @@ module NEOs
 
 # __precompile__(false)
 import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary,
-       lastindex, merge
+       firstindex, lastindex, merge
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination, argperi,
        longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly,
@@ -91,9 +91,10 @@ export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
        orbitdetermination
 # Impact monitoring
-export BPlane, MTP, bopik, mtp, targetplane, crosssection, valsecchi_circle
-export LineOfVariations, CloseApproach, VirtualAsteroid, lineofvariations, closeapproaches,
-       virtualasteroids, sigma, lbound, ubound
+export ImpactTarget, IMProblem, BPlane, MTP, bopik, mtp, targetplane, crosssection,
+       valsecchi_circle
+export LineOfVariations, VirtualAsteroid, CloseApproach, Return, lineofvariations,
+       virtualasteroids, closeapproaches, showersnreturns, sigma, lbound, ubound
 export VirtualImpactor, virtualimpactors, impact_probability, impactor_table, impactenergy,
        palermoscale, torinoscale, semiwidth, stretching
 

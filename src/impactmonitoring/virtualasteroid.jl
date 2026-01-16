@@ -1,102 +1,110 @@
 """
     VirtualAsteroid{T} <: AbstractLineOfVariations{T}
 
-A set of [`CloseApproach`](@ref)s with subsequent domains over the line
-of variations and nominal dates within a given time window.
+A segment of the line of variations (LOV).
 
 # Fields
 
+- `epoch::T`: reference epoch [days since J2000 TDB].
+- `σ::T`: LOV index.
 - `domain::NTuple{2, T}`: segment of the line of variations.
-- `CAs::Vector{CloseApproach{T}}`: vector of close approaches.
+- `q0::Vector{Taylor1{T}}`: barycentric initial condition [au, au/day].
 """
-@auto_hash_equals struct VirtualAsteroid{T} <: AbstractLineOfVariations{T}
+struct VirtualAsteroid{T} <: AbstractLineOfVariations{T}
+    epoch::T
+    σ::T
     domain::NTuple{2, T}
-    CAs::Vector{CloseApproach{T}}
+    q0::Vector{Taylor1{T}}
 end
 
+# Outer constructors
+function VirtualAsteroid(epoch::T, σ::T, domain::NTuple{2, T},
+                         q0::Vector{Taylor1{T}}) where {T <: Real}
+    return VirtualAsteroid{T}(epoch, σ, domain, q0)
+end
+
+VirtualAsteroid(lov::LineOfVariations, σ::Real, domain::NTuple{2, <:Real}) =
+    VirtualAsteroid(epoch(lov), σ, domain, lov(σ, domain))
+
+# Print method for VirtualAsteroid
 function show(io::IO, x::VirtualAsteroid)
     t = date(x)
-    N = length(x.CAs)
     domain = x.domain
-    print(io, "VA at ", t, " with ", N, " CAs covering ", domain)
+    print(io, "VA at ", t, " over ", domain)
 end
 
-nominaltime(x::VirtualAsteroid) = mean(nominaltime, x.CAs)
-
-sigma(x::VirtualAsteroid) = (lbound(x) + ubound(x)) / 2
-
-get_order(x::VirtualAsteroid) = get_order(x[1])
-
-getindex(x::VirtualAsteroid, i::Int) = x.CAs[i]
-lastindex(x::VirtualAsteroid) = lastindex(x.CAs)
-
-closeapproaches(x::VirtualAsteroid) = x.CAs
-
-isconvergent(x::VirtualAsteroid, ctol::Real) = all(Base.Fix2(isconvergent, ctol), x.CAs)
-
-function convergence_domain(x::VirtualAsteroid, ctol::Real)
-    ds = convergence_domain.(x.CAs, ctol)
-    return (minimum(first, ds), maximum(last, ds))
-end
-
-function exponential_weights(x::CloseApproach, σ::Real, ctol::Real)
-    dσ = deltasigma(x, σ) / convergence_radius(x, ctol)
-    w = 1 / 1000^(abs(dσ) - 1)
-    return w
-end
-
-nominalstate(x::VirtualAsteroid, ctol::Real) = targetplane(x, sigma(x), ctol)
-
-for f in (:(targetplane), :(timeofca), :(distance), :(rvelea), :(concavity))
-    @eval begin
-        function $f(x::VirtualAsteroid, σ::Real, ctol::Real)
-            d = convergence_domain(x, ctol)
-            @assert d[1] ≤ σ ≤ d[2] "`σ` is outside the convergence domain of `x`"
-            ws = @. exponential_weights(x.CAs, σ, ctol)
-            fs = @. $f(x.CAs, σ)
-            return mean(fs, weights(ws))
-        end
-    end
-end
-
-issameva(x::CloseApproach, y::CloseApproach, Δt::Real) = (x.tp == y.tp) &&
-    ubound(x) == lbound(y) && difft(x, y) < Δt
+# AbstractLineOfVariations interface
+epoch(x::VirtualAsteroid) = x.epoch
+nominaltime(x::VirtualAsteroid) = x.epoch
+sigma(x::VirtualAsteroid) = x.σ
+initialcondition(x::VirtualAsteroid) = x.q0
+get_order(x::VirtualAsteroid) = get_order(first(x.q0))
 
 """
-    virtualasteroids(CAs [, Δt])
+    virtualasteroids(lov, method; kwargs...)
 
-Aggregate a vector of [`CloseApproach`](@ref)s into a vector of
-[`VirtualAsteroid`](@ref)s given a time window `Δt` [days] (default: `45.0`).
+Divide the line of variations `lov` into a vector of virtual asteroids
+using `method`. Each of the following available methods have their own
+keyword arguments:
+- `:uniform`: domains of equal length. Keyword arguments:
+    - `N::Int`: number of domains.
+- `:normal`: domains of equal probability according to a normal density
+    function. Keyword arguments:
+    - `N::Int`: number of domains.
+- `:DelVigna19`: optimal method for LOV sampling proposed by Del Vigna
+    et al (2019). Keyword arguments:
+    - `R_TP::Real`: target plane radius [au].
+    - `R_P::Real`: planet radius [au].
+    - `IP::Real`: generic completeness limit.
+    - `Δσmax`: maximum interval length.
 """
-function virtualasteroids(x::AbstractVector{CloseApproach{T}},
-                          Δt::Real = 45.0) where {T <: Real}
-    VAs = Vector{VirtualAsteroid{T}}(undef, 0)
-    y = deepcopy(x)
-    while !isempty(y)
-        CAs = splice!(y, 1:1)
-        for _ in eachindex(y)
-            j = findfirst(z -> issameva(z, CAs[1], Δt), y)
-            isnothing(j) && break
-            z = popat!(y, j)
-            pushfirst!(CAs, z)
-        end
-        for _ in eachindex(y)
-            j = findfirst(z -> issameva(CAs[end], z, Δt), y)
-            isnothing(j) && break
-            z = popat!(y, j)
-            push!(CAs, z)
-        end
-        domain = (minimum(lbound, CAs), maximum(ubound, CAs))
-        push!(VAs, VirtualAsteroid{T}(domain, CAs))
-    end
+virtualasteroids(lov::LineOfVariations, method::Symbol; kwargs...) =
+    virtualasteroids(Val(method), lov; kwargs...)
 
-    return VAs
+function virtualasteroids(::Val{:uniform}, lov::LineOfVariations; N::Int)
+    endpoints = LinRange(lbound(lov), ubound(lov), N+1)
+    domains = [(endpoints[i], endpoints[i+1]) for i in 1:N]
+    σs = midpoint.(domains)
+    if isodd(N)
+        σs[(N ÷ 2) + 1] = sigma(lov)
+    end
+    return VirtualAsteroid.(Ref(lov), σs, domains)
 end
 
-function virtualasteroids(x::Vector{Vector{CloseApproach{T}}},
-                          Δt::Real = 45.0) where {T <: Real}
-    CAs = reduce(vcat, x)
-    sort!(CAs, by = nominaltime)
-    VAs = virtualasteroids(CAs, Δt)
-    return VAs
+function virtualasteroids(::Val{:normal}, lov::LineOfVariations; N::Int)
+    _, T = numtypes(lov)
+    d = Normal{T}(zero(T), one(T))
+    xs = LinRange(cdf(d, lbound(lov)), cdf(d, ubound(lov)), N+1)
+    endpoints = quantile.(d, xs)
+    endpoints[1], endpoints[end] = lbound(lov), ubound(lov)
+    domains = [(endpoints[i], endpoints[i+1]) for i in 1:N]
+    σs = midpoint.(domains)
+    if isodd(N)
+        σs[(N ÷ 2) + 1] = sigma(lov)
+    end
+    return VirtualAsteroid.(Ref(lov), σs, domains)
+end
+
+function virtualasteroids(::Val{:DelVigna19}, lov::LineOfVariations;
+                          R_TP::Real, R_P::Real, IP::Real, Δσmax::Real)
+    _, T = numtypes(lov)
+    endpoints = [zero(T)]
+    while endpoints[end] < ubound(lov)
+        σ = endpoints[end]
+        σ += min(R_TP * IP / (2R_P * lovdensity(σ)), Δσmax)
+        if σ < ubound(lov)
+            push!(endpoints, σ)
+        else
+            push!(endpoints, ubound(lov))
+            break
+        end
+    end
+    endpoints = vcat(reverse(-endpoints[2:end]), endpoints)
+    N = length(endpoints) - 1
+    domains = [(endpoints[i], endpoints[i+1]) for i in 1:N]
+    σs = midpoint.(domains)
+    if isodd(N)
+        σs[(N ÷ 2) + 1] = sigma(lov)
+    end
+    return VirtualAsteroid.(Ref(lov), σs, domains)
 end

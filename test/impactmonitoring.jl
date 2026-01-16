@@ -7,13 +7,16 @@ using TaylorSeries
 using PlanetaryEphemeris
 using Test
 
-using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
-      convergence_domain, isconvergent, timeofca, distance, rvelea,
-      concavity, width, isoutlov, vinf, ismarginal, refine
+using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
+      initialcondition, nominalstate, difft, domain_radius, convergence_radius,
+      convergence_domain, isconvergent, timeofca, distance, radialvelocity,
+      concavity, width, isoutlov, vinf, ismarginal, closeapproaches, issamereturn
 
 @testset "Impact monitoring" begin
 
     @testset "Common" begin
+        using NEOs: PLANET_NAMES_TO_INDEX, PLANET_RADII, escapevelocity, sseph, numtype
+
         # Impact monitoring scales
         Es  = [1E2,  1E4,  1E5,  1E1,  1E3,  1E4,  1E7,  1E7,  1E1,   1E4,   1E7] # Mt
         IPs = [1E-6, 1E-4, 1E-3, 1E-1, 1E-1, 1E-1, 1E-3, 1E-1, 0.999, 0.999, 0.999]
@@ -27,37 +30,27 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         perm = sortperm(@. IPs / Es^(-0.8))
         @test issorted(PS[perm])
 
-        # Domain refinement
-        σ = 0.0
-        domain = (-5.0, 5.0)
-        N = 11
+        # Impact target
+        t = dtutc2days(now())
+        planets = Symbol.(first.(sort(collect(PLANET_NAMES_TO_INDEX), by = last)))
+        for (i, planet) in enumerate(planets)
+            target = ImpactTarget(:($planet))
+            @test gm(target) == PE.μ[i]
+            @test radius(target) == PLANET_RADII[i]
+            @test escapevelocity(target) == sqrt(2 * gm(target) / radius(target)) * (au/daysec)
+            @test target(t) == sseph(i, t)
+        end
 
-        @test_throws AssertionError refine(σ, domain, 0)
-        @test_throws AssertionError refine(σ, domain, 2)
-        @test_throws ArgumentError refine(σ, domain, N, :exp)
+        # Target plane
+        TP1 = BPlane(rand(5)...)
+        TP2 = MTP(rand(2)...)
 
-        σs1, domains1 = refine(σ, domain, 1, :uniform)
-        σs2, domains2 = refine(σ, domain, 1, :normal)
-        @test σs1 == σs2 == [σ]
-        @test domains1 == domains2 == [domain]
+        @test numtype(TP1) == numtype(TP2) == Float64
+        @test isa(string(TP1), String)
+        @test isa(string(TP2), String)
 
-        d1 = Uniform(domain[1], domain[2])
-        σs1, domains1 = refine(σ, domain, N, :uniform)
-        @test σs1[(N ÷ 2) + 1] == σ
-        @test domains1[1][1] == domain[1]
-        @test domains1[end][end] == domain[2]
-        @test all(domains1[i][end] == domains1[i+1][1] for i in 1:N-1)
-        ps = @. cdf(d1, last(domains1)) - cdf(d1, first(domains1))
-        @test all(Base.Fix1(isapprox, ps[1]), ps)
-
-        d2 = Normal(0.0, 1.0)
-        σs2, domains2 = refine(σ, domain, N, :normal)
-        @test σs2[(N ÷ 2) + 1] == σ
-        @test domains2[1][1] == domain[1]
-        @test domains2[end][end] == domain[2]
-        @test all(domains2[i][end] == domains2[i+1][1] for i in 1:N-1)
-        ps = @. cdf(d2, last(domains2)) - cdf(d2, first(domains2))
-        @test all(Base.Fix1(isapprox, ps[1]), ps)
+        R, D = valsecchi_circle(1.0, 0.5, 0.0, 1, 1)
+        @test isinf(R) && isinf(D)
     end
 
     @testset "BPlane" begin
@@ -76,68 +69,140 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Oct 22, 2025
+        # Values by Jan 15, 2026
+
+        # Impact target
+        target = ImpactTarget(:earth)
+        # Impact monitoring problem
+        IM = IMProblem(orbit, target)
+
+        @test dynamicalmodel(IM) == newtonian!
+        @test NEOs.dof(IM) == 6
+        @test epoch(IM) == epoch(orbit)
+        @test noptical(IM) == length(optical)
+        @test opticalindices(IM) == eachindex(optical)
+        @test gm(IM) == gm(target)
+        @test mass(IM, params) == mass(orbit, params)
+        @test escapevelocity(IM) == escapevelocity(target)
+        @test minmaxdates(IM) == (date(optical[1]), date(optical[end]))
 
         # Line of variations
         order, σmax = 12, 5.0
-        lov = lineofvariations(od, orbit, params; order, σmax)
+        lov = lineofvariations(IM, params; order, σmax)
 
-        @test round(date(lov), Minute) == DateTime(2018, 06, 02, 09, 34)
+        @test numtypes(lov) == (typeof(newtonian!), Float64)
+        @test dynamicalmodel(lov) == newtonian!
+        @test epoch(lov) == nominaltime(lov) == epoch(orbit)
+        @test round(date(lov), Minute) == round(days2dtutc(epoch(orbit)), Minute)
         @test sigma(lov) == 0.0
+        @test get_order(lov) == order
+        @test lov(0.0) == orbit()
+        @test constant_term(lov(0.0, (-σmax, σmax))) == orbit()
+
+        @test lov.domain == (-σmax, σmax)
         @test lbound(lov) == -σmax
         @test ubound(lov) == σmax
         @test width(lov) == 2σmax
+        @test all(Base.Fix2(in, lov), [-σmax, 0.0, σmax])
 
-        @test lov.dynamics == od.dynamics
-        @test nominaltime(lov) == epoch(lov) == epoch(orbit)
-        @test lov.domain == (-σmax, σmax)
-        @test -σmax in lov
-        @test 0.0 in lov
-        @test σmax in lov
-        @test lov(0.0) == orbit()
-        @test get_order(lov) == order
+        # Virtual asteroids
+        N = 11
+        R_TP, R_P, IP, Δσmax = 0.2, radius(target), 1E-5, 0.1
+        VAs1 = virtualasteroids(lov, :uniform; N)
+        VAs2 = virtualasteroids(lov, :normal; N)
+        VAs3 = virtualasteroids(lov, :DelVigna19; R_TP, R_P, IP, Δσmax)
+
+        @test sigma(VAs1[(N ÷ 2) + 1]) == 0.0
+        @test lbound(VAs1[1]) == -σmax
+        @test ubound(VAs1[end]) == σmax
+        @test all(ubound(VAs1[i]) == lbound(VAs1[i+1]) for i in 1:N-1)
+        d1 = Uniform(-σmax, σmax)
+        ps = @. cdf(d1, lbound(VAs1)) - cdf(d1, ubound(VAs1))
+        @test all(Base.Fix1(isapprox, ps[1]), ps)
+
+        @test sigma(VAs2[(N ÷ 2) + 1]) == 0.0
+        @test lbound(VAs2[1]) == -σmax
+        @test ubound(VAs2[end]) == σmax
+        @test all(ubound(VAs2[i]) == lbound(VAs2[i+1]) for i in 1:N-1)
+        d2 = Normal(0.0, 1.0)
+        ps = @. cdf(d2, lbound(VAs2)) - cdf(d2, ubound(VAs2))
+        @test all(Base.Fix1(isapprox, ps[1]), ps)
+
+        @test lbound(VAs3[1]) == -σmax
+        @test ubound(VAs3[end]) == σmax
+        @test all(ubound(VAs3[i]) == lbound(VAs3[i+1]) for i in 1:length(VAs3)-1)
+        @test maximum(width, VAs3) ≈ Δσmax
+
+        N = 1
+        VAs = virtualasteroids(lov, :uniform; N)
+        VA = VAs[1]
+        @test epoch(VA) == epoch(lov)
+        @test nominaltime(VA) == nominaltime(lov)
+        @test sigma(VA) == sigma(lov)
+        @test initialcondition(VA) == lov(0.0, (-σmax, σmax))
+        @test get_order(VA) == get_order(lov)
 
         # Close approaches
-        σ, domain = 0.0, (-σmax, σmax)
         nyears = 0.4 / yr
-        lovorder = 6
+        vaorder = 6
         ctol = 0.01
-        CAs = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
+        CAs = closeapproaches(IM, VA, nyears, params; vaorder, ctol)
         @test length(CAs) == 1
         CA = CAs[1]
 
-        # Virtual asteroids
-        VAs = virtualasteroids(CAs)
-        @test length(VAs) == 1
-        VA = VAs[1]
-
-        @test round(date(CA), Minute) == round(date(VA), Minute) == DateTime(2018, 06, 02, 16, 49)
-        @test sigma(CA) == sigma(VA) == σ
-        @test lbound(CA) == lbound(VA) == -σmax
-        @test ubound(CA) == ubound(VA) == σmax
-
-        @test σ in CA && σ in VA
-        @test get_order(CA) == get_order(VA) == lovorder
-        @test nominaltime(CA) == nominaltime(VA) == timeofca(CA, σ) == timeofca(VA, σ, ctol)
-        @test nominalstate(CA) == nominalstate(VA, ctol) == targetplane(CA, σ) == targetplane(VA, σ, ctol)
+        @test nominaltime(CA) == constant_term(CA.t) == timeofca(CA, 0.0)
+        @test sigma(CA) == sigma(VA)
+        @test get_order(CA) == vaorder < get_order(VA)
+        @test nominalstate(CA) == [CA.x[0], CA.y[0], CA.z[0]] == targetplane(CA, 0.0)
+        @test difft(CA, CA) == 0.0
         @test domain_radius(CA) == σmax
+
+        @test 0.0 in CA
+        @test lbound(CA) == lbound(VA)
+        @test ubound(CA) == ubound(VA)
         @test convergence_radius(CA, ctol) > 1
-        @test convergence_domain(CA, ctol) == convergence_domain(CA, ctol)
-        @test isconvergent(CA, ctol) && isconvergent(CA, ctol)
+        a, b = convergence_domain(CA, ctol)
+        @test a < -σmax && σmax < b
+        @test isconvergent(CA, ctol)
         @test CA.tp == BPlane{Taylor1{Float64}}
-        @test distance(CA, σ) == distance(VA, σ, ctol) < 0
-        @test rvelea(CA, σ) == rvelea(VA, σ, ctol)
-        @test concavity(CA, σ) ≈ concavity(VA, σ, ctol) > 0
+
+        # Returns
+        RTs = showersnreturns(CAs)
+        @test length(RTs) == 1
+        RT = RTs[1]
+
+        @test isa(string(RT), String)
+        @test RT[1] == CA
+        @test closeapproaches(RT) == RT[1:end] == [CA]
+        @test firstindex(RT) == lastindex(RT) == 1
+        @test !issamereturn(CA, CA, 45.0)
+        @test showersnreturns(CAs) == showersnreturns([CAs])
+
+        @test round(date(CA), Minute) == round(date(RT), Minute) == DateTime(2018, 06, 02, 16, 49)
+        @test sigma(RT) == sigma(CA)
+        @test lbound(RT) == lbound(CA)
+        @test ubound(RT) == ubound(CA)
+
+        @test 0.0 in RT
+        @test get_order(RT) == get_order(CA)
+        @test nominaltime(RT) == timeofca(RT, 0.0, ctol) == nominaltime(CA)
+        @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) == nominalstate(CA)
+        @test convergence_domain(RT, ctol) == convergence_domain(CA, ctol)
+        @test isconvergent(RT, ctol)
+
+        @test distance(CA, 0.0) == distance(RT, 0.0, ctol) < 0
+        @test radialvelocity(CA, 0.0) == radialvelocity(RT, 0.0, ctol)
+        @test concavity(CA, 0.0) ≈ concavity(RT, 0.0, ctol) > 0
 
         # Virtual impactors
-        VIs = virtualimpactors(VAs, ctol, lov, od, orbit, params)
+        VIs = virtualimpactors(IM, lov, RTs, ctol, params)
         @test length(VIs) == 1
-
         VI1 = VIs[1]
-        VI2 = VirtualImpactor(lov, od, orbit, params, σ, nominaltime(VA), (σ, σ))
 
-        @test date(VI1) == date(VI2) == date(CA) == date(VA)
-        @test sigma(VI1) == sigma(VI2) == σ
+        VI2 = VirtualImpactor(IM, lov, params, 0.0, nominaltime(RT), (0.0, 0.0))
+
+        @test date(VI1) == date(VI2) == date(CA) == date(RT)
+        @test sigma(VI1) == sigma(VI2) == 0.0
         @test impact_probability(VI1) ≈ impact_probability(VI2) atol = 0.01
         @test width(VI1) == 2σmax
         @test width(VI2) == 0.0
@@ -147,15 +212,17 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test semiwidth(VI1) == semiwidth(VI2) > 0
         @test stretching(VI1) == stretching(VI2) > 0
         @test semimajoraxis(VI1) == semimajoraxis(VI2) < 0
-        @test vinf(VI1) == vinf(VI2) > 0
         @test ishyperbolic(VI1) && ishyperbolic(VI2)
-        @test impactenergy(VI1, orbit, params) == impactenergy(VI2, orbit, params) > 0
-        @test palermoscale(VI1, orbit, params) ≈ palermoscale(VI2, orbit, params) atol=0.01
-        @test torinoscale(VI1, orbit, params) == torinoscale(VI1, orbit, params) == 0
+
+        @test vinf(IM, VI1) == vinf(IM, VI2) > 0
+        @test impactenergy(IM, VI1, params) == impactenergy(IM, VI2, params) > 0
+        @test palermoscale(IM, VI1, params) ≈ palermoscale(IM, VI2, params) atol=0.01
+        @test torinoscale(IM, VI1, params) == torinoscale(IM, VI1, params) == 0
 
         VIs = [VI1, VI2]
         impactor_table(VIs)
         @test isa(summary(VIs), String)
+        @test isa(string(VI1), String) && isa(string(VI2), String)
     end
 
     @testset "Modified target plane" begin
@@ -175,68 +242,140 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Oct 22, 2025
+        # Values by Jan 15, 2026
+
+        # Impact target
+        target = ImpactTarget(:earth)
+        # Impact monitoring problem
+        IM = IMProblem(orbit, target)
+
+        @test dynamicalmodel(IM) == newtonian!
+        @test NEOs.dof(IM) == 6
+        @test epoch(IM) == epoch(orbit)
+        @test noptical(IM) == 9
+        @test opticalindices(IM) == 1:9
+        @test gm(IM) == gm(target)
+        @test mass(IM, params) == mass(orbit, params)
+        @test escapevelocity(IM) == escapevelocity(target)
+        @test minmaxdates(IM) == (date(optical[1]), date(optical[9]))
 
         # Line of variations
         order, σmax = 12, 5.0
-        lov = lineofvariations(od, orbit, params; order, σmax)
+        lov = lineofvariations(IM, params; order, σmax)
 
-        @test round(date(lov), Minute) == DateTime(2024, 10, 04, 20, 08)
+        @test numtypes(lov) == (typeof(newtonian!), Float64)
+        @test dynamicalmodel(lov) == newtonian!
+        @test epoch(lov) == nominaltime(lov) == epoch(orbit)
+        @test round(date(lov), Minute) == round(days2dtutc(epoch(orbit)), Minute)
         @test sigma(lov) == 0.0
+        @test get_order(lov) == order
+        @test lov(0.0) == orbit()
+        @test constant_term(lov(0.0, (-σmax, σmax))) == orbit()
+
+        @test lov.domain == (-σmax, σmax)
         @test lbound(lov) == -σmax
         @test ubound(lov) == σmax
         @test width(lov) == 2σmax
+        @test all(Base.Fix2(in, lov), [-σmax, 0.0, σmax])
 
-        @test lov.dynamics == od.dynamics
-        @test nominaltime(lov) == epoch(lov) == epoch(orbit)
-        @test lov.domain == (-σmax, σmax)
-        @test -σmax in lov
-        @test 0.0 in lov
-        @test σmax in lov
-        @test lov(0.0) == orbit()
-        @test get_order(lov) == order
+        # Virtual asteroids
+        N = 11
+        R_TP, R_P, IP, Δσmax = 0.2, radius(target), 1E-5, 0.1
+        VAs1 = virtualasteroids(lov, :uniform; N)
+        VAs2 = virtualasteroids(lov, :normal; N)
+        VAs3 = virtualasteroids(lov, :DelVigna19; R_TP, R_P, IP, Δσmax)
+
+        @test sigma(VAs1[(N ÷ 2) + 1]) == 0.0
+        @test lbound(VAs1[1]) == -σmax
+        @test ubound(VAs1[end]) == σmax
+        @test all(ubound(VAs1[i]) == lbound(VAs1[i+1]) for i in 1:N-1)
+        d1 = Uniform(-σmax, σmax)
+        ps = @. cdf(d1, lbound(VAs1)) - cdf(d1, ubound(VAs1))
+        @test all(Base.Fix1(isapprox, ps[1]), ps)
+
+        @test sigma(VAs2[(N ÷ 2) + 1]) == 0.0
+        @test lbound(VAs2[1]) == -σmax
+        @test ubound(VAs2[end]) == σmax
+        @test all(ubound(VAs2[i]) == lbound(VAs2[i+1]) for i in 1:N-1)
+        d2 = Normal(0.0, 1.0)
+        ps = @. cdf(d2, lbound(VAs2)) - cdf(d2, ubound(VAs2))
+        @test all(Base.Fix1(isapprox, ps[1]), ps)
+
+        @test lbound(VAs3[1]) == -σmax
+        @test ubound(VAs3[end]) == σmax
+        @test all(ubound(VAs3[i]) == lbound(VAs3[i+1]) for i in 1:length(VAs3)-1)
+        @test maximum(width, VAs3) ≈ Δσmax
+
+        N = 1
+        VAs = virtualasteroids(lov, :uniform; N)
+        VA = VAs[1]
+        @test epoch(VA) == epoch(lov)
+        @test nominaltime(VA) == nominaltime(lov)
+        @test sigma(VA) == sigma(lov)
+        @test initialcondition(VA) == lov(0.0, (-σmax, σmax))
+        @test get_order(VA) == get_order(lov)
 
         # Close approaches
-        σ, domain = 0.0, (-σmax, σmax)
         nyears = 26 / yr
-        lovorder = 6
+        vaorder = 6
         ctol = 0.01
-        CAs = closeapproaches(lov, σ, domain, nyears, params; lovorder, ctol)
+        CAs = closeapproaches(IM, VA, nyears, params; vaorder, ctol)
         @test length(CAs) == 1
         CA = CAs[1]
 
-        # Virtual asteroids
-        VAs = virtualasteroids(CAs)
-        @test length(VAs) == 1
-        VA = VAs[1]
-
-        @test round(date(CA), Minute) == round(date(VA), Minute) == DateTime(2024, 10, 28, 23, 41)
-        @test sigma(CA) == sigma(VA) == σ
-        @test lbound(CA) == lbound(VA) == -σmax
-        @test ubound(CA) == ubound(VA) == σmax
-
-        @test σ in CA && σ in VA
-        @test get_order(CA) == get_order(VA) == lovorder
-        @test nominaltime(CA) == nominaltime(VA) == timeofca(CA, σ) == timeofca(VA, σ, ctol)
-        @test nominalstate(CA) == nominalstate(VA, ctol) == targetplane(CA, σ) == targetplane(VA, σ, ctol)
+        @test nominaltime(CA) == constant_term(CA.t) == timeofca(CA, 0.0)
+        @test sigma(CA) == sigma(VA)
+        @test get_order(CA) == vaorder < get_order(VA)
+        @test nominalstate(CA) == [CA.x[0], CA.y[0], CA.z[0]] == targetplane(CA, 0.0)
+        @test difft(CA, CA) == 0.0
         @test domain_radius(CA) == σmax
+
+        @test 0.0 in CA
+        @test lbound(CA) == lbound(VA)
+        @test ubound(CA) == ubound(VA)
         @test convergence_radius(CA, ctol) > 1
-        @test convergence_domain(CA, ctol) == convergence_domain(CA, ctol)
-        @test isconvergent(CA, ctol) && isconvergent(CA, ctol)
+        a, b = convergence_domain(CA, ctol)
+        @test a < -σmax && σmax < b
+        @test isconvergent(CA, ctol)
         @test CA.tp == MTP{Taylor1{Float64}}
-        @test distance(CA, σ) == distance(VA, σ, ctol) > 0
-        @test rvelea(CA, σ) == rvelea(VA, σ, ctol)
-        @test concavity(CA, σ) ≈ concavity(VA, σ, ctol) < 0
+
+        # Returns
+        RTs = showersnreturns(CAs)
+        @test length(RTs) == 1
+        RT = RTs[1]
+
+        @test isa(string(RT), String)
+        @test RT[1] == CA
+        @test closeapproaches(RT) == RT[1:end] == [CA]
+        @test firstindex(RT) == lastindex(RT) == 1
+        @test !issamereturn(CA, CA, 45.0)
+        @test showersnreturns(CAs) == showersnreturns([CAs])
+
+        @test round(date(CA), Minute) == round(date(RT), Minute) == DateTime(2024, 10, 28, 23, 41)
+        @test sigma(RT) == sigma(CA)
+        @test lbound(RT) == lbound(CA)
+        @test ubound(RT) == ubound(CA)
+
+        @test 0.0 in RT
+        @test get_order(RT) == get_order(CA)
+        @test nominaltime(RT) == timeofca(RT, 0.0, ctol) == nominaltime(CA)
+        @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) == nominalstate(CA)
+        @test convergence_domain(RT, ctol) == convergence_domain(CA, ctol)
+        @test isconvergent(RT, ctol)
+
+        @test distance(CA, 0.0) == distance(RT, 0.0, ctol) > 0
+        @test radialvelocity(CA, 0.0) == radialvelocity(RT, 0.0, ctol)
+        @test concavity(CA, 0.0) ≈ concavity(RT, 0.0, ctol) < 0
 
         # Virtual impactors
-        VIs = virtualimpactors(VAs, ctol, lov, od, orbit, params)
+        VIs = virtualimpactors(IM, lov, RTs, ctol, params)
         @test isempty(VIs)
 
-        VI1 = VirtualImpactor(lov, od, orbit, params, σ, nominaltime(VA), domain)
-        VI2 = VirtualImpactor(lov, od, orbit, params, σ, nominaltime(VA), (σ, σ))
+        VI1 = VirtualImpactor(IM, lov, params, 0.0, nominaltime(RT), (-σmax, σmax))
+        VI2 = VirtualImpactor(IM, lov, params, 0.0, nominaltime(RT), (0.0, 0.0))
 
-        @test date(VI1) == date(VI2) == date(CA) == date(VA)
-        @test sigma(VI1) == sigma(VI2) == σ
+        @test date(VI1) == date(VI2) == date(CA) == date(RT)
+        @test sigma(VI1) == sigma(VI2) == 0.0
         @test impact_probability(VI1) > impact_probability(VI2) == 0.0
         @test width(VI1) == 2σmax
         @test width(VI2) == 0.0
@@ -246,15 +385,17 @@ using NEOs: nominaltime, nominalstate, domain_radius, convergence_radius,
         @test semiwidth(VI1) == semiwidth(VI2) > 0
         @test stretching(VI1) == stretching(VI2) > 0
         @test semimajoraxis(VI1) == semimajoraxis(VI2) > 0
-        @test vinf(VI1) == vinf(VI2) == 0.0
         @test !ishyperbolic(VI1) && !ishyperbolic(VI2)
-        @test impactenergy(VI1, orbit, params) == impactenergy(VI2, orbit, params) > 0
-        @test palermoscale(VI1, orbit, params) > palermoscale(VI2, orbit, params) == -Inf
-        @test torinoscale(VI1, orbit, params) == torinoscale(VI1, orbit, params) == 0
+
+        @test vinf(IM, VI1) == vinf(IM, VI2) == 0.0
+        @test impactenergy(IM, VI1, params) == impactenergy(IM, VI2, params) > 0
+        @test palermoscale(IM, VI1, params) > palermoscale(IM, VI2, params) == -Inf
+        @test torinoscale(IM, VI1, params) == torinoscale(IM, VI1, params) == 0
 
         VIs = [VI1, VI2]
         impactor_table(VIs)
         @test isa(summary(VIs), String)
+        @test isa(string(VI1), String) && isa(string(VI2), String)
     end
 
 end
