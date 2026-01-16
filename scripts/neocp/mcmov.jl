@@ -309,13 +309,14 @@ end
         return kep
     end
 
-    function write_neocp_orbits(orbits::AbstractVector{VariantOrbit{T}},
-                                filename::AbstractString) where {T <: Real}
+    function write_neocp_orbits(norbits::AbstractVector{<:AbstractOrbit},
+                                vorbits::AbstractVector{<:AbstractOrbit},
+                                filename::AbstractString)
         open(filename, "w") do file
             # Header
             write(file, NEOCP_ORBITS_HEADER, '\n')
             # Orbits
-            for (j, orbit) in enumerate(orbits)
+            for (j, orbit) in enumerate(Iterators.flatten((norbits, vorbits)))
                 # Absolute magnitude
                 H, _ = absolutemagnitude(orbit, params)
                 # Slope parameter
@@ -443,7 +444,8 @@ function main()
     params = Parameters(
         maxsteps = 1_000, order = 15, abstol = 1E-12, parse_eqs = true,
         coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-        jtlsiter = 20, lsiter = 20, significance = 0.99,
+        jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 20,
+        significance = 0.99, jtlsproject = true, outrej = false,
     )
     # Admissible region
     A = AdmissibleRegion(od.tracklets[1], params)
@@ -511,15 +513,21 @@ function main()
         # Find closest orbit to the median
         αmedian, δmedian = median(αs), median(δs)
         i = argmin(@. hypot(αs - αmedian, δs - δmedian))
-        # Sort orbits
+        # Sort orbits by nms
         orbits[1], orbits[i] = orbits[i], orbits[1]
         sort!(view(orbits, 2:length(orbits)), by = nms)
+        # Nominal orbit
+        norbit = jtls(od, orbits[1], params)
     else
+        # Sort orbits by nms
         sort!(orbits, by = nms)
+        # Nominal orbit
+        norbit = orbits[1]
     end
 
     # Save results
-    write_neocp_orbits(orbits, output)
+    norbits, vorbits = [norbit], view(orbits, 2:length(orbits))
+    write_neocp_orbits(norbits, vorbits, output)
     println("• Output saved to: ", output)
 
     # Final time
