@@ -56,6 +56,9 @@ function parse_commandline()
         "--neoscan"
             help = "Fetch NEODyS NEOScan data and save it into a .mov_sample file"
             action = :store_true
+        "--neocp"
+            help = "Fetch MPC NEOCP data and save it into a .orb file"
+            action = :store_true
     end
 
     return parse_args(s)
@@ -124,6 +127,17 @@ end
         response_neoscan = HTTP.get(string(uri) #=, require_ssl_verification = false=#)
         write("$input.mov_sample", response_neoscan.body)
         println("• Fetched NEOScan data; saved to: $(input).mov_sample")
+        return nothing
+    end
+
+    function fetch_neocp_orbits(input::AbstractString)
+        url_neocp = "https://cgi.minorplanetcenter.net/cgi-bin/showobsorbs.cgi"
+        data = Dict("Obj" => input, "orb" => "y")
+        response_neocp = HTTP.post(url_neocp, [], data #=, require_ssl_verification = false=#)
+        text = String(response_neocp.body)
+        lines = split(text, '\n')[2:end-2]
+        write("$input.orb", join(lines, '\n'))
+        println("• Fetched NEOCP data; saved to: $(input).orb")
         return nothing
     end
 
@@ -400,6 +414,10 @@ function main()
     fetch_neoscan = parsed_args["neoscan"]
     println("• Fetch NEOScan data?: ", fetch_neoscan)
 
+    # Fetch MPC NEOCP data?
+    fetch_neocp = parsed_args["neocp"]
+    println("• Fetch NEOCP data?: ", fetch_neocp)
+
     # Initial time
     initial_time = now()
     printitle("Computation", "-")
@@ -409,6 +427,8 @@ function main()
     fetch_scout && fetch_scout_orbits(input)
     # Get NEODyS NEOScan data for same object, if requested by user
     fetch_neoscan && fetch_neoscan_orbits(input)
+    # Get MPC NEOCP data for same object, if requested by user
+    fetch_neocp && fetch_neocp_orbits(input)
 
     # Fetch optical astrometry
     optical_all = fetch_optical_ades(input, NEOCP)
