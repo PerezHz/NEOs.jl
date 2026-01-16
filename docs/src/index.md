@@ -8,7 +8,7 @@
 (https://coveralls.io/github/PerezHz/NEOs.jl?branch=main)
 [![codecov](https://codecov.io/gh/PerezHz/NEOs.jl/branch/main/graph/badge.svg?token=F1IY79YP3J)]
 (https://codecov.io/gh/PerezHz/NEOs.jl)
-![v0.19.2](https://img.shields.io/badge/version-v0.19.2-green.svg)
+![v0.20.0](https://img.shields.io/badge/version-v0.20.0-green.svg)
 
 A [Julia](http://julialang.org) package for high-accuracy propagation, orbit determination
 and impact monitoring of Near-Earth Objects. It exploits jet transport techniques via
