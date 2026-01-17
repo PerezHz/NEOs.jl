@@ -295,8 +295,8 @@ end
         return radec
     end
 
-    function keplerian(orbit::VariantOrbit{T}, t::T,
-                       params::Parameters{T}) where {T <: Real}
+    function keplerian(orbit::AbstractOrbit{D, T, T}, t::T,
+                       params::Parameters{T}) where {D, T <: Real}
         # Reference epoch [MJD TDB]
         mjd0 = t + MJD2000
         # Scalar initial condition
