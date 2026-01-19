@@ -1,14 +1,12 @@
 # Pre-allocated memory for the evaluation of solar system
 # ephemerides within propagation functions
 struct EphemerisEvaluationBuffer{T <: Real, U <: Number} <: AbstractBuffer
+    t::Taylor1{T}
     eph::DensePropagation2{T, T}
     aux::Vector{Taylor1{T}}
     ephT::Vector{Taylor1{T}}
     ephU::Vector{Taylor1{U}}
 end
-
-# This function assumes that order ≤ get_order(x)
-reduceorder(x::Taylor1, order::Int) = Taylor1(x[0:order], order)
 
 # Outer constructor
 function EphemerisEvaluationBuffer(eph::DensePropagation2{T, T}, tlim::NTuple{2, T},
@@ -16,73 +14,55 @@ function EphemerisEvaluationBuffer(eph::DensePropagation2{T, T}, tlim::NTuple{2,
     # Check order
     @assert order <= SSEPHORDER "order ($order) must be less or equal than solar system \
         ephemerides order ($SSEPHORDER)"
+    # Evaluation time
+    t = Taylor1(SSEPHORDER)
     # Load ephemeris
     t0, tf = minmax(tlim[1], tlim[2])
     j0 = searchsortedlast(eph.t, t0)
     jf = searchsortedfirst(eph.t, tf)
-    t = eph.t[j0:jf]
-    x = reduceorder.(view(eph.x, j0:jf-1, :), order)
-    _eph_ = TaylorInterpolant(eph.t0, t, x)
+    _eph_ = TaylorInterpolant(eph.t0, eph.t[j0:jf], eph.x[j0:jf-1, :])
     # Evaluation vectors
-    zeroT = Taylor1(zeros(order+1), order)
-    aux = [zero(zeroT) for _ in axes(x, 2)]
-    ephT = [zero(zeroT) for _ in axes(x, 2)]
+    idxs = axes(eph.x, 2)
+    zeroT = Taylor1(zeros(order+1), SSEPHORDER)
+    aux = [zero(zeroT) for _ in idxs]
+    ephT = [zero(zeroT) for _ in idxs]
     zeroU = Taylor1(zero(q0[1]), order)
-    ephU = [zero(zeroU) for _ in axes(x, 2)]
+    ephU = [zero(zeroU) for _ in idxs]
 
-    return EphemerisEvaluationBuffer{T, U}(_eph_, aux, ephT, ephU)
+    return EphemerisEvaluationBuffer{T, U}(t, _eph_, aux, ephT, ephU)
 end
 
 # Evaluation methods for EphemerisEvaluationBuffer
-function (y::EphemerisEvaluationBuffer{T, T})(t::Taylor1{T}) where {T <: Real}
-    @unpack eph, aux, ephT, ephU = y
-    # Get index of eph.x that interpolates at time t
-    ind::Int, δt::Taylor1{T} = getinterpindex(eph, t)
-    # Evaluate eph at t and convert the output to T
-    Threads.@threads for i in eachindex(ephU)
-        TS.zero!(ephT[i])
-        TS.zero!(aux[i])
-        TS._horner!(ephT[i], eph.x[ind, i], δt, aux[i])
-        TS.zero!(ephU[i])
-        for k in eachindex(ephU[i])
-            TS.identity!(ephU[i], ephT[i], k)
+for U in (:(T), :(TaylorN{T}), :(Taylor1{T}))
+    @eval begin
+        function (y::EphemerisEvaluationBuffer{T, $U})(tt::Taylor1{T}) where {T <: Real}
+            @unpack t, eph, aux, ephT, ephU = y
+            # Get index of eph.x that interpolates at time t
+            TS.identity!(t, tt, 0)
+            ind::Int, δt::Taylor1{T} = getinterpindex(eph, t)
+            # Evaluate eph at t and convert the output to $U
+            Threads.@threads for i in eachindex(ephU)
+                TS.zero!(ephT[i])
+                TS.zero!(aux[i])
+                TS._horner!(ephT[i], eph.x[ind, i], δt, aux[i])
+                TS.zero!(ephU[i])
+                if $U == T
+                    for k in eachindex(ephU[i])
+                        TS.identity!(ephU[i], ephT[i], k)
+                    end
+                elseif $U == TaylorN{T}
+                    for k in eachindex(ephU[i])
+                        ephU[i][k][0][1] = ephT[i][k]
+                    end
+                elseif $U == Taylor1{T}
+                    for k in eachindex(ephU[i])
+                        ephU[i][k][0] = ephT[i][k]
+                    end
+                end
+            end
+            return ephU
         end
     end
-    return ephU
-end
-
-function (y::EphemerisEvaluationBuffer{T, TaylorN{T}})(t::Taylor1{T}) where {T <: Real}
-    @unpack eph, aux, ephT, ephU = y
-    # Get index of eph.x that interpolates at time t
-    ind::Int, δt::Taylor1{T} = getinterpindex(eph, t)
-    # Evaluate eph at t and convert the output to TaylorN{T}
-    Threads.@threads for i in eachindex(ephU)
-        TS.zero!(ephT[i])
-        TS.zero!(aux[i])
-        TS._horner!(ephT[i], eph.x[ind, i], δt, aux[i])
-        TS.zero!(ephU[i])
-        for k in eachindex(ephU[i])
-            ephU[i][k][0][1] = ephT[i][k]
-        end
-    end
-    return ephU
-end
-
-function (y::EphemerisEvaluationBuffer{T, Taylor1{T}})(t::Taylor1{T}) where {T <: Real}
-    @unpack eph, aux, ephT, ephU = y
-    # Get index of eph.x that interpolates at time t
-    ind::Int, δt::Taylor1{T} = getinterpindex(y.eph, t)
-    # Evaluate eph at t and convert the output to Taylor1{T}
-    Threads.@threads for i in eachindex(ephU)
-        TS.zero!(ephT[i])
-        TS.zero!(aux[i])
-        TS._horner!(ephT[i], eph.x[ind, i], δt, aux[i])
-        TS.zero!(ephU[i])
-        for k in eachindex(ephU[i])
-            ephU[i][k][0] = ephT[i][k]
-        end
-    end
-    return ephU
 end
 
 # Parameters used within dynamical model functions
