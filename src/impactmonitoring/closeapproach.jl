@@ -173,6 +173,9 @@ function radialvelocity(x, teph, params, t)
     return euclid3D(cte(xae[1:3])) < 0.2, dot3D(xae[1:3], xae[4:6])
 end
 
+# This function assumes that order ≤ get_order(x)
+reduceorder(x::Taylor1, order::Int) = Taylor1(x[0:order], order)
+
 """
     closeapproaches(IM, VA, nyears, params; kwargs...)
 
