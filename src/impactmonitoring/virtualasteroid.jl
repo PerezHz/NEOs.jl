@@ -88,18 +88,26 @@ end
 function virtualasteroids(::Val{:DelVigna19}, lov::LineOfVariations;
                           R_TP::Real, R_P::Real, IP::Real, Δσmax::Real)
     _, T = numtypes(lov)
-    endpoints = [zero(T)]
-    while endpoints[end] < ubound(lov)
+    σmax = ubound(lov)
+    C = R_TP * IP / (2 * R_P)
+    endpoints = [min(C / lovdensity(zero(T)), Δσmax) / 2]
+    while endpoints[end] < σmax
         σ = endpoints[end]
-        σ += min(R_TP * IP / (2R_P * lovdensity(σ)), Δσmax)
-        if σ < ubound(lov)
+        Δσ = min(C / lovdensity(σ), Δσmax)
+        if Δσ ≥ Δσmax
+            N = ceil(Int, (σmax - σ) / Δσmax)
+            splice!(endpoints, length(endpoints), LinRange(σ, σmax, N+1))
+            break
+        end
+        σ += Δσ
+        if σ < σmax
             push!(endpoints, σ)
         else
-            push!(endpoints, ubound(lov))
+            push!(endpoints, σmax)
             break
         end
     end
-    endpoints = vcat(reverse(-endpoints[2:end]), endpoints)
+    endpoints = vcat(reverse(-endpoints), endpoints)
     N = length(endpoints) - 1
     domains = [(endpoints[i], endpoints[i+1]) for i in 1:N]
     σs = midpoint.(domains)
