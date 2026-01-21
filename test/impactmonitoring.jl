@@ -131,7 +131,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test lbound(VAs3[1]) == -σmax
         @test ubound(VAs3[end]) == σmax
         @test all(ubound(VAs3[i]) == lbound(VAs3[i+1]) for i in 1:length(VAs3)-1)
-        @test maximum(width, VAs3) ≈ Δσmax
+        @test maximum(width, VAs3) < Δσmax
 
         N = 1
         VAs = virtualasteroids(lov, :uniform; N)
@@ -304,7 +304,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test lbound(VAs3[1]) == -σmax
         @test ubound(VAs3[end]) == σmax
         @test all(ubound(VAs3[i]) == lbound(VAs3[i+1]) for i in 1:length(VAs3)-1)
-        @test maximum(width, VAs3) ≈ Δσmax
+        @test maximum(width, VAs3) < Δσmax
 
         N = 1
         VAs = virtualasteroids(lov, :uniform; N)
