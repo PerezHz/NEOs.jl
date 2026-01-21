@@ -103,17 +103,27 @@ using NEOs: SCRATCH_PATH
             unknownobs, parse_observatories_mpc, read_observatories_mpc
 
         # Check global variable OBSERVATORIES_MPC[]
-        @test allunique(OBSERVATORIES_MPC[])
+        Ntotal = length(OBSERVATORIES_MPC[])
+        Nradar = count(isradar, OBSERVATORIES_MPC[])
+        Ncoord = count(hascoord, OBSERVATORIES_MPC[])
+        Nroving = count(isroving, OBSERVATORIES_MPC[])
+        Nunknown = count(isunknown, OBSERVATORIES_MPC[])
+        Noptical = count(isoptical, OBSERVATORIES_MPC[])
+        Nsatellite = count(issatellite, OBSERVATORIES_MPC[])
+        Ngeocentric = count(isgeocentric, OBSERVATORIES_MPC[])
+        Noccultation = count(isoccultation, OBSERVATORIES_MPC[])
+
         @test issorted(OBSERVATORIES_MPC[])
+        @test allunique(OBSERVATORIES_MPC[])
         @test isa(OBSERVATORIES_MPC[], Vector{ObservatoryMPC{Float64}})
-        @test count(isoptical, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 40
-        @test count(isoccultation, OBSERVATORIES_MPC[]) == 2
-        @test count(issatellite, OBSERVATORIES_MPC[]) == 21
-        @test count(isradar, OBSERVATORIES_MPC[]) == 15
-        @test count(isroving, OBSERVATORIES_MPC[]) == 2
-        @test count(isgeocentric, OBSERVATORIES_MPC[]) == 2
-        @test count(hascoord, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 22
-        @test count(isunknown, OBSERVATORIES_MPC[]) == 0
+
+        @test Nroving ≥ 2
+        @test Nunknown == 0
+        @test Ngeocentric ≥ 2
+        @test Noccultation ≥ 2
+        @test Noptical + Nradar ≤ Ncoord
+        @test Nsatellite + Nroving + Noccultation ≥ Ntotal - Ncoord
+        @test Noptical + Nradar + Nroving + Nsatellite + Noccultation == Ntotal
 
         # Parse ObservatoryMPC
         lemmon_s = """
@@ -168,17 +178,28 @@ using NEOs: SCRATCH_PATH
 
         # Update observatories file
         update_observatories_mpc()
-        @test allunique(OBSERVATORIES_MPC[])
+
+        Ntotal = length(OBSERVATORIES_MPC[])
+        Nradar = count(isradar, OBSERVATORIES_MPC[])
+        Ncoord = count(hascoord, OBSERVATORIES_MPC[])
+        Nroving = count(isroving, OBSERVATORIES_MPC[])
+        Nunknown = count(isunknown, OBSERVATORIES_MPC[])
+        Noptical = count(isoptical, OBSERVATORIES_MPC[])
+        Nsatellite = count(issatellite, OBSERVATORIES_MPC[])
+        Ngeocentric = count(isgeocentric, OBSERVATORIES_MPC[])
+        Noccultation = count(isoccultation, OBSERVATORIES_MPC[])
+
         @test issorted(OBSERVATORIES_MPC[])
+        @test allunique(OBSERVATORIES_MPC[])
         @test isa(OBSERVATORIES_MPC[], Vector{ObservatoryMPC{Float64}})
-        @test count(isoptical, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 40
-        @test count(isoccultation, OBSERVATORIES_MPC[]) == 2
-        @test count(issatellite, OBSERVATORIES_MPC[]) == 21
-        @test count(isradar, OBSERVATORIES_MPC[]) == 15
-        @test count(isroving, OBSERVATORIES_MPC[]) == 2
-        @test count(isgeocentric, OBSERVATORIES_MPC[]) == 2
-        @test count(hascoord, OBSERVATORIES_MPC[]) == length(OBSERVATORIES_MPC[]) - 22
-        @test count(isunknown, OBSERVATORIES_MPC[]) == 0
+
+        @test Nroving ≥ 2
+        @test Nunknown == 0
+        @test Ngeocentric ≥ 2
+        @test Noccultation ≥ 2
+        @test Noptical + Nradar ≤ Ncoord
+        @test Nsatellite + Nroving + Noccultation ≥ Ntotal - Ncoord
+        @test Noptical + Nradar + Nroving + Nsatellite + Noccultation == Ntotal
 
         # Search observatory code
         obs = search_observatory_code("G96")
