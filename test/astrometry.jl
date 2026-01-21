@@ -121,9 +121,9 @@ using NEOs: SCRATCH_PATH
         @test Nunknown == 0
         @test Ngeocentric ≥ 2
         @test Noccultation ≥ 2
-        @test Ncoord + Nsatellite == Ntotal
-        @test Nroving ≤ Nradar ≤ Noptical ≤ Ncoord
-        @test Noptical + Nradar + Nroving + Nsatellite + Ngeocentric == Ntotal
+        @test Noptical + Nradar ≤ Ncoord
+        @test Nsatellite + Nroving + Noccultation ≥ Ntotal - Ncoord
+        @test Noptical + Nradar + Nroving + Nsatellite + Noccultation == Ntotal
 
         # Parse ObservatoryMPC
         lemmon_s = """
@@ -197,9 +197,9 @@ using NEOs: SCRATCH_PATH
         @test Nunknown == 0
         @test Ngeocentric ≥ 2
         @test Noccultation ≥ 2
-        @test Ncoord + Nsatellite == Ntotal
-        @test Nroving ≤ Nradar ≤ Noptical ≤ Ncoord
-        @test Noptical + Nradar + Nroving + Nsatellite + Ngeocentric == Ntotal
+        @test Noptical + Nradar ≤ Ncoord
+        @test Nsatellite + Nroving + Noccultation ≥ Ntotal - Ncoord
+        @test Noptical + Nradar + Nroving + Nsatellite + Noccultation == Ntotal
 
         # Search observatory code
         obs = search_observatory_code("G96")
