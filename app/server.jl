@@ -7,8 +7,15 @@ function handler(req::HTTP.Request)
         if req.method == "POST" && req.target == "/run"
             body = String(req.body)
             input = isempty(body) ? Dict{String, Any}() : JSON.parse(body)
-            result = mcmov(input)
-            return HTTP.Response(200, JSON.json(Dict("ok" => true, "result" => result)))
+            neos, scout, neoscan, neocp = mcmov(input; write_output = false)
+            dict = JSON.json(Dict(
+                "ok" => true,
+                "neos" => neos,
+                "scout" => scout,
+                "neoscan" => neoscan,
+                "neocp" => neocp
+            ))
+            return HTTP.Response(200, dict)
         elseif req.method == "GET" && req.target == "/health"
             return HTTP.Response(200, "ok")
         else

@@ -146,12 +146,12 @@ function generate_grid(A::AdmissibleRegion{T}, B::AbstractVector{T},
     return points
 end
 
-function fetch_scout_orbits(input::AbstractString)
+function fetch_scout_orbits(input::AbstractString, write_output::Bool)
     uri = HTTP.URI(
         scheme = "https",
         host   = "ssd-api.jpl.nasa.gov",
         path   = "/scout.api",
-        query  = "tdes=$(input)&orbits=1"
+        query  = "tdes=$input&orbits=1"
     )
     response_scout = HTTP.get(string(uri), require_ssl_verification = false)
     text_scout = String(response_scout.body)
@@ -161,32 +161,50 @@ function fetch_scout_orbits(input::AbstractString)
     orbits_fields = dict_scout["orbits"]["fields"]
     mat = vcat([permutedims(r) for r in rows]...)  # or hcat(rows...)' as another option
     df = DataFrame(mat, orbits_fields)
-    CSV.write("$(input).csv", df)
-    println("• Fetched Scout data; saved to: $(input).csv")
-    return nothing
+    println("• Fetched Scout data")
+    if write_output
+        CSV.write("$input.csv", df)
+        println("• Scout data saved to: $input.csv")
+        return ""
+    else
+        io = IOBuffer()
+        CSV.write(io, df)
+        return String(take!(io))
+    end
 end
 
-function fetch_neoscan_orbits(input::AbstractString)
+function fetch_neoscan_orbits(input::AbstractString, write_output::Bool)
     uri = HTTP.URI(
         scheme = "https",
         host   = "newton.spacedys.com",
         path   = "/neodys/NEOScan/scan_neocp/$input/$input.mov_sample"
     )
     response_neoscan = HTTP.get(string(uri) #=, require_ssl_verification = false=#)
-    write("$input.mov_sample", response_neoscan.body)
-    println("• Fetched NEOScan data; saved to: $(input).mov_sample")
-    return nothing
+    println("• Fetched NEOScan data")
+    if write_output
+        write("$input.mov_sample", response_neoscan.body)
+        println("• NEOScan data saved to: $(input).mov_sample")
+        return ""
+    else
+        return String(response_neoscan.body)
+    end
 end
 
-function fetch_neocp_orbits(input::AbstractString)
+function fetch_neocp_orbits(input::AbstractString, write_output::Bool)
     url_neocp = "https://cgi.minorplanetcenter.net/cgi-bin/showobsorbs.cgi"
     data = Dict("Obj" => input, "orb" => "y")
     response_neocp = HTTP.post(url_neocp, [], data #=, require_ssl_verification = false=#)
     text = String(response_neocp.body)
     lines = split(text, '\n')[2:end-2]
-    write("$input.orb", join(lines, '\n'))
-    println("• Fetched NEOCP data; saved to: $(input).orb")
-    return nothing
+    text = join(lines, '\n')
+    println("• Fetched NEOCP data")
+    if write_output
+        write("$input.orb", text)
+        println("• NEOCP data saved to: $(input).orb")
+        return ""
+    else
+        return text
+    end
 end
 
 function fetch_neodys_weights(desig::AbstractString)
@@ -367,7 +385,7 @@ end
     return orbits
 end
 
-function mcmov(dict::AbstractDict = Dict())
+function mcmov(dict::AbstractDict = Dict(); write_output::Bool = true)
     # Parse arguments from commandline
     parsed_args = parse_commandline(dict)
 
@@ -384,8 +402,13 @@ function mcmov(dict::AbstractDict = Dict())
     println("• Input NEOCP designation (trksub): ", input)
 
     # Output file
-    output::String = isnothing(parsed_args["output"]) ? input*".neosjl" : parsed_args["output"]
-    println("• Output file: ", output)
+    if write_output
+        output::String = isnothing(parsed_args["output"]) ? input * ".neosjl" :
+            parsed_args["output"]
+        println("• Output file: ", output)
+    else
+        output = ""
+    end
 
     # Horizontal scale
     scale_str::String = parsed_args["scale"]
@@ -426,11 +449,11 @@ function mcmov(dict::AbstractDict = Dict())
     println("• Run started at ", initial_time)
 
     # Get JPL Scout data for same object, if requested by user
-    fetch_scout && fetch_scout_orbits(input)
+    scout_string = fetch_scout ? fetch_scout_orbits(input, write_output) : ""
     # Get NEODyS NEOScan data for same object, if requested by user
-    fetch_neoscan && fetch_neoscan_orbits(input)
+    neoscan_string = fetch_neoscan ? fetch_neoscan_orbits(input, write_output) : ""
     # Get MPC NEOCP data for same object, if requested by user
-    fetch_neocp && fetch_neocp_orbits(input)
+    neocp_string = fetch_neocp ? fetch_neocp_orbits(input, write_output) : ""
 
     # Fetch optical astrometry
     optical_all = fetch_optical_ades(input, NEOCP)
@@ -521,8 +544,10 @@ function mcmov(dict::AbstractDict = Dict())
     reference_epoch = dtutc2days(tracklet)
     orbits_string = neocp_orbits_format(input, reference_epoch, norbits,
         view(orbits, 2:Norbits), params)
-    write(output, orbits_string)
-    println("• Output saved to: ", output)
+    if write_output
+        write(output, orbits_string)
+        println("• Output saved to: ", output)
+    end
 
     # Final time
     final_time = now()
@@ -530,7 +555,7 @@ function mcmov(dict::AbstractDict = Dict())
     computation_time = computationtime(initial_time, final_time)
     println("• Total computation time was: $computation_time min")
 
-    return orbits_string
+    return orbits_string, scout_string, neoscan_string, neocp_string
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
