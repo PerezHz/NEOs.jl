@@ -30,7 +30,8 @@ Dynamical effects considered are:
 
 To improve performance, some internal loops are multi-threaded via `@threads`.
 
-For other dynamical models, see [`gravityonly!`](@ref) and [`newtonian!`](@ref).
+For other dynamical models, see [`gravityonly!`](@ref), [`newtonian!`](@ref) and
+[`sunearthmoon!`](@ref).
 """
 function nongravs!(dq, q, params, t)
     # Julian date (TDB) of start time
@@ -47,11 +48,11 @@ function nongravs!(dq, q, params, t)
     local S = eltype(q)
     # Interaction matrix with flattened bodies
     local UJ_interaction = params.UJ_interaction
-    # Number of bodies, including NEA
+    # Number of bodies (perturbers + asteroid)
     local N = params.N
-    # Number of bodies, except the asteroid
+    # Number of bodies (only perturbers)
     local Nm1 = N-1
-    # Vector of mass parameters GM's
+    # Gravitational parameters
     local μ = params.μ
     # Marsden et al. (1973) radial function constants
     local marsden_α = params.marsden_radial[1]
@@ -655,7 +656,8 @@ Dynamical effects considered are:
 
 To improve performance, some internal loops are multi-threaded via `@threads`.
 
-For other dynamical models, see [`nongravs!`](@ref) and [`newtonian!`](@ref).
+For other dynamical models, see [`nongravs!`](@ref), [`newtonian!`](@ref) and
+[`sunearthmoon!`](@ref).
 """
 function gravityonly!(dq, q, params, t)
     # Julian date (TDB) of start time
@@ -672,11 +674,11 @@ function gravityonly!(dq, q, params, t)
     local S = eltype(q)
     # Interaction matrix with flattened bodies
     local UJ_interaction = params.UJ_interaction
-    # Number of bodies, including NEA
+    # Number of bodies (perturbers + asteroid)
     local N = params.N
     # Number of bodies, except the asteroid
     local Nm1 = N-1
-    # Vector of mass parameters GM's
+    # Gravitational parameters
     local μ = params.μ
 
     # zero(q[1])
@@ -1210,7 +1212,8 @@ Dynamical effects considered are:
 
 To improve performance, some internal loops are multi-threaded via `@threads`.
 
-For other dynamical models, see [`nongravs!`](@ref) and [`gravityonly!`](@ref).
+For other dynamical models, see [`nongravs!`](@ref), [`gravityonly!`](@ref) and
+[`sunearthmoon!`](@ref).
 """
 function newtonian!(dq, q, params, t)
     # Julian date (TDB) of start time
@@ -1221,12 +1224,12 @@ function newtonian!(dq, q, params, t)
     local ss16asteph_t = params.sseph(dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
-    # Number of bodies, including NEA
-    local N = 10 # Sun, Moon and planets # params.N
+    # Number of bodies (perturbers + asteroid)
+    local N = params.N
     # Number of bodies, except the asteroid
     local Nm1 = N-1
-    # Vector of mass parameters GM's
-    local μ = params.μ[1:10]
+    # Gravitational parameters
+    local μ = params.μ
 
     # zero(q[1])
     local zero_q_1 = auxzero(q[1])
@@ -1312,12 +1315,149 @@ function newtonian!(dq, q, params, t)
     nothing
 end
 
+"""
+    sunearthmoon!
+
+Asteroid dynamical model specially suited for imminent impactors analysis.
+
+The model considers the asteroid of interest as a test particle with null mass.
+Perturbing bodies included in the model are: the Sun, the Earth and the Moon.
+Planetary ephemerides are provided by `PlanetaryEphemeris.jl`, which is based
+on the JPL DE430 model.
+
+Dynamical effects considered are:
+
+- Newtonian point-mass accelerations between all bodies.
+
+For other dynamical models, see [`nongravs!`](@ref), [`gravityonly!`](@ref) and
+[`newtonian!`](@ref).
+"""
+function sunearthmoon!(dq, q, params, t)
+    # Julian date (TDB) of start time
+    local jd0 = params.jd0
+    # Days since J2000.0 = 2.451545e6
+    local dsj2k = t + (jd0 - JD_J2000)
+    # Solar system ephemeris at dsj2k
+    local ss16asteph_t = params.sseph(dsj2k)
+    # Type of position / velocity components
+    local S = eltype(q)
+    # Number of bodies (perturbers + asteroid)
+    local N = params.N
+    # Number of bodies, except the asteroid
+    local Nm1 = N-1
+    # Gravitational parameters
+    local μ = params.μ
+
+    # zero(q[1])
+    local zero_q_1 = auxzero(q[1])
+
+    #=
+    Point-mass accelerations
+    See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
+    =#
+
+    # Position of the i-th body - position of the asteroid
+    X = Array{S}(undef, N)         # X-axis component
+    Y = Array{S}(undef, N)         # Y-axis component
+    Z = Array{S}(undef, N)         # Z-axis component
+
+    # Distance between the i-th body and the asteroid
+    r_p2 = Array{S}(undef, N)      # r_{i,asteroid}^2
+    r_p3d2 = Array{S}(undef, N)    # r_p2^1.5 <-> r_{i, asteroid}^3
+
+    # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
+    newtonianCoeff = Array{S}(undef, N)
+
+    # Newtonian coefficient * difference between two positions, i.e.,
+    # \mu_i * (\mathbf{r_i} - \mathbf{r_asteroid}) / r_{ij}^3
+    newton_acc_X = Array{S}(undef, N)   # X-axis component
+    newton_acc_Y = Array{S}(undef, N)   # Y-axis component
+    newton_acc_Z = Array{S}(undef, N)   # Z-axis component
+
+    # Temporary arrays for the sum of full extended body accelerations
+    temp_accX_i = Array{S}(undef, N)
+    temp_accY_i = Array{S}(undef, N)
+    temp_accZ_i = Array{S}(undef, N)
+
+    # Full extended-body accelerations
+    accX = zero_q_1
+    accY = zero_q_1
+    accZ = zero_q_1
+
+    # Fill first 3 elements of dq with velocities
+    dq[1] = q[4]
+    dq[2] = q[5]
+    dq[3] = q[6]
+
+    #=
+    Compute point-mass Newtonian accelerations, all bodies
+    See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
+    =#
+    for i in 1:Nm1
+        # Position of the i-th body - position of the asteroid
+        X[i] = ss16asteph_t[3i-2]-q[1]      # X-axis component
+        Y[i] = ss16asteph_t[3i-1]-q[2]      # Y-axis component
+        Z[i] = ss16asteph_t[3i  ]-q[3]      # Z-axis component
+
+        # Distance between the i-th body and the asteroid
+        r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,asteroid}^2
+        r_p3d2[i] = r_p2[i]^1.5                     # r_p2^1.5 <-> r_{i, asteroid}^3
+
+        # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
+        newtonianCoeff[i] =  μ[i]/r_p3d2[i]
+
+        # Newtonian coefficient * difference between two positions, i.e.,
+        # \mu_i * (\mathbf{r_i} - \mathbf{r_asteroid}) / r_{ij}^3
+        newton_acc_X[i] = X[i]*newtonianCoeff[i]
+        newton_acc_Y[i] = Y[i]*newtonianCoeff[i]
+        newton_acc_Z[i] = Z[i]*newtonianCoeff[i]
+    end
+
+    for i in 1:Nm1
+        # Newtonian point-mass accelerations
+        temp_accX_i[i] = accX + newton_acc_X[i]
+        accX = temp_accX_i[i]
+        temp_accY_i[i] = accY + newton_acc_Y[i]
+        accY = temp_accY_i[i]
+        temp_accZ_i[i] = accZ + newton_acc_Z[i]
+        accZ = temp_accZ_i[i]
+    end
+
+    # Fill dq[4:6] with accelerations
+    # Newtonian point-mass accelerations
+    dq[4] = accX
+    dq[5] = accY
+    dq[6] = accZ
+
+    nothing
+end
+
 # Number of degrees of freedom for each dynamical model
+dof(::Val{sunearthmoon!}) = 6
 dof(::Val{newtonian!}) = 6
 dof(::Val{gravityonly!}) = 6
 dof(::Val{nongravs!}) = 9
 
 # Number of jet transport variables for each dynamical model
+numvars(::Val{sunearthmoon!}, _) = 6
 numvars(::Val{newtonian!}, _) = 6
 numvars(::Val{gravityonly!}, _) = 6
 numvars(::Val{nongravs!}, params::Parameters) = 6 + count(!iszero, params.marsden_scalings)
+
+# Number of bodies for each dynamical model (perturbers + asteroid)
+numberofbodies(::Val{sunearthmoon!}) = 4
+numberofbodies(::Val{newtonian!}) = 10
+numberofbodies(::Val{gravityonly!}) = SSEPHNBODIES + 1
+numberofbodies(::Val{nongravs!}) = SSEPHNBODIES + 1
+
+# Indices of the bodies used by each dynamical model
+indices(::Val{sunearthmoon!}) = [su, ea, mo]
+indices(::Val{newtonian!}) = 1:9
+indices(::Val{gravityonly!}) = 1:SSEPHNBODIES
+indices(::Val{nongravs!}) = 1:SSEPHNBODIES
+
+# Gravitational parameters used by each dynamical model
+gm(::Val{sunearthmoon!}) = μ_DE430[indices(Val(sunearthmoon!))]
+gm(::Val{newtonian!}) = μ_DE430[indices(Val(newtonian!))]
+gm(::Val{gravityonly!}) = μ_DE430[indices(Val(gravityonly!))]
+gm(::Val{nongravs!}) = μ_DE430[indices(Val(nongravs!))]

@@ -2531,9 +2531,9 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T
     local dsj2k = t + (jd0 - JD_J2000)
     local ss16asteph_t = params.sseph(dsj2k)
     local S = eltype(q)
-    local N = 10
+    local N = params.N
     local Nm1 = N - 1
-    local μ = params.μ[1:10]
+    local μ = params.μ
     local zero_q_1 = auxzero(q[1])
     X = Array{S}(undef, N)
     Y = Array{S}(undef, N)
@@ -2647,9 +2647,9 @@ function TaylorIntegration.jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T}, q::Abst
     local dsj2k = t + (jd0 - JD_J2000)
     local ss16asteph_t = params.sseph(dsj2k)
     local S = eltype(q)
-    local N = 10
+    local N = params.N
     local Nm1 = N - 1
-    local μ = params.μ[1:10]
+    local μ = params.μ
     local zero_q_1 = auxzero(q[1])
     for ord = 0:order - 1
         ordnext = ord + 1
@@ -2674,6 +2674,174 @@ function TaylorIntegration.jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T}, q::Abst
                 TaylorSeries.mul!(newton_acc_Y[i], Y[i], newtonianCoeff[i], ord)
                 TaylorSeries.mul!(newton_acc_Z[i], Z[i], newtonianCoeff[i], ord)
             end
+        for i = 1:Nm1
+            TaylorSeries.add!(temp_accX_i[i], accX, newton_acc_X[i], ord)
+            TaylorSeries.identity!(accX, temp_accX_i[i], ord)
+            TaylorSeries.add!(temp_accY_i[i], accY, newton_acc_Y[i], ord)
+            TaylorSeries.identity!(accY, temp_accY_i[i], ord)
+            TaylorSeries.add!(temp_accZ_i[i], accZ, newton_acc_Z[i], ord)
+            TaylorSeries.identity!(accZ, temp_accZ_i[i], ord)
+        end
+        TaylorSeries.identity!(dq[4], accX, ord)
+        TaylorSeries.identity!(dq[5], accY, ord)
+        TaylorSeries.identity!(dq[6], accZ, ord)
+        for __idx = eachindex(q)
+            TaylorIntegration.solcoeff!(q[__idx], dq[__idx], ordnext)
+        end
+    end
+    return nothing
+end
+
+# sunearthmoon!
+function TaylorIntegration._allocate_jetcoeffs!(::Val{sunearthmoon!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params) where {_T <: Real, _S <: Number, _N}
+    order = t.order
+    local jd0 = params.jd0
+    local dsj2k = t + (jd0 - JD_J2000)
+    local ss16asteph_t = params.sseph(dsj2k)
+    local S = eltype(q)
+    local N = params.N
+    local Nm1 = N - 1
+    local μ = params.μ
+    local zero_q_1 = auxzero(q[1])
+    X = Array{S}(undef, N)
+    Y = Array{S}(undef, N)
+    Z = Array{S}(undef, N)
+    r_p2 = Array{S}(undef, N)
+    r_p3d2 = Array{S}(undef, N)
+    newtonianCoeff = Array{S}(undef, N)
+    newton_acc_X = Array{S}(undef, N)
+    newton_acc_Y = Array{S}(undef, N)
+    newton_acc_Z = Array{S}(undef, N)
+    temp_accX_i = Array{S}(undef, N)
+    temp_accY_i = Array{S}(undef, N)
+    temp_accZ_i = Array{S}(undef, N)
+    accX = Taylor1(identity(constant_term(zero_q_1)), order)
+    accY = Taylor1(identity(constant_term(zero_q_1)), order)
+    accZ = Taylor1(identity(constant_term(zero_q_1)), order)
+    dq[1] = Taylor1(identity(constant_term(q[4])), order)
+    dq[2] = Taylor1(identity(constant_term(q[5])), order)
+    dq[3] = Taylor1(identity(constant_term(q[6])), order)
+    tmp275 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp275)
+        tmp275[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp291 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp291)
+        tmp291[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp277 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp277)
+        tmp277[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp292 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp292)
+        tmp292[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp278 = Array{Taylor1{_S}}(undef, size(tmp275))
+    for i = eachindex(tmp278)
+        tmp278[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp280 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp280)
+        tmp280[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp293 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp293)
+        tmp293[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp294 = Array{Taylor1{_S}}(undef, size(r_p2))
+    for i = eachindex(tmp294)
+        tmp294[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    for i = 1:Nm1
+        X[i] = Taylor1(constant_term(ss16asteph_t[3i - 2]) - constant_term(q[1]), order)
+        Y[i] = Taylor1(constant_term(ss16asteph_t[3i - 1]) - constant_term(q[2]), order)
+        Z[i] = Taylor1(constant_term(ss16asteph_t[3i]) - constant_term(q[3]), order)
+        tmp275[i] = Taylor1(constant_term(X[i]) ^ float(constant_term(2)), order)
+        tmp291[i] = Taylor1(zero(constant_term(X[i])), order)
+        tmp277[i] = Taylor1(constant_term(Y[i]) ^ float(constant_term(2)), order)
+        tmp292[i] = Taylor1(zero(constant_term(Y[i])), order)
+        tmp278[i] = Taylor1(constant_term(tmp275[i]) + constant_term(tmp277[i]), order)
+        tmp280[i] = Taylor1(constant_term(Z[i]) ^ float(constant_term(2)), order)
+        tmp293[i] = Taylor1(zero(constant_term(Z[i])), order)
+        r_p2[i] = Taylor1(constant_term(tmp278[i]) + constant_term(tmp280[i]), order)
+        r_p3d2[i] = Taylor1(constant_term(r_p2[i]) ^ float(constant_term(1.5)), order)
+        tmp294[i] = Taylor1(zero(constant_term(r_p2[i])), order)
+        newtonianCoeff[i] = Taylor1(constant_term(μ[i]) / constant_term(r_p3d2[i]), order)
+        newton_acc_X[i] = Taylor1(constant_term(X[i]) * constant_term(newtonianCoeff[i]), order)
+        newton_acc_Y[i] = Taylor1(constant_term(Y[i]) * constant_term(newtonianCoeff[i]), order)
+        newton_acc_Z[i] = Taylor1(constant_term(Z[i]) * constant_term(newtonianCoeff[i]), order)
+    end
+    for i = 1:Nm1
+        temp_accX_i[i] = Taylor1(constant_term(accX) + constant_term(newton_acc_X[i]), order)
+        accX = Taylor1(identity(constant_term(temp_accX_i[i])), order)
+        temp_accY_i[i] = Taylor1(constant_term(accY) + constant_term(newton_acc_Y[i]), order)
+        accY = Taylor1(identity(constant_term(temp_accY_i[i])), order)
+        temp_accZ_i[i] = Taylor1(constant_term(accZ) + constant_term(newton_acc_Z[i]), order)
+        accZ = Taylor1(identity(constant_term(temp_accZ_i[i])), order)
+    end
+    dq[4] = Taylor1(identity(constant_term(accX)), order)
+    dq[5] = Taylor1(identity(constant_term(accY)), order)
+    dq[6] = Taylor1(identity(constant_term(accZ)), order)
+    return TaylorIntegration.RetAlloc{Taylor1{_S}}([accX, accY, accZ], [X, Y, Z, r_p2, r_p3d2, newtonianCoeff, newton_acc_X, newton_acc_Y, newton_acc_Z, temp_accX_i, temp_accY_i, temp_accZ_i, tmp275, tmp291, tmp277, tmp292, tmp278, tmp280, tmp293, tmp294], [Array{Taylor1{_S}, 2}(undef, 0, 0)], [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)])
+end
+
+function TaylorIntegration.jetcoeffs!(::Val{sunearthmoon!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
+    order = t.order
+    accX = __ralloc.v0[1]
+    accY = __ralloc.v0[2]
+    accZ = __ralloc.v0[3]
+    X = __ralloc.v1[1]
+    Y = __ralloc.v1[2]
+    Z = __ralloc.v1[3]
+    r_p2 = __ralloc.v1[4]
+    r_p3d2 = __ralloc.v1[5]
+    newtonianCoeff = __ralloc.v1[6]
+    newton_acc_X = __ralloc.v1[7]
+    newton_acc_Y = __ralloc.v1[8]
+    newton_acc_Z = __ralloc.v1[9]
+    temp_accX_i = __ralloc.v1[10]
+    temp_accY_i = __ralloc.v1[11]
+    temp_accZ_i = __ralloc.v1[12]
+    tmp275 = __ralloc.v1[13]
+    tmp291 = __ralloc.v1[14]
+    tmp277 = __ralloc.v1[15]
+    tmp292 = __ralloc.v1[16]
+    tmp278 = __ralloc.v1[17]
+    tmp280 = __ralloc.v1[18]
+    tmp293 = __ralloc.v1[19]
+    tmp294 = __ralloc.v1[20]
+    local jd0 = params.jd0
+    local dsj2k = t + (jd0 - JD_J2000)
+    local ss16asteph_t = params.sseph(dsj2k)
+    local S = eltype(q)
+    local N = params.N
+    local Nm1 = N - 1
+    local μ = params.μ
+    local zero_q_1 = auxzero(q[1])
+    for ord = 0:order - 1
+        ordnext = ord + 1
+        TaylorSeries.identity!(accX, zero_q_1, ord)
+        TaylorSeries.identity!(accY, zero_q_1, ord)
+        TaylorSeries.identity!(accZ, zero_q_1, ord)
+        TaylorSeries.identity!(dq[1], q[4], ord)
+        TaylorSeries.identity!(dq[2], q[5], ord)
+        TaylorSeries.identity!(dq[3], q[6], ord)
+        for i = 1:Nm1
+            TaylorSeries.subst!(X[i], ss16asteph_t[3i - 2], q[1], ord)
+            TaylorSeries.subst!(Y[i], ss16asteph_t[3i - 1], q[2], ord)
+            TaylorSeries.subst!(Z[i], ss16asteph_t[3i], q[3], ord)
+            TaylorSeries.pow!(tmp275[i], X[i], tmp291[i], 2, ord)
+            TaylorSeries.pow!(tmp277[i], Y[i], tmp292[i], 2, ord)
+            TaylorSeries.add!(tmp278[i], tmp275[i], tmp277[i], ord)
+            TaylorSeries.pow!(tmp280[i], Z[i], tmp293[i], 2, ord)
+            TaylorSeries.add!(r_p2[i], tmp278[i], tmp280[i], ord)
+            TaylorSeries.pow!(r_p3d2[i], r_p2[i], tmp294[i], 1.5, ord)
+            TaylorSeries.div!(newtonianCoeff[i], μ[i], r_p3d2[i], ord)
+            TaylorSeries.mul!(newton_acc_X[i], X[i], newtonianCoeff[i], ord)
+            TaylorSeries.mul!(newton_acc_Y[i], Y[i], newtonianCoeff[i], ord)
+            TaylorSeries.mul!(newton_acc_Z[i], Z[i], newtonianCoeff[i], ord)
+        end
         for i = 1:Nm1
             TaylorSeries.add!(temp_accX_i[i], accX, newton_acc_X[i], ord)
             TaylorSeries.identity!(accX, temp_accX_i[i], ord)
