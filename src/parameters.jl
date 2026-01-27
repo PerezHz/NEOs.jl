@@ -10,8 +10,6 @@ A collection of the most important parameters in `NEOs.jl` functions.
 # Propagation
 
 - `maxsteps::Int`: maximum number of steps for the integration (default: `500`).
-- `μ_ast::Vector{T}`: vector of gravitational parameters
-    (default: `μ_ast343_DE430[1:end]`).
 - `order::Int`: order of Taylor expansions wrt time (default: 25).
 - `abstol::T`: absolute tolerance used to compute propagation timestep
     (default: `1e-20`).
@@ -83,7 +81,6 @@ nongravitational accelerations model:
     verbose::Bool = true
     # Propagation
     maxsteps::Int = 500
-    μ_ast::Vector{T} = μ_ast343_DE430[1:end]
     order::Int = 25
     abstol::T = 1e-20
     parse_eqs::Bool = true

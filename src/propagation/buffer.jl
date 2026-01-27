@@ -9,8 +9,10 @@ struct EphemerisEvaluationBuffer{T <: Real, U <: Number} <: AbstractBuffer
 end
 
 # Outer constructor
-function EphemerisEvaluationBuffer(eph::DensePropagation2{T, T}, tlim::NTuple{2, T},
-                                   order::Int, q0::Vector{U}) where {T <: Real, U <: Number}
+function EphemerisEvaluationBuffer(
+        eph::DensePropagation2{T, T}, tlim::NTuple{2, T}, order::Int,
+        q0::Vector{U}; cols::AbstractVector{Int} = axes(eph.x, 2)
+    ) where {T <: Real, U <: Number}
     # Check order
     @assert order <= SSEPHORDER "order ($order) must be less or equal than solar system \
         ephemerides order ($SSEPHORDER)"
@@ -20,14 +22,13 @@ function EphemerisEvaluationBuffer(eph::DensePropagation2{T, T}, tlim::NTuple{2,
     t0, tf = minmax(tlim[1], tlim[2])
     j0 = searchsortedlast(eph.t, t0)
     jf = searchsortedfirst(eph.t, tf)
-    _eph_ = TaylorInterpolant(eph.t0, eph.t[j0:jf], eph.x[j0:jf-1, :])
+    _eph_ = TaylorInterpolant(eph.t0, eph.t[j0:jf], eph.x[j0:jf-1, cols])
     # Evaluation vectors
-    idxs = axes(eph.x, 2)
     zeroT = Taylor1(zeros(order+1), SSEPHORDER)
-    aux = [zero(zeroT) for _ in idxs]
-    ephT = [zero(zeroT) for _ in idxs]
+    aux = [zero(zeroT) for _ in cols]
+    ephT = [zero(zeroT) for _ in cols]
     zeroU = Taylor1(zero(q0[1]), order)
-    ephU = [zero(zeroU) for _ in idxs]
+    ephU = [zero(zeroU) for _ in cols]
 
     return EphemerisEvaluationBuffer{T, U}(t, _eph_, aux, ephT, ephU)
 end
@@ -111,24 +112,24 @@ function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::NTuple{2, T
                            params::Parameters{T}) where {D, T <: Real, U <: Number,
                            V <: Number}
     # Unpack parameters
-    @unpack order, μ_ast, maxsteps, parse_eqs, marsden_radial = params
-    # Load solar system ephemeris [au, au/day]
-    _sseph_ = EphemerisEvaluationBuffer(sseph, tlim, order, q0)
-    # Number of massive bodies
-    Nm1 = numberofbodies(sseph)
-    # Number of bodies, including NEA
-    N = Nm1 + 1
-    # Vector of G*m values
-    μ = convert(Vector{T}, vcat( μ_DE430[1:11], μ_ast[1:Nm1-11], zero(T) ) )
-    # Check: number of SS bodies (N) in ephemeris must be equal to length of GM vector (μ)
-    @assert N == length(μ) "Total number of bodies in ephemeris must be equal to length \
-        of GM vector μ"
+    @unpack order, maxsteps, parse_eqs, marsden_radial = params
+    # Number of bodies (perturbers + asteroid)
+    N = numberofbodies(Val(dynamics))
+    # Gravitational parameters
+    μ = T.(gm(Val(dynamics)))
+    # Indices of perturbers
+    idxs = indices(Val(dynamics))
+    cols = nbodyind(SSEPHNBODIES, idxs)
+    # Solar system ephemeris [au, au/day]
+    _sseph_ = EphemerisEvaluationBuffer(sseph, tlim, order, q0; cols)
     # Accelerations, Newtonian potentials and interaction matrix with flattened bodies
-    if dynamics == newtonian!
+    if dynamics in (sunearthmoon!, newtonian!)
         _acceph_, _poteph_, UJ_interaction = nothing, nothing, nothing
     else
-        _acceph_ = EphemerisEvaluationBuffer(acceph, tlim, order, q0)
-        _poteph_ = EphemerisEvaluationBuffer(poteph, tlim, order, q0)
+        _acceph_ = EphemerisEvaluationBuffer(acceph, tlim, order, q0;
+            cols = view(cols, 1:3(N-1)))
+        _poteph_ = EphemerisEvaluationBuffer(poteph, tlim, order, q0;
+            cols = idxs)
         UJ_interaction = falses(N)
         # Turn on Earth interaction
         UJ_interaction[ea] = true

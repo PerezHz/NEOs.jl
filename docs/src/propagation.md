@@ -4,22 +4,21 @@ NEOs uses an adaptive-step Taylor method [Jorba2005](@cite) to propagate an init
 
 ## [Dynamical model](@id DynamicalModel)
 
-First, we need to choose a dynamical model. Currently, NEOs supports three different models: `newtonian!`, `gravityonly!` and `nongravs!`. All of the former:
-- treat the object of interest as a test particle with null mass,
-- include the contribution from the Sun, the eight planets and the Moon,
-- use multi-threading to improve the performance of some internal loops.
+First, we need to choose a dynamical model. Currently, NEOs supports four different models: `sunearthmoon!`, `newtonian!`, `gravityonly!` and `nongravs!`; all of which treat the object of interest as a test particle with null mass.
 
 In the following table we summarize the dynamical effects included in each model. For futher details, check the documentation of each function.
 
-| Effect                                                     | `newtonian!` | `gravityonly!` | `nongravs!` |
-| :--------------------------------------------------------- | :----------: | :------------: | :---------: |
-| Newtonian accelerations                                    |   ✅   |   ✅   |   ✅   |
-| Contribution from Ceres                                    |   ❌   |   ✅   |   ✅   |
-| Post-Newtonian accelerations [Moyer1971](@cite)            |   ❌   |   ✅   |   ✅   |
-| Figure-effects (oblateness) [Moyer1971](@cite)             |   ❌   |   ✅   |   ✅   |
-| IAU 1976/1980 Earth orientation model [Folkner2014](@cite) |   ❌   |   ✅   |   ✅   |
-| Moon's orientation model [Folkner2014](@cite)              |   ❌   |   ✅   |   ✅   |
-| Non-gravitational accelerations [Marsden1973](@cite)       |   ❌   |   ❌   |   ✅   |
+| Effect                                                     | `sunearthmoon!` | `newtonian!` | `gravityonly!` | `nongravs!` |
+| :--------------------------------------------------------- |  :-----------:  | :----------: | :------------: | :---------: |
+| Newtonian accelerations (Sun, Earth, Moon)                 |   ✅   |   ✅   |   ✅   |   ✅   |
+| Newtonian accelerations (+ eight planets)                  |   ❌   |   ✅   |   ✅   |   ✅   |
+| Newtonian accelerations (+ 16 most massive asteroids)      |   ❌   |   ❌   |   ✅   |   ✅   |
+| Post-Newtonian accelerations [Moyer1971](@cite)            |   ❌   |   ❌   |   ✅   |   ✅   |
+| Figure-effects (oblateness) [Moyer1971](@cite)             |   ❌   |   ❌   |   ✅   |   ✅   |
+| IAU 1976/1980 Earth orientation model [Folkner2014](@cite) |   ❌   |   ❌   |   ✅   |   ✅   |
+| Moon's orientation model [Folkner2014](@cite)              |   ❌   |   ❌   |   ✅   |   ✅   |
+| Non-gravitational accelerations [Marsden1973](@cite)       |   ❌   |   ❌   |   ❌   |   ✅   |
+| Multi-threaded internal loops                              |   ❌   |   ✅   |   ✅   |   ✅   |
 
 For now, let's use `newtonian!` as the dynamical model.
 ```@example Apophis

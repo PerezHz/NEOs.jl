@@ -7,13 +7,23 @@ using TaylorIntegration
 using JLD2
 using Test
 
-using InteractiveUtils: methodswith
+function warmuptests(dynamics, q00, jd0, nyears, params)
+    @testset "$dynamics warmup (parse_eqs = $(params.parse_eqs))" begin
+        fwd = NEOs.propagate(dynamics, q00, jd0, nyears, params)
+        @test isa(fwd, DensePropagation2{Float64, Float64})
+        @test fwd.t0 == jd0 - PE.J2000
+        @test length(fwd.t) == 2
+        @test size(fwd.x) == (1, dof(Val(dynamics)))
+    end
+end
 
 @testset "Propagation" begin
 
     @testset "Integration methods" begin
 
+        using InteractiveUtils: methodswith
         using TaylorIntegration: jetcoeffs!, _allocate_jetcoeffs!
+        using NEOs: SSEPHNBODIES, dof, numvars, indices, gm
 
         @test !isempty(methodswith(Val{nongravs!}, jetcoeffs!))
         @test !isempty(methodswith(Val{nongravs!}, _allocate_jetcoeffs!))
@@ -24,6 +34,67 @@ using InteractiveUtils: methodswith
         @test !isempty(methodswith(Val{newtonian!}, jetcoeffs!))
         @test !isempty(methodswith(Val{newtonian!}, _allocate_jetcoeffs!))
 
+        @test !isempty(methodswith(Val{sunearthmoon!}, jetcoeffs!))
+        @test !isempty(methodswith(Val{sunearthmoon!}, _allocate_jetcoeffs!))
+
+        @test dof(Val(nongravs!)) == 9
+        @test dof(Val(gravityonly!)) == 6
+        @test dof(Val(newtonian!)) == 6
+        @test dof(Val(sunearthmoon!)) == 6
+
+        params = Parameters()
+        @test numvars(Val(nongravs!), params) == 6
+        params = Parameters(params; marsden_scalings = (1E-14, 1E-14, 1E-14))
+        @test numvars(Val(nongravs!), params) == 9
+        @test numvars(Val(gravityonly!), params) == 6
+        @test numvars(Val(newtonian!), params) == 6
+        @test numvars(Val(sunearthmoon!), params) == 6
+
+        @test numberofbodies(Val(nongravs!)) == SSEPHNBODIES + 1
+        @test numberofbodies(Val(gravityonly!)) == SSEPHNBODIES + 1
+        @test numberofbodies(Val(newtonian!)) == 10
+        @test numberofbodies(Val(sunearthmoon!)) == 4
+
+        @test length(indices((Val(nongravs!)))) == numberofbodies(Val(nongravs!)) - 1
+        @test length(indices((Val(gravityonly!)))) == numberofbodies(Val(gravityonly!)) - 1
+        @test length(indices((Val(newtonian!)))) == numberofbodies(Val(newtonian!)) - 1
+        @test length(indices((Val(sunearthmoon!)))) == numberofbodies(Val(sunearthmoon!)) - 1
+
+        @test length(gm((Val(nongravs!)))) == numberofbodies(Val(nongravs!)) - 1
+        @test length(gm((Val(gravityonly!)))) == numberofbodies(Val(gravityonly!)) - 1
+        @test length(gm((Val(newtonian!)))) == numberofbodies(Val(newtonian!)) - 1
+        @test length(gm((Val(sunearthmoon!)))) == numberofbodies(Val(sunearthmoon!)) - 1
+
+        @test iszero(length(nbodyind(SSEPHNBODIES, indices((Val(nongravs!))))) % 6)
+        @test iszero(length(nbodyind(SSEPHNBODIES, indices((Val(gravityonly!))))) % 6)
+        @test iszero(length(nbodyind(SSEPHNBODIES, indices((Val(newtonian!))))) % 6)
+        @test iszero(length(nbodyind(SSEPHNBODIES, indices((Val(sunearthmoon!))))) % 6)
+    end
+
+    @testset "Warmup (2023 DW)" begin
+        using NEOs: DensePropagation2, dof
+
+        # Initial time [Julian date TDB]
+        jd0 = datetime2julian(DateTime(2023, 2, 25, 0, 0, 0))
+        # Initial condition
+        q00 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01,
+               -9.071450085084557E-03, -9.353197026254517E-03, -5.610023032269034E-03]
+        q00NG = vcat(q00, 0.0, 0.0, 0.0)
+        # Time of integration [years]
+        nyears = 0.1
+        # Propagation parameters
+        params1 = Parameters(maxsteps = 1, order = 15, abstol = 1E-12, parse_eqs = false)
+        params2 = Parameters(maxsteps = 1, order = 15, abstol = 1E-12, parse_eqs = true)
+
+        # Warmup propagations
+        warmuptests(nongravs!, q00NG, jd0, nyears, params1)
+        warmuptests(nongravs!, q00NG, jd0, nyears, params2)
+        warmuptests(gravityonly!, q00, jd0, nyears, params1)
+        warmuptests(gravityonly!, q00, jd0, nyears, params2)
+        warmuptests(newtonian!, q00, jd0, nyears, params1)
+        warmuptests(newtonian!, q00, jd0, nyears, params2)
+        warmuptests(sunearthmoon!, q00, jd0, nyears, params1)
+        warmuptests(sunearthmoon!, q00, jd0, nyears, params2)
     end
 
     using PlanetaryEphemeris: PlanetaryEphemerisSerialization, selecteph, ea, su, daysec,
@@ -42,7 +113,7 @@ using InteractiveUtils: methodswith
         q0 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01,
               -9.071450085084557E-03, -9.353197026254517E-03, -5.610023032269034E-03]
         # Propagation parameters
-        params = Parameters(maxsteps = 1, order = 25, abstol = 1e-20, parse_eqs = true)
+        params = Parameters(maxsteps = 1_000, order = 25, abstol = 1e-20, parse_eqs = true)
 
         # Initial time [days since J2000]
         t0 = jd0 - PE.J2000
@@ -51,10 +122,7 @@ using InteractiveUtils: methodswith
         # Earth's ephemeris
         eph_ea = selecteph(NEOs.sseph, ea, t0 - nyears*yr, t0 + nyears*yr)
 
-        # Warmup propagation (forward)
-        NEOs.propagate(dynamics, q0, jd0, nyears, params)
         # Propagate orbit
-        params = Parameters(params; maxsteps = 1_000)
         sol_bwd = NEOs.propagate(dynamics, q0, jd0, -nyears, params)
         sol_fwd = NEOs.propagate(dynamics, q0, jd0, nyears, params)
 
@@ -157,7 +225,7 @@ using InteractiveUtils: methodswith
               0.0029591421121582077, -0.01423233538611057, -0.005218412537773594,
               -5.592839897872e-14, 0.0, 0.0]
         # Propagation parameters
-        params = Parameters(maxsteps = 1, order = 25, abstol = 1e-20, parse_eqs = true)
+        params = Parameters(maxsteps = 5_000, order = 25, abstol = 1e-20, parse_eqs = true)
 
         # Initial time [days since J2000]
         t0 = jd0 - PE.J2000
@@ -166,10 +234,7 @@ using InteractiveUtils: methodswith
         # Earth's ephemeris
         eph_ea = selecteph(NEOs.sseph, ea, t0, t0 + nyears*yr)
 
-        # Warmup propagation
-        sol = NEOs.propagate(dynamics, q0, jd0, nyears, params)
         # Propagate orbit
-        params = Parameters(params, maxsteps = 5_000)
         sol = NEOs.propagate(dynamics, q0, jd0, nyears, params)
 
         # Check that solution saves correctly
