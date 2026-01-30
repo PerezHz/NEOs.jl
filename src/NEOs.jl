@@ -44,6 +44,7 @@ using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update_cache!,
       taylorstep!, set_psol!, findroot!
+using TaylorSeries: NumberNotSeries
 
 # Common
 export Parameters

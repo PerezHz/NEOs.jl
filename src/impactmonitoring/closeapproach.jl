@@ -1,5 +1,5 @@
 """
-    CloseApproach{T} <: AbstractLineOfVariations{T}
+    CloseApproach{T, U <: Number} <: AbstractLineOfVariations{T}
 
 The projection over the target plane of a virtual asteroid at
 close approach with respect to a planet.
@@ -8,57 +8,37 @@ close approach with respect to a planet.
 
 - `σ::T`: LOV index.
 - `domain::NTuple{2, T}`: segment of the line of variations.
-- `t::Taylor1{T}`: time of close approach [days since J2000 TDB].
-- `x/y::Taylor1{T}`: coordinates on the target plane [planet radii].
-- `z::Taylor1{T}`: impact parameter [planet radii].
+- `t::U`: time of close approach [days since J2000 TDB].
+- `x/y::U`: coordinates on the target plane [planet radii].
+- `z::U`: impact parameter [planet radii].
 - `tp::Type{<:AbstractTargetPlane}`: type of target plane, either
     [`BPlane`](@ref) or [`MTP`](@ref).
 """
-@auto_hash_equals struct CloseApproach{T} <: AbstractLineOfVariations{T}
+@auto_hash_equals struct CloseApproach{T, U <: Number} <: AbstractLineOfVariations{T}
     σ::T
     domain::NTuple{2, T}
-    t::Taylor1{T}
-    x::Taylor1{T}
-    y::Taylor1{T}
-    z::Taylor1{T}
+    t::U
+    x::U
+    y::U
+    z::U
     tp::Type{<:AbstractTargetPlane}
 end
 
+# Abbreviations
+const CloseApproachT1{T} = CloseApproach{T, Taylor1{T}}
+
 # Outer constructors
-function CloseApproach(σ::T, domain::NTuple{2, T}, t::Taylor1{T},
-                       x::Taylor1{T}, y::Taylor1{T}, z::Taylor1{T},
-                       tp::Type{<:AbstractTargetPlane}) where {T <: Real}
-    return CloseApproach{T}(σ, domain, t, x, y, z, tp)
+function CloseApproach(σ::T, domain::NTuple{2, T}, t::U, x::U, y::U, z::U,
+                       tp::Type{<:AbstractTargetPlane}) where {T, U}
+    return CloseApproach{T, U}(σ, domain, t, x, y, z, tp)
 end
 
-CloseApproach(VA::VirtualAsteroid, t::Taylor1, x::Taylor1, y::Taylor1, z::Taylor1, tp) =
+CloseApproach(VA::VirtualAsteroid{T, U}, t::U, x::U, y::U, z::U, tp) where {T, U} =
     CloseApproach(sigma(VA), VA.domain, t, x, y, z, tp)
-
-function CloseApproach(IM::AbstractIMProblem{D, T}, σ::T, domain::NTuple{2, T},
-                       t::Taylor1{T}, eph::DensePropagation2{T, Taylor1{T}},
-                       params::Parameters{T}) where {D, T <: Real}
-    # Unpack
-    @unpack target = IM
-    @unpack eph_su = params
-    # Asteroid's planetocentric state vector
-    xae = eph(t) - target(t)
-    # Asteroid's planetocentric semimajor axis
-    a = semimajoraxis(xae..., gm(target), zero(T))
-    if a < 0
-        # Planet's heliocentric state vector
-        xes = target(t) - eph_su(t)
-        # B-Plane in Öpik's coordinates
-        tp = bopik(xae, xes, target)
-    else
-        # Modified target plane
-        tp = mtp(xae, target)
-    end
-    return CloseApproach{T}(σ, domain, t, targetplane(tp)..., typeof(tp))
-end
 
 # Print method for CloseApproach
 function show(io::IO, x::CloseApproach)
-    tp = x.tp.name.wrapper
+    tp = targetplane(x)
     σ = sigma(x)
     t = date(x)
     r = nominalstate(x)
@@ -67,21 +47,20 @@ function show(io::IO, x::CloseApproach)
 end
 
 # AbstractLineOfVariations interface
-nominaltime(x::CloseApproach) = cte(x.t)
-
 sigma(x::CloseApproach) = x.σ
-
-get_order(x::CloseApproach) = get_order(x.t)
-
+targetplane(x::CloseApproach) = x.tp
+nominaltime(x::CloseApproach) = cte(x.t)
 nominalstate(x::CloseApproach) = [cte(x.x), cte(x.y), cte(x.z)]
 
 difft(x::CloseApproach, y::CloseApproach) = abs(nominaltime(x) - nominaltime(y))
 
+get_order(x::CloseApproach{T, U}) where {T, U <: AbstractSeries} = get_order(x.t)
+
 domain_radius(x::CloseApproach) = max(ubound(x) - sigma(x), sigma(x) - lbound(x))
 
-convergence_radius(x::Taylor1, ctol::Real) = (ctol / norm(x[end], Inf))^(1 / get_order(x))
+convergence_radius(x::NumberNotSeries, ctol::Real) = ctol / zero(x)
 
-convergence_radius(x::AbstractVector, ctol::Real) = minimum(convergence_radius.(x, ctol))
+convergence_radius(x::AbstractSeries, ctol::Real) = (ctol / norm(x[end], Inf))^(1 / get_order(x))
 
 function convergence_radius(x::CloseApproach, ctol::Real)
     return min(
@@ -101,22 +80,22 @@ isconvergent(x, ctol::Real) = convergence_radius(x, ctol) > 1
 
 deltasigma(x::CloseApproach, σ::Real) = (σ - sigma(x)) / domain_radius(x)
 
-function timeofca(x::CloseApproach, σ::Real)
+function timeofca(x::CloseApproachT1, σ::Real)
     dσ = deltasigma(x, σ)
     return x.t(dσ)
 end
 
-function targetplane(x::CloseApproach, σ::Real)
+function targetplane(x::CloseApproachT1, σ::Real)
     dσ = deltasigma(x, σ)
     return [x.x(dσ), x.y(dσ), x.z(dσ)]
 end
 
-function distance(x::CloseApproach, σ::Real)
+function distance(x::CloseApproachT1, σ::Real)
     dσ = deltasigma(x, σ)
     return hypot(x.x(dσ), x.y(dσ)) - x.z(dσ)
 end
 
-function radialvelocity(x::CloseApproach, σ::Real)
+function radialvelocity(x::CloseApproachT1, σ::Real)
     dσ = deltasigma(x, σ)
     n = get_order(x)
     ξ, ζ, b = x.x[end], x.y[end], x.z[end]
@@ -134,7 +113,7 @@ function radialvelocity(x::CloseApproach, σ::Real)
     return (rv/r - db) / domain_radius(x)
 end
 
-function concavity(x::CloseApproach, σ::Real)
+function concavity(x::CloseApproachT1, σ::Real)
     dσ = deltasigma(x, σ)
     n = get_order(x)
     ξ = x.x[end-1] + dσ * x.x[end]
