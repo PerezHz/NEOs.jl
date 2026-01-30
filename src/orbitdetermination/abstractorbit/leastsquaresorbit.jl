@@ -292,3 +292,13 @@ function evalfit(orbit::MixedLeastSquaresOrbit{D, T, TaylorN{T}, O, R}) where {D
         orbit.jacobian, orbit.qs, orbit.Qs
     )
 end
+
+"""
+    shiftepoch(od, orbit, jd0, params)
+
+Given an orbit determination problem `od`, shift the reference epoch of
+an `orbit` to `jd0` [julian date TDB]. For a list of parameters see the
+`Propagation` section of [`Parameters`](@ref).
+"""
+shiftepoch(od::ODProblem, orbit::LeastSquaresOrbit, jd0::Real, params::Parameters) =
+    LeastSquaresOrbit(od, orbit(jd0 - PE.J2000), jd0, params)

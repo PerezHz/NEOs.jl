@@ -211,7 +211,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 27, 2025
+        # Values by Jan 30, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -352,7 +352,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 27, 2025
+        # Values by Jan 30, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -435,7 +435,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by Dec 27, 2025
+        # Values by Jan 30, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -513,7 +513,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by Dec 27, 2025
+        # Values by Jan 30, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -661,7 +661,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 27, 2025
+        # Values by Jan 30, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -747,7 +747,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 27, 2025
+        # Values by Jan 30, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -893,7 +893,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 27, 2025
+        # Values by Jan 30, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -979,7 +979,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Dec 27, 2025
+        # Values by Jan 30, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -1150,7 +1150,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Dec 27, 2025
+        # Values by Jan 30, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -1242,13 +1242,20 @@ end
         q00 = kmsec2auday(apophisposvel199(julian2etsecs(jd0)))
         orbit0 = LeastSquaresOrbit(od0, q00, jd0, params)
 
+        # Shift reference epoch
+        _jd0_ = mean(dtutc2days, minmaxdates(orbit0)) + PE.J2000
+        _orbit0_ = shiftepoch(od0, orbit0, _jd0_, params)
+        t0, _t0_ = epoch(orbit0), epoch(_orbit0_)
+        @test mre(orbit0(t0), _orbit0_(t0), sigmas(orbit0)) < eps()
+        @test mre(orbit0(_t0_), _orbit0_(_t0_), sigmas(_orbit0_)) < eps()
+
         # Orbit determination problem (both optical and radar astrometry)
         od1 = ODProblem(newtonian!, optical, radar)
 
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by Dec 27, 2025
+        # Values by Jan 30, 2026
 
         # Check type
         @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
