@@ -1,5 +1,5 @@
 """
-    VirtualAsteroid{T} <: AbstractLineOfVariations{T}
+    VirtualAsteroid{T, U <: Number} <: AbstractLineOfVariations{T}
 
 A segment of the line of variations (LOV).
 
@@ -8,29 +8,30 @@ A segment of the line of variations (LOV).
 - `epoch::T`: reference epoch [days since J2000 TDB].
 - `σ::T`: LOV index.
 - `domain::NTuple{2, T}`: segment of the line of variations.
-- `q0::Vector{Taylor1{T}}`: barycentric initial condition [au, au/day].
+- `q0::Vector{U}`: barycentric initial condition [au, au/day].
 """
-struct VirtualAsteroid{T} <: AbstractLineOfVariations{T}
+struct VirtualAsteroid{T, U <: Number} <: AbstractLineOfVariations{T}
     epoch::T
     σ::T
     domain::NTuple{2, T}
-    q0::Vector{Taylor1{T}}
+    q0::Vector{U}
 end
 
+numtypes(::VirtualAsteroid{T, U}) where {T, U} = T, U
+
 # Outer constructors
-function VirtualAsteroid(epoch::T, σ::T, domain::NTuple{2, T},
-                         q0::Vector{Taylor1{T}}) where {T <: Real}
-    return VirtualAsteroid{T}(epoch, σ, domain, q0)
-end
+VirtualAsteroid(epoch::T, σ::T, domain::NTuple{2, T}, q0::Vector{U}) where {T, U} =
+    VirtualAsteroid{T, U}(epoch, σ, domain, q0)
 
 VirtualAsteroid(lov::LineOfVariations, σ::Real, domain::NTuple{2, <:Real}) =
     VirtualAsteroid(epoch(lov), σ, domain, lov(σ, domain))
 
 # Print method for VirtualAsteroid
 function show(io::IO, x::VirtualAsteroid)
+    T, U = numtypes(x)
     t = date(x)
     domain = x.domain
-    print(io, "VA at ", t, " over ", domain)
+    print(io, "VA{$T, $U} at ", t, " over ", domain)
 end
 
 # AbstractLineOfVariations interface
@@ -38,7 +39,8 @@ epoch(x::VirtualAsteroid) = x.epoch
 nominaltime(x::VirtualAsteroid) = x.epoch
 sigma(x::VirtualAsteroid) = x.σ
 initialcondition(x::VirtualAsteroid) = x.q0
-get_order(x::VirtualAsteroid) = get_order(first(x.q0))
+
+get_order(x::VirtualAsteroid{T, U}) where {T, U <: AbstractSeries} = get_order(first(x.q0))
 
 """
     virtualasteroids(lov, method; kwargs...)
