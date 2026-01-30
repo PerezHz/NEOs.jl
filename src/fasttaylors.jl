@@ -1,3 +1,12 @@
+"""
+    AbstractBuffer
+
+Supertype for the buffers interface.
+"""
+abstract type AbstractBuffer end
+
+show(io::IO, x::AbstractBuffer) = print(io, typeof(x))
+
 # Return a zero of the same type as `a`
 auxzero(a::AbstractSeries) = zero(a)
 
