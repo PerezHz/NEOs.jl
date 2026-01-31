@@ -47,7 +47,7 @@ end
 # Warning: functions euclid3D(x) and dot3D(x) assume length(x) >= 3
 euclid3D(x::AbstractVector{T}) where {T <: Real} = sqrt(dot3D(x, x))
 
-function euclid3D(x::AbstractVector{TaylorN{T}}) where {T <: Real}
+function euclid3D(x::AbstractVector{TaylorN{T}}) where {T <: Number}
     z, w = zero(x[1]), zero(x[1])
     @inbounds for i in 1:3
         TS.zero!(w)
@@ -63,7 +63,7 @@ function euclid3D(x::AbstractVector{TaylorN{T}}) where {T <: Real}
     return w
 end
 
-function euclid3D(x::AbstractVector{Taylor1{T}}) where {T <: Real}
+function euclid3D(x::AbstractVector{Taylor1{T}}) where {T <: Number}
     z, w = zero(x[1]), zero(x[1])
     @inbounds for i in 1:3
         TS.zero!(w)

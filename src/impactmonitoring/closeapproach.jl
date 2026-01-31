@@ -138,18 +138,22 @@ function concavity(x::CloseApproachT1, σ::Real)
     return ( ra / r - rv^2 / r^3 - d2b) / domain_radius(x)^2
 end
 
-# Asteroid's radial velocity with respect to a planet
-function radialvelocity(x, teph, params, t)
+# Root-finding function for `closeapproaches`
+function closeapproach(x, teph, params, t; R_TP, R_P)
     # Julian date (TDB) of start time
     jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     dsj2k = t + (jd0 - JD_J2000)
     # Planet ephemeris at dsj2k
-    xe = teph(dsj2k)
-    # Asteroid's planetocentric state vector
-    xae = x[1:6] - xe
-    # Planetocentric radial velocity
-    return euclid3D(cte(xae[1:3])) < 0.2, dot3D(xae[1:3], xae[4:6])
+    xp = teph(dsj2k)
+    # Asteroid's planetocentric position and velocity
+    rap = [x[i] - xp[i] for i in 1:3]
+    vap = [x[i] - xp[i] for i in 4:6]
+    # Planetocentric distance and radial velocity
+    dap = euclid3D(rap)
+    rvap = dot3D(rap, vap)
+    # Root-finding tuples
+    return (true, dap - R_P), (dap < R_TP, rvap)
 end
 
 """
@@ -161,11 +165,12 @@ list of parameters see the `Propagation` section of  [`Parameters`](@ref).
 
 # Keyword arguments
 
+- `R_TP::Real`: target plane radius in au (default: `0.2`).
 - `ctol::Real`: convergence tolerance (default: `Inf`); the integration
     will stop before the final time if it finds a close approach `x`
     such that `!isconvergent(x, ctol)`.
 - `newtoniter::Int`: maximum Newton-Raphson iterations per detected event
-    (default: `20`).
+    (default: `25`).
 - `nrabstol::Real`: allowed tolerance for the Newton-Raphson process
     (default: `eps()`).
 - `buffer::Union{Nothing, ImpactMonitoringBuffer}`: pre-allocated memory
@@ -173,8 +178,8 @@ list of parameters see the `Propagation` section of  [`Parameters`](@ref).
 """
 function closeapproaches(
         IM::AbstractIMProblem{D, T}, VA::VirtualAsteroid{T, U},
-        nyears::T, params::Parameters{T}; ctol::T = T(Inf),
-        newtoniter::Int = 20, nrabstol::T = eps(T),
+        nyears::T, params::Parameters{T}; R_TP::T = 0.2,
+        ctol::T = T(Inf), newtoniter::Int = 25, nrabstol::T = eps(T),
         buffer::Union{Nothing, ImpactMonitoringBuffer{T, U}} = nothing
     ) where {D, T <: Real, U <: Number}
     # Unpack
@@ -201,14 +206,18 @@ function closeapproaches(
 
     # Some auxiliary arrays for root-finding/event detection/Poincaré
     # surface of section evaluation
-    g_tupl = (false, radialvelocity(x, teph, dparams, t)[2])
-    g_tupl_old = deepcopy(g_tupl)
+    R_P = radius(target)
+    f_tupl, g_tupl = closeapproach(x, teph, dparams, t; R_TP, R_P)
+    f_tupl, g_tupl = (false, f_tupl[2]), (false, g_tupl[2])
+    f_tupl_old, g_tupl_old = deepcopy(f_tupl), deepcopy(g_tupl)
     δt = zero(x[1])
     δt_old = zero(x[1])
 
     x_dx = vcat(x, dx)
+    f_df = vcat(f_tupl[2], f_tupl_old[2])
     g_dg = vcat(g_tupl[2], g_tupl_old[2])
     x_dx_val = TS.evaluate(x_dx)
+    f_df_val = vcat(TS.evaluate(f_tupl[2]), TS.evaluate(f_tupl_old[2]))
     g_dg_val = vcat(TS.evaluate(g_tupl[2]), TS.evaluate(g_tupl_old[2]))
 
     CAs = Vector{CloseApproach{T, U}}(undef, 0)
@@ -227,35 +236,72 @@ function closeapproaches(
         δt = sign_tstep * min(δt, sign_tstep * (tmax - t0))
         # New initial condition
         TS.evaluate!(x, δt, x0)
-        g_tupl = radialvelocity(x, teph, dparams, t)
+        # Root-finding
+        f_tupl, g_tupl = closeapproach(x, teph, dparams, t; R_TP, R_P)
+        nevents = findroot!(t, x, dx, f_tupl_old, f_tupl, 0, tvS, xvS, gvS,
+                            t0, δt_old, x_dx, x_dx_val, f_df, f_df_val, nrabstol,
+                            newtoniter, nevents)
+        if nevents > 1
+            # Time at surface crossing
+            t_CA = epoch(VA) + tvS[1]
+            # Asteroid's planetocentric state vector
+            xap = xvS[:, 1] - target(t_CA)
+            # Planetocentric keplerian elements
+            kep = KeplerianElements{T, U}(
+                gm(target),
+                cte(t_CA) + MJD2000,
+                :equatorial,
+                cartesian2keplerian(xap, t_CA + MJD2000; μ = gm(target)),
+                SMatrix{6, 6, T}(fill(NaN, 6, 6))
+            )
+            # Time at close approach
+            t_CA = timeperipass(kep) - MJD2000
+            # Asteroid's planetocentric state vector
+            xap = kep(t_CA + MJD2000)
+            # Asteroid's planetocentric semimajor axis
+            a = semimajoraxis(xap..., gm(target), zero(T))
+            if a < 0
+                # Planet's heliocentric state vector
+                xps = target(t_CA) - eph_su(t_CA)
+                # BPlane in Öpik's coordinates
+                tp = bopik(xap, xps, target)
+            else
+                # Modified target plane
+                tp = mtp(xap, target)
+            end
+            # Close approach
+            CA = CloseApproach(VA, t_CA, targetplane(tp)..., typeof(tp))
+            push!(CAs, CA)
+            @warn("Integration entered the physical radius of the target; exiting.")
+            break
+        end
         nevents = findroot!(t, x, dx, g_tupl_old, g_tupl, 0, tvS, xvS, gvS,
                             t0, δt_old, x_dx, x_dx_val, g_dg, g_dg_val, nrabstol,
                             newtoniter, nevents)
-        # An event has been detected
         if nevents > 1
             # Reset events counter
             nevents = 1
             # Time at close approach
             t_CA = epoch(VA) + tvS[1]
             # Asteroid's planetocentric state vector
-            xae = xvS[:, 1] - target(t_CA)
+            xap = xvS[:, 1] - target(t_CA)
             # Asteroid's planetocentric semimajor axis
-            a = semimajoraxis(xae..., gm(target), zero(T))
+            a = semimajoraxis(xap..., gm(target), zero(T))
             if a < 0
                 # Planet's heliocentric state vector
-                xes = target(t_CA) - eph_su(t_CA)
+                xps = target(t_CA) - eph_su(t_CA)
                 # BPlane in Öpik's coordinates
-                tp = bopik(xae, xes, target)
+                tp = bopik(xap, xps, target)
             else
                 # Modified target plane
-                tp = mtp(xae, target)
+                tp = mtp(xap, target)
             end
             # Close approach
             CA = CloseApproach(VA, t_CA, targetplane(tp)..., typeof(tp))
             push!(CAs, CA)
             !isconvergent(CA, ctol) && break
         end
-        g_tupl_old = deepcopy(g_tupl)
+        f_tupl_old, g_tupl_old = deepcopy(f_tupl), deepcopy(g_tupl)
         # Update time
         t0 += δt
         update_cache!(cache, t0, x0)
