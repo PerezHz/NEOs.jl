@@ -9,6 +9,7 @@ close approach with respect to a planet.
 - `σ::T`: LOV index.
 - `domain::NTuple{2, T}`: segment of the line of variations.
 - `t::U`: time of close approach [days since J2000 TDB].
+- `a::U`: planetocentric semimajor axis at close approach [au].
 - `x/y::U`: coordinates on the target plane [planet radii].
 - `z::U`: impact parameter [planet radii].
 - `tp::Type{<:AbstractTargetPlane}`: type of target plane, either
@@ -18,6 +19,7 @@ close approach with respect to a planet.
     σ::T
     domain::NTuple{2, T}
     t::U
+    a::U
     x::U
     y::U
     z::U
@@ -28,13 +30,13 @@ end
 const CloseApproachT1{T} = CloseApproach{T, Taylor1{T}}
 
 # Outer constructors
-function CloseApproach(σ::T, domain::NTuple{2, T}, t::U, x::U, y::U, z::U,
+function CloseApproach(σ::T, domain::NTuple{2, T}, t::U, a::U, x::U, y::U, z::U,
                        tp::Type{<:AbstractTargetPlane}) where {T, U}
-    return CloseApproach{T, U}(σ, domain, t, x, y, z, tp)
+    return CloseApproach{T, U}(σ, domain, t, a, x, y, z, tp)
 end
 
-CloseApproach(VA::VirtualAsteroid{T, U}, t::U, x::U, y::U, z::U, tp) where {T, U} =
-    CloseApproach(sigma(VA), VA.domain, t, x, y, z, tp)
+CloseApproach(VA::VirtualAsteroid{T, U}, t::U, a::U, x::U, y::U, z::U, tp) where {T, U} =
+    CloseApproach(sigma(VA), VA.domain, t, a, x, y, z, tp)
 
 # Print method for CloseApproach
 function show(io::IO, x::CloseApproach)
@@ -49,6 +51,7 @@ end
 # AbstractLineOfVariations interface
 sigma(x::CloseApproach) = x.σ
 targetplane(x::CloseApproach) = x.tp
+semimajoraxis(x::CloseApproach) = x.a
 nominaltime(x::CloseApproach) = cte(x.t)
 nominalstate(x::CloseApproach) = [cte(x.x), cte(x.y), cte(x.z)]
 
@@ -83,6 +86,11 @@ deltasigma(x::CloseApproach, σ::Real) = (σ - sigma(x)) / domain_radius(x)
 function timeofca(x::CloseApproachT1, σ::Real)
     dσ = deltasigma(x, σ)
     return x.t(dσ)
+end
+
+function semimajoraxis(x::CloseApproachT1, σ::Real)
+    dσ = deltasigma(x, σ)
+    return x.a(dσ)
 end
 
 function targetplane(x::CloseApproachT1, σ::Real)
@@ -270,7 +278,7 @@ function closeapproaches(
                 tp = mtp(xap, target)
             end
             # Close approach
-            CA = CloseApproach(VA, t_CA, targetplane(tp)..., typeof(tp))
+            CA = CloseApproach(VA, t_CA, a, targetplane(tp)..., typeof(tp))
             push!(CAs, CA)
             @warn("Integration entered the physical radius of the target; exiting.")
             break
@@ -297,7 +305,7 @@ function closeapproaches(
                 tp = mtp(xap, target)
             end
             # Close approach
-            CA = CloseApproach(VA, t_CA, targetplane(tp)..., typeof(tp))
+            CA = CloseApproach(VA, t_CA, a, targetplane(tp)..., typeof(tp))
             push!(CAs, CA)
             !isconvergent(CA, ctol) && break
         end

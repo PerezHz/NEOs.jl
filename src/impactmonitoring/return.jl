@@ -53,7 +53,8 @@ function exponential_weights(x::CloseApproach, σ::Real, ctol::Real)
     return w
 end
 
-for f in (:(targetplane), :(timeofca), :(distance), :(radialvelocity), :(concavity))
+for f in (:(targetplane), :(timeofca), :(semimajoraxis), :(distance),
+    :(radialvelocity), :(concavity))
     @eval begin
         function $f(x::ReturnT1, σ::Real, ctol::Real)
             d = convergence_domain(x, ctol)
