@@ -42,8 +42,8 @@ function ImpactMonitoringBuffer(IM::AbstractIMProblem{D, T}, q0::Vector{U}, nyea
     # Target ephemeris evaluation buffer
     teph = EphemerisEvaluationBuffer(target.eph, tlim, order, q0)
     # Root-finding arrays
-    tvS = Array{U}(undef, maxsteps + 1)
-    xvS = Array{U}(undef, length(q0), maxsteps + 1)
+    tvS = Array{U}(undef, 1)
+    xvS = Array{U}(undef, length(q0), 1)
     gvS = similar(tvS)
 
     return ImpactMonitoringBuffer{T, U}(prop, teph, tvS, xvS, gvS)

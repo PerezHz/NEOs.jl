@@ -159,53 +159,44 @@ Return the vector of close approaches, under the impact monitoring problem
 `IM`, of a virtual asteroid `VA` for a period of `nyears` [years]. For a
 list of parameters see the `Propagation` section of  [`Parameters`](@ref).
 
-The propagation will stop before the final time if it finds a close approach
-that does not converge under the tolerance `ctol`.
-
 # Keyword arguments
 
-- `vaorder::Int`: order of the Taylor expansions wrt the LOV index
-    (default: `get_order(VA)`).
-- `ctol::Real`: convergence tolerance (default: `0.01`); the integration
-    will stop at the first close approach not converging under `ctol`.
+- `ctol::Real`: convergence tolerance (default: `Inf`); the integration
+    will stop before the final time if it finds a close approach `x`
+    such that `!isconvergent(x, ctol)`.
 - `newtoniter::Int`: maximum Newton-Raphson iterations per detected event
-    (default: `10`).
+    (default: `20`).
 - `nrabstol::Real`: allowed tolerance for the Newton-Raphson process
     (default: `eps()`).
 - `buffer::Union{Nothing, ImpactMonitoringBuffer}`: pre-allocated memory
     (default: `nothing`).
 """
 function closeapproaches(
-        IM::AbstractIMProblem{D, T}, VA::VirtualAsteroid{T}, nyears::T,
-        params::Parameters{T}; vaorder::Int = get_order(VA),
-        ctol::T = 0.01, newtoniter::Int = 10, nrabstol::T = eps(T),
-        buffer::Union{Nothing, ImpactMonitoringBuffer{T}} = nothing
-    ) where {D, T <: Real}
+        IM::AbstractIMProblem{D, T}, VA::VirtualAsteroid{T, U},
+        nyears::T, params::Parameters{T}; ctol::T = T(Inf),
+        newtoniter::Int = 20, nrabstol::T = eps(T),
+        buffer::Union{Nothing, ImpactMonitoringBuffer{T, U}} = nothing
+    ) where {D, T <: Real, U <: Number}
     # Unpack
     @unpack target = IM
     @unpack abstol, maxsteps, order, eph_su = params
     # Dynamical model
     dynamics = dynamicalmodel(IM)
-    # Reference epoch
-    d0 = epoch(VA)
-    jd0 = d0 + JD_J2000
     # Initial conditions
-    tpre, t0, tmax = zero(T), zero(T), nyears * yr
-    q0 = reduceorder.(initialcondition(VA), vaorder)
+    t0, tmax = zero(T), nyears * yr
+    q0 = initialcondition(VA)
     # Impact monitoring buffer
     if isnothing(buffer)
-        buffer = ImpactMonitoringBuffer(IM, nyears, vaorder, params)
+        buffer = ImpactMonitoringBuffer(IM, q0, nyears, params)
     end
     @unpack prop, teph, tvS, xvS, gvS = buffer
     @unpack cache, dparams = prop
-    @unpack psol, xaux, t, x, dx, rv, parse_eqs = cache
-    dparams.jd0 = jd0
+    @unpack xaux, t, x, dx, rv, parse_eqs = cache
+    dparams.jd0 = epoch(VA) + JD_J2000
 
     # Specialized version of the root-finding method of taylorinteg
     x0 = deepcopy(q0)
     update_cache!(cache, t0, x0)
-    psol[:, 1] .= zero.(x)
-    psol[:, 2] .= zero.(x)
     sign_tstep = copysign(1, tmax - t0)
 
     # Some auxiliary arrays for root-finding/event detection/Poincaré
@@ -220,7 +211,7 @@ function closeapproaches(
     x_dx_val = TS.evaluate(x_dx)
     g_dg_val = vcat(TS.evaluate(g_tupl[2]), TS.evaluate(g_tupl_old[2]))
 
-    CAs = Vector{CloseApproach{T}}(undef, 0)
+    CAs = Vector{CloseApproach{T, U}}(undef, 0)
 
     # Integration
     nsteps = 1
@@ -229,26 +220,25 @@ function closeapproaches(
         δt_old = δt
         δt = taylorstep!(Val(parse_eqs), dynamics, t, x, dx, xaux, abstol, dparams, rv) # δt is positive!
         # Below, δt has the proper sign according to the direction of the integration
+        if iszero(δt)
+            @warn("The step-size is zero; exiting.")
+            break
+        end
         δt = sign_tstep * min(δt, sign_tstep * (tmax - t0))
         # New initial condition
         TS.evaluate!(x, δt, x0)
-        # Store the Taylor polynomial solution
-        for i in eachindex(x)
-            for k in eachindex(x[i])
-                TS.identity!(psol[:, 1][i], psol[:, 2][i], k)
-                TS.identity!(psol[:, 2][i], x[i], k)
-            end
-        end
         g_tupl = radialvelocity(x, teph, dparams, t)
-        nevents_old = nevents
         nevents = findroot!(t, x, dx, g_tupl_old, g_tupl, 0, tvS, xvS, gvS,
                             t0, δt_old, x_dx, x_dx_val, g_dg, g_dg_val, nrabstol,
                             newtoniter, nevents)
-        if nevents > nevents_old
+        # An event has been detected
+        if nevents > 1
+            # Reset events counter
+            nevents = 1
             # Time at close approach
-            t_CA = d0 + tvS[nevents-1]
+            t_CA = epoch(VA) + tvS[1]
             # Asteroid's planetocentric state vector
-            xae = psol[1:6, 1]( t_CA - d0 - tpre ) - target(t_CA)
+            xae = xvS[:, 1] - target(t_CA)
             # Asteroid's planetocentric semimajor axis
             a = semimajoraxis(xae..., gm(target), zero(T))
             if a < 0
@@ -267,14 +257,11 @@ function closeapproaches(
         end
         g_tupl_old = deepcopy(g_tupl)
         # Update time
-        tpre = t0
         t0 += δt
         update_cache!(cache, t0, x0)
         nsteps += 1
         if nsteps > maxsteps
-            @warn("""
-            Maximum number of integration steps reached; exiting.
-            """)
+            @warn("Maximum number of integration steps reached; exiting.")
             break
         end
     end
