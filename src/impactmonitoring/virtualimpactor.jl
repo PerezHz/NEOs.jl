@@ -8,7 +8,7 @@ A segment of the line of variations that impacts the Earth.
 - `t::T`: time of impact [days since J2000 TDB].
 - `σ::T`: LOV index.
 - `ip::T`: impact probability.
-- `a::T`: geocentric semimajor axis [au].
+- `a::T`: planetocentric semimajor axis [au].
 - `domain::NTuple{2, T}`: segment of the line of variations.
 - `covariance::Matrix{T}`: target plane covariance matrix.
 """
@@ -21,32 +21,37 @@ A segment of the line of variations that impacts the Earth.
     covariance::Matrix{T}
 end
 
-# Outer constructor
+# Outer constructorss
 function VirtualImpactor(t::T, σ::T, ip::T, a::T, domain::NTuple{2, T},
                          Γ_tp::Matrix{T} = Matrix{T}(undef, 0, 0)) where {T <: Real}
     return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
 end
 
+function VirtualImpactor(RT::ReturnT1{T}, σ::T, domain::NTuple{2, T},
+                         ctol::T) where {T <: Real}
+    t = timeofca(RT, σ, ctol)
+    ip = impact_probability(domain[1], domain[2])
+    a = semimajoraxis(RT, σ, ctol)
+    return VirtualImpactor(t, σ, ip, a, domain)
+end
+
 # Abbreviations
-const Shower{T} = AbstractVector{Return{T}}
-const ImpactCondition{T} = Tuple{Int, T, NTuple{2, T}, T, T}
+const Shower{T, U} = AbstractVector{Return{T, U}}
+const ShowerT1{T} = Shower{T, Taylor1{T}}
 
 # AbstractVirtualImpactor interface
-nominaltime(x::VirtualImpactor) = x.t
-date(x::VirtualImpactor) = days2dtutc(nominaltime(x))
-
 sigma(x::VirtualImpactor) = x.σ
-
+nominaltime(x::VirtualImpactor) = x.t
+semimajoraxis(x::VirtualImpactor) = x.a
+covariance(x::VirtualImpactor) = x.covariance
 impact_probability(x::VirtualImpactor) = x.ip
 
-semimajoraxis(x::VirtualImpactor) = x.a
+date(x::VirtualImpactor) = days2dtutc(nominaltime(x))
 
 width(x::VirtualImpactor) = width(x.domain)
 
 isoutlov(x::VirtualImpactor) = iszero(width(x))
 ishyperbolic(x::VirtualImpactor) = semimajoraxis(x) < 0
-
-covariance(x::VirtualImpactor) = x.covariance
 
 # A marginal virtual impactor is one that was detected
 # but could not be verified
@@ -57,6 +62,28 @@ semiwidth(x::VirtualImpactor{T}) where {T <: Real} =
 
 stretching(x::VirtualImpactor{T}) where {T <: Real} =
     ismarginal(x) ? T(NaN) : sqrt(last(eigvals(covariance(x))))
+
+# Impactor table
+function summary(VIs::AbstractVector{VirtualImpactor{T}}) where {T <: Real}
+    s1 = string(
+        "Impactor table{$T}\n",
+        repeat('-', 80), "\n",
+        "Date (UTC)          Sigma      Semi-width [RE]    Stretching [RE]    IP\n",
+    )
+    s2 = Vector{String}(undef, length(VIs))
+    for (i, VI) in enumerate(VIs)
+        t = rpad(Dates.format(date(VI), "yyyy-mm-dd HH:MM"), 20)
+        σ = rpad(@sprintf("%+.4f", sigma(VI)), 11)
+        w = rpad(@sprintf("%.3f", semiwidth(VI)), 19)
+        Λ = rpad(@sprintf("%.2E", stretching(VI)), 19)
+        asterisk = isoutlov(VI) ? " *" : "  "
+        ip = rpad(@sprintf("%.2E", VI.ip) * asterisk, 11)
+        s2[i] = string(t, σ, w, Λ, ip, "\n")
+    end
+    return string(s1, join(s2))
+end
+
+impactor_table(x::AbstractVector{VirtualImpactor{T}}) where {T} = println(summary(x))
 
 # Impact probability computation
 impact_probability(a::Real, b::Real) = erf(a/sqrt(2), b/sqrt(2)) / 2
@@ -91,12 +118,11 @@ end
 # Virtual impactors search
 function VirtualImpactor(
         IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
-        params::Parameters{T}, σ::T, t::T, domain::NTuple{2, T}
+        VI::VirtualImpactor{T}, params::Parameters{T}
     ) where {D, T <: Real}
     # Unpack
     @unpack orbit, target = IM
-    # A priori impact probability
-    ip = impact_probability(domain[1], domain[2])
+    @unpack t, σ, ip, a, domain = VI
     # Set jet transport variables
     Npar = numvars(orbit)
     set_od_order(T, 2, Npar)
@@ -116,36 +142,26 @@ function VirtualImpactor(
     # χ = sqrt(notoutobs(orbit) * ( cte(Q) - nms(orbit) ))
     # First order jet transport initial condition
     q0 = q00 + sigmas(orbit) .* get_variables(T, 1)
-    # Forward propagation
+    # Virtual asteroid
+    VA = VirtualAsteroid(epoch(lov), σ, domain, q0)
+    # Number of years until impact
     nyears = min(t + 2 + PE.J2000 - jd0, dtutc2days(DateTime(2099, 12, 31))) / yr
-    fwd, tvS, _, _ = propagate_root(dynamicalmodel(IM), q0, jd0, nyears, params)
-    if any(isnan, fwd.t) || isempty(tvS)
+    # Close approach
+    CAs = closeapproaches(IM, VA, nyears, params)
+    if isempty(CAs)
         @warn string(
-            "The following virtual impactor was detected but integration failed\n",
+            "The following virtual impactor was detected but could not be verified\n",
             "Date (UTC)          Sigma      IP\n",
             rpad(Dates.format(days2dtutc(t), "yyyy-mm-dd HH:MM"), 20),
             rpad(@sprintf("%+.4f", σ), 11),
             @sprintf("%.2E", ip),
             width(domain) > 0 ? "" : " *"
         )
-        return VirtualImpactor(t, σ, ip, T(NaN), domain)
+        return VI
     end
-    # Close approach
-    t_CA = fwd.t0 + tvS[end]
-    xae = fwd(t_CA)[1:6] - target(t_CA)
-    # Asteroid's planetocentric semimajor axis
-    a = cte(semimajoraxis(xae..., gm(target), zero(T)))
-    if a < 0
-        # Planet's heliocentric state vector
-        xes = target(t_CA) - params.eph_su(t_CA)
-        # Öpik's coordinates
-        tp = bopik(xae, xes)
-    else
-        # Modified target plane
-        tp = mtp(xae)
-    end
+    CA = CAs[end]
     # Target plane coordinates
-    X, Y, Z = targetplane(tp)
+    X, Y, Z = CA.x, CA.y, CA.z
     # Target plane covariance matrix at close approach
     Γ_tp = Symmetric(project([X, Y], zeros(Npar), Γ))
     # Eigenpairs of the target plane covariance matrix
@@ -160,7 +176,7 @@ function VirtualImpactor(
             @sprintf("%.2E", ip),
             width(domain) > 0 ? "" : " *"
         )
-        return VirtualImpactor(t, σ, ip, a, domain)
+        return VI
     end
     # Approximate the impact probability using the formula from Milani et al (2005)
     if iszero(width(domain))
@@ -180,247 +196,132 @@ function VirtualImpactor(
     return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
 end
 
-function impactbounds(RT::Return, σ::Real, ctol::Real)
+function virtualimpactors(RT::ReturnT1{T}; ctol::Real = T(Inf), σmax::Real = 3.0,
+                          no_pts::Int = 100, dmax::Real = zero(T)) where {T <: Real}
+    # Allocate memory
+    VIs = Vector{VirtualImpactor{T}}(undef, 0)
+    # Intersect the convergence domain of RT with (-σmax, σmax)
     a, b = convergence_domain(RT, ctol)
-    for CA in Iterators.reverse(RT.CAs)
-        a ≤ lbound(CA) || break
-        if distance(RT, lbound(CA), ctol) > 0 && lbound(CA) < σ
-            a = max(a, lbound(CA))
-            break
+    overlap((a, b), (-σmax, σmax)) || return VIs
+    a, b = max(a, -σmax), min(b, σmax)
+    # Find the roots of the radial velocity
+    rs = find_zeros(σ -> radialvelocity(RT, σ, ctol), (a, b); no_pts)
+    # Check if any of the roots of the radial velocity is a local minimum
+    # with positive distance
+    for σ in rs
+        VI = VirtualImpactor(RT, σ, (σ, σ), ctol)
+        if 0 ≤ nominaltime(VI) ≤ 36525.0 && 0 < distance(RT, σ, ctol) < dmax &&
+            0 < concavity(RT, σ, ctol)
+            push!(VIs, VI)
         end
     end
-    for CA in RT.CAs
-        ubound(CA) ≤ b || break
-        if distance(RT, ubound(CA), ctol) > 0 && σ < ubound(CA)
-            b = min(b, ubound(CA))
-            break
+    # Search for virtual impactors between the roots of the radial velocity
+    # Since there are no critical points in domain, the radial distance is monotonic
+    for domain in zip(Iterators.flatten((a, rs)), Iterators.flatten((rs, b)))
+        da, db = distance(RT, domain[1], ctol), distance(RT, domain[2], ctol)
+        # The radial distance is always positive in domain
+        (da > 0 && db > 0) && continue
+        # The radial distance changes sign in domain, so there is a root
+        if da * db < 0
+            σ = find_zero(σ -> distance(RT, σ, ctol), domain, Bisection())
+            domain = (da < 0 && db > 0) ? (domain[1], σ) : (σ, domain[2])
+        end
+        σ = midpoint(domain)
+        VI = VirtualImpactor(RT, σ, domain, ctol)
+        if 0 ≤ nominaltime(VI) ≤ 36525.0 && distance(RT, σ, ctol) < dmax
+            push!(VIs, VI)
         end
     end
-    return a, b
-end
-
-# Val{true}: The radial distance function is monotonic over domain
-function impactcondition(::Val{true}, RT::Return{T},
-                         domain::NTuple{2, T}, ctol::T) where {T <: Real}
-    a, b = domain
-    da, db = distance(RT, a, ctol), distance(RT, b, ctol)
-    # The radial distance changes sign in [a, b], so there is a root
-    if da * db < 0
-        σ = find_zero(σ -> distance(RT, σ, ctol), (a, b), Bisection())
-        if da < 0 && db > 0
-            domain = (a, σ)
-        else
-            domain = (σ, b)
-        end
-        σ = (domain[1] + domain[2]) / 2
-    # The radial distance is always negative in [a, b]
-    elseif da < 0 && db < 0
-        σ = sigma(RT)
-        domain = (a, b)
-    # The radial distance is always positive in [a, b]
-    else
-        σ, domain = T(NaN), (T(NaN), T(NaN))
-    end
-    return σ, domain
-end
-
-# Val{false}: The radial distance function is not monotonic around σ
-function impactcondition(::Val{false}, RT::Return{T},
-                         domain::NTuple{2, T}, ctol::T) where {T <: Real}
-    σ, d = domain
-    if d > 0
-        domain = (σ, σ)
-    else
-        a, b = impactbounds(RT, σ, ctol)
-        σa, da = impactcondition(Val(true), RT, (a, σ), ctol)
-        σb, db = impactcondition(Val(true), RT, (σ, b), ctol)
-        σ = (isnan(σa) || isnan(σb)) ? T(NaN) : σ
-        domain = (da[1], db[2])
-    end
-    return σ, domain
-end
-
-function impactconditions(RTs::Shower{T}, ctol::Real; no_pts::Int = 100,
-                          dmax::Real = 236.0) where {T <: Real}
-    # Find all the impact conditions over RTs
-    ics = Vector{ImpactCondition{T}}(undef, 0)
-    for i in eachindex(RTs)
-        RT = RTs[i]
-        a, b = convergence_domain(RT, ctol)
-        rs = find_zeros(σ -> radialvelocity(RT, σ, ctol), (a, b); no_pts)
-        # The radial velocity has no roots in [a, b], so the radial distance is monotonic
-        if isempty(rs)
-            σ, domain = impactcondition(Val(true), RT, (a, b), ctol)
-            isnan(σ) && continue
-            t, d = timeofca(RT, σ, ctol), distance(RT, σ, ctol)
-            if 0 ≤ t ≤ 36525.0 && d < dmax
-                push!(ics, (i, σ, domain, t, d))
-            end
-        # The radial velocity has at least one root in [a, b], so the radial distance
-        # is not monotonic
-        else
-            for j in eachindex(rs)
-                σ = rs[j]
-                d, c = distance(RT, σ, ctol), concavity(RT, σ, ctol)
-                # Skip maxima outside the impact cross section
-                if c < 0 && d > 0
-                    continue
-                end
-                σ, domain = impactcondition(Val(false), RT, (σ, d), ctol)
-                isnan(σ) && continue
-                t, d = timeofca(RT, σ, ctol), distance(RT, σ, ctol)
-                if 0 ≤ t ≤ 36525.0 && d < dmax
-                    push!(ics, (i, σ, domain, t, d))
-                end
-            end
-        end
-    end
-    # Sort by distance
-    sort!(ics, by = last)
-
-    return ics
-end
-
-# This function assumes that all the impact conditions in `ics` have negative distance
-function merge(ics::AbstractVector{ImpactCondition{T}},
-               RTs::Shower{T}, ctol::T) where {T <: Real}
-    isempty(ics) && return Vector{ImpactCondition{T}}(undef, 0)
+    isempty(VIs) && return VIs
     # Sort by domain
-    sort!(ics, by = Base.Fix2(getindex, 3))
-    # Merge impact conditions
-    newics = [ics[1]]
-    for ic in Iterators.drop(ics, 1)
-        ka, _, domaina, ta, _ = newics[end]
-        kb, _, domainb, tb, _ = ic
+    sort!(VIs, by = Base.Fix2(getfield, :domain))
+    # Merge virtual impactors
+    newVIs = [VIs[1]]
+    for VI in Iterators.drop(VIs, 1)
+        domaina, domainb = newVIs[end].domain, VI.domain
         # The intersection of domaina and domainb is not empty
         if overlap(domaina, domainb)
             domain = (min(domaina[1], domainb[1]), max(domaina[2], domainb[2]))
-            σ = (domain[1] + domain[2]) / 2
+            σ = midpoint(domain)
+            newVIs[end] = VirtualImpactor(RT, σ, domain, ctol)
+        # The intersection of domaina and domainb is empty
+        else
+            push!(newVIs, VI)
+        end
+    end
+
+    return newVIs
+end
+
+function virtualimpactors(RTs::ShowerT1{T}; ctol::Real = T(Inf), σmax::Real = 3.0,
+                          no_pts::Int = 100, dmax::Real = zero(T)) where {T <: Real}
+    # Search for virtual impactors in each return
+    _VIs_ = virtualimpactors.(RTs; ctol, σmax, no_pts, dmax)
+    ks = reduce(vcat, fill.(eachindex(_VIs_), length.(_VIs_)))
+    VIs = reduce(vcat, _VIs_)
+    isempty(VIs) && return VIs
+    # Sort by domain
+    perm = sortperm(VIs, by = Base.Fix2(getfield, :domain))
+    permute!(ks, perm)
+    permute!(VIs, perm)
+    # Merge virtual impactors
+    newks = [ks[1]]
+    newVIs = [VIs[1]]
+    for (k, VI) in zip(Iterators.drop(ks, 1), Iterators.drop(VIs, 1))
+        ka, domaina = newks[end], newVIs[end].domain
+        kb, domainb = k, VI.domain
+        # The intersection of domaina and domainb is not empty
+        if overlap(domaina, domainb)
+            domain = (min(domaina[1], domainb[1]), max(domaina[2], domainb[2]))
+            σ = midpoint(domain)
             flaga, flagb = domaina[1] ≤ σ ≤ domaina[2], domainb[1] ≤ σ ≤ domainb[2]
             if flaga && flagb
-                k = ta < tb ? ka : kb
+                k = nominaltime(newVIs[end]) < nominaltime(VI) ? ka : kb
             else
                 k = flaga ? ka : kb
             end
-            t, d = timeofca(RTs[k], σ, ctol), distance(RTs[k], σ, ctol)
-            newics[end] = (k, σ, domain, t, d)
+            newVIs[end] = VirtualImpactor(RTs[k], σ, domain, ctol)
         # The intersection of domaina and domainb is empty
         else
-            push!(newics, ic)
-        end
-    end
-    # Sort by distance
-    sort!(newics, by = last)
-
-    return newics
-end
-
-"""
-    virtualimpactors(RTs, ctol; kwargs...)
-
-Return the indices, sigmas, domains, times and distances of all
-the impact conditions found in a vector of returns `RTs` given a
-convergence tolerance `ctol`.
-
-# Keyword arguments
-
-- `no_pts::Int`: number of points used to find the roots of
-    `radialvelocity` in each return (default: `100`).
-- `dmax::Real`: maximum allowed value of [`distance`](@ref)
-    (default: `236.0`).
-"""
-function virtualimpactors(RTs::Shower{T}, ctol::Real; no_pts::Int = 100,
-                          dmax::Real = 236.0) where {T <: Real}
-    # Find all the impact conditions over RTs
-    ics = impactconditions(RTs, ctol; no_pts, dmax)
-    # Separate impact conditions with negative and positive distances
-    k = findlast(x -> x[end] < 0, ics)
-    isnothing(k) && return ics
-    icsa, icsb = ics[1:k], ics[k+1:end]
-    # Merge impact conditions
-    icsa = merge(icsa, RTs, ctol)
-    mask = falses(length(icsb))
-    for i in eachindex(icsb)
-        σb = icsb[i][2]
-        for j in eachindex(icsa)
-            domaina = icsa[j][3]
-            if domaina[1] ≤ σb ≤ domaina[2]
-                mask[i] = true
-                break
-            end
-        end
-    end
-    deleteat!(icsb, mask)
-    ics = vcat(icsa, icsb)
-    # Sort by distance
-    sort!(ics, by = last)
-
-    return ics
-end
-
-"""
-    virtualimpactors(IM, lov, RTs, ctol, params; kwargs...)
-
-Return the virtual impactors, under the impact monitoring problem `IM`
-with line of variations `lov`, found in a vector of returns `RTs` given
-a convergence tolerance `ctol`. For a list of parameters, see the
-`Propagation` section of  [`Parameters`](@ref).
-
-# Keyword arguments
-
-- `Nmax::Int`: maximum number of virtual impactors to compute
-    (default: `10`).
-- `no_pts::Int`: number of points used to find the roots of
-    `radialvelocity` in each return (default: `100`).
-- `dmax::Real`: maximum allowed value of [`distance`](@ref)
-    (default: `236.0`).
-"""
-function virtualimpactors(IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
-                          RTs::Shower{T}, ctol::Real, params::Parameters; Nmax::Int = 10,
-                          no_pts::Int = 100, dmax::Real = 236.0) where {D, T <: Real}
-    # Find all the impact conditions over RTs
-    ics = virtualimpactors(RTs, ctol; no_pts, dmax)
-    Nic = length(ics)
-    # Compute virtual impactors
-    VIs = Vector{VirtualImpactor{T}}(undef, 0)
-    for k in 1:min(Nmax, Nic)
-        i, σ, domain, t, _ = ics[k]
-        # The intersection of domain and lov is not empty
-        if overlap(domain, lov.domain)
-            domain = (max(domain[1], lbound(lov)), min(domain[2], ubound(lov)))
-            σ = (domain[1] + domain[2]) / 2
-            t = timeofca(RTs[i], σ, ctol)
-            (σ in lov && 0.0 ≤ t ≤ 36525.0 ) || continue
-            VI = VirtualImpactor(IM, lov, params, σ, t, domain)
-            if impact_probability(VI) > 0
-                push!(VIs, VI)
-            end
+            push!(newks, k)
+            push!(newVIs, VI)
         end
     end
     # Sort by time of impact
-    sort!(VIs, by = nominaltime)
+    sort!(newVIs, by = nominaltime)
 
-    return VIs
+    return newVIs
 end
 
-# Impactor table
-function summary(VIs::AbstractVector{VirtualImpactor{T}}) where {T <: Real}
-    s1 = string(
-        "Impactor table{$T}\n",
-        repeat('-', 80), "\n",
-        "Date (UTC)          Sigma      Semi-width [RE]    Stretching [RE]    IP\n",
-    )
-    s2 = Vector{String}(undef, length(VIs))
+"""
+    virtualimpactors(IM, lov, RTs, params; kwargs...)
+
+Return the virtual impactors, under the impact monitoring problem
+`IM` with line of variations `lov`, found in a vector of returns
+`RTs`. For a list of parameters, see the `Propagation` section of
+[`Parameters`](@ref).
+
+# Keyword arguments
+
+- `ctol::Real`: convergence tolerance (default: `Inf`).
+- `no_pts::Int`: number of points used to find the roots of
+    `radialvelocity` in each return (default: `100`).
+- `dmax::Real`: maximum allowed value of [`distance`](@ref)
+    (default: `0.0`).
+"""
+function virtualimpactors(IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
+                          RTs::ShowerT1{T}, params::Parameters; ctol::Real = T(Inf),
+                          no_pts::Int = 100, dmax::Real = zero(T)) where {D, T <: Real}
+    # Find all the virtual impactors in RTs
+    σmax = ubound(lov)
+    VIs = virtualimpactors(RTs; ctol, σmax, no_pts, dmax)
+    # Verify each virtual impactor
+    newVIs = Vector{VirtualImpactor{T}}(undef, length(VIs))
     for (i, VI) in enumerate(VIs)
-        t = rpad(Dates.format(date(VI), "yyyy-mm-dd HH:MM"), 20)
-        σ = rpad(@sprintf("%+.4f", sigma(VI)), 11)
-        w = rpad(@sprintf("%.3f", semiwidth(VI)), 19)
-        Λ = rpad(@sprintf("%.2E", stretching(VI)), 19)
-        asterisk = isoutlov(VI) ? " *" : "  "
-        ip = rpad(@sprintf("%.2E", VI.ip) * asterisk, 11)
-        s2[i] = string(t, σ, w, Λ, ip, "\n")
+        newVIs[i] = VirtualImpactor(IM, lov, VI, params)
     end
-    return string(s1, join(s2))
-end
+    # Sort by time of impact
+    sort!(newVIs, by = nominaltime)
 
-impactor_table(x::AbstractVector{VirtualImpactor{T}}) where {T <: Real} = println(summary(x))
+    return newVIs
+end
