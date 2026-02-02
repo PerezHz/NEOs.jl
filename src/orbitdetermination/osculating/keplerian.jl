@@ -140,8 +140,8 @@ an epoch `t` [MJD TDB], to keplerian elements [deg, au].
 - `μ::Real`: gravitational parameter of the central body
     [au³/day²] (default: `μ_S`).
 """
-function cartesian2keplerian(x::AbstractVector{U}, t::T;
-                             μ::Real = μ_S) where {T <: Real, U <: Number}
+function cartesian2keplerian(x::AbstractVector{U}, t::Number;
+                             μ::Real = μ_S) where {U <: Number}
     # Position and velocity vectors [au, au/day]
     r_vec, v_vec = x[1:3], x[4:6]
     r = euclid3D(r_vec)
@@ -158,7 +158,7 @@ function cartesian2keplerian(x::AbstractVector{U}, t::T;
     # Orbit inclination [rad]
     i = acos(h_vec[3] / h)
     # Vector n pointing towards the ascending node [au^2/day]
-    n_vec = [-h_vec[2], h_vec[1], zero(T)]
+    n_vec = [-h_vec[2], h_vec[1], zero(h)]
     n = euclid3D(n_vec)
     # Argument of periapsis [rad]
     if e_vec[3] ≥ 0
@@ -214,8 +214,8 @@ epoch `t` [MJD TDB], to a cartesian state vector [au, au/day].
 - `μ::Real`: gravitational parameter of the central body
     [au³/day²] (default: `μ_S`).
 """
-function keplerian2cartesian(x::AbstractVector{U}, t::T;
-                             μ::Real = μ_S) where {T <: Real, U <: Number}
+function keplerian2cartesian(x::AbstractVector{U}, t::Number;
+                             μ::Real = μ_S) where {U <: Number}
     # Eccentricity
     e = x[2]
     # Boolean flag

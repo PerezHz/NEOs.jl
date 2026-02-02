@@ -1,11 +1,4 @@
 """
-    AbstractBuffer
-
-Supertype for the buffers interface.
-"""
-abstract type AbstractBuffer end
-
-"""
     OpticalBuffer{U <: Number} <: AbstractBuffer
 
 Pre-allocated memory for [`compute_radec`](@ref).

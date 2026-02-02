@@ -69,7 +69,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jan 15, 2026
+        # Values by Feb 1, 2026
 
         # Impact target
         target = ImpactTarget(:earth)
@@ -134,25 +134,25 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test maximum(width, VAs3) < Δσmax
 
         N = 1
-        VAs = virtualasteroids(lov, :uniform; N)
+        vaorder = 6
+        VAs = virtualasteroids(lov, :uniform, vaorder; N)
         VA = VAs[1]
         @test epoch(VA) == epoch(lov)
         @test nominaltime(VA) == nominaltime(lov)
         @test sigma(VA) == sigma(lov)
         @test initialcondition(VA) == lov(0.0, (-σmax, σmax))
-        @test get_order(VA) == get_order(lov)
+        @test get_order(VA) == vaorder
 
         # Close approaches
         nyears = 0.4 / yr
-        vaorder = 6
         ctol = 0.01
-        CAs = closeapproaches(IM, VA, nyears, params; vaorder, ctol)
+        CAs = closeapproaches(IM, VA, nyears, params; ctol)
         @test length(CAs) == 1
         CA = CAs[1]
 
         @test nominaltime(CA) == constant_term(CA.t) == timeofca(CA, 0.0)
         @test sigma(CA) == sigma(VA)
-        @test get_order(CA) == vaorder < get_order(VA)
+        @test get_order(CA) == get_order(VA) == vaorder
         @test nominalstate(CA) == [CA.x[0], CA.y[0], CA.z[0]] == targetplane(CA, 0.0)
         @test difft(CA, CA) == 0.0
         @test domain_radius(CA) == σmax
@@ -185,21 +185,23 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
 
         @test 0.0 in RT
         @test get_order(RT) == get_order(CA)
-        @test nominaltime(RT) == timeofca(RT, 0.0, ctol) == nominaltime(CA)
-        @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) == nominalstate(CA)
+        @test nominaltime(RT, ctol) == timeofca(RT, 0.0, ctol) ≈ nominaltime(CA)
+        @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) ≈ nominalstate(CA)
         @test convergence_domain(RT, ctol) == convergence_domain(CA, ctol)
         @test isconvergent(RT, ctol)
 
-        @test distance(CA, 0.0) == distance(RT, 0.0, ctol) < 0
-        @test radialvelocity(CA, 0.0) == radialvelocity(RT, 0.0, ctol)
+        @test distance(CA, 0.0) ≈ distance(RT, 0.0, ctol) < 0
+        @test radialvelocity(CA, 0.0) ≈ radialvelocity(RT, 0.0, ctol)
         @test concavity(CA, 0.0) ≈ concavity(RT, 0.0, ctol) > 0
 
         # Virtual impactors
-        VIs = virtualimpactors(IM, lov, RTs, ctol, params)
+        VIs = virtualimpactors(IM, lov, RTs, params; ctol)
         @test length(VIs) == 1
         VI1 = VIs[1]
 
-        VI2 = VirtualImpactor(IM, lov, params, 0.0, nominaltime(RT), (0.0, 0.0))
+        σ = sigma(VI1)
+        domain = (σ, σ)
+        VI2 = VirtualImpactor(IM, lov, VirtualImpactor(RT, σ, domain, ctol), params)
 
         @test date(VI1) == date(VI2) == date(CA) == date(RT)
         @test sigma(VI1) == sigma(VI2) == 0.0
@@ -242,7 +244,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Jan 15, 2026
+        # Values by Feb 1, 2026
 
         # Impact target
         target = ImpactTarget(:earth)
@@ -307,25 +309,25 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test maximum(width, VAs3) < Δσmax
 
         N = 1
-        VAs = virtualasteroids(lov, :uniform; N)
+        vaorder = 6
+        VAs = virtualasteroids(lov, :uniform, vaorder; N)
         VA = VAs[1]
         @test epoch(VA) == epoch(lov)
         @test nominaltime(VA) == nominaltime(lov)
         @test sigma(VA) == sigma(lov)
         @test initialcondition(VA) == lov(0.0, (-σmax, σmax))
-        @test get_order(VA) == get_order(lov)
+        @test get_order(VA) == vaorder
 
         # Close approaches
         nyears = 26 / yr
-        vaorder = 6
         ctol = 0.01
-        CAs = closeapproaches(IM, VA, nyears, params; vaorder, ctol)
+        CAs = closeapproaches(IM, VA, nyears, params; ctol)
         @test length(CAs) == 1
         CA = CAs[1]
 
         @test nominaltime(CA) == constant_term(CA.t) == timeofca(CA, 0.0)
         @test sigma(CA) == sigma(VA)
-        @test get_order(CA) == vaorder < get_order(VA)
+        @test get_order(CA) == get_order(VA) == vaorder
         @test nominalstate(CA) == [CA.x[0], CA.y[0], CA.z[0]] == targetplane(CA, 0.0)
         @test difft(CA, CA) == 0.0
         @test domain_radius(CA) == σmax
@@ -358,21 +360,23 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
 
         @test 0.0 in RT
         @test get_order(RT) == get_order(CA)
-        @test nominaltime(RT) == timeofca(RT, 0.0, ctol) == nominaltime(CA)
-        @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) == nominalstate(CA)
+        @test nominaltime(RT, ctol) == timeofca(RT, 0.0, ctol) ≈ nominaltime(CA)
+        @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) ≈ nominalstate(CA)
         @test convergence_domain(RT, ctol) == convergence_domain(CA, ctol)
         @test isconvergent(RT, ctol)
 
-        @test distance(CA, 0.0) == distance(RT, 0.0, ctol) > 0
-        @test radialvelocity(CA, 0.0) == radialvelocity(RT, 0.0, ctol)
+        @test distance(CA, 0.0) ≈ distance(RT, 0.0, ctol) > 0
+        @test radialvelocity(CA, 0.0) ≈ radialvelocity(RT, 0.0, ctol)
         @test concavity(CA, 0.0) ≈ concavity(RT, 0.0, ctol) < 0
 
         # Virtual impactors
-        VIs = virtualimpactors(IM, lov, RTs, ctol, params)
+        VIs = virtualimpactors(IM, lov, RTs, params; ctol)
         @test isempty(VIs)
 
-        VI1 = VirtualImpactor(IM, lov, params, 0.0, nominaltime(RT), (-σmax, σmax))
-        VI2 = VirtualImpactor(IM, lov, params, 0.0, nominaltime(RT), (0.0, 0.0))
+        σ = 0.0
+        domain1, domain2 = (-σmax, σmax), (0.0, 0.0)
+        VI1 = VirtualImpactor(IM, lov, VirtualImpactor(RT, σ, domain1, ctol), params)
+        VI2 = VirtualImpactor(IM, lov, VirtualImpactor(RT, σ, domain2, ctol), params)
 
         @test date(VI1) == date(VI2) == date(CA) == date(RT)
         @test sigma(VI1) == sigma(VI2) == 0.0

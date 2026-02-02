@@ -2,7 +2,7 @@ module NEOs
 
 # __precompile__(false)
 import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary,
-       firstindex, lastindex, merge
+       firstindex, lastindex
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination, argperi,
        longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly,
@@ -44,6 +44,7 @@ using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update_cache!,
       taylorstep!, set_psol!, findroot!
+using TaylorSeries: NumberNotSeries
 
 # Common
 export Parameters
@@ -96,8 +97,8 @@ export ImpactTarget, IMProblem, BPlane, MTP, bopik, mtp, targetplane, crosssecti
        valsecchi_circle
 export LineOfVariations, VirtualAsteroid, CloseApproach, Return, lineofvariations,
        virtualasteroids, closeapproaches, showersnreturns, sigma, lbound, ubound
-export VirtualImpactor, virtualimpactors, impact_probability, impactor_table, impactenergy,
-       palermoscale, torinoscale, semiwidth, stretching
+export VirtualImpactor, semiwidth, stretching, virtualimpactors, impact_probability,
+       impactor_table, vinf, impactenergy, palermoscale, torinoscale
 
 include("constants.jl")
 include("units.jl")
