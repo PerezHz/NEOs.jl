@@ -66,6 +66,7 @@ for f in (:(targetplane), :(timeofca), :(semimajoraxis), :(distance),
     end
 end
 
+nominaltime(x::ReturnT1, ctol::Real) = timeofca(x, sigma(x), ctol)
 nominalstate(x::ReturnT1, ctol::Real) = targetplane(x, sigma(x), ctol)
 
 issamereturn(x::CloseApproach, y::CloseApproach, Δt::Real) = (x.tp == y.tp) &&

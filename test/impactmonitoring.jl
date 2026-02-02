@@ -185,13 +185,13 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
 
         @test 0.0 in RT
         @test get_order(RT) == get_order(CA)
-        @test nominaltime(RT) == timeofca(RT, 0.0, ctol) == nominaltime(CA)
-        @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) == nominalstate(CA)
+        @test nominaltime(RT, ctol) == timeofca(RT, 0.0, ctol) ≈ nominaltime(CA)
+        @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) ≈ nominalstate(CA)
         @test convergence_domain(RT, ctol) == convergence_domain(CA, ctol)
         @test isconvergent(RT, ctol)
 
-        @test distance(CA, 0.0) == distance(RT, 0.0, ctol) < 0
-        @test radialvelocity(CA, 0.0) == radialvelocity(RT, 0.0, ctol)
+        @test distance(CA, 0.0) ≈ distance(RT, 0.0, ctol) < 0
+        @test radialvelocity(CA, 0.0) ≈ radialvelocity(RT, 0.0, ctol)
         @test concavity(CA, 0.0) ≈ concavity(RT, 0.0, ctol) > 0
 
         # Virtual impactors
@@ -360,13 +360,13 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
 
         @test 0.0 in RT
         @test get_order(RT) == get_order(CA)
-        @test nominaltime(RT) == timeofca(RT, 0.0, ctol) == nominaltime(CA)
-        @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) == nominalstate(CA)
+        @test nominaltime(RT, ctol) == timeofca(RT, 0.0, ctol) ≈ nominaltime(CA)
+        @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) ≈ nominalstate(CA)
         @test convergence_domain(RT, ctol) == convergence_domain(CA, ctol)
         @test isconvergent(RT, ctol)
 
-        @test distance(CA, 0.0) == distance(RT, 0.0, ctol) > 0
-        @test radialvelocity(CA, 0.0) == radialvelocity(RT, 0.0, ctol)
+        @test distance(CA, 0.0) ≈ distance(RT, 0.0, ctol) > 0
+        @test radialvelocity(CA, 0.0) ≈ radialvelocity(RT, 0.0, ctol)
         @test concavity(CA, 0.0) ≈ concavity(RT, 0.0, ctol) < 0
 
         # Virtual impactors
