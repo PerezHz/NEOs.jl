@@ -53,7 +53,7 @@ function lovcovariance(
         jd0::T, params::Parameters{T};
         bufferTN::Union{Nothing, PropresBuffer{T, TaylorN{T}, T}} = nothing,
         bufferT1::Union{Nothing, PropresBuffer{T, Taylor1{T}, T}} = nothing,
-        order::Int = 15
+        order::Int = 12
     ) where {D, T <: Real}
     # Set jet transport variables
     Npar = dof(IM)
@@ -219,12 +219,12 @@ impact monitoring problem `IM`. For a list of parameters, see the
 # Keyword arguments
 
 - `σmax::Real`: maximum (absolute) value of the LOV index (default: `3.0`).
-- `lovorder::Int`: order of Taylor expansions wrt LOV index (default: `15`).
-- `lovtol::Real`: absolute tolerance used to integrate the LOV (default: `1E-12`).
+- `lovorder::Int`: order of Taylor expansions wrt LOV index (default: `12`).
+- `lovtol::Real`: absolute tolerance used to integrate the LOV (default: `1E-20`).
 """
 function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
-                          σmax::Real = 3.0, lovorder::Int = 15,
-                          lovtol::Real = 1E-12) where {D, T <: Real}
+                          σmax::Real = 3.0, lovorder::Int = 12,
+                          lovtol::Real = 1E-20) where {D, T <: Real}
     # Unpack
     @unpack orbit = IM
     @unpack maxsteps, parse_eqs = params
