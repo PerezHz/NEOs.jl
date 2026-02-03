@@ -87,8 +87,8 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test minmaxdates(IM) == (date(optical[1]), date(optical[end]))
 
         # Line of variations
-        lovorder, lovtol, σmax = 12, 1E-20, 5.0
-        lov = lineofvariations(IM, params; lovorder, lovtol, σmax)
+        σmax, lovorder, lovtol = 5.0, 12, 1E-20
+        lov = lineofvariations(IM, params; σmax, lovorder, lovtol)
 
         @test numtypes(lov) == (typeof(newtonian!), Float64)
         @test dynamicalmodel(lov) == newtonian!
@@ -98,12 +98,17 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test get_order(lov) == lovorder
         @test lov(0.0) == orbit()
         @test constant_term(lov(0.0, (-σmax, σmax))) == orbit()
+        @test isa(string(lov), String)
 
         @test lov.domain == (-σmax, σmax)
         @test lbound(lov) == -σmax
         @test ubound(lov) == σmax
         @test width(lov) == 2σmax
         @test all(Base.Fix2(in, lov), [-σmax, 0.0, σmax])
+
+        _lov_ = lineofvariations(IM, params; σmax, lovorder, lovtol, lovparse = false)
+        @test lov(σmax) == _lov_(σmax)
+        @test lov(-σmax) == _lov_(-σmax)
 
         # Virtual asteroids
         N = 11
@@ -262,8 +267,8 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test minmaxdates(IM) == (date(optical[1]), date(optical[9]))
 
         # Line of variations
-        lovorder, lovtol, σmax = 12, 1E-20, 5.0
-        lov = lineofvariations(IM, params; lovorder, lovtol, σmax)
+        σmax, lovorder, lovtol = 5.0, 12, 1E-20
+        lov = lineofvariations(IM, params; σmax, lovorder, lovtol)
 
         @test numtypes(lov) == (typeof(newtonian!), Float64)
         @test dynamicalmodel(lov) == newtonian!
@@ -273,12 +278,17 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test get_order(lov) == lovorder
         @test lov(0.0) == orbit()
         @test constant_term(lov(0.0, (-σmax, σmax))) == orbit()
+        @test isa(string(lov), String)
 
         @test lov.domain == (-σmax, σmax)
         @test lbound(lov) == -σmax
         @test ubound(lov) == σmax
         @test width(lov) == 2σmax
         @test all(Base.Fix2(in, lov), [-σmax, 0.0, σmax])
+
+        _lov_ = lineofvariations(IM, params; σmax, lovorder, lovtol, lovparse = false)
+        @test lov(σmax) == _lov_(σmax)
+        @test lov(-σmax) == _lov_(-σmax)
 
         # Virtual asteroids
         N = 11
