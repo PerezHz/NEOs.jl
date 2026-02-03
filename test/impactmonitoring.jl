@@ -69,7 +69,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Feb 1, 2026
+        # Values by Feb 3, 2026
 
         # Impact target
         target = ImpactTarget(:earth)
@@ -87,15 +87,15 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test minmaxdates(IM) == (date(optical[1]), date(optical[end]))
 
         # Line of variations
-        order, σmax = 12, 5.0
-        lov = lineofvariations(IM, params; order, σmax)
+        lovorder, lovtol, σmax = 12, 1E-20, 5.0
+        lov = lineofvariations(IM, params; lovorder, lovtol, σmax)
 
         @test numtypes(lov) == (typeof(newtonian!), Float64)
         @test dynamicalmodel(lov) == newtonian!
         @test epoch(lov) == nominaltime(lov) == epoch(orbit)
         @test round(date(lov), Minute) == round(days2dtutc(epoch(orbit)), Minute)
         @test sigma(lov) == 0.0
-        @test get_order(lov) == order
+        @test get_order(lov) == lovorder
         @test lov(0.0) == orbit()
         @test constant_term(lov(0.0, (-σmax, σmax))) == orbit()
 
@@ -244,7 +244,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Feb 1, 2026
+        # Values by Feb 3, 2026
 
         # Impact target
         target = ImpactTarget(:earth)
@@ -262,15 +262,15 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test minmaxdates(IM) == (date(optical[1]), date(optical[9]))
 
         # Line of variations
-        order, σmax = 12, 5.0
-        lov = lineofvariations(IM, params; order, σmax)
+        lovorder, lovtol, σmax = 12, 1E-20, 5.0
+        lov = lineofvariations(IM, params; lovorder, lovtol, σmax)
 
         @test numtypes(lov) == (typeof(newtonian!), Float64)
         @test dynamicalmodel(lov) == newtonian!
         @test epoch(lov) == nominaltime(lov) == epoch(orbit)
         @test round(date(lov), Minute) == round(days2dtutc(epoch(orbit)), Minute)
         @test sigma(lov) == 0.0
-        @test get_order(lov) == order
+        @test get_order(lov) == lovorder
         @test lov(0.0) == orbit()
         @test constant_term(lov(0.0, (-σmax, σmax))) == orbit()
 
