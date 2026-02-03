@@ -221,13 +221,16 @@ impact monitoring problem `IM`. For a list of parameters, see the
 - `σmax::Real`: maximum (absolute) value of the LOV index (default: `3.0`).
 - `lovorder::Int`: order of Taylor expansions wrt LOV index (default: `12`).
 - `lovtol::Real`: absolute tolerance used to integrate the LOV (default: `1E-20`).
+- `lovsteps::Int`: maximum number of steps for the integration (default: `10_000`).
+- `lovparse::Bool`: whether to use the specialized method of `jetcoeffs` or not
+    (default: `true`).
 """
 function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
                           σmax::Real = 3.0, lovorder::Int = 12,
-                          lovtol::Real = 1E-20) where {D, T <: Real}
+                          lovtol::Real = 1E-20, lovsteps::Int = 10_000,
+                          lovparse::Bool = true) where {D, T <: Real}
     # Unpack
     @unpack orbit = IM
-    @unpack maxsteps, parse_eqs = params
     # Number of degrees of freedom
     Npar = dof(IM)
     # Jet transpot initial condition
@@ -246,9 +249,9 @@ function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
     lovparams = (resTN, resT1, IM, jd0, params, bufferTN, bufferT1, lovorder)
     # Taylor expansion of the line of variations
     _bwd_ = taylorinteg(lov!, q00, zero(T), -σmax, lovorder, lovtol, lovparams;
-                        maxsteps, parse_eqs, dense = true)
+                        maxsteps = lovsteps, parse_eqs = lovparse, dense = true)
     _fwd_ = taylorinteg(lov!, q00, zero(T), σmax, lovorder, lovtol, lovparams;
-                        maxsteps, parse_eqs, dense = true)
+                        maxsteps = lovsteps, parse_eqs = lovparse, dense = true)
     bwd = TaylorInterpolant{T, T, 2}(zero(T), _bwd_.t, _bwd_.p)
     fwd = TaylorInterpolant{T, T, 2}(zero(T), _fwd_.t, _fwd_.p)
     domain = (last(bwd.t), last(fwd.t))
