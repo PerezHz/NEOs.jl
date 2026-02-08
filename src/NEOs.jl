@@ -58,7 +58,7 @@ export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophis
 export MPC, NEOCP, NEOCC, NEODyS2, JPL
 export UniformWeights, SourceWeights, Veres17
 export ZeroDebiasing, SourceDebiasing, Farnocchia15, Eggl20
-export numberofdays, unpacknum, packnum, unpackdesig, packdesig
+export numberofdays, unpacknum, packnum, unpackdesig, packdesig, fetch_designation_information
 export date, measure, observatory, rms, debias, corr, ra, dec, mag, band, catalogue,
        frequency, residual, weight, weights, isoutlier, nout, notout, notoutobs
 export obsposECEF, obsposvelECI

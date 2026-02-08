@@ -46,11 +46,16 @@ Dynamics APIs.
 struct JPL <: AbstractAstrometrySource end
 
 function get_http_response(::Type{MPC}; mode::Int = 0, id::AbstractString = "",
+                           ids::AbstractVector{<:AbstractString} = [""],
                            format::AbstractString = "", connect_timeout = 180,
                            readtimeout = 180, kwargs...)
-    @assert 0 <= mode <= 2 "`mode`  must be an integer between 0 and 2"
+    @assert -1 <= mode <= 2 "`mode`  must be an integer between -1 and 2"
+    # Designations
+    if mode == -1
+        params = JSON.json(Dict("ids" => ids))
+        url = DESIGNATIONS_MPC_API
     # CatalogueMPC
-    if mode == 0
+    elseif mode == 0
         params = JSON.json(Dict())
         url = CATALOGUES_MPC_FILE_URL
     # ObservatoryMPC
