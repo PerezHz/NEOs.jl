@@ -47,6 +47,8 @@ rms(::NEOCPObject{T}) where {T <: Real} = (T(NaN), T(NaN))
 debias(::NEOCPObject{T}) where {T <: Real} = (T(NaN), T(NaN))
 corr(::NEOCPObject{T}) where {T <: Real} = T(NaN)
 
+trackletid(x::NEOCPObject) = ""
+
 # Print method for NEOCPObject
 function show(io::IO, x::NEOCPObject)
     print(io, x.desig, " α: ", @sprintf("%.5f", rad2deg(x.ra)), "° δ: ",

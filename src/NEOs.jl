@@ -17,15 +17,15 @@ using AngleBetweenVectors, AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, 
       TaylorSeries, XML
 
 using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
-using DataFrames: AbstractDataFrame, DataFrame, DataFrameRow, nrow, eachrow, eachcol,
-      groupby, combine
+using DataFrames: AbstractDataFrame, AsTable, DataFrame, DataFrameRow, nrow, eachrow,
+      eachcol, groupby, combine
 using Dates: epochms2datetime
 using DelimitedFiles: readdlm
 using Distributions: Chisq, Normal, Uniform, cdf, quantile
 using Healpix: Resolution, ang2pixRing
 using HORIZONS: smb_spk
 using LinearAlgebra: inv!
-using LsqFit: curve_fit, vcov, stderror
+using LsqFit: curve_fit, vcov
 using OhMyThreads: tmap, tmap!, @allow_boxed_captures
 using Parameters: @with_kw, @unpack
 using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea, mo,

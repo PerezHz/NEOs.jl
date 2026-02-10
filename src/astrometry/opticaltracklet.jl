@@ -46,6 +46,8 @@ rms(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
 debias(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
 corr(::OpticalTracklet{T}) where {T <: Real} = T(NaN)
 
+trackletid(x::OpticalTracklet) = ""
+
 nobs(x::OpticalTracklet) = x.nobs
 nobs(x::AbstractTrackletVector) = sum(nobs, x; init = 0)
 
@@ -117,72 +119,61 @@ function diffcoeffs(x::AbstractVector{T}) where {T <: Real}
 end
 
 # Outer constructor
-function OpticalTracklet(df::AbstractDataFrame)
+function OpticalTracklet(x::NamedTuple)
+    # Unpack
+    @unpack date, ra, dec, observatory, mag, night, indices = x
     # Number of observations
-    nobs = nrow(df)
-    # Indices
-    indices = getfield(df, :rows)
-
-    # Only one observation
-    if isone(nobs)
-        observatory = df.observatory[1]
-        night = df.TimeOfDay[1]
-        date = df.date[1]
-        ra, dec = df.ra[1], df.dec[1]
-        vra, vdec = zero(ra), zero(dec)
-        mag = df.mag[1]
-        return OpticalTracklet(observatory, night, date, ra, dec,
-                               vra, vdec, mag, nobs, indices)
+    nobs = minimum(length, x)
+    # Zero or one observations
+    if iszero(nobs)
+        throw(ArgumentError("Zero observations do not constitute a tracklet"))
+    elseif isone(nobs)
+        return OpticalTracklet(
+            observatory[1], night[1], date[1], ra[1], dec[1],
+            zero(ra[1]), zero(dec[1]), mag[1], nobs, collect(indices)
+        )
     end
-
     # Make sure there are no repeated dates
-    gdf = groupby(df, :date)
-    df = combine(gdf, [:ra, :dec] .=> mean, :observatory, :mag => skipnanmean,
-                 :TimeOfDay, renamecols = false)
-    # Julian days of observation
-    df.t_julian = dtutc2jdtdb.(df.date)
-    # Days of observation [relative to first observation]
-    df.t_rel = df.t_julian .- df.t_julian[1]
-    # Mean date [relative to first observation]
-    t_mean = mean(df.t_rel)
-    # Mean date [DateTime]
-    date = jdtdb2dtutc(df.t_julian[1] + t_mean)
-
+    if !allunique(date)
+        @warn "Two or or more observations have the same date"
+    end
+    # Observation times [JDTDB]
+    jds = dtutc2jdtdb.(date)
+    # Observation times [Julian days since first observation]
+    ts = jds .- jds[1]
+    # Mean observation date [Julian days since first observation]
+    t_mean = mean(ts)
+    # Mean observation date [UTC]
+    d_mean = jdtdb2dtutc(jds[1] + t_mean)
     # Points in top quarter
-    N_top = count(x -> x > 3π/2, df.ra)
+    N_top = count(x -> x > 3π/2, ra)
     # Points in bottom quarter
-    N_bottom = count(x -> x < π/2, df.ra)
+    N_bottom = count(x -> x < π/2, ra)
     # Discontinuity
     if !iszero(N_top) && !iszero(N_bottom)
-        df.ra = map(x -> x < π ? x + 2π : x, df.ra)
+        for (i, y) in enumerate(ra)
+            ra[i] = y < π ? y + 2π : y
+        end
     end
-
     # Polynomial regression
-    ra_coef = polyfit(df.t_rel, df.ra)
-    dec_coef = polyfit(df.t_rel, df.dec)
-
+    ra_coef = polyfit(ts, ra)
+    dec_coef = polyfit(ts, dec)
     # All observations are from a non Earth-fixed observatory
-    if all(istwoliner, df.observatory)
-        i = argmin(@. abs(datediff(date, df.date)))
-        observatory = df.observatory[i]
-        night = df.TimeOfDay[i]
-        date = df.date[i]
-        ra, dec = df.ra[i], df.dec[i]
-        vra = polymodel(df.t_rel[i], diffcoeffs(ra_coef))
-        vdec = polymodel(df.t_rel[i], diffcoeffs(dec_coef))
-        mag = df.mag[i]
+    if all(istwoliner, observatory)
+        i = argmin(@. abs(datediff(d_mean, date)))
+        t_mean, d_mean = ts[i], date[i]
+        α, δ = ra[i], dec[i]
+        h = mag[i]
     else
-        observatory = df.observatory[1]
-        night = df.TimeOfDay[1]
-        ra = mod2pi(polymodel(t_mean, ra_coef))
-        dec = polymodel(t_mean, dec_coef)
-        vra = polymodel(t_mean, diffcoeffs(ra_coef))
-        vdec = polymodel(t_mean, diffcoeffs(dec_coef))
-        mag = skipnanmean(df.mag)
+        i = 1
+        α, δ = mod2pi(polymodel(t_mean, ra_coef)), polymodel(t_mean, dec_coef)
+        h = skipnanmean(mag)
     end
+    v_α = polymodel(t_mean, diffcoeffs(ra_coef))
+    v_δ = polymodel(t_mean, diffcoeffs(dec_coef))
 
-    return OpticalTracklet(observatory, night, date, ra, dec,
-                           vra, vdec, mag, nobs, indices)
+    return OpticalTracklet(observatory[i], night[i], d_mean, α, δ, v_α, v_δ,
+                           h, nobs, collect(indices))
 end
 
 """
@@ -192,26 +183,32 @@ Return a vector of optical tracklets where each element corresponds to a
 batch of observations taken by the same observatory on the same night.
 The reduction is performed via polynomial regression.
 """
-function reduce_tracklets(optical::AbstractOpticalVector{T}) where {T <: Real}
-    # Construct DataFrame
-    df = DataFrame(date = date.(optical), ra = ra.(optical), dec = dec.(optical),
-        observatory = observatory.(optical), mag = mag.(optical))
-    # Compute TimeOfDay
-    df.TimeOfDay = tmap(TimeOfDay, optical)
-    # Group by observatory and TimeOfDay
-    if hasfield(eltype(optical), :trkid)
-        df.trkid = getfield.(optical, :trkid)
-        gdf = groupby(df, [:trkid])
-    else
-        gdf = groupby(df, [:observatory, :TimeOfDay])
-    end
-    # Reduce tracklets
-    tracklets = TrackletVector{T}(undef, gdf.ngroups)
-    Threads.@threads for i in eachindex(tracklets)
-        tracklets[i] = OpticalTracklet(gdf[i])
-    end
-    # Sort by date
-    sort!(tracklets)
+reduce_tracklets
 
-    return tracklets
+for O in nameof.(subtypes(AbstractOpticalAstrometry))
+    @eval begin
+        function reduce_tracklets(optical::AbstractVector{$O{T}}) where {T <: Real}
+            # Construct DataFrame
+            df = DataFrame(
+                date = date.(optical), ra = ra.(optical), dec = dec.(optical),
+                observatory = observatory.(optical), mag = mag.(optical),
+                night = tmap(TimeOfDay, TimeOfDay, optical), trkid = trackletid.(optical),
+                indices = eachindex(optical)
+            )
+            # Group by ...
+            if hasfield($O, :trkid)
+                gdf = groupby(df, [:trkid])
+            else
+                gdf = groupby(df, [:observatory, :TimeOfDay])
+            end
+            # Reduce tracklets
+            cdf = combine(gdf, AsTable(:) => OpticalTracklet => :tracklets, threads = true)
+            # Sort by date
+            sort!(cdf, :tracklets)
+            # Return vector of tracklets
+            tracklets::TrackletVector{T} = cdf.:tracklets
+
+            return tracklets
+        end
+    end
 end

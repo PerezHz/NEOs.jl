@@ -55,8 +55,9 @@ function TimeOfDay(observatory::ObservatoryMPC, date::DateTime; eop::EOPIAU = EO
         return TimeOfDay(:day, Date(today[1]), Date(today[2]), utc)
     elseif today[2] <= date <= tomorrow[1]
         return TimeOfDay(:night, Date(today[2]), Date(tomorrow[1]), utc)
+    else
+        throw(ArgumentError("Cannot find the sunrise and sunset for date"))
     end
-
 end
 
 # Return the naive hour difference between longitude `lon` [rad] and UTC.

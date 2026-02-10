@@ -93,6 +93,8 @@ rms(::OpticalMPC80{T}) where {T <: Real} = (one(T), one(T))
 debias(::OpticalMPC80{T}) where {T <: Real} = (zero(T), zero(T))
 corr(::OpticalMPC80{T}) where {T <: Real} = zero(T)
 
+trackletid(x::OpticalMPC80) = ""
+
 isdiscovery(x::OpticalMPC80) = x.discovery == '*'
 
 # Print method for OpticalMPC80
