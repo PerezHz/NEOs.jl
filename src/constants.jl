@@ -11,8 +11,11 @@ const OBSERVATORIES_PATH = joinpath(dirname(SRC_PATH), "data", "observatoriesmpc
 
 ## Minor bodies astrometry interface
 
-# Characters for MPC base 62 encoding
+# Designations
+
 const BASE_62_ENCODING = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+const DESIGNATIONS_MPC_API = "https://data.minorplanetcenter.net/api/query-identifier"
 
 # CatalogueMPC
 

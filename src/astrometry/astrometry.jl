@@ -1,6 +1,6 @@
 # Common interface
 include("abstractastrometry.jl")
-include("utils.jl")
+include("designations.jl")
 include("cataloguempc.jl")
 include("observatorympc.jl")
 include("topocentric.jl")

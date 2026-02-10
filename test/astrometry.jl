@@ -27,6 +27,10 @@ using NEOs: SCRATCH_PATH
         @test all(unpacknum.(packednums) .== unpackednums)
         @test all(packnum.(unpackednums) .== packednums)
 
+        dict = fetch_designation_information("2010 EJ27", "2017 HK118")
+        @test haskey(dict, "2010 EJ27") && haskey(dict, "2017 HK118")
+        @test dict["2010 EJ27"]["unpacked_secondary_provisional_designations"] == ["2017 HK118"]
+        @test dict["2017 HK118"]["unpacked_primary_provisional_designation"] == "2010 EJ27"
     end
 
     @testset "CatalogueMPC" begin

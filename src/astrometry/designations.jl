@@ -135,3 +135,24 @@ function packdesig(s::AbstractString)
 
     return string(packed_year, half_month_letter, cycle_count, second_letter)
 end
+
+"""
+    fetch_designation_information(ids)
+
+Return the information given by the Minor Planet Center designation
+identifier API about the designation(s) `ids`.
+
+!!! reference
+    The Minor Planet Center designation identifier API is described at:
+    - https://www.minorplanetcenter.net/mpcops/documentation/designation-identifier-api/
+"""
+fetch_designation_information(s...) = fetch_designation_information(collect(s))
+
+function fetch_designation_information(ids::AbstractVector{<:AbstractString})
+    # Parse HTTP response as String
+    text = fetch_http_text(MPC; mode = -1, ids)
+    # Parse JSON
+    dict = JSON.parse(text)
+
+    return dict
+end
