@@ -199,7 +199,7 @@ for O in nameof.(subtypes(AbstractOpticalAstrometry))
             if hasfield($O, :trkid)
                 gdf = groupby(df, [:trkid])
             else
-                gdf = groupby(df, [:observatory, :TimeOfDay])
+                gdf = groupby(df, [:observatory, :night])
             end
             # Reduce tracklets
             cdf = combine(gdf, AsTable(:) => OpticalTracklet => :tracklets, threads = true)

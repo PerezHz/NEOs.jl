@@ -13,7 +13,7 @@ function warmuptests(dynamics, q00, jd0, nyears, params)
         @test isa(fwd, DensePropagation2{Float64, Float64})
         @test fwd.t0 == jd0 - PE.J2000
         @test length(fwd.t) == 2
-        @test size(fwd.x) == (1, dof(Val(dynamics)))
+        @test size(fwd.x) == (1, NEOs.dof(Val(dynamics)))
     end
 end
 
@@ -23,7 +23,7 @@ end
 
         using InteractiveUtils: methodswith
         using TaylorIntegration: jetcoeffs!, _allocate_jetcoeffs!
-        using NEOs: SSEPHNBODIES, dof, numvars, indices, gm
+        using NEOs: SSEPHNBODIES, numvars, indices, gm
 
         @test !isempty(methodswith(Val{nongravs!}, jetcoeffs!))
         @test !isempty(methodswith(Val{nongravs!}, _allocate_jetcoeffs!))
@@ -37,10 +37,10 @@ end
         @test !isempty(methodswith(Val{sunearthmoon!}, jetcoeffs!))
         @test !isempty(methodswith(Val{sunearthmoon!}, _allocate_jetcoeffs!))
 
-        @test dof(Val(nongravs!)) == 9
-        @test dof(Val(gravityonly!)) == 6
-        @test dof(Val(newtonian!)) == 6
-        @test dof(Val(sunearthmoon!)) == 6
+        @test NEOs.dof(Val(nongravs!)) == 9
+        @test NEOs.dof(Val(gravityonly!)) == 6
+        @test NEOs.dof(Val(newtonian!)) == 6
+        @test NEOs.dof(Val(sunearthmoon!)) == 6
 
         params = Parameters()
         @test numvars(Val(nongravs!), params) == 6
@@ -72,7 +72,7 @@ end
     end
 
     @testset "Warmup (2023 DW)" begin
-        using NEOs: DensePropagation2, dof
+        using NEOs: DensePropagation2
 
         # Initial time [Julian date TDB]
         jd0 = datetime2julian(DateTime(2023, 2, 25, 0, 0, 0))
