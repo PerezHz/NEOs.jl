@@ -1,5 +1,6 @@
 using NEOs
 using Dates
+using PlanetaryEphemeris
 using LinearAlgebra
 using DataFrames
 using Query
@@ -435,7 +436,7 @@ using Test
     @testset "Topocentric" begin
 
         using NEOs: TimeOfDay, isday, isnight, issatellite, isgeocentric,
-              sunriseset, obsposECEF, obsposvelECI
+              sunriseset, obsposECEF, obsposvelECI, parse_optical_ades
 
         # TimeOfDay
         light1 = TimeOfDay.(optical1)
@@ -502,6 +503,77 @@ using Test
         @test maximum(abs, rECEF2 - rECI2) < 2.4e-10
         @test maximum(abs, rECEF3 - rECI3) < 2.4e-10
 
+        # Consistency between ICRF_KM and ICRF_AU
+        s = """
+        <?xml version='1.0' encoding='UTF-8'?>
+        <ades version="2022">
+        <optical>
+            <trkSub>SYNTH</trkSub>
+            <trkID>0000000195</trkID>
+            <mode>UNK</mode>
+            <stn>247</stn>
+            <sys>ICRF_KM</sys>
+            <ctr>399</ctr>
+            <pos1>44560751.403</pos1>
+            <pos2>249847769.733</pos2>
+            <pos3>63875407.816</pos3>
+            <posCov11>1.0</posCov11>
+            <posCov12>0.0</posCov12>
+            <posCov13>0.0</posCov13>
+            <posCov22>1.0</posCov22>
+            <posCov23>0.0</posCov23>
+            <posCov33>1.0</posCov33>
+            <obsTime>2028-04-12T08:16:03.68Z</obsTime>
+            <ra>87.975492</ra>
+            <dec>25.292972</dec>
+            <rmsRA>1</rmsRA>
+            <rmsDec>1</rmsDec>
+            <astCat>UNK</astCat>
+            <mag>10.8</mag>
+            <rmsMag>1</rmsMag>
+            <band>V</band>
+        </optical>
+        <optical>
+            <trkSub>SYNTH</trkSub>
+            <trkID>0000000195</trkID>
+            <mode>UNK</mode>
+            <stn>247</stn>
+            <sys>ICRF_KM</sys>
+            <ctr>399</ctr>
+            <pos1>43351538.866</pos1>
+            <pos2>250481696.410</pos2>
+            <pos3>64215174.021</pos3>
+            <posCov11>1.0</posCov11>
+            <posCov12>0.0</posCov12>
+            <posCov13>0.0</posCov13>
+            <posCov22>1.0</posCov22>
+            <posCov23>0.0</posCov23>
+            <posCov33>1.0</posCov33>
+            <obsTime>2028-04-12T20:16:03.68Z</obsTime>
+            <ra>212.234596</ra>
+            <dec>-8.836389</dec>
+            <rmsRA>1</rmsRA>
+            <rmsDec>1</rmsDec>
+            <astCat>UNK</astCat>
+            <mag>-4.2</mag>
+            <rmsMag>1</rmsMag>
+            <band>V</band>
+        </optical>
+        </ades>
+        """
+        optical4 = parse_optical_ades(s)
+
+        re = r"<pos(?<i>\d)>(?<x>[\d\.]+)</pos.>"
+        ss = replace(s, "<sys>ICRF_KM</sys>" => "<sys>ICRF_AU</sys>")
+        for m in eachmatch(re, s)
+           i, x = m
+           y = parse(Float64, x) / au
+           ss = replace(ss, m.match => "<pos$i>$y</pos$i>")
+       end
+       _optical4_ = parse_optical_ades(ss)
+
+       @test maximum(norm, @. obsposECEF(optical4) - obsposECEF(_optical4_)) < eps()
+       @test maximum(norm, @. obsposvelECI(optical4) - obsposvelECI(_optical4_)) < eps()
     end
 
     @testset "Tracklet" begin

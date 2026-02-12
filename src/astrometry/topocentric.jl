@@ -183,7 +183,7 @@ function obsposECEF(::Val{:ICRF_AU}, coords::SVector{3, T}, et::U;
     # Julian days UTC
     jd_utc = JD_J2000 + utc_secs/daysec
     # Cartesian coordinates of the observer's state vector in GCRF (ECI) frame [km]
-    posECI = coords * oneU / au
+    posECI = coords * oneU * au
     velECI = SVector{3, U}(zeroU, zeroU, zeroU)
     accECI = SVector{3, U}(zeroU, zeroU, zeroU)
     posvelECI = OrbitStateVector(jd_utc, posECI, velECI, accECI)
@@ -337,7 +337,7 @@ function obsposvelECI(::Val{:ICRF_AU}, coords::SVector{3, T}, et::U;
     # One with correct type (and order)
     zeroU, oneU = zero(et), one(et)
     # Cartesian coordinates of the observer's state vector in GCRF (ECI) frame [km]
-    posECI = coords * oneU / au
+    posECI = coords * oneU * au
     velECI = SVector{3, U}(zeroU, zeroU, zeroU)
 
     return vcat(posECI, velECI)
