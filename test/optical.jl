@@ -39,6 +39,7 @@ using Test
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)
         @test corr(apophis) == 0.0
+        @test trackletid(apophis) == ""
 
         # Custom show
         @test string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
@@ -130,6 +131,7 @@ using Test
         @test all(isnan, rms(X85177))
         @test all(isnan, debias(X85177))
         @test isnan(corr(X85177))
+        @test trackletid(X85177) == ""
 
         # Custom show
         @test string(X85177) == "X85177 α: 235.07700° δ: -6.97660° t: 2025-05-24T14:24:00"
@@ -217,6 +219,7 @@ using Test
         @test rms(apophis) == (0.612, 0.612)
         @test debias(apophis) == (-0.247, 0.14)
         @test corr(apophis) == 0.0
+        @test trackletid(apophis) == ""
 
         # Custom show
         string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
@@ -362,6 +365,7 @@ using Test
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)
         @test corr(apophis) == 0.0
+        @test trackletid(apophis) == "000002w-NJ"
 
         # Custom show
         string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
@@ -579,9 +583,13 @@ using Test
     @testset "Tracklet" begin
 
         using NEOs: OpticalTracklet, OpticalMPC80, OpticalRWO, OpticalADES,
-            indices, reduce_tracklets, isunknown
+            indices, reduce_tracklets, isunknown, closest_tracklet
 
         # Reduce tracklets
+        @test_throws ArgumentError reduce_tracklets(OpticalMPC80{Float64}[])
+        @test_throws ArgumentError reduce_tracklets(OpticalRWO{Float64}[])
+        @test_throws ArgumentError reduce_tracklets(OpticalADES{Float64}[])
+
         trks1 = reduce_tracklets(optical1)
         trks2 = reduce_tracklets(optical2)
         trks3 = reduce_tracklets(optical3)
@@ -598,6 +606,18 @@ using Test
         @test indices(trks1) == collect(eachindex(optical1))
         @test indices(trks2) == collect(eachindex(optical2))
         @test indices(trks3) == collect(eachindex(optical3))
+
+        @test indices(trks1, 1:10) == indices(trks1[1:10])
+        @test indices(trks2, 1:10) == indices(trks2[1:10])
+        @test indices(trks3, 1:10) == indices(trks3[1:10])
+
+        @test all(isempty, trackletid.(trks1))
+        @test all(isempty, trackletid.(trks2))
+        @test all(isempty, trackletid.(trks3))
+
+        @test closest_tracklet(dtutc2days(optical1[1]), trks1) == 1
+        @test closest_tracklet(dtutc2days(optical2[1]), trks2) == 1
+        @test closest_tracklet(dtutc2days(optical3[1]), trks3) == 1
 
         @test maximum(datediff.(trks1, trks2)) == 0
         @test maximum(abs, ra.(trks1) - ra.(trks2)) == 0.0
