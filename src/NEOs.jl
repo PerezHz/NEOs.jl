@@ -17,15 +17,15 @@ using AngleBetweenVectors, AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, 
       TaylorSeries, XML
 
 using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
-using DataFrames: AbstractDataFrame, DataFrame, DataFrameRow, nrow, eachrow, eachcol,
-      groupby, combine
+using DataFrames: AbstractDataFrame, AsTable, DataFrame, DataFrameRow, nrow, eachrow,
+      eachcol, groupby, combine
 using Dates: epochms2datetime
 using DelimitedFiles: readdlm
 using Distributions: Chisq, Normal, Uniform, cdf, quantile
 using Healpix: Resolution, ang2pixRing
 using HORIZONS: smb_spk
 using LinearAlgebra: inv!
-using LsqFit: curve_fit, vcov, stderror
+using LsqFit: curve_fit, vcov
 using OhMyThreads: tmap, tmap!, @allow_boxed_captures
 using Parameters: @with_kw, @unpack
 using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea, mo,
@@ -60,7 +60,7 @@ export UniformWeights, SourceWeights, Veres17
 export ZeroDebiasing, SourceDebiasing, Farnocchia15, Eggl20
 export numberofdays, unpacknum, packnum, unpackdesig, packdesig, fetch_designation_information
 export date, measure, observatory, rms, debias, corr, ra, dec, mag, band, catalogue,
-       frequency, residual, weight, weights, isoutlier, nout, notout, notoutobs
+       frequency, residual, weight, weights, isoutlier, nout, notout, notoutobs, trackletid
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
 export update_observatories_mpc, search_observatory_code, fetch_observatory_information

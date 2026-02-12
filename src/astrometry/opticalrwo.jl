@@ -148,6 +148,8 @@ function debias(x::OpticalRWO{T}) where {T <: Real}
 end
 corr(::OpticalRWO{T}) where {T <: Real} = zero(T)
 
+trackletid(x::OpticalRWO) = ""
+
 # Print method for OpticalRWO
 show(io::IO, o::OpticalRWO) = print(io, o.design, " α: ", @sprintf("%.5f",
     rad2deg(o.ra)), "° δ: ", @sprintf("%.5f", rad2deg(o.dec)), "° t: ", o.date,

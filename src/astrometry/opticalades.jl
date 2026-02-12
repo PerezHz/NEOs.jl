@@ -130,6 +130,8 @@ end
 debias(x::OpticalADES{T}) where {T <: Real} = (zero(T), zero(T))
 corr(x::OpticalADES{T}) where {T <: Real} = isnan(x.rmscorr) ? zero(T) : x.rmscorr
 
+trackletid(x::OpticalADES) = x.trkid
+
 # Print method for OpticalADES
 function show(io::IO, o::OpticalADES)
     # If there is no number, use temporary designation

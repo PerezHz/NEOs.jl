@@ -1,5 +1,6 @@
 using NEOs
 using Dates
+using PlanetaryEphemeris
 using LinearAlgebra
 using DataFrames
 using Query
@@ -38,6 +39,7 @@ using Test
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)
         @test corr(apophis) == 0.0
+        @test trackletid(apophis) == ""
 
         # Custom show
         @test string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
@@ -129,6 +131,7 @@ using Test
         @test all(isnan, rms(X85177))
         @test all(isnan, debias(X85177))
         @test isnan(corr(X85177))
+        @test trackletid(X85177) == ""
 
         # Custom show
         @test string(X85177) == "X85177 α: 235.07700° δ: -6.97660° t: 2025-05-24T14:24:00"
@@ -216,6 +219,7 @@ using Test
         @test rms(apophis) == (0.612, 0.612)
         @test debias(apophis) == (-0.247, 0.14)
         @test corr(apophis) == 0.0
+        @test trackletid(apophis) == ""
 
         # Custom show
         string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
@@ -361,6 +365,7 @@ using Test
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)
         @test corr(apophis) == 0.0
+        @test trackletid(apophis) == "000002w-NJ"
 
         # Custom show
         string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
@@ -435,7 +440,7 @@ using Test
     @testset "Topocentric" begin
 
         using NEOs: TimeOfDay, isday, isnight, issatellite, isgeocentric,
-              sunriseset, obsposECEF, obsposvelECI
+              sunriseset, obsposECEF, obsposvelECI, parse_optical_ades
 
         # TimeOfDay
         light1 = TimeOfDay.(optical1)
@@ -502,14 +507,89 @@ using Test
         @test maximum(abs, rECEF2 - rECI2) < 2.4e-10
         @test maximum(abs, rECEF3 - rECI3) < 2.4e-10
 
+        # Consistency between ICRF_KM and ICRF_AU
+        s = """
+        <?xml version='1.0' encoding='UTF-8'?>
+        <ades version="2022">
+        <optical>
+            <trkSub>SYNTH</trkSub>
+            <trkID>0000000195</trkID>
+            <mode>UNK</mode>
+            <stn>247</stn>
+            <sys>ICRF_KM</sys>
+            <ctr>399</ctr>
+            <pos1>44560751.403</pos1>
+            <pos2>249847769.733</pos2>
+            <pos3>63875407.816</pos3>
+            <posCov11>1.0</posCov11>
+            <posCov12>0.0</posCov12>
+            <posCov13>0.0</posCov13>
+            <posCov22>1.0</posCov22>
+            <posCov23>0.0</posCov23>
+            <posCov33>1.0</posCov33>
+            <obsTime>2028-04-12T08:16:03.68Z</obsTime>
+            <ra>87.975492</ra>
+            <dec>25.292972</dec>
+            <rmsRA>1</rmsRA>
+            <rmsDec>1</rmsDec>
+            <astCat>UNK</astCat>
+            <mag>10.8</mag>
+            <rmsMag>1</rmsMag>
+            <band>V</band>
+        </optical>
+        <optical>
+            <trkSub>SYNTH</trkSub>
+            <trkID>0000000195</trkID>
+            <mode>UNK</mode>
+            <stn>247</stn>
+            <sys>ICRF_KM</sys>
+            <ctr>399</ctr>
+            <pos1>43351538.866</pos1>
+            <pos2>250481696.410</pos2>
+            <pos3>64215174.021</pos3>
+            <posCov11>1.0</posCov11>
+            <posCov12>0.0</posCov12>
+            <posCov13>0.0</posCov13>
+            <posCov22>1.0</posCov22>
+            <posCov23>0.0</posCov23>
+            <posCov33>1.0</posCov33>
+            <obsTime>2028-04-12T20:16:03.68Z</obsTime>
+            <ra>212.234596</ra>
+            <dec>-8.836389</dec>
+            <rmsRA>1</rmsRA>
+            <rmsDec>1</rmsDec>
+            <astCat>UNK</astCat>
+            <mag>-4.2</mag>
+            <rmsMag>1</rmsMag>
+            <band>V</band>
+        </optical>
+        </ades>
+        """
+        optical4 = parse_optical_ades(s)
+
+        re = r"<pos(?<i>\d)>(?<x>[\d\.]+)</pos.>"
+        ss = replace(s, "<sys>ICRF_KM</sys>" => "<sys>ICRF_AU</sys>")
+        for m in eachmatch(re, s)
+           i, x = m
+           y = parse(Float64, x) / au
+           ss = replace(ss, m.match => "<pos$i>$y</pos$i>")
+       end
+       _optical4_ = parse_optical_ades(ss)
+
+       @test maximum(norm, @. obsposECEF(optical4) - obsposECEF(_optical4_)) < eps()
+       @test maximum(norm, @. obsposvelECI(optical4) - obsposvelECI(_optical4_)) < eps()
     end
 
     @testset "Tracklet" begin
 
         using NEOs: OpticalTracklet, OpticalMPC80, OpticalRWO, OpticalADES,
-            indices, reduce_tracklets, isunknown
+            indices, reduce_tracklets, isunknown, closest_tracklet
 
         # Reduce tracklets
+        @test_throws ArgumentError reduce_tracklets(OpticalMPC80{Float64}[])
+        @test_throws ArgumentError reduce_tracklets(OpticalRWO{Float64}[])
+        @test_throws ArgumentError reduce_tracklets(OpticalADES{Float64}[])
+
         trks1 = reduce_tracklets(optical1)
         trks2 = reduce_tracklets(optical2)
         trks3 = reduce_tracklets(optical3)
@@ -526,6 +606,18 @@ using Test
         @test indices(trks1) == collect(eachindex(optical1))
         @test indices(trks2) == collect(eachindex(optical2))
         @test indices(trks3) == collect(eachindex(optical3))
+
+        @test indices(trks1, 1:10) == indices(trks1[1:10])
+        @test indices(trks2, 1:10) == indices(trks2[1:10])
+        @test indices(trks3, 1:10) == indices(trks3[1:10])
+
+        @test all(isempty, trackletid.(trks1))
+        @test all(isempty, trackletid.(trks2))
+        @test all(isempty, trackletid.(trks3))
+
+        @test closest_tracklet(dtutc2days(optical1[1]), trks1) == 1
+        @test closest_tracklet(dtutc2days(optical2[1]), trks2) == 1
+        @test closest_tracklet(dtutc2days(optical3[1]), trks3) == 1
 
         @test maximum(datediff.(trks1, trks2)) == 0
         @test maximum(abs, ra.(trks1) - ra.(trks2)) == 0.0
