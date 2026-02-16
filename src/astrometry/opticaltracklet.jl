@@ -187,7 +187,8 @@ reduce_tracklets
 
 for O in nameof.(subtypes(AbstractOpticalAstrometry))
     @eval begin
-        function reduce_tracklets(optical::AbstractVector{$O{T}}) where {T <: Real}
+        function reduce_tracklets(optical::AbstractVector{$O{T}};
+                                  threads::Bool = true) where {T <: Real}
             # Construct DataFrame
             df = DataFrame(
                 date = date.(optical), ra = ra.(optical), dec = dec.(optical),
@@ -202,7 +203,7 @@ for O in nameof.(subtypes(AbstractOpticalAstrometry))
                 gdf = groupby(df, [:observatory, :night])
             end
             # Reduce tracklets
-            cdf = combine(gdf, AsTable(:) => OpticalTracklet => :tracklets, threads = true)
+            cdf = combine(gdf, AsTable(:) => OpticalTracklet => :tracklets; threads)
             # Sort by date
             sort!(cdf, :tracklets)
             # Return vector of tracklets
