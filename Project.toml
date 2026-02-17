@@ -49,7 +49,7 @@ NEOsRecipesBaseExt = "RecipesBase"
 [compat]
 AngleBetweenVectors = "0.3"
 Artifacts = "1"
-AstroAngles = "0.1"
+AstroAngles = "0.1, 0.2"
 AutoHashEquals = "2"
 DataFrames = "1.5"
 Dates = "1"
