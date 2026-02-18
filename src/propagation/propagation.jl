@@ -15,15 +15,12 @@ function rvelea(eph, params, t)
     return dot3D(rv[1:3], rv[4:6])
 end
 
-# Return `true` and the asteroid's radial velocity with respect to the Earth
+# Root-finding function for geocentric close approaches search
 function rvelea(dx, x, params, t)
-    # Julian date (TDB) of start time
-    # jd0 = params.jd0
-    # Days since J2000.0 = 2.451545e6
-    # dsj2k = t + (jd0 - JD_J2000)
+    # Target plane radius
+    R_TP = params.R_TP
     # Solar system ephemeris at dsj2k
     ss16asteph_t = params.sseph.ephU
-    # evaleph!(ss16asteph_t, params.sseph, dsj2k)
     # Total number of bodies
     N = params.N
     # Earth's ephemeris
@@ -31,7 +28,7 @@ function rvelea(dx, x, params, t)
     # Asteroid's geocentric state vector
     xae = x[1:6] - xe
     # Geocentric radial velocity
-    return euclid3D(cte(xae[1:3])) < 0.1, dot3D(xae[1:3], xae[4:6])
+    return euclid3D(cte(xae[1:3])) < R_TP, dot3D(xae[1:3], xae[4:6])
 end
 
 """
@@ -125,18 +122,19 @@ This function uses the Taylor Method implemented in `TaylorIntegration`.
 
 # Keyword arguments
 
+- `R_TP::Real`: target plane radius [au].
 - `eventorder::Int`: order of the derivative of `NEOs.rvelea` whose roots are computed
     (default: `0`).
 - `newtoniter::Int`: maximum Newton-Raphson iterations per detected root (default: `10`).
-- `nrabstol::T`: allowed tolerance for the Newton-Raphson process (default: `eps(T)`).
+- `nrabstol::Real`: allowed tolerance for the Newton-Raphson process (default: `eps(T)`).
 """
 function propagate_root(f::D, q0::Vector{U}, jd0::Number, tmax::T, params::Parameters{T};
-                        eventorder::Int = 0, newtoniter::Int = 10,
+                        R_TP::T = 0.2, eventorder::Int = 0, newtoniter::Int = 10,
                         nrabstol::T = eps(T)) where {D, T <: Real, U <: Number}
     # Pre-allocate memory
     _jd0_ = cte(cte(jd0))
     tlim = minmax(_jd0_, _jd0_ + tmax * yr) .- JD_J2000
-    buffer = PropagationBuffer(f, q0, jd0, tlim, params)
+    buffer = PropagationBuffer(f, q0, jd0, tlim, params; R_TP)
     # Propagate orbit
     return _propagate_root(f, q0, jd0, tmax, buffer, params; eventorder,
         newtoniter, nrabstol)

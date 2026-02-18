@@ -68,14 +68,15 @@ end
 
 # Parameters used within dynamical model functions
 mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
-    sseph::EphemerisEvaluationBuffer{T, U}
-    acceph::Union{Nothing, EphemerisEvaluationBuffer{T, U}}
-    poteph::Union{Nothing, EphemerisEvaluationBuffer{T, U}}
-    jd0::V
-    UJ_interaction::Union{Nothing, Vector{Bool}}
     N::Int
+    jd0::V
+    R_TP::T
     μ::Vector{T}
     marsden_radial::NTuple{5, T}
+    sseph::EphemerisEvaluationBuffer{T, U}
+    UJ_interaction::Union{Nothing, Vector{Bool}}
+    acceph::Union{Nothing, EphemerisEvaluationBuffer{T, U}}
+    poteph::Union{Nothing, EphemerisEvaluationBuffer{T, U}}
 end
 
 """
@@ -96,7 +97,7 @@ struct PropagationBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
 end
 
 """
-    PropagationBuffer(dynamics, q0, jd0, tlim, params)
+    PropagationBuffer(dynamics, q0, jd0, tlim, params; kwargs...)
 
 Return a `PropagationBuffer` object with pre-allocated memory for `propagate`.
 
@@ -107,12 +108,17 @@ Return a `PropagationBuffer` object with pre-allocated memory for `propagate`.
 - `jd0::Number`: initial Julian date (TDB).
 - `tlim::NTuple{2, <:Real}`: ephemeris timespan [days since J2000].
 - `params::Parameters{<:Real}`: see the `Propagation` section of [`Parameters`](@ref).
+
+# Keyword arguments
+
+- `R_TP::Real`: target plane radius [au].
 """
-function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::NTuple{2, T},
-                           params::Parameters{T}) where {D, T <: Real, U <: Number,
-                           V <: Number}
+function PropagationBuffer(
+        dynamics::D, q0::Vector{U}, jd0::V, tlim::NTuple{2, T},
+        params::Parameters{T}; R_TP::T = 0.2
+    ) where {D, T <: Real, U <: Number, V <: Number}
     # Unpack parameters
-    @unpack order, maxsteps, parse_eqs, marsden_radial = params
+    @unpack order, maxsteps, marsden_radial, parse_eqs = params
     # Number of bodies (perturbers + asteroid)
     N = numberofbodies(Val(dynamics))
     # Gravitational parameters
@@ -135,8 +141,8 @@ function PropagationBuffer(dynamics::D, q0::Vector{U}, jd0::V, tlim::NTuple{2, T
         UJ_interaction[ea] = true
     end
     # Dynamical parameters for `propagate`
-    dparams = DynamicalParameters{T, U, V}(_sseph_, _acceph_, _poteph_, jd0, UJ_interaction,
-                                           N, μ, marsden_radial)
+    dparams = DynamicalParameters{T, U, V}(N, jd0, R_TP, μ, marsden_radial, _sseph_,
+        UJ_interaction, _acceph_, _poteph_)
     # TaylorIntegration cache
     cache = init_cache(Val(true), zero(T), q0, maxsteps, order, dynamics, dparams;
                        parse_eqs)
