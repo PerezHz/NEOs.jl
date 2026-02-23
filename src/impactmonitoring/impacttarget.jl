@@ -27,6 +27,13 @@ gm(x::ImpactTarget) = x.gm
 radius(x::ImpactTarget) = x.radius
 escapevelocity(x::ImpactTarget) = sqrt(2 * gm(x) / radius(x)) * (au/daysec)
 
+minmaxdays(x::ImpactTarget) = minmax(x.eph.t0, x.eph.t0 + x.eph.t[end])
+
+function isintimerange(t::Number, x::ImpactTarget)
+    t0, tf = minmaxdays(x)
+    return t0 ≤ t ≤ tf
+end
+
 # Print method for ImpactTarget
 show(io::IO, x::ImpactTarget) = print(io, "Impact target with gm ",
     @sprintf("%.2E", gm(x)), " au³/day² and radius ", @sprintf("%.2E", radius(x)), " au")
