@@ -254,6 +254,12 @@ function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
                         maxsteps = lovsteps, parse_eqs = lovparse, dense = true)
     bwd = TaylorInterpolant{T, T, 2}(zero(T), _bwd_.t, _bwd_.p)
     fwd = TaylorInterpolant{T, T, 2}(zero(T), _fwd_.t, _fwd_.p)
+    # The positive sigma direction is given by the semimajor axis
+    q0T1 = fwd.x[1, :] - params.eph_su(epoch(orbit))
+    a = semimajoraxis(q0T1..., μ_S, 0.0)
+    if differentiate(1, a) < 0
+        bwd, fwd = flipsign(fwd), flipsign(bwd)
+    end
     domain = (last(bwd.t), last(fwd.t))
 
     return LineOfVariations{D, T}(dynamicalmodel(IM), epoch(orbit), domain, bwd, fwd)
