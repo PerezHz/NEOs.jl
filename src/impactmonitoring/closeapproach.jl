@@ -164,6 +164,46 @@ function closeapproach(x, teph, params, t; R_TP, R_P)
     return (true, dap - R_P), (dap < R_TP, rvap)
 end
 
+# Specialized version of TaylorIntegration.findroot!
+function findroot(g_tupl_old::Tuple{Bool, Taylor1{U}}, g_tupl::Tuple{Bool, Taylor1{U}},
+                  δt_old::T, buffer::ImpactMonitoringBuffer{T, U}; nrabstol::T = eps(T),
+                  newtoniter::Int = 25) where {T <: Real, U <: Number}
+    # Check if g changes sign in the given interval
+    surfacecrossing(g_tupl_old, g_tupl, 0) || return false, zero(g_tupl[2][0])
+    # Unpack
+    @unpack g_constant, g_dg, g_dg_val = buffer
+    # Select expansion for Newton-Raphson
+    for i in eachindex(g_tupl[2])
+        g_constant[1][i] = constant_term(g_tupl_old[2][i])
+        g_constant[2][i] = constant_term(g_tupl[2][i])
+    end
+    if g_constant[1](zero(T)) * g_constant[1](δt_old) < zero(T)
+        a, b = zero(T), δt_old
+        g_dg[1] = g_tupl_old[2]
+    elseif g_constant[2](-δt_old) * g_constant[2](zero(T)) < zero(T)
+        a, b = -δt_old, zero(T)
+        g_dg[1] = g_tupl[2]
+    else
+        return false, zero(g_tupl[2][0])
+    end
+    g_dg[2] = derivative(g_dg[1])
+    # First guess: linear interpolation
+    dt_nr = (a * g_tupl[2][0] - b * g_tupl_old[2][0]) / (g_tupl[2][0] - g_tupl_old[2][0])
+    # Newton-Raphson iterations
+    nriter = 1
+    evaluate!(g_dg, dt_nr, view(g_dg_val, :))
+    while nrconvergencecriterion(g_dg_val[1], nrabstol, nriter, newtoniter)
+        dt_nr = dt_nr - g_dg_val[1] / g_dg_val[2]
+        evaluate!(g_dg, dt_nr, view(g_dg_val, :))
+        nriter += 1
+    end
+    nriter == newtoniter + 1 && @warn("""
+        Newton-Raphson did not converge for prescribed tolerance and maximum allowed iterations.
+        """)
+
+    return true, dt_nr
+end
+
 """
     closeapproaches(IM, VA, nyears, params; kwargs...)
 
@@ -190,9 +230,10 @@ function closeapproaches(
         ctol::T = T(Inf), newtoniter::Int = 25, nrabstol::T = eps(T),
         buffer::Union{Nothing, ImpactMonitoringBuffer{T, U}} = nothing
     ) where {D, T <: Real, U <: Number}
-    # Unpack
+    # Unpack problem and parameters
     @unpack target = IM
-    @unpack abstol, maxsteps, order, eph_su = params
+    @unpack abstol, maxsteps, eph_su = params
+    R_P = radius(target)
     # Dynamical model
     dynamics = dynamicalmodel(IM)
     # Initial conditions
@@ -202,39 +243,25 @@ function closeapproaches(
     if isnothing(buffer)
         buffer = ImpactMonitoringBuffer(IM, q0, nyears, params)
     end
-    @unpack prop, teph, tvS, xvS, gvS = buffer
+    @unpack prop, teph = buffer
     @unpack cache, dparams = prop
     @unpack xaux, t, x, dx, rv, parse_eqs = cache
     dparams.jd0 = epoch(VA) + JD_J2000
-
-    # Specialized version of the root-finding method of taylorinteg
+    # Initialize cache
     x0 = deepcopy(q0)
     update_cache!(cache, t0, x0)
     sign_tstep = copysign(1, tmax - t0)
-
-    # Some auxiliary arrays for root-finding/event detection/Poincaré
-    # surface of section evaluation
-    R_P = radius(target)
+    # Some auxiliary arrays for root-finding
+    xold = zero.(x)
+    δt, told = zero(T), zero(T)
+    CAs = Vector{CloseApproach{T, U}}(undef, 0)
     f_tupl, g_tupl = closeapproach(x, teph, dparams, t; R_TP, R_P)
     f_tupl, g_tupl = (false, f_tupl[2]), (false, g_tupl[2])
     f_tupl_old, g_tupl_old = deepcopy(f_tupl), deepcopy(g_tupl)
-    δt = zero(x[1])
-    δt_old = zero(x[1])
-
-    x_dx = vcat(x, dx)
-    f_df = vcat(f_tupl[2], f_tupl_old[2])
-    g_dg = vcat(g_tupl[2], g_tupl_old[2])
-    x_dx_val = TS.evaluate(x_dx)
-    f_df_val = vcat(TS.evaluate(f_tupl[2]), TS.evaluate(f_tupl_old[2]))
-    g_dg_val = vcat(TS.evaluate(g_tupl[2]), TS.evaluate(g_tupl_old[2]))
-
-    CAs = Vector{CloseApproach{T, U}}(undef, 0)
-
     # Integration
     nsteps = 1
-    nevents = 1 # number of detected events
     while sign_tstep * t0 < sign_tstep * tmax
-        δt_old = δt
+        δt_old = t0 - told
         δt = taylorstep!(Val(parse_eqs), dynamics, t, x, dx, xaux, abstol, dparams, rv) # δt is positive!
         # Below, δt has the proper sign according to the direction of the integration
         if iszero(δt)
@@ -246,14 +273,17 @@ function closeapproaches(
         TS.evaluate!(x, δt, x0)
         # Root-finding
         f_tupl, g_tupl = closeapproach(x, teph, dparams, t; R_TP, R_P)
-        nevents = findroot!(t, x, dx, f_tupl_old, f_tupl, 0, tvS, xvS, gvS,
-                            t0, δt_old, x_dx, x_dx_val, f_df, f_df_val, nrabstol,
-                            newtoniter, nevents)
-        if nevents > 1
+        flag, dt_nr = findroot(f_tupl_old, f_tupl, δt_old, buffer; nrabstol, newtoniter)
+        if flag
             # Time at surface crossing
-            t_CA = epoch(VA) + tvS[1]
+            t_CA = epoch(VA) + told + dt_nr
+            if !isintimerange(t_CA, target)
+                @warn("Time of close approach is outside the target's ephemeris \
+                       timerange; exiting.")
+                break
+            end
             # Asteroid's planetocentric state vector
-            xap = xvS[:, 1] - target(t_CA)
+            xap = xold(dt_nr) - target(t_CA)
             # Planetocentric keplerian elements
             kep = KeplerianElements{T, U}(
                 gm(target),
@@ -283,16 +313,17 @@ function closeapproaches(
             @warn("Integration entered the physical radius of the target; exiting.")
             break
         end
-        nevents = findroot!(t, x, dx, g_tupl_old, g_tupl, 0, tvS, xvS, gvS,
-                            t0, δt_old, x_dx, x_dx_val, g_dg, g_dg_val, nrabstol,
-                            newtoniter, nevents)
-        if nevents > 1
-            # Reset events counter
-            nevents = 1
+        flag, dt_nr = findroot(g_tupl_old, g_tupl, δt_old, buffer; nrabstol, newtoniter)
+        if flag
             # Time at close approach
-            t_CA = epoch(VA) + tvS[1]
+            t_CA = epoch(VA) + told + dt_nr
+            if !isintimerange(t_CA, target)
+                @warn("Time of close approach is utside the target's ephemeris \
+                       timerange; exiting.")
+                break
+            end
             # Asteroid's planetocentric state vector
-            xap = xvS[:, 1] - target(t_CA)
+            xap = xold(dt_nr) - target(t_CA)
             # Asteroid's planetocentric semimajor axis
             a = semimajoraxis(xap..., gm(target), zero(T))
             if a < 0
@@ -311,7 +342,14 @@ function closeapproaches(
         end
         f_tupl_old, g_tupl_old = deepcopy(f_tupl), deepcopy(g_tupl)
         # Update time
+        told = t0
         t0 += δt
+        # Update state vector
+        for i in eachindex(x)
+            for k in eachindex(x[i])
+                TS.identity!(xold[i], x[i], k)
+            end
+        end
         update_cache!(cache, t0, x0)
         nsteps += 1
         if nsteps > maxsteps

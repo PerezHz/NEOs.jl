@@ -7,14 +7,16 @@ Pre-allocated memory for [`closeapproaches`](@ref).
 
 - `prop::PropagationBuffer{T, U, T}`: propagation buffer.
 - `teph::EphemerisEvaluationBuffer{T, U}`: target ephemeris evaluation buffer.
-- `tvS/xvS/gvS::Array{U, _}`: root-finding arrays.
+- `g_constant::Vector{Taylor1{T}}`: surface crossing buffer.
+- `g_dg::Vector{Taylor1{U}}`: objective function buffer.
+- `g_dg_val::Vector{U}`: objective function evaluation buffer.
 """
 struct ImpactMonitoringBuffer{T <: Real, U <: Number} <: AbstractBuffer
     prop::PropagationBuffer{T, U, T}
     teph::EphemerisEvaluationBuffer{T, U}
-    tvS::Vector{U}
-    xvS::Matrix{U}
-    gvS::Vector{U}
+    g_constant::Vector{Taylor1{T}}
+    g_dg::Vector{Taylor1{U}}
+    g_dg_val::Vector{U}
 end
 
 """
@@ -41,10 +43,11 @@ function ImpactMonitoringBuffer(IM::AbstractIMProblem{D, T}, q0::Vector{U}, nyea
     prop = PropagationBuffer(dynamicalmodel(IM), q0, jd0, tlim, params)
     # Target ephemeris evaluation buffer
     teph = EphemerisEvaluationBuffer(target.eph, tlim, order, q0)
-    # Root-finding arrays
-    tvS = Array{U}(undef, 1)
-    xvS = Array{U}(undef, length(q0), 1)
-    gvS = similar(tvS)
+    # Objective function buffers
+    @unpack t, x = prop.cache
+    g_constant = [zero(t), zero(t)]
+    g_dg = [zero(x[1]), zero(x[1])]
+    g_dg_val = [zero(q0[1]), zero(q0[1])]
 
-    return ImpactMonitoringBuffer{T, U}(prop, teph, tvS, xvS, gvS)
+    return ImpactMonitoringBuffer{T, U}(prop, teph, g_constant, g_dg, g_dg_val)
 end

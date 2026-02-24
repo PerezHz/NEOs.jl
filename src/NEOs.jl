@@ -43,7 +43,7 @@ using SpecialFunctions: erf
 using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update_cache!,
-      taylorstep!, set_psol!, findroot!
+      taylorstep!, set_psol!, surfacecrossing, nrconvergencecriterion
 using TaylorSeries: NumberNotSeries
 
 # Common
