@@ -99,6 +99,7 @@ function showersnreturns(x::AbstractVector{CloseApproach{T, U}},
         domain = (minimum(lbound, CAs), maximum(ubound, CAs))
         push!(RTs, Return{T, U}(domain, CAs))
     end
+    sort!(RTs, by = nominaltime)
 
     return RTs
 end
