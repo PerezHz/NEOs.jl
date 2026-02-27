@@ -43,10 +43,45 @@ get_order(x::LineOfVariations) = get_order(first(x.bwd.x))
 (x::LineOfVariations)(σ::Number, domain::NTuple{2, <:Number}) =
     x(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(get_order(x)))
 
-# Return the Taylor expansion of the covariance matrix of an initial condition,
-# with respect to the normalized direction of the eigenvector associated to the
-# largest eigenvalue
-function lovcovariance(
+# Return the Taylor expansion of the vector field associated to the
+# weak direction of Γ; see https://doi.org/10.1137/23M1551961
+function weakfield(Γ::AbstractMatrix{Taylor1{T}}, order::Int) where {T <: Real}
+    # Allocate memory
+    Lx, Ly = size(Γ)
+    λs = Vector{T}(undef, order+1)
+    vs = Matrix{T}(undef, Lx, order+1)
+    As = Array{T}(undef, Lx, Ly, order+1)
+    # 0th-order eigenvalues
+    As[:, :, 1] = Symmetric(constant_term.(Γ))
+    E0 = eigen(As[:, :, 1])
+    λs[1], vs[:, 1] = E0.values[end], E0.vectors[:, end]
+    # Coefficients matrix
+    E = [0 vs[:, 1]'; vs[:, 1] λs[1]*I-As[:, :, 1]]
+    # Main loop
+    for k in 1:order
+        As[:, :, k+1] = TS.differentiate.(k, Γ)
+        y, z = zeros(T, Lx), zero(T)
+        for l in 0:k-1
+            y += binomial(k, l) * As[:, :, k-l+1] * vs[:, l+1]
+            if l >= 1
+                y -= binomial(k, l) * vs[:, k-l+1] * λs[l+1]
+                if l < k -1
+                    z += binomial(k-1, l-1) * vs[:, k-l+1]' * vs[:, l+1]
+                end
+            end
+        end
+        Ek = E \ [-z/2; y]
+        λs[k+1], vs[:, k+1] = Ek[1], Ek[2:end]
+    end
+    λ = Taylor1(λs, order)
+    v = [Taylor1(vs[i, :], order) for i in axes(vs, 1)]
+    F = sqrt(λ) * v
+    return F
+end
+
+# Return the Taylor expansion of the vector field associated to the
+# weak direction of an orbit
+function weakfield(
         resTN::Vector{OpticalResidual{T, TaylorN{T}}},
         resT1::Vector{OpticalResidual{T, Taylor1{T}}},
         IM::AbstractIMProblem{D, T}, q00::Vector{T},
@@ -94,43 +129,10 @@ function lovcovariance(
         TS.differentiate!(J[i], q0T1[i] - q00[i])
     end
     Γ_c = Symmetric(J * Γ_ξ * J')
+    # Weak field
+    F = weakfield(Γ_c, order)
 
-    return Γ_c
-end
-
-# Return the Taylor expansions of the largest eigenpair of Γ
-# See https://doi.org/10.1137/23M1551961
-function machseries(Γ::AbstractMatrix{Taylor1{T}}, order::Int) where {T <: Real}
-    # Allocate memory
-    Lx, Ly = size(Γ)
-    λs = Vector{T}(undef, order+1)
-    vs = Matrix{T}(undef, Lx, order+1)
-    As = Array{T}(undef, Lx, Ly, order+1)
-    # 0th-order eigenvalues
-    As[:, :, 1] = Symmetric(constant_term.(Γ))
-    E0 = eigen(As[:, :, 1])
-    λs[1], vs[:, 1] = E0.values[end], E0.vectors[:, end]
-    # Coefficients matrix
-    E = [0 vs[:, 1]'; vs[:, 1] λs[1]*I-As[:, :, 1]]
-    # Main loop
-    for k in 1:order
-        As[:, :, k+1] = TS.differentiate.(k, Γ)
-        y, z = zeros(T, Lx), zero(T)
-        for l in 0:k-1
-            y += binomial(k, l) * As[:, :, k-l+1] * vs[:, l+1]
-            if l >= 1
-                y -= binomial(k, l) * vs[:, k-l+1] * λs[l+1]
-                if l < k -1
-                    z += binomial(k-1, l-1) * vs[:, k-l+1]' * vs[:, l+1]
-                end
-            end
-        end
-        Ek = E \ [-z/2; y]
-        λs[k+1], vs[:, k+1] = Ek[1], Ek[2:end]
-    end
-    λ, v = Taylor1(λs, order), [Taylor1(vs[i, :], order) for i in axes(vs, 1)]
-
-    return λ, v
+    return F
 end
 
 """
@@ -144,18 +146,14 @@ Definition of the line of variations as a differential equation.
 """
 function lov!(dq, q, params, t)
     local resTN, resT1, IM, jd0, _params, bufferTN, bufferT1, order = params
-    local Γ = lovcovariance(resTN, resT1, IM, cte(q), jd0, _params;
-                            bufferTN, bufferT1, order)
-    local λ, v = machseries(Γ, order)
-    sqrt_λ = sqrt(λ)
-    dq[1] = sqrt_λ * v[1]
-    dq[2] = sqrt_λ * v[2]
-    dq[3] = sqrt_λ * v[3]
-    dq[4] = sqrt_λ * v[4]
-    dq[5] = sqrt_λ * v[5]
-    dq[6] = sqrt_λ * v[6]
-
-    nothing
+    local F = weakfield(resTN, resT1, IM, cte(q), jd0, _params; bufferTN, bufferT1, order)
+    dq[1] = F[1]
+    dq[2] = F[2]
+    dq[3] = F[3]
+    dq[4] = F[4]
+    dq[5] = F[5]
+    dq[6] = F[6]
+    return nothing
 end
 
 # Methods of `TaylorIntegration._allocate_jetcoeffs!` and `TaylorIntegration.jetcoeffs!`
@@ -165,20 +163,19 @@ function TaylorIntegration._allocate_jetcoeffs!(
         dq::AbstractArray{Taylor1{_S}, _N}, params
     ) where {_T <: Real, _S <: Number, _N}
     order = t.order
-    local resTN, resT1, IM, jd0, _params, bufferTN, bufferT1, _ = params
-    local Γ = lovcovariance(resTN, resT1, IM, cte(q), jd0, _params;
-                            bufferTN, bufferT1, order)
-    local (λ, v) = machseries(Γ, order)
-    sqrt_λ = Taylor1(sqrt(constant_term(λ)), order)
-    dq[1] = Taylor1(constant_term(sqrt_λ) * constant_term(v[1]), order)
-    dq[2] = Taylor1(constant_term(sqrt_λ) * constant_term(v[2]), order)
-    dq[3] = Taylor1(constant_term(sqrt_λ) * constant_term(v[3]), order)
-    dq[4] = Taylor1(constant_term(sqrt_λ) * constant_term(v[4]), order)
-    dq[5] = Taylor1(constant_term(sqrt_λ) * constant_term(v[5]), order)
-    dq[6] = Taylor1(constant_term(sqrt_λ) * constant_term(v[6]), order)
+    local (resTN, resT1, IM, jd0, _params, bufferTN, bufferT1, order) = params
+    local F = weakfield(resTN, resT1, IM, cte(q), jd0, _params; bufferTN, bufferT1, order)
+    dq[1] = Taylor1(identity(constant_term(F[1])), order)
+    dq[2] = Taylor1(identity(constant_term(F[2])), order)
+    dq[3] = Taylor1(identity(constant_term(F[3])), order)
+    dq[4] = Taylor1(identity(constant_term(F[4])), order)
+    dq[5] = Taylor1(identity(constant_term(F[5])), order)
+    dq[6] = Taylor1(identity(constant_term(F[6])), order)
     return TaylorIntegration.RetAlloc{Taylor1{_S}}(
-        [sqrt_λ], [Array{Taylor1{_S}, 1}(undef, 0)], [Array{Taylor1{_S}, 2}(undef, 0, 0)],
-        [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)]
+        Taylor1{_S}[], [Array{Taylor1{_S}, 1}(undef, 0)],
+        [Array{Taylor1{_S}, 2}(undef, 0, 0)],
+        [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)],
+        [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)]
     )
 end
 
@@ -188,20 +185,16 @@ function TaylorIntegration.jetcoeffs!(
         __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}
     ) where {_T <: Real, _S <: Number, _N}
     order = t.order
-    sqrt_λ = __ralloc.v0[1]
-    local resTN, resT1, IM, jd0, _params, bufferTN, bufferT1, _ = params
-    local Γ = lovcovariance(resTN, resT1, IM, cte(q), jd0, _params;
-                            bufferTN, bufferT1, order)
-    local (λ, v) = machseries(Γ, order)
+    local (resTN, resT1, IM, jd0, _params, bufferTN, bufferT1, order) = params
+    local F = weakfield(resTN, resT1, IM, cte(q), jd0, _params; bufferTN, bufferT1, order)
     for ord = 0:order - 1
         ordnext = ord + 1
-        TaylorSeries.sqrt!(sqrt_λ, λ, ord)
-        TaylorSeries.mul!(dq[1], sqrt_λ, v[1], ord)
-        TaylorSeries.mul!(dq[2], sqrt_λ, v[2], ord)
-        TaylorSeries.mul!(dq[3], sqrt_λ, v[3], ord)
-        TaylorSeries.mul!(dq[4], sqrt_λ, v[4], ord)
-        TaylorSeries.mul!(dq[5], sqrt_λ, v[5], ord)
-        TaylorSeries.mul!(dq[6], sqrt_λ, v[6], ord)
+        TaylorSeries.identity!(dq[1], F[1], ord)
+        TaylorSeries.identity!(dq[2], F[2], ord)
+        TaylorSeries.identity!(dq[3], F[3], ord)
+        TaylorSeries.identity!(dq[4], F[4], ord)
+        TaylorSeries.identity!(dq[5], F[5], ord)
+        TaylorSeries.identity!(dq[6], F[6], ord)
         for __idx = eachindex(q)
             TaylorIntegration.solcoeff!(q[__idx], dq[__idx], ordnext)
         end
