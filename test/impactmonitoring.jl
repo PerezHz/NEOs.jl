@@ -85,6 +85,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test mass(IM, params) == mass(orbit, params)
         @test escapevelocity(IM) == escapevelocity(target)
         @test minmaxdates(IM) == (date(optical[1]), date(optical[end]))
+        @test isa(string(IM), String) && isa(string(target), String)
 
         # Line of variations
         σmax, lovorder, lovtol = 5.0, 12, 1E-20
@@ -147,6 +148,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test sigma(VA) == sigma(lov)
         @test initialcondition(VA) == lov(0.0, (-σmax, σmax))
         @test get_order(VA) == vaorder
+        @test isa(string(VA), String)
 
         # Close approaches
         nyears = 0.4 / yr
@@ -157,6 +159,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
 
         @test nominaltime(CA) == constant_term(CA.t) == timeofca(CA, 0.0)
         @test sigma(CA) == sigma(VA)
+        @test semimajoraxis(CA) < 0
         @test get_order(CA) == get_order(VA) == vaorder
         @test nominalstate(CA) == [CA.x[0], CA.y[0], CA.z[0]] == targetplane(CA, 0.0)
         @test difft(CA, CA) == 0.0
@@ -165,11 +168,13 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test 0.0 in CA
         @test lbound(CA) == lbound(VA)
         @test ubound(CA) == ubound(VA)
+        @test isinf(convergence_radius(0.0, ctol))
         @test convergence_radius(CA, ctol) > 1
         a, b = convergence_domain(CA, ctol)
         @test a < -σmax && σmax < b
         @test isconvergent(CA, ctol)
-        @test CA.tp == BPlane{Taylor1{Float64}}
+        @test targetplane(CA) == BPlane{Taylor1{Float64}}
+        @test isa(string(CA), String)
 
         # Returns
         RTs = showersnreturns(CAs)
@@ -265,6 +270,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test mass(IM, params) == mass(orbit, params)
         @test escapevelocity(IM) == escapevelocity(target)
         @test minmaxdates(IM) == (date(optical[1]), date(optical[9]))
+        @test isa(string(IM), String) && isa(string(target), String)
 
         # Line of variations
         σmax, lovorder, lovtol = 5.0, 12, 1E-20
@@ -327,6 +333,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test sigma(VA) == sigma(lov)
         @test initialcondition(VA) == lov(0.0, (-σmax, σmax))
         @test get_order(VA) == vaorder
+        @test isa(string(VA), String)
 
         # Close approaches
         nyears = 26 / yr
@@ -337,6 +344,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
 
         @test nominaltime(CA) == constant_term(CA.t) == timeofca(CA, 0.0)
         @test sigma(CA) == sigma(VA)
+        @test semimajoraxis(CA) > 0
         @test get_order(CA) == get_order(VA) == vaorder
         @test nominalstate(CA) == [CA.x[0], CA.y[0], CA.z[0]] == targetplane(CA, 0.0)
         @test difft(CA, CA) == 0.0
@@ -345,11 +353,13 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
         @test 0.0 in CA
         @test lbound(CA) == lbound(VA)
         @test ubound(CA) == ubound(VA)
+        @test isinf(convergence_radius(0.0, ctol))
         @test convergence_radius(CA, ctol) > 1
         a, b = convergence_domain(CA, ctol)
         @test a < -σmax && σmax < b
         @test isconvergent(CA, ctol)
-        @test CA.tp == MTP{Taylor1{Float64}}
+        @test targetplane(CA) == MTP{Taylor1{Float64}}
+        @test isa(string(CA), String)
 
         # Returns
         RTs = showersnreturns(CAs)
