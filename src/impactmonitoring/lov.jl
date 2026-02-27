@@ -1,4 +1,59 @@
 """
+    LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
+
+Pre-allocated memory for [`lineofvariations`](@ref).
+
+# Fields
+
+- `resTN::Vector{OpticalResidual{T, TaylorN{T}}}`: buffer for `TaylorN{T}` residuals.
+- `resT1::Vector{OpticalResidual{T, Taylor1{T}}}`: buffer for `Taylor1{T}` residuals.
+- `bufferTN::PropresBuffer{T, TaylorN{T}, T}`: buffer for `TaylorN{T}` propagations.
+- `bufferT1::PropresBuffer{T, Taylor1{T}, T}`: buffer for `Taylor1{T}` propagations.
+"""
+struct LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
+    resTN::Vector{OpticalResidual{T, TaylorN{T}}}
+    resT1::Vector{OpticalResidual{T, Taylor1{T}}}
+    bufferTN::PropresBuffer{T, TaylorN{T}, T}
+    bufferT1::PropresBuffer{T, Taylor1{T}, T}
+end
+
+get_order(x::LineOfVariationsBuffer) = get_order(x.bufferT1.prop.cache.x[1][0])
+
+"""
+    LineOfVariationsBuffer(IM, lovorder, params)
+
+Return a `LineOfVariationsBuffer` object with pre-allocated
+memory for [`lineofvariations`](@ref).
+
+# Arguments
+
+- `IM::IMProblem`: impact monitoring problem.
+- `lovorder::Int`: order of Taylor expansions wrt LOV index.
+- `params::Parameters`: see the `Propagation` section of [`Parameters`](@ref).
+"""
+function LineOfVariationsBuffer(IM::AbstractIMProblem{D, T}, lovorder::Int,
+                                params::Parameters{T}) where {D, T <: Real}
+    # Unpack
+    @unpack orbit = IM
+    # Refence epoch [julian date TDB]
+    jd0 = epoch(orbit) + PE.J2000
+    # Set jet transport order
+    set_od_order(T, 2, dof(IM))
+    # Initial condition
+    q00 = orbit()
+    q0TN = q00 + sigmas(orbit) .* get_variables(T, 2)
+    q0T1 = q00 + sigmas(orbit) .* Taylor1(lovorder)
+    # Vectors of residuals
+    resTN = init_optical_residuals(TaylorN{T}, IM)
+    resT1 = init_optical_residuals(Taylor1{T}, IM)
+    # Propagation and residuals buffers
+    bufferTN = PropresBuffer(IM, q0TN, jd0, params)
+    bufferT1 = PropresBuffer(IM, q0T1, jd0, params)
+
+    return LineOfVariationsBuffer{T}(resTN, resT1, bufferTN, bufferT1)
+end
+
+"""
     LineOfVariations{D, T} <: AbstractLineOfVariations{T}
 
 A parametrization of the line of variations (LOV).
@@ -82,20 +137,19 @@ end
 # Return the Taylor expansion of the vector field associated to the
 # weak direction of an orbit
 function weakfield(
-        resTN::Vector{OpticalResidual{T, TaylorN{T}}},
-        resT1::Vector{OpticalResidual{T, Taylor1{T}}},
         IM::AbstractIMProblem{D, T}, q00::Vector{T},
-        jd0::T, params::Parameters{T};
-        bufferTN::Union{Nothing, PropresBuffer{T, TaylorN{T}, T}} = nothing,
-        bufferT1::Union{Nothing, PropresBuffer{T, Taylor1{T}, T}} = nothing,
-        order::Int = 12
+        buffer::LineOfVariationsBuffer{T}, params::Parameters{T}
     ) where {D, T <: Real}
-    # Set jet transport variables
-    Npar = dof(IM)
-    set_od_order(T, 2, Npar)
+    # Unpack
+    @unpack orbit = IM
+    @unpack resTN, resT1, bufferTN, bufferT1 = buffer
+    # Refence epoch [julian date TDB]
+    jd0 = epoch(orbit) + PE.J2000
+    # Order with respect to LOV index
+    order = get_order(buffer)
     # Jet transpot initial condition
     scalings = fill(1e-8, 6)
-    if Npar == 9
+    if get_numvars() == 9
         scalings = vcat(scalings, params.marsden_scalings...)
     end
     dq = scalings .* get_variables(T, 2)
@@ -145,8 +199,7 @@ Definition of the line of variations as a differential equation.
     - https://doi.org/10.1017/CBO9781139175371
 """
 function lov!(dq, q, params, t)
-    local resTN, resT1, IM, jd0, _params, bufferTN, bufferT1, order = params
-    local F = weakfield(resTN, resT1, IM, cte(q), jd0, _params; bufferTN, bufferT1, order)
+    local F = weakfield(params[1], cte(q), params[2], params[3])
     dq[1] = F[1]
     dq[2] = F[2]
     dq[3] = F[3]
@@ -163,8 +216,7 @@ function TaylorIntegration._allocate_jetcoeffs!(
         dq::AbstractArray{Taylor1{_S}, _N}, params
     ) where {_T <: Real, _S <: Number, _N}
     order = t.order
-    local (resTN, resT1, IM, jd0, _params, bufferTN, bufferT1, order) = params
-    local F = weakfield(resTN, resT1, IM, cte(q), jd0, _params; bufferTN, bufferT1, order)
+    local F = weakfield(params[1], cte(q), params[2], params[3])
     dq[1] = Taylor1(identity(constant_term(F[1])), order)
     dq[2] = Taylor1(identity(constant_term(F[2])), order)
     dq[3] = Taylor1(identity(constant_term(F[3])), order)
@@ -185,8 +237,7 @@ function TaylorIntegration.jetcoeffs!(
         __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}
     ) where {_T <: Real, _S <: Number, _N}
     order = t.order
-    local (resTN, resT1, IM, jd0, _params, bufferTN, bufferT1, order) = params
-    local F = weakfield(resTN, resT1, IM, cte(q), jd0, _params; bufferTN, bufferT1, order)
+    local F = weakfield(params[1], cte(q), params[2], params[3])
     for ord = 0:order - 1
         ordnext = ord + 1
         TaylorSeries.identity!(dq[1], F[1], ord)
@@ -224,26 +275,13 @@ function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
                           lovparse::Bool = true) where {D, T <: Real}
     # Unpack
     @unpack orbit = IM
-    # Number of degrees of freedom
-    Npar = dof(IM)
-    # Jet transpot initial condition
-    set_od_order(T, 2, Npar)
-    # Refence epoch [julian date TDB]
-    jd0 = epoch(orbit) + PE.J2000
-    # Initial condition
-    q00 = orbit()
-    q0TN = q00 + sigmas(orbit) .* get_variables(T, 2)
-    q0T1 = q00 + sigmas(orbit) .* Taylor1(lovorder)
-    # Line of variations parameters
-    resTN = init_optical_residuals(TaylorN{T}, IM)
-    resT1 = init_optical_residuals(Taylor1{T}, IM)
-    bufferTN = PropresBuffer(IM, q0TN, jd0, params)
-    bufferT1 = PropresBuffer(IM, q0T1, jd0, params)
-    lovparams = (resTN, resT1, IM, jd0, params, bufferTN, bufferT1, lovorder)
+    # Line of variations buffer
+    buffer = LineOfVariationsBuffer(IM, lovorder, params)
     # Taylor expansion of the line of variations
-    _bwd_ = taylorinteg(lov!, q00, zero(T), -σmax, lovorder, lovtol, lovparams;
+    lovparams = (IM, buffer, params)
+    _bwd_ = taylorinteg(lov!, orbit(), zero(T), -σmax, lovorder, lovtol, lovparams;
                         maxsteps = lovsteps, parse_eqs = lovparse, dense = true)
-    _fwd_ = taylorinteg(lov!, q00, zero(T), σmax, lovorder, lovtol, lovparams;
+    _fwd_ = taylorinteg(lov!, orbit(), zero(T), σmax, lovorder, lovtol, lovparams;
                         maxsteps = lovsteps, parse_eqs = lovparse, dense = true)
     bwd = TaylorInterpolant{T, T, 2}(zero(T), _bwd_.t, _bwd_.p)
     fwd = TaylorInterpolant{T, T, 2}(zero(T), _fwd_.t, _fwd_.p)
