@@ -145,10 +145,10 @@ function equinoctial2keplerian(x::AbstractVector{U}, t::T;
 end
 
 """
-    cartesian2equinoctial(x, t; kwargs...)
+    cartesian2equinoctial(x; kwargs...)
 
-Convert a cartesian state vector `x` [au, au/day], referred to
-an epoch `t` [MJD TDB], to equinoctial elements [deg, au].
+Convert a cartesian state vector `x` [au, au/day] to a
+set of equinoctial elements [deg, au].
 
 # Keyword arguments
 
