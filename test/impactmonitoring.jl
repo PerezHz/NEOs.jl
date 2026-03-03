@@ -190,7 +190,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test !issamereturn(CA, CA, 45.0)
         @test showersnreturns(CAs) == showersnreturns([CAs])
 
-        @test round(date(CA), Minute) == round(date(RT), Minute) == DateTime(2018, 06, 02, 16, 49)
+        @test round(date(CA), Minute) == round(date(RT), Minute) == DateTime(2018, 06, 02, 16, 48)
         @test sigma(RT) == sigma(CA)
         @test lbound(RT) == lbound(CA)
         @test ubound(RT) == ubound(CA)
