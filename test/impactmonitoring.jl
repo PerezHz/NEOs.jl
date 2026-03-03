@@ -12,6 +12,8 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
       convergence_domain, isconvergent, timeofca, distance, radialvelocity,
       concavity, width, isoutlov, vinf, ismarginal, closeapproaches, issamereturn
 
+const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
+
 @testset "Impact monitoring" begin
 
     @testset "Common" begin
@@ -55,7 +57,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
 
     @testset "BPlane" begin
         # Fetch optical astrometry
-        optical = fetch_optical_mpc80("2018 LA", MPC)
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2018LA.txt"))
         # Parameters
         params = Parameters(
             coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
@@ -239,7 +241,7 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
 
     @testset "Modified target plane" begin
         # Fetch optical astrometry
-        optical = fetch_optical_mpc80("2024 PT5", MPC)
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2024PT5.txt"))
         filter!(x -> Date(2024, 10) < date(x) < Date(2024, 11), optical)
         # Parameters
         params = Parameters(
