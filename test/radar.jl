@@ -96,7 +96,8 @@ using Test
 
     @testset "RadarRWO" begin
 
-        using NEOs: RadarRWO, parse_radar_rwo, isdelay, isdoppler, ismonostatic
+        using NEOs: NEOCC_RADAR_HEADER, RadarRWO, parse_radar_rwo, isdelay, isdoppler,
+                    ismonostatic
 
         # Parse RadarRWO
         apophis_s =
@@ -106,9 +107,9 @@ using Test
         RMSast  =   3.02422E-01
         RMSmag  =   4.31723E-01
         END_OF_HEADER
-        ! Object   Obser ====== Date =======  ============ Radar range/range rate (km or km/d) =============  Station  ====  Residual
-        ! Design   K T N YYYY MM DD hh:mm:ss         Measure  Accuracy       rms F        Bias       Resid    TRX  RCX        Chi   S
-         99942     V c   2005 01 27 23:31:00    548781.78980   1.36040   1.36040 F     0.00000     0.22763    -1   -1         0.17  1
+        ! Object      Obser ====== Date =======  ============ Radar range/range rate (km or km/d) =============  Station  ====  Residual
+        ! Design      K T N YYYY MM DD hh:mm:ss         Measure  Accuracy       rms F        Bias       Resid    TRX  RCX        Chi   S
+         99942        V c   2005 01 27 23:31:00    548781.78980   1.36040   1.36040 F     0.00000     0.22763    -1   -1         0.17  1
         """
         apophis_p = parse_radar_rwo(apophis_s)
         @test isa(apophis_p, Vector{RadarRWO{Float64}})
@@ -129,6 +130,10 @@ using Test
         @test apophis.rcx == observatory(apophis) == search_observatory_code("251")
         @test apophis.chi == 0.17
         @test apophis.S == true
+        idxs = findfirst(NEOCC_RADAR_HEADER, apophis_s)
+        @test apophis.source == apophis_s[last(idxs)+1:end-1]
+        idxs = findfirst("END_OF_HEADER", apophis_s)
+        @test apophis.header == apophis_s[1:first(idxs)-1]
         @test measure(apophis) == rangerate2doppler(548781.7898, 2380.0)
         @test frequency(apophis) == 2380.0
         @test rms(apophis) == abs(rangerate2doppler(1.3604, 2380.0))
@@ -147,46 +152,55 @@ using Test
         @test issorted(radar1)
         @test allunique(radar1)
 
-        # Read/write OpticalMPC80 file
-        filename = joinpath(pkgdir(NEOs), "test", "data", "433.rwo")
-        radar2 = read_radar_rwo(filename)
+        radar2 = fetch_radar_rwo("433", NEODyS2)
         @test isa(radar2, Vector{RadarRWO{Float64}})
         @test issorted(radar2)
         @test allunique(radar2)
 
-        filename = joinpath(pkgdir(NEOs), "test", "data", "433_.rwo")
-        write_radar_rwo(radar2, filename)
+        # Read/write OpticalMPC80 file
+        filename = joinpath(pkgdir(NEOs), "test", "data", "433.rwo")
         radar3 = read_radar_rwo(filename)
-        rm(filename)
         @test isa(radar3, Vector{RadarRWO{Float64}})
         @test issorted(radar3)
         @test allunique(radar3)
 
-        @test radar1 == radar2 == radar3
+        filename = joinpath(pkgdir(NEOs), "test", "data", "433_.rwo")
+        write_radar_rwo(radar3, filename)
+        radar4 = read_radar_rwo(filename)
+        rm(filename)
+        @test isa(radar4, Vector{RadarRWO{Float64}})
+        @test issorted(radar4)
+        @test allunique(radar4)
+
+        @test radar1 == radar2 == radar3 == radar4
 
         # DataFrames
         df1 = DataFrame(radar1)
         df2 = DataFrame(radar2)
         df3 = DataFrame(radar3)
+        df4 = DataFrame(radar4)
 
         @test nrow(df1) == length(radar1)
         @test nrow(df2) == length(radar2)
         @test nrow(df3) == length(radar3)
+        @test nrow(df4) == length(radar4)
 
         @test all(names(df1) .== String.(fieldnames(RadarRWO{Float64})))
         @test all(names(df2) .== String.(fieldnames(RadarRWO{Float64})))
         @test all(names(df3) .== String.(fieldnames(RadarRWO{Float64})))
+        @test all(names(df4) .== String.(fieldnames(RadarRWO{Float64})))
 
         @test all(eltype.(eachcol(df1)) .== fieldtypes(RadarRWO{Float64}))
         @test all(eltype.(eachcol(df2)) .== fieldtypes(RadarRWO{Float64}))
         @test all(eltype.(eachcol(df3)) .== fieldtypes(RadarRWO{Float64}))
+        @test all(eltype.(eachcol(df4)) .== fieldtypes(RadarRWO{Float64}))
 
         # Query
-        radar4 = radar1 |> @filter(isdelay(_) && year(date(_)) < 2019) |> DataFrame
+        radar5 = radar1 |> @filter(isdelay(_) && year(date(_)) < 2019) |> DataFrame
 
-        @test nrow(radar4) == 3
-        @test all(@. radar4.K == 'R')
-        @test all(@. year(radar4.date) < 2019)
+        @test nrow(radar5) == 3
+        @test all(@. radar5.K == 'R')
+        @test all(@. year(radar5.date) < 2019)
 
     end
 

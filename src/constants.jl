@@ -112,12 +112,23 @@ const NEOCP_OBJECTS_FILE_URL = "https://www.minorplanetcenter.net/iau/NEO/neocp.
 
 # OpticalRWO
 
-const RWO_OPTICAL_HEADER = """
+const NEOCC_OPTICAL_HEADER = """
+! Object      Obser ============= Date ============= ================== Right Ascension =================  ================= Declination ===================== ==== Magnitude ==== Ast Obs  Residual SEL
+! Design      K T N YYYY MM DD.dddddddddd   Accuracy HH MM SS.sss  Accuracy      RMS  F     Bias    Resid sDD MM SS.ss  Accuracy      RMS  F     Bias    Resid Val  B   RMS  Resid Cat Cod       Chi A M
+"""
+
+const NEODyS2_OPTICAL_HEADER = """
 ! Object   Obser ============= Date ============= ================== Right Ascension =================  ================= Declination ===================== ==== Magnitude ==== Ast Obs  Residual SEL
 ! Design   K T N YYYY MM DD.dddddddddd   Accuracy HH MM SS.sss  Accuracy      RMS  F     Bias    Resid sDD MM SS.ss  Accuracy      RMS  F     Bias    Resid Val  B   RMS  Resid Cat Cod       Chi A M
 """
 
-const RWO_OPTICAL_COLUMNS = [
+const NEOCC_OPTICAL_COLUMNS = [
+    1:14, 15:15, 17:17, 19:19, 21:41, 44:52, 54:65, 68:76, 77:85, 87:87, 91:96,
+    100:105, 107:118, 121:129, 130:138, 140:140, 144:149, 150:158, 160:164, 165:165,
+    166:173, 174:179, 180:183, 184:186, 187:196, 198:198, 200:200
+]
+
+const NEODyS2_OPTICAL_COLUMNS = [
     1:11, 12:12, 14:14, 16:16, 18:38, 41:49, 51:62, 65:73, 74:82, 84:84, 88:93,
     97:102, 104:115, 118:126, 127:135, 137:137, 141:146, 147:155, 157:161, 162:162,
     163:170, 171: 176, 177:180, 181:183, 184:193, 195:195, 197:197
@@ -163,14 +174,24 @@ const RADAR_JPL_API = "https://ssd-api.jpl.nasa.gov/sb_radar.api"
 
 # RadarRWO
 
-const RWO_RADAR_HEADER = """
-! Object   Obser ====== Date =======  ============ Radar range/range rate (km or km/d) =============  Station  ====  Residual
-! Design   K T N YYYY MM DD hh:mm:ss         Measure  Accuracy       rms F        Bias       Resid    TRX  RCX        Chi   S
+const NEOCC_RADAR_HEADER = """
+! Object      Obser ====== Date =======  ============ Radar range/range rate (km or km/d) =============  Station  ====  Residual
+! Design      K T N YYYY MM DD hh:mm:ss         Measure  Accuracy       rms F        Bias       Resid    TRX  RCX        Chi   S
 """
 
-const RWO_RADAR_COLUMNS = [
-    1:11,  12:12, 14:14, 16:16, 18:36, 37:52, 53:62, 63:72,
-    74:74, 75:86, 87:98, 103:105, 108:110, 111:122, 125:125
+const NEODyS2_RADAR_HEADER = """
+! Object   Obser ====== Date =======  ============ Radar range/range rate (km or km/d) ============= Station    Residual
+! Design   K T N YYYY MM DD hh:mm:ss        Measure     Accuracy    rms    F      Bias       Resid   TRX RCX     Chi   S
+"""
+
+const NEOCC_RADAR_COLUMNS = [
+    1:14,  15:15, 17:17, 19:19, 21:39, 40:55, 56:65, 66:75,
+    77:77, 78:89, 90:101, 106:108, 111:113, 114:125, 128:128
+]
+
+const NEODyS2_RADAR_COLUMNS = [
+    1:11,  12:12, 14:14, 16:16, 18:36, 37:52, 53:64, 65:73,
+    74:74, 75:86, 87:98, 100:102, 104:106, 107:116, 118:118
 ]
 
 # AbstractDebiasingScheme

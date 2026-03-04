@@ -12,6 +12,8 @@ using NEOs: AbstractOpticalVector, KeplerianElements, EquinoctialElements,
       numtypes, sseph
 using Statistics: mean
 
+const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
+
 function iodsuboptical(optical::AbstractOpticalVector, N::Int = 3)
     tracklets = reduce_tracklets(optical)
     idxs = indices(tracklets[1:N])
@@ -193,8 +195,7 @@ end
 
     @testset "Straight Gauss Method" begin
         # Load observations
-        optical = read_optical_mpc80(joinpath(pkgdir(NEOs), "test", "data",
-            "2023DW_OPTICAL.dat"))
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2023DW.txt"))
         # Subset of optical for IOD
         suboptical = iodsuboptical(optical, 3)
 
@@ -335,7 +336,7 @@ end
 
     @testset "Unsafe Gauss Method" begin
         # Load observations
-        optical = fetch_optical_mpc80("2005 TM173", MPC)
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2005TM173.txt"))
         # Subset of optical for IOD
         # suboptical = iodsuboptical(optical, 3)
         # In this case: optical == suboptical
@@ -416,7 +417,7 @@ end
 
     @testset "Gauss Method with ADAM refinement" begin
         # Load observations
-        optical = fetch_optical_mpc80("2024 MK", MPC)
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2024MK.txt"))
         # Subset of optical for IOD
         suboptical = optical[10:21]
 
@@ -504,7 +505,7 @@ end
             arS, ardS, ard2S, arG
 
         # Fetch optical astrometry
-        optical = fetch_optical_mpc80("2024 BX1", MPC)
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2024BX1.txt"))
         # Parameters
         params = Parameters()
         # First tracklet
@@ -643,7 +644,7 @@ end
 
     @testset "Too Short Arc" begin
         # Fetch optical astrometry
-        optical = fetch_optical_mpc80("2008 EK68", MPC)
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2008EK68.txt"))
         # Subset of optical for IOD
         # suboptical = iodsuboptical(optical, 3)
         # In this case: optical == suboptical
@@ -731,7 +732,7 @@ end
 
     @testset "Outlier Rejection" begin
         # Fetch optical astrometry
-        optical = fetch_optical_mpc80("2007 VV7", MPC)
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2007VV7.txt"))
         # Subset of optical for IOD
         suboptical = iodsuboptical(optical, 3)
 
@@ -875,7 +876,7 @@ end
         # 2014 AA hit the Earth around January 2, 2014, 02:49 UTC
 
         # Fetch optical astrometry
-        optical = fetch_optical_mpc80("2014 AA", MPC)
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2014AA.txt"))
         # Subset of optical for IOD
         # suboptical = iodsuboptical(optical, 3)
         # In this case: optical == suboptical
@@ -963,7 +964,7 @@ end
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
         # Fetch optical astrometry
-        optical = fetch_optical_mpc80("2008 TC3", MPC)
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2008TC3.txt"))
         # Subset of optical for IOD
         suboptical = iodsuboptical(optical, 3)
 
@@ -1132,7 +1133,7 @@ end
         end
 
         # Fetch and filter optical astrometry
-        optical = fetch_optical_mpc80("2023 QR6", MPC)
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2023QR6.txt"))
         flag, optical = opticalfilter(optical)
 
         # Parameters
