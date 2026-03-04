@@ -149,6 +149,9 @@ end
 
 # Parsing
 
+get_rwo_radar_columns(x::Symbol) = x == :NEOCC ?
+    NEOCC_RADAR_COLUMNS : NEODyS2_RADAR_COLUMNS
+
 RadarRWO(r::DataFrameRow) = RadarRWO{Float64}(
     r.design, r.K, r.T, r.N, r.date, r.measure, r.accuracy, r.rms, r.flag,
     r.bias, r.resid, r.trx, r.rcx, r.chi, r.S, r.source, r.header
@@ -158,13 +161,14 @@ function parse_radar_rwo(text::String)
     # File reader
     reader = RWOFileReader(text)
     L = length(reader.radar)
+    columns = get_rwo_radar_columns(reader.source)
     # Construct DataFrame
     R = RadarRWO{Float64}
     names, types = fieldnames(R), fieldtypes(R)
     df = DataFrame([fill(astrometrydefault(fieldtype(R, name)), L) for name in names],
         collect(names))
     for (i, line) in enumerate(reader.radar)
-        for (name, type, idxs) in zip(names, types, RWO_RADAR_COLUMNS)
+        for (name, type, idxs) in zip(names, types, columns)
             x = strip(view(line, idxs))
             df[i, name] = rwoparse(name, type, x)
         end
@@ -227,6 +231,17 @@ function read_radar_rwo(filename::AbstractString)
     return radar
 end
 
+function get_rwo_radar_header(x::RadarRWO)
+    i = findfirst(x.K, x.source)
+    if i == first(findfirst("Obser", NEOCC_RADAR_HEADER))
+        return NEOCC_RADAR_HEADER
+    elseif i == first(findfirst("Obser", NEODyS2_RADAR_HEADER))
+        return NEODyS2_RADAR_HEADER
+    else
+        throw(ArgumentError("Cannot match observation to a radar header"))
+    end
+end
+
 """
     write_radar_rwo(obs, filename)
 
@@ -234,11 +249,14 @@ Write `obs` to `filename` in the RWO format.
 """
 function write_radar_rwo(obs::AbstractVector{RadarRWO{T}},
                          filename::AbstractString) where {T <: Real}
+    @assert !isempty(obs) "The observation vector is empty"
+    header = obs[1].header
+    radar_header = get_rwo_radar_header(obs[1])
     open(filename, "w") do file
         # File Header
-        write(file, obs[1].header, "END_OF_HEADER\n")
+        write(file, header, "END_OF_HEADER\n")
         # Radar observations header
-        write(file, RWO_RADAR_HEADER)
+        write(file, radar_header)
         # Radar observations
         for i in eachindex(obs)
             write(file, obs[i].source, "\n")

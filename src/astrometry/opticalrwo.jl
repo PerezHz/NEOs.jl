@@ -1,12 +1,19 @@
 struct RWOFileReader
+    source::Symbol
     header::SubString{String}
     optical::Vector{SubString{String}}
     radar::Vector{SubString{String}}
 end
 
-function is_rwo_two_liner(line::AbstractString)
-    line[12] == 'S' && return true
-    obscode = view(line, 181:183)
+get_rwo_optical_shift(x::Symbol) = x == :NEOCC ? 3 : 0
+
+get_rwo_optical_columns(x::Symbol) = x == :NEOCC ?
+    NEOCC_OPTICAL_COLUMNS : NEODyS2_OPTICAL_COLUMNS
+
+function is_rwo_two_liner(line::AbstractString, source::Symbol)
+    shift = get_rwo_optical_shift(source)
+    line[12+shift] == 'S' && return true
+    obscode = view(line, 181+shift:183+shift)
     return obscode == "247" || obscode == "270"
 end
 
@@ -20,18 +27,36 @@ function RWOFileReader(text::AbstractString)
         as it does not contain a header"
     S1 = split(text, "END_OF_HEADER\n")
     header, body = S1
+    # Optical header
+    if contains(body, NEOCC_OPTICAL_HEADER)
+        F1, source = true, :NEOCC
+        optical_header = NEOCC_OPTICAL_HEADER
+    elseif contains(body, NEODyS2_OPTICAL_HEADER)
+        F1, source = true, :NEODyS2
+        optical_header = NEODyS2_OPTICAL_HEADER
+    else
+        F1 = false
+    end
+    # Radar header
+    if contains(body, NEOCC_RADAR_HEADER)
+        F2, source = true, :NEOCC
+        radar_header = NEOCC_RADAR_HEADER
+    elseif contains(body, NEODyS2_RADAR_HEADER)
+        F2, source = true, :NEODyS2
+        radar_header = NEODyS2_RADAR_HEADER
+    else
+        F2 = false
+    end
     # Parse body
-    F1 = contains(body, RWO_OPTICAL_HEADER)
-    F2 = contains(body, RWO_RADAR_HEADER)
     if F1 && F2
-        body = first(split(body, RWO_OPTICAL_HEADER, keepempty = false))
-        body1, body2 = split(body, RWO_RADAR_HEADER)
+        body = first(split(body, optical_header, keepempty = false))
+        body1, body2 = split(body, radar_header)
     elseif F1
-        body1 = first(split(body, RWO_OPTICAL_HEADER, keepempty = false))
+        body1 = first(split(body, optical_header, keepempty = false))
         body2 = body[2:1]
     elseif F2
         body1 = body[2:1]
-        body2 = first(split(body, RWO_RADAR_HEADER, keepempty = false))
+        body2 = first(split(body, radar_header, keepempty = false))
     else
         throw(ArgumentError("Cannot parse text as it has no optical nor radar header"))
     end
@@ -43,7 +68,7 @@ function RWOFileReader(text::AbstractString)
     for i in eachindex(optical)
         b = findnext('\n', body1, a)
         optical[i] = view(body1, a:b)
-        if is_rwo_two_liner(optical[i])
+        if is_rwo_two_liner(optical[i], source)
             c = findnext('\n', body1, b+1)
             optical[i] = view(body1, a:c)
             a = c + 1
@@ -58,7 +83,7 @@ function RWOFileReader(text::AbstractString)
     # Parse radar observations
     radar = split(body2, '\n', keepempty = false)
 
-    return RWOFileReader(header, optical, radar)
+    return RWOFileReader(source, header, optical, radar)
 end
 
 """
@@ -210,13 +235,15 @@ function parse_optical_rwo(text::AbstractString)
     # File reader
     reader = RWOFileReader(text)
     L = length(reader.optical)
+    shift = get_rwo_optical_shift(reader.source)
+    columns = get_rwo_optical_columns(reader.source)
     # Construct DataFrame
     R = OpticalRWO{Float64}
     names, types = fieldnames(R), fieldtypes(R)
     df = DataFrame([fill(astrometrydefault(fieldtype(R, name)), L) for name in names],
         collect(names))
     for (i, line) in enumerate(reader.optical)
-        for (name, type, idxs) in zip(names, types, RWO_OPTICAL_COLUMNS)
+        for (name, type, idxs) in zip(names, types, columns)
             x = strip(view(line, idxs))
             df[i, name] = rwoparse(name, type, x)
         end
@@ -227,9 +254,9 @@ function parse_optical_rwo(text::AbstractString)
         # Skip observations with a 'x' note (e.g. 2010 BO127)
         df.T[i] == 'x' && continue
         obs = df.observatory[i]
-        line = view(reader.optical[i], 199:length(reader.optical[i]))
+        line = view(reader.optical[i], 199+shift:length(reader.optical[i]))
         if isoccultation(obs) || issatellite(obs)
-            frame = line[35] == '1' ? "ICRF_KM" : "ICRF_AU"
+            frame = line[35+shift] == '1' ? "ICRF_KM" : "ICRF_AU"
         else
             frame = obs.frame
         end
@@ -299,6 +326,17 @@ function read_optical_rwo(filename::AbstractString)
     return optical
 end
 
+function get_rwo_optical_header(x::OpticalRWO)
+    i = findfirst(x.K, x.source)
+    if i == first(findfirst("Obser", NEOCC_OPTICAL_HEADER))
+        return NEOCC_OPTICAL_HEADER
+    elseif i == first(findfirst("Obser", NEODyS2_OPTICAL_HEADER))
+        return NEODyS2_OPTICAL_HEADER
+    else
+        throw(ArgumentError("Cannot match observation to an optical header"))
+    end
+end
+
 """
     write_optical_rwo(obs, filename)
 
@@ -306,11 +344,14 @@ Write `obs` to `filename` in the RWO format.
 """
 function write_optical_rwo(obs::AbstractVector{OpticalRWO{T}},
                            filename::AbstractString) where {T <: Real}
+    @assert !isempty(obs) "The observation vector is empty"
+    header = obs[1].header
+    optical_header = get_rwo_optical_header(obs[1])
     open(filename, "w") do file
         # File Header
-        write(file, obs[1].header, "END_OF_HEADER\n")
+        write(file, header, "END_OF_HEADER\n")
         # Optical observations header
-        write(file, RWO_OPTICAL_HEADER)
+        write(file, optical_header)
         # Optical observations
         for i in eachindex(obs)
             write(file, obs[i].source)

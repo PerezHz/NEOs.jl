@@ -7,6 +7,8 @@ using TaylorIntegration
 using JLD2
 using Test
 
+const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
+
 function warmuptests(dynamics, q00, jd0, nyears, params)
     @testset "$dynamics warmup (parse_eqs = $(params.parse_eqs))" begin
         fwd = NEOs.propagate(dynamics, q00, jd0, nyears, params)
@@ -148,8 +150,7 @@ end
         @test norm(sol_bwd(sol_bwd.t0 + sol_bwd.t[end])-q_bwd_end, Inf) < 1e-12
 
         # Read optical astrometry file
-        optical_2023DW = read_optical_mpc80(joinpath(pkgdir(NEOs), "test", "data",
-            "2023DW_OPTICAL.dat"))
+        optical_2023DW = read_optical_mpc80(joinpath(TEST_DATA, "2023DW.txt"))
         # Make weigths and debiasing corrections
         w8s = weights(Veres17(optical_2023DW))
         bias = debias(Eggl20(optical_2023DW))
@@ -245,8 +246,7 @@ end
         rm("test.jld2")
 
         # Read optical astrometry file
-        optical_Apophis = read_optical_mpc80(joinpath(pkgdir(NEOs), "test", "data",
-            "99942_Tholen_etal_2013.dat"))
+        optical_Apophis = read_optical_mpc80(joinpath(TEST_DATA, "99942_Tholen_etal_2013.dat"))
         # Make weights and debiasing corrections
         w8s = weights(Veres17(optical_Apophis))
         bias = debias(Eggl20(optical_Apophis))
@@ -280,8 +280,7 @@ end
         @test nrms_dec ≈ 0.0417 atol=1e-4
 
         # Read radar astrometry file
-        radar_Apophis = read_radar_jpl(joinpath(pkgdir(NEOs), "test", "data",
-            "99942_RADAR_2005_2013.json"))
+        radar_Apophis = read_radar_jpl(joinpath(TEST_DATA, "99942_RADAR_2005_2013.json"))
 
         # Compute mean radar (time-delay and Doppler-shift) residuals
         res_radar = residuals(
@@ -440,8 +439,7 @@ end
         xvs(et) = auday2kmsec(eph_su(et/daysec))
 
         # Read optical astrometry file
-        optical_Apophis = read_optical_mpc80(joinpath(pkgdir(NEOs), "test", "data",
-            "99942_Tholen_etal_2013.dat"))
+        optical_Apophis = read_optical_mpc80(joinpath(TEST_DATA, "99942_Tholen_etal_2013.dat"))
         # Make weights and debiasing corrections
         w8s = weights(Veres17(optical_Apophis))
         bias = debias(Eggl20(optical_Apophis))
@@ -473,8 +471,7 @@ end
         @test nrms_dec ≈ 0.0417 atol=1e-4
 
         # Read radar astrometry file
-        radar_Apophis = NEOs.read_radar_jpl(joinpath(pkgdir(NEOs), "test", "data",
-            "99942_RADAR_2005_2013.json"))
+        radar_Apophis = NEOs.read_radar_jpl(joinpath(TEST_DATA, "99942_RADAR_2005_2013.json"))
         filter!(x -> year(date(x)) == 2005, radar_Apophis)
         mask_del, mask_dop = @. isdelay(radar_Apophis), isdoppler(radar_Apophis)
         del, dop = radar_Apophis[mask_del], radar_Apophis[mask_dop]

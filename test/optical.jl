@@ -169,7 +169,7 @@ using Test
 
     @testset "OpticalRWO" begin
 
-        using NEOs: OpticalRWO, parse_optical_rwo, isoccultation
+        using NEOs: NEODyS2_OPTICAL_HEADER, OpticalRWO, parse_optical_rwo, isoccultation
 
         # Parse OpticalRWO
         apophis_s = """
@@ -213,8 +213,10 @@ using Test
         @test apophis.chi == 0.43
         @test apophis.sel_A == 1
         @test apophis.sel_M == 0
-        @test apophis.source == apophis_s[492:end]
-        @test apophis.header == apophis_s[1:81]
+        idxs = findfirst(NEODyS2_OPTICAL_HEADER, apophis_s)
+        @test apophis.source == apophis_s[last(idxs)+1:end]
+        idxs = findfirst("END_OF_HEADER", apophis_s)
+        @test apophis.header == apophis_s[1:first(idxs)-1]
         @test measure(apophis) == (1.0739650841580173, 0.2952738332250385)
         @test rms(apophis) == (0.612, 0.612)
         @test debias(apophis) == (-0.247, 0.14)
@@ -235,48 +237,58 @@ using Test
         @test issorted(optical1)
         @test allunique(optical1)
 
-        # Read/write OpticalRWO file
-        filename = joinpath(pkgdir(NEOs), "test", "data", "433.rwo")
-        optical2 = read_optical_rwo(filename)
+        optical2 = fetch_optical_rwo("433", NEODyS2)
         filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical2)
         @test isa(optical2, Vector{OpticalRWO{Float64}})
         @test issorted(optical2)
         @test allunique(optical2)
 
-        filename = joinpath(pkgdir(NEOs), "test", "data", "433_.rwo")
-        write_optical_rwo(optical2, filename)
+        # Read/write OpticalRWO file
+        filename = joinpath(pkgdir(NEOs), "test", "data", "433.rwo")
         optical3 = read_optical_rwo(filename)
-        rm(filename)
+        filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical3)
         @test isa(optical3, Vector{OpticalRWO{Float64}})
         @test issorted(optical3)
         @test allunique(optical3)
 
-        @test optical1 == optical2 == optical3
+        filename = joinpath(pkgdir(NEOs), "test", "data", "433_.rwo")
+        write_optical_rwo(optical3, filename)
+        optical4 = read_optical_rwo(filename)
+        rm(filename)
+        @test isa(optical4, Vector{OpticalRWO{Float64}})
+        @test issorted(optical4)
+        @test allunique(optical4)
+
+        @test optical1 == #= optical2 == =# optical3 == optical4
 
         # DataFrames
         df1 = DataFrame(optical1)
         df2 = DataFrame(optical2)
         df3 = DataFrame(optical3)
+        df4 = DataFrame(optical4)
 
         @test nrow(df1) == length(optical1)
         @test nrow(df2) == length(optical2)
         @test nrow(df3) == length(optical3)
+        @test nrow(df4) == length(optical4)
 
         @test all(names(df1) .== String.(fieldnames(OpticalRWO{Float64})))
         @test all(names(df2) .== String.(fieldnames(OpticalRWO{Float64})))
         @test all(names(df3) .== String.(fieldnames(OpticalRWO{Float64})))
+        @test all(names(df4) .== String.(fieldnames(OpticalRWO{Float64})))
 
         @test all(eltype.(eachcol(df1)) .== fieldtypes(OpticalRWO{Float64}))
         @test all(eltype.(eachcol(df2)) .== fieldtypes(OpticalRWO{Float64}))
         @test all(eltype.(eachcol(df3)) .== fieldtypes(OpticalRWO{Float64}))
+        @test all(eltype.(eachcol(df4)) .== fieldtypes(OpticalRWO{Float64}))
 
         # Query
-        optical4 = optical1 |> @filter(year(date(_)) > 2011 &&
+        optical5 = optical1 |> @filter(year(date(_)) > 2011 &&
             isoccultation(observatory(_))) |> DataFrame
 
-        @test nrow(optical4) == 3
-        @test all(@. year(optical4.date) > 2011)
-        @test all(@. isoccultation(optical4.observatory))
+        @test nrow(optical5) == 3
+        @test all(@. year(optical5.date) > 2011)
+        @test all(@. isoccultation(optical5.observatory))
 
     end
 
