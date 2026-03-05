@@ -13,7 +13,7 @@
 
 # nongravs!
 function TaylorIntegration._allocate_jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params) where {_T <: Real, _S <: Number, _N}
-    order = t.order
+    order = get_order(t)
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
     local ss16asteph_t = params.sseph(dsj2k)
@@ -785,7 +785,7 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}
 end
 
 function TaylorIntegration.jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
-    order = t.order
+    order = get_order(t)
     tmp763 = __ralloc.v0[1]
     tmp765 = __ralloc.v0[2]
     tmp766 = __ralloc.v0[3]
@@ -1391,7 +1391,7 @@ end
 
 # gravityonly!
 function TaylorIntegration._allocate_jetcoeffs!(::Val{gravityonly!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params) where {_T <: Real, _S <: Number, _N}
-    order = t.order
+    order = get_order(t)
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
     local ss16asteph_t = params.sseph(dsj2k)
@@ -2077,7 +2077,7 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{gravityonly!}, t::Taylor1{
 end
 
 function TaylorIntegration.jetcoeffs!(::Val{gravityonly!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
-    order = t.order
+    order = get_order(t)
     tmp1406 = __ralloc.v0[1]
     tmp1408 = __ralloc.v0[2]
     tmp1409 = __ralloc.v0[3]
@@ -2526,7 +2526,7 @@ end
 
 # newtonian!
 function TaylorIntegration._allocate_jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params) where {_T <: Real, _S <: Number, _N}
-    order = t.order
+    order = get_order(t)
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
     local ss16asteph_t = params.sseph(dsj2k)
@@ -2619,7 +2619,7 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T
 end
 
 function TaylorIntegration.jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
-    order = t.order
+    order = get_order(t)
     accX = __ralloc.v0[1]
     accY = __ralloc.v0[2]
     accZ = __ralloc.v0[3]
@@ -2694,7 +2694,7 @@ end
 
 # sunearthmoon!
 function TaylorIntegration._allocate_jetcoeffs!(::Val{sunearthmoon!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params) where {_T <: Real, _S <: Number, _N}
-    order = t.order
+    order = get_order(t)
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
     local ss16asteph_t = params.sseph(dsj2k)
@@ -2787,7 +2787,7 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{sunearthmoon!}, t::Taylor1
 end
 
 function TaylorIntegration.jetcoeffs!(::Val{sunearthmoon!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
-    order = t.order
+    order = get_order(t)
     accX = __ralloc.v0[1]
     accY = __ralloc.v0[2]
     accZ = __ralloc.v0[3]

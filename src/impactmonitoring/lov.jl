@@ -257,7 +257,7 @@ function TaylorIntegration._allocate_jetcoeffs!(
         ::Val{lov!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N},
         dq::AbstractArray{Taylor1{_S}, _N}, params
     ) where {_T <: Real, _S <: Number, _N}
-    order = t.order
+    order = get_order(t)
     local F = weakfield(params[1], cte(q), params[2], params[3], params[4])
     dq[1] = Taylor1(identity(constant_term(F[1])), order)
     dq[2] = Taylor1(identity(constant_term(F[2])), order)
@@ -278,7 +278,7 @@ function TaylorIntegration.jetcoeffs!(
         dq::AbstractArray{Taylor1{_S}, _N}, params,
         __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}
     ) where {_T <: Real, _S <: Number, _N}
-    order = t.order
+    order = get_order(t)
     local F = weakfield(params[1], cte(q), params[2], params[3], params[4])
     for ord = 0:order - 1
         ordnext = ord + 1
