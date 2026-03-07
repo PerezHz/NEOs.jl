@@ -167,9 +167,9 @@ end
 function evaldeltas(orbit::GaussOrbit{D, T, TaylorN{T}, O},
                     δs::Vector{T} = zeros(T, get_numvars())) where {D, T, O}
     # Evaluate integrations
-    new_bwd_x = map(x -> Taylor1(x.coeffs(δs)), orbit.bwd.x)
+    new_bwd_x = evaluate.(orbit.bwd.x, Ref(δs))
     new_bwd = TaylorInterpolant(orbit.bwd.t0, orbit.bwd.t, new_bwd_x)
-    new_fwd_x = map(x -> Taylor1(x.coeffs(δs)), orbit.fwd.x)
+    new_fwd_x = evaluate.(orbit.fwd.x, Ref(δs))
     new_fwd = TaylorInterpolant(orbit.fwd.t0, orbit.fwd.t, new_fwd_x)
     # Evaluate residuals
     new_ores = orbit.ores(δs)
@@ -283,9 +283,9 @@ iszero(x::MMOVOrbit{D, T, U, O}) where {D, T, U, O} = x == zero(MMOVOrbit{D, T, 
 function evaldeltas(orbit::MMOVOrbit{D, T, TaylorN{T}, O},
                     δs::Vector{T} = zeros(T, get_numvars())) where {D, T, O}
     # Evaluate integrations
-    new_bwd_x = map(x -> Taylor1(x.coeffs(δs)), orbit.bwd.x)
+    new_bwd_x = evaluate.(orbit.bwd.x, Ref(δs))
     new_bwd = TaylorInterpolant(orbit.bwd.t0, orbit.bwd.t, new_bwd_x)
-    new_fwd_x = map(x -> Taylor1(x.coeffs(δs)), orbit.fwd.x)
+    new_fwd_x = evaluate.(orbit.fwd.x, Ref(δs))
     new_fwd = TaylorInterpolant(orbit.fwd.t0, orbit.fwd.t, new_fwd_x)
     # Evaluate residuals
     new_ores = orbit.ores(δs)

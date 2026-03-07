@@ -66,7 +66,7 @@ function leastsquares!(ls::AbstractLeastSquaresMethod{T},
     for j in axes(xs, 2)
         xs[:, j] .= x0
     end
-    Qs[1] = TS.evaluate(ls.Q, x0)
+    Qs[1] = evaluate(ls.Q, x0)
     Qs[1] < 0 && return fit
     Qs[2:end] .= T(Inf)
     # Main loop
@@ -76,7 +76,7 @@ function leastsquares!(ls::AbstractLeastSquaresMethod{T},
         !flag && return fit
         # Update rule
         xs[idxs, i+1] .= xs[idxs, i] + Δx
-        Qs[i+1] = TS.evaluate(ls.Q, xs[:, i+1])
+        Qs[i+1] = evaluate(ls.Q, xs[:, i+1])
         Qs[i+1] < 0 && return fit
         # TO DO: break if Q has not changed significantly in
         # 3-5 iterations
@@ -161,8 +161,8 @@ function Newton(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
         end
     end
     # Evaluate gradient and hessian
-    dQ = TS.evaluate(GQ, x0)
-    d2Q = TS.evaluate(HQ, x0)
+    dQ = evaluate(GQ, x0)
+    d2Q = evaluate(HQ, x0)
 
     return Newton{T}(nobs, npar, Q, GQ, HQ, dQ, d2Q)
 end
@@ -171,8 +171,8 @@ getid(::Newton) = "Newton"
 
 function lsstep(ls::Newton{T}, x::Vector{T}) where {T <: Real}
     # Evaluate gradient and hessian
-    TS.evaluate!(ls.GQ, x, ls.dQ)
-    TS.evaluate!(ls.HQ, x, ls.d2Q)
+    evaluate!(ls.GQ, x, ls.dQ)
+    evaluate!(ls.HQ, x, ls.d2Q)
     # Invert hessian
     lud2Q = lu!(ls.d2Q; check = false)
     !issuccess(lud2Q) && return Vector{T}(undef, 0), false
@@ -188,7 +188,7 @@ function lsstep(ls::Newton{T}, x::Vector{T}) where {T <: Real}
 end
 
 function normalmatrix(ls::Newton{T}, x::Vector{T}) where {T <: Real}
-    TS.evaluate!(ls.HQ, x, ls.d2Q)
+    evaluate!(ls.HQ, x, ls.d2Q)
     return (ls.nobs / 2) * ls.d2Q
 end
 
@@ -208,8 +208,8 @@ function update!(ls::Newton{T}, res::AbstractResidualSet{T, TaylorN{T}}, x0::Vec
         end
     end
     # Evaluate gradient and hessian
-    TS.evaluate!(ls.GQ, x0, ls.dQ)
-    TS.evaluate!(ls.HQ, x0, ls.d2Q)
+    evaluate!(ls.GQ, x0, ls.dQ)
+    evaluate!(ls.HQ, x0, ls.d2Q)
 
     return nothing
 end
@@ -248,8 +248,8 @@ function DifferentialCorrections(res::AbstractResidualSet{T, TaylorN{T}}, x0::Ve
     # Deprecated term
     # C -> C + ξTH(res, V, B, idxs)
     # Evaluate D and C matrices
-    Dx = TS.evaluate(D, x0)
-    Cx = TS.evaluate(C, x0)
+    Dx = evaluate(D, x0)
+    Cx = evaluate(C, x0)
 
     return DifferentialCorrections{T}(nobs, npar, Q, D, C, Dx, Cx)
 end
@@ -258,8 +258,8 @@ getid(::DifferentialCorrections) = "Differential Corrections"
 
 function lsstep(ls::DifferentialCorrections{T}, x::Vector{T}) where {T <: Real}
     # Evaluate D and C matrices
-    TS.evaluate!(ls.D, x, ls.Dx)
-    TS.evaluate!(ls.C, x, ls.Cx)
+    evaluate!(ls.D, x, ls.Dx)
+    evaluate!(ls.C, x, ls.Cx)
     # Invert C matrix
     luCx = lu!(ls.Cx; check = false)
     !issuccess(luCx) && return Vector{T}(undef, 0), false
@@ -273,7 +273,7 @@ function lsstep(ls::DifferentialCorrections{T}, x::Vector{T}) where {T <: Real}
 end
 
 function normalmatrix(ls::DifferentialCorrections{T}, x::Vector{T}) where {T <: Real}
-    TS.evaluate!(ls.C, x, ls.Cx)
+    evaluate!(ls.C, x, ls.Cx)
     return ls.Cx
 end
 
@@ -288,8 +288,8 @@ function update!(ls::DifferentialCorrections{T}, res::AbstractResidualSet{T, Tay
     # Deprecated term
     # C -> C + ξTH(res, V, B, idxs)
     # Evaluate D and C matrices
-    TS.evaluate!(ls.D, x0, ls.Dx)
-    TS.evaluate!(ls.C, x0, ls.Cx)
+    evaluate!(ls.D, x0, ls.Dx)
+    evaluate!(ls.C, x0, ls.Cx)
 
     return nothing
 end
@@ -398,8 +398,8 @@ function LevenbergMarquardt(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{
         end
     end
     # Evaluate gradient and hessian
-    dQ = TS.evaluate(GQ, x0)
-    d2Q = TS.evaluate(HQ, x0)
+    dQ = evaluate(GQ, x0)
+    d2Q = evaluate(HQ, x0)
 
     return LevenbergMarquardt{T}(nobs, npar, idxs, λ, Q, GQ, HQ, dQ, d2Q)
 end
@@ -408,8 +408,8 @@ getid(::LevenbergMarquardt) = "Levenberg-Marquardt"
 
 function lsstep(ls::LevenbergMarquardt{T}, x::Vector{T}) where {T <: Real}
     # Evaluate gradient and hessian
-    TS.evaluate!(ls.GQ, x, ls.dQ)
-    TS.evaluate!(ls.HQ, x, ls.d2Q)
+    evaluate!(ls.GQ, x, ls.dQ)
+    evaluate!(ls.HQ, x, ls.d2Q)
     # Modified Hessian
     for i in axes(ls.d2Q, 1)
         ls.d2Q[i, i] *= (1 + ls.λ)
@@ -434,7 +434,7 @@ function lsstep(ls::LevenbergMarquardt{T}, x::Vector{T}) where {T <: Real}
 end
 
 function normalmatrix(ls::LevenbergMarquardt{T}, x::Vector{T}) where {T <: Real}
-    TS.evaluate!(ls.HQ, x, ls.d2Q)
+    evaluate!(ls.HQ, x, ls.d2Q)
     return (ls.nobs / 2) * ls.d2Q
 end
 
@@ -456,8 +456,8 @@ function update!(ls::LevenbergMarquardt{T}, res::AbstractResidualSet{T, TaylorN{
         end
     end
     # Evaluate gradient and hessian
-    TS.evaluate!(ls.GQ, x0, ls.dQ)
-    TS.evaluate!(ls.HQ, x0, ls.d2Q)
+    evaluate!(ls.GQ, x0, ls.dQ)
+    evaluate!(ls.HQ, x0, ls.d2Q)
 
     return nothing
 end

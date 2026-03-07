@@ -110,24 +110,6 @@ end
 
 dot3D(x::Vector{T}, y::Vector{Taylor1{T}}) where {T <: Real} = dot3D(y, x)
 
-# TO DO: move this methods to TaylorSeries' Static Arrays extension,
-# in order to avoid type piracy
-evaluate(y::SVector{N, Taylor1{T}}, x::Number) where {N, T <: Number} =
-    [y[i](x) for i in eachindex(y)]
-
-(y::SVector{N, Taylor1{T}})(x::Number) where {N, T <: Number} = evaluate(y, x)
-
-evaluate(y::SVector{N, TaylorN{T}}, x::Vector{<:Number}) where {N, T <: Number} =
-    [y[i](x) for i in eachindex(y)]
-
-(y::SVector{N, TaylorN{T}})(x::Vector{T}) where {N, T <: Number} = evaluate(y, x)
-
-evaluate(y::SMatrix{S1, S2, TaylorN{T}, L}, x::Vector{<:Number}) where {S1, S2,
-    T <: Number, L} = [y[i, j](x) for i in axes(y, 1), j in axes(y, 2)]
-
-(y::SMatrix{S1, S2, TaylorN{T}, L})(x::Vector{T}) where {S1, S2, T <: Number, L} =
-    evaluate(y, x)
-
 # Evaluate `y` at time `t` using `OhMyThreads.tmap`
 # This function is a multithreaded version of
 # (::TaylorInterpolant{T, U, 2})(t::TT) where {T, U, TT<:TaylorInterpCallingArgs{T,U}}
@@ -196,7 +178,7 @@ function evaleph!(y::Vector{U}, et::U,
     # Get index of bwd/fwd that interpolates at time t
     ind::Int, δt::U = getinterpindex(eph, t)
     # Evaluate bwd/fwd.x[ind] at δt
-    y .= TS.evaluate(view(eph.x, ind, eachindex(y)), δt)
+    y .= evaluate(view(eph.x, ind, eachindex(y)), δt)
     # Convert state vector from [au, au/day] to [km, km/sec]
     auday2kmsec!(y)
 
@@ -255,9 +237,9 @@ function evaleph!(y::Vector{T}, et::T, bwd::DensePropagation2{T, T},
     ind::Int, δt::T = t <= bwd.t0 ? getinterpindex(bwd, t) : getinterpindex(fwd, t)
     # Evaluate bwd/fwd.x[ind] at δt
     if t <= bwd.t0
-        y .= TS.evaluate(view(bwd.x, ind, eachindex(y)), δt)
+        y .= evaluate(view(bwd.x, ind, eachindex(y)), δt)
     else
-        y .= TS.evaluate(view(fwd.x, ind, eachindex(y)), δt)
+        y .= evaluate(view(fwd.x, ind, eachindex(y)), δt)
     end
     # Convert state vector from [au, au/day] to [km, km/sec]
     auday2kmsec!(y)
