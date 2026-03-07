@@ -10,7 +10,7 @@ import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import StatsBase: weights
 import Tables: Schema, istable, rowaccess, rows, schema
-import TaylorSeries: get_order
+import TaylorSeries: get_order, evaluate
 
 using AngleBetweenVectors, AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON,
       LazyArtifacts, LinearAlgebra, Printf, Scratch, SPICE, TaylorIntegration,

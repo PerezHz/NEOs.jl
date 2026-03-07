@@ -260,9 +260,9 @@ function evalfit(orbit::OpticalLeastSquaresOrbit{D, T, TaylorN{T}, O}) where {D,
     # Fit δs
     δs = orbit.fit.x
     # Evaluate integrations
-    new_bwd_x = map(x -> Taylor1(x.coeffs(δs)), orbit.bwd.x)
+    new_bwd_x = evaluate.(orbit.bwd.x, Ref(δs))
     new_bwd = TaylorInterpolant(orbit.bwd.t0, orbit.bwd.t, new_bwd_x)
-    new_fwd_x = map(x -> Taylor1(x.coeffs(δs)), orbit.fwd.x)
+    new_fwd_x = evaluate.(orbit.fwd.x, Ref(δs))
     new_fwd = TaylorInterpolant(orbit.fwd.t0, orbit.fwd.t, new_fwd_x)
     # Evaluate residuals
     new_ores = orbit.ores(δs)
@@ -278,9 +278,9 @@ function evalfit(orbit::MixedLeastSquaresOrbit{D, T, TaylorN{T}, O, R}) where {D
     # Fit δs
     δs = orbit.fit.x
     # Evaluate integrations
-    new_bwd_x = map(x -> Taylor1(x.coeffs(δs)), orbit.bwd.x)
+    new_bwd_x = evaluate.(orbit.bwd.x, Ref(δs))
     new_bwd = TaylorInterpolant(orbit.bwd.t0, orbit.bwd.t, new_bwd_x)
-    new_fwd_x = map(x -> Taylor1(x.coeffs(δs)), orbit.fwd.x)
+    new_fwd_x = evaluate.(orbit.fwd.x, Ref(δs))
     new_fwd = TaylorInterpolant(orbit.fwd.t0, orbit.fwd.t, new_fwd_x)
     # Evaluate residuals
     new_ores = orbit.ores(δs)
