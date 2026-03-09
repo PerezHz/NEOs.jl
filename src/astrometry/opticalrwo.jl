@@ -327,11 +327,11 @@ function read_optical_rwo(filename::AbstractString)
 end
 
 function get_rwo_optical_header(x::OpticalRWO)
-    i = findfirst(x.K, x.source)
-    if i == first(findfirst("Obser", NEOCC_OPTICAL_HEADER))
-        return NEOCC_OPTICAL_HEADER
-    elseif i == first(findfirst("Obser", NEODyS2_OPTICAL_HEADER))
+    @unpack source, K, T, N = x
+    if source[12] == K && source[14] == T && source[16] == N
         return NEODyS2_OPTICAL_HEADER
+    elseif source[15] == K && source[17] == T && source[19] == N
+        return NEOCC_OPTICAL_HEADER
     else
         throw(ArgumentError("Cannot match observation to an optical header"))
     end

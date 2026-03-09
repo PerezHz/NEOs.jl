@@ -232,11 +232,11 @@ function read_radar_rwo(filename::AbstractString)
 end
 
 function get_rwo_radar_header(x::RadarRWO)
-    i = findfirst(x.K, x.source)
-    if i == first(findfirst("Obser", NEOCC_RADAR_HEADER))
-        return NEOCC_RADAR_HEADER
-    elseif i == first(findfirst("Obser", NEODyS2_RADAR_HEADER))
+    @unpack source, K, T, N = x
+    if source[12] == K && source[14] == T && source[16] == N
         return NEODyS2_RADAR_HEADER
+    elseif source[15] == K && source[17] == T && source[19] == N
+        return NEOCC_RADAR_HEADER
     else
         throw(ArgumentError("Cannot match observation to a radar header"))
     end
