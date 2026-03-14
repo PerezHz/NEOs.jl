@@ -147,48 +147,65 @@ function concavity(x::CloseApproachT1, σ::Real)
 end
 
 # Root-finding function for `closeapproaches`
-function closeapproach(x, teph, params, t; R_TP, R_P)
-    # Julian date (TDB) of start time
-    jd0 = params.jd0
+function closeapproach!(A::RootFindingEvent, B::RootFindingEvent, x, params, t; R_TP, R_P)
+    # Unpack
+    @unpack jd0, rv, teph = params
+    @unpack v0, v1 = rv
+    rvap = v1[1]
     # Days since J2000.0 = 2.451545e6
     dsj2k = t + (jd0 - JD_J2000)
     # Planet ephemeris at dsj2k
     xp = teph(dsj2k)
-    # Asteroid's planetocentric position and velocity
-    rap = [x[i] - xp[i] for i in 1:3]
-    vap = [x[i] - xp[i] for i in 4:6]
-    # Planetocentric distance and radial velocity
-    dap = euclid3D(rap)
-    rvap = dot3D(rap, vap)
-    # Root-finding tuples
-    return (true, dap - R_P), (dap < R_TP, rvap)
+    # Update events A and B
+    for ord in eachindex(t)
+        # Asteroid's planetocentric state vector
+        for i in 1:6
+            TaylorSeries.subst!(rvap[i], x[i], xp[i], ord)
+        end
+        # Planetocentric distance
+        TaylorSeries.pow!(v0[1], rvap[1], v0[2], 2, ord)
+        TaylorSeries.pow!(v0[3], rvap[2], v0[4], 2, ord)
+        TaylorSeries.pow!(v0[5], rvap[3], v0[6], 2, ord)
+        TaylorSeries.add!(v0[7], v0[1], v0[3], ord)
+        TaylorSeries.add!(v0[7], v0[7], v0[5], ord)
+        TaylorSeries.sqrt!(v0[8], v0[7], v0[9], ord)
+        TaylorSeries.subst!(A.func, v0[8], R_P, ord)
+        # Planetocentric radial velocity
+        TaylorSeries.mul!(v0[10], rvap[1], rvap[4], ord)
+        TaylorSeries.mul!(v0[11], rvap[2], rvap[5], ord)
+        TaylorSeries.mul!(v0[12], rvap[3], rvap[6], ord)
+        TaylorSeries.add!(B.func, v0[10], v0[11], ord)
+        TaylorSeries.add!(B.func, B.func, v0[12], ord)
+    end
+    A.flag, B.flag = true, v0[8] < R_TP
+    return nothing
 end
 
 # Specialized version of TaylorIntegration.findroot!
-function findroot(g_tupl_old::Tuple{Bool, Taylor1{U}}, g_tupl::Tuple{Bool, Taylor1{U}},
-                  δt_old::T, buffer::ImpactMonitoringBuffer{T, U}; nrabstol::T = eps(T),
+function findroot(g_tupl_old::RootFindingEvent{U}, g_tupl::RootFindingEvent{U},
+                  δt_old::T, buffer::RootFindingBuffer{T, U}; nrabstol::T = eps(T),
                   newtoniter::Int = 25) where {T <: Real, U <: Number}
     # Check if g changes sign in the given interval
-    surfacecrossing(g_tupl_old, g_tupl, 0) || return false, zero(g_tupl[2][0])
+    surfacecrossing(g_tupl_old, g_tupl, 0) || return false, scalarzero(g_tupl)
     # Unpack
     @unpack g_constant, g_dg, g_dg_val = buffer
     # Select expansion for Newton-Raphson
-    for i in eachindex(g_tupl[2])
-        g_constant[1][i] = constant_term(g_tupl_old[2][i])
-        g_constant[2][i] = constant_term(g_tupl[2][i])
+    for i in eachindex(last(g_tupl))
+        g_constant[1][i] = constant_term(last(g_tupl_old)[i])
+        g_constant[2][i] = constant_term(last(g_tupl)[i])
     end
     if g_constant[1](zero(T)) * g_constant[1](δt_old) < zero(T)
         a, b = zero(T), δt_old
-        g_dg[1] = g_tupl_old[2]
+        g_dg[1] = last(g_tupl_old)
     elseif g_constant[2](-δt_old) * g_constant[2](zero(T)) < zero(T)
         a, b = -δt_old, zero(T)
-        g_dg[1] = g_tupl[2]
+        g_dg[1] = last(g_tupl)
     else
-        return false, zero(g_tupl[2][0])
+        return false, scalarzero(g_tupl)
     end
     g_dg[2] = derivative(g_dg[1])
     # First guess: linear interpolation
-    dt_nr = (a * g_tupl[2][0] - b * g_tupl_old[2][0]) / (g_tupl[2][0] - g_tupl_old[2][0])
+    dt_nr = (a * cte(g_tupl) - b * cte(g_tupl_old)) / (cte(g_tupl) - cte(g_tupl_old))
     # Newton-Raphson iterations
     nriter = 1
     evaluate!(g_dg, dt_nr, view(g_dg_val, :))
@@ -243,7 +260,8 @@ function closeapproaches(
     if isnothing(buffer)
         buffer = ImpactMonitoringBuffer(IM, q0, nyears, params)
     end
-    @unpack prop, teph = buffer
+    @unpack prop, root = buffer
+    # Unpack propagation buffer
     @unpack cache, dparams = prop
     @unpack xaux, t, x, dx, rv, parse_eqs = cache
     dparams.jd0 = epoch(VA) + JD_J2000
@@ -251,13 +269,17 @@ function closeapproaches(
     x0 = deepcopy(q0)
     update_cache!(cache, t0, x0)
     sign_tstep = copysign(1, tmax - t0)
+    # Unpack root-finding buffer
+    root.jd0 = epoch(VA) + JD_J2000
+    @unpack f_tupl, g_tupl, f_tupl_old, g_tupl_old = root
+    closeapproach!(f_tupl, g_tupl, x, root, t; R_TP, R_P)
+    f_tupl.flag, g_tupl.flag = false, false
+    identity!(f_tupl_old, f_tupl)
+    identity!(g_tupl_old, g_tupl)
     # Some auxiliary arrays for root-finding
     xold = zero.(x)
     δt, told = zero(T), zero(T)
     CAs = Vector{CloseApproach{T, U}}(undef, 0)
-    f_tupl, g_tupl = closeapproach(x, teph, dparams, t; R_TP, R_P)
-    f_tupl, g_tupl = (false, f_tupl[2]), (false, g_tupl[2])
-    f_tupl_old, g_tupl_old = deepcopy(f_tupl), deepcopy(g_tupl)
     # Integration
     nsteps = 1
     while sign_tstep * t0 < sign_tstep * tmax
@@ -272,8 +294,8 @@ function closeapproaches(
         # New initial condition
         TS.evaluate!(x, δt, x0)
         # Root-finding
-        f_tupl, g_tupl = closeapproach(x, teph, dparams, t; R_TP, R_P)
-        flag, dt_nr = findroot(f_tupl_old, f_tupl, δt_old, buffer; nrabstol, newtoniter)
+        closeapproach!(f_tupl, g_tupl, x, root, t; R_TP, R_P)
+        flag, dt_nr = findroot(f_tupl_old, f_tupl, δt_old, root; nrabstol, newtoniter)
         if flag
             # Time at surface crossing
             t_CA = epoch(VA) + told + dt_nr
@@ -313,7 +335,7 @@ function closeapproaches(
             @warn("Integration entered the physical radius of the target; exiting.")
             break
         end
-        flag, dt_nr = findroot(g_tupl_old, g_tupl, δt_old, buffer; nrabstol, newtoniter)
+        flag, dt_nr = findroot(g_tupl_old, g_tupl, δt_old, root; nrabstol, newtoniter)
         if flag
             # Time at close approach
             t_CA = epoch(VA) + told + dt_nr
@@ -340,14 +362,16 @@ function closeapproaches(
             push!(CAs, CA)
             !isconvergent(CA, ctol) && break
         end
-        f_tupl_old, g_tupl_old = deepcopy(f_tupl), deepcopy(g_tupl)
+        # Update events
+        identity!(f_tupl_old, f_tupl)
+        identity!(g_tupl_old, g_tupl)
         # Update time
         told = t0
         t0 += δt
         # Update state vector
         for i in eachindex(x)
             for k in eachindex(x[i])
-                TS.identity!(xold[i], x[i], k)
+                identity!(xold[i], x[i], k)
             end
         end
         update_cache!(cache, t0, x0)

@@ -2,7 +2,7 @@ module NEOs
 
 # __precompile__(false)
 import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary,
-       firstindex, lastindex
+       firstindex, lastindex, first, last
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination, argperi,
        longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly,
@@ -10,7 +10,8 @@ import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import StatsBase: weights
 import Tables: Schema, istable, rowaccess, rows, schema
-import TaylorSeries: get_order, evaluate
+import TaylorIntegration: surfacecrossing
+import TaylorSeries: get_order, evaluate, constant_term, identity!
 
 using AngleBetweenVectors, AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON,
       LazyArtifacts, LinearAlgebra, Printf, Scratch, SPICE, TaylorIntegration,
@@ -43,7 +44,7 @@ using SpecialFunctions: erf
 using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update_cache!,
-      taylorstep!, set_psol!, surfacecrossing, nrconvergencecriterion
+      taylorstep!, set_psol!, nrconvergencecriterion
 using TaylorSeries: NumberNotSeries
 
 # Common
