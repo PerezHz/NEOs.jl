@@ -1,3 +1,4 @@
+include("cyclicbarrier.jl")
 include("buffer.jl")
 include("dynamicalmodels.jl")
 include("jetcoeffs.jl")
