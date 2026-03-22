@@ -1092,7 +1092,7 @@ function TaylorIntegration.jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}, q::Abstr
     local zero_q_1 = auxzero(q[1])
     local M_ = Array{S}(undef, 3, 3, N)
     local M_[:, :, ea] = t2c_jpl_de430(dsj2k, zero_q_1)
-    for ord = 0:order - 1
+    @cyclicbarrier for ord = 0:order - 1
         ordnext = ord + 1
         TaylorSeries.identity!(pntempX, zero_q_1, ord)
         TaylorSeries.identity!(pntempY, zero_q_1, ord)
@@ -2305,7 +2305,7 @@ function TaylorIntegration.jetcoeffs!(::Val{gravityonly!}, t::Taylor1{_T}, q::Ab
     local zero_q_1 = auxzero(q[1])
     local M_ = Array{S}(undef, 3, 3, N)
     local M_[:, :, ea] = t2c_jpl_de430(dsj2k, zero_q_1)
-    for ord = 0:order - 1
+    @cyclicbarrier for ord = 0:order - 1
         ordnext = ord + 1
         TaylorSeries.identity!(pntempX, zero_q_1, ord)
         TaylorSeries.identity!(pntempY, zero_q_1, ord)
@@ -2666,7 +2666,7 @@ function TaylorIntegration.jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T}, q::Abst
     local Nm1 = N - 1
     local μ = params.μ
     local zero_q_1 = auxzero(q[1])
-    for ord = 0:order - 1
+    @cyclicbarrier for ord = 0:order - 1
         ordnext = ord + 1
         TaylorSeries.identity!(accX, zero_q_1, ord)
         TaylorSeries.identity!(accY, zero_q_1, ord)
