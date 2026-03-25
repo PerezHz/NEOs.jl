@@ -12,7 +12,7 @@ Near-Earth Objects. `NEOs.jl` exploits jet transport techniques via
 ## Authors
 
 - [Jorge A. Pérez](https://github.com/PerezHz),
-Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
+Minor Planet Center, Harvard & Smithsonian Center for Astrophysics
 - [Luis Benet](http://www.cicc.unam.mx/~benet/),
 Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
 - [Luis Eduardo Ramírez Montoya](https://github.com/LuEdRaMo),
@@ -27,15 +27,15 @@ The current version of this package may be installed in Julia pkg manager via:
 
 ## Usage
 
-The `pha` directory contains the `apophis.jl` script which performs an
+The `research/2022CommEarthEnviron` directory contains the `apophis.jl` script which performs an
 orbit determination for asteroid (99942) Apophis from optical and radar astrometry. In order
 to run this script, the environment corresponding to the `Project.toml` contained in the
-`pha` directory has to be active and instantiated. This can be done, for example, by running
-the following command from the `pha` directory:
+`research/2022CommEarthEnviron` directory has to be active and instantiated. This can be done, for example, by running
+the following command from the `research/2022CommEarthEnviron` directory:
 
-``julia -e `import Pkg; Pkg.activate(); Pkg.instantiate()` # run this from the `pha` directory ``
+``julia -e `import Pkg; Pkg.activate(); Pkg.instantiate()` # run this from the `research/2022CommEarthEnviron` directory ``
 
-Once the `pha` environment is active, this script may be called from the `pha` directory
+Once the `research/2022CommEarthEnviron` environment is active, this script may be called from the `research/2022CommEarthEnviron` directory
 with the default settings as:
 
 `julia --project apophis.jl`
