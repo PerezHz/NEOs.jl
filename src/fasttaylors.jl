@@ -13,13 +13,7 @@ auxzero(a::AbstractSeries) = zero(a)
 # Return a `TaylorN` with zero coefficients of the same type as `a.coeffs`
 auxzero(a::TaylorN{Taylor1{T}}) where {T <: Number} = TaylorN(zero.(a.coeffs))
 
-# TO DO: move this method to PlanetaryEphemeris in order to avoid type piracy
-function kmsec2auday(x::SVector{6, T}) where {T <: Number}
-    k = daysec / au
-    return SVector{6, T}(x[1] / au, x[2] / au, x[3] / au,
-                         x[4] * k, x[5] * k, x[6] * k)
-end
-
+# In-place methods of auday2kmsec
 function auday2kmsec!(y::Vector{T}) where {T <: Real}
     y[1:3] .*= au
     y[4:6] .*= au/daysec
@@ -245,17 +239,4 @@ function evaleph!(y::Vector{T}, et::T, bwd::DensePropagation2{T, T},
     auday2kmsec!(y)
 
     return nothing
-end
-
-t2c_jpl_de430(dsj2k::Taylor1{T}, zero_q::Taylor1{T}) where {T <: Real} =
-    t2c_jpl_de430(dsj2k) .+ zero_q
-
-t2c_jpl_de430(dsj2k::Taylor1{T}, zero_q::Taylor1{TaylorN{T}}) where {T <: Real} =
-    t2c_jpl_de430(dsj2k) .+ zero_q
-
-function t2c_jpl_de430(dsj2k::Taylor1{T}, zero_q::Taylor1{Taylor1{T}}) where {T <: Real}
-    M = t2c_jpl_de430(dsj2k)
-    one_q = one(zero_q.coeffs[1])
-    _M_ = @. Taylor1(getfield(M, :coeffs) * one_q)
-    return _M_
 end

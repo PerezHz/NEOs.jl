@@ -90,45 +90,6 @@ function timeperipass(x::KeplerianElements)
     return tp
 end
 
-keplerequation(e::Number, E::Number, ::Val{true}) = E - e * sin(E)
-keplerequation(e::Number, E::Number, ::Val{false}) = e * sinh(E) - E
-
-keplerderivative(e::Number, E::Number, ::Val{true}) = 1 - e * cos(E)
-keplerderivative(e::Number, E::Number, ::Val{false}) = e * cosh(E) - 1
-
-for V in (:(true), :(false))
-    @eval begin
-
-        function eccentricanomaly(e::Number, M::Number, ::Val{$V})
-            # Curtis (2020) initial estimate
-            if $V
-                M = mod2pi(M)
-                E0 = M < π ? M + e/2 : M - e/2
-            else
-                E0 = M
-            end
-            # Successive approximations via Newtons' method
-            for _ in 0:20
-                # TODO: implement modified Newton's method for Kepler's equation (Murray-Dermott)
-                E1 = E0 - (keplerequation(e, E0, Val($V)) - M) / keplerderivative(e, E0, Val($V))
-                E0 = E1
-            end
-            return rad2deg(E0)
-        end
-
-        function trueanomaly(e::Number, E::Number, ::Val{$V})
-            # True anomaly [rad]
-            if $V
-                ν = 2 * atan( sqrt( (1+e) / (1-e) ) * tan(E / 2) )
-            else
-                ν = 2 * atan( sqrt( (e+1) / (e-1) ) * tanh(E / 2) )
-            end
-            return rad2deg(ν)
-        end
-
-    end
-end
-
 """
     cartesian2keplerian(x, t; kwargs...)
 
