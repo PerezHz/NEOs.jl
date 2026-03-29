@@ -4,9 +4,8 @@ module NEOs
 import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary,
        firstindex, lastindex, first, last, wait
 import PlanetaryEphemeris as PE
-import PlanetaryEphemeris: kmsec2auday, semimajoraxis, eccentricity, inclination, argperi,
-       longascnode, meanmotion, meananomaly, timeperipass, eccentricanomaly, trueanomaly,
-       t2c_jpl_de430, numberofbodies
+import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, longascnode,
+       meanmotion, meananomaly, timeperipass, numberofbodies
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import StatsBase: weights
 import Tables: Schema, istable, rowaccess, rows, schema
@@ -32,8 +31,8 @@ using Parameters: @with_kw, @unpack
 using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea, mo,
       yr, RE, Rx, Ry, Rz, R_sun, α_p_sun, δ_p_sun, daysec, auday2kmsec, kmsec2auday,
       c_au_per_day, c_au_per_sec, c_cm_per_sec, semimajoraxis, eccentricity, inclination,
-      longascnode, argperi, timeperipass, meanmotion, meananomaly, selecteph,
-      getinterpindex, pole_rotation, t2c_jpl_de430, nbodyind
+      longascnode, argperi, timeperipass, meanmotion, meananomaly, eccentricanomaly,
+      trueanomaly, selecteph, getinterpindex, pole_rotation, t2c_jpl_de430, nbodyind
 using QuadGK: quadgk
 using Roots: Bisection, find_zero, find_zeros
 using SatelliteToolboxTransformations: DCM, EARTH_ANGULAR_SPEED, EopIau1980, EopIau2000A,
