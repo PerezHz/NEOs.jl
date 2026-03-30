@@ -10,3 +10,4 @@ EOP_IAU*.TXT
 Manifest.toml
 *.DS_Store
 .vscode
+LocalPreferences.toml
