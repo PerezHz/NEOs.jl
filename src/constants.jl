@@ -217,13 +217,52 @@ const DensePropagation1{T, U} = TaylorInterpolant{T, U, 1, Vector{T}, Vector{Tay
 const DensePropagation2{T, U} = TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}}
 
 # Load Solar System, accelerations, newtonian potentials and TT-TDB 2000-2100 ephemeris
-const sseph_artifact_path = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
-const sseph::DensePropagation2{Float64, Float64} = JLD2.load(sseph_artifact_path, "ss16ast_eph")
-const acceph::DensePropagation2{Float64, Float64} = JLD2.load(sseph_artifact_path, "acc_eph")
-const poteph::DensePropagation2{Float64, Float64} = JLD2.load(sseph_artifact_path, "pot_eph")
+const SSEPH_ARTIFACT_PATH = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
+const SSEPH_SOURCE = @load_preference("SSEPH_SOURCE", SSEPH_ARTIFACT_PATH)
+
+"""
+    set_sseph_source(filename)
+
+Set the solar system ephemeris source file to `filename`.
+
+# Extended help
+
+`filename` must be a valid `.jld2` file produced by PlanetaryEphemeris.jl,
+meaning that it contains the following fields:
+- `ss16ast_eph`: solar system ephemeris.
+- `acc_eph`: acceleration ephemeris.
+- `pot_eph`: Newtonian potential ephemeris.
+"""
+function set_sseph_source(filename::AbstractString)
+    @set_preferences!("SSEPH_SOURCE" => filename)
+    @info("Solar system ephemeris source file set to $filename; \
+          restart your Julia session for this change to take effect!")
+end
+
+const sseph::DensePropagation2{Float64, Float64} = JLD2.load(SSEPH_SOURCE, "ss16ast_eph")
+const acceph::DensePropagation2{Float64, Float64} = JLD2.load(SSEPH_SOURCE, "acc_eph")
+const poteph::DensePropagation2{Float64, Float64} = JLD2.load(SSEPH_SOURCE, "pot_eph")
 const ttmtdb::DensePropagation1{Float64, Float64} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
 const SSEPHORDER::Int = get_order(sseph.x[1])
 const SSEPHNBODIES::Int = numberofbodies(sseph)
+
+"""
+    print_sseph_summary()
+
+Print a summary of the solar system ephemeris currently loaded by NEOs.
+"""
+function print_sseph_summary()
+    t = repeat(' ', 4)
+    print(
+        "Solar system ephemeris summary\n",
+        t, rpad("Expansion order:", 21), SSEPHORDER, "\n",
+        t, rpad("Number of bodies:", 21), SSEPHNBODIES, "\n",
+        t, rpad("Initial time:", 21), julian2datetime(sseph.t0 + JD_J2000),
+            " TDB", "\n",
+        t, rpad("Final time:", 21), julian2datetime(sseph.t0 + sseph.t[end] + JD_J2000),
+            " TDB", "\n",
+    )
+end
 
 # Modified julian date offset
 const MJD2000 = JD_J2000 - 2400000.5

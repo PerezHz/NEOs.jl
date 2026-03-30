@@ -33,6 +33,7 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea
       c_au_per_day, c_au_per_sec, c_cm_per_sec, semimajoraxis, eccentricity, inclination,
       longascnode, argperi, timeperipass, meanmotion, meananomaly, eccentricanomaly,
       trueanomaly, selecteph, getinterpindex, pole_rotation, t2c_jpl_de430, nbodyind
+using Preferences: @load_preference, @set_preferences!
 using QuadGK: quadgk
 using Roots: Bisection, find_zero, find_zeros
 using SatelliteToolboxTransformations: DCM, EARTH_ANGULAR_SPEED, EopIau1980, EopIau2000A,
