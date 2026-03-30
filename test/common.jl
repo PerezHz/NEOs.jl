@@ -1,11 +1,30 @@
 using NEOs
 using Dates
+using Preferences
 using TaylorSeries
 using LinearAlgebra
 using PlanetaryEphemeris
 using Test
 
 @testset "Common" begin
+
+    @testset "Solar system ephemerides" begin
+        using NEOs: SSEPH_SOURCE, SSEPH_ARTIFACT_PATH, print_sseph_summary, set_sseph_source
+
+        print_sseph_summary()
+
+        @test SSEPH_SOURCE == SSEPH_ARTIFACT_PATH
+
+        set_sseph_source("sseph343ast016_p100y_et.jld2")
+
+        @test has_preference(NEOs, "SSEPH_SOURCE")
+        @test load_preference(NEOs, "SSEPH_SOURCE") == "sseph343ast016_p100y_et.jld2"
+
+        set_sseph_source(SSEPH_ARTIFACT_PATH)
+
+        @test has_preference(NEOs, "SSEPH_SOURCE")
+        @test load_preference(NEOs, "SSEPH_SOURCE") == SSEPH_ARTIFACT_PATH
+    end
 
     @testset "Time conversions" begin
         t0 = now()
