@@ -77,6 +77,9 @@ mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
     UJ_interaction::Union{Nothing, Vector{Bool}}
     acceph::Union{Nothing, EphemerisEvaluationBuffer{T, U}}
     poteph::Union{Nothing, EphemerisEvaluationBuffer{T, U}}
+    orientAlloc::Union{Nothing, RetAlloc{Taylor1{T}}}
+    Mmatrix::Array{Taylor1{U},3}
+    zeroq1::Taylor1{U}
 end
 
 """
@@ -131,6 +134,7 @@ function PropagationBuffer(
     # Accelerations, Newtonian potentials and interaction matrix with flattened bodies
     if dynamics in (sunearthmoon!, newtonian!)
         _acceph_, _poteph_, UJ_interaction = nothing, nothing, nothing
+        _orientation_ = nothing
     else
         _acceph_ = EphemerisEvaluationBuffer(acceph, tlim, order, q0;
             cols = view(cols, 1:3(N-1)))
@@ -139,10 +143,13 @@ function PropagationBuffer(
         UJ_interaction = falses(N)
         # Turn on Earth interaction
         UJ_interaction[ea] = true
+        _orientation_ = allocate_c2t_jpl_de430(_acceph_.t)
     end
+    M_ = Array{Taylor1{U}}(undef, 3, 3, N)
+    zero_q_1 = auxzero(Taylor1([q0[1]], order))
     # Dynamical parameters for `propagate`
     dparams = DynamicalParameters{T, U, V}(N, jd0, R_TP, μ, marsden_radial, _sseph_,
-        UJ_interaction, _acceph_, _poteph_)
+        UJ_interaction, _acceph_, _poteph_, _orientation_, M_, zero_q_1)
     # TaylorIntegration cache
     cache = init_cache(Val(true), zero(T), q0, maxsteps, order, dynamics, dparams;
                        parse_eqs)
