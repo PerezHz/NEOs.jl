@@ -143,10 +143,15 @@ function PropagationBuffer(
         UJ_interaction = falses(N)
         # Turn on Earth interaction
         UJ_interaction[ea] = true
-        _orientation_ = allocate_c2t_jpl_de430(_acceph_.t)
+        _orientation_ = allocate_c2t_jpl_de430(Taylor1(order))
     end
     M_ = Array{Taylor1{U}}(undef, 3, 3, N)
-    zero_q_1 = auxzero(Taylor1([q0[1]], order))
+    zero_q_1 = auxzero(Taylor1(q0[1], order))
+    for j = 1:3
+        for i = 1:3
+            M_[i, j, ea] = zero(zero_q_1)
+        end
+    end
     # Dynamical parameters for `propagate`
     dparams = DynamicalParameters{T, U, V}(N, jd0, R_TP, μ, marsden_radial, _sseph_,
         UJ_interaction, _acceph_, _poteph_, _orientation_, M_, zero_q_1)
