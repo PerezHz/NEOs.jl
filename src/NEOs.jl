@@ -32,7 +32,8 @@ using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea
       yr, RE, Rx, Ry, Rz, R_sun, α_p_sun, δ_p_sun, daysec, auday2kmsec, kmsec2auday,
       c_au_per_day, c_au_per_sec, c_cm_per_sec, semimajoraxis, eccentricity, inclination,
       longascnode, argperi, timeperipass, meanmotion, meananomaly, eccentricanomaly,
-      trueanomaly, selecteph, getinterpindex, pole_rotation, t2c_jpl_de430, nbodyind
+      trueanomaly, selecteph, getinterpindex, pole_rotation, nbodyind,
+      t2c_jpl_de430, t2c_jpl_de430!, allocate_c2t_jpl_de430
 using Preferences: @load_preference, @set_preferences!
 using QuadGK: quadgk
 using Roots: Bisection, find_zero, find_zeros
