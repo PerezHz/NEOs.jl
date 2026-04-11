@@ -20,8 +20,8 @@ function EphemerisEvaluationBuffer(
     t = Taylor1(SSEPHORDER)
     # Load ephemeris
     t0, tf = minmax(tlim[1], tlim[2])
-    j0 = searchsortedlast(eph.t, t0)
-    jf = searchsortedfirst(eph.t, tf)
+    j0 = searchsortedlast(eph.t, t0 - eph.t0)
+    jf = searchsortedfirst(eph.t, tf - eph.t0)
     _eph_ = TaylorInterpolant(eph.t0, eph.t[j0:jf], eph.x[j0:jf-1, cols])
     # Evaluation vectors
     zeroT = Taylor1(zeros(order+1), SSEPHORDER)
