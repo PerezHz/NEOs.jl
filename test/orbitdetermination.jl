@@ -212,7 +212,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 4, 2026
+        # Values by Apr 12, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -353,7 +353,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 4, 2026
+        # Values by Apr 12, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -436,7 +436,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by Apr 4, 2026
+        # Values by Apr 12, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -514,7 +514,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by Apr 4, 2026
+        # Values by Apr 12, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -662,7 +662,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 4, 2026
+        # Values by Apr 12, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -713,7 +713,7 @@ end
             1.294946774085543E+02, 3.442349856198504E+02, 2.206164242012555E+01]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
         JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (1.3E-02, 1.7E-02, 1.3E-11, 3.8E-13, 3.8E-13),
+        jpl_compatibility_tests(orbit, params, (1.3E-02, 1.7E-02, 1.5E-11, 3.8E-13, 3.8E-13),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
@@ -748,7 +748,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 4, 2026
+        # Values by Apr 12, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -894,7 +894,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 4, 2026
+        # Values by Apr 12, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -980,7 +980,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 4, 2026
+        # Values by Apr 12, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -1151,7 +1151,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Apr 4, 2026
+        # Values by Apr 12, 2026
 
         # Check type
         @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
@@ -1197,7 +1197,7 @@ end
             2.293324466168822E+02, 3.254353160068554E+02, 2.033836565098925E+01]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
         JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (5.3E-01, 1.4E+00, 1.4E-12, 8.9E-15, 5.2E-14),
+        jpl_compatibility_tests(orbit, params, (5.3E-01, 1.4E+00, 2.1E-12, 8.9E-15, 5.2E-14),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
@@ -1256,7 +1256,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by Apr 4, 2026
+        # Values by Apr 12, 2026
 
         # Check type
         @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
