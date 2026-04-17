@@ -54,6 +54,9 @@ function nongravs!(dq, q, params, t)
     local Nm1 = N-1
     # Gravitational parameters
     local μ = params.μ
+    # Allocations for Earth orientation model
+    local orientAlloc = params.orientAlloc
+    # local M_ = params.Mmatrix
     # Marsden et al. (1973) radial function constants
     local marsden_α = params.marsden_radial[1]
     local marsden_r₀ = params.marsden_radial[2]
@@ -62,7 +65,7 @@ function nongravs!(dq, q, params, t)
     local marsden_k = -params.marsden_radial[5]
 
     # zero(q[1])
-    local zero_q_1 = auxzero(q[1])
+    local zero_q_1 = params.zeroq1
 
     #=
     Point-mass accelerations
@@ -269,9 +272,8 @@ function nongravs!(dq, q, params, t)
     accZ = zero_q_1
 
     # Rotations to and from Earth, Sun and Moon pole-oriented frames
-    local M_ = Array{S}(undef, 3, 3, N)
-
-    local M_[:, :, ea] = t2c_jpl_de430(dsj2k, zero_q_1)
+    # local M_[:, :, ea] = t2c_jpl_de430!(dsj2k, zero_q_1, orientAlloc)
+    local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
 
     # Fill first 3 elements of dq with velocities
     dq[1] = q[4]
@@ -680,9 +682,11 @@ function gravityonly!(dq, q, params, t)
     local Nm1 = N-1
     # Gravitational parameters
     local μ = params.μ
-
+    # Allocations for Earth orientation model
+    local orientAlloc = params.orientAlloc
+    # local M_ = params.Mmatrix
     # zero(q[1])
-    local zero_q_1 = auxzero(q[1])
+    local zero_q_1 = params.zeroq1
 
     #=
     Point-mass accelerations
@@ -889,10 +893,8 @@ function gravityonly!(dq, q, params, t)
     accZ = zero_q_1
 
     # Rotations to and from Earth, Sun and Moon pole-oriented frames
-    local M_ = Array{S}(undef, 3, 3, N)
-
-    local M_[:, :, ea] = t2c_jpl_de430(dsj2k, zero_q_1)
-
+    # local M_[:, :, ea] = t2c_jpl_de430!(dsj2k, zero_q_1, orientAlloc)
+    local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
     # Fill first 3 elements of dq with velocities
     dq[1] = q[4]
     dq[2] = q[5]
@@ -1232,7 +1234,7 @@ function newtonian!(dq, q, params, t)
     local μ = params.μ
 
     # zero(q[1])
-    local zero_q_1 = auxzero(q[1])
+    local zero_q_1 = params.zeroq1
 
     #=
     Point-mass accelerations
@@ -1349,7 +1351,7 @@ function sunearthmoon!(dq, q, params, t)
     local μ = params.μ
 
     # zero(q[1])
-    local zero_q_1 = auxzero(q[1])
+    local zero_q_1 = params.zeroq1
 
     #=
     Point-mass accelerations
