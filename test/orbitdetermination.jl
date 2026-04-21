@@ -1245,7 +1245,7 @@ end
 
         # Shift reference epoch
         _jd0_ = mean(dtutc2days, minmaxdates(orbit0)) + PE.J2000
-        _orbit0_ = shiftepoch(od0, orbit0, _jd0_, params)
+        _orbit0_ = shiftepoch(orbit0, _jd0_, params)
         t0, _t0_ = epoch(orbit0), epoch(_orbit0_)
         @test mre(orbit0(t0), _orbit0_(t0), sigmas(orbit0)) < eps()
         @test mre(orbit0(_t0_), _orbit0_(_t0_), sigmas(_orbit0_)) < eps()
