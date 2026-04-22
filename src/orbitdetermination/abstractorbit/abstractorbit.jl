@@ -136,8 +136,22 @@ function init_optical_residuals(::Type{V}, orbit::AbstractOrbit{D, T, U}) where 
     res = Vector{OpticalResidual{T, V}}(undef, noptical(orbit))
     for i in eachindex(res)
         ra, dec = zero(V), zero(V)
-        @unpack wra, wdec, dra, ddec, corr, outlier = orbit.res[i]
+        @unpack wra, wdec, dra, ddec, corr, outlier = orbit.ores[i]
         res[i] = OpticalResidual{T, V}(ra, dec, wra, wdec, dra, ddec, corr, outlier)
+    end
+
+    return res
+end
+
+# Initialize a vector of radar residuals consistent with orbit
+function init_radar_residuals(::Type{V}, orbit::AbstractOrbit{D, T, U}) where {D,
+                              T <: Real, U <: Number, V <: Number}
+    # Initialize vector of radar residuals
+    res = Vector{RadarResidual{T, V}}(undef, nradar(orbit))
+    for i in eachindex(res)
+        residual = zero(V)
+        @unpack weight, debias, outlier = orbit.rres[i]
+        res[i] = RadarResidual{T, V}(residual, weight, debias, outlier)
     end
 
     return res

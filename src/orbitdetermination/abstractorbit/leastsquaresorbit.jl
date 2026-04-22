@@ -294,11 +294,70 @@ function evalfit(orbit::MixedLeastSquaresOrbit{D, T, TaylorN{T}, O, R}) where {D
 end
 
 """
-    shiftepoch(od, orbit, jd0, params)
+    shiftepoch(orbit, jdnew, params)
 
-Given an orbit determination problem `od`, shift the reference epoch of
-an `orbit` to `jd0` [julian date TDB]. For a list of parameters see the
-`Propagation` section of [`Parameters`](@ref).
+Shift the reference epoch of an `orbit` to `jdnew` [julian date TDB]. For a
+list of parameters see the `Propagation` section of [`Parameters`](@ref).
+
+!!! warning
+    Currently, jdnew must be within the observational arc of orbit. This
+    restriction may be removed in future versions.
 """
-shiftepoch(od::ODProblem, orbit::LeastSquaresOrbit, jd0::Real, params::Parameters) =
-    LeastSquaresOrbit(od, orbit(jd0 - PE.J2000), jd0, params)
+function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
+                    params::Parameters) where {D, T, O, R, RR}
+    # Check new epoch
+    tnew = jdnew - PE.J2000
+    d0, df = minmaxdates(orbit)
+    t0, tf = dtutc2days(d0) - params.bwdoffset, dtutc2days(df) + params.fwdoffset
+    @assert t0 ≤ tnew ≤ tf "New epoch must be within the observational arc"
+    # Unpack
+    @unpack coeffstol, eph_su, eph_ea = params
+    @unpack dynamics, variables, optical, tracklets, radar, jacobian = orbit
+    # Number of degrees of freedom
+    Ndof = dof(orbit)
+    # Set jet transport variables
+    Npar = numvars(Val(dynamics), params)
+    set_od_order(T, 2, Npar)
+    # Scalar initial condition
+    q00::Vector{T} = initialcondition(orbit(tnew), variables, Ndof, params)
+    # Backward (forward) integration
+    nyears_bwd = -(tnew - t0) / yr
+    nyears_fwd = (tf - tnew) / yr
+    pbuffer = PropagationBuffer(dynamics, q00, jdnew, (t0, tf), params)
+    bwd = _propagate(dynamics, q00, jdnew, nyears_bwd, pbuffer, params)
+    fwd = _propagate(dynamics, q00, jdnew, nyears_fwd, pbuffer, params)
+    # O-C residuals
+    ores = init_optical_residuals(T, orbit)
+    obuffer = [OpticalBuffer(q00[1]) for _ in eachindex(ores)]
+    residuals!(ores, optical, obuffer; xvs = eph_su, xve = eph_ea,
+               xva = (bwd, fwd))
+    if hasradar(orbit)
+        rres = init_radar_residuals(T, orbit)
+        residuals!(rres, radar;
+            xvs = et -> auday2kmsec(eph_su(et/daysec)),
+            xve = et -> auday2kmsec(eph_ea(et/daysec)),
+            xva = et -> bwdfwdeph(et, bwd, fwd)
+        )
+        Q = nrms((ores, rres))
+    else
+        rres = nothing
+        Q = nrms(ores)
+    end
+    # Propagate covariance matrix
+    q00 = initialcondition(orbit(), variables, Ndof, params)
+    dq = jtperturbation(ones(T, Ndof), variables, Ndof, 2, params)
+    q0 = q00 + dq
+    nyears = (tnew - epoch(orbit)) / yr
+    prop = propagate(dynamics, q0, epoch(orbit) + PE.J2000, nyears, params)
+    x0 = zeros(T, Npar)
+    Γ = project(prop(tnew), x0, orbit.fit.Γ)
+    fit = LeastSquaresFit{T}(orbit.fit.success, x0, Γ, orbit.fit.routine)
+    # History of initial conditions and target function
+    qs = reshape(q00[variables], Npar, 1)
+    Qs = [Q]
+
+    return LeastSquaresOrbit(
+        dynamics, variables, optical, tracklets, radar, bwd, fwd,
+        ores, rres, fit, jacobian, qs, Qs
+    )
+end
