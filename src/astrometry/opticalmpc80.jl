@@ -97,6 +97,8 @@ trackletid(x::OpticalMPC80) = ""
 
 isdiscovery(x::OpticalMPC80) = x.discovery == '*'
 
+isdeprecated(x::OpticalMPC80) = x.note2 == 'X'
+
 # Print method for OpticalMPC80
 function show(io::IO, o::OpticalMPC80)
     # If there is no number, use temporary designation

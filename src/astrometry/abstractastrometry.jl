@@ -94,6 +94,8 @@ measure(x::AbstractOpticalAstrometry) = (ra(x), dec(x))
 ra(x::AbstractOpticalAstrometry) = x.ra
 dec(x::AbstractOpticalAstrometry) = x.dec
 mag(x::AbstractOpticalAstrometry) = x.mag
+cataloguecode(x::AbstractOpticalAstrometry) = catalogue(x).code
+observatorycode(x::AbstractOpticalAstrometry) = observatory(x).code
 
 """
     AbstractRadarAstrometry{T} <: AbstractAstrometryObservation{T}

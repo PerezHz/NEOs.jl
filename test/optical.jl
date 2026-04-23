@@ -35,11 +35,16 @@ using Test
         @test apophis.info2 == "m6394"
         @test apophis.observatory == observatory(apophis) == search_observatory_code("691")
         @test apophis.source == apophis_s
+
         @test measure(apophis) == (1.0739650841580173, 0.2952738332250385)
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)
         @test corr(apophis) == 0.0
         @test trackletid(apophis) == ""
+        @test !isdiscovery(apophis)
+        @test !isdeprecated(apophis)
+        @test cataloguecode(apophis) == 'o'
+        @test observatorycode(apophis) == "691"
 
         # Custom show
         @test string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
@@ -217,11 +222,15 @@ using Test
         @test apophis.source == apophis_s[last(idxs)+1:end]
         idxs = findfirst("END_OF_HEADER", apophis_s)
         @test apophis.header == apophis_s[1:first(idxs)-1]
+
         @test measure(apophis) == (1.0739650841580173, 0.2952738332250385)
         @test rms(apophis) == (0.612, 0.612)
         @test debias(apophis) == (-0.247, 0.14)
         @test corr(apophis) == 0.0
         @test trackletid(apophis) == ""
+        @test !isdeprecated(apophis)
+        @test cataloguecode(apophis) == 'o'
+        @test observatorycode(apophis) == "691"
 
         # Custom show
         string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
@@ -373,11 +382,16 @@ using Test
         @test apophis.remarks == ""
         @test apophis.deprecated == ""
         @test replace(apophis.source, " " => "") == replace(apophis_s[64:end-9], " " => "")
+
         @test measure(apophis) == (1.073965142335659, 0.2952737556548495)
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)
         @test corr(apophis) == 0.0
         @test trackletid(apophis) == "000002w-NJ"
+        @test !isdiscovery(apophis)
+        @test !isdeprecated(apophis)
+        @test cataloguecode(apophis) == 'o'
+        @test observatorycode(apophis) == "691"
 
         # Custom show
         string(apophis) == "99942 α: 61.53367° δ: 16.91794° t: 2004-03-15T02:35:21.696 \
