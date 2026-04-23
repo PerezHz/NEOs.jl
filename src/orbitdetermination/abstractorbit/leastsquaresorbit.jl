@@ -347,8 +347,8 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
     q00 = initialcondition(orbit(), variables, Ndof, params)
     dq = jtperturbation(ones(T, Ndof), variables, Ndof, 2, params)
     q0 = q00 + dq
-    nyears = (tnew - epoch(orbit) + tnew > epoch(orbit) ? params.fwdoffset :
-        -params.bwdoffset) / yr
+    offset = tnew > epoch(orbit) ? params.fwdoffset : -params.bwdoffset
+    nyears = (tnew - epoch(orbit) + offset) / yr
     prop = propagate(dynamics, q0, epoch(orbit) + PE.J2000, nyears, params)
     x0 = zeros(T, Npar)
     Γ = project(prop(tnew), x0, orbit.fit.Γ)
