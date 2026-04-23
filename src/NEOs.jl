@@ -2,7 +2,7 @@ module NEOs
 
 # __precompile__(false)
 import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary,
-       firstindex, lastindex, first, last, wait
+       firstindex, lastindex, first, last, wait, isdeprecated
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, longascnode,
        meanmotion, meananomaly, timeperipass, numberofbodies
@@ -62,7 +62,8 @@ export UniformWeights, SourceWeights, Veres17
 export ZeroDebiasing, SourceDebiasing, Farnocchia15, Eggl20
 export numberofdays, unpacknum, packnum, unpackdesig, packdesig, fetch_designation_information
 export date, measure, observatory, rms, debias, corr, ra, dec, mag, band, catalogue,
-       frequency, residual, weight, weights, isoutlier, nout, notout, notoutobs, trackletid
+       cataloguecode, observatorycode, isdiscovery, isdeprecated, trackletid, frequency,
+       residual, weight, weights, isoutlier, nout, notout, notoutobs
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
 export update_observatories_mpc, search_observatory_code, fetch_observatory_information

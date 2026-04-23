@@ -132,6 +132,10 @@ corr(x::OpticalADES{T}) where {T <: Real} = isnan(x.rmscorr) ? zero(T) : x.rmsco
 
 trackletid(x::OpticalADES) = x.trkid
 
+isdiscovery(x::OpticalADES) = !isempty(x.disc)
+
+isdeprecated(x::OpticalADES) = !isempty(x.deprecated)
+
 # Print method for OpticalADES
 function show(io::IO, o::OpticalADES)
     # If there is no number, use temporary designation

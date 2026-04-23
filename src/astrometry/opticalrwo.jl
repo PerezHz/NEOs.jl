@@ -175,6 +175,8 @@ corr(::OpticalRWO{T}) where {T <: Real} = zero(T)
 
 trackletid(x::OpticalRWO) = ""
 
+isdeprecated(x::OpticalRWO) = x.T == 'X'
+
 # Print method for OpticalRWO
 show(io::IO, o::OpticalRWO) = print(io, o.design, " α: ", @sprintf("%.5f",
     rad2deg(o.ra)), "° δ: ", @sprintf("%.5f", rad2deg(o.dec)), "° t: ", o.date,
