@@ -234,7 +234,7 @@ function main()
     bins = 0:5:60
     histogram(ts .* 60, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
         xlabel = "Computation time [s]", ylabel = "Count", xlim = extrema(bins),
-        xticks = bins, ylim = (0, 8_000), yticks = 0:1_000:8_000)
+        xticks = bins, ylim = (0, 9_000), yticks = 0:1_000:9_000)
     filename = joinpath(directory, "THIST.png")
     savefig(filename)
     println("• Saved computation times histogram to: ", filename)
@@ -243,7 +243,7 @@ function main()
     bins = 0:0.1:1
     histogram(Qs, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
         xlabel = "NRMS", ylabel = "Count", xlim = extrema(bins), xticks = bins,
-        ylim = (0, 6_000), yticks = 0:1_000:6_000)
+        ylim = (0, 7_000), yticks = 0:1_000:7_000)
     filename = joinpath(directory, "QHIST.png")
     savefig(filename)
     println("• Saved NRMS histogram to: ", filename)
@@ -261,7 +261,7 @@ function main()
     bins = -0.5:9.5
     histogram(Us, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
         xlabel = "Uncertainty parameter", ylabel = "Count", xlim = extrema(bins), xticks = 0:9,
-        ylim = (0, 8_000), yticks = 0:1_000:8_000)
+        ylim = (0, 10_000), yticks = 0:1_000:10_000)
     filename = joinpath(directory, "UHIST.png")
     savefig(filename)
     println("• Saved uncertainty parameters histogram to: ", filename)
