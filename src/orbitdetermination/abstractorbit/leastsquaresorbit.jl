@@ -21,7 +21,10 @@ hasradar(x::AbstractLeastSquaresOrbit) = !isnothing(x.radar)
 
 covariance(x::AbstractLeastSquaresOrbit) = x.fit.Γ
 
-variances(x::AbstractLeastSquaresOrbit) = diag(x.jacobian * covariance(x) * x.jacobian')
+covariance(::Val{:cartesian}, x::AbstractLeastSquaresOrbit) =
+    x.jacobian * covariance(x) * x.jacobian'
+
+variances(x::AbstractLeastSquaresOrbit) = diag(covariance(Val(:cartesian), x))
 
 # Initialize a vector of optical residuals consistent with od and orbit
 function init_optical_residuals(::Type{U}, od::ODProblem,
@@ -170,7 +173,7 @@ function LeastSquaresOrbit(od::OpticalODProblem{D, T, O}, q00::Vector{T}, jd0::T
         variables = vcat(variables, findall(!iszero, marsden_scalings) .+ 6)
     end
     q00 = initialcondition(q00, variables, Ndof, params)
-    dq = jtperturbation(fill(1e-8, 6), variables, Ndof, 2, params)
+    dq = jtperturbation(fill(1E-8, 6), variables, Ndof, 2, params)
     q0 = q00 + dq
     # Propagation and residuals
     bwd, fwd, res = propres(od, q0, jd0, params)
@@ -207,7 +210,7 @@ function LeastSquaresOrbit(od::MixedODProblem{D, T, O, R}, q00::Vector{T}, jd0::
         variables = vcat(variables, findall(!iszero, params.marsden_scalings) .+ 6)
     end
     q00 = initialcondition(q00, variables, Ndof, params)
-    dq = jtperturbation(fill(1e-8, 6), variables, Ndof, 2, params)
+    dq = jtperturbation(fill(1E-8, 6), variables, Ndof, 2, params)
     q0 = q00 + dq
     # Propagation and residuals
     bwd, fwd, res = propres(od, q0, jd0, params)
@@ -312,11 +315,11 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
     @assert t0 ≤ tnew ≤ tf "New epoch must be within the observational arc"
     # Unpack
     @unpack coeffstol, eph_su, eph_ea = params
-    @unpack dynamics, variables, optical, tracklets, radar, jacobian = orbit
+    @unpack dynamics, variables, optical, tracklets, radar = orbit
     # Number of degrees of freedom
     Ndof = dof(orbit)
     # Set jet transport variables
-    Npar = numvars(Val(dynamics), params)
+    Npar = length(variables)
     set_od_order(T, 2, Npar)
     # Scalar initial condition
     q00::Vector{T} = initialcondition(orbit(tnew), variables, Ndof, params)
@@ -343,6 +346,9 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
         rres = nothing
         Q = nrms(ores)
     end
+    # History of initial conditions and target function
+    qs = reshape(q00[variables], Npar, 1)
+    Qs = [Q]
     # Propagate covariance matrix
     q00 = initialcondition(orbit(), variables, Ndof, params)
     dq = jtperturbation(ones(T, Ndof), variables, Ndof, 2, params)
@@ -351,11 +357,9 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
     nyears = (tnew - epoch(orbit) + offset) / yr
     prop = propagate(dynamics, q0, epoch(orbit) + PE.J2000, nyears, params)
     x0 = zeros(T, Npar)
-    Γ = project(prop(tnew), x0, orbit.fit.Γ)
+    Γ = project(prop(tnew)[variables], x0, covariance(Val(:cartesian), orbit))
     fit = LeastSquaresFit{T}(orbit.fit.success, x0, Γ, orbit.fit.routine)
-    # History of initial conditions and target function
-    qs = reshape(q00[variables], Npar, 1)
-    Qs = [Q]
+    jacobian = Matrix{T}(I, Npar, Npar)
 
     return LeastSquaresOrbit(
         dynamics, variables, optical, tracklets, radar, bwd, fwd,
