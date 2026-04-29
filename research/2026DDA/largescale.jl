@@ -76,7 +76,7 @@ end
         prop = NEOs._propagate(gravityonly!, q0, jd0NEOs, ndays / yr, bufferTN, params)
         q0 = equatorial2ecliptic(prop(jd0ESA - J2000) - params.eph_su(jd0ESA - J2000))
         ele = cartesian2keplerian(q0, mjd0ESA)
-        Γ_ele = project(ele, covariance(orbitNEOs))
+        Γ_ele = project(ele, 1E16 * covariance(orbitNEOs))
         kep = evaldeltas(KeplerianElements{Float64, TaylorN{Float64}}(
             μ_S, mjd0ESA, :ecliptic, ele, Γ_ele), zeros(Float64, 6))
         elementsNEOs = elements(kep)
@@ -92,7 +92,7 @@ end
         prop = NEOs._propagate(gravityonly!, q0, jd0NEOs, ndays / yr, bufferTN, params)
         q0 = equatorial2ecliptic(prop(jd0JPL - J2000) - params.eph_su(jd0JPL - J2000))
         ele = cartesian2keplerian(q0, mjd0JPL)
-        Γ_ele = project(ele, covariance(orbitNEOs))
+        Γ_ele = project(ele, 1E16 * covariance(orbitNEOs))
         kep = evaldeltas(KeplerianElements{Float64, TaylorN{Float64}}(
             μ_S, mjd0JPL, :ecliptic, ele, Γ_ele), zeros(Float64, 6))
         elementsNEOs = elements(kep)
@@ -141,13 +141,13 @@ function main()
         set_od_order(Float64, 2, 6)
         # Parameters
         const params = Parameters(
-            maxsteps = 10_000, order = 25, abstol = 1E-20, parse_eqs = true,
+            maxsteps = 20_000, order = 25, abstol = 1E-20, parse_eqs = true,
             coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
             gaussorder = 2, safegauss = false, refscale = :log,
             tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
             jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
-            significance = 0.99, verbose = true, outrej = true,
-            χ2_rec = 7.0, χ2_rej = 8.0, fudge = 100.0, max_per = 20.0
+            jtlsproject = true, significance = 0.99, verbose = true,
+            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0, fudge = 100.0, max_per = 20.0
         )
         # Propagation buffers
         jd0 = 2459200.5

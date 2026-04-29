@@ -63,8 +63,6 @@ end
     printitle(s::AbstractString, d::AbstractString) = println(d ^ length(s),
         '\n', s, '\n', d ^ length(s))
 
-    odk(x::AbstractString) = x in ("2021JB6", "2022JN11") ? 100 : 10
-
     chi(x::OpticalResidual) = sqrt(chi2(x))
     logchi(x::OpticalResidual) = log(chi(x))
 
@@ -74,7 +72,8 @@ end
     daysbetween(x::OpticalTracklet, y::OpticalTracklet) = daysbetween(date(x), date(y))
 
     isodvalid(od::ODProblem, orbit::LeastSquaresOrbit, params::Parameters) =
-        noptical(od) == noptical(orbit) && critical_value(orbit) < params.significance
+        noptical(od) == noptical(orbit) && critical_value(orbit) < params.significance &&
+        all(!isnan, sigmas(orbit))
 
     function meantime(x::ODProblem)
         t = Vector{Float64}(undef, noptical(x))
@@ -82,7 +81,7 @@ end
         for i in eachindex(x.optical)
             t[i] = dtutc2days(x.optical[i])
             δ = dec(x.optical[i])
-            σα, σδ = x.weights.weights[i]
+            σα, σδ = inv.(x.weights.weights[i])
             w[i] = 1 / (σα^2 * cos(δ)^2 + σδ^2)
         end
         return mean(t, weights(w))
@@ -114,8 +113,8 @@ end
 
     function σsmveres17(obs::OpticalADES{T}) where {T <: Real}
         σ = σsveres17(obs)
-        σα = isnan(obs.rmsra) ? σ : max(σα, σ)
-        σδ = isnan(obs.rmsdec) ? σ : max(σδ, σ)
+        σα = isnan(obs.rmsra) ? σ : max(obs.rmsra, σ)
+        σδ = isnan(obs.rmsdec) ? σ : max(obs.rmsdec, σ)
         return σα, σδ
     end
 
@@ -338,10 +337,10 @@ end
     end
 
     function orbit_determination(neo::AbstractString, optical::AbstractVector;
-                                 niter::Int = 20, k::Real = odk(neo))
+                                 niter::Int = 20, k::Real = 10)
         # Parameters
         params = Parameters(
-            maxsteps = 7_500, order = 25, abstol = 1E-20, parse_eqs = true,
+            maxsteps = 20_000, order = 25, abstol = 1E-20, parse_eqs = true,
             coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
             gaussorder = 2, safegauss = false, refscale = :log,
             tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
@@ -380,7 +379,8 @@ end
             if noptical(orbit) == length(optical)
                 # Shift epoch to the middle of the observational arc
                 tmean = meantime(od)
-                orbit = shiftepoch(orbit, tmean + PE.J2000, params)
+                _orbit_ = shiftepoch(orbit, tmean + PE.J2000, params)
+                orbit = isodvalid(od, _orbit_, params) ? _orbit_ : orbit
                 printitle("Final orbit", "*")
                 println(summary(orbit))
                 # Save output
