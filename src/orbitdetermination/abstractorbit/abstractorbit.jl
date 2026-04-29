@@ -94,23 +94,24 @@ initialcondition(orbit::AbstractOrbit, dof::Int, params::Parameters) =
     initialcondition(orbit(), variables(orbit), dof, params)
 
 function jtperturbation(sigmas::AbstractVector{T}, variables::AbstractVector{Int},
-                        dof::Int, order::Int, params::Parameters{T}) where {T <: Real}
-    scalings = zeros(T, dof)
-    jtvariables = get_variables(T, order)
-    dq = [zero(jtvariables[1]) for _ in 1:dof]
-    dq[variables] .= jtvariables
-    for i in 1:6
-        scalings[i] = isnan(sigmas[i]) ? 1e-8 : sigmas[i]
+                        Ndof::Int, order::Int, params::Parameters{T}) where {T <: Real}
+    k = 1
+    vars = get_variables(T, order)
+    dq = [zero(vars[1]) for _ in 1:Ndof]
+    for i in eachindex(dq)
+        !(i in variables) && continue
+        scaling = 1 ≤ i ≤ 6 ? 1E-8 : params.marsden_scalings[i-6]
+        if i ≤ length(sigmas) && !isnan(sigmas[i])
+            scaling = sigmas[i]
+        end
+        dq[i] = scaling * vars[k]
+        k += 1
     end
-    for i in 7:dof
-        scalings[i] = params.marsden_scalings[i-6]
-    end
-    dq .*= scalings
     return dq
 end
 
-jtperturbation(orbit::AbstractOrbit, variables::AbstractVector{Int}, dof::Int, order::Int,
-    params::Parameters) = jtperturbation(sigmas(orbit), variables, dof, order, params)
+jtperturbation(orbit::AbstractOrbit, variables::AbstractVector{Int}, Ndof::Int, order::Int,
+    params::Parameters) = jtperturbation(sigmas(orbit), variables, Ndof, order, params)
 
 # Number of outlier / non-outlier residuals
 function nout(x::AbstractOrbit)

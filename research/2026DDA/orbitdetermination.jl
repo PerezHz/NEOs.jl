@@ -44,9 +44,9 @@ end
     using JLD2, HTTP, JSON, ThreadPinning
 
     using Dates: UTInstant, value
-    using NEOs: NEOCC_URL, AbstractOpticalAstrometry, AbstractWeightingScheme,
-          AbstractOpticalVector, OpticalADES, OpticalTracklet, AdmissibleRegion,
-          OpticalResidual, indices, set_od_order, updateorbit, rexveres17, σsveres17
+    using NEOs: NEOCC_URL, AbstractWeightingScheme, OpticalADES, OpticalTracklet,
+          AdmissibleRegion, OpticalResidual, indices, set_od_order, updateorbit,
+          rexveres17, σsveres17
 
     import NEOs: weights, corr, getid, update!
 
@@ -72,7 +72,8 @@ end
     daysbetween(x::OpticalTracklet, y::OpticalTracklet) = daysbetween(date(x), date(y))
 
     isodvalid(od::ODProblem, orbit::LeastSquaresOrbit, params::Parameters) =
-        noptical(od) == noptical(orbit) && critical_value(orbit) < params.significance
+        noptical(od) == noptical(orbit) && critical_value(orbit) < params.significance &&
+        all(!isnan, sigmas(orbit))
 
     function meantime(x::ODProblem)
         t = Vector{Float64}(undef, noptical(x))
@@ -80,7 +81,7 @@ end
         for i in eachindex(x.optical)
             t[i] = dtutc2days(x.optical[i])
             δ = dec(x.optical[i])
-            σα, σδ = x.weights.weights[i]
+            σα, σδ = inv.(x.weights.weights[i])
             w[i] = 1 / (σα^2 * cos(δ)^2 + σδ^2)
         end
         return mean(t, weights(w))
@@ -94,29 +95,30 @@ end
         corr::Vector{T}
     end
 
-    function ModifiedVeres17(optical::AbstractOpticalVector{T}) where {T <: Real}
+    function ModifiedVeres17(optical::AbstractVector{OpticalADES{T}}) where {T <: Real}
         weights = w8smveres17(optical)
-        corr = [zero(T) for _ in eachindex(optical)]
-        return ModifiedVeres17{T}(weights, corr)
+        corrs = corr.(optical)
+        return ModifiedVeres17{T}(weights, corrs)
     end
 
     weights(x::ModifiedVeres17) = x.weights
     corr(x::ModifiedVeres17) = x.corr
     getid(::ModifiedVeres17) = "Modified Veres et al. (2017)"
 
-    function update!(x::ModifiedVeres17{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
+    function update!(x::ModifiedVeres17{T}, optical::AbstractVector{OpticalADES{T}}) where {T <: Real}
         x.weights = w8smveres17(optical)
-        x.corr = [zero(T) for _ in eachindex(optical)]
+        x.corr = corr.(optical)
         return nothing
     end
 
-    function σsmveres17(obs::AbstractOpticalAstrometry{T}) where {T <: Real}
-        σα, σδ = rms(obs)
+    function σsmveres17(obs::OpticalADES{T}) where {T <: Real}
         σ = σsveres17(obs)
-        return (max(σα, σ), max(σδ, σ))
+        σα = isnan(obs.rmsra) ? σ : max(obs.rmsra, σ)
+        σδ = isnan(obs.rmsdec) ? σ : max(obs.rmsdec, σ)
+        return σα, σδ
     end
 
-    function w8smveres17(optical::AbstractOpticalVector{T}) where {T <: Real}
+    function w8smveres17(optical::AbstractVector{OpticalADES{T}}) where {T <: Real}
         σs = σsmveres17.(optical)
         rex = rexveres17(optical)
         return @. tuple(1 / (rex * first(σs)), 1 / (rex * last(σs)))
@@ -189,15 +191,16 @@ end
         n = max(2, minimum(mags, init = typemax(Int)))
         cmax = exp(n)
         # New observations
-        j0, jf = indexin(@view(od.optical[[begin, end]]), OD.optical)
+        idxs = Int.(indexin(od.optical, OD.optical))
         if n ≥ 10
             trk = argmin(Base.Fix1(daysbetween, meandate(od)), trks)
-            ja, jb = trk.indices[1], trk.indices[end]
+            union!(idxs, indices(trk))
         else
-            mask = @. chi(res) < cmax
-            ja, jb = findfirst(mask), findlast(mask)
+            mask = @. mags ≤ n
+            union!(idxs, indices(view(trks, mask)))
         end
-        return min(j0, ja):max(jf, jb), cmax
+        sort!(idxs)
+        return idxs, cmax
     end
 
     function initial_orbit_determination(od::ODProblem, params::Parameters)
@@ -337,7 +340,7 @@ end
                                  niter::Int = 20, k::Real = 10)
         # Parameters
         params = Parameters(
-            maxsteps = 5_000, order = 25, abstol = 1E-20, parse_eqs = true,
+            maxsteps = 20_000, order = 25, abstol = 1E-20, parse_eqs = true,
             coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
             gaussorder = 2, safegauss = false, refscale = :log,
             tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
@@ -376,7 +379,8 @@ end
             if noptical(orbit) == length(optical)
                 # Shift epoch to the middle of the observational arc
                 tmean = meantime(od)
-                orbit = shiftepoch(orbit, tmean + PE.J2000, params)
+                _orbit_ = shiftepoch(orbit, tmean + PE.J2000, params)
+                orbit = isodvalid(od, _orbit_, params) ? _orbit_ : orbit
                 printitle("Final orbit", "*")
                 println(summary(orbit))
                 # Save output
@@ -460,7 +464,7 @@ function main()
 
     # Final time
     global_final_time = now()
-    println("• Run started ", global_final_time, " and finished ", global_final_time)
+    println("• Run started ", global_initial_time, " and finished ", global_final_time)
     global_computation_time = computationtime(global_initial_time, global_final_time)
     println("• Total computation time was: ", global_computation_time, " min")
 

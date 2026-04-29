@@ -165,34 +165,34 @@ function updateorbit(orbit::AbstractOrbit{D, T, TaylorN{T}},
     # Unpack parameters
     @unpack jtlsproject, H_max = params
     # Projection onto the admissible region
-    if jtlsproject
-        # Reference epoch
-        t0 = epoch(orbit)
-        # Lest squares fit
-        @unpack fit = orbit
+    !jtlsproject && return evalfit(orbit)
+    # Reference epoch
+    t0 = epoch(orbit)
+    # Lest squares fit
+    @unpack fit = orbit
+    # Barycentric initial condition
+    q0 = orbit()
+    # Geocentric attributable elements
+    attr = cartesian2attributable(q0(fit.x) - params.eph_ea(t0))
+    ρ, v_ρ = attr[5], attr[6]
+    h = H_max + 5 * log10(R_EA)
+    # Admissible region
+    A = AdmissibleRegion(
+        days2dtutc(t0), deg2rad(attr[1]), deg2rad(attr[2]), deg2rad(attr[3]),
+        deg2rad(attr[4]), h, search_observatory_code("500"), params
+    )
+    iszero(A) && return evalfit(orbit)
+    # Projection onto the admissible region
+    if !((ρ, v_ρ) in A)
+        ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
         # Barycentric initial condition
-        q0 = orbit()
-        # Geocentric attributable elements
-        attr = cartesian2attributable(q0(fit.x) - params.eph_ea(t0))
-        ρ, v_ρ = attr[5], attr[6]
-        h = H_max + 5 * log10(R_EA)
-        # Admissible region
-        A = AdmissibleRegion(
-            days2dtutc(t0), deg2rad(attr[1]), deg2rad(attr[2]), deg2rad(attr[3]),
-            deg2rad(attr[4]), h, search_observatory_code("500"), params
-        )
-        # Projection onto the admissible region
-        if !((ρ, v_ρ) in A)
-            ρ, v_ρ = boundary_projection(A, ρ, v_ρ)
-            # Barycentric initial condition
-            q1 = attributable2cartesian(SVector{6, T}(attr[1], attr[2], attr[3],
-                 attr[4], ρ, v_ρ)) + params.eph_ea(t0)
-            # New deltas and covariance matrix
-            @. fit.x = (q1 - cte(q0)) / $diag(orbit.jacobian)
-            for method in lsmethods
-                if typeof(method) == fit.routine
-                    fit.Γ .= inv(normalmatrix(method, fit.x))
-                end
+        q1 = attributable2cartesian(SVector{6, T}(attr[1], attr[2], attr[3],
+                attr[4], ρ, v_ρ)) + params.eph_ea(t0)
+        # New deltas and covariance matrix
+        @. fit.x = (q1 - cte(q0)) / $diag(orbit.jacobian)
+        for method in lsmethods
+            if typeof(method) == fit.routine
+                fit.Γ .= inv(normalmatrix(method, fit.x))
             end
         end
     end
