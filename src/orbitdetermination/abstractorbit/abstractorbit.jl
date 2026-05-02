@@ -10,8 +10,6 @@ Every orbit has:
 - a vector of optical tracklets of type `TrackletVector{T}`,
 - a backward and a forward integration, both of type `DensePropagation2{T, U}`,
 - a vector of optical residuals of type `Vector{OpticalResidual{T, U}}`,
-- a jacobian representing the transformation from the space of residuals to
-    barycentric coordinates, of type `Matrix{T}`.
 """
 abstract type AbstractOrbit{D, T <: Real, U <: Number} end
 
@@ -294,7 +292,7 @@ function keplerian(orbit::AbstractOrbit{D, T, T},
     t = epoch(orbit)
     mjd0 = t + MJD2000
     # Jet transport initial condition
-    q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
+    q0 = orbit(t) + get_variables(T, 2)
     q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
     # Origin
     x0 = zeros(T, Npar)
@@ -326,7 +324,7 @@ function equinoctial(orbit::AbstractOrbit{D, T, T},
     t = epoch(orbit)
     mjd0 = t + MJD2000
     # Jet transport initial condition
-    q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
+    q0 = orbit(t) + get_variables(T, 2)
     q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
     # Origin
     x0 = zeros(T, Npar)
@@ -358,7 +356,7 @@ function attributable(orbit::AbstractOrbit{D, T, T},
     t = epoch(orbit)
     mjd0 = t + MJD2000
     # Jet transport initial condition
-    q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
+    q0 = orbit(t) + get_variables(T, 2)
     q0 = q0[1:6] - params.eph_ea(t)
     # Origin
     x0 = zeros(T, Npar)
@@ -392,7 +390,7 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
     t = epoch(orbit)
     mjd0 = t + MJD2000
     # Jet transport initial condition
-    q0 = orbit(t) + diag(orbit.jacobian) .* get_variables(T, 2)
+    q0 = orbit(t) + get_variables(T, 2)
     q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
     # Origin
     x0 = zeros(T, Npar)

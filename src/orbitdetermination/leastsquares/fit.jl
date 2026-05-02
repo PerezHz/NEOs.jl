@@ -52,6 +52,15 @@ function project(y::AbstractVector{TaylorN{T}}, x::AbstractVector{T},
     return (J') * Γ * J
 end
 
+function project(y::AbstractVector{Taylor1{T}}, Γ::Taylor1{T}) where {T <: Real}
+    J = Matrix{Taylor1{T}}(undef, 1, length(y))
+    for i in eachindex(y)
+        J[1, i] = zero(y[i])
+        TS.differentiate!(J[1, i], y[i])
+    end
+    return (J') * Γ * J
+end
+
 """
     project(y, fit)
 

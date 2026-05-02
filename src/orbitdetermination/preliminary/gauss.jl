@@ -197,15 +197,14 @@ function gaussmethod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where
         # Current Q
         Q = nms(res)
         # Covariance matrix
+        x0 = zeros(T, 6)
         nobs = 2 * notout(res)
         C = (nobs/2) * TS.hessian(Q)
-        covariance = inv(C)
-        # Residuals space to barycentric coordinates jacobian
-        jacobian = Matrix(TS.jacobian(q0 - cte.(q0)))
+        Γ = project(q0, x0, inv(C))
         # Update orbit
         orbits[i] = evaldeltas(GaussOrbit(
-            dynamics, variables, optical, tracklets, bwd, fwd, res, covariance, jacobian,
-            τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2s[i], r_vec[:, :, i], ρ[:, i]
+            dynamics, variables, optical, tracklets, bwd, fwd, res, Γ, τ_1, τ_3,
+            ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2s[i], r_vec[:, :, i], ρ[:, i]
         ))
     end
     # Sort orbits by nms

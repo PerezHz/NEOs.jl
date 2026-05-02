@@ -189,7 +189,7 @@ function updateorbit(orbit::AbstractOrbit{D, T, TaylorN{T}},
         q1 = attributable2cartesian(SVector{6, T}(attr[1], attr[2], attr[3],
                 attr[4], ρ, v_ρ)) + params.eph_ea(t0)
         # New deltas and covariance matrix
-        @. fit.x = (q1 - cte(q0)) / $diag(orbit.jacobian)
+        @. fit.x = (q1 - cte(q0)) / scalingfactor(q0)
         for method in lsmethods
             if typeof(method) == fit.routine
                 fit.Γ .= inv(normalmatrix(method, fit.x))
@@ -270,9 +270,8 @@ function jtls(
         # Incrementally add observations to fit
         oidxs, fit = addoptical!(Val(mode), oidxs, fit, lscache, lsmethods,
                                  trksin, trksout, res, x0, params)
-        # Residuals space to barycentric coordinates jacobian
-        jacobian = Matrix(TS.jacobian(dq[variables], fit.x))
-        all(>(0), diag(jacobian * fit.Γ * jacobian')) || break
+        fit.Γ .= project(q0[variables], fit)
+        all(>(0), diag(fit.Γ)) || break
         # Outlier rejection
         if outrej
             outlier_rejection!(view(res, oidxs), fit.x, fit.Γ, orcache;
@@ -281,7 +280,7 @@ function jtls(
         # Update orbit
         orbits[i] = updateorbit(LeastSquaresOrbit(
             od.dynamics, variables, od.optical[oidxs], trksin, nothing, bwd, fwd,
-            res[oidxs], nothing, fit, jacobian, q00s[variables, 1:i], Qs[1:i]
+            res[oidxs], nothing, fit, q00s[variables, 1:i], Qs[1:i]
         ), lsmethods, params)
         Qs[i] = orbits[i].Qs[end] = nrms(res, orbits[i].fit)
         if outrej
@@ -370,9 +369,8 @@ function jtls(
         # Incrementally add observations to fit
         oidxs, ridxs, fit = addobservations!(od, oidxs, ridxs, fit, lscache, lsmethods,
             trksin, trksout, radarin, radarout, res, x0, params)
-        # Residuals space to barycentric coordinates jacobian
-        jacobian = Matrix(TS.jacobian(dq[variables], fit.x))
-        all(>(0), diag(jacobian * fit.Γ * jacobian')) || break
+        fit.Γ .= project(q0[variables], fit)
+        all(>(0), diag(fit.Γ)) || break
         # Outlier rejection
         if outrej
             outlier_rejection!(view(res[1], oidxs), fit.x, fit.Γ, orcache;
@@ -381,7 +379,7 @@ function jtls(
         # Update orbit
         orbits[i] = updateorbit(LeastSquaresOrbit(
             od.dynamics, variables, od.optical[oidxs], trksin, od.radar[ridxs], bwd, fwd,
-            res[1][oidxs], res[2][ridxs], fit, jacobian, q00s[variables, 1:i], Qs[1:i]
+            res[1][oidxs], res[2][ridxs], fit, q00s[variables, 1:i], Qs[1:i]
         ), lsmethods, params)
         Qs[i] = orbits[i].Qs[end] = nrms(res, orbits[i].fit)
         if outrej
