@@ -13,6 +13,9 @@ auxzero(a::AbstractSeries) = zero(a)
 # Return a `TaylorN` with zero coefficients of the same type as `a.coeffs`
 auxzero(a::TaylorN{Taylor1{T}}) where {T <: Number} = TaylorN(zero.(a.coeffs))
 
+# Extract the linear scaling factor from a TaylorN
+scalingfactor(x::TaylorN{T}) where {T <: Real} = x[1][findfirst(x[1])]
+
 # In-place methods of auday2kmsec
 function auday2kmsec!(y::Vector{T}) where {T <: Real}
     y[1:3] .*= au

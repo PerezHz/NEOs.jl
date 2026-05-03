@@ -99,13 +99,11 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
         # Covariance matrix
         nobs = 2 * notout(res)
         C = (nobs/2) * TS.hessian(Q, x1)
-        covariance = inv(C)
-        # Residuals space to barycentric coordinates jacobian
-        jacobian = Matrix(TS.jacobian(q - cte.(q), x1))
+        Γ = project(q, x1, inv(C))
         # Update orbit
         orbits[t] = evaldeltas(MMOVOrbit(
             dynamics, variables, optical, tracklets, bwd, fwd,
-            res, covariance, jacobian, aes[:, 1:t], Qs[1:t]
+            res, Γ, aes[:, 1:t], Qs[1:t]
         ), x1)
         # Convergence conditions
         if t > 1

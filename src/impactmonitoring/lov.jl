@@ -197,8 +197,7 @@ function weakfield(
     ΓTN_res = inv(Symmetric(CTN_res))
     # Covariance matrix in coordinate space
     coordTN = lovtransform(mjd0, carTN, sun, Val(:cartesian), Val(coord))
-    JTN_res2coord = TS.jacobian(coordTN)
-    Γ_coord = Symmetric(JTN_res2coord * ΓTN_res * JTN_res2coord')
+    Γ_coord = Symmetric(project(coordTN, zeros(T, get_numvars()), ΓTN_res))
     # Weak direction eigenpair
     E_coord = eigen(Γ_coord)
     k1, v1 = sqrt(E_coord.values[end]), E_coord.vectors[:, end]
@@ -216,15 +215,11 @@ function weakfield(
     dQT1, d2QT1 = zero(QT1), zero(QT1)
     TS.differentiate!(dQT1, QT1)
     TS.differentiate!(d2QT1, dQT1)
-    CT1_res = notout(resT1) * [d2QT1;;]
-    ΓT1_res = inv(Symmetric(CT1_res))
+    CT1_res = notout(resT1) * d2QT1
+    ΓT1_res = inv(CT1_res)
     # Covariance matrix in coordinate space
     coordT1 = lovtransform(mjd0, carT1, sun, Val(:cartesian), Val(coord))
-    JT1_res2coord = zero.(coordT1)
-    for i in eachindex(JT1_res2coord)
-        TS.differentiate!(JT1_res2coord[i], coordT1[i])
-    end
-    ΓT1_coord = Symmetric(JT1_res2coord * ΓT1_res * JT1_res2coord')
+    ΓT1_coord = Symmetric(project(coordT1, ΓT1_res))
     # Vector field associated to the weak direction
     F = weakfield(ΓT1_coord, order)
 

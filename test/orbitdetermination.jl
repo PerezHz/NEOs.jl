@@ -7,12 +7,15 @@ using LinearAlgebra
 using StaticArraysCore
 using Test
 
-using NEOs: AbstractOpticalVector, KeplerianElements, EquinoctialElements,
-      AttributableElements, μ_S, indices, equatorial2ecliptic, ecliptic2equatorial,
-      numtypes, sseph
+using NEOs: OpticalMPC80, RadarJPL, AbstractOpticalVector, RadarResidual, KeplerianElements,
+      EquinoctialElements, AttributableElements, μ_S, indices, equatorial2ecliptic,
+      ecliptic2equatorial, numtypes, sseph, covariance
 using Statistics: mean
 
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
+const OpticalOrbit{T} = LeastSquaresOrbit{typeof(newtonian!), T, T, Vector{OpticalMPC80{T}}}
+const RadarOrbit{T} = LeastSquaresOrbit{typeof(newtonian!), T, T, Vector{OpticalMPC80{T}},
+    Vector{RadarJPL{T}}, Vector{RadarResidual{T, T}}}
 
 function iodsuboptical(optical::AbstractOpticalVector, N::Int = 3)
     tracklets = reduce_tracklets(optical)
@@ -212,11 +215,10 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 12, 2026
+        # Values by May 2, 2026
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(suboptical)})
+        @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
         @test length(suboptical) == nobs(od) == nobs(orbit) == 9
         @test numberofdays(suboptical) == numberofdays(orbit) < 0.18
@@ -241,10 +243,11 @@ end
         @test all( snr(orbit) .> 14.5)
         @test chi2(orbit) < 0.53
         @test nrms(orbit) < 0.18
-        # Jacobian
-        @test size(orbit.jacobian) == (6, 6)
-        @test isdiag(orbit.jacobian)
-        @test maximum(orbit.jacobian) < 9e-4
+        # Covariance matrix
+        Γ = covariance(orbit)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
@@ -281,8 +284,7 @@ end
         orbit1 = orbitdetermination(od, orbit, params)
 
         # Check type
-        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(suboptical)})
+        @test isa(orbit1, OpticalOrbit{Float64})
         # Tracklets
         @test length(suboptical) == nobs(od) == nobs(orbit1) == 43
         @test numberofdays(suboptical) == numberofdays(orbit1) < 2.76
@@ -307,10 +309,11 @@ end
         @test all( snr(orbit1) .> 866 )
         @test chi2(orbit1) < 11.64
         @test nrms(orbit1) < 0.37
-        # Jacobian
-        @test size(orbit1.jacobian) == (6, 6)
-        @test isdiag(orbit1.jacobian)
-        @test maximum(orbit1.jacobian) < 9e-4
+        # Covariance matrix
+        Γ = covariance(orbit1)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit1.qs, 1) == 6
         @test size(orbit1.qs, 2) == length(orbit1.Qs) == 6
@@ -353,11 +356,10 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 12, 2026
+        # Values by May 2, 2026
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(optical)})
+        @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
         @test length(optical) == nobs(od) == nobs(orbit) == 6
         @test numberofdays(optical) == numberofdays(orbit) < 1.95
@@ -382,10 +384,11 @@ end
         @test all( snr(orbit) .> 21.4)
         @test chi2(orbit) < 2.53
         @test nrms(orbit) < 0.46
-        # Jacobian
-        @test size(orbit.jacobian) == (6, 6)
-        @test isdiag(orbit.jacobian)
-        @test maximum(orbit.jacobian) < 6.8e-4
+        # Covariance matrix
+        Γ = covariance(orbit)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
@@ -436,11 +439,10 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by Apr 12, 2026
+        # Values by May 2, 2026
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(suboptical)})
+        @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
         @test length(suboptical) == nobs(od) == nobs(orbit) == 12
         @test numberofdays(suboptical) == numberofdays(orbit) < 42.8
@@ -465,10 +467,11 @@ end
         @test all( snr(orbit) .> 38.8)
         @test chi2(orbit) < 2.43
         @test nrms(orbit) < 0.32
-        # Jacobian
-        @test size(orbit.jacobian) == (6, 6)
-        @test isdiag(orbit.jacobian)
-        @test maximum(orbit.jacobian) < 9.5e-6
+        # Covariance matrix
+        Γ = covariance(orbit)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 3
@@ -514,7 +517,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by Apr 12, 2026
+        # Values by May 2, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -662,7 +665,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 12, 2026
+        # Values by May 2, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -671,8 +674,7 @@ end
         χ2 = C' * inv(Γ_C) * C
         @test χ2 > 1_006
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(optical)})
+        @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
         @test length(optical) == nobs(od) == nobs(orbit) == 10
         @test numberofdays(optical) == numberofdays(orbit) < 0.05
@@ -697,10 +699,11 @@ end
         @test all( snr(orbit) .> 4.1)
         @test chi2(orbit) < 14.24
         @test nrms(orbit) < 0.85
-        # Jacobian
-        @test size(orbit.jacobian) == (6, 6)
-        @test isdiag(orbit.jacobian)
-        @test maximum(orbit.jacobian) < 9.5e-3
+        # Covariance matrix
+        Γ = covariance(orbit)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
@@ -748,11 +751,10 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 12, 2026
+        # Values by May 2, 2026
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(suboptical)})
+        @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
         @test length(suboptical) == nobs(od) == nobs(orbit) == 18
         @test numberofdays(suboptical) == numberofdays(orbit) < 2.16
@@ -777,10 +779,11 @@ end
         @test all( snr(orbit) .> 50)
         @test chi2(orbit) < 1.55
         @test nrms(orbit) < 0.22
-        # Jacobian
-        @test size(orbit.jacobian) == (6, 6)
-        @test isdiag(orbit.jacobian)
-        @test maximum(orbit.jacobian) < 5e-4
+        # Covariance matrix
+        Γ = covariance(orbit)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 7
@@ -793,7 +796,7 @@ end
             9.751283439586027E+01, 2.742918197067644E+02, 1.116208224849003E+01]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
         JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (7.6E-02, 1.2E-01, 6.1E-12, 7.1E-15, 1.4E-12),
+        jpl_compatibility_tests(orbit, params, (7.6E-02, 1.2E-01, 9.0E-12, 1.9E-14, 2.0E-12),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
@@ -815,8 +818,7 @@ end
         orbit1 = orbitdetermination(od, orbit, params)
 
         # Check type
-        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(optical)})
+        @test isa(orbit1, OpticalOrbit{Float64})
         # Tracklets
         @test length(optical) == nobs(od) == nobs(orbit1) == 21
         @test numberofdays(optical) == numberofdays(orbit1) < 3.03
@@ -841,10 +843,11 @@ end
         @test all( snr(orbit1) .> 574)
         @test chi2(orbit1) < 2.38
         @test nrms(orbit1) < 0.25
-        # Jacobian
-        @test size(orbit1.jacobian) == (6, 6)
-        @test isdiag(orbit1.jacobian)
-        @test maximum(orbit1.jacobian) < 4e-3
+        # Covariance matrix
+        Γ = covariance(orbit1)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit1.qs, 1) == 6
         # (26/04/2025) There are roundoff differences in the nrms of the two
@@ -894,7 +897,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 12, 2026
+        # Values by May 2, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -903,8 +906,7 @@ end
         χ2 = C' * inv(Γ_C) * C
         @test χ2 > 5.93e5
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(optical)})
+        @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
         @test length(optical) == nobs(od) == nobs(orbit) == 7
         @test numberofdays(optical) == numberofdays(orbit) < 0.05
@@ -929,10 +931,11 @@ end
         @test all( snr(orbit) .> 20.5)
         @test chi2(orbit) < 0.23
         @test nrms(orbit) < 0.13
-        # Jacobian
-        @test size(orbit.jacobian) == (6, 6)
-        @test isdiag(orbit.jacobian)
-        @test maximum(orbit.jacobian) < 3e-4
+        # Covariance matrix
+        Γ = covariance(orbit)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
@@ -980,11 +983,10 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Apr 12, 2026
+        # Values by May 2, 2026
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(suboptical)})
+        @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
         @test length(suboptical) == nobs(od) == nobs(orbit) == 18
         @test numberofdays(suboptical) == numberofdays(orbit) < 0.34
@@ -1009,10 +1011,11 @@ end
         @test all( snr(orbit) .> 644)
         @test chi2(orbit) < 4.35
         @test nrms(orbit) < 0.35
-        # Jacobian
-        @test size(orbit.jacobian) == (6, 6)
-        @test isdiag(orbit.jacobian)
-        @test maximum(orbit.jacobian) < 2e-5
+        # Covariance matrix
+        Γ = covariance(orbit)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
@@ -1049,8 +1052,7 @@ end
         orbit1 = orbitdetermination(od, orbit, params)
 
         # Check type
-        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(suboptical)})
+        @test isa(orbit1, OpticalOrbit{Float64})
         # Tracklets
         @test length(suboptical) == nobs(od) == nobs(orbit1) == 97
         @test numberofdays(suboptical) == numberofdays(orbit1) < 0.70
@@ -1075,10 +1077,11 @@ end
         @test all( snr(orbit1) .> 21_880)
         @test chi2(orbit1) < 54.85
         @test nrms(orbit1) < 0.53
-        # Jacobian
-        @test size(orbit1.jacobian) == (6, 6)
-        @test isdiag(orbit1.jacobian)
-        @test maximum(orbit1.jacobian) < 2e-5
+        # Covariance matrix
+        Γ = covariance(orbit1)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit1.qs, 1) == 6
         @test size(orbit1.qs, 2) == length(orbit1.Qs) == 2
@@ -1151,11 +1154,10 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by Apr 12, 2026
+        # Values by May 2, 2026
 
         # Check type
-        @test isa(orbit, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(optical)})
+        @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
         @test flag
         @test length(optical) == nobs(od) == nobs(orbit) == 6
@@ -1181,10 +1183,11 @@ end
         @test all( snr(orbit) .> 7.00)
         @test chi2(orbit) < 0.91
         @test nrms(orbit) < 0.28
-        # Jacobian
-        @test size(orbit.jacobian) == (6, 6)
-        @test isdiag(orbit.jacobian)
-        @test maximum(orbit.jacobian) < 0.007
+        # Covariance matrix
+        Γ = covariance(orbit)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 3
@@ -1215,7 +1218,6 @@ end
     end
 
     @testset "Radar astrometry" begin
-        using NEOs: RadarResidual
 
         # Load observations
         optical = read_optical_mpc80(joinpath(pkgdir(NEOs), "data",
@@ -1256,11 +1258,10 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by Apr 12, 2026
+        # Values by May 2, 2026
 
         # Check type
-        @test isa(orbit1, LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-            typeof(optical), typeof(radar), Vector{RadarResidual{Float64, Float64}}})
+        @test isa(orbit1, RadarOrbit{Float64})
         # Astrometry
         @test length(optical) == noptical(od1) == noptical(orbit1) == 24
         @test length(radar) == nradar(od1) == nradar(orbit1) == 5
@@ -1293,10 +1294,11 @@ end
         @test all( snr(orbit1) .> 8_342)
         @test chi2(orbit1) < 19.7
         @test nrms(orbit1) < 0.61
-        # Jacobian
-        @test size(orbit1.jacobian) == (6, 6)
-        @test isdiag(orbit1.jacobian)
-        @test maximum(orbit1.jacobian) < 4.1e-3
+        # Covariance matrix
+        Γ = covariance(orbit1)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit1.qs, 1) == 6
         @test size(orbit1.qs, 2) == length(orbit1.Qs) <= 2
