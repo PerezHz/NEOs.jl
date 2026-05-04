@@ -62,7 +62,7 @@ An optical astrometric observation in Minor Planet Center 80-column format.
 
 !!! reference
     The Minor Planet Center 80-column format is described at:
-    - https://minorplanetcenter.net/iau/info/OpticalObs.html
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/observations/mpc1992-format/
     and discussed thoroughly in pages 158-181 of:
     - https://doi.org/10.1016/j.icarus.2010.06.003
 """

@@ -9,9 +9,9 @@ with different formats in a uniform way.
 
 An optical observation is a tuple of topocentric right ascension and declination. NEOs can
 parse optical astrometry in three different formats:
-- The Minor Planet Center's [80-column](https://minorplanetcenter.net/iau/info/OpticalObs.html) format,
+- The Minor Planet Center's [80-column](https://docs.minorplanetcenter.net/mpc-ops-docs/observations/mpc1992-format/) format,
     represented internally as `OpticalMPC80`.
-- The Minor Planet Center's [ADES](https://minorplanetcenter.net/mpcops/documentation/ades/) format,
+- The Minor Planet Center's [ADES](https://github.com/IAU-ADES/ADES-Master/blob/master/ADES_Description.pdf) format,
     represented internally as `OpticalADES`.
 - The OrbFit's [RWO](https://neo.ssa.esa.int/objects/help#obs) format,
     represented internally as `OpticalRWO`.
@@ -32,7 +32,7 @@ optical = fetch_optical_ades("P12jLGB", NEOCP)
 optical = fetch_optical_rwo("2024 YR4", NEOCC)
 optical = fetch_optical_rwo("2024 YR4", NEODyS2)
 ```
-which leverage the Minor Planet Center's [Observations API](https://minorplanetcenter.net/mpcops/documentation/observations-api/) and the NEOCC's [Automated Data Access](https://neo.ssa.esa.int/computer-access).
+which leverage the Minor Planet Center's [Observations API](https://docs.minorplanetcenter.net/mpc-ops-docs/apis/get-obs/) and the NEOCC's [Automated Data Access](https://neo.ssa.esa.int/computer-access).
 
 Also, we can read and write observations from a file in a similar fashion:
 ```julia
