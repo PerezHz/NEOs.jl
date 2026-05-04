@@ -47,7 +47,7 @@ function show(io::IO, x::AbstractOsculatingElements)
     O = elementstype(x)
     T, U = numtypes(x)
     e0 = cte.(elements(x))
-    σ0 = sigmas(x)
+    σ0 = cte.(sigmas(x))
     se0 = [rpad(@sprintf("%+.12E", e0[i]), 25) for i in eachindex(e0)]
     sσ0 = [rpad(@sprintf("%+.12E", σ0[i]), 25) for i in eachindex(σ0)]
     names = elementsnames(x)
