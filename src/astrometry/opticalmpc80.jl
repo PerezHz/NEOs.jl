@@ -196,8 +196,8 @@ Return the optical astrometry of minor body `id` in the Minor Planet Center
 
 !!! reference
     The Minor Planet Center observations APIs are described at:
-    - https://minorplanetcenter.net/mpcops/documentation/observations-api/
-    - https://minorplanetcenter.net/mpcops/documentation/neocp-observations-api/
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/get-obs/
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/get-obs-neocp/
 """
 function fetch_optical_mpc80(id::AbstractString, ::Type{MPC})
     # Get and parse HTTP response
