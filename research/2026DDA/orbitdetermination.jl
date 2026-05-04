@@ -38,12 +38,13 @@ function parse_commandline()
 end
 
 @everywhere using Printf
+@everywhere using Accessors: @reset
+@everywhere using Parameters: @unpack
 
 @everywhere begin
     using NEOs, PlanetaryEphemeris, TaylorSeries, Dates, Statistics
     using JLD2, HTTP, JSON, ThreadPinning
 
-    using Dates: UTInstant, value
     using NEOs: NEOCC_URL, AbstractWeightingScheme, OpticalADES, OpticalTracklet,
           AdmissibleRegion, OpticalResidual, indices, set_od_order, updateorbit,
           rexveres17, σsveres17
@@ -88,6 +89,14 @@ end
     end
 
     meandate(x::ODProblem) = days2dtutc(meantime(x))
+
+    function deweightfactor(neo::AbstractString)
+        if neo in ("2009DD45", "2020DQ16", "2021JB6", "2022JN11")
+            return 100
+        else
+            return 10
+        end
+    end
 
     # Error model
     mutable struct ModifiedVeres17{T} <: AbstractWeightingScheme{T}
@@ -168,6 +177,24 @@ end
             (sum(A.ρ_domain) / 2, v_ρ, :linear),
             (A.ρ_domain[2], v_ρ, :linear),
         ]
+    end
+
+    function preprocessing!(optical::AbstractVector{OpticalADES{T}}) where {T <: Real}
+        filter!(!isdeprecated, optical)
+        @unpack provid = optical[1]
+        provid = replace(provid, " " => "")
+        if provid == "2022PW40"
+            for i in eachindex(optical)
+                @reset optical[i].trkid = optical[i].trkid * string(ceil(Int, i / 3))
+            end
+        elseif provid == "2015EQ"
+            filter!(x -> observatorycode(x) != "703", optical)
+        elseif provid == "2025OB22"
+            filter!(x -> observatorycode(x) != "U68", optical)
+        elseif provid == "2020XL1"
+            deleteat!(optical, 1:2)
+        end
+        return nothing
     end
 
     function initialtracklets(OD::ODProblem)
@@ -277,13 +304,13 @@ end
         return orbit3
     end
 
-    function orbit_determination(neo::AbstractString; niter::Int = 20, k::Real = 10,
-                                 dtmin::Second = Second(60))
+    function orbit_determination(neo::AbstractString; niter::Int = 20,
+                                 k::Real = deweightfactor(neo), dtmin::Second = Second(60))
         # Outer initial time
         outer_initial_time = now()
         # Fetch optical astrometry
         optical = fetch_optical_ades(neo, MPC)
-        filter!(!isdeprecated, optical)
+        preprocessing!(optical)
         if any(x -> date(x) < MINUTC, optical)
             outer_time_string = timestring(outer_initial_time)
             println("• Asteroid $neo skipped: observations before J2000 $outer_time_string")
@@ -337,7 +364,7 @@ end
     end
 
     function orbit_determination(neo::AbstractString, optical::AbstractVector;
-                                 niter::Int = 20, k::Real = 10)
+                                 niter::Int = 20, k::Real = deweightfactor(neo))
         # Parameters
         params = Parameters(
             maxsteps = 20_000, order = 25, abstol = 1E-20, parse_eqs = true,
@@ -346,7 +373,8 @@ end
             tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
             jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
             jtlsproject = true, significance = 0.99, verbose = true,
-            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0, fudge = 100.0, max_per = 20.0
+            outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10), fudge = 100.0,
+            max_per = 33.3
         )
         # Global orbit determination problem
         OD = ODProblem(newtonian!, optical, weights = ModifiedVeres17, debias = Eggl20)
@@ -377,6 +405,11 @@ end
             iszero(orbit) && break
             # Break condition
             if noptical(orbit) == length(optical)
+                # Last resort: direct Gauss method to a all observations
+                if !isodvalid(od, orbit, params)
+                    printitle("Last resort", "*")
+                    orbit = gaussiod(od, params)
+                end
                 # Shift epoch to the middle of the observational arc
                 tmean = meantime(od)
                 _orbit_ = shiftepoch(orbit, tmean + PE.J2000, params)
