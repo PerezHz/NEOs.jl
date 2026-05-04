@@ -47,11 +47,24 @@ struct JPL <: AbstractAstrometrySource end
 
 function get_http_response(::Type{MPC}; mode::Int = 0, id::AbstractString = "",
                            ids::AbstractVector{<:AbstractString} = [""],
+                           terms::AbstractVector{<:AbstractString} = [""],
+                           issued_before::Union{Nothing, DateTime} = nothing,
+                           issued_after::Union{Nothing, DateTime} = nothing,
                            format::AbstractString = "", connect_timeout = 180,
                            readtimeout = 180, kwargs...)
-    @assert -1 <= mode <= 2 "`mode`  must be an integer between -1 and 2"
+    @assert -2 <= mode <= 2 "`mode`  must be an integer between -2 and 2"
+    # MPECs
+    if mode == -2
+        dict = Dict("terms" => terms)
+        if !isnothing(issued_before)
+            dict["issued_before"] = Dates.format(issued_before, "yyyy-mm-dd HH:MM:SS")
+        elseif !isnothing(issued_after)
+            dict["issued_after"] = Dates.format(issued_after, "yyyy-mm-dd HH:MM:SS")
+        end
+        params = JSON.json(dict)
+        url = MPECs_MPC_API
     # Designations
-    if mode == -1
+    elseif mode == -1
         params = JSON.json(Dict("ids" => ids))
         url = DESIGNATIONS_MPC_API
     # CatalogueMPC
