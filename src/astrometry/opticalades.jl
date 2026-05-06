@@ -242,8 +242,8 @@ ADES format. The `source` of the observations can be either `MPC` or `NEOCP`.
 
 !!! reference
     The Minor Planet Center observations APIs are described at:
-    - https://minorplanetcenter.net/mpcops/documentation/observations-api/
-    - https://minorplanetcenter.net/mpcops/documentation/neocp-observations-api/
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/get-obs/
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/get-obs-neocp/
 """
 function fetch_optical_ades(id::AbstractString, ::Type{MPC})
     # Get and parse HTTP response

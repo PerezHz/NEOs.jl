@@ -7,7 +7,7 @@ See also [`packnum`](@ref).
 
 !!! reference
     The Minor Planet Center unpacking of permanent designations is described at:
-    - https://minorplanetcenter.net/iau/info/PackedDes.html#perm
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/designations/packed-designations/
 """
 function unpacknum(s::AbstractString)
     # Packed designation corresponds to a comet
@@ -40,7 +40,7 @@ See also [`unpacknum`](@ref).
 
 !!! reference
     The Minor Planet Center packing of permanent designations is described at:
-    - https://minorplanetcenter.net/iau/info/PackedDes.html#perm
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/designations/packed-designations/
 """
 function packnum(s::AbstractString)
     # Packed designation corresponds to a comet
@@ -77,7 +77,7 @@ See also [`packdesig`](@ref).
 
 !!! reference
     The Minor Planet Center unpacking of provisional designations is described at:
-    - https://minorplanetcenter.net/iau/info/PackedDes.html#prov
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/designations/provisional-designations/
 """
 function unpackdesig(s::AbstractString)
     if s[1] == 'I'
@@ -112,7 +112,7 @@ See also [`unpackdesig`](@ref).
 
 !!! reference
     The Minor Planet Center packing of provisional designations is described at:
-    - https://minorplanetcenter.net/iau/info/PackedDes.html#prov
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/designations/provisional-designations/
 """
 function packdesig(s::AbstractString)
     year, tail = split(s, " ")
@@ -144,7 +144,7 @@ identifier API about the designation(s) `ids`.
 
 !!! reference
     The Minor Planet Center designation identifier API is described at:
-    - https://www.minorplanetcenter.net/mpcops/documentation/designation-identifier-api/
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/query-identifier/
 """
 fetch_designation_information(s...) = fetch_designation_information(collect(s))
 

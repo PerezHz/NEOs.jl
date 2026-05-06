@@ -14,8 +14,12 @@ const OBSERVATORIES_PATH = joinpath(dirname(SRC_PATH), "data", "observatoriesmpc
 # Designations
 
 const BASE_62_ENCODING = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+const MPC_API_URL = "https://data.minorplanetcenter.net/api/"
+const DESIGNATIONS_MPC_API = MPC_API_URL * "query-identifier"
 
-const DESIGNATIONS_MPC_API = "https://data.minorplanetcenter.net/api/query-identifier"
+# MPECs
+
+const MPECs_MPC_API = MPC_API_URL * "mpecs"
 
 # CatalogueMPC
 
@@ -89,7 +93,7 @@ const CATALOGUES_MPC_FILE_URL = "https://www.minorplanetcenter.net/iau/info/astC
 
 # ObservatoryMPC
 
-const OBSERVATORIES_MPC_API = "https://data.minorplanetcenter.net/api/obscodes"
+const OBSERVATORIES_MPC_API = MPC_API_URL * "obscodes"
 
 # OpticalMPC80
 
@@ -97,9 +101,9 @@ const MPC80_OPTICAL_COLUMNS = [
     1:5, 6:12, 13:13, 14:14, 15:15, 16:32, 33:44,
     45:56, 57:65, 66:70, 71:71, 72:72, 73:77, 78:80
 ]
-const OBSERVATIONS_MPC_API = "https://data.minorplanetcenter.net/api/get-obs"
+const OBSERVATIONS_MPC_API = MPC_API_URL * "get-obs"
 
-const OBSERVATIONS_NEOCP_API = "https://data.minorplanetcenter.net/api/get-obs-neocp"
+const OBSERVATIONS_NEOCP_API = MPC_API_URL * "get-obs-neocp"
 
 # NEOCPObject
 

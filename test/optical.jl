@@ -6,6 +6,8 @@ using DataFrames
 using Query
 using Test
 
+const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
+
 @testset "AbstractOpticalAstrometry" begin
 
     @testset "OpticalMPC80" begin
@@ -61,14 +63,14 @@ using Test
         @test allunique(optical1)
 
         # Read/write OpticalMPC80 file
-        filename = joinpath(pkgdir(NEOs), "test", "data", "433.txt")
+        filename = joinpath(TEST_DATA, "433.txt")
         optical2 = read_optical_mpc80(filename)
         filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical2)
         @test isa(optical2, Vector{OpticalMPC80{Float64}})
         @test issorted(optical2)
         @test allunique(optical2)
 
-        filename = joinpath(pkgdir(NEOs), "test", "data", "433_.txt")
+        filename = joinpath(TEST_DATA, "433_.txt")
         write_optical_mpc80(optical2, filename)
         optical3 = read_optical_mpc80(filename)
         rm(filename)
@@ -154,13 +156,13 @@ using Test
         # @test allunique(objects1)
 
         # Read/write NEOCPObject file
-        filename = joinpath(pkgdir(NEOs), "test", "data", "neocp.txt")
+        filename = joinpath(TEST_DATA, "neocp.txt")
         objects2 = read_neocp_objects(filename)
         @test isa(objects2, Vector{NEOCPObject{Float64}})
         @test issorted(objects2)
         @test allunique(objects2)
 
-        filename = joinpath(pkgdir(NEOs), "test", "data", "neocp_.txt")
+        filename = joinpath(TEST_DATA, "neocp_.txt")
         write_neocp_objects(objects2, filename)
         objects3 = read_neocp_objects(filename)
         rm(filename)
@@ -253,14 +255,14 @@ using Test
         @test allunique(optical2)
 
         # Read/write OpticalRWO file
-        filename = joinpath(pkgdir(NEOs), "test", "data", "433.rwo")
+        filename = joinpath(TEST_DATA, "433.rwo")
         optical3 = read_optical_rwo(filename)
         filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical3)
         @test isa(optical3, Vector{OpticalRWO{Float64}})
         @test issorted(optical3)
         @test allunique(optical3)
 
-        filename = joinpath(pkgdir(NEOs), "test", "data", "433_.rwo")
+        filename = joinpath(TEST_DATA, "433_.rwo")
         write_optical_rwo(optical3, filename)
         optical4 = read_optical_rwo(filename)
         rm(filename)
@@ -408,14 +410,14 @@ using Test
         @test allunique(optical1)
 
         # Read/write OpticalRWO file
-        filename = joinpath(pkgdir(NEOs), "test", "data", "433.xml")
+        filename = joinpath(TEST_DATA, "433.xml")
         optical2 = read_optical_ades(filename)
         filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical2)
         @test isa(optical2, Vector{OpticalADES{Float64}})
         @test issorted(optical2)
         @test allunique(optical2)
 
-        filename = joinpath(pkgdir(NEOs), "test", "data", "433_.xml")
+        filename = joinpath(TEST_DATA, "433_.xml")
         write_optical_ades(optical2, filename)
         optical3 = read_optical_ades(filename)
         rm(filename)
@@ -453,13 +455,13 @@ using Test
     end
 
     # Load optical astrometry
-    filename = joinpath(pkgdir(NEOs), "test", "data", "433.txt")
+    filename = joinpath(TEST_DATA, "433.txt")
     optical1 = read_optical_mpc80(filename)
     filter!(x -> Date(2000) < date(x) < Date(2025), optical1)
-    filename = joinpath(pkgdir(NEOs), "test", "data", "433.rwo")
+    filename = joinpath(TEST_DATA, "433.rwo")
     optical2 = read_optical_rwo(filename)
     filter!(x -> Date(2000) < date(x) < Date(2025), optical2)
-    filename = joinpath(pkgdir(NEOs), "test", "data", "433.xml")
+    filename = joinpath(TEST_DATA, "433.xml")
     optical3 = read_optical_ades(filename)
     filter!(x -> Date(2000) < date(x) < Date(2025), optical3)
 
@@ -700,12 +702,19 @@ using Test
 
     end
 
+    using NEOs: getid, update!
+
     @testset "AbstractWeightingScheme" begin
 
         # Weighting schemes
         w11 = UniformWeights(optical1)
         w12 = SourceWeights(optical1)
         w13 = Veres17(optical1)
+
+        @test isa(string(w11), String) && isa(string(w12), String) && isa(string(w13), String)
+        @test getid(w11) == "Uniform"
+        @test getid(w12) == "Source"
+        @test getid(w13) == "Veres et al. (2017)"
 
         @test length(weights(w11)) == length(weights(w12)) == length(weights(w13))
         @test all(==((1.0, 1.0)), weights(w11))
@@ -719,6 +728,11 @@ using Test
         w21 = UniformWeights(optical2)
         w22 = SourceWeights(optical2)
         w23 = Veres17(optical2)
+
+        @test isa(string(w21), String) && isa(string(w22), String) && isa(string(w23), String)
+        @test getid(w21) == "Uniform"
+        @test getid(w22) == "Source"
+        @test getid(w23) == "Veres et al. (2017)"
 
         @test length(weights(w21)) == length(weights(w22)) == length(weights(w23))
         @test all(==((1.0, 1.0)), weights(w21))
@@ -739,6 +753,11 @@ using Test
         w32 = SourceWeights(optical3)
         w33 = Veres17(optical3)
 
+        @test isa(string(w31), String) && isa(string(w32), String) && isa(string(w33), String)
+        @test getid(w31) == "Uniform"
+        @test getid(w32) == "Source"
+        @test getid(w33) == "Veres et al. (2017)"
+
         @test length(weights(w31)) == length(weights(w32)) == length(weights(w33))
         @test all(==((1.0, 1.0)), weights(w31))
         @test all(map(weights(w32), optical3) do w, x
@@ -756,6 +775,30 @@ using Test
         @test weights(w13) == weights(w23) == weights(w33)
         @test corr(w13) == corr(w23) == corr(w33)
 
+        update!(w11, optical1[1:1])
+        update!(w12, optical1[1:1])
+        update!(w13, optical1[1:1])
+
+        @test w11.weights == [(1.0, 1.0)] && w11.corr == [0.0]
+        @test w12.weights == [(1.0, 1.0)] && w12.corr == [0.0]
+        @test w13.weights == [(1.0, 1.0)] && w13.corr == [0.0]
+
+        update!(w21, optical2[1:1])
+        update!(w22, optical2[1:1])
+        update!(w23, optical2[1:1])
+
+        @test w21.weights == [(1.0, 1.0)] && w21.corr == [0.0]
+        @test w22.weights == [(1.0, 1.0)] && w22.corr == [0.0]
+        @test w23.weights == [(1.0, 1.0)] && w23.corr == [0.0]
+
+        update!(w31, optical3[1:1])
+        update!(w32, optical3[1:1])
+        update!(w33, optical3[1:1])
+
+        @test w31.weights == [(1.0, 1.0)] && w31.corr == [0.0]
+        @test w32.weights == [(1.0, 1.0)] && w32.corr == [0.0]
+        @test w33.weights == [(1.0, 1.0)] && w33.corr == [0.0]
+
     end
 
     @testset "AbstractDebiasingScheme" begin
@@ -766,6 +809,13 @@ using Test
         d13 = Farnocchia15(optical1)
         d14 = Eggl20(optical1)
 
+        @test isa(string(d11), String) && isa(string(d12), String) && isa(string(d13), String) &&
+              isa(string(d14), String)
+        @test getid(d11) == "Zero"
+        @test getid(d12) == "Source"
+        @test getid(d13) == "Farnocchia et al. (2015)"
+        @test getid(d14) == "Eggl et al. (2020)"
+
         @test length(debias(d11)) == length(debias(d12)) == length(debias(d13)) == length(debias(d14))
         @test all(==((0.0, 0.0)), debias(d11))
         @test all(==((0.0, 0.0)), debias(d12))
@@ -775,6 +825,13 @@ using Test
         d23 = Farnocchia15(optical2)
         d24 = Eggl20(optical2)
 
+        @test isa(string(d21), String) && isa(string(d22), String) && isa(string(d23), String) &&
+              isa(string(d24), String)
+        @test getid(d21) == "Zero"
+        @test getid(d22) == "Source"
+        @test getid(d23) == "Farnocchia et al. (2015)"
+        @test getid(d24) == "Eggl et al. (2020)"
+
         @test length(debias(d21)) == length(debias(d22)) == length(debias(d23)) == length(debias(d24))
         @test all(==((0.0, 0.0)), debias(d21))
         @test all(@. $debias(d22) == tuple(getfield(optical2, :ra_bias), getfield(optical2, :dec_bias)))
@@ -783,6 +840,13 @@ using Test
         d32 = SourceDebiasing(optical3)
         d33 = Farnocchia15(optical3)
         d34 = Eggl20(optical3)
+
+        @test isa(string(d31), String) && isa(string(d32), String) && isa(string(d33), String) &&
+              isa(string(d34), String)
+        @test getid(d31) == "Zero"
+        @test getid(d32) == "Source"
+        @test getid(d33) == "Farnocchia et al. (2015)"
+        @test getid(d34) == "Eggl et al. (2020)"
 
         @test length(debias(d31)) == length(debias(d32)) == length(debias(d33)) == length(debias(d34))
         @test all(==((0.0, 0.0)), debias(d31))
@@ -794,6 +858,36 @@ using Test
         @test debias(d14) == debias(d24)
         @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), debias(d14), debias(d34))) < 0.95
         @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), debias(d24), debias(d34))) < 0.95
+
+        update!(d11, optical1[1:1])
+        update!(d12, optical1[1:1])
+        update!(d13, optical1[1:1])
+        update!(d14, optical1[1:1])
+
+        @test d11.debias == [(0.0, 0.0)]
+        @test d12.debias == [(0.0, 0.0)]
+        @test d13.debias != [(0.0, 0.0)]
+        @test d14.debias != [(0.0, 0.0)]
+
+        update!(d21, optical2[1:1])
+        update!(d22, optical2[1:1])
+        update!(d23, optical2[1:1])
+        update!(d24, optical2[1:1])
+
+        @test d21.debias == [(0.0, 0.0)]
+        @test d22.debias != [(0.0, 0.0)]
+        @test d23.debias != [(0.0, 0.0)]
+        @test d24.debias != [(0.0, 0.0)]
+
+        update!(d31, optical3[1:1])
+        update!(d32, optical3[1:1])
+        update!(d33, optical3[1:1])
+        update!(d34, optical3[1:1])
+
+        @test d31.debias == [(0.0, 0.0)]
+        @test d32.debias == [(0.0, 0.0)]
+        @test d33.debias != [(0.0, 0.0)]
+        @test d34.debias != [(0.0, 0.0)]
 
     end
 

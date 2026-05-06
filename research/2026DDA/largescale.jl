@@ -147,7 +147,8 @@ function main()
             tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
             jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
             jtlsproject = true, significance = 0.99, verbose = true,
-            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0, fudge = 100.0, max_per = 20.0
+            outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10), fudge = 100.0,
+            max_per = 33.3
         )
         # Propagation buffers
         jd0 = 2459200.5
@@ -243,7 +244,7 @@ function main()
     bins = 0:0.1:1
     histogram(Qs, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
         xlabel = "NRMS", ylabel = "Count", xlim = extrema(bins), xticks = bins,
-        ylim = (0, 7_000), yticks = 0:1_000:7_000)
+        ylim = (0, 9_000), yticks = 0:1_000:9_000)
     filename = joinpath(directory, "QHIST.png")
     savefig(filename)
     println("• Saved NRMS histogram to: ", filename)
@@ -270,7 +271,7 @@ function main()
     bins = 0:0.25:3
     histogram(MsESA, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
         xlabel = "Mahalanobis distance", ylabel = "Count", xlim = extrema(bins), xticks = bins,
-        ylim = (0, 9_000), yticks = 0:1_000:9_000)
+        ylim = (0, 9_000), yticks = 0:1_000:9_000, right_margin = 2Plots.mm)
     filename = joinpath(directory, "MESAHIST.png")
     savefig(filename)
     println("• Saved ESA Mahalanobis distance histogram to: ", filename)
@@ -278,8 +279,9 @@ function main()
     # JPL Mahalanobis distance
     bins = 0:0.25:3
     histogram(MsJPL, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
-        xlabel = "Mahalanobis distance", ylabel = "Count", xlim = extrema(bins), xticks = bins,
-        ylim = (0, 9_000), yticks = 0:1_000:9_000)
+        xlabel = "Mahalanobis distance", ylabel = "Count", xlim = extrema(bins),
+        xticks = bins, ylim = (0, 12_000), yticks = (0:2_000:12_000, string.(0:2_000:12_000)),
+        right_margin = 2Plots.mm)
     filename = joinpath(directory, "MJPLHIST.png")
     savefig(filename)
     println("• Saved JPL Mahalanobis distance histogram to: ", filename)

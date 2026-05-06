@@ -19,7 +19,7 @@ An observatory recognized by the Minor Planet Center.
     - https://minorplanetcenter.net/iau/lists/ObsCodesF.html
     - https://minorplanetcenter.net/mpcops/documentation/valid-ades-values/#stn
     The Minor Planet Center observatories API is described at:
-    - https://www.minorplanetcenter.net/mpcops/documentation/obscodes-api/
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/obscodes/
 
 # Extended help
 
@@ -187,7 +187,7 @@ API about the observatory that matches `code`.
 
 !!! reference
     The Minor Planet Center observatories API is described at:
-    - https://www.minorplanetcenter.net/mpcops/documentation/obscodes-api/
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/obscodes/
 """
 function fetch_observatory_information(code::AbstractString)
     # Parse HTTP response as String

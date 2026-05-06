@@ -62,7 +62,7 @@ An optical astrometric observation in Minor Planet Center 80-column format.
 
 !!! reference
     The Minor Planet Center 80-column format is described at:
-    - https://minorplanetcenter.net/iau/info/OpticalObs.html
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/observations/mpc1992-format/
     and discussed thoroughly in pages 158-181 of:
     - https://doi.org/10.1016/j.icarus.2010.06.003
 """
@@ -196,8 +196,8 @@ Return the optical astrometry of minor body `id` in the Minor Planet Center
 
 !!! reference
     The Minor Planet Center observations APIs are described at:
-    - https://minorplanetcenter.net/mpcops/documentation/observations-api/
-    - https://minorplanetcenter.net/mpcops/documentation/neocp-observations-api/
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/get-obs/
+    - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/get-obs-neocp/
 """
 function fetch_optical_mpc80(id::AbstractString, ::Type{MPC})
     # Get and parse HTTP response
