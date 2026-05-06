@@ -31,6 +31,12 @@ using NEOs: SCRATCH_PATH
         @test haskey(dict, "2010 EJ27") && haskey(dict, "2017 HK118")
         @test dict["2010 EJ27"]["unpacked_secondary_provisional_designations"] == ["2017 HK118"]
         @test dict["2017 HK118"]["unpacked_primary_provisional_designation"] == "2010 EJ27"
+
+        dict = fetch_mpec_information("2008 TC3", "2014 AA")
+        @test haskey(dict, "request") && haskey(dict, "results")
+        @test haskey(dict["request"], "terms") && dict["request"]["terms"] == ["2008 TC3", "2014 AA"]
+        @test haskey(dict["results"], "2008 TC3") && !isempty(dict["results"]["2008 TC3"])
+        @test haskey(dict["results"], "2014 AA") && !isempty(dict["results"]["2014 AA"])
     end
 
     @testset "CatalogueMPC" begin

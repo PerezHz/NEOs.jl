@@ -15,7 +15,7 @@ for the given search `terms`.
     The Minor Planet Center MPECs API is described at:
     - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/mpecs/
 """
-fetch_mpec_information(s...; kwargs...) = fetch_mpec_information(collect(s); kwargs)
+fetch_mpec_information(s...; kwargs...) = fetch_mpec_information(collect(s); kwargs...)
 
 function fetch_mpec_information(terms::AbstractVector{<:AbstractString};
                                 issued_before::Union{Nothing, DateTime} = nothing,
