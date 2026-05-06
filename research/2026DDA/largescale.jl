@@ -244,7 +244,7 @@ function main()
     bins = 0:0.1:1
     histogram(Qs, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
         xlabel = "NRMS", ylabel = "Count", xlim = extrema(bins), xticks = bins,
-        ylim = (0, 7_000), yticks = 0:1_000:7_000)
+        ylim = (0, 9_000), yticks = 0:1_000:9_000)
     filename = joinpath(directory, "QHIST.png")
     savefig(filename)
     println("• Saved NRMS histogram to: ", filename)
@@ -271,7 +271,7 @@ function main()
     bins = 0:0.25:3
     histogram(MsESA, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
         xlabel = "Mahalanobis distance", ylabel = "Count", xlim = extrema(bins), xticks = bins,
-        ylim = (0, 9_000), yticks = 0:1_000:9_000)
+        ylim = (0, 9_000), yticks = 0:1_000:9_000, right_margin = 2Plots.mm)
     filename = joinpath(directory, "MESAHIST.png")
     savefig(filename)
     println("• Saved ESA Mahalanobis distance histogram to: ", filename)
@@ -279,8 +279,9 @@ function main()
     # JPL Mahalanobis distance
     bins = 0:0.25:3
     histogram(MsJPL, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
-        xlabel = "Mahalanobis distance", ylabel = "Count", xlim = extrema(bins), xticks = bins,
-        ylim = (0, 9_000), yticks = 0:1_000:9_000)
+        xlabel = "Mahalanobis distance", ylabel = "Count", xlim = extrema(bins),
+        xticks = bins, ylim = (0, 12_000), yticks = (0:2_000:12_000, string.(0:2_000:12_000)),
+        right_margin = 2Plots.mm)
     filename = joinpath(directory, "MJPLHIST.png")
     savefig(filename)
     println("• Saved JPL Mahalanobis distance histogram to: ", filename)
