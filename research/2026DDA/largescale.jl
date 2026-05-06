@@ -147,7 +147,8 @@ function main()
             tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
             jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
             jtlsproject = true, significance = 0.99, verbose = true,
-            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0, fudge = 100.0, max_per = 20.0
+            outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10), fudge = 100.0,
+            max_per = 33.3
         )
         # Propagation buffers
         jd0 = 2459200.5
