@@ -45,6 +45,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test trackletid(apophis) == ""
         @test !isdiscovery(apophis)
         @test !isdeprecated(apophis)
+        @test vconversion(apophis) == 0.0
         @test cataloguecode(apophis) == 'o'
         @test observatorycode(apophis) == "691"
 
@@ -231,6 +232,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test corr(apophis) == 0.0
         @test trackletid(apophis) == ""
         @test !isdeprecated(apophis)
+        @test vconversion(apophis) == 0.0
         @test cataloguecode(apophis) == 'o'
         @test observatorycode(apophis) == "691"
 
@@ -392,6 +394,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test trackletid(apophis) == "000002w-NJ"
         @test !isdiscovery(apophis)
         @test !isdeprecated(apophis)
+        @test vconversion(apophis) == 0.0
         @test cataloguecode(apophis) == 'o'
         @test observatorycode(apophis) == "691"
 
