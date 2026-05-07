@@ -36,7 +36,7 @@ An optical astrometric observation in the Minor Planet Center ADES format.
 - `astcat::CatalogueMPC`: star catalog used for the astrometric reduction.
 - `mag::T`: apparent magnitude.
 - `rmsmag::T`: 1-sigma uncertainty of `mag`.
-- `band::String`: passband designation for photometry.
+- `band::MagnitudeBandMPC{T}`: visual magnitude band.
 - `photcat::CatalogueMPC`: star catalog used for the photometric reduction.
 - `ref::String`: standard reference field used for citations.
 - `disc::String`: discovery flag.
@@ -95,7 +95,7 @@ An optical astrometric observation in the Minor Planet Center ADES format.
     # Photometry Group Elements
     mag::T
     rmsmag::T
-    band::String
+    band::MagnitudeBandMPC{T}
     photcat::CatalogueMPC
     ref::String
     disc::String
@@ -113,15 +113,7 @@ end
 
 # AbstractAstrometryObservation interface
 date(x::OpticalADES) = x.obstime
-function band(x::OpticalADES)
-    if isempty(x.band)
-        return ' '
-    elseif haskey(ADES_TO_MPC80_BAND, x.band)
-        return ADES_TO_MPC80_BAND[x.band]
-    else
-        return last(x.band)
-    end
-end
+band(x::OpticalADES) = x.band
 observatory(x::OpticalADES) = x.stn
 catalogue(x::OpticalADES) = x.astcat
 function rms(x::OpticalADES{T}) where {T <: Real}
@@ -162,6 +154,7 @@ function adesparse(_, ::Type{CatalogueMPC}, x)
     end
 end
 adesparse(_, ::Type{ObservatoryMPC{T}}, x) where {T <: Real} = search_observatory_code(x)
+adesparse(_, ::Type{MagnitudeBandMPC{T}}, x) where {T <: Real} = search_magnitude_band(x)
 adesparse(_, ::Type{Int}, x) = isa(x, Number) ? round(Int, x) : parse(Int, x)
 
 function adesparse(_, ::Type{DateTime}, x)

@@ -103,55 +103,6 @@ const OBSERVATORIES_MPC_API = MPC_API_URL * "obscodes"
 
 const MAGNITUDE_BANDS_API = MPC_API_URL * "mag-band"
 
-# Conversion to V band used by MPC
-# See https://minorplanetcenter.net/iau/info/BandConversion.txt
-const V_BAND_CORRECTION = Dict{Char, Float64}(
-    ' ' => -0.8,
-    'U' => -1.3,
-    'B' => -0.8,
-    'g' => -0.35,
-    'V' =>  0,
-    'r' =>  0.14,
-    'R' =>  0.4,
-    'C' =>  0.4,
-    'W' =>  0.4,
-    'i' =>  0.32,
-    'z' =>  0.26,
-    'I' =>  0.8,
-    'J' =>  1.2,
-    'w' => -0.13,
-    'y' =>  0.32,
-    'L' =>  0.2,
-    'H' =>  1.4,
-    'K' =>  1.7,
-    'Y' =>  0.7,
-    'G' =>  0.28,
-    'v' =>  0,
-    'c' => -0.05,
-    'o' =>  0.33,
-    'u' => +2.5
-)
-
-# Conversion from ADES band to MPC80 band
-# See https://github.com/IAU-ADES/ADES-Master/Python/ades/xmltompc80col.py
-# This set of band-conversion maps captures the subset of bands that need special
-# handling when creating an obs80 string. By default, single-character ADES bands
-# are passed through unmodified, and multi-character ADES bands are mapped to
-# the second character (e.g., `Sg` => `g`). Currently, all of the exceptions in
-# this table are two-character bands where we use the first character instead of
-# the second, but this table can be used to define any mapping that needs to take
-# precedence over the default logic.
-const ADES_TO_MPC80_BAND = Dict(
-    "Vj" => 'V',
-    "VR" => 'V',
-    "Rc" => 'R',
-    "Ic" => 'I',
-    "Bj" => 'B',
-    "Uj" => 'U',
-    "Gb" => 'G',
-    "Gr" => 'G',
-)
-
 # Parameters of the Bowell et al (1989) H-G photometric model for asteroids
 # See https://ui.adsabs.harvard.edu/abs/1989aste.conf..524B/abstract
 const PHASE_INTEGRAL_A1 = 3.332

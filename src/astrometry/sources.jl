@@ -157,6 +157,7 @@ astrometrydefault(::Type{DateTime}) = DateTime(2000, 1, 1)
 astrometrydefault(::Type{T}) where {T <: Real} = T(NaN)
 astrometrydefault(::Type{CatalogueMPC}) = unknowncat()
 astrometrydefault(::Type{ObservatoryMPC{T}}) where {T <: Real} = unknownobs(T)
+astrometrydefault(::Type{MagnitudeBandMPC{T}}) where {T <: Real} = unknownband(T)
 
 astrometryparse(::Type{T}, x::T) where {T} = x
 astrometryparse(::Type{Bool}, x::AbstractString) = x == "Yes"

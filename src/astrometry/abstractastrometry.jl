@@ -102,6 +102,7 @@ ra(x::AbstractOpticalAstrometry) = x.ra
 dec(x::AbstractOpticalAstrometry) = x.dec
 mag(x::AbstractOpticalAstrometry) = x.mag
 cataloguecode(x::AbstractOpticalAstrometry) = catalogue(x).code
+vconversion(x::AbstractOpticalAstrometry) = band(x).v_conversion
 observatorycode(x::AbstractOpticalAstrometry) = observatory(x).code
 
 """

@@ -63,8 +63,8 @@ export ZeroDebiasing, SourceDebiasing, Farnocchia15, Eggl20
 export numberofdays, unpacknum, packnum, unpackdesig, packdesig,
        fetch_designation_information, fetch_mpec_information
 export date, measure, observatory, rms, debias, corr, ra, dec, mag, band, catalogue,
-       cataloguecode, observatorycode, isdiscovery, isdeprecated, trackletid, frequency,
-       residual, weight, weights, isoutlier, nout, notout, notoutobs
+       cataloguecode, observatorycode, vconversion, isdiscovery, isdeprecated, trackletid,
+       frequency, residual, weight, weights, isoutlier, nout, notout, notoutobs
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
 export update_observatories_mpc, search_observatory_code, fetch_observatory_information
