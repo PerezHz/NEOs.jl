@@ -20,6 +20,13 @@ Supertye for the observatories interface.
 abstract type AbstractAstrometryObservatory{T <: Real} <: AbstractAstrometry end
 
 """
+    AbstractAstrometryMagnitudeBand{T <: Real} <: AbstractAstrometry
+
+Supertye for the visual magnitude bands interface.
+"""
+abstract type AbstractAstrometryMagnitudeBand{T <: Real} <: AbstractAstrometry end
+
+"""
     AbstractAstrometryTime <: AbstractAstrometry
 
 Supertye for the observing time interface.

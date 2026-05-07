@@ -68,6 +68,7 @@ export date, measure, observatory, rms, debias, corr, ra, dec, mag, band, catalo
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
 export update_observatories_mpc, search_observatory_code, fetch_observatory_information
+export update_magnitude_bands_mpc, search_magnitude_band, fetch_magnitude_band_information
 export fetch_optical_mpc80, read_optical_mpc80, write_optical_mpc80
 export fetch_neocp_objects, read_neocp_objects, write_neocp_objects
 export fetch_optical_rwo, read_optical_rwo, write_optical_rwo
