@@ -1102,11 +1102,11 @@ end
         # Diameter
         Da, Db = minmax(diameter(H, 0.05), diameter(H, 0.25))
         Dc = diameter(orbit1, params)
-        @test 2.3 < Da < Dc < Db < 5.5
+        @test 2.1 < Da < Dc < Db < 5.0
         # Mass
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit1, params)
-        @test 1.8E4 < Ma < Mc < Mb < 2.3E5
+        @test 1.4E4 < Ma < Mc < Mb < 1.7E5
     end
 
     @testset "research/2025CMDA/orbitdetermination.jl" begin
