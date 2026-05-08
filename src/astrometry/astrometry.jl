@@ -4,6 +4,7 @@ include("designations.jl")
 include("mpec.jl")
 include("cataloguempc.jl")
 include("observatorympc.jl")
+include("magnitudeband.jl")
 include("topocentric.jl")
 include("sources.jl")
 # Optical astrometry

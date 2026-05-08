@@ -54,7 +54,7 @@ An optical astrometric observation in Minor Planet Center 80-column format.
 - `dec::T`: observed declination [rad].
 - `info1::String`: additional information.
 - `mag::T`: observed magnitude.
-- `band::Char`: magnitude band (or nuclear/total flag for comets).
+- `band::MagnitudeBandMPC{T}`: visual magnitude band.
 - `catalogue::CatalogueMPC`: reference star catalogue.
 - `info2::String`: additional information.
 - `observatory::ObservatoryMPC{T}`: observatory.
@@ -77,7 +77,7 @@ An optical astrometric observation in Minor Planet Center 80-column format.
     dec::T
     info1::String
     mag::T
-    band::Char
+    band::MagnitudeBandMPC{T}
     catalogue::CatalogueMPC
     info2::String
     observatory::ObservatoryMPC{T}
@@ -118,6 +118,7 @@ mpc80parse(_, ::Type{String}, x) = String(x)
 mpc80parse(_, ::Type{Char}, x) = isempty(x) ? ' ' : first(x)
 mpc80parse(_, ::Type{CatalogueMPC}, x) = isempty(x) ? unknowncat() : search_catalogue_code(first(x))
 mpc80parse(_, ::Type{ObservatoryMPC{T}}, x) where {T} = search_observatory_code(x)
+mpc80parse(_, ::Type{MagnitudeBandMPC{T}}, x) where {T} = search_magnitude_band(x)
 
 function mpc80parse(_, ::Type{DateTime}, x)
     date = DateTime(view(x, 1:10), "yyyy mm dd")

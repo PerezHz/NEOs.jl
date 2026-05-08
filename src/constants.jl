@@ -2,12 +2,16 @@
 
 # Path to NEOs src directory
 const SRC_PATH = dirname(pathof(NEOs))
+# Path to NEOs data directory
+const DATA_PATH = joinpath(dirname(SRC_PATH), "data")
 # Path to scratch space
 const SCRATCH_PATH = Ref{String}("")
 # Path to catalogues file
-const CATALOGUES_PATH = joinpath(dirname(SRC_PATH), "data", "astCat_photCat.json")
+const CATALOGUES_PATH = joinpath(DATA_PATH, "astCat_photCat.json")
 # Path to observatories file
-const OBSERVATORIES_PATH = joinpath(dirname(SRC_PATH), "data", "observatoriesmpc.json")
+const OBSERVATORIES_PATH = joinpath(DATA_PATH, "observatoriesmpc.json")
+# Path to magnitude bands file
+const MAGNITUDE_BANDS_PATH = joinpath(DATA_PATH, "magnitudebandsmpc.json")
 
 ## Minor bodies astrometry interface
 
@@ -94,6 +98,19 @@ const CATALOGUES_MPC_FILE_URL = "https://www.minorplanetcenter.net/iau/info/astC
 # ObservatoryMPC
 
 const OBSERVATORIES_MPC_API = MPC_API_URL * "obscodes"
+
+# MagnitudeBandMPC
+
+const MAGNITUDE_BANDS_API = MPC_API_URL * "mag-band"
+
+# Parameters of the Bowell et al (1989) H-G photometric model for asteroids
+# See https://ui.adsabs.harvard.edu/abs/1989aste.conf..524B/abstract
+const PHASE_INTEGRAL_A1 = 3.332
+const PHASE_INTEGRAL_A2 = 1.862
+const PHASE_INTEGRAL_B1 = 0.631
+const PHASE_INTEGRAL_B2 = 1.218
+const PHASE_INTEGRAL_C1 = 0.986
+const PHASE_INTEGRAL_C2 = 0.238
 
 # OpticalMPC80
 
@@ -337,66 +354,6 @@ const R_SI = 0.010044
 const R_EA = 4.24e-5
 # Ratio between the mass of the Earth and the mass of the Sun
 const μ_ES = PE.μ[ea] / PE.μ[su] # 1 / 328_900.5614
-
-# Absolute magnitude
-
-# Conversion to V band used by MPC
-# See https://minorplanetcenter.net/iau/info/BandConversion.txt
-const V_BAND_CORRECTION = Dict{Char, Float64}(
-    ' ' => -0.8,
-    'U' => -1.3,
-    'B' => -0.8,
-    'g' => -0.35,
-    'V' =>  0,
-    'r' =>  0.14,
-    'R' =>  0.4,
-    'C' =>  0.4,
-    'W' =>  0.4,
-    'i' =>  0.32,
-    'z' =>  0.26,
-    'I' =>  0.8,
-    'J' =>  1.2,
-    'w' => -0.13,
-    'y' =>  0.32,
-    'L' =>  0.2,
-    'H' =>  1.4,
-    'K' =>  1.7,
-    'Y' =>  0.7,
-    'G' =>  0.28,
-    'v' =>  0,
-    'c' => -0.05,
-    'o' =>  0.33,
-    'u' => +2.5
-)
-
-# Conversion from ADES band to MPC80 band
-# See https://github.com/IAU-ADES/ADES-Master/Python/ades/xmltompc80col.py
-# This set of band-conversion maps captures the subset of bands that need special
-# handling when creating an obs80 string. By default, single-character ADES bands
-# are passed through unmodified, and multi-character ADES bands are mapped to
-# the second character (e.g., `Sg` => `g`). Currently, all of the exceptions in
-# this table are two-character bands where we use the first character instead of
-# the second, but this table can be used to define any mapping that needs to take
-# precedence over the default logic.
-const ADES_TO_MPC80_BAND = Dict(
-    "Vj" => 'V',
-    "VR" => 'V',
-    "Rc" => 'R',
-    "Ic" => 'I',
-    "Bj" => 'B',
-    "Uj" => 'U',
-    "Gb" => 'G',
-    "Gr" => 'G',
-)
-
-# Parameters of the Bowell et al (1989) H-G photometric model for asteroids
-# See https://ui.adsabs.harvard.edu/abs/1989aste.conf..524B/abstract
-const PHASE_INTEGRAL_A1 = 3.332
-const PHASE_INTEGRAL_A2 = 1.862
-const PHASE_INTEGRAL_B1 = 0.631
-const PHASE_INTEGRAL_B2 = 1.218
-const PHASE_INTEGRAL_C1 = 0.986
-const PHASE_INTEGRAL_C2 = 0.238
 
 # Impact monitoring
 

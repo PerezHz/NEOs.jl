@@ -467,10 +467,8 @@ function absolutemagnitude(orbit::AbstractOrbit, params::Parameters)
     d_BO = @. norm(xa - xe)     # Asteroid-Earth
     # Phase angles [rad]
     αs = @. acos((d_BO^2 + d_BS^2 - d_OS^2) / (2 * d_BO * d_BS))
-    # Observed magnitudes and bands
-    Vs, bands = @. mag(optical), band.(optical)
-    # Convert magnitudes to V band
-    Vs .+= getindex.(Ref(V_BAND_CORRECTION), bands)
+    # Convert observed magnitudes to V band
+    Vs = @. mag(optical) + vconversion(optical)
     # Reduced magnitudes
     @. Vs -= 5 * log10(d_BS * d_BO)
     # Phase integrals

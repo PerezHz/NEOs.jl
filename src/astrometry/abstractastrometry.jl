@@ -20,6 +20,13 @@ Supertye for the observatories interface.
 abstract type AbstractAstrometryObservatory{T <: Real} <: AbstractAstrometry end
 
 """
+    AbstractAstrometryMagnitudeBand{T <: Real} <: AbstractAstrometry
+
+Supertye for the visual magnitude bands interface.
+"""
+abstract type AbstractAstrometryMagnitudeBand{T <: Real} <: AbstractAstrometry end
+
+"""
     AbstractAstrometryTime <: AbstractAstrometry
 
 Supertye for the observing time interface.
@@ -95,6 +102,7 @@ ra(x::AbstractOpticalAstrometry) = x.ra
 dec(x::AbstractOpticalAstrometry) = x.dec
 mag(x::AbstractOpticalAstrometry) = x.mag
 cataloguecode(x::AbstractOpticalAstrometry) = catalogue(x).code
+vconversion(x::AbstractOpticalAstrometry) = band(x).v_conversion
 observatorycode(x::AbstractOpticalAstrometry) = observatory(x).code
 
 """

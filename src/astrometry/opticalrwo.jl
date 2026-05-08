@@ -112,7 +112,7 @@ An optical astrometric observation in the RWO format.
 - `dec_bias::T`: bias for `dec` [arcsec].
 - `dec_resid::T`: residual for `dec`.
 - `mag::T`: apparent magnitude.
-- `mag_band::Char`: colour band for `mag`.
+- `mag_band::MagnitudeBandMPC{T}`: visual magnitude band for `mag`.
 - `mag_rms::T`: a-priori formal RMS for `mag`.
 - `mag_resid::T`: residual for `mag`.
 - `catalogue::CatalogueMPC`: star catalogue used for astrometric reduction.
@@ -148,7 +148,7 @@ An optical astrometric observation in the RWO format.
     dec_bias::T
     dec_resid::T
     mag::T
-    mag_band::Char
+    mag_band::MagnitudeBandMPC{T}
     mag_rms::T
     mag_resid::T
     catalogue::CatalogueMPC
@@ -186,6 +186,7 @@ show(io::IO, o::OpticalRWO) = print(io, o.design, " α: ", @sprintf("%.5f",
 
 rwoparse(_, ::Type{String}, x) = String(x)
 rwoparse(_, ::Type{Char}, x) = isempty(x) ? ' ' : first(x)
+rwoparse(_, ::Type{MagnitudeBandMPC{T}}, x) where {T} = search_magnitude_band(x)
 rwoparse(_, ::Type{CatalogueMPC}, x) = isempty(x) ? unknowncat() : search_catalogue_code(first(x))
 
 function rwoparse(_, ::Type{ObservatoryMPC{T}}, x) where {T <: Real}

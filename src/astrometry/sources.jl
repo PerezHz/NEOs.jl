@@ -45,16 +45,22 @@ Dynamics APIs.
 """
 struct JPL <: AbstractAstrometrySource end
 
-function get_http_response(::Type{MPC}; mode::Int = 0, id::AbstractString = "",
+function get_http_response(::Type{MPC}; mode::Int = 0,
+                           id::AbstractString = "",
+                           band::AbstractString = "all",
                            ids::AbstractVector{<:AbstractString} = [""],
                            terms::AbstractVector{<:AbstractString} = [""],
                            issued_before::Union{Nothing, DateTime} = nothing,
                            issued_after::Union{Nothing, DateTime} = nothing,
                            format::AbstractString = "", connect_timeout = 180,
                            readtimeout = 180, kwargs...)
-    @assert -2 <= mode <= 2 "`mode`  must be an integer between -2 and 2"
+    @assert -3 <= mode <= 2 "`mode`  must be an integer between -2 and 2"
+    # Magnitude bands
+    if mode == -3
+        params = JSON.json(Dict("band" => band))
+        url = MAGNITUDE_BANDS_API
     # MPECs
-    if mode == -2
+    elseif mode == -2
         dict = Dict("terms" => terms)
         if !isnothing(issued_before)
             dict["issued_before"] = Dates.format(issued_before, "yyyy-mm-dd HH:MM:SS")
@@ -151,7 +157,11 @@ astrometrydefault(::Type{DateTime}) = DateTime(2000, 1, 1)
 astrometrydefault(::Type{T}) where {T <: Real} = T(NaN)
 astrometrydefault(::Type{CatalogueMPC}) = unknowncat()
 astrometrydefault(::Type{ObservatoryMPC{T}}) where {T <: Real} = unknownobs(T)
+astrometrydefault(::Type{MagnitudeBandMPC{T}}) where {T <: Real} = unknownband(T)
 
 astrometryparse(::Type{T}, x::T) where {T} = x
 astrometryparse(::Type{Bool}, x::AbstractString) = x == "Yes"
 astrometryparse(::Type{T}, x::AbstractString) where {T <: Real} = parse(T, x)
+
+astrometryparse(::Type{String}, ::Nothing) = ""
+astrometryparse(::Type{T}, ::Nothing) where {T <: Real} = zero(T)

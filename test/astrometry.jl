@@ -1,4 +1,6 @@
 using NEOs
+using Dates
+using PlanetaryEphemeris
 using Test
 
 using NEOs: SCRATCH_PATH
@@ -6,6 +8,10 @@ using NEOs: SCRATCH_PATH
 @testset "AbstractAstrometry" begin
 
     @testset "Utils" begin
+
+        # numberofdays
+        date1, date2 = julian2datetime(PE.J2000), now()
+        @test floor(Int, numberofdays([date1, date2])) == floor(date2 - date1, Day).value
 
         # This tests are based on the examples in:
         # https://minorplanetcenter.net/iau/info/PackedDes.html
@@ -70,6 +76,7 @@ using NEOs: SCRATCH_PATH
         @test gaia.meaning == "Gaia epoch 2016"
         @test !isdeprecated(gaia)
         @test gaia in CATALOGUES_MPC[]
+        @test isa(string(gaia), String)
 
         # Unknown catalogue
         unkcat = unknowncat()
@@ -168,6 +175,7 @@ using NEOs: SCRATCH_PATH
         @test lemmon.uses_two_line_observations == false
         @test lemmon.observations_type == "optical"
         @test lemmon in OBSERVATORIES_MPC[]
+        @test isa(string(lemmon), String)
 
         # Unknown observatory
         unkobs = unknownobs()
@@ -261,6 +269,77 @@ using NEOs: SCRATCH_PATH
         @test obs["updated_at"] == "Wed, 17 Sep 2025 18:08:55 GMT"
         @test obs["uses_two_line_observations"] == false
         @test obs["web_link"] == "http://www.lpl.arizona.edu/css/"
+
+    end
+
+    @testset "MagnitudeBandMPC" begin
+
+        using NEOs: MAGNITUDE_BANDS_MPC, MagnitudeBandMPC, isallowed, isunknown, unknownband,
+              parse_magnitude_bands_mpc, read_magnitude_bands_mpc
+
+        # Check global variable MAGNITUDE_BANDS_MPC[]
+        @test allunique(MAGNITUDE_BANDS_MPC[])
+        @test issorted(MAGNITUDE_BANDS_MPC[])
+        @test isa(MAGNITUDE_BANDS_MPC[], Vector{MagnitudeBandMPC{Float64}})
+        @test count(!isallowed, MAGNITUDE_BANDS_MPC[]) == 2
+        @test count(isunknown, MAGNITUDE_BANDS_MPC[]) == 1
+
+        # Parse MagnitudeBandMPC
+        ultraviolet_s = """
+        {
+            "request": {
+                "band": "all"
+            },
+            "response": [
+                {
+                    "allowed" : true,
+                    "band" : "u",
+                    "notes" : "Ultraviolet",
+                    "v_conversion" : -2.5
+                }
+            ]
+        }
+        """
+        ultraviolet_p = parse_magnitude_bands_mpc(ultraviolet_s)
+        @test isa(ultraviolet_p, Vector{MagnitudeBandMPC{Float64}})
+        @test isone(length(ultraviolet_p))
+        ultraviolet = first(ultraviolet_p)
+        @test ultraviolet.allowed
+        @test ultraviolet.band == "u"
+        @test ultraviolet.notes == "Ultraviolet"
+        @test ultraviolet.v_conversion == -2.5
+        @test isa(string(ultraviolet), String)
+
+        # Unknown magnitude band
+        unkband = unknownband()
+        @test isunknown(unkband)
+        @test !isunknown(ultraviolet)
+
+        # MagnitudeBandMPC equality
+        @test unkband == unkband
+        @test ultraviolet == ultraviolet
+        @test ultraviolet != unkband
+
+        # Read magnitude bands file
+        MAGNITUDE_BANDS_PATH = joinpath(SCRATCH_PATH[], "magnitudebandsmpc.json")
+        @test isfile(MAGNITUDE_BANDS_PATH)
+        bands = read_magnitude_bands_mpc(MAGNITUDE_BANDS_PATH)
+        @test MAGNITUDE_BANDS_MPC[] == bands
+
+        # Search magnitude band
+        band = search_magnitude_band("u")
+        @test band == ultraviolet
+
+        # Fetch obervatory information
+        dict = fetch_magnitude_band_information("u")
+        @test haskey(dict, "request") && haskey(dict, "response")
+        @test haskey(dict["request"], "band") && dict["request"]["band"] == "u"
+        @test length(dict["response"]) == 1
+        subdict = dict["response"][1]
+        @test subdict["allowed"]
+        @test subdict["band"] == "u"
+        @test subdict["notes"] == "Ultraviolet"
+        @test subdict["v_conversion"] == -2.5
 
     end
 

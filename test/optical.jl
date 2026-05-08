@@ -32,7 +32,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test apophis.dec == dec(apophis) == 0.2952738332250385
         @test apophis.info1 == ""
         @test isnan(apophis.mag) && isnan(mag(apophis))
-        @test apophis.band == band(apophis) == ' '
+        @test apophis.band == band(apophis) == search_magnitude_band("UNK")
         @test apophis.catalogue == catalogue(apophis) == search_catalogue_code('o')
         @test apophis.info2 == "m6394"
         @test apophis.observatory == observatory(apophis) == search_observatory_code("691")
@@ -45,6 +45,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test trackletid(apophis) == ""
         @test !isdiscovery(apophis)
         @test !isdeprecated(apophis)
+        @test vconversion(apophis) == 0.0
         @test cataloguecode(apophis) == 'o'
         @test observatorycode(apophis) == "691"
 
@@ -212,7 +213,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test apophis.dec_bias == 0.14
         @test apophis.dec_resid == -0.07
         @test isnan(apophis.mag) && isnan(mag(apophis))
-        @test apophis.mag_band == band(apophis) == ' '
+        @test apophis.mag_band == band(apophis) == search_magnitude_band("UNK")
         @test isnan(apophis.mag_rms)
         @test isnan(apophis.mag_resid)
         @test apophis.catalogue == catalogue(apophis) == search_catalogue_code('o')
@@ -231,6 +232,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test corr(apophis) == 0.0
         @test trackletid(apophis) == ""
         @test !isdeprecated(apophis)
+        @test vconversion(apophis) == 0.0
         @test cataloguecode(apophis) == 'o'
         @test observatorycode(apophis) == "691"
 
@@ -371,7 +373,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test apophis.astcat == catalogue(apophis) == search_catalogue_code('o')
         @test isnan(apophis.mag) && isnan(mag(apophis))
         @test isnan(apophis.rmsmag)
-        @test apophis.band == "" && band(apophis) == ' '
+        @test apophis.band == band(apophis) == search_magnitude_band("UNK")
         @test apophis.photcat == unknowncat()
         @test apophis.ref == "MPS   126394"
         @test apophis.disc == ""
@@ -392,6 +394,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test trackletid(apophis) == "000002w-NJ"
         @test !isdiscovery(apophis)
         @test !isdeprecated(apophis)
+        @test vconversion(apophis) == 0.0
         @test cataloguecode(apophis) == 'o'
         @test observatorycode(apophis) == "691"
 
