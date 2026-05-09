@@ -44,14 +44,14 @@ using Test
 
         # Fetch RadarJPL
         radar = fetch_radar_jpl(JPL)
-        @assert all(@. frequency(radar) == frequency(getfield(radar, :xmit), date(radar)))
+        @test all(@. frequency(radar) == frequency(getfield(radar, :xmit), date(radar)))
 
         radar1 = fetch_radar_jpl("spk" => "20000433", JPL)
         @test isa(radar1, Vector{RadarJPL{Float64}})
         @test issorted(radar1)
         @test allunique(radar1)
 
-        # Read/write OpticalMPC80 file
+        # Read/write RadarJPL file
         filename = joinpath(pkgdir(NEOs), "test", "data", "433.json")
         radar2 = read_radar_jpl(filename)
         @test isa(radar2, Vector{RadarJPL{Float64}})
@@ -157,7 +157,7 @@ using Test
         @test issorted(radar2)
         @test allunique(radar2)
 
-        # Read/write OpticalMPC80 file
+        # Read/write RadarRWO file
         filename = joinpath(pkgdir(NEOs), "test", "data", "433.rwo")
         radar3 = read_radar_rwo(filename)
         @test isa(radar3, Vector{RadarRWO{Float64}})

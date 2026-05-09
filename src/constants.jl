@@ -182,6 +182,9 @@ const JPL_TO_MPC_OBSCODES = Dict(
     "-38" => "255",	# Yevpatoriya
     "-43" => "265", # Canberra DSS 43
     "-47" => "271", # ATCA DSS 47
+#   As of May 9th 2026 these two radar stations do not have a MPC code
+#   "-63" => "   ", # DSS-63 (70-m)
+#   "-70" => "   ", # Lovell (76-m, Jodrell Bank)
     "-73" => "259",	# EISCAT Tromso UHF
     "-74" => "287", # Ceduna 30, UTAS
     "-86" => "308", # Usuda DSS 64

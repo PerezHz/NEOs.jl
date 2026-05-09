@@ -68,6 +68,9 @@ RadarJPL(r::DataFrameRow) = RadarJPL{Float64}(
 function parse_radar_jpl(text::AbstractString)
     # Parse JSON
     dict = JSON.parse(text)
+    # NOTE: As of May 9th 2026, DSS-63 (70-m) [-63] and
+    # Lovell (76-m, Jodrell Bank) [-70] do not have a MPC code
+    filter!(x -> !(x[7] in ("-63", "-70") || x[8] in ("-63", "-70")), dict["data"])
     L = length(dict["data"])
     iszero(L) && return RadarJPL{Float64}[]
     # Construct DataFrame
