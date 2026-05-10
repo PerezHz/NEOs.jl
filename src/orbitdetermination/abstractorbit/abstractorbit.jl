@@ -273,98 +273,119 @@ end
 =#
 
 """
-    keplerian(orbit, params)
+    keplerian(orbit, params [, t])
 
 Return the heliocentric ecliptic keplerian elements of an `orbit`
-at its reference epoch.
+at time `t` [TDB days since J2000] (default: `epoch(orbit)`).
 
 See also [`cartesian2keplerian`](@ref).
 
 !!! warning
     This function may change the (global) `TaylorSeries` variables.
 """
-function keplerian(orbit::AbstractOrbit{D, T, T},
-                   params::Parameters{T}) where {D, T <: Real}
+function keplerian(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
+                   t::T = epoch(orbit)) where {D, T <: Real}
+    # Unpack
+    @unpack fwdoffset, bwdoffset, eph_su = params
     # Set jet transport variables
     Npar = numvars(orbit)
     set_od_order(T, 2, Npar)
-    # Reference epoch [MJD TDB]
-    t = epoch(orbit)
-    mjd0 = t + MJD2000
+    # Orbit reference epoch [TDB days since J2000]
+    t0 = epoch(orbit)
     # Jet transport initial condition
-    q0 = orbit(t) + get_variables(T, 2)
-    q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
+    q0 = orbit() + get_variables(T, 2)
+    if t != t0
+        offset = t > t0 ? fwdoffset : -bwdoffset
+        nyears = (t - t0 + offset) / yr
+        prop = propagate(dynamicalmodel(orbit), q0, t0 + PE.J2000, nyears, params)
+        q0 = prop(t)
+    end
+    q0 = equatorial2ecliptic(q0[1:6] - eph_su(t))
     # Origin
     x0 = zeros(T, Npar)
     # Keplerian orbital elements
-    elements = cartesian2keplerian(q0, mjd0; μ = μ_S)
+    elements = cartesian2keplerian(q0, t + MJD2000; μ = μ_S)
     Γ_kep = project(elements, covariance(orbit))
-    kep = KeplerianElements{T, TaylorN{T}}(μ_S, mjd0, :ecliptic, elements, Γ_kep)
+    kep = KeplerianElements{T, TaylorN{T}}(μ_S, t + MJD2000, :ecliptic, elements, Γ_kep)
 
     return evaldeltas(kep, x0)
 end
 
 """
-    equinoctial(orbit, params)
+    equinoctial(orbit, params [, t])
 
 Return the heliocentric ecliptic equinoctial elements of an `orbit`
-at its reference epoch.
+at time `t` [TDB days since J2000] (default: `epoch(orbit)`).
 
 See also [`cartesian2equinoctial`](@ref).
 
 !!! warning
     This function may change the (global) `TaylorSeries` variables.
 """
-function equinoctial(orbit::AbstractOrbit{D, T, T},
-                     params::Parameters{T}) where {D, T <: Real}
+function equinoctial(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
+                     t::T = epoch(orbit)) where {D, T <: Real}
+    # Unpack
+    @unpack fwdoffset, bwdoffset, eph_su = params
     # Set jet transport variables
     Npar = numvars(orbit)
     set_od_order(T, 2, Npar)
-    # Reference epoch [MJD TDB]
-    t = epoch(orbit)
-    mjd0 = t + MJD2000
+    # Orbit reference epoch [TDB days since J2000]
+    t0 = epoch(orbit)
     # Jet transport initial condition
-    q0 = orbit(t) + get_variables(T, 2)
+    q0 = orbit() + get_variables(T, 2)
+    if t != t0
+        offset = t > t0 ? fwdoffset : -bwdoffset
+        nyears = (t - t0 + offset) / yr
+        prop = propagate(dynamicalmodel(orbit), q0, t0 + PE.J2000, nyears, params)
+        q0 = prop(t)
+    end
     q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
     # Origin
     x0 = zeros(T, Npar)
     # Equinoctial orbital elements
     elements = cartesian2equinoctial(q0; μ = μ_S)
     Γ_eqn = project(elements, covariance(orbit))
-    eqn = EquinoctialElements{T, TaylorN{T}}(μ_S, mjd0, :ecliptic, elements, Γ_eqn)
+    eqn = EquinoctialElements{T, TaylorN{T}}(μ_S, t + MJD2000, :ecliptic, elements, Γ_eqn)
 
     return evaldeltas(eqn, x0)
 end
 
 """
-    attributable(orbit, params)
+    attributable(orbit, params [, t])
 
 Return the geocentric equatorial attributable elements of an `orbit`
-at its reference epoch.
+at time `t` [TDB days since J2000] (default: `epoch(orbit)`).
 
 See also [`cartesian2attributable`](@ref).
 
 !!! warning
     This function may change the (global) `TaylorSeries` variables.
 """
-function attributable(orbit::AbstractOrbit{D, T, T},
-                      params::Parameters{T}) where {D, T <: Real}
+function attributable(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
+                      t::T = epoch(orbit)) where {D, T <: Real}
+    # Unpack
+    @unpack fwdoffset, bwdoffset, eph_ea = params
     # Set jet transport variables
     Npar = numvars(orbit)
     set_od_order(T, 2, Npar)
-    # Reference epoch [MJD TDB]
-    t = epoch(orbit)
-    mjd0 = t + MJD2000
+    # Orbit reference epoch [TDB days since J2000]
+    t0 = epoch(orbit)
     # Jet transport initial condition
-    q0 = orbit(t) + get_variables(T, 2)
-    q0 = q0[1:6] - params.eph_ea(t)
+    q0 = orbit() + get_variables(T, 2)
+    if t != t0
+        offset = t > t0 ? fwdoffset : -bwdoffset
+        nyears = (t - t0 + offset) / yr
+        prop = propagate(dynamicalmodel(orbit), q0, t0 + PE.J2000, nyears, params)
+        q0 = prop(t)
+    end
+    q0 = q0[1:6] - eph_ea(t)
     # Origin
     x0 = zeros(T, Npar)
     # Attributable elements
     elements = cartesian2attributable(q0)
     Γ_attr = project(elements, covariance(orbit))
-    attr = AttributableElements{T, TaylorN{T}}(PE.μ[ea], mjd0,
-           :equatorial, elements, Γ_attr)
+    attr = AttributableElements{T, TaylorN{T}}(PE.μ[ea], t + MJD2000, :equatorial,
+        elements, Γ_attr)
 
     return evaldeltas(attr, x0)
 end
