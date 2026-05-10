@@ -16,8 +16,11 @@ abstract type AbstractOrbit{D, T <: Real, U <: Number} end
 # Numeric types
 numtypes(::AbstractOrbit{D, T, U}) where {D, T, U} = T, U
 
+# Dynamical model
+dynamicalmodel(x::AbstractOrbit) = x.dynamics
+
 # Degrees of freedom
-dof(x::AbstractOrbit) = dof(Val(x.dynamics))
+dof(x::AbstractOrbit) = dof(Val(dynamicalmodel(x)))
 
 # Variables
 variables(x::AbstractOrbit) = x.variables
@@ -559,7 +562,7 @@ mass(orbit::AbstractOrbit, params::Parameters) =
 function summary(orbit::AbstractOrbit)
     O = nameof(typeof(orbit))
     T, U = numtypes(orbit)
-    D = orbit.dynamics
+    D = dynamicalmodel(orbit)
     Nobs, Nout = nobs(orbit), nout(orbit)
     Ndays = @sprintf("%.8f", numberofdays(orbit))
     t0 = epoch(orbit) + PE.J2000
