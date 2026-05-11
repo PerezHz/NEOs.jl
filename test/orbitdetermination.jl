@@ -27,6 +27,10 @@ end
 # Maximum relative error
 mre(x, y, z) = maximum(@. abs(x - y) / z)
 
+# Mahalanobis distance
+mahalanobis(x::AbstractVector, μ::AbstractVector, Σ::AbstractMatrix) =
+        sqrt((x - μ)' * inv(Diagonal(Σ)) * (x - μ))
+
 function jpl_compatibility_tests(orbit, params, bounds, JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
     @testset "Compatibility with JPL" begin
         # Reference epoch
@@ -65,6 +69,15 @@ function jpl_compatibility_tests(orbit, params, bounds, JPL_CAR, JPL_KEP, JPL_EQ
         @test mre(cartesian2attributable(q2), attr0, σattr0) < bounds[4]
         @test mre(keplerian2equinoctial(kep0, mjd0; μ = μ_S), eqn0, σeqn0) < bounds[5]
         @test mre(equinoctial2keplerian(eqn0, mjd0; μ = μ_S), kep0, σkep0) < bounds[5]
+        _kep_ = keplerian(orbit, params, t0 - 30)
+        _eqn_ = equinoctial(orbit, params, t0 - 30)
+        _attr_ = attributable(orbit, params, t0 - 30)
+        @test mahalanobis(elements(kep), elements(_kep_), covariance(kep)) > 1
+        @test mahalanobis(elements(kep), elements(_kep_), covariance(_kep_)) > 1
+        @test mahalanobis(elements(eqn), elements(_eqn_), covariance(eqn)) > 1
+        @test mahalanobis(elements(eqn), elements(_eqn_), covariance(_eqn_)) > 1
+        @test mahalanobis(elements(attr), elements(_attr_), covariance(attr)) > 1
+        @test mahalanobis(elements(attr), elements(_attr_), covariance(_attr_)) > 1
     end
 end
 
