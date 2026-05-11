@@ -44,6 +44,9 @@ function chi2(x::OpticalResidual)
         return (ξ_α^2 + ξ_δ^2 - 2ρ*ξ_α*ξ_δ) / (1 - ρ^2)
     end
 end
+chi(x::OpticalResidual) = sqrt(chi2(x))
+logchi(x::OpticalResidual) = log(chi(x))
+log10chi(x::OpticalResidual) = log10(chi(x))
 
 ra(x::OpticalResidual) = x.ra
 dec(x::OpticalResidual) = x.dec

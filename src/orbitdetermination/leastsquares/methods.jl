@@ -435,6 +435,9 @@ end
 
 function normalmatrix(ls::LevenbergMarquardt{T}, x::Vector{T}) where {T <: Real}
     evaluate!(ls.HQ, x, ls.d2Q)
+    for i in axes(ls.d2Q, 1)
+        ls.d2Q[i, i] *= (1 + ls.λ)
+    end
     return (ls.nobs / 2) * ls.d2Q
 end
 
