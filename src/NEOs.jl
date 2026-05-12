@@ -96,7 +96,7 @@ export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, ke
        shiftepoch
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
-       orbitdetermination
+       orbitdetermination, linkage
 # Impact monitoring
 export ImpactTarget, IMProblem, BPlane, MTP, bopik, mtp, targetplane, crosssection,
        valsecchi_circle

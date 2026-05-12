@@ -520,7 +520,7 @@ end
             boundary_projection, topo2bary, bary2topo, arW, ardW, ard2W,
             arS, ardS, ard2S, arG
 
-        # Fetch optical astrometry
+        # Read optical astrometry
         optical = read_optical_mpc80(joinpath(TEST_DATA, "2024BX1.txt"))
         # Parameters
         params = Parameters()
@@ -659,7 +659,7 @@ end
     end
 
     @testset "Too Short Arc" begin
-        # Fetch optical astrometry
+        # Read optical astrometry
         optical = read_optical_mpc80(joinpath(TEST_DATA, "2008EK68.txt"))
         # Subset of optical for IOD
         # suboptical = iodsuboptical(optical, 3)
@@ -747,7 +747,7 @@ end
     end
 
     @testset "Outlier Rejection" begin
-        # Fetch optical astrometry
+        # Read optical astrometry
         optical = read_optical_mpc80(joinpath(TEST_DATA, "2007VV7.txt"))
         # Subset of optical for IOD
         suboptical = iodsuboptical(optical, 3)
@@ -891,7 +891,7 @@ end
 
         # 2014 AA hit the Earth around January 2, 2014, 02:49 UTC
 
-        # Fetch optical astrometry
+        # Read optical astrometry
         optical = read_optical_mpc80(joinpath(TEST_DATA, "2014AA.txt"))
         # Subset of optical for IOD
         # suboptical = iodsuboptical(optical, 3)
@@ -979,7 +979,7 @@ end
 
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
-        # Fetch optical astrometry
+        # Read optical astrometry
         optical = read_optical_mpc80(joinpath(TEST_DATA, "2008TC3.txt"))
         # Subset of optical for IOD
         suboptical = iodsuboptical(optical, 3)
@@ -1339,6 +1339,95 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit1, params)
         @test 1.0E11 < Ma < Mc < Mb < 1.4E12
+    end
+
+    @testset "Linkage" begin
+        # Read optical astrometry
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2020NB1.txt"))
+
+        # Parameters
+        params = Parameters(
+            maxsteps = 20_000, order = 15, abstol = 1E-12, parse_eqs = true,
+            coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
+            gaussorder = 2, safegauss = false, refscale = :log,
+            tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
+            jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
+            jtlsproject = true, significance = 0.99, verbose = true,
+            outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10), fudge = 100.0,
+            max_per = 33.3
+        )
+
+        # Orbit determination problem with only the observations from 2020
+        idxs = findall(x -> date(x) > Date(2020), optical)
+        od = ODProblem(newtonian!, optical[idxs]; weights = Veres17, debias = Eggl20)
+        # Orbit Determination with only the observations from 2020
+        orbit = initialorbitdetermination(od, params)
+
+        # Include the observations from 2010
+        NEOs.update!(od, optical)
+        # Linkage
+        orbit = linkage(od, orbit, params)
+
+        # Values by May 12, 2026
+
+        # Check type
+        @test isa(orbit, OpticalOrbit{Float64})
+        # Tracklets
+        @test length(optical) == nobs(od) == nobs(orbit) == 44
+        @test numberofdays(optical) == numberofdays(orbit) < 3766
+        @test minmaxdates(orbit) == (date(optical[1]), date(optical[end]))
+        @test length(od.tracklets) == length(orbit.tracklets) == 18
+        @test od.tracklets == orbit.tracklets
+        @test orbit.tracklets[1].indices[1] == 1
+        @test orbit.tracklets[end].indices[end] == length(optical)
+        @test issorted(orbit.tracklets)
+        # Backward (forward) integration
+        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical[idxs]), atol = 6E+0)
+        @test dtutc2days(date(optical[1])) > orbit.bwd.t0 + orbit.bwd.t[end]
+        @test all( norm.(orbit.bwd.x, Inf) .< 3.7 )
+        @test dtutc2days(date(optical[end])) < orbit.fwd.t0 + orbit.fwd.t[end]
+        @test all( norm.(orbit.fwd.x, Inf) .< 2 )
+        # Vector of residuals
+        @test notout(orbit.ores) == 43
+        @test nout(orbit.ores) == 1
+        # Least squares fit
+        @test orbit.fit.success
+        @test all( sigmas(orbit) .< 1.4E-6 )
+        @test all( snr(orbit) .> 1E+5)
+        @test chi2(orbit) < 10.40
+        @test nrms(orbit) < 0.35
+        # Covariance matrix
+        Γ = covariance(orbit)
+        @test size(Γ) == (6, 6)
+        @test eigmin(Γ) > 0
+        @test isapprox(Γ, Γ')
+        # Convergence history
+        @test size(orbit.qs, 1) == 6
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
+        @test issorted(orbit.Qs, rev = true)
+        @test orbit.Qs[end] == nrms(orbit)
+        # Compatibility with JPL
+        JPL_CAR = [4.848674283176028E-01, -1.256976941043074E+00, 7.558473824624909E-02,
+                   2.837659541627720E-03, 1.669282318693257E-02, 4.630635236479733E-03]
+        JPL_KEP = [2.315552902881586E+00, 8.475227263442291E-01, 3.315750642722048E+01,
+                   1.778735230275155E+02, 2.484374010431416E+02, 3.416112652341685E+02]
+        JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
+        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
+        jpl_compatibility_tests(orbit, params, (2.8E+0, 3.8E+0, 1.2E-8, 2.3E-16, 9.3E-10),
+                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        # Absolute magnitude
+        H, dH = absolutemagnitude(orbit, params)
+        @test H - dH ≤ 20.59 ≤ H + dH
+        # MPC Uncertainty Parameter
+        @test uncertaintyparameter(orbit, params) == 1
+        # Diameter
+        Da, Db = minmax(diameter(H, 0.05), diameter(H, 0.25))
+        Dc = diameter(orbit, params)
+        @test 200 < Da < Dc < Db < 448
+        # Mass
+        Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
+        Mc = mass(orbit, params)
+        @test 1.0E+10 < Ma < Mc < Mb < 1.3E+11
     end
 
 end
