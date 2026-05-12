@@ -99,6 +99,7 @@ end
         warmuptests(sunearthmoon!, q00, jd0, nyears, params2)
     end
 
+    using NEOs: chi, logchi, log10chi
     using PlanetaryEphemeris: PlanetaryEphemerisSerialization, selecteph, ea, su, daysec,
           auday2kmsec
     using Statistics
@@ -163,8 +164,16 @@ end
             xve = eph_ea,
             xva = (sol_bwd, sol_fwd)
         )
-        res, _, _ = unfold(_res_)
 
+        @test iszero(zero(eltype(_res_)))
+        @test all(@. isa(string(_res_), String))
+        @test all(@. residual(_res_) == tuple(ra(_res_), dec(_res_)))
+        @test all(@. weight(_res_) == w8s)
+        @test all(@. debias(_res_) == bias)
+        @test sqrt(chi2(_res_)) ≤ sum(chi, _res_)
+        @test all(@. logchi(_res_) < log10chi(_res_) || chi(_res_) > 1)
+
+        res, _, _ = unfold(_res_)
         mean_optical0 = mean(res)
         std_optical0 = std(res)
         chi2_optical0 = chi2(res)
@@ -195,8 +204,16 @@ end
             xve = eph_ea,
             xva = (sol1, sol1)
         )
-        res1, _, _ = unfold(_res1_)
 
+        @test iszero(zero(eltype(_res1_)))
+        @test all(@. isa(string(_res1_), String))
+        @test all(@. residual(_res1_) == tuple(ra(_res1_), dec(_res1_)))
+        @test all(@. weight(_res1_) == w8s)
+        @test all(@. debias(_res1_) == bias)
+        @test sqrt(chi2(_res1_)) ≤ sum(chi, _res1_)
+        @test all(@. logchi(_res1_) < log10chi(_res1_) || chi(_res1_) > 1)
+
+        res1, _, _ = unfold(_res1_)
         mean_optical1 = mean(res1)
         std_optical1 = std(res1)
         chi2_optical1 = chi2(res1)
@@ -259,9 +276,17 @@ end
             xve = eph_ea,
             xva = (sol, sol)
         )
-        res_ra, res_dec = @. ra(res_optical), dec(res_optical)
+
+        @test iszero(zero(eltype(res_optical)))
+        @test all(@. isa(string(res_optical), String))
+        @test all(@. residual(res_optical) == tuple(ra(res_optical), dec(res_optical)))
+        @test all(@. weight(res_optical) == w8s)
+        @test all(@. debias(res_optical) == bias)
+        @test sqrt(chi2(res_optical)) ≤ sum(chi, res_optical)
+        @test all(@. logchi(res_optical) < log10chi(res_optical) || chi(res_optical) > 1)
 
         # Compute mean optical astrometric residual (right ascension and declination)
+        res_ra, res_dec = @. ra(res_optical), dec(res_optical)
         mean_ra, mean_dec = mean(res_ra), mean(res_dec)
         std_ra, std_dec = std(res_ra), std(res_dec)
         chi2_ra, chi2_dec = chi2(res_ra), chi2(res_dec)
@@ -450,9 +475,17 @@ end
             xve = eph_ea,
             xva = (sol, sol)
         )
-        res_ra, res_dec = @. ra(res_optical), dec(res_optical)
+
+        @test iszero(zero(eltype(res_optical)))
+        @test all(@. isa(string(res_optical), String))
+        @test all(@. residual(res_optical) == tuple(ra(res_optical), dec(res_optical)))
+        @test all(@. weight(res_optical) == w8s)
+        @test all(@. debias(res_optical) == bias)
+        @test sqrt(chi2(res_optical)) ≤ sum(chi, res_optical)
+        # @test all(@. logchi(res_optical) < log10chi(res_optical) || chi(res_optical) > 1)
 
         # Compute mean optical astrometric residual (right ascension and declination)
+        res_ra, res_dec = @. ra(res_optical), dec(res_optical)
         mean_ra, mean_dec = mean(res_ra), mean(res_dec)
         std_ra, std_dec = std(res_ra), std(res_dec)
         chi2_ra, chi2_dec = chi2(res_ra), chi2(res_dec)
