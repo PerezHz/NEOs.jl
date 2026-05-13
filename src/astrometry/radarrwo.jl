@@ -64,6 +64,13 @@ frequency(x::RadarRWO) = frequency(x.trx, date(x))
 function frequency(observatory::ObservatoryMPC{T}, date::DateTime) where {T <: Real}
     code = observatory.code
     year = Dates.year(date)
+    # Stations that have no observations as the transmitter antenna
+    # [-9]  Green Bank
+    # [-38] Yevpatoriya
+    # [-47] ATCA DSS 47
+    # [-70] Lovell (76-m, Jodrell Bank)
+    # [-74] Ceduna 30, UTAS
+    # [-86] Usuda DSS 64
     # Arecibo uses 2380 MHz almost all the time
     if code == "251"
         # except its first observation of Eros (1975-01-23)
@@ -78,8 +85,6 @@ function frequency(observatory::ObservatoryMPC{T}, date::DateTime) where {T <: R
     # Haystack, Westford only has two Icarus observations in 1968 both in 7840.0 MHz
     elseif code == "254"
         freq = 7840.0
-    # Green Bank has no observations as the transmitter antenna
-    # elseif code == "256"
     # Goldstone DSS 13, Fort Irwin uses 7190 MHz
     elseif code == "252"
         # except its Icarus observations in 1968
@@ -114,14 +119,12 @@ function frequency(observatory::ObservatoryMPC{T}, date::DateTime) where {T <: R
     # between 2019 and 2025 all in 7159.45 MHz
     elseif code in ("272", "263", "264", "265")
         freq = 7159.45
-    # Yevpatoriya has no observations as the transmitter antenna
-    # elseif code == "255"
-    # ATCA DSS 47 has no observations as the transmitter antenna
+    # Madrid DSS-63 (70-m) has a single 2025 FA22 observation in 7167.0 MHz (2025-09-18)
+    elseif code == "R47"
+        freq = 7167.0
     # EISCAT Tromso UHF only has one 367943 observation in 929.6 MHz (2013-02-15)
     elseif code == "259"
         freq = 929.6
-    # Ceduna 30, UTAS and Usuda DSS 64 have no observations as the transmitter antenna
-    # elseif code in ("287", "308")
     # Unknown observatory
     else
         freq = T(NaN)
