@@ -407,3 +407,83 @@ function jtls(
 
     return orbits[k]
 end
+
+"""
+    linkage(od, porbit, params; kwargs...)
+
+Fit an orbit to an orbit determination problem `od` by successively
+scaling the weights of the observations that are in `od` but not in
+a preliminary orbit `porbit`. For a list of parameters, see the
+`Least Squares` section of [`Parameters`](@ref).
+
+# Keyword arguments
+
+- `maxiter::Int`: maximum number of iterations (default: `10`).
+"""
+function linkage(
+        od::OpticalODProblem{D, T, O}, porbit::AbstractOrbit, params::Parameters{T};
+        maxiter::Int = 10
+    ) where {D, T <: Real, O <: AbstractOpticalVector{T}}
+    # Unpack
+    @unpack verbose = params
+    # Reference epoch [Julian days TDB]
+    jd0 = epoch(porbit) + PE.J2000
+    # Find observations in od that are not in porbit
+    trks = setdiff(od.tracklets, porbit.tracklets)
+    idxs = indices(trks)
+    # Original weights
+    w8s = deepcopy(od.weights.weights)
+    # Initialize buffer and set of residuals
+    buffer = PropresBuffer(od, porbit(), jd0, params)
+    res = init_residuals(T, od, porbit)
+    # Select first scaling factor
+    mags = Vector{Int}(undef, length(trks))
+    propres!(res, od, porbit(), jd0, params; buffer)
+    for i in eachindex(mags)
+        x = maximum(log10chi, view(res, indices(trks[i])))
+        mags[i] = ceil(Int, x)
+    end
+    k = max(0, minimum(mags) - 1)
+    # Main cycle
+    orbit = zero(OpticalLeastSquaresOrbit{D, T, T, O})
+    for i in 1:maxiter
+        # Scale down weights
+        for j in idxs
+            wra, wdec = w8s[j] ./ 10^k
+            res[j] = OpticalResidual{T, T}(ra(res[j]), dec(res[j]), wra, wdec,
+                dra(res[j]), ddec(res[j]), corr(res[j]), isoutlier(res[j]))
+            od.weights.weights[j] = (wra, wdec)
+        end
+        # Jet transport least squares
+        if i == 1
+            orbit = jtls(od, porbit, params)
+        else
+            orbit = jtls(od, orbit, params)
+        end
+        # Break conditions
+        if iszero(k) || nrms(orbit) > 10
+            if nrms(orbit) < 10 && nobs(orbit) == nobs(od)
+                verbose && println(
+                    "* Linkage converged in $i iterations to: \n\n",
+                    summary(orbit)
+                )
+            else
+                verbose && @warn("Linkage did not converge within the \
+                    given parameters or could not fit all the astrometry")
+            end
+            break
+        end
+        # Scale up weights
+        propres!(res, od, orbit(), jd0, params; buffer)
+        for i in eachindex(mags)
+            x = maximum(log10chi, view(res, indices(trks[i])))
+            mags[i] = ceil(Int, x)
+        end
+        k += min(-1, minimum(mags))
+        k = max(0, k)
+    end
+    # Return weights to original
+    od.weights.weights .= w8s
+
+    return orbit
+end
