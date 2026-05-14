@@ -35,7 +35,7 @@ end
 project(::AbstractVector{T}, Γ::AbstractMatrix{T}) where {T <: Real} =
     fill(T(NaN), size(Γ))
 
-function project(y::AbstractVector{TaylorN{T}}, Γ::AbstractMatrix{T}) where {T <: Real}
+function project(y::AbstractVector{TaylorN{T}}, Γ::AbstractMatrix) where {T <: Real}
     J = Matrix{TaylorN{T}}(undef, get_numvars(), length(y))
     for i in eachindex(y)
         J[:, i] = TS.gradient(y[i])
