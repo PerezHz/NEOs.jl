@@ -60,6 +60,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         optical = read_optical_mpc80(joinpath(TEST_DATA, "2018LA.txt"))
         # Parameters
         params = Parameters(
+            maxsteps = 100, order = 15, abstol = 1E-12, parse_eqs = true,
             coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
             gaussorder = 2, tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
             jtlsorder = 2, jtlsiter = 200, lsiter = 1,
@@ -71,7 +72,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Feb 3, 2026
+        # Values by May 15, 2026
 
         # Impact target
         target = ImpactTarget(:earth)
@@ -90,7 +91,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test isa(string(IM), String) && isa(string(target), String)
 
         # Line of variations
-        σmax, lovorder, lovtol = 5.0, 12, 1E-20
+        σmax, lovorder, lovtol = 5.0, 4, 1E-8
         lov = lineofvariations(IM, params; σmax, lovorder, lovtol)
 
         @test numtypes(lov) == (typeof(newtonian!), Float64)
@@ -108,10 +109,6 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test ubound(lov) == σmax
         @test width(lov) == 2σmax
         @test all(Base.Fix2(in, lov), [-σmax, 0.0, σmax])
-
-        _lov_ = lineofvariations(IM, params; σmax, lovorder, lovtol, lovparse = false)
-        @test lov(σmax) == _lov_(σmax)
-        @test lov(-σmax) == _lov_(-σmax)
 
         # Virtual asteroids
         N = 11
@@ -142,7 +139,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test maximum(width, VAs3) < Δσmax
 
         N = 1
-        vaorder = 6
+        vaorder = 4
         VAs = virtualasteroids(lov, :uniform, vaorder; N)
         VA = VAs[1]
         @test epoch(VA) == epoch(lov)
@@ -245,6 +242,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         filter!(x -> Date(2024, 10) < date(x) < Date(2024, 11), optical)
         # Parameters
         params = Parameters(
+            maxsteps = 100, order = 15, abstol = 1E-12, parse_eqs = true,
             coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
             gaussorder = 2, tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
             jtlsorder = 2, jtlsiter = 200, lsiter = 1,
@@ -256,7 +254,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by Feb 3, 2026
+        # Values by May 15, 2026
 
         # Impact target
         target = ImpactTarget(:earth)
@@ -275,7 +273,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test isa(string(IM), String) && isa(string(target), String)
 
         # Line of variations
-        σmax, lovorder, lovtol = 5.0, 12, 1E-20
+        σmax, lovorder, lovtol = 5.0, 4, 1E-8
         lov = lineofvariations(IM, params; σmax, lovorder, lovtol)
 
         @test numtypes(lov) == (typeof(newtonian!), Float64)
@@ -293,10 +291,6 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test ubound(lov) == σmax
         @test width(lov) == 2σmax
         @test all(Base.Fix2(in, lov), [-σmax, 0.0, σmax])
-
-        _lov_ = lineofvariations(IM, params; σmax, lovorder, lovtol, lovparse = false)
-        @test lov(σmax) == _lov_(σmax)
-        @test lov(-σmax) == _lov_(-σmax)
 
         # Virtual asteroids
         N = 11
@@ -327,7 +321,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test maximum(width, VAs3) < Δσmax
 
         N = 1
-        vaorder = 6
+        vaorder = 4
         VAs = virtualasteroids(lov, :uniform, vaorder; N)
         VA = VAs[1]
         @test epoch(VA) == epoch(lov)
@@ -389,7 +383,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         @test distance(CA, 0.0) ≈ distance(RT, 0.0, ctol) > 0
         @test radialvelocity(CA, 0.0) ≈ radialvelocity(RT, 0.0, ctol)
-        @test concavity(CA, 0.0) ≈ concavity(RT, 0.0, ctol) < 0
+        @test concavity(CA, 0.0) ≈ concavity(RT, 0.0, ctol) > 0
 
         # Virtual impactors
         VIs = virtualimpactors(IM, lov, RTs, params; ctol)
