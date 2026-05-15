@@ -116,23 +116,6 @@ end
 (x::LineOfVariations)(σ::Number, domain::NTuple{2, <:Number}) =
     x(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(get_order(x)))
 
-# Hessian matrix without evaluation
-# TO DO: move this function to TaylorSeries
-function hessianmatrix(f::TaylorN{T}) where {T <: Number}
-    numVars = get_numvars()
-    hess = Matrix{TaylorN{T}}(undef, numVars, numVars)
-    ntup = zeros(Int, numVars)
-    for j in axes(hess, 2)
-        for i in axes(hess, 1)
-            ntup .= 0
-            ntup[i] += 1
-            ntup[j] += 1
-            hess[i, j] = differentiate(f, tuple(ntup...))
-        end
-    end
-    return hess
-end
-
 # Coordinate transformations
 lovtransform(::Real, x::AbstractVector, ::AbstractVector, ::Val{:cartesian},
     ::Val{:cartesian}) = collect(x)
@@ -175,7 +158,7 @@ function covariance(
     propres!(resTN, IM, carTN, jd0, params; buffer = bufferTN)
     # Covariance matrix in residuals space
     QTN = nms(resTN)
-    CTN_res = notout(resTN) * hessianmatrix(QTN)
+    CTN_res = notout(resTN) * TS.hessianmatrix(QTN)
     ΓTN_res = inv(Symmetric(CTN_res))
     # Covariance matrix in coordinate space
     coordTN = lovtransform(mjd0, carTN, sun, Val(:cartesian), Val(coord))
