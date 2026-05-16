@@ -5,19 +5,21 @@ Pre-allocated memory for [`lineofvariations`](@ref).
 
 # Fields
 
+- `t0::T`: reference epoch [TDB days since J2000].
+- `sun::Vector{T}`: Sun barycentric cartesian state vector at `t0` [au, au/day].
+- `scalings::Vector{T}`: covariance matrix scaling factors.
 - `resTN::Vector{OpticalResidual{T, TaylorN{T}}}`: buffer for `TaylorN{T}` residuals.
-- `resT1::Vector{OpticalResidual{T, Taylor1{T}}}`: buffer for `Taylor1{T}` residuals.
 - `bufferTN::PropresBuffer{T, TaylorN{T}, T}`: buffer for `TaylorN{T}` propagations.
-- `bufferT1::PropresBuffer{T, Taylor1{T}, T}`: buffer for `Taylor1{T}` propagations.
 """
 struct LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
+    t0::T
+    sun::Vector{T}
+    scalings::Vector{T}
     resTN::Vector{OpticalResidual{T, TaylorN{T}}}
-    resT1::Vector{OpticalResidual{T, Taylor1{T}}}
     bufferTN::PropresBuffer{T, TaylorN{T}, T}
-    bufferT1::PropresBuffer{T, Taylor1{T}, T}
 end
 
-get_order(x::LineOfVariationsBuffer) = get_order(x.bufferT1.prop.cache.x[1][0])
+get_order(x::LineOfVariationsBuffer) = get_order(x.bufferTN.prop.cache.x[1][0])
 
 """
     LineOfVariationsBuffer(IM, lovorder, params)
@@ -35,22 +37,29 @@ function LineOfVariationsBuffer(IM::AbstractIMProblem{D, T}, lovorder::Int,
                                 params::Parameters{T}) where {D, T <: Real}
     # Unpack
     @unpack orbit = IM
-    # Refence epoch [julian date TDB]
-    jd0 = epoch(orbit) + PE.J2000
+    @unpack eph_su = params
     # Set jet transport order
-    set_od_order(T, 2, dof(IM))
+    Ndof = dof(IM)
+    set_od_order(T, lovorder, Ndof)
+    # Refence epoch [julian date TDB]
+    t0 = epoch(orbit)
+    jd0 = t0 + PE.J2000
+    # Sun's state vector at jd0
+    sun = eph_su(t0)
+    # Covariance matrix scaling factors
+    scalings = fill(1E-8, 6)
+    if Ndof == 9
+        scalings = vcat(scalings, params.marsden_scalings...)
+    end
     # Initial condition
     q00 = orbit()
-    q0TN = q00 + sigmas(orbit) .* get_variables(T, 2)
-    q0T1 = q00 + sigmas(orbit) .* Taylor1(lovorder)
+    q0TN = q00 + sigmas(orbit) .* get_variables(T, lovorder)
     # Vectors of residuals
     resTN = init_optical_residuals(TaylorN{T}, IM)
-    resT1 = init_optical_residuals(Taylor1{T}, IM)
     # Propagation and residuals buffers
     bufferTN = PropresBuffer(IM, q0TN, jd0, params)
-    bufferT1 = PropresBuffer(IM, q0T1, jd0, params)
 
-    return LineOfVariationsBuffer{T}(resTN, resT1, bufferTN, bufferT1)
+    return LineOfVariationsBuffer{T}(t0, sun, scalings, resTN, bufferTN)
 end
 
 """
@@ -107,42 +116,7 @@ end
 (x::LineOfVariations)(σ::Number, domain::NTuple{2, <:Number}) =
     x(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(get_order(x)))
 
-# Return the Taylor expansion of the vector field associated to the
-# weak direction of Γ; see https://doi.org/10.1137/23M1551961
-function weakfield(Γ::AbstractMatrix{Taylor1{T}}, order::Int) where {T <: Real}
-    # Allocate memory
-    Lx, Ly = size(Γ)
-    λs = Vector{T}(undef, order+1)
-    vs = Matrix{T}(undef, Lx, order+1)
-    As = Array{T}(undef, Lx, Ly, order+1)
-    # 0th-order eigenvalues
-    As[:, :, 1] = Symmetric(constant_term.(Γ))
-    E0 = eigen(As[:, :, 1])
-    λs[1], vs[:, 1] = E0.values[end], E0.vectors[:, end]
-    # Coefficients matrix
-    E = [0 vs[:, 1]'; vs[:, 1] λs[1]*I-As[:, :, 1]]
-    # Main loop
-    for k in 1:order
-        As[:, :, k+1] = TS.differentiate.(k, Γ)
-        y, z = zeros(T, Lx), zero(T)
-        for l in 0:k-1
-            y += binomial(k, l) * As[:, :, k-l+1] * vs[:, l+1]
-            if l >= 1
-                y -= binomial(k, l) * vs[:, k-l+1] * λs[l+1]
-                if l < k -1
-                    z += binomial(k-1, l-1) * vs[:, k-l+1]' * vs[:, l+1]
-                end
-            end
-        end
-        Ek = E \ [-z/2; y]
-        λs[k+1], vs[:, k+1] = Ek[1], Ek[2:end]
-    end
-    λ = Taylor1(λs, order)
-    v = [Taylor1(vs[i, :], order) for i in axes(vs, 1)]
-    F = sqrt(λ) * v
-    return F
-end
-
+# Coordinate transformations
 lovtransform(::Real, x::AbstractVector, ::AbstractVector, ::Val{:cartesian},
     ::Val{:cartesian}) = collect(x)
 
@@ -164,65 +138,63 @@ lovtransform(t::Real, x::AbstractVector, sun::AbstractVector, ::Val{:cartesian},
 lovtransform(t::Real, x::AbstractVector, sun::AbstractVector, ::Val{:keplerian},
     ::Val{:cartesian}) = collect(ecliptic2equatorial(keplerian2cartesian(x, t)) + sun)
 
-# Return the Taylor expansion of the vector field associated to the
-# weak direction of an orbit
-function weakfield(
+# Return the jet transport expansion of the covariance matrix
+# of an orbit in the required coordinates
+function covariance(
         IM::AbstractIMProblem{D, T}, coord00::Vector{T}, coord::Symbol,
         buffer::LineOfVariationsBuffer{T}, params::Parameters{T}
     ) where {D, T <: Real}
     # Unpack
-    @unpack orbit = IM
-    @unpack eph_su = params
-    @unpack resTN, resT1, bufferTN, bufferT1 = buffer
-    # Refence epoch [days since J2000 / JDTDB / MJDTDB]
-    t0 = epoch(orbit)
-    jd0 = t0 + PE.J2000
+    @unpack t0, sun, scalings, resTN, bufferTN = buffer
+    # Refence epoch [MJDTDB, JDTDB]
     mjd0 = t0 + MJD2000
+    jd0 = t0 + PE.J2000
     # Order with respect to LOV index
     order = get_order(buffer)
-    # Sun's state vector at jd0
-    sun = eph_su(t0)
     # Jet transpot initial condition
-    scalings = fill(1e-8, 6)
-    if get_numvars() == 9
-        scalings = vcat(scalings, params.marsden_scalings...)
-    end
     car00 = lovtransform(mjd0, coord00, sun, Val(coord), Val(:cartesian))
-    carTN = car00 + scalings .* get_variables(T, 2)
+    carTN = car00 + scalings .* get_variables(T, order)
     # TaylorN propagation and residuals
     propres!(resTN, IM, carTN, jd0, params; buffer = bufferTN)
     # Covariance matrix in residuals space
     QTN = nms(resTN)
-    CTN_res = notout(resTN) * TS.hessian(QTN)
+    CTN_res = notout(resTN) * TS.hessianmatrix(QTN)
     ΓTN_res = inv(Symmetric(CTN_res))
     # Covariance matrix in coordinate space
     coordTN = lovtransform(mjd0, carTN, sun, Val(:cartesian), Val(coord))
-    Γ_coord = Symmetric(project(coordTN, zeros(T, get_numvars()), ΓTN_res))
-    # Weak direction eigenpair
-    E_coord = eigen(Γ_coord)
-    k1, v1 = sqrt(E_coord.values[end]), E_coord.vectors[:, end]
-    # Perturbation along the weak direction
-    coordT1 = coord00 + k1 * v1 * Taylor1(order)
-    carT1 = lovtransform(mjd0, coordT1, sun, Val(coord), Val(:cartesian))
-    # Note: the above transformation is only consistent to first order
-    for i in eachindex(carT1)
-        carT1[i][2:end] .= zero(T)
-    end
-    # Taylor1 propagation and residuals
-    propres!(resT1, IM, carT1, jd0, params; buffer = bufferT1)
-    # Covariance matrix in residuals space
-    QT1 = nms(resT1)
-    dQT1, d2QT1 = zero(QT1), zero(QT1)
-    TS.differentiate!(dQT1, QT1)
-    TS.differentiate!(d2QT1, dQT1)
-    CT1_res = notout(resT1) * d2QT1
-    ΓT1_res = inv(CT1_res)
-    # Covariance matrix in coordinate space
-    coordT1 = lovtransform(mjd0, carT1, sun, Val(:cartesian), Val(coord))
-    ΓT1_coord = Symmetric(project(coordT1, ΓT1_res))
-    # Vector field associated to the weak direction
-    F = weakfield(ΓT1_coord, order)
+    ΓTN_coord = Symmetric(project(coordTN, ΓTN_res))
+    return ΓTN_coord
+end
 
+# Return the Taylor expansion of the vector field associated to the
+# weak direction of Γ; see https://doi.org/10.1137/23M1551961
+function weakfield(Γ::AbstractMatrix{Taylor1{T}}, order::Int) where {T <: Real}
+    # 0th-order eigenvalues
+    Γ0 = Symmetric(constant_term.(Γ))
+    E0 = eigen(Γ0)
+    λ = Taylor1(E0.values[end], order)
+    v = Taylor1.(E0.vectors[:, end], order)
+    # Coefficients matrix
+    E = [0 E0.vectors[:, end]'; E0.vectors[:, end] E0.values[end]*I-Γ0]
+    # Main loop
+    for k in 1:order
+        y, z = zeros(T, length(v)), zero(T)
+        for l in 0:k-1
+            y .+= getcoeff.(Γ, k-l) * getcoeff.(v, l)
+            if l >= 1
+                y .-= getcoeff.(v, k-l) * λ[l]
+                if l < k - 1
+                    z += l * getcoeff.(v, k-l)' * getcoeff.(v, l)
+                end
+            end
+        end
+        Ek = E \ [-z/(2k); y]
+        λ[k] = Ek[1]
+        for i in eachindex(v)
+            v[i][k] = Ek[i+1]
+        end
+    end
+    F = sqrt(λ) * v
     return F
 end
 
@@ -235,16 +207,7 @@ Definition of the line of variations as a differential equation.
     See equation (10.2) in section 10.1:
     - https://doi.org/10.1017/CBO9781139175371
 """
-function lov!(dq, q, params, t)
-    local F = weakfield(params[1], cte(q), params[2], params[3], params[4])
-    dq[1] = F[1]
-    dq[2] = F[2]
-    dq[3] = F[3]
-    dq[4] = F[4]
-    dq[5] = F[5]
-    dq[6] = F[6]
-    return nothing
-end
+function lov! end
 
 # Methods of `TaylorIntegration._allocate_jetcoeffs!` and `TaylorIntegration.jetcoeffs!`
 # generated by @taylorize for lov!
@@ -252,14 +215,6 @@ function TaylorIntegration._allocate_jetcoeffs!(
         ::Val{lov!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N},
         dq::AbstractArray{Taylor1{_S}, _N}, params
     ) where {_T <: Real, _S <: Number, _N}
-    order = get_order(t)
-    local F = weakfield(params[1], cte(q), params[2], params[3], params[4])
-    dq[1] = Taylor1(identity(constant_term(F[1])), order)
-    dq[2] = Taylor1(identity(constant_term(F[2])), order)
-    dq[3] = Taylor1(identity(constant_term(F[3])), order)
-    dq[4] = Taylor1(identity(constant_term(F[4])), order)
-    dq[5] = Taylor1(identity(constant_term(F[5])), order)
-    dq[6] = Taylor1(identity(constant_term(F[6])), order)
     return TaylorIntegration.RetAlloc{Taylor1{_S}}(
         Taylor1{_S}[], [Array{Taylor1{_S}, 1}(undef, 0)],
         [Array{Taylor1{_S}, 2}(undef, 0, 0)],
@@ -274,17 +229,19 @@ function TaylorIntegration.jetcoeffs!(
         __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}
     ) where {_T <: Real, _S <: Number, _N}
     order = get_order(t)
-    local F = weakfield(params[1], cte(q), params[2], params[3], params[4])
+    local IM, coord, buffer, _params_ = params
+    @unpack t0, sun, scalings = buffer
+    local mjd0 = t0 + MJD2000
+    local ΓTN_coord = covariance(IM, cte(q), coord, buffer, _params_)
     for ord = 0:order - 1
         ordnext = ord + 1
-        TaylorSeries.identity!(dq[1], F[1], ord)
-        TaylorSeries.identity!(dq[2], F[2], ord)
-        TaylorSeries.identity!(dq[3], F[3], ord)
-        TaylorSeries.identity!(dq[4], F[4], ord)
-        TaylorSeries.identity!(dq[5], F[5], ord)
-        TaylorSeries.identity!(dq[6], F[6], ord)
-        for __idx = eachindex(q)
-            TaylorIntegration.solcoeff!(q[__idx], dq[__idx], ordnext)
+        carT1 = lovtransform(mjd0, reduceorder.(q, ord), sun, Val(coord), Val(:cartesian))
+        dx = @. (carT1 - cte(carT1)) / scalings
+        ΓT1_coord = ΓTN_coord(dx)
+        F = weakfield(ΓT1_coord, ord)
+        for i in eachindex(F)
+            TaylorSeries.identity!(dq[i], F[i], ord)
+            TaylorIntegration.solcoeff!(q[i], dq[i], ordnext)
         end
     end
     return nothing
@@ -302,36 +259,34 @@ impact monitoring problem `IM`. For a list of parameters, see the
 - `coord::Symbol`: coordinates for the LOV; accepted values are: `:cartesian`
     (default), `:equinoctial`, `:keplerian` and `:attributable`.
 - `σmax::Real`: maximum (absolute) value of the LOV index (default: `3.0`).
-- `lovorder::Int`: order of Taylor expansions wrt LOV index (default: `12`).
-- `lovtol::Real`: absolute tolerance used to integrate the LOV (default: `1E-20`).
+- `lovorder::Int`: order of Taylor expansions wrt LOV index (default: `4`).
+- `lovtol::Real`: absolute tolerance used to integrate the LOV (default: `1E-8`).
 - `lovsteps::Int`: maximum number of steps for the integration (default: `100`).
-- `lovparse::Bool`: whether to use the specialized method of `jetcoeffs` or not
-    (default: `true`).
 """
 function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
                           coord::Symbol = :cartesian, σmax::Real = 3.0,
-                          lovorder::Int = 12, lovtol::Real = 1E-20,
-                          lovsteps::Int = 100, lovparse::Bool = true) where {D, T <: Real}
-    # Unpack
-    @unpack orbit = IM
-    @unpack eph_su = params
-    # Refence epoch [days since J2000 / MJDTDB]
-    t0 = epoch(orbit)
-    mjd0 = t0 + MJD2000
-    # Sun's state vector at t0 [au, au/day]
-    sun = eph_su(t0)
-    # Initial condition
-    q00 = orbit()
+                          lovorder::Int = 4, lovtol::Real = 1E-8,
+                          lovsteps::Int = 100) where {D, T <: Real}
     # Line of variations buffer
     buffer = LineOfVariationsBuffer(IM, lovorder, params)
-    # Taylor expansion of the line of variations
+    # Unpack
+    @unpack orbit = IM
+    @unpack t0, sun = buffer
+    # Refence epoch [days since J2000 / MJDTDB]
+    mjd0 = t0 + MJD2000
+    # Initial condition
+    q00 = orbit()
     coord00 = lovtransform(mjd0, q00, sun, Val(:cartesian), Val(coord))
+    # TaylorIntegration cache
     lovparams = (IM, coord, buffer, params)
-    _bwd_ = taylorinteg(lov!, coord00, zero(T), -σmax, lovorder, lovtol, lovparams;
-                        maxsteps = lovsteps, parse_eqs = lovparse, dense = true)
-    _fwd_ = taylorinteg(lov!, coord00, zero(T), σmax, lovorder, lovtol, lovparams;
-                        maxsteps = lovsteps, parse_eqs = lovparse, dense = true)
+    cache = init_cache(Val(true), zero(T), coord00, lovsteps, lovorder, lov!,
+                       lovparams; parse_eqs = true)
+    # Taylor expansion of the line of variations
+    _bwd_ = taylorinteg!(Val(true), lov!, coord00, zero(T), -σmax, lovtol,
+                        cache, lovparams; maxsteps = lovsteps)
     bwd = TaylorInterpolant{T, T, 2}(zero(T), _bwd_.t, _bwd_.p)
+    _fwd_ = taylorinteg!(Val(true), lov!, coord00, zero(T), σmax, lovtol,
+                        cache, lovparams; maxsteps = lovsteps)
     fwd = TaylorInterpolant{T, T, 2}(zero(T), _fwd_.t, _fwd_.p)
     # The positive sigma direction is given by the semimajor axis
     q0T1 = lovtransform(mjd0, fwd.x[1, :], sun, Val(coord), Val(:cartesian)) - sun
