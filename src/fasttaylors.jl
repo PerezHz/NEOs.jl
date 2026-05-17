@@ -11,7 +11,7 @@ show(io::IO, x::AbstractBuffer) = print(io, typeof(x))
 auxzero(a::AbstractSeries) = zero(a)
 
 # Return a `TaylorN` with zero coefficients of the same type as `a.coeffs`
-auxzero(a::TaylorN{Taylor1{T}}) where {T <: Number} = TaylorN(zero.(a.coeffs))
+# auxzero(a::TaylorN{Taylor1{T}}) where {T <: Number} = TaylorN(zero.(a.coeffs))
 
 # Extract the linear scaling factor from a TaylorN
 scalingfactor(x::TaylorN{T}) where {T <: Real} = x[1][findfirst(x[1])]
@@ -129,8 +129,8 @@ Evaluate `eph` at time `t` with type given by `q`.
 evaleph(eph::TaylorInterpolant, t::Taylor1, q::Taylor1{U}) where {U} =
     map(x -> Taylor1( x.coeffs * one(q[0]) ), tpeeval(eph, t))
 
-evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T <: Real} =
-    one(q) * eph(t)
+# evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T <: Real} =
+#    one(q) * eph(t)
 
 evaleph(eph::NTuple{2, DensePropagation2{T, U}}, et::Number) where {T, U} =
     bwdfwdeph(et, eph[1], eph[2])
