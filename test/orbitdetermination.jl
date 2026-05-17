@@ -228,7 +228,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 12, 2026
+        # Values by May 16, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -251,6 +251,7 @@ end
         @test notout(orbit.ores) == 9
         @test nout(orbit.ores) == 0
         # Least squares fit
+        @test isa(string(orbit.fit), String)
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 9e-4 )
         @test all( snr(orbit) .> 14.5)
@@ -317,6 +318,7 @@ end
         @test notout(orbit1.ores) == 43
         @test nout(orbit1.ores) == 0
         # Least squares fit
+        @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
         @test all( sigmas(orbit1) .< 2e-4 )
         @test all( snr(orbit1) .> 866 )
@@ -369,7 +371,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 12, 2026
+        # Values by May 16, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -392,6 +394,7 @@ end
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
         # Least squares fit
+        @test isa(string(orbit.fit), String)
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 5e-3 )
         @test all( snr(orbit) .> 21.4)
@@ -452,7 +455,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by May 12, 2026
+        # Values by May 16, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -475,6 +478,7 @@ end
         @test notout(orbit.ores) == 12
         @test nout(orbit.ores) == 0
         # Least squares fit
+        @test isa(string(orbit.fit), String)
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 6.6e-4 )
         @test all( snr(orbit) .> 38.8)
@@ -530,7 +534,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by May 12, 2026
+        # Values by May 16, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -678,7 +682,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 12, 2026
+        # Values by May 16, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -707,6 +711,7 @@ end
         @test notout(orbit.ores) == 10
         @test nout(orbit.ores) == 0
         # Least squares fit
+        @test isa(string(orbit.fit), String)
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 6e-3 )
         @test all( snr(orbit) .> 4.1)
@@ -764,7 +769,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 12, 2026
+        # Values by May 16, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -787,6 +792,7 @@ end
         @test notout(orbit.ores) == 16
         @test nout(orbit.ores) == 2
         # Least squares fit
+        @test isa(string(orbit.fit), String)
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 4e-3 )
         @test all( snr(orbit) .> 50)
@@ -851,6 +857,7 @@ end
         @test notout(orbit1.ores) == 19
         @test nout(orbit1.ores) == 2
         # Least squares fit
+        @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
         @test all( sigmas(orbit1) .< 3e-4 )
         @test all( snr(orbit1) .> 574)
@@ -910,7 +917,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 12, 2026
+        # Values by May 16, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -939,6 +946,7 @@ end
         @test notout(orbit.ores) == 7
         @test nout(orbit.ores) == 0
         # Least squares fit
+        @test isa(string(orbit.fit), String)
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 3e-4 )
         @test all( snr(orbit) .> 20.5)
@@ -996,7 +1004,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 12, 2026
+        # Values by May 16, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1019,6 +1027,7 @@ end
         @test notout(orbit.ores) == 18
         @test nout(orbit.ores) == 0
         # Least squares fit
+        @test isa(string(orbit.fit), String)
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 2e-5 )
         @test all( snr(orbit) .> 644)
@@ -1085,6 +1094,7 @@ end
         @test notout(orbit1.ores) == 97
         @test nout(orbit1.ores) == 0
         # Least squares fit
+        @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
         @test all( sigmas(orbit1) .< 4e-7 )
         @test all( snr(orbit1) .> 21_880)
@@ -1167,7 +1177,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by May 12, 2026
+        # Values by May 16, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1191,6 +1201,7 @@ end
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
         # Least squares fit
+        @test isa(string(orbit.fit), String)
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 0.018 )
         @test all( snr(orbit) .> 7.00)
@@ -1271,7 +1282,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by May 12, 2026
+        # Values by May 16, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1302,6 +1313,7 @@ end
         @test nout(orbit1.ores) == 0
         @test nout(orbit1.rres) == 0
         # Least squares fit
+        @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
         @test all( sigmas(orbit1) .< 2.9e-7 )
         @test all( snr(orbit1) .> 8_342)
@@ -1368,7 +1380,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by May 12, 2026
+        # Values by May 16, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1391,6 +1403,7 @@ end
         @test notout(orbit.ores) == 43
         @test nout(orbit.ores) == 1
         # Least squares fit
+        @test isa(string(orbit.fit), String)
         @test orbit.fit.success
         @test all( sigmas(orbit) .< 1.4E-6 )
         @test all( snr(orbit) .> 1E+5)
