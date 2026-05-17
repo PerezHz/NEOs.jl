@@ -11,8 +11,8 @@ Near-Earth Objects. `NEOs.jl` exploits jet transport techniques via
 
 ## Authors
 
-- [Jorge A. Pérez](https://github.com/PerezHz),
-Minor Planet Center, Harvard & Smithsonian Center for Astrophysics
+- [Jorge A. Pérez Hernández](https://github.com/PerezHz),
+Minor Planet Center, Center for Astrophysics | Harvard & Smithsonian
 - [Luis Benet](http://www.cicc.unam.mx/~benet/),
 Instituto de Ciencias Físicas, Universidad Nacional Autónoma de México (UNAM)
 - [Luis Eduardo Ramírez Montoya](https://github.com/LuEdRaMo),
