@@ -17,7 +17,8 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 @testset "Impact monitoring" begin
 
     @testset "Common" begin
-        using NEOs: PLANET_NAMES_TO_INDEX, PLANET_RADII, escapevelocity, sseph, numtype
+        using NEOs: PLANET_NAMES_TO_INDEX, PLANET_RADII, escapevelocity, sseph, numtype,
+              μ_S, lovtransform
 
         # Impact monitoring scales
         Es  = [1E2,  1E4,  1E5,  1E1,  1E3,  1E4,  1E7,  1E7,  1E1,   1E4,   1E7] # Mt
@@ -53,6 +54,40 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         R, D = valsecchi_circle(1.0, 0.5, 0.0, 1, 1)
         @test isinf(R) && isinf(D)
+
+        # Pérez-Hernández & Benet (2022) Apophis OR7 orbit
+        # See Tables 2 and 3 of the Supplementary Information in
+        # https://doi.org/10.1038/s43247-021-00337-x
+
+        # Reference epoch [TDB]
+        jd0 = 2459200.5                      # JD
+        mjd0 = jd0 + (MJD2000 - J2000)       # MJD
+        # Sun's state vector at jd0
+        sun = sseph(su, jd0 - PE.J2000)
+
+        # Cartesian state vector [au, au/day]
+        car = [−0.18034828526, 0.94069105951, 0.34573599029,
+               −0.0162659397882, 4.39154800E−5, −0.000395204013]
+
+        # Keplerian elements
+        e   = 0.19150886716
+        q   = 0.74585305033                             # au
+        tp  = 2459101.04092537 + (MJD2000 - J2000)      # MJDTDB
+        Ω   = 204.04199116                              # deg
+        ω   = 126.65396094                              # deg
+        i   = 3.336773201                               # deg
+        a   = q / (1 - e)                               # au
+        M   = rad2deg(sqrt(μ_S / a^3)) * (mjd0 - tp)    # deg
+        kep = [a, e, i, ω, Ω, M]
+
+        @test lovtransform(mjd0, car, sun, Val(:cartesian), Val(:cartesian)) == car
+        @test lovtransform(mjd0, car, sun, Val(:cartesian), Val(:keplerian)) ≈ kep
+        @test lovtransform(mjd0, kep, sun, Val(:keplerian), Val(:cartesian)) ≈ car
+
+        eqn = lovtransform(mjd0, car, sun, Val(:cartesian), Val(:equinoctial))
+        @test lovtransform(mjd0, eqn, sun, Val(:equinoctial), Val(:cartesian)) ≈ car
+        attr = lovtransform(mjd0, car, sun, Val(:cartesian), Val(:attributable))
+        @test lovtransform(mjd0, attr, sun, Val(:attributable), Val(:cartesian)) ≈ car
     end
 
     @testset "BPlane" begin
