@@ -9,4 +9,4 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 TaylorSeries = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
 
 [compat]
-NEOs = "0.24"
+NEOs = "0.26"

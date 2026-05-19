@@ -80,14 +80,14 @@ function main()
     IM = IMProblem(orbit, ImpactTarget(:earth))
 
     # Virtual asteroids
-    R_TP, R_P, IP, Δσmax, vaorder = 0.2, radius(IM.target), 5E-6, 0.05, 6
+    R_TP, R_P, IP, Δσmax, vaorder = 0.2, radius(IM.target), 5E-6, 0.05, 4
     VAs = virtualasteroids(lov, :DelVigna19, vaorder; R_TP, R_P, IP, Δσmax)
     VA = VAs[1]
 
     # Close approaches
     ctol = 1.0
     jd0 = epoch(lov) + PE.J2000
-    nyears = ( datetime2julian(DateTime(2099, 12, 31)) - jd0 ) / yr
+    nyears = ( datetime2julian(DateTime(2100, 1, 1, 12)) - jd0 ) / yr
     q0 = orbit() .+ 1E-8 * Taylor1(vaorder)
     buffer = ImpactMonitoringBuffer(IM, q0, nyears, params)
     # Compilation run
