@@ -282,7 +282,8 @@ function closeapproaches(
     CAs = Vector{CloseApproach{T, U}}(undef, 0)
     # Integration
     nsteps = 1
-    while sign_tstep * t0 < sign_tstep * tmax
+    flagA, flagB = true, true
+    while flagA || flagB
         δt_old = t0 - told
         δt = taylorstep!(Val(parse_eqs), dynamics, t, x, dx, xaux, abstol, dparams, rv) # δt is positive!
         # Below, δt has the proper sign according to the direction of the integration
@@ -291,6 +292,7 @@ function closeapproaches(
             break
         end
         δt = sign_tstep * min(δt, sign_tstep * (tmax - t0))
+        flagB = flagA
         # New initial condition
         TS.evaluate!(x, δt, x0)
         # Root-finding
@@ -340,7 +342,7 @@ function closeapproaches(
             # Time at close approach
             t_CA = epoch(VA) + told + dt_nr
             if !isintimerange(t_CA, target)
-                @warn("Time of close approach is utside the target's ephemeris \
+                @warn("Time of close approach is outside the target's ephemeris \
                        timerange; exiting.")
                 break
             end
@@ -368,6 +370,7 @@ function closeapproaches(
         # Update time
         told = t0
         t0 += δt
+        flagA = sign_tstep * t0 < sign_tstep * tmax
         # Update state vector
         for i in eachindex(x)
             for k in eachindex(x[i])

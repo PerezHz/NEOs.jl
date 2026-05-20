@@ -53,4 +53,57 @@ using Test
         @test norm((kmsec2auday(apophisposvel197(0.0)) - q_Apophis_JPL_220) ./ s_Apophis_JPL_220) < 250
         @test norm((kmsec2auday(apophisposvel199(0.0)) - q_Apophis_JPL_220) ./ s_Apophis_JPL_220) < 290
     end
+
+    @testset "fasttaylors" begin
+        using NEOs: AbstractBuffer, OpticalBuffer, auxzero, scalingfactor, auday2kmsec!,
+              dot3D, euclid3D, evaleph, evaleph!, cte, sseph
+
+        buffer = OpticalBuffer(0.0)
+        @test isa(string(buffer), String)
+        @test isa(buffer, AbstractBuffer)
+        @test isa(buffer, OpticalBuffer{Float64})
+
+        q00 = rand(6)
+        scalings = fill(1E-8, 6)
+        vars = set_variables(Float64, "dx"; order = 2, numvars = 6)
+        q0T1 = q00 + scalings * Taylor1(2)
+        q0TN = q00 + scalings .* vars
+        q0T11 = [Taylor1(Taylor1([q00[i], rand()], 2), 2) for i in 1:6]
+        q0T1N =  [Taylor1(q00[i] + dot(rand(6), vars), 2) for i in 1:6]
+
+        @test all(iszero, auxzero.(q0T1))
+        @test all(iszero, auxzero.(q0TN))
+        @test all(iszero, auxzero.(q0T11))
+        @test all(iszero, auxzero.(q0T1N))
+        @test all(@. scalingfactor(q0TN) == scalings)
+        @test all(@. q00 == cte(q0T1) == cte(q0TN) == cte(cte(q0T11)) == cte(cte(q0TN)))
+
+        @test dot3D(q00, q0T1) ≈ dot3D(q0T1, q00)
+        @test dot3D(q00, q0TN) ≈ dot3D(q0TN, q00)
+        @test sqrt(dot3D(q00, q00)) ≈ euclid3D(q00)
+        @test sqrt(dot3D(q0T1, q0T1)) ≈ euclid3D(q0T1)
+        @test sqrt(dot3D(q0TN, q0TN)) ≈ euclid3D(q0TN)
+
+        @test evaleph(sseph, Taylor1(2), Taylor1(2)) ≈ evaleph(sseph, Taylor1(2))
+
+        evaleph!.(q0T1, q0T11, 0.0)
+        evaleph!.(q0TN, q0T1N, 0.0)
+
+        @test q0T1 == cte(q0T11)
+        @test q0TN == cte(q0T1N)
+
+        Q00 = deepcopy(q00)
+        Q0T1 = deepcopy(q0T1)
+        Q0TN = deepcopy(q0TN)
+
+        auday2kmsec!(q00)
+        auday2kmsec!(q0T1)
+        auday2kmsec!(q0TN)
+
+        @test auday2kmsec(Q00) ≈ q00
+        @test auday2kmsec(Q0T1) ≈ q0T1
+        @test auday2kmsec(Q0TN) ≈ q0TN
+
+    end
+
 end
