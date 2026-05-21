@@ -44,68 +44,62 @@ end
 # Warning: functions euclid3D(x) and dot3D(x) assume length(x) >= 3
 euclid3D(x::AbstractVector{T}) where {T <: Real} = sqrt(dot3D(x, x))
 
-function euclid3D(x::AbstractVector{TaylorN{T}}) where {T <: Number}
-    z, w, aux = zero(x[1]), zero(x[1]), zero(x[1])
+function euclid3D!(z::S, x::AbstractVector{S}, aux1::S,
+                   aux2::S, ord::Int) where {S <: AbstractSeries}
+    TS.zero!(aux1, ord)
+    TS.zero!(aux2, ord)
     @inbounds for i in 1:3
-        TS.zero!(w)
-        for k in eachindex(x[i])
-            TS.mul!(w, x[i], x[i], k)
-            TS.add!(z, z, w, k)
-        end
+        TS.zero!(z, ord)
+        TS.mul!(z, x[i], x[i], ord)
+        TS.add!(aux1, aux1, z, ord)
     end
-    TS.zero!(w)
-    for k in eachindex(z)
-        TS.sqrt!(w, z, aux, k)
-    end
-    return w
+    TS.zero!(z, ord)
+    TS.sqrt!(z, aux1, aux2, ord)
+    return nothing
 end
 
-function euclid3D(x::AbstractVector{Taylor1{T}}) where {T <: Number}
-    z, w, aux = zero(x[1]), zero(x[1]), zero(x[1])
-    @inbounds for i in 1:3
-        TS.zero!(w)
-        for k in eachindex(x[i])
-            TS.mul!(w, x[i], x[i], k)
-            TS.add!(z, z, w, k)
-        end
+function euclid3D(x::AbstractVector{S}) where {S <: AbstractSeries}
+    z, aux1, aux2 = zero(x[1]), zero(x[1]), zero(x[1])
+    for ord in eachindex(z)
+        euclid3D!(z, x, aux1, aux2, ord)
     end
-    TS.zero!(w)
-    for k in eachindex(z)
-        TS.sqrt!(w, z, aux, k)
-    end
-    return w
+    return z
 end
 
 dot3D(x::AbstractVector{T}, y::AbstractVector{T}) where {T <: Real} =
     x[1]*y[1] + x[2]*y[2] + x[3]*y[3]
 
-function dot3D(x::Vector{TaylorN{T}}, y::Vector{U}) where {T <: Real, U <: Number}
-    z, w = zero(x[1]), zero(x[1])
+function dot3D!(z::S, x::AbstractVector{S}, y::AbstractVector{U}, aux::S,
+                ord::Int) where {S <: AbstractSeries, U <: Number}
+    TS.zero!(z, ord)
     @inbounds for i in 1:3
-        TS.zero!(w)
-        for k in eachindex(x[i])
-            TS.mul!(w, x[i], y[i], k)
-            TS.add!(z, z, w, k)
-        end
+        TS.zero!(aux, ord)
+        TS.mul!(aux, x[i], y[i], ord)
+        TS.add!(z, z, aux, ord)
+    end
+    return nothing
+end
+
+function dot3D!(z::S, x::AbstractVector{T}, y::AbstractVector{S}, aux::S,
+                ord::Int) where {T <: Real, S <: AbstractSeries}
+    return dot3D!(z, y, x, aux, ord)
+end
+
+function dot3D(
+        x::AbstractVector{S}, y::AbstractVector{U}
+    ) where {S <: AbstractSeries, U <: Number}
+    z, aux = zero(x[1]), zero(x[1])
+    for ord in eachindex(z)
+        dot3D!(z, x, y, aux, ord)
     end
     return z
 end
 
-dot3D(x::Vector{T}, y::Vector{TaylorN{T}}) where {T <: Real} = dot3D(y, x)
-
-function dot3D(x::Vector{Taylor1{T}}, y::Vector{U}) where {T <: Number, U <: Number}
-    z, w = zero(x[1]), zero(x[1])
-    @inbounds for i in 1:3
-        TS.zero!(w)
-        for k in eachindex(x[i])
-            TS.mul!(w, x[i], y[i], k)
-            TS.add!(z, z, w, k)
-        end
-    end
-    return z
+function dot3D(
+        x::AbstractVector{T}, y::AbstractVector{S}
+    ) where {T <: Real, S <: AbstractSeries}
+    return dot3D(y, x)
 end
-
-dot3D(x::Vector{T}, y::Vector{Taylor1{T}}) where {T <: Real} = dot3D(y, x)
 
 # Evaluate `y` at time `t` using `OhMyThreads.tmap`
 # This function is a multithreaded version of
