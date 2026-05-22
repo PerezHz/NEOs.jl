@@ -150,18 +150,18 @@ using NEOs: SCRATCH_PATH
                 "firstdate": "2007-09-14",
                 "lastdate": null,
                 "longitude": "249.21128",
-                "name": "Mt. Lemmon Survey",
-                "name_latex": "Mt. Lemmon Survey",
-                "name_utf8": "Mt. Lemmon Survey",
+                "name": "University of Arizona Mt. Lemmon Survey",
+                "name_latex": "University of Arizona Mt. Lemmon Survey",
+                "name_utf8": "University of Arizona Mt. Lemmon Survey",
                 "obscode": "G96",
                 "observations_type": "optical",
-                "old_names": null,
+                "old_names": ["Mt. Lemmon Survey"],
                 "rhocosphi": "0.845107",
                 "rhosinphi": "0.533611",
-                "short_name": "Mt. Lemmon Survey",
-                "updated_at": "Wed, 17 Sep 2025 18:08:55 GMT",
+                "short_name": "University of Arizona Mt. Lemmon Survey",
+                "updated_at": "Fri, 22 May 2026 14:55:53 GMT",
                 "uses_two_line_observations": false,
-                "web_link": "http://www.lpl.arizona.edu/css/"
+                "web_link": "https://catalina.lpl.arizona.edu/"
             }
         }
         """
@@ -171,7 +171,7 @@ using NEOs: SCRATCH_PATH
         lemmon = first(lemmon_p)
         @test lemmon.code == "G96"
         @test lemmon.coords == [249.21128, 0.845107, 0.533611]
-        @test lemmon.name == "Mt. Lemmon Survey"
+        @test lemmon.name == "University of Arizona Mt. Lemmon Survey"
         @test lemmon.uses_two_line_observations == false
         @test lemmon.observations_type == "optical"
         @test lemmon in OBSERVATORIES_MPC[]
@@ -253,17 +253,22 @@ using NEOs: SCRATCH_PATH
 
         # Fetch obervatory information
         obs = fetch_observatory_information("G96")
+        @test obs["created_at"] == "Sat, 25 May 2019 00:11:26 GMT"
+        @test obs["firstdate"] == "2007-09-14"
+        @test isnothing(obs["lastdate"])
+        @test obs["longitude"] == "249.21128"
+        @test obs["name"] == "University of Arizona Mt. Lemmon Survey"
+        @test obs["name_latex"] == "University of Arizona Mt. Lemmon Survey"
+        @test obs["name_utf8"] == "University of Arizona Mt. Lemmon Survey"
         @test obs["obscode"] == "G96"
         @test obs["observations_type"] == "optical"
+        @test obs["old_names"] == ["Mt. Lemmon Survey"]
+        @test obs["rhocosphi"] == "0.845107"
+        @test obs["rhosinphi"] == "0.533611"
+        @test obs["short_name"] == "University of Arizona Mt. Lemmon Survey"
+        @test obs["updated_at"] == "Fri, 22 May 2026 14:55:53 GMT"
         @test obs["uses_two_line_observations"] == false
-        @test !isempty(obs["name"])
-        @test !isempty(obs["short_name"])
-        lon = parse(Float64, obs["longitude"])
-        rhocosphi = parse(Float64, obs["rhocosphi"])
-        rhosinphi = parse(Float64, obs["rhosinphi"])
-        @test 0.0 ≤ lon < 360.0
-        @test 0.0 < rhocosphi ≤ 1.0
-        @test 0.0 < rhosinphi ≤ 1.0
+        @test obs["web_link"] == "https://catalina.lpl.arizona.edu/"
 
     end
 
