@@ -130,7 +130,7 @@ function VirtualImpactor(
     jd0 = epoch(lov) + PE.J2000
     q00 = lov(σ)
     # Second order jet transport initial condition
-    q0 = q00 + sigmas(orbit) .* TaylorSeries.variables(T, 2)
+    q0 = q00 + sigmas(orbit) .* taylor_variables(T, 2)
     # O-C residuals
     res = init_optical_residuals(TaylorN{T}, IM)
     propres!(res, IM, q0, jd0, params)
@@ -141,7 +141,7 @@ function VirtualImpactor(
     # Chi parameter
     # χ = sqrt(notoutobs(orbit) * ( cte(Q) - nms(orbit) ))
     # First order jet transport initial condition
-    q0 = q00 + sigmas(orbit) .* TaylorSeries.variables(T, 1)
+    q0 = q00 + sigmas(orbit) .* taylor_variables(T, 1)
     # Virtual asteroid
     VA = VirtualAsteroid(epoch(lov), σ, domain, q0)
     # Number of years until impact

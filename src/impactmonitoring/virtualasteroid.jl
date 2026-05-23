@@ -28,7 +28,7 @@ VirtualAsteroid(epoch::T, σ::T, domain::NTuple{2, T}, q0::Vector{U}) where {T, 
 
 function VirtualAsteroid(lov::LineOfVariations, σ::Real,
                          domain::NTuple{2, <:Real}, vaorder::Int)
-    @assert 0 ≤ vaorder ≤ TaylorSeries.order(lov)
+    @assert 0 ≤ vaorder ≤ taylor_order(lov)
     return VirtualAsteroid(epoch(lov), σ, domain, reduceorder.(lov(σ, domain), vaorder))
 end
 
@@ -46,8 +46,13 @@ nominaltime(x::VirtualAsteroid) = x.epoch
 sigma(x::VirtualAsteroid) = x.σ
 initialcondition(x::VirtualAsteroid) = x.q0
 
-TaylorSeries.order(x::VirtualAsteroid{T, U}) where {T, U <: AbstractSeries} =
-    TaylorSeries.order(first(x.q0))
+taylor_order(x::VirtualAsteroid{T, U}) where {T, U <: AbstractSeries} =
+    taylor_order(first(x.q0))
+if isdefined(TaylorSeries, :order)
+    TaylorSeries.order(x::VirtualAsteroid{T, U}) where {T, U <: AbstractSeries} = taylor_order(x)
+else
+    TaylorSeries.get_order(x::VirtualAsteroid{T, U}) where {T, U <: AbstractSeries} = taylor_order(x)
+end
 
 """
     virtualasteroids(lov, method [, vaorder]; kwargs...)
@@ -68,7 +73,7 @@ available methods have their own keyword arguments:
     - `IP::Real`: generic completeness limit.
     - `Δσmax`: maximum interval length.
 """
-virtualasteroids(lov::LineOfVariations, method::Symbol, vaorder::Int = TaylorSeries.order(lov);
+virtualasteroids(lov::LineOfVariations, method::Symbol, vaorder::Int = taylor_order(lov);
     kwargs...) = virtualasteroids(Val(method), lov, vaorder; kwargs...)
 
 function virtualasteroids(::Val{:uniform}, lov::LineOfVariations, vaorder::Int; N::Int)

@@ -97,7 +97,7 @@ initialcondition(orbit::AbstractOrbit, dof::Int, params::Parameters) =
 function jtperturbation(sigmas::AbstractVector{T}, variables::AbstractVector{Int},
                         Ndof::Int, order::Int, params::Parameters{T}) where {T <: Real}
     k = 1
-    vars = TaylorSeries.variables(T, order)
+    vars = taylor_variables(T, order)
     dq = [zero(vars[1]) for _ in 1:Ndof]
     for i in eachindex(dq)
         !(i in variables) && continue
@@ -296,7 +296,7 @@ function keplerian(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
     # Orbit reference epoch [TDB days since J2000]
     t0 = epoch(orbit)
     # Jet transport initial condition
-    q0 = orbit() + TaylorSeries.variables(T, 2)
+    q0 = orbit() + taylor_variables(T, 2)
     if t != t0
         offset = t > t0 ? fwdoffset : -bwdoffset
         nyears = (t - t0 + offset) / yr
@@ -335,7 +335,7 @@ function equinoctial(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
     # Orbit reference epoch [TDB days since J2000]
     t0 = epoch(orbit)
     # Jet transport initial condition
-    q0 = orbit() + TaylorSeries.variables(T, 2)
+    q0 = orbit() + taylor_variables(T, 2)
     if t != t0
         offset = t > t0 ? fwdoffset : -bwdoffset
         nyears = (t - t0 + offset) / yr
@@ -374,7 +374,7 @@ function attributable(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
     # Orbit reference epoch [TDB days since J2000]
     t0 = epoch(orbit)
     # Jet transport initial condition
-    q0 = orbit() + TaylorSeries.variables(T, 2)
+    q0 = orbit() + taylor_variables(T, 2)
     if t != t0
         offset = t > t0 ? fwdoffset : -bwdoffset
         nyears = (t - t0 + offset) / yr
@@ -414,7 +414,7 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
     t = epoch(orbit)
     mjd0 = t + MJD2000
     # Jet transport initial condition
-    q0 = orbit(t) + TaylorSeries.variables(T, 2)
+    q0 = orbit(t) + taylor_variables(T, 2)
     q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
     # Origin
     x0 = zeros(T, Npar)

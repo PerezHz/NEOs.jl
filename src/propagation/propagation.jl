@@ -44,7 +44,7 @@ times a scaling given by `c`.
 function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6);
                           order::Int = 5) where {T <: Real}
     # Set TaylorN variables
-    dq = TaylorSeries.variables!(T, names; order, numvars = length(c))
+    dq = taylor_variables!(T, names; order, numvars = length(c))
     # Scale jet transport perturbation
     for i in eachindex(dq)
         dq[i][1][i] = c[i]
