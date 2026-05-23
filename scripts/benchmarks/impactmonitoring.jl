@@ -12,7 +12,7 @@ function parse_commandline()
     s.epilog = """
         Example:\n
         \n
-        julia -t 5 --project impactmonitoring.jl -i 2022NX1.jld2\n
+        julia -t 5 --project impactmonitoring.jl -i 2022NX1.jld2 -o benchmark.json\n
         \n
     """
 
