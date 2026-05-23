@@ -65,7 +65,7 @@ using Test
 
         q00 = rand(6)
         scalings = fill(1E-8, 6)
-        vars = set_variables(Float64, "dx"; order = 2, numvars = 6)
+        vars = TaylorSeries.variables!(Float64, "dx"; order = 2, numvars = 6)
         q0T1 = q00 + scalings * Taylor1(2)
         q0TN = q00 + scalings .* vars
         q0T11 = [Taylor1(Taylor1([q00[i], rand()], 2), 2) for i in 1:6]

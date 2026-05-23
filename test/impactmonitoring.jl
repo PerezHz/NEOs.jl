@@ -134,7 +134,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test epoch(lov) == nominaltime(lov) == epoch(orbit)
         @test round(date(lov), Minute) == round(days2dtutc(epoch(orbit)), Minute)
         @test sigma(lov) == 0.0
-        @test get_order(lov) == lovorder
+        @test TaylorSeries.order(lov) == lovorder
         @test lov(0.0) == orbit()
         @test constant_term(lov(0.0, (-σmax, σmax))) == orbit()
         @test isa(string(lov), String)
@@ -181,7 +181,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test nominaltime(VA) == nominaltime(lov)
         @test sigma(VA) == sigma(lov)
         @test initialcondition(VA) == lov(0.0, (-σmax, σmax))
-        @test get_order(VA) == vaorder
+        @test TaylorSeries.order(VA) == vaorder
         @test isa(string(VA), String)
 
         # Close approaches
@@ -194,7 +194,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test nominaltime(CA) == constant_term(CA.t) == timeofca(CA, 0.0)
         @test sigma(CA) == sigma(VA)
         @test semimajoraxis(CA) < 0
-        @test get_order(CA) == get_order(VA) == vaorder
+        @test TaylorSeries.order(CA) == TaylorSeries.order(VA) == vaorder
         @test nominalstate(CA) == [CA.x[0], CA.y[0], CA.z[0]] == targetplane(CA, 0.0)
         @test difft(CA, CA) == 0.0
         @test domain_radius(CA) == σmax
@@ -228,7 +228,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test ubound(RT) == ubound(CA)
 
         @test 0.0 in RT
-        @test get_order(RT) == get_order(CA)
+        @test TaylorSeries.order(RT) == TaylorSeries.order(CA)
         @test nominaltime(RT, ctol) == timeofca(RT, 0.0, ctol) ≈ nominaltime(CA)
         @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) ≈ nominalstate(CA)
         @test convergence_domain(RT, ctol) == convergence_domain(CA, ctol)
@@ -316,7 +316,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test epoch(lov) == nominaltime(lov) == epoch(orbit)
         @test round(date(lov), Minute) == round(days2dtutc(epoch(orbit)), Minute)
         @test sigma(lov) == 0.0
-        @test get_order(lov) == lovorder
+        @test TaylorSeries.order(lov) == lovorder
         @test lov(0.0) == orbit()
         @test constant_term(lov(0.0, (-σmax, σmax))) == orbit()
         @test isa(string(lov), String)
@@ -363,7 +363,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test nominaltime(VA) == nominaltime(lov)
         @test sigma(VA) == sigma(lov)
         @test initialcondition(VA) == lov(0.0, (-σmax, σmax))
-        @test get_order(VA) == vaorder
+        @test TaylorSeries.order(VA) == vaorder
         @test isa(string(VA), String)
 
         # Close approaches
@@ -376,7 +376,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test nominaltime(CA) == constant_term(CA.t) == timeofca(CA, 0.0)
         @test sigma(CA) == sigma(VA)
         @test semimajoraxis(CA) > 0
-        @test get_order(CA) == get_order(VA) == vaorder
+        @test TaylorSeries.order(CA) == TaylorSeries.order(VA) == vaorder
         @test nominalstate(CA) == [CA.x[0], CA.y[0], CA.z[0]] == targetplane(CA, 0.0)
         @test difft(CA, CA) == 0.0
         @test domain_radius(CA) == σmax
@@ -410,7 +410,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test ubound(RT) == ubound(CA)
 
         @test 0.0 in RT
-        @test get_order(RT) == get_order(CA)
+        @test TaylorSeries.order(RT) == TaylorSeries.order(CA)
         @test nominaltime(RT, ctol) == timeofca(RT, 0.0, ctol) ≈ nominaltime(CA)
         @test nominalstate(RT, ctol) == targetplane(RT, 0.0, ctol) ≈ nominalstate(CA)
         @test convergence_domain(RT, ctol) == convergence_domain(CA, ctol)

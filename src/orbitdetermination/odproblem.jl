@@ -137,8 +137,8 @@ function init_radar_residuals(::Type{U}, od::MixedODProblem, idxs = radarindices
 end
 
 function set_od_order(::Type{T}, varorder::Int, numvars::Int = 6) where {T <: Real}
-    if get_order() < varorder || get_numvars() != numvars
-        set_variables(T, "dx"; order = varorder, numvars = numvars)
+    if TaylorSeries.order() < varorder || get_numvars() != numvars
+        TaylorSeries.variables!(T, "dx"; order = varorder, numvars = numvars)
     end
     return nothing
 end

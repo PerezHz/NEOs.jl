@@ -75,7 +75,7 @@ function main()
     # Admissible region
     A = AdmissibleRegion(tracklet, params)
     # Set jet transport variables
-    set_variables(Float64, "dx"; order = varorder, numvars = 6)
+    TaylorSeries.variables!(Float64, "dx"; order = varorder, numvars = 6)
 
     # Generate N points over the external boundary of A
     points = map(t -> arboundary(A, t, :outer, :log), LinRange(0, 3, N))

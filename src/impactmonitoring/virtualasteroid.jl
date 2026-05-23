@@ -19,7 +19,7 @@ end
 
 numtypes(::VirtualAsteroid{T, U}) where {T, U} = T, U
 
-# This function assumes that order ≤ get_order(x)
+# This function assumes that order ≤ TaylorSeries.order(x)
 reduceorder(x::Taylor1, order::Int) = Taylor1(x[0:order], order)
 
 # Outer constructors
@@ -28,7 +28,7 @@ VirtualAsteroid(epoch::T, σ::T, domain::NTuple{2, T}, q0::Vector{U}) where {T, 
 
 function VirtualAsteroid(lov::LineOfVariations, σ::Real,
                          domain::NTuple{2, <:Real}, vaorder::Int)
-    @assert 0 ≤ vaorder ≤ get_order(lov)
+    @assert 0 ≤ vaorder ≤ TaylorSeries.order(lov)
     return VirtualAsteroid(epoch(lov), σ, domain, reduceorder.(lov(σ, domain), vaorder))
 end
 
@@ -46,15 +46,15 @@ nominaltime(x::VirtualAsteroid) = x.epoch
 sigma(x::VirtualAsteroid) = x.σ
 initialcondition(x::VirtualAsteroid) = x.q0
 
-get_order(x::VirtualAsteroid{T, U}) where {T, U <: AbstractSeries} =
-    get_order(first(x.q0))
+TaylorSeries.order(x::VirtualAsteroid{T, U}) where {T, U <: AbstractSeries} =
+    TaylorSeries.order(first(x.q0))
 
 """
     virtualasteroids(lov, method [, vaorder]; kwargs...)
 
 Divide the line of variations `lov` into a vector of `Taylor1` virtual
 asteroids using a given sampling `method` and truncating the polynomials
-to degree `vaorder` (default: `get_order(lov)`). Each of the following
+to degree `vaorder` (default: `TaylorSeries.order(lov)`). Each of the following
 available methods have their own keyword arguments:
 - `:uniform`: domains of equal length. Keyword arguments:
     - `N::Int`: number of domains.
@@ -68,7 +68,7 @@ available methods have their own keyword arguments:
     - `IP::Real`: generic completeness limit.
     - `Δσmax`: maximum interval length.
 """
-virtualasteroids(lov::LineOfVariations, method::Symbol, vaorder::Int = get_order(lov);
+virtualasteroids(lov::LineOfVariations, method::Symbol, vaorder::Int = TaylorSeries.order(lov);
     kwargs...) = virtualasteroids(Val(method), lov, vaorder; kwargs...)
 
 function virtualasteroids(::Val{:uniform}, lov::LineOfVariations, vaorder::Int; N::Int)

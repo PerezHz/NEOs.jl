@@ -10,7 +10,7 @@ import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to
 import StatsBase: weights
 import Tables: Schema, istable, rowaccess, rows, schema
 import TaylorIntegration: surfacecrossing
-import TaylorSeries: get_order, evaluate, constant_term, identity!
+import TaylorSeries: evaluate, constant_term, identity!
 
 using AngleBetweenVectors, AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON,
       LazyArtifacts, LinearAlgebra, Printf, Scratch, SPICE, TaylorIntegration,

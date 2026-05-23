@@ -19,7 +19,7 @@ struct LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
     bufferTN::PropresBuffer{T, TaylorN{T}, T}
 end
 
-get_order(x::LineOfVariationsBuffer) = get_order(x.bufferTN.prop.cache.x[1][0])
+TaylorSeries.order(x::LineOfVariationsBuffer) = TaylorSeries.order(x.bufferTN.prop.cache.x[1][0])
 
 """
     LineOfVariationsBuffer(IM, lovorder, params)
@@ -53,7 +53,7 @@ function LineOfVariationsBuffer(IM::AbstractIMProblem{D, T}, lovorder::Int,
     end
     # Initial condition
     q00 = orbit()
-    q0TN = q00 + sigmas(orbit) .* get_variables(T, lovorder)
+    q0TN = q00 + sigmas(orbit) .* TaylorSeries.variables(T, lovorder)
     # Vectors of residuals
     resTN = init_optical_residuals(TaylorN{T}, IM)
     # Propagation and residuals buffers
@@ -105,7 +105,7 @@ nominaltime(x::LineOfVariations) = x.epoch
 
 sigma(::LineOfVariations{D, T}) where {D, T} = zero(T)
 
-get_order(x::LineOfVariations) = get_order(first(x.bwd.x))
+TaylorSeries.order(x::LineOfVariations) = TaylorSeries.order(first(x.bwd.x))
 
 function (x::LineOfVariations)(σ::Number)
     mjd0 = epoch(x) + MJD2000
@@ -114,7 +114,7 @@ function (x::LineOfVariations)(σ::Number)
 end
 
 (x::LineOfVariations)(σ::Number, domain::NTuple{2, <:Number}) =
-    x(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(get_order(x)))
+    x(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(TaylorSeries.order(x)))
 
 # Coordinate transformations
 lovtransform(::Real, x::AbstractVector, ::AbstractVector, ::Val{:cartesian},
@@ -150,10 +150,10 @@ function covariance(
     mjd0 = t0 + MJD2000
     jd0 = t0 + PE.J2000
     # Order with respect to LOV index
-    order = get_order(buffer)
+    order = TaylorSeries.order(buffer)
     # Jet transpot initial condition
     car00 = lovtransform(mjd0, coord00, sun, Val(coord), Val(:cartesian))
-    carTN = car00 + scalings .* get_variables(T, order)
+    carTN = car00 + scalings .* TaylorSeries.variables(T, order)
     # TaylorN propagation and residuals
     propres!(resTN, IM, carTN, jd0, params; buffer = bufferTN)
     # Covariance matrix in residuals space
@@ -228,7 +228,7 @@ function TaylorIntegration.jetcoeffs!(
         dq::AbstractArray{Taylor1{_S}, _N}, params,
         __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}
     ) where {_T <: Real, _S <: Number, _N}
-    order = get_order(t)
+    order = TaylorSeries.order(t)
     local IM, coord, buffer, _params_ = params
     @unpack t0, sun, scalings = buffer
     local mjd0 = t0 + MJD2000

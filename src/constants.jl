@@ -266,7 +266,7 @@ const sseph::DensePropagation2{Float64, Float64} = JLD2.load(SSEPH_SOURCE, "ss16
 const acceph::DensePropagation2{Float64, Float64} = JLD2.load(SSEPH_SOURCE, "acc_eph")
 const poteph::DensePropagation2{Float64, Float64} = JLD2.load(SSEPH_SOURCE, "pot_eph")
 const ttmtdb::DensePropagation1{Float64, Float64} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
-const SSEPHORDER::Int = get_order(sseph.x[1])
+const SSEPHORDER::Int = TaylorSeries.order(sseph.x[1])
 const SSEPHNBODIES::Int = numberofbodies(sseph)
 
 """

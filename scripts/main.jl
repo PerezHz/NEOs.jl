@@ -4,6 +4,7 @@
 #julia --project=@. main.jl
 using NEOs
 using Dates
+using TaylorSeries
 using TaylorIntegration
 using JLD2
 using SPICE: furnsh
@@ -41,7 +42,7 @@ ss_eph_file = joinpath(apophisjlpath, "jldeph", "ss16ast343_eph_p6y_et.jld")
 #dq[end][1] = 1e-14
 
 #### dq: perturbation to nominal initial condition (TaylorN jet transport)
-dq = set_variables("δx", order=varorder, numvars=nv)
+dq = TaylorSeries.variables!("δx", order=varorder, numvars=nv)
 for i in 1:6
     dq[i][1][i] = 1e-8
 end
