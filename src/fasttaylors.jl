@@ -46,14 +46,9 @@ euclid3D(x::AbstractVector{T}) where {T <: Real} = sqrt(dot3D(x, x))
 
 function euclid3D!(z::S, x::AbstractVector{S}, aux1::S,
                    aux2::S, ord::Int) where {S <: AbstractSeries}
-    TS.zero!(aux1, ord)
-    TS.zero!(aux2, ord)
-    @inbounds for i in 1:3
-        TS.zero!(z, ord)
-        TS.mul!(z, x[i], x[i], ord)
-        TS.add!(aux1, aux1, z, ord)
-    end
+    dot3D!(aux1, x, x, z, ord)
     TS.zero!(z, ord)
+    TS.zero!(aux2, ord)
     TS.sqrt!(z, aux1, aux2, ord)
     return nothing
 end
