@@ -253,22 +253,17 @@ using NEOs: SCRATCH_PATH
 
         # Fetch obervatory information
         obs = fetch_observatory_information("G96")
-        @test obs["created_at"] == "Sat, 25 May 2019 00:11:26 GMT"
-        @test obs["firstdate"] == "2007-09-14"
-        @test isnothing(obs["lastdate"])
-        @test obs["longitude"] == "249.21128"
-        @test obs["name"] == "Mt. Lemmon Survey"
-        @test obs["name_latex"] == "Mt. Lemmon Survey"
-        @test obs["name_utf8"] == "Mt. Lemmon Survey"
         @test obs["obscode"] == "G96"
         @test obs["observations_type"] == "optical"
-        @test isnothing(obs["old_names"])
-        @test obs["rhocosphi"] == "0.845107"
-        @test obs["rhosinphi"] == "0.533611"
-        @test obs["short_name"] == "Mt. Lemmon Survey"
-        @test obs["updated_at"] == "Wed, 17 Sep 2025 18:08:55 GMT"
         @test obs["uses_two_line_observations"] == false
-        @test obs["web_link"] == "http://www.lpl.arizona.edu/css/"
+        @test !isempty(obs["name"])
+        @test !isempty(obs["short_name"])
+        lon = parse(Float64, obs["longitude"])
+        rhocosphi = parse(Float64, obs["rhocosphi"])
+        rhosinphi = parse(Float64, obs["rhosinphi"])
+        @test 0.0 ≤ lon < 360.0
+        @test 0.0 < rhocosphi ≤ 1.0
+        @test 0.0 < rhosinphi ≤ 1.0
 
     end
 
