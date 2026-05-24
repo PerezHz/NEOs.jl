@@ -158,7 +158,7 @@ function compute_radec(
     E_H = euclid3D(E_H_vec)
     e_vec = E_H_vec/E_H
     # See ESAA 2014, equation (7.115)
-    g1 = (2μ_DE430[su]/(c_au_per_day^2))/(E_H/au)
+    g1 = g1coeff / (E_H / au)
     g2 = 1 + dot3D(q_vec, e_vec)
     # See ESAA 2014, equation (7.116)
     u1_vec = U_norm * ( u_vec + (g1/g2) * ( dot3D(u_vec, q_vec) * e_vec -
@@ -298,7 +298,7 @@ function compute_radec(
     E_H = euclid3D(E_H_vec)
     e_vec = E_H_vec/E_H
     # See ESAA 2014, equation (7.115)
-    g1 = (2μ_DE430[su]/(c_au_per_day^2))/(E_H/au)
+    g1 = g1coeff / (E_H / au)
     g2 = 1 + dot3D(q_vec, e_vec)
     # See ESAA 2014, equation (7.116)
     u1_vec = U_norm * ( u_vec + (g1/g2) * ( dot3D(u_vec, q_vec) * e_vec -
@@ -343,13 +343,13 @@ function compute_radec(
     E_H_vec = e_D_vec  = r_r_t_r - r_s_t_r
     E_H = e_D = euclid3D(e_D_vec)
     e_vec = E_H_vec / E_H
-    g1 = (2μ_DE430[su] /(c_au_per_day^2)) / (E_H / au)
+    g1 = g1coeff / (E_H / au)
     for ord = 0:order
         for i in 1:3
             TS.subst!(ρ_vec_r[i], r_a_t_r[i], r_r_t_r[i], ord)
         end
         euclid3D!(ρ_r, ρ_vec_r, aux1, aux2, ord)
-        TS.mul!(τ_D, 1/clightkms, ρ_r, ord)
+        TS.mul!(τ_D, c_kms_m1, ρ_r, ord)
         TS.subst!(et_b_secs, et_r_secs, τ_D, ord)
     end
     for _ in 1:niter
@@ -372,8 +372,8 @@ function compute_radec(
             TS.identity!(Δτ_D, Δτ_rel_D, ord)
             dot3D!(_p_dot_23_, ρ_vec_r, v_a_t_b, aux1, ord)
             TS.div!(p_dot_23, _p_dot_23_, ρ_r, ord)
-            TS.mul!(τ_D_r, 1/clightkms, ρ_r, ord)
-            TS.mul!(τ_D_23, 1/clightkms, p_dot_23, ord)
+            TS.mul!(τ_D_r, c_kms_m1, ρ_r, ord)
+            TS.mul!(τ_D_23, c_kms_m1, p_dot_23, ord)
             TS.subst!(one_minus_τ_D_23, 1, τ_D_23, ord)
             TS.subst!(_Δt_2_, τ_D, τ_D_r, ord)
             TS.subst!(_Δt_2_, _Δt_2_, Δτ_rel_D, ord)
@@ -424,10 +424,10 @@ function compute_radec(
         if ord == 0
             α_rad[0] = mod2pi(mod2pi(atan(cte(u1_vec[2]), cte(u1_vec[1]))))
         end
-        TS.mul!(α_as, rad2deg(one(T)), α_rad, ord)
+        TS.mul!(α_as, onerad, α_rad, ord)
         TS.mul!(α_as, 3_600, α_as, ord)
         TS.asin!(δ_rad, u13_div_u1_norm, δ_aux, ord)
-        TS.mul!(δ_as, rad2deg(one(T)), δ_rad, ord)
+        TS.mul!(δ_as, onerad, δ_rad, ord)
         TS.mul!(δ_as, 3_600, δ_as, ord)
     end
     return α_as, δ_as
