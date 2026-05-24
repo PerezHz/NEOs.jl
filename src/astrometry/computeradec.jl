@@ -14,46 +14,9 @@ struct OpticalBuffer{U <: Number} <: AbstractBuffer
 end
 
 function OpticalBuffer(x::U) where {U <: Number}
-    # Scalars
-    ρ_r = zero(x)
-    τ_D = zero(x)
-    et_b_secs = zero(x)
-    Δτ_D = zero(x)
-    Δτ_rel_D = zero(x)
-    p_D = zero(x)
-    q_D = zero(x)
-    p_dot_23 = zero(x)
-    Δt_2 = zero(x)
-    U_norm = zero(x)
-    g2 = zero(x)
-    u1_norm = zero(x)
-    α_rad_ = zero(x)
-    α_rad = zero(x)
-    δ_rad = zero(x)
-    δ_as = zero(x)
-    α_as = zero(x)
-    # Vectors
-    rv_a_t_r = [zero(x) for _ in 1:6]
-    r_a_t_r = [zero(x) for _ in 1:3]
-    ρ_vec_r = [zero(x) for _ in 1:3]
-    rv_a_t_b = [zero(x) for _ in 1:6]
-    r_a_t_b = [zero(x) for _ in 1:3]
-    v_a_t_b = [zero(x) for _ in 1:3]
-    rv_s_t_b = [zero(x) for _ in 1:6]
-    r_s_t_b = [zero(x) for _ in 1:3]
-    p_D_vec  = [zero(x) for _ in 1:3]
-    U_vec = [zero(x) for _ in 1:3]
-    u_vec = [zero(x) for _ in 1:3]
-    Q_vec = [zero(x) for _ in 1:3]
-    q_vec = [zero(x) for _ in 1:3]
-    u1_vec = [zero(x) for _ in 1:3]
-
-    return OpticalBuffer{U}(
-        [ρ_r, τ_D, et_b_secs, Δτ_D, Δτ_rel_D, p_D, q_D, p_dot_23, Δt_2,
-         U_norm, g2, u1_norm, α_rad_, α_rad, δ_rad, δ_as, α_as],
-        [rv_a_t_r, r_a_t_r, ρ_vec_r, rv_a_t_b, r_a_t_b, v_a_t_b, rv_s_t_b,
-         r_s_t_b, p_D_vec, U_vec, u_vec, Q_vec, q_vec, u1_vec],
-    )
+    v0 = [zero(x) for _ in 1:32]
+    v1 = [[zero(x) for _ in 1:6] for _ in 1:19]
+    return OpticalBuffer{U}(v0, v1)
 end
 
 """
@@ -79,9 +42,10 @@ compute_radec(x::AbstractOpticalAstrometry; kwargs...) =
 compute_radec(x::AbstractOpticalAstrometry, buffer::OpticalBuffer; kwargs...) =
     compute_radec(observatory(x), date(x), buffer; kwargs...)
 
-function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
-                       xvs::SunEph = sunposvel, xve::EarthEph = earthposvel,
-                       xva::AstEph) where {T <: Real, SunEph, EarthEph, AstEph}
+function compute_radec(
+        observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter::Int = 5,
+        xvs::SunEph = sunposvel, xve::EarthEph = earthposvel, xva::AstEph
+    ) where {T <: Real, SunEph, EarthEph, AstEph}
     # Transform receiving time from UTC to TDB seconds since J2000
     et_r_secs = dtutc2et(t_r_utc)
     # Sun barycentric position and velocity at receive time
@@ -194,7 +158,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
     E_H = euclid3D(E_H_vec)
     e_vec = E_H_vec/E_H
     # See ESAA 2014, equation (7.115)
-    g1 = (2μ_DE430[su]/(c_au_per_day^2))/(E_H/au)
+    g1 = g1coeff / (E_H / au)
     g2 = 1 + dot3D(q_vec, e_vec)
     # See ESAA 2014, equation (7.116)
     u1_vec = U_norm * ( u_vec + (g1/g2) * ( dot3D(u_vec, q_vec) * e_vec -
@@ -212,10 +176,11 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; niter:
     return α_as, δ_as # right ascension, declination both in arcsec
 end
 
-function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime,
-                       buffer::OpticalBuffer{U}; niter::Int = 5,
-                       xvs::DensePropagation2{T, T}, xve::DensePropagation2{T, T},
-                       xva::NTuple{2, DensePropagation2{T, U}}) where {T <: Real, U <: Number}
+function compute_radec(
+        observatory::ObservatoryMPC{T}, t_r_utc::DateTime, buffer::OpticalBuffer{U};
+        niter::Int = 5, xvs::DensePropagation2{T, T}, xve::DensePropagation2{T, T},
+        xva::NTuple{2, DensePropagation2{T, U}}
+    ) where {T <: Real, U <: NumberNotSeries}
     # Unfold
     ρ_r, τ_D, et_b_secs, Δτ_D, Δτ_rel_D, p_D, q_D, p_dot_23, Δt_2, U_norm,
         g2, u1_norm, α_rad_, α_rad, δ_rad, δ_as, α_as = buffer.v0
@@ -321,7 +286,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime,
 
     # Compute gravitational deflection of light
     # See Explanatory Supplement to the Astronomical Almanac (ESAA) 2014 Section 7.4.1.4
-    E_H_vec = r_r_t_r -r_s_t_r    # ESAA 2014, equation (7.104)
+    E_H_vec = r_r_t_r - r_s_t_r    # ESAA 2014, equation (7.104)
     U_vec = ρ_vec_r               # r_a_t_b - r_e_t_r, ESAA 2014, equation (7.112)
     U_norm = ρ_r                  # sqrt(U_vec[1]^2 + U_vec[2]^2 + U_vec[3]^2)
     u_vec = U_vec/U_norm
@@ -333,7 +298,7 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime,
     E_H = euclid3D(E_H_vec)
     e_vec = E_H_vec/E_H
     # See ESAA 2014, equation (7.115)
-    g1 = (2μ_DE430[su]/(c_au_per_day^2))/(E_H/au)
+    g1 = g1coeff / (E_H / au)
     g2 = 1 + dot3D(q_vec, e_vec)
     # See ESAA 2014, equation (7.116)
     u1_vec = U_norm * ( u_vec + (g1/g2) * ( dot3D(u_vec, q_vec) * e_vec -
@@ -349,4 +314,121 @@ function compute_radec(observatory::ObservatoryMPC{T}, t_r_utc::DateTime,
     α_as = rad2arcsec(α_rad) # rad -> arcsec + debiasing
 
     return α_as, δ_as # right ascension, declination both in arcsec
+end
+
+# Taylorized version of the function above
+function compute_radec(
+        observatory::ObservatoryMPC{T}, t_r_utc::DateTime, buffer::OpticalBuffer{U};
+        niter::Int = 5, xvs::DensePropagation2{T, T}, xve::DensePropagation2{T, T},
+        xva::NTuple{2, DensePropagation2{T, U}}
+    ) where {T <: Real, U <: AbstractSeries}
+    aux1, aux2, ρ_r, τ_D, et_b_secs, Δτ_D, Δτ_rel_D, p_D, q_D, _p_dot_23_,
+    p_dot_23, τ_D_r, τ_D_23, one_minus_τ_D_23, _Δt_2_, Δt_2, U_norm, Q_norm,
+    q_dot_e, g2, u_dot_q, e_dot_u, g1_div_g2, u1_norm, u12_div_u11, α_aux,
+    u13_div_u1_norm, δ_aux, α_rad,  δ_rad, δ_as, α_as = buffer.v0
+    rv_a_t_r, r_a_t_r, ρ_vec_r, rv_a_t_b, r_a_t_b, v_a_t_b, rv_s_t_b,
+    r_s_t_b, p_D_vec, U_vec, u_vec, Q_vec, q_vec, u_dot_q_e_vec,
+    e_dot_u_q_vec, uqe_minus_euq, g12_uqe_vec, _u1_vec_, u1_vec = buffer.v1
+    et_r_secs = dtutc2et(t_r_utc)
+    rv_s_t_r = auday2kmsec(xvs(et_r_secs/daysec))
+    r_s_t_r = rv_s_t_r[1:3]
+    rv_e_t_r = auday2kmsec(xve(et_r_secs/daysec))
+    r_e_t_r = rv_e_t_r[1:3]
+    evaleph!(rv_a_t_r, et_r_secs, xva[1], xva[2])
+    r_a_t_r = rv_a_t_r[1:3]
+    order = get_order(r_a_t_r[1])
+    RV_r = obsposvelECI(observatory, et_r_secs)
+    R_r = RV_r[1:3]
+    r_r_t_r = r_e_t_r + R_r
+    E_H_vec = e_D_vec  = r_r_t_r - r_s_t_r
+    E_H = e_D = euclid3D(e_D_vec)
+    e_vec = E_H_vec / E_H
+    g1 = g1coeff / (E_H / au)
+    for ord = 0:order
+        for i in 1:3
+            TS.subst!(ρ_vec_r[i], r_a_t_r[i], r_r_t_r[i], ord)
+        end
+        euclid3D!(ρ_r, ρ_vec_r, aux1, aux2, ord)
+        TS.mul!(τ_D, c_kms_m1, ρ_r, ord)
+        TS.subst!(et_b_secs, et_r_secs, τ_D, ord)
+    end
+    for _ in 1:niter
+        evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2])
+        evaleph!(rv_s_t_b, et_b_secs, xvs)
+        for ord in 0:order
+            for i in 1:3
+                TS.identity!(r_a_t_b[i], rv_a_t_b[i], ord)
+                TS.identity!(v_a_t_b[i], rv_a_t_b[i+3], ord)
+                TS.identity!(r_s_t_b[i], rv_s_t_b[i], ord)
+                TS.subst!(ρ_vec_r[i], r_a_t_b[i], r_r_t_r[i], ord)
+                TS.subst!(p_D_vec[i], r_a_t_b[i], r_s_t_b[i], ord)
+            end
+            euclid3D!(ρ_r, ρ_vec_r, aux1, aux2, ord)
+            euclid3D!(p_D, p_D_vec, aux1, aux2, ord)
+            TS.identity!(q_D, ρ_r, ord)
+        end
+        Δτ_rel_D = shapiro_delay(e_D, p_D, q_D)
+        for ord in 0:order
+            TS.identity!(Δτ_D, Δτ_rel_D, ord)
+            dot3D!(_p_dot_23_, ρ_vec_r, v_a_t_b, aux1, ord)
+            TS.div!(p_dot_23, _p_dot_23_, ρ_r, ord)
+            TS.mul!(τ_D_r, c_kms_m1, ρ_r, ord)
+            TS.mul!(τ_D_23, c_kms_m1, p_dot_23, ord)
+            TS.subst!(one_minus_τ_D_23, 1, τ_D_23, ord)
+            TS.subst!(_Δt_2_, τ_D, τ_D_r, ord)
+            TS.subst!(_Δt_2_, _Δt_2_, Δτ_rel_D, ord)
+            TS.div!(Δt_2, _Δt_2_, one_minus_τ_D_23, ord)
+            TS.subst!(τ_D, τ_D, Δt_2, ord)
+            TS.subst!(et_b_secs, et_r_secs, τ_D, ord)
+        end
+    end
+    evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2])
+    evaleph!(rv_s_t_b, et_b_secs, xvs)
+    for ord in 0:order
+        for i in 1:3
+            TS.identity!(r_a_t_b[i], rv_a_t_b[i], ord)
+            TS.identity!(v_a_t_b[i], rv_a_t_b[i+3], ord)
+            TS.identity!(r_s_t_b[i], rv_s_t_b[i], ord)
+            TS.subst!(ρ_vec_r[i], r_a_t_b[i], r_r_t_r[i], ord)
+            TS.identity!(U_vec[i], ρ_vec_r[i], ord)
+            TS.subst!(Q_vec[i], r_a_t_b[i], r_s_t_b[i], ord)
+        end
+        euclid3D!(ρ_r, ρ_vec_r, aux1, aux2, ord)
+        TS.identity!(U_norm, ρ_r, ord)
+        euclid3D!(Q_norm, Q_vec, aux1, aux2, ord)
+        for i in 1:3
+            TS.div!(u_vec[i], U_vec[i], U_norm, ord)
+            TS.div!(q_vec[i], Q_vec[i], Q_norm, ord)
+        end
+        dot3D!(q_dot_e, q_vec, e_vec, aux1, ord)
+        TS.add!(g2, 1, q_dot_e, ord)
+        TS.div!(g1_div_g2, g1, g2, ord)
+        dot3D!(u_dot_q, u_vec, q_vec, aux1, ord)
+        dot3D!(e_dot_u, e_vec, u_vec, aux1, ord)
+        for i in 1:3
+            TS.zero!(e_dot_u_q_vec[i], ord)
+            TS.mul!(e_dot_u_q_vec[i], e_dot_u, q_vec[i], ord)
+            TS.zero!(u_dot_q_e_vec[i], ord)
+            TS.mul!(u_dot_q_e_vec[i], u_dot_q, e_vec[i], ord)
+            TS.subst!(uqe_minus_euq[i], u_dot_q_e_vec[i], e_dot_u_q_vec[i], ord)
+            TS.zero!(g12_uqe_vec[i], ord)
+            TS.mul!(g12_uqe_vec[i], g1_div_g2, uqe_minus_euq[i], ord)
+            TS.add!(_u1_vec_[i], u_vec[i], g12_uqe_vec[i], ord)
+            TS.zero!(u1_vec[i], ord)
+            TS.mul!(u1_vec[i], U_norm, _u1_vec_[i], ord)
+        end
+        euclid3D!(u1_norm, u1_vec, aux1, aux2, ord)
+        TS.div!(u12_div_u11, u1_vec[2], u1_vec[1], ord)
+        TS.div!(u13_div_u1_norm, u1_vec[3], u1_norm, ord)
+        TS.atan!(α_rad, u12_div_u11, α_aux, ord)
+        if ord == 0
+            α_rad[0] = mod2pi(mod2pi(atan(cte(u1_vec[2]), cte(u1_vec[1]))))
+        end
+        TS.mul!(α_as, onerad, α_rad, ord)
+        TS.mul!(α_as, 3_600, α_as, ord)
+        TS.asin!(δ_rad, u13_div_u1_norm, δ_aux, ord)
+        TS.mul!(δ_as, onerad, δ_rad, ord)
+        TS.mul!(δ_as, 3_600, δ_as, ord)
+    end
+    return α_as, δ_as
 end
