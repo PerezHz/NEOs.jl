@@ -1,6 +1,6 @@
-using ArgParse, NEOs, Dates, DelimitedFiles, PlanetaryEphemeris, JLD2
-using Plots, Colors, Printf
-using NEOs: OpticalADES, RadarJPL, AbstractOrbit, rexveres17, isoccultation
+using ArgParse, NEOs, Dates, PlanetaryEphemeris, JLD2
+using DelimitedFiles, Plots, Colors, Printf, Statistics
+using NEOs: OpticalADES, RadarJPL, AbstractOrbit, rexveres17, isoccultation, μ_S
 
 ENV["GKSwstype"] = "100"
 
@@ -56,6 +56,25 @@ function initcond(A::AdmissibleRegion)
         (sum(A.ρ_domain) / 2, v_ρ, :linear),
         (A.ρ_domain[2], v_ρ, :linear),
     ]
+end
+
+function meanepoch(x::ODProblem)
+    t = Vector{Float64}(undef, noptical(x))
+    w = Vector{Float64}(undef, noptical(x))
+    for i in eachindex(x.optical)
+        t[i] = dtutc2days(x.optical[i])
+        δ = dec(x.optical[i])
+        σα, σδ = inv.(x.weights.weights[i])
+        w[i] = 1 / (σα^2 * cos(δ)^2 + σδ^2)
+    end
+    return mean(t, weights(w))
+end
+
+function meanaxisdrift(A2, a, e, dA2, da, de)
+    C = 1000 * au * yr
+    adot = 2A2 / ((1 - e^2) * sqrt(μ_S * a))
+    dadot = abs(adot) * hypot(dA2/A2, da/(2a), 2e*de/(1-e^2))
+    return C * adot, C * dadot
 end
 
 function main()
@@ -116,7 +135,7 @@ function main()
     idxs0 = findall(x -> Date(2004, 5) < date(x) < Date(2004, 7), OD.optical)
     od0 = ODProblem(newtonian!, OD.optical[idxs0]; weights = UniformWeights, debias = Eggl20)
     params = Parameters(
-        maxsteps = 2_000, order = 25, abstol = 1E-20, parse_eqs = true,
+        maxsteps = 5_000, order = 25, abstol = 1E-20, parse_eqs = true,
         coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
         gaussorder = 2, safegauss = false, refscale = :log,
         tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
@@ -217,6 +236,33 @@ function main()
     params = Parameters(params; outrej = true, χ2_rec = sqrt(9.21),
         χ2_rej = sqrt(10), fudge = 100.0, max_per = 34.0)
     orbit = orbitdetermination(od10, orbit10, params)
+
+    # Shift epoch to the middle of the observational arc
+    tmean = meanepoch(od10)
+    orbit = shiftepoch(orbit, tmean + PE.J2000, params)
+    orbit = jtls(od10, orbit, params)
+    printitle("Final orbit", "*")
+    println(summary(orbit))
+
+    # Compute keplerian elements at 2025-Nov-21.0
+    t = datetime2julian(DateTime(2025, 11, 21)) - PE.J2000
+    kep = keplerian(orbit, params, t)
+    println(kep)
+
+    # Compute average semimajor axis drift
+    A2_JPL, a_JPL, e_JPL = -2.901766637153165E-14, 0.9223803173917017, 0.1911663355386932
+    dA2_JPL, da_JPL, de_JPL = 1.859E-16, 2.4147E-9, 1.3149E-9
+    adot_JPL, dadot_JPL = meanaxisdrift(A2_JPL, a_JPL, e_JPL, dA2_JPL, da_JPL, de_JPL)
+    println("• Average semimajor axis drift (JPL): ", @sprintf("%.2f", adot_JPL),
+        " +/- ", @sprintf("%.2f", dadot_JPL), " m / yr")
+
+    q0, s0 = orbit(), sigmas(orbit)
+    ele0, sele0 = elements(kep), sigmas(kep)
+    A2_NEOs, a_NEOs, e_NEOs = q0[end], ele0[1], ele0[2]
+    dA2_NEOs, da_NEOs, de_NEOs = s0[end], sele0[1], sele0[2]
+    adot_NEOs, dadot_NEOs = meanaxisdrift(A2_NEOs, a_NEOs, e_NEOs, dA2_NEOs, da_NEOs, de_NEOs)
+    println("• Average semimajor axis drift (NEOs.jl): ", @sprintf("%.2f", adot_NEOs),
+        " +/- ", @sprintf("%.2f", dadot_NEOs), " m / yr")
 
     # Save orbit
     filename = joinpath(directory, "apophis.jld2")
