@@ -78,11 +78,16 @@ using Test
         @test all(@. scalingfactor(q0TN) == scalings)
         @test all(@. q00 == cte(q0T1) == cte(q0TN) == cte(cte(q0T11)) == cte(cte(q0TN)))
 
-        @test dot3D(q00, q0T1) ≈ dot3D(q0T1, q00)
-        @test dot3D(q00, q0TN) ≈ dot3D(q0TN, q00)
-        @test sqrt(dot3D(q00, q00)) ≈ euclid3D(q00)
-        @test sqrt(dot3D(q0T1, q0T1)) ≈ euclid3D(q0T1)
-        @test sqrt(dot3D(q0TN, q0TN)) ≈ euclid3D(q0TN)
+        @test q00[1]*q0T1[1] + q00[2]*q0T1[2] + q00[3]*q0T1[3] == dot3D(q00, q0T1) ==
+              dot3D(q0T1, q00)
+        @test q00[1]*q0TN[1] + q00[2]*q0TN[2] + q00[3]*q0TN[3] == dot3D(q00, q0TN) ==
+              dot3D(q0TN, q00)
+        @test sqrt(q00[1]^2 + q00[2]^2 + q00[3]^2) == sqrt(dot3D(q00, q00)) ==
+              euclid3D(q00)
+        @test sqrt(q0T1[1]^2 + q0T1[2]^2 + q0T1[3]^2) == sqrt(dot3D(q0T1, q0T1)) ==
+              euclid3D(q0T1)
+        @test sqrt(q0TN[1]^2 + q0TN[2]^2 + q0TN[3]^2) == sqrt(dot3D(q0TN, q0TN)) ==
+              euclid3D(q0TN)
 
         @test evaleph(sseph, Taylor1(2), Taylor1(2)) ≈ evaleph(sseph, Taylor1(2))
 

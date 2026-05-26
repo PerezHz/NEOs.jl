@@ -1,25 +1,22 @@
-using ArgParse, NEOs, PlanetaryEphemeris, TaylorSeries, Dates, JLD2, Printf, BenchmarkTools
-using NEOs: ImpactMonitoringBuffer, radius
+using ArgParse, NEOs, PlanetaryEphemeris, TaylorSeries
+using Dates, BenchmarkTools, Printf
 
 function parse_commandline()
     s = ArgParseSettings()
 
     # Program name (for usage & help screen)
-    s.prog = "impactmonitoring.jl"
+    s.prog = "propagation.jl"
     # Desciption (for help screen)
-    s.description = "NEOs impact monitoring benchmark (2022 NX1)"
+    s.description = "NEOs propagation benchmark (Apophis)"
 
     s.epilog = """
         Example:\n
         \n
-        julia -t 5 --project impactmonitoring.jl -i 2022NX1.jld2 -o benchmark.json\n
+        julia -t 5 --project propagation.jl -o benchmark.json\n
         \n
     """
 
     @add_arg_table! s begin
-        "--input", "-i"
-            help = "input orbit determination file"
-            arg_type = String
         "--output", "-o"
             help = "output benchmark file"
             arg_type = String
@@ -30,7 +27,7 @@ function parse_commandline()
         "--seconds", "-t"
             help = "number of seconds budgeted for the benchmarking process"
             arg_type = Int
-            default = 250
+            default = 700
     end
 
     return parse_args(s)
@@ -46,14 +43,10 @@ function main()
     parsed_args = parse_commandline()
 
     # Print header
-    printitle("NEOs impact monitoring benchmark (2022 NX1)", "=")
+    printitle("NEOs propagation benchmark (Apophis)", "=")
 
     # Number of workers and threads
     println("• Detected 1 worker with ", Threads.nthreads(), " thread(s)")
-
-    # Input orbit determination file
-    input::String = parsed_args["input"]
-    println("• Input orbit determination file: ", input)
 
     # Output benchmark file
     output::String = parsed_args["output"]
@@ -71,30 +64,27 @@ function main()
     global_initial_time = now()
     println("• Run started at ", global_initial_time)
 
-    # Load orbit, line of variations and parameters
-    orbit = JLD2.load(input, "orbit")
-    lov = JLD2.load(input, "lov")
-    params = Parameters(JLD2.load(input, "params"); order = 15, abstol = 1E-12)
-
-    # Impact monitoring problem
-    IM = IMProblem(orbit, ImpactTarget(:earth))
-
-    # Virtual asteroids
-    R_TP, R_P, IP, Δσmax, vaorder = 0.2, radius(IM.target), 5E-6, 0.05, 4
-    VAs = virtualasteroids(lov, :DelVigna19, vaorder; R_TP, R_P, IP, Δσmax)
-    VA = VAs[1]
-
-    # Close approaches
-    ctol = 1.0
-    jd0 = epoch(lov) + PE.J2000
-    nyears = ( datetime2julian(DateTime(2100, 1, 1, 12)) - jd0 ) / yr
-    q0 = orbit() .+ 1E-8 * Taylor1(vaorder)
-    buffer = ImpactMonitoringBuffer(IM, q0, nyears, params)
+    # Parameters
+    params = Parameters(
+        order = 15, abstol = 1E-12, parse_eqs = true
+    )
+    # Time span
+    jd0 = PE.J2000
+    nyears = 25.0
+    # Initial condition
+    set_variables(Float64, "dx"; order = 2, numvars = 6)
+    q00 = [-1.045062875223473E+00, -1.294565996082367E-01, -7.496573820257184E-02,
+           +4.232752764404431E-03, -1.412783025595556E-02, -5.148374014688117E-03]
+           # -2.901766637153165E-14, 5.E-13, 0.0
+    q0 = q00 + get_variables(Float64, 2)
     # Compilation run
-    closeapproaches(IM, VA, nyears, params; R_TP, ctol, buffer)
+    params = Parameters(params; maxsteps = 1)
+    NEOs.propagate(gravityonly!, q0, jd0, nyears, params)
     # Benchmark
-    b = @benchmark closeapproaches($IM, $VA, $nyears, $params; R_TP = $R_TP, ctol = $ctol, buffer = $buffer) samples = samples seconds = seconds
+    params = Parameters(params; maxsteps = 10_000)
+    b = @benchmark NEOs.propagate($gravityonly!, $q0, $jd0, $nyears, $params) samples = samples seconds = seconds
     show(stdout, "text/plain", b)
+    println()
 
     # Save results
     BenchmarkTools.save(output, b)

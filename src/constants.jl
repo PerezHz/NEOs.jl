@@ -300,6 +300,9 @@ const cte = constant_term
 const order = 30
 const abstol = 1.0E-30
 
+# 1 rad = 57.29577951308232 deg
+const onerad = rad2deg(1.0)
+
 # Vector of GM's (DE430 values) [au^2 / day^3]
 const μ_DE430 = PE.μ
 # Gravitational parameter of the Sun [au^2 / day^3]
@@ -338,6 +341,7 @@ const c_km_per_us = c_cm_per_sec * 1e-11 # km/microsecond
 # Parameters related to speed of light, c
 const c_p2 = 29979.063823897606      # c^2 = 29979.063823897606 au^2/d^2
 const c_m2 = 3.3356611996764786e-5   # c^-2 = 3.3356611996764786e-5 d^2/au^2
+const c_kms_m1 = 1/clightkms         # c^-1 = 3.3356409519815205e-6 sec/km
 
 # Earth-Moon distance in [km]
 const d_EM_km = 384_400
@@ -356,6 +360,9 @@ const R_SI = 0.010044
 const R_EA = 4.24e-5
 # Ratio between the mass of the Earth and the mass of the Sun
 const μ_ES = PE.μ[ea] / PE.μ[su] # 1 / 328_900.5614
+
+# Coefficient of g1 (used in compute_radec)
+const g1coeff = 2μ_DE430[su] / c_au_per_day^2
 
 # Impact monitoring
 
