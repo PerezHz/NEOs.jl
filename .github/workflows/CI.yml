@@ -36,8 +36,6 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
-      ### Uncomment lines below to run on custom dep branches
-      - run: julia --project=. -e 'using Pkg; pkg"add https://github.com/PerezHz/TaylorSeries.jl#jp/jet-spaces"; pkg"add https://github.com/PerezHz/TaylorIntegration.jl#jp/test-jet-spaces"; Pkg.instantiate()'
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         env:
