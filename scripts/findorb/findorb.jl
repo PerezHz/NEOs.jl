@@ -279,10 +279,13 @@ function main()
 
     # Print heliocentric ecliptic Keplerian elements (plus q, tp)
     kep = keplerian(orbit, params)
+    H, dH = absolutemagnitude(orbit, params)
     printitle("Keplerian elements", "*")
     println(kep)
     println("q  = ", @sprintf("%+.12E", pericenter(kep)), " au")
     println("tp = ", @sprintf("%+.12E", timeperipass(kep)), " MJD TDB")
+    println("H  = ", @sprintf("%.3f", H), " +/- ", @sprintf("%.3f", dH), " mag")
+    println("")
 
     # Save orbit
     jldsave(output; orbit)
