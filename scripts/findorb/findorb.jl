@@ -277,6 +277,13 @@ function main()
     printitle("Final orbit", "*")
     println(summary(orbit))
 
+    # Print heliocentric ecliptic Keplerian elements (plus q, tp)
+    kep = keplerian(orbit, params)
+    printitle("Keplerian elements", "*")
+    println(kep)
+    println("q  = ", @sprintf("%+.12E", pericenter(kep)), " au")
+    println("tp = ", @sprintf("%+.12E", timeperipass(kep)), " MJD TDB")
+
     # Save orbit
     jldsave(output; orbit)
     println("Final orbit saved to: ", output)
