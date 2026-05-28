@@ -72,11 +72,11 @@ function main()
     jd0 = PE.J2000
     nyears = 25.0
     # Initial condition
-    set_variables(Float64, "dx"; order = 2, numvars = 6)
+    NEOs.taylor_variables!(Float64, "dx"; order = 2, numvars = 6)
     q00 = [-1.045062875223473E+00, -1.294565996082367E-01, -7.496573820257184E-02,
            +4.232752764404431E-03, -1.412783025595556E-02, -5.148374014688117E-03]
            # -2.901766637153165E-14, 5.E-13, 0.0
-    q0 = q00 + get_variables(Float64, 2)
+    q0 = q00 + NEOs.taylor_variables(Float64, 2)
     # Compilation run
     params = Parameters(params; maxsteps = 1)
     NEOs.propagate(gravityonly!, q0, jd0, nyears, params)
