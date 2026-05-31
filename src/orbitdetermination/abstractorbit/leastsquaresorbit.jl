@@ -112,7 +112,7 @@ An asteroid least squares orbit.
     # Inner constructor
     function LeastSquaresOrbit{D, T, U, O, R, RR}(
             dynamics::D, variables::Vector{Int}, optical::O, tracklets::TrackletVector{T},
-            radar::R, bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
+            radar::R, bwd::DensePropagation2{T, U}, fwd::DensePropagation2{T, U},
             ores::Vector{OpticalResidual{T, U}}, rres::RR, fit::LeastSquaresFit{T},
             qs::Matrix{T}, Qs::Vector{T}
         ) where {
@@ -120,13 +120,13 @@ An asteroid least squares orbit.
             R <: Union{Nothing, AbstractRadarVector{T}},
             RR <: Union{Nothing, Vector{RadarResidual{T, U}}}
         }
-        @assert bwd.t0 == fwd.t0 "Backward and forward integration initial \
+        @assert first(bwd.t) == first(fwd.t) "Backward and forward integration initial \
             times must match"
         @assert length(optical) == length(ores) "Number of observations must \
             match number of residuals"
-        cols = length(variables) < size(bwd.x, 2) ? variables : axes(bwd.x, 2)
-        _bwd_ = TaylorInterpolant(bwd.t0, bwd.t, collect(view(bwd.x, :, cols)))
-        _fwd_ = TaylorInterpolant(fwd.t0, fwd.t, collect(view(fwd.x, :, cols)))
+        cols = length(variables) < size(bwd.p, 2) ? variables : axes(bwd.p, 2)
+        _bwd_ = dense_solution(bwd.t, collect(view(bwd.p, :, cols)))
+        _fwd_ = dense_solution(fwd.t, collect(view(fwd.p, :, cols)))
         return new{D, T, U, O, R, RR}(dynamics, variables, optical, tracklets, radar,
                                       _bwd_, _fwd_, ores, rres, fit, qs, Qs)
     end
@@ -139,7 +139,7 @@ const MixedLeastSquaresOrbit{D, T, U, O, R} = LeastSquaresOrbit{D, T, U, O, R, V
 # Outer constructor
 function LeastSquaresOrbit(
         dynamics::D, variables::Vector{Int}, optical::O, tracklets::TrackletVector{T},
-        radar::R, bwd::TaylorInterpolant{T, U, 2}, fwd::TaylorInterpolant{T, U, 2},
+        radar::R, bwd::DensePropagation2{T, U}, fwd::DensePropagation2{T, U},
         ores::Vector{OpticalResidual{T, U}}, rres::RR, fit::LeastSquaresFit{T},
         qs::Matrix{T}, Qs::Vector{T}
     ) where {
@@ -232,8 +232,8 @@ function zero(::Type{LeastSquaresOrbit{D, T, U, O, R, RR}}) where {D, T, U, O, R
     optical = O()
     tracklets = TrackletVector{T}()
     radar = R == Nothing ? nothing : R()
-    bwd = zero(DensePropagation2{T, U})
-    fwd = zero(DensePropagation2{T, U})
+    bwd = _zero_dense_solution(DensePropagation2{T, U})
+    fwd = _zero_dense_solution(DensePropagation2{T, U})
     ores = Vector{OpticalResidual{T, U}}(undef, 0)
     rres = RR == Nothing ? nothing : RR()
     fit = zero(LeastSquaresFit{T})
@@ -243,18 +243,18 @@ function zero(::Type{LeastSquaresOrbit{D, T, U, O, R, RR}}) where {D, T, U, O, R
                              ores, rres, fit, qs, Qs)
 end
 
-iszero(x::LeastSquaresOrbit{D, T, U, O, R, RR}) where {D, T, U, O, R, RR} =
-    x == zero(LeastSquaresOrbit{D, T, U, O, R, RR})
+iszero(x::LeastSquaresOrbit) = isempty(x.variables) && isempty(x.ores) &&
+    _iszero_dense_solution(x.bwd) && _iszero_dense_solution(x.fwd)
 
 # Evaluate integrations and residuals in fit deltas
 function evalfit(orbit::OpticalLeastSquaresOrbit{D, T, TaylorN{T}, O}) where {D, T, O}
     # Fit δs
     δs = orbit.fit.x
     # Evaluate integrations
-    new_bwd_x = evaluate.(orbit.bwd.x, Ref(δs))
-    new_bwd = TaylorInterpolant(orbit.bwd.t0, orbit.bwd.t, new_bwd_x)
-    new_fwd_x = evaluate.(orbit.fwd.x, Ref(δs))
-    new_fwd = TaylorInterpolant(orbit.fwd.t0, orbit.fwd.t, new_fwd_x)
+    new_bwd_p = evaluate.(orbit.bwd.p, Ref(δs))
+    new_bwd = dense_solution(orbit.bwd.t, new_bwd_p)
+    new_fwd_p = evaluate.(orbit.fwd.p, Ref(δs))
+    new_fwd = dense_solution(orbit.fwd.t, new_fwd_p)
     # Evaluate residuals
     new_ores = orbit.ores(δs)
 
@@ -269,10 +269,10 @@ function evalfit(orbit::MixedLeastSquaresOrbit{D, T, TaylorN{T}, O, R}) where {D
     # Fit δs
     δs = orbit.fit.x
     # Evaluate integrations
-    new_bwd_x = evaluate.(orbit.bwd.x, Ref(δs))
-    new_bwd = TaylorInterpolant(orbit.bwd.t0, orbit.bwd.t, new_bwd_x)
-    new_fwd_x = evaluate.(orbit.fwd.x, Ref(δs))
-    new_fwd = TaylorInterpolant(orbit.fwd.t0, orbit.fwd.t, new_fwd_x)
+    new_bwd_p = evaluate.(orbit.bwd.p, Ref(δs))
+    new_bwd = dense_solution(orbit.bwd.t, new_bwd_p)
+    new_fwd_p = evaluate.(orbit.fwd.p, Ref(δs))
+    new_fwd = dense_solution(orbit.fwd.t, new_fwd_p)
     # Evaluate residuals
     new_ores = orbit.ores(δs)
     new_rres = orbit.rres(δs)

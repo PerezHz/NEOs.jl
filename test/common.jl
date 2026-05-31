@@ -43,7 +43,7 @@ using Test
         @test tt_tdb(0.0) ≈ ttmtdb(0.0)
         # Note: By Sep 26, 2025 the time derivative of TT-TDB differs
         # between JPL and PlanetaryEphemeris
-        @test !(dtt_tdb(0.0) ≈ TS.differentiate(1, ttmtdb.x[1]))
+        @test !(dtt_tdb(0.0) ≈ TS.differentiate(1, ttmtdb.p[1]))
 
         q_Apophis_JPL_220 = [-1.045062875223473E+00, -1.294565996082367E-01, -7.496573820257184E-02,
                               4.232752764404431E-03, -1.412783025595556E-02, -5.148374014688117E-03]

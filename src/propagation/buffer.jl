@@ -11,7 +11,7 @@ end
 # Outer constructor
 function EphemerisEvaluationBuffer(
         eph::DensePropagation2{T, T}, tlim::NTuple{2, T}, order::Int,
-        q0::Vector{U}; cols::AbstractVector{Int} = axes(eph.x, 2)
+        q0::Vector{U}; cols::AbstractVector{Int} = axes(eph.p, 2)
     ) where {T <: Real, U <: Number}
     # Check order
     @assert order <= SSEPHORDER "order ($order) must be less or equal than solar system \
@@ -20,9 +20,9 @@ function EphemerisEvaluationBuffer(
     t = Taylor1(SSEPHORDER)
     # Load ephemeris
     t0, tf = minmax(tlim[1], tlim[2])
-    j0 = searchsortedlast(eph.t, t0 - eph.t0)
-    jf = searchsortedfirst(eph.t, tf - eph.t0)
-    _eph_ = TaylorInterpolant(eph.t0, eph.t[j0:jf], eph.x[j0:jf-1, cols])
+    j0 = searchsortedlast(eph.t, t0)
+    jf = searchsortedfirst(eph.t, tf)
+    _eph_ = dense_solution(eph.t[j0:jf], eph.p[j0:jf-1, cols])
     # Evaluation vectors
     zeroT = Taylor1(zeros(order+1), SSEPHORDER)
     aux = [zero(zeroT) for _ in cols]
@@ -38,14 +38,14 @@ for U in (:(T), :(TaylorN{T}), :(Taylor1{T}))
     @eval begin
         function (y::EphemerisEvaluationBuffer{T, $U})(tt::Taylor1{T}) where {T <: Real}
             @unpack t, eph, aux, ephT, ephU = y
-            # Get index of eph.x that interpolates at time t
+            # Get index of eph.p that interpolates at time t
             TS.identity!(t, tt, 0)
-            ind::Int, δt::Taylor1{T} = getinterpindex(eph, t)
+            ind::Int, δt::Taylor1{T} = timeindex(eph, t)
             # Evaluate eph at t and convert the output to $U
             Threads.@threads for i in eachindex(ephU)
                 TS.zero!(ephT[i])
                 TS.zero!(aux[i])
-                TS._horner!(ephT[i], eph.x[ind, i], δt, aux[i])
+                TS._horner!(ephT[i], eph.p[ind, i], δt, aux[i])
                 TS.zero!(ephU[i])
                 if $U == T
                     for k in eachindex(ephU[i])

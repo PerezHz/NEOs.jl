@@ -102,8 +102,8 @@ function propres!(
     # Backward (forward) integration
     bwd = _propagate(dynamicalmodel(IM), q0, jd0, nyears_bwd, buffer.prop, params)
     fwd = _propagate(dynamicalmodel(IM), q0, jd0, nyears_fwd, buffer.prop, params)
-    if !issuccessfulprop(bwd, t0 - _jd0_; tol = coeffstol) ||
-       !issuccessfulprop(fwd, tf - _jd0_; tol = coeffstol)
+    if !issuccessfulprop(bwd, t0 - JD_J2000; tol = coeffstol) ||
+       !issuccessfulprop(fwd, tf - JD_J2000; tol = coeffstol)
         empty!(res)
         return bwd, fwd
     end

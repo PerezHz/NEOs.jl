@@ -69,8 +69,8 @@ function isjtlsfit(od::OpticalODProblem, q::Vector{<:Number},
     end
     all(mask) || return false
     # Check that orbit stays out of Earth's radius
-    ts = find_zeros(t -> rvelea(eph, params, t), bwd.t0 + bwd.t[end] + 0.007,
-        fwd.t0 + fwd.t[end] - 0.007)
+    ts = find_zeros(t -> rvelea(eph, params, t), last(bwd.t) + 0.007,
+        last(fwd.t) - 0.007)
     ds = map(t -> euclid3D(eph(t) - eph_ea(t)), ts)
     mask = ds .> R_EA
 

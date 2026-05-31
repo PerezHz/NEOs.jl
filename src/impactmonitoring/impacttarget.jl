@@ -27,7 +27,7 @@ gm(x::ImpactTarget) = x.gm
 radius(x::ImpactTarget) = x.radius
 escapevelocity(x::ImpactTarget) = sqrt(2 * gm(x) / radius(x)) * (au/daysec)
 
-minmaxdays(x::ImpactTarget) = minmax(x.eph.t0, x.eph.t0 + x.eph.t[end])
+minmaxdays(x::ImpactTarget) = minmax(first(x.eph.t), last(x.eph.t))
 
 function isintimerange(t::Number, x::ImpactTarget)
     t0, tf = minmaxdays(x)

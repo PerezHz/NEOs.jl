@@ -110,7 +110,7 @@ nominaltime(x::LineOfVariations) = x.epoch
 
 sigma(::LineOfVariations{D, T}) where {D, T} = zero(T)
 
-taylor_order(x::LineOfVariations) = taylor_order(first(x.bwd.x))
+taylor_order(x::LineOfVariations) = taylor_order(first(x.bwd.p))
 if isdefined(TaylorSeries, :order)
     TaylorSeries.order(x::LineOfVariations) = taylor_order(x)
 else
@@ -294,15 +294,15 @@ function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
     # Taylor expansion of the line of variations
     _bwd_ = taylorinteg!(Val(true), lov!, coord00, zero(T), -σmax, lovtol,
                         cache, lovparams; maxsteps = lovsteps)
-    bwd = TaylorInterpolant{T, T, 2}(zero(T), _bwd_.t, _bwd_.p)
+    bwd = dense_solution(_bwd_.t, _bwd_.p)
     _fwd_ = taylorinteg!(Val(true), lov!, coord00, zero(T), σmax, lovtol,
                         cache, lovparams; maxsteps = lovsteps)
-    fwd = TaylorInterpolant{T, T, 2}(zero(T), _fwd_.t, _fwd_.p)
+    fwd = dense_solution(_fwd_.t, _fwd_.p)
     # The positive sigma direction is given by the semimajor axis
-    q0T1 = lovtransform(mjd0, fwd.x[1, :], sun, Val(coord), Val(:cartesian)) - sun
+    q0T1 = lovtransform(mjd0, fwd.p[1, :], sun, Val(coord), Val(:cartesian)) - sun
     a = semimajoraxis(q0T1..., μ_S, 0.0)
     if differentiate(1, a) < 0
-        bwd, fwd = flipsign(fwd), flipsign(bwd)
+        bwd, fwd = _flipsign_solution(fwd), _flipsign_solution(bwd)
     end
     domain = (last(bwd.t), last(fwd.t))
 

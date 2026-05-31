@@ -180,7 +180,7 @@ of TT seconds past the J2000.0 epoch.
 """
 function ttmtdb_tt(tt::Real; niter::Int = 5)
     # Ansatz: TDB - TT = 0
-    ttmtdb_order = taylor_order(ttmtdb.x[1])
+    ttmtdb_order = taylor_order(ttmtdb.p[1])
     tdb = Taylor1([tt,one(tt)], ttmtdb_order)
     for _ in 1:niter
         ttmtdb_tdb = ttmtdb(tdb/daysec)

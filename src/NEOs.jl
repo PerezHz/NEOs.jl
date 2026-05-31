@@ -1,8 +1,8 @@
 module NEOs
 
 # __precompile__(false)
-import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary,
-       firstindex, lastindex, first, last, wait, isdeprecated
+import Base: RefValue, isless, show, string, getindex, in, zero,
+       iszero, isnan, summary, firstindex, lastindex, first, last, wait, isdeprecated
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, longascnode,
        meanmotion, meananomaly, timeperipass, numberofbodies
@@ -28,12 +28,12 @@ using LinearAlgebra: inv!
 using LsqFit: curve_fit, vcov
 using OhMyThreads: tmap, tmap!, @allow_boxed_captures
 using Parameters: @with_kw, @unpack
-using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea, mo,
-      yr, RE, Rx, Ry, Rz, R_sun, α_p_sun, δ_p_sun, daysec, auday2kmsec, kmsec2auday,
+using PlanetaryEphemeris: au, su, ea, mo, yr, RE, Rx, Ry, Rz, R_sun, α_p_sun,
+      δ_p_sun, daysec, auday2kmsec, kmsec2auday,
       c_au_per_day, c_au_per_sec, c_cm_per_sec, semimajoraxis, eccentricity, inclination,
       longascnode, argperi, timeperipass, meanmotion, meananomaly, eccentricanomaly,
-      trueanomaly, selecteph, getinterpindex, pole_rotation, nbodyind,
-      t2c_jpl_de430, t2c_jpl_de430!, allocate_c2t_jpl_de430
+      trueanomaly, pole_rotation, nbodyind, t2c_jpl_de430,
+      t2c_jpl_de430!, allocate_c2t_jpl_de430
 using Preferences: @load_preference, @set_preferences!
 using QuadGK: quadgk
 using Roots: Bisection, find_zero, find_zeros
@@ -45,7 +45,8 @@ using SpecialFunctions: erf
 using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update_cache!,
-      taylorstep!, set_psol!, nrconvergencecriterion
+      taylorstep!, set_psol!, nrconvergencecriterion, TaylorSolution,
+      TaylorSolutionCallingArgs, timeindex
 using TaylorSeries: NumberNotSeries
 
 const _taylor_order = getfield(TaylorSeries, isdefined(TaylorSeries, :order) ? :order : :get_order)

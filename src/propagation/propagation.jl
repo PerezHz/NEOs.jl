@@ -53,9 +53,9 @@ function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6);
 end
 
 # Check if an integration was successful
-function issuccessfulprop(sol::TaylorInterpolant, t::T; tol::T = 10.0) where {T <: Real}
-    # Zero TaylorInterpolant
-    iszero(sol) && return false
+function issuccessfulprop(sol::TaylorSolution, t::T; tol::T = 10.0) where {T <: Real}
+    # Zero TaylorSolution
+    _iszero_dense_solution(sol) && return false
     # Forward integration
     if issorted(sol.t)
         # Insufficient steps
@@ -73,7 +73,7 @@ function issuccessfulprop(sol::TaylorInterpolant, t::T; tol::T = 10.0) where {T 
         return false
     end
     # All coefficients are below tol
-    return all( norm.(view(sol.x, 1:i, :), Inf) .< tol )
+    return all( norm.(view(sol.p, 1:i, :), Inf) .< tol )
 end
 
 """
@@ -108,7 +108,7 @@ function _propagate(f::D, q0::Vector{U}, jd0::V, tmax::T, buffer::PropagationBuf
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
-    return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, orbit.t, orbit.p)
+    return dense_solution((_jd0_ - JD_J2000) .+ orbit.t, orbit.p)
 end
 
 """
@@ -155,8 +155,8 @@ function _propagate_root(f::D, q0::Vector{U}, jd0::V, tmax::T, buffer::Propagati
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
-    return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, orbit.t, orbit.p),
-        orbit.tevents, orbit.xevents, orbit.gresids
+    return dense_solution((_jd0_ - JD_J2000) .+ orbit.t, orbit.p), orbit.tevents,
+        orbit.xevents, orbit.gresids
 end
 
 """

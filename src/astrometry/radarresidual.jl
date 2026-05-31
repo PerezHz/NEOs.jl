@@ -423,8 +423,7 @@ where ``f`` is the transmitter frequency [MHz] and ``\tau`` is the time-delay at
 reception time ``t``. Computed values include corrections due to Earth orientation,
 LOD and polar motion.
 
-The above works only with `TaylorInterpolant` ephemeris. See
-[`PlanetaryEphemeris.TaylorInterpolant`](@ref).
+The above works only with dense `TaylorSolution` ephemerides.
 """
 function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::Int = 10,
                        niter::Int = 10, xve::EarthEph = earthposvel, xvs::SunEph = sunposvel,

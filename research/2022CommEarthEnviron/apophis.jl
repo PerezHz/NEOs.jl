@@ -149,9 +149,9 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     println()
 
     # Load Sun ephemeris
-    eph_su = selecteph(NEOs.sseph, su, sol_bwd.t0+sol_bwd.t[end], sol_fwd.t0+sol_fwd.t[end])
+    eph_su = NEOs._selecteph(NEOs.sseph, su, last(sol_bwd.t), last(sol_fwd.t))
     # Load Earth ephemeris
-    eph_ea = selecteph(NEOs.sseph, ea, sol_bwd.t0+sol_bwd.t[end], sol_fwd.t0+sol_fwd.t[end])
+    eph_ea = NEOs._selecteph(NEOs.sseph, ea, last(sol_bwd.t), last(sol_fwd.t))
 
     # Apophis
     # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
@@ -247,7 +247,7 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     lscache = LeastSquaresCache(x0, 1:npar, 10)
     # Least squares fit
     fit_OR8 = leastsquares!(lsmethod, lscache)
-    x_OR8 = sol_fwd(sol_fwd.t0)(fit_OR8.x)
+    x_OR8 = sol_fwd(first(sol_fwd.t))(fit_OR8.x)
     σ_OR8 = sqrt.(diag(fit_OR8.Γ)).*scalings
 
     nradec = length(res_radec)

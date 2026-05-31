@@ -31,7 +31,7 @@ numvars(x::AbstractOrbit) = length(x.variables)
 
 Return the reference epoch of an orbit in TDB days since J2000.
 """
-epoch(x::AbstractOrbit) = x.bwd.t0
+epoch(x::AbstractOrbit) = first(x.bwd.t)
 
 # Number of observations
 noptical(x::AbstractOrbit) = length(x.optical)

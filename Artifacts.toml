@@ -68,4 +68,4 @@ lazy = true
 
     [[sseph_p100.download]]
     sha256 = "25b525ffef5c05cc51ee554760ae83107b9bd163577439470b60c2d4c7153a21"
-    url = "https://github.com/LuEdRaMo/sseph/raw/main/sseph343ast016_p100y_et.tar.gz"
+    url = "https://github.com/PerezHz/sseph/raw/main/sseph343ast016_p100y_et.tar.gz"
