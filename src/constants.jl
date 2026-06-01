@@ -235,10 +235,6 @@ const CATALOGUE_MPC_CODES_2018 = [
 
 # Propagation
 
-# Abbreviation for dense TaylorIntegration solutions used as interpolants.
-const DensePropagation1{T, U} = TaylorIntegration.DensePropagation1{T, U}
-const DensePropagation2{T, U} = TaylorIntegration.DensePropagation2{T, U}
-
 # Load Solar System, accelerations, newtonian potentials and TT-TDB 2000-2100 ephemeris
 const SSEPH_ARTIFACT_PATH = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
 const SSEPH_SOURCE = @load_preference("SSEPH_SOURCE", SSEPH_ARTIFACT_PATH)

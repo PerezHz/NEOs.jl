@@ -45,8 +45,8 @@ using SpecialFunctions: erf
 using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update_cache!,
-      taylorstep!, set_psol!, nrconvergencecriterion, TaylorSolution,
-      TaylorSolutionCallingArgs, timeindex
+      taylorstep!, set_psol!, nrconvergencecriterion, TaylorSolution, DensePropagation1,
+      DensePropagation2, TaylorSolutionCallingArgs, timeindex
 using TaylorSeries: NumberNotSeries
 
 const _taylor_order = getfield(TaylorSeries, isdefined(TaylorSeries, :order) ? :order : :get_order)
