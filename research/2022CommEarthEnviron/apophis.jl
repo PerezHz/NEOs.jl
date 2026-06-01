@@ -149,9 +149,9 @@ function main(dynamics::D, maxsteps::Int, jd0_datetime::DateTime, nyears_bwd::T,
     println()
 
     # Load Sun ephemeris
-    eph_su = NEOs._selecteph(NEOs.sseph, su, last(sol_bwd.t), last(sol_fwd.t))
+    eph_su = selecteph(NEOs.sseph, su, last(sol_bwd.t), last(sol_fwd.t))
     # Load Earth ephemeris
-    eph_ea = NEOs._selecteph(NEOs.sseph, ea, last(sol_bwd.t), last(sol_fwd.t))
+    eph_ea = selecteph(NEOs.sseph, ea, last(sol_bwd.t), last(sol_fwd.t))
 
     # Apophis
     # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
