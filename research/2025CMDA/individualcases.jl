@@ -188,7 +188,7 @@ function neo2014AA(filename::String)
     set_od_order(Float64, 2)
     t = epoch(orbit)
     jd0 = t + PE.J2000
-    q0 = orbit(t) + diag(orbit.J) .* TaylorSeries.variables(Float64, 2)
+    q0 = orbit(t) + diag(orbit.J) .* get_variables(Float64, 2)
     params = Parameters(params; bwdoffset = 0.5)
     bwd, _, _ = propres(od, jd0, q0, params)
     jd0, t = 2456658.5, 2456658.5 - J2000

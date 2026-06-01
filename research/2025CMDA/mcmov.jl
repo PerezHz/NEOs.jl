@@ -197,7 +197,7 @@ function main()
     # Admissible region
     A = AdmissibleRegion(tracklets[idxtrk], params)
     # Set jet transport variables
-    TaylorSeries.variables!(Float64, "dx"; order = varorder, numvars = 6)
+    set_variables(Float64, "dx"; order = varorder, numvars = 6)
     println("• Jet transport order: ", varorder)
 
     # Global box

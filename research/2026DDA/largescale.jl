@@ -72,7 +72,7 @@ end
         # Keplerian elements for NEOs at ESA's epoch
         ndays = jd0ESA - jd0NEOs
         ndays += sign(ndays) * max(params.fwdoffset, params.bwdoffset)
-        q0 = orbitNEOs() + 1E-8 * TaylorSeries.variables(Float64, 2)
+        q0 = orbitNEOs() + 1E-8 * get_variables(Float64, 2)
         prop = NEOs._propagate(gravityonly!, q0, jd0NEOs, ndays / yr, bufferTN, params)
         q0 = equatorial2ecliptic(prop(jd0ESA - J2000) - params.eph_su(jd0ESA - J2000))
         ele = cartesian2keplerian(q0, mjd0ESA)
@@ -88,7 +88,7 @@ end
         # Keplerian elements for NEOs at JPL's epoch
         ndays = jd0JPL - jd0NEOs
         ndays += sign(ndays) * max(params.fwdoffset, params.bwdoffset)
-        q0 = orbitNEOs() + 1E-8 * TaylorSeries.variables(Float64, 2)
+        q0 = orbitNEOs() + 1E-8 * get_variables(Float64, 2)
         prop = NEOs._propagate(gravityonly!, q0, jd0NEOs, ndays / yr, bufferTN, params)
         q0 = equatorial2ecliptic(prop(jd0JPL - J2000) - params.eph_su(jd0JPL - J2000))
         ele = cartesian2keplerian(q0, mjd0JPL)
@@ -155,7 +155,7 @@ function main()
         tlim = (0.0, 9861.5)
         q00 = [−0.18034828526, 0.94069105951, 0.34573599029,
                −0.0162659397882, 4.39154800E−5, −0.000395204013]
-        q0 = q00 + 1E-8 * TaylorSeries.variables(Float64, 2)
+        q0 = q00 + 1E-8 * get_variables(Float64, 2)
         const bufferTN = PropagationBuffer(gravityonly!, q0, jd0, tlim, params)
     end
 
