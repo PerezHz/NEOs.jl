@@ -5,7 +5,7 @@ import Base: RefValue, isless, show, string, getindex, in, zero,
        iszero, isnan, summary, firstindex, lastindex, first, last, wait, isdeprecated
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, longascnode,
-       meanmotion, meananomaly, timeperipass, numberofbodies
+       meanmotion, meananomaly, timeperipass, numberofbodies, selecteph
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import StatsBase: weights
 import Tables: Schema, istable, rowaccess, rows, schema

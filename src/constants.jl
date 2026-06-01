@@ -236,132 +236,8 @@ const CATALOGUE_MPC_CODES_2018 = [
 # Propagation
 
 # Abbreviation for dense TaylorIntegration solutions used as interpolants.
-const DensePropagation1{T, U} = TaylorSolution{T, U, 1}
-const DensePropagation2{T, U} = TaylorSolution{T, U, 2}
-
-function dense_solution(t::AbstractVector{T}, p::AbstractVector{Taylor1{U}}) where {T, U}
-    @assert length(t) == length(p) + 1
-    x = Vector{U}(undef, length(t))
-    for i in eachindex(p)
-        x[i] = p[i](zero(T))
-    end
-    if isempty(p)
-        x[end] = zero(U)
-    else
-        x[end] = p[end](t[end] - t[end-1])
-    end
-    return TaylorSolution(collect(t), x, collect(p))
-end
-
-function dense_solution(t::AbstractVector{T}, p::AbstractMatrix{Taylor1{U}}) where {T, U}
-    @assert length(t) == size(p, 1) + 1
-    x = Matrix{U}(undef, length(t), size(p, 2))
-    for j in axes(p, 2)
-        for i in axes(p, 1)
-            x[i, j] = p[i, j](zero(T))
-        end
-        x[end, j] = isempty(axes(p, 1)) ? zero(U) : p[end, j](t[end] - t[end-1])
-    end
-    return TaylorSolution(collect(t), x, collect(p))
-end
-
-function _zero_dense_solution(::Type{<:TaylorSolution{T, U, 1}}) where {T, U}
-    return TaylorSolution(zeros(T, 1), zeros(U, 1), Vector{Taylor1{U}}(undef, 0))
-end
-
-function _zero_dense_solution(::Type{<:TaylorSolution{T, U, 2}}) where {T, U}
-    x = Matrix{U}(undef, 1, 0)
-    p = Matrix{Taylor1{U}}(undef, 0, 0)
-    return TaylorSolution(zeros(T, 1), x, p)
-end
-
-_same_dense_solution(a::TaylorSolution, b::TaylorSolution) =
-    a.t == b.t && a.x == b.x && a.p == b.p && a.tevents == b.tevents &&
-    a.xevents == b.xevents && a.gresids == b.gresids && a.λ == b.λ
-
-function _iszero_dense_solution(sol::TaylorSolution)
-    if sol.x isa AbstractVector
-        xzero = length(sol.x) == 1 && iszero(only(sol.x))
-    else
-        xzero = size(sol.x) == (1, 0)
-    end
-    return length(sol.t) == 1 && iszero(only(sol.t)) && xzero && isempty(sol.p) &&
-        isnothing(sol.tevents) && isnothing(sol.xevents) && isnothing(sol.gresids) &&
-        isnothing(sol.λ)
-end
-
-function _flipsign_solution(sol::TaylorSolution)
-    p = sol.p
-    isnothing(p) && error("_flipsign_solution requires a dense TaylorSolution")
-    dt = Taylor1(taylor_order(first(p)))
-    t = flipsign.(sol.t, -one(eltype(sol.t)))
-    t[begin] = sol.t[begin]
-    return dense_solution(t, map(poly -> poly(-dt), p))
-end
-
-function _selecteph(eph::TaylorSolution{S, U, 2},
-                    bodyind::Union{Int, AbstractVector{Int}},
-                    t0::T = first(minmax(first(eph.t), last(eph.t))),
-                    tf::T = last(minmax(first(eph.t), last(eph.t)));
-                    euler::Bool = false, ttmtdb::Bool = false) where {S, U, T <: Real}
-    isnothing(eph.p) && error("_selecteph requires a dense TaylorSolution")
-
-    tmin, tmax = minmax(first(eph.t), last(eph.t))
-    @assert tmin ≤ t0 < tf ≤ tmax "$tmin ≤ $t0 < $tf ≤ $tmax"
-
-    N = numberofbodies(eph)
-    bodyinds = bodyind isa Int ? (bodyind,) : bodyind
-    @assert all(≤(N), bodyinds) "All bodyind must be smaller than $N"
-
-    cols = nbodyind(N, bodyind)
-    if euler
-        cols = vcat(cols, 6N+1:6N+12)
-    end
-    if ttmtdb
-        cols = vcat(cols, 6N+13)
-    end
-
-    if issorted(eph.t)
-        j0 = searchsortedlast(eph.t, t0)
-        jf = searchsortedfirst(eph.t, tf)
-    else
-        j0 = searchsortedlast(eph.t, tf, rev = true)
-        jf = searchsortedfirst(eph.t, t0, rev = true)
-    end
-    j0 = max(firstindex(eph.t), j0)
-    jf = min(lastindex(eph.t), jf)
-    @assert j0 < jf "No TaylorSolution steps overlap the requested time span"
-
-    return dense_solution(eph.t[j0:jf], eph.p[j0:jf-1, cols])
-end
-
-function _load_dense_solution(filename::AbstractString, key::AbstractString)
-    sol = JLD2.load(filename, key)
-    if sol isa TaylorSolution
-        solx = getproperty(sol, :x)
-        if isnothing(sol.p) && eltype(solx) <: Taylor1
-            return dense_solution(sol.t, solx)
-        end
-        return sol
-    end
-
-    # Backward compatibility for artifacts serialized with PlanetaryEphemeris <= 0.11.
-    if all(hasproperty(sol, p) for p in (:order, :dims, :t0, :t, :x))
-        t = getproperty(sol, :t)
-        coeffs = getproperty(sol, :x)
-        T = eltype(t)
-        order = getproperty(sol, :order)
-        dims = getproperty(sol, :dims)
-        k = order + 1
-        p = Matrix{Taylor1{T}}(undef, dims...)
-        for i in eachindex(p)
-            p[i] = Taylor1{T}(coeffs[(i-1)*k+1:i*k], order)
-        end
-        return dense_solution(getproperty(sol, :t0) .+ t, p)
-    end
-
-    error("Unsupported ephemeris object stored in $filename under key $key")
-end
+const DensePropagation1{T, U} = TaylorIntegration.DensePropagation1{T, U}
+const DensePropagation2{T, U} = TaylorIntegration.DensePropagation2{T, U}
 
 # Load Solar System, accelerations, newtonian potentials and TT-TDB 2000-2100 ephemeris
 const SSEPH_ARTIFACT_PATH = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
@@ -387,12 +263,12 @@ function set_sseph_source(filename::AbstractString)
 end
 
 const sseph::DensePropagation2{Float64, Float64} =
-    _load_dense_solution(SSEPH_SOURCE, "ss16ast_eph")
+    JLD2.load(SSEPH_SOURCE, "ss16ast_eph")
 const acceph::DensePropagation2{Float64, Float64} =
-    _load_dense_solution(SSEPH_SOURCE, "acc_eph")
+    JLD2.load(SSEPH_SOURCE, "acc_eph")
 const poteph::DensePropagation2{Float64, Float64} =
-    _load_dense_solution(SSEPH_SOURCE, "pot_eph")
-const ttmtdb::DensePropagation1{Float64, Float64} = dense_solution(sseph.t, sseph.p[:, end])
+    JLD2.load(SSEPH_SOURCE, "pot_eph")
+const ttmtdb::DensePropagation1{Float64, Float64} = TaylorSolution(sseph.t, sseph.p[:, end])
 const SSEPHORDER::Int = taylor_order(sseph.p[1])
 const SSEPHNBODIES::Int = numberofbodies(sseph)
 

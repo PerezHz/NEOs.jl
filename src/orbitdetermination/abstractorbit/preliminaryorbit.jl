@@ -88,8 +88,8 @@ A preliminary orbit computed by Gauss method.
             times must match"
         @assert length(optical) == length(ores) "Number of observations must \
             match number of residuals"
-        _bwd_ = dense_solution(bwd.t, collect(bwd.p))
-        _fwd_ = dense_solution(fwd.t, collect(fwd.p))
+        _bwd_ = TaylorSolution(bwd.t, collect(bwd.p))
+        _fwd_ = TaylorSolution(fwd.t, collect(fwd.p))
         return new{D, T, U, O}(dynamics, variables, optical, tracklets, _bwd_, _fwd_,
             ores, covariance, τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c,
             r_2, r_vec, ρ)
@@ -119,8 +119,8 @@ function zero(::Type{GaussOrbit{D, T, U, O}}) where {D, T, U, O}
     variables = Vector{Int}(undef, 0)
     optical = O()
     tracklets = TrackletVector{T}()
-    bwd = _zero_dense_solution(DensePropagation2{T, U})
-    fwd = _zero_dense_solution(DensePropagation2{T, U})
+    bwd = zero(DensePropagation2{T, U})
+    fwd = zero(DensePropagation2{T, U})
     ores = Vector{OpticalResidual{T, U}}(undef, 0)
     covariance = Matrix{T}(undef, 0, 0)
     τ_1, τ_3 = zero(T), zero(T)
@@ -139,7 +139,7 @@ function zero(::Type{GaussOrbit{D, T, U, O}}) where {D, T, U, O}
 end
 
 iszero(x::GaussOrbit) = isempty(x.variables) && isempty(x.ores) &&
-    _iszero_dense_solution(x.bwd) && _iszero_dense_solution(x.fwd)
+    iszero(x.bwd) && iszero(x.fwd)
 
 # Check topocentric slant ranges are positive
 isphysical(x::GaussOrbit) = iszero(x) ? false : all(x.ρ .> 0)
@@ -162,9 +162,9 @@ function evaldeltas(orbit::GaussOrbit{D, T, TaylorN{T}, O},
                     δs::Vector{T} = zeros(T, get_numvars())) where {D, T, O}
     # Evaluate integrations
     new_bwd_p = evaluate.(orbit.bwd.p, Ref(δs))
-    new_bwd = dense_solution(orbit.bwd.t, new_bwd_p)
+    new_bwd = TaylorSolution(orbit.bwd.t, new_bwd_p)
     new_fwd_p = evaluate.(orbit.fwd.p, Ref(δs))
-    new_fwd = dense_solution(orbit.fwd.t, new_fwd_p)
+    new_fwd = TaylorSolution(orbit.fwd.t, new_fwd_p)
     # Evaluate residuals
     new_ores = orbit.ores(δs)
     # Evaluate Gauss method objects
@@ -228,8 +228,8 @@ A preliminary orbit computed by the minimization over the MOV method.
             match number of residuals"
         # @assert size(aes, 1) == 6
         # @assert size(aes, 2) == length(Qs)
-        _bwd_ = dense_solution(bwd.t, collect(view(bwd.p, :, variables)))
-        _fwd_ = dense_solution(fwd.t, collect(view(fwd.p, :, variables)))
+        _bwd_ = TaylorSolution(bwd.t, collect(view(bwd.p, :, variables)))
+        _fwd_ = TaylorSolution(fwd.t, collect(view(fwd.p, :, variables)))
         return new{D, T, U, O}(dynamics, variables, optical, tracklets, _bwd_, _fwd_,
                                ores, covariance, aes, Qs)
     end
@@ -256,8 +256,8 @@ function zero(::Type{MMOVOrbit{D, T, U, O}}) where {D, T, U, O}
     variables = Vector{Int}(undef, 0)
     optical = O()
     tracklets = TrackletVector{T}()
-    bwd = _zero_dense_solution(DensePropagation2{T, U})
-    fwd = _zero_dense_solution(DensePropagation2{T, U})
+    bwd = zero(DensePropagation2{T, U})
+    fwd = zero(DensePropagation2{T, U})
     ores = Vector{OpticalResidual{T, U}}(undef, 0)
     covariance = Matrix{T}(undef, 0, 0)
     aes = Matrix{T}(undef, 0, 0)
@@ -268,16 +268,16 @@ function zero(::Type{MMOVOrbit{D, T, U, O}}) where {D, T, U, O}
 end
 
 iszero(x::MMOVOrbit) = isempty(x.variables) && isempty(x.ores) &&
-    _iszero_dense_solution(x.bwd) && _iszero_dense_solution(x.fwd)
+    iszero(x.bwd) && iszero(x.fwd)
 
 # Evaluate integrations and residuals in deltas
 function evaldeltas(orbit::MMOVOrbit{D, T, TaylorN{T}, O},
                     δs::Vector{T} = zeros(T, get_numvars())) where {D, T, O}
     # Evaluate integrations
     new_bwd_p = evaluate.(orbit.bwd.p, Ref(δs))
-    new_bwd = dense_solution(orbit.bwd.t, new_bwd_p)
+    new_bwd = TaylorSolution(orbit.bwd.t, new_bwd_p)
     new_fwd_p = evaluate.(orbit.fwd.p, Ref(δs))
-    new_fwd = dense_solution(orbit.fwd.t, new_fwd_p)
+    new_fwd = TaylorSolution(orbit.fwd.t, new_fwd_p)
     # Evaluate residuals
     new_ores = orbit.ores(δs)
 

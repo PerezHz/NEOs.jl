@@ -126,6 +126,5 @@ end
 
 # Load the ephemeris of a solar system body
 function _loadeph(i::Int)
-    eph = _selecteph(sseph, i)
-    return dense_solution(eph.t, collect(eph.p))
+    return selecteph(sseph, i)
 end

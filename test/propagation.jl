@@ -9,8 +9,6 @@ using Test
 
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
-same_solution(a, b) = NEOs._same_dense_solution(a, b)
-
 function warmuptests(dynamics, q00, jd0, nyears, params)
     @testset "$dynamics warmup (parse_eqs = $(params.parse_eqs))" begin
         fwd = NEOs.propagate(dynamics, q00, jd0, nyears, params)
@@ -122,9 +120,9 @@ end
         # Initial time [days since J2000]
         t0 = jd0 - PE.J2000
         # Sun's ephemeris
-        eph_su = NEOs._selecteph(NEOs.sseph, su, t0 - nyears*yr, t0 + nyears*yr)
+        eph_su = selecteph(NEOs.sseph, su, t0 - nyears*yr, t0 + nyears*yr)
         # Earth's ephemeris
-        eph_ea = NEOs._selecteph(NEOs.sseph, ea, t0 - nyears*yr, t0 + nyears*yr)
+        eph_ea = selecteph(NEOs.sseph, ea, t0 - nyears*yr, t0 + nyears*yr)
 
         # Propagate orbit
         sol_bwd = NEOs.propagate(dynamics, q0, jd0, -nyears, params)
@@ -134,8 +132,8 @@ end
         jldsave("test.jld2"; sol_bwd, sol_fwd)
         recovered_sol_fwd = JLD2.load("test.jld2", "sol_fwd")
         recovered_sol_bwd = JLD2.load("test.jld2", "sol_bwd")
-        @test same_solution(sol_fwd, recovered_sol_fwd)
-        @test same_solution(sol_bwd, recovered_sol_bwd)
+        @test sol_fwd == recovered_sol_fwd
+        @test sol_bwd == recovered_sol_bwd
         rm("test.jld2")
 
         @test first(sol_bwd.t) == first(sol_fwd.t) == t0
@@ -193,7 +191,7 @@ end
         # Check that solution saves correctly
         jldsave("test.jld2"; sol1)
         recovered_sol1 = JLD2.load("test.jld2", "sol1")
-        @test same_solution(sol1, recovered_sol1)
+        @test sol1 == recovered_sol1
         rm("test.jld2")
 
         # Compute residuals for orbit with perturbed initial conditions
@@ -248,9 +246,9 @@ end
         # Initial time [days since J2000]
         t0 = jd0 - PE.J2000
         # Sun's ephemeris
-        eph_su = NEOs._selecteph(NEOs.sseph, su, t0, t0 + nyears*yr)
+        eph_su = selecteph(NEOs.sseph, su, t0, t0 + nyears*yr)
         # Earth's ephemeris
-        eph_ea = NEOs._selecteph(NEOs.sseph, ea, t0, t0 + nyears*yr)
+        eph_ea = selecteph(NEOs.sseph, ea, t0, t0 + nyears*yr)
 
         # Propagate orbit
         sol = NEOs.propagate(dynamics, q0, jd0, nyears, params)
@@ -258,7 +256,7 @@ end
         # Check that solution saves correctly
         jldsave("test.jld2"; sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
-        @test same_solution(sol, recovered_sol)
+        @test sol == recovered_sol
         rm("test.jld2")
 
         # Read optical astrometry file
@@ -438,9 +436,9 @@ end
         sol = NEOs.propagate(dynamicsng, q0, jd0, nyears, params)
 
         # Sun's ephemeris
-        eph_su = NEOs._selecteph(NEOs.sseph, su, first(sol.t), last(sol.t))
+        eph_su = selecteph(NEOs.sseph, su, first(sol.t), last(sol.t))
         # Earth's ephemeris
-        eph_ea = NEOs._selecteph(NEOs.sseph, ea, first(sol.t), last(sol.t))
+        eph_ea = selecteph(NEOs.sseph, ea, first(sol.t), last(sol.t))
 
         # Apophis
         # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec

@@ -294,15 +294,15 @@ function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
     # Taylor expansion of the line of variations
     _bwd_ = taylorinteg!(Val(true), lov!, coord00, zero(T), -σmax, lovtol,
                         cache, lovparams; maxsteps = lovsteps)
-    bwd = dense_solution(_bwd_.t, _bwd_.p)
+    bwd = TaylorSolution(collect(_bwd_.t), collect(_bwd_.p))
     _fwd_ = taylorinteg!(Val(true), lov!, coord00, zero(T), σmax, lovtol,
                         cache, lovparams; maxsteps = lovsteps)
-    fwd = dense_solution(_fwd_.t, _fwd_.p)
+    fwd = TaylorSolution(collect(_fwd_.t), collect(_fwd_.p))
     # The positive sigma direction is given by the semimajor axis
     q0T1 = lovtransform(mjd0, fwd.p[1, :], sun, Val(coord), Val(:cartesian)) - sun
     a = semimajoraxis(q0T1..., μ_S, 0.0)
     if differentiate(1, a) < 0
-        bwd, fwd = _flipsign_solution(fwd), _flipsign_solution(bwd)
+        bwd, fwd = flipsign(fwd), flipsign(bwd)
     end
     domain = (last(bwd.t), last(fwd.t))
 

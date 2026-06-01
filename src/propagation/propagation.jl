@@ -55,7 +55,7 @@ end
 # Check if an integration was successful
 function issuccessfulprop(sol::TaylorSolution, t::T; tol::T = 10.0) where {T <: Real}
     # Zero TaylorSolution
-    _iszero_dense_solution(sol) && return false
+    iszero(sol) && return false
     # Forward integration
     if issorted(sol.t)
         # Insufficient steps
@@ -108,7 +108,7 @@ function _propagate(f::D, q0::Vector{U}, jd0::V, tmax::T, buffer::PropagationBuf
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
-    return dense_solution((_jd0_ - JD_J2000) .+ orbit.t, orbit.p)
+    return TaylorSolution(collect((_jd0_ - JD_J2000) .+ orbit.t), collect(orbit.p))
 end
 
 """
@@ -155,8 +155,8 @@ function _propagate_root(f::D, q0::Vector{U}, jd0::V, tmax::T, buffer::Propagati
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
-    return dense_solution((_jd0_ - JD_J2000) .+ orbit.t, orbit.p), orbit.tevents,
-        orbit.xevents, orbit.gresids
+    sol = TaylorSolution(collect((_jd0_ - JD_J2000) .+ orbit.t), collect(orbit.p))
+    return sol, orbit.tevents, orbit.xevents, orbit.gresids
 end
 
 """

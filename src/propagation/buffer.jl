@@ -22,7 +22,7 @@ function EphemerisEvaluationBuffer(
     t0, tf = minmax(tlim[1], tlim[2])
     j0 = searchsortedlast(eph.t, t0)
     jf = searchsortedfirst(eph.t, tf)
-    _eph_ = dense_solution(eph.t[j0:jf], eph.p[j0:jf-1, cols])
+    _eph_ = TaylorSolution(eph.t[j0:jf], eph.p[j0:jf-1, cols])
     # Evaluation vectors
     zeroT = Taylor1(zeros(order+1), SSEPHORDER)
     aux = [zero(zeroT) for _ in cols]
