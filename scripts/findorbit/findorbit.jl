@@ -8,14 +8,15 @@ function parse_commandline()
     s = ArgParseSettings()
 
     # Program name (for usage & help screen)
-    s.prog = "findorb.jl"
+    s.prog = "findorbit.jl"
     # Desciption (for help screen)
     s.description = "Find an orbit from a set of optical astrometry"
 
     s.epilog = """
         Example:\n
         \n
-        julia -t 5 --project findorb.jl -i 2024YR4\n
+        julia -t 5 --project findorbit.jl -i 2024YR4\n
+        julia -t 5 --project findorbit.jl -i obs.obs -o obs.jld2\n
         \n
     """
 
