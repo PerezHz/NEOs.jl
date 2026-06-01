@@ -76,7 +76,7 @@ end
         noptical(od) == noptical(orbit) && critical_value(orbit) < params.significance &&
         all(!isnan, sigmas(orbit))
 
-    function meantime(x::ODProblem)
+    function meanepoch(x::ODProblem)
         t = Vector{Float64}(undef, noptical(x))
         w = Vector{Float64}(undef, noptical(x))
         for i in eachindex(x.optical)
@@ -88,15 +88,7 @@ end
         return mean(t, weights(w))
     end
 
-    meandate(x::ODProblem) = days2dtutc(meantime(x))
-
-    function deweightfactor(neo::AbstractString)
-        if neo in ("2009DD45", "2020DQ16", "2021JB6", "2022JN11")
-            return 100
-        else
-            return 10
-        end
-    end
+    meandate(x::ODProblem) = days2dtutc(meanepoch(x))
 
     # Error model
     mutable struct ModifiedVeres17{T} <: AbstractWeightingScheme{T}
@@ -181,20 +173,50 @@ end
 
     function preprocessing!(optical::AbstractVector{OpticalADES{T}}) where {T <: Real}
         filter!(!isdeprecated, optical)
+        if numberofdays(optical) > 30
+            d0 = date(optical[j0])
+            L0, Lf = 1, length(optical)
+            j0 = something(findfirst(isdiscovery, optical), L0)
+            jf = something(findlast(x -> daysbetween(d0, date(x)) ≤ Day(30), optical), Lf)
+            keepat!(optical, j0:jf)
+        end
         @unpack provid = optical[1]
         provid = replace(provid, " " => "")
         if provid == "2022PW40"
-            for i in eachindex(optical)
-                @reset optical[i].trkid = optical[i].trkid * string(ceil(Int, i / 3))
+            for (i, x) in enumerate(optical)
+                @reset x.trkid = x.trkid * string(ceil(Int, i / 3))
+                optical[i] = x
             end
         elseif provid == "2015EQ"
             filter!(x -> observatorycode(x) != "703", optical)
+        elseif provid == "2017UR52"
+            filter!(x -> observatorycode(x) != "568", optical)
         elseif provid == "2025OB22"
             filter!(x -> observatorycode(x) != "U68", optical)
         elseif provid == "2020XL1"
             deleteat!(optical, 1:2)
         end
         return nothing
+    end
+
+    function parameters(OD::ODProblem)
+        Nt = length(OD.tracklets)
+        if Nt == 1
+            χ2_rec, χ2_rej, fudge, max_per = 7.378, 7.824, 400.0, 10.0
+        elseif Nt == 2
+            χ2_rec, χ2_rej, fudge, max_per = 5.991, 7.378, 200.0, 20.0
+        else
+            χ2_rec, χ2_rej, fudge, max_per = 4.605, 5.991, 100.0, 30.0
+        end
+        return Parameters(;
+            maxsteps = 50_000, order = 15, abstol = 1E-12, parse_eqs = true,
+            coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
+            gaussorder = 2, safegauss = false, refscale = :log,
+            tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
+            jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
+            jtlsproject = true, significance = 0.99, verbose = true,
+            outrej = true, χ2_rec, χ2_rej, fudge, max_per
+        )
     end
 
     function initialtracklets(OD::ODProblem)
@@ -278,44 +300,45 @@ end
         return orbit
     end
 
-    function orbit_determination(od::ODProblem, obs::AbstractSet, orbit::LeastSquaresOrbit,
-                                 params::Parameters; cmax::Real = 10, k::Real = 10)
-        # Try #1: direct orbit refinement
-        if cmax ≤ 100
-            orbit1 = orbitdetermination(od, orbit, params)
-            isodvalid(od, orbit1, params) && return orbit1
+    function orbit_determination(od::ODProblem, orbit::LeastSquaresOrbit, params::Parameters)
+        # Try #1: linkage
+        params = Parameters(params; outrej = false, verbose = false)
+        orbit1 = linkage(od, orbit, params)
+        params = Parameters(params; outrej = true, verbose = true)
+        if isodvalid(od, orbit1, params)
+            orbit1 = jtls(od, orbit1, params)
+            if isodvalid(od, orbit1, params)
+                println(
+                    "* Linkage converged to: \n\n",
+                    summary(orbit1)
+                )
+                return orbit1
+            else
+                @warn("Linkage did not converge within the given parameters or \
+                    could not fit all the astrometry")
+            end
         end
-        # Try #2: deweight selected observations
-        idxs = indexin(obs, od.optical)
-        sort!(idxs)
-        for i in idxs
-            od.weights.weights[i] = od.weights.weights[i] ./ k
-        end
-        orbit2 = orbitdetermination(od, orbit, params)
-        for i in idxs
-            od.weights.weights[i] = od.weights.weights[i] .* k
-        end
-        if isodvalid(od, orbit2, params)
-            orbit2 = orbitdetermination(od, orbit2, params)
-            isodvalid(od, orbit2, params) && return orbit2
-        end
-        # Try #3: repeat initial orbit determination
-        orbit3 = initial_orbit_determination(od, params)
-        return orbit3
+        # Try #2: repeat initial orbit determination
+        params = Parameters(params; outrej = false)
+        orbit2 = initial_orbit_determination(od, params)
+        params = Parameters(params; outrej = true)
+        isodvalid(od, orbit2, params) && return orbit2
+        orbit2 = initial_orbit_determination(od, params)
+        return orbit2
     end
 
     function orbit_determination(neo::AbstractString; niter::Int = 20,
-                                 k::Real = deweightfactor(neo), dtmin::Second = Second(60))
-        # Outer initial time
-        outer_initial_time = now()
+                                 dtmin::Second = Second(60))
+        # Random start delay
+        sleep(Second(rand(1:Nworkers)))
         # Fetch optical astrometry
         optical = fetch_optical_ades(neo, MPC)
-        preprocessing!(optical)
         if any(x -> date(x) < MINUTC, optical)
-            outer_time_string = timestring(outer_initial_time)
-            println("• Asteroid $neo skipped: observations before J2000 $outer_time_string")
+            println("• Asteroid $neo skipped: observations before J2000")
+            sleep(dtmin)
             return false
         end
+        preprocessing!(optical)
         # Create output directory
         dirname = joinpath(output, neo)
         mkdir(dirname)
@@ -335,6 +358,8 @@ end
             filename = joinpath(dirname, neo * "JPL.json")
             JSON.json(filename, JSON.parse(orbitJPL))
         end
+        # Outer initial time
+        outer_initial_time = now()
         # Redirect output to a file
         filename = joinpath(dirname, "nohupOrbit.out")
         flag = redirect_stdio(; stdout = filename, stderr = filename) do
@@ -344,7 +369,7 @@ end
             println("• Detected 1 worker with ",  Threads.nthreads(), " thread(s)")
             println("• Run started at ", inner_initial_time)
             # Orbit determination
-            flag = orbit_determination(neo, optical; niter, k)
+            flag = orbit_determination(neo, optical; niter)
             # Inner final time
             inner_final_time = now()
             println("• Run finished at ", inner_final_time)
@@ -364,20 +389,10 @@ end
     end
 
     function orbit_determination(neo::AbstractString, optical::AbstractVector;
-                                 niter::Int = 20, k::Real = deweightfactor(neo))
-        # Parameters
-        params = Parameters(
-            maxsteps = 20_000, order = 25, abstol = 1E-20, parse_eqs = true,
-            coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
-            gaussorder = 2, safegauss = false, refscale = :log,
-            tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
-            jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
-            jtlsproject = true, significance = 0.99, verbose = true,
-            outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10), fudge = 100.0,
-            max_per = 33.3
-        )
-        # Global orbit determination problem
+                                 niter::Int = 20)
+        # Global orbit determination problem and parameters
         OD = ODProblem(newtonian!, optical, weights = ModifiedVeres17, debias = Eggl20)
+        params = parameters(OD)
         # Initial orbit determination
         od = deepcopy(OD)
         orbit = zero(Orbit)
@@ -400,7 +415,7 @@ end
             # Orbit determination
             if i > 1
                 printitle("Iteration $i/$niter (cmax = $cmax)", "*")
-                orbit = orbit_determination(od, obs[i], orbit, params; cmax, k)
+                orbit = orbit_determination(od, orbit, params)
             end
             iszero(orbit) && break
             # Break condition
@@ -411,9 +426,12 @@ end
                     orbit = gaussiod(od, params)
                 end
                 # Shift epoch to the middle of the observational arc
-                tmean = meantime(od)
-                _orbit_ = shiftepoch(orbit, tmean + PE.J2000, params)
+                tmean = meanepoch(od)
+                orbit = shiftepoch(orbit, tmean + PE.J2000, params)
+                iszero(orbit) && break
+                _orbit_ = jtls(od, orbit, params)
                 orbit = isodvalid(od, _orbit_, params) ? _orbit_ : orbit
+                iszero(orbit) && break
                 printitle("Final orbit", "*")
                 println(summary(orbit))
                 # Save output
@@ -442,8 +460,8 @@ function main()
     printitle("Large scale orbit determination for NEOs via jet transport", "=")
 
     # Number of workers and threads
-    println("• Detected ", nworkers(), " worker(s) with ", Threads.nthreads(),
-            " thread(s) each")
+    Nworkers, Nthreads = nworkers(), Threads.nthreads()
+    println("• Detected ", Nworkers, " worker(s) with ", Nthreads, " thread(s) each")
 
     # Pin threads to sockets
     distributed_pinthreads(:sockets)
@@ -474,6 +492,8 @@ function main()
         const neocc = $neocc
         const neodys = $neodys
         const jpl = $jpl
+        const Nworkers = $Nworkers
+        const Nthreads = $Nthreads
         # Update observatories and catalogues
         update_catalogues_mpc()
         update_observatories_mpc()
