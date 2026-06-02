@@ -266,6 +266,7 @@ using NEOs: SCRATCH_PATH
         @test obs["rhocosphi"] == "0.845107"
         @test obs["rhosinphi"] == "0.533611"
         @test obs["short_name"] == "University of Arizona Mt. Lemmon Survey"
+        # @test obs["updated_at"] == "Tue, 26 May 2026 20:34:56 GMT"
         @test obs["uses_two_line_observations"] == false
         @test obs["web_link"] == "https://catalina.lpl.arizona.edu/"
 
