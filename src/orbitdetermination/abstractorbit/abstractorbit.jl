@@ -291,12 +291,14 @@ function keplerian(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
     # Unpack
     @unpack fwdoffset, bwdoffset, eph_su = params
     # Set jet transport variables
-    Npar = numvars(orbit)
+    Npar, Ndof = numvars(orbit), dof(orbit)
     set_od_order(T, 2, Npar)
     # Orbit reference epoch [TDB days since J2000]
     t0 = epoch(orbit)
     # Jet transport initial condition
-    q0 = orbit() + taylor_variables(T, 2)
+    q00 = initialcondition(orbit, Ndof, params)
+    dq = jtperturbation(ones(T, Npar), variables(orbit), Ndof, 2, params)
+    q0 = q00 + dq
     if t != t0
         offset = t > t0 ? fwdoffset : -bwdoffset
         nyears = (t - t0 + offset) / yr
@@ -330,12 +332,14 @@ function equinoctial(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
     # Unpack
     @unpack fwdoffset, bwdoffset, eph_su = params
     # Set jet transport variables
-    Npar = numvars(orbit)
+    Npar, Ndof = numvars(orbit), dof(orbit)
     set_od_order(T, 2, Npar)
     # Orbit reference epoch [TDB days since J2000]
     t0 = epoch(orbit)
     # Jet transport initial condition
-    q0 = orbit() + taylor_variables(T, 2)
+    q00 = initialcondition(orbit, Ndof, params)
+    dq = jtperturbation(ones(T, Npar), variables(orbit), Ndof, 2, params)
+    q0 = q00 + dq
     if t != t0
         offset = t > t0 ? fwdoffset : -bwdoffset
         nyears = (t - t0 + offset) / yr
@@ -369,12 +373,14 @@ function attributable(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
     # Unpack
     @unpack fwdoffset, bwdoffset, eph_ea = params
     # Set jet transport variables
-    Npar = numvars(orbit)
+    Npar, Ndof = numvars(orbit), dof(orbit)
     set_od_order(T, 2, Npar)
     # Orbit reference epoch [TDB days since J2000]
     t0 = epoch(orbit)
     # Jet transport initial condition
-    q0 = orbit() + taylor_variables(T, 2)
+    q00 = initialcondition(orbit, Ndof, params)
+    dq = jtperturbation(ones(T, Npar), variables(orbit), Ndof, 2, params)
+    q0 = q00 + dq
     if t != t0
         offset = t > t0 ? fwdoffset : -bwdoffset
         nyears = (t - t0 + offset) / yr
