@@ -10,7 +10,9 @@ function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <:
     elseif ρ ≥ xmax
         return xmax, ymid
     else # xmin < ρ < xmax
-        ymin, ymax = _helrangerates(A.coeffs, A.a_max, ρ)
+        ys = _helrangerates(A.coeffs, A.a_max, ρ)
+        length(ys) < 2 && return xmax, ymid
+        ymin, ymax = ys
         ymin, ymax = minmax(ymin, ymax)
         ymin ≤ v_ρ ≤ ymax && return ρ, v_ρ
         m = v_ρ > ymid ? :max : :min

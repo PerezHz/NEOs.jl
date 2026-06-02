@@ -55,8 +55,13 @@ end
     const Orbit = LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
         Vector{OpticalADES{Float64}}, Nothing, Nothing}
 
-    mahalanobis(x::AbstractVector, μ::AbstractVector, Σ::AbstractMatrix) =
-        sqrt((x - μ)' * inv(Diagonal(Σ)) * (x - μ))
+    function mahalanobis(x::AbstractVector, μ::AbstractVector, Σ::AbstractMatrix)
+        dx = collect(x - μ)
+        for i in 3:6
+            dx[i] = (dx[i] + 540) % 360 - 180
+        end
+        return sqrt(dx' * inv(Diagonal(Σ)) * dx)
+    end
 
     function mahalanobis(orbitNEOs::LeastSquaresOrbit, orbitESA::AbstractVector,
                          orbitJPL::AbstractVector)
@@ -141,14 +146,14 @@ function main()
         set_od_order(Float64, 2, 6)
         # Parameters
         const params = Parameters(
-            maxsteps = 20_000, order = 25, abstol = 1E-20, parse_eqs = true,
+            maxsteps = 50_000, order = 15, abstol = 1E-12, parse_eqs = true,
             coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
             gaussorder = 2, safegauss = false, refscale = :log,
             tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
             jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
             jtlsproject = true, significance = 0.99, verbose = true,
-            outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10), fudge = 100.0,
-            max_per = 33.3
+            outrej = true, χ2_rec = 4.605, χ2_rej = 5.991, fudge = 100.0,
+            max_per = 30.0
         )
         # Propagation buffers
         jd0 = 2459200.5
@@ -245,6 +250,7 @@ function main()
     histogram(Qs, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
         xlabel = "NRMS", ylabel = "Count", xlim = extrema(bins), xticks = bins,
         ylim = (0, 9_000), yticks = 0:1_000:9_000)
+    annotate!(0.9*bins[end], 0.9*9_000, ("(a)", 12))
     filename = joinpath(directory, "QHIST.png")
     savefig(filename)
     println("• Saved NRMS histogram to: ", filename)
@@ -254,6 +260,7 @@ function main()
     histogram(log10.(Ss), bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
         xlabel = "log₁₀(SNR)", ylabel = "Count", xlim = extrema(bins), xticks = -3:7,
         ylim = (0, 7_000), yticks = 0:1_000:7_000)
+    annotate!(0.9*bins[end], 0.9*7_000, ("(b)", 12))
     filename = joinpath(directory, "SHIST.png")
     savefig(filename)
     println("• Saved SNR histogram to: ", filename)
@@ -270,21 +277,23 @@ function main()
     # ESA Mahalanobis distance
     bins = 0:0.25:3
     histogram(MsESA, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
-        xlabel = "Mahalanobis distance", ylabel = "Count", xlim = extrema(bins), xticks = bins,
-        ylim = (0, 9_000), yticks = 0:1_000:9_000, right_margin = 2Plots.mm)
+        xlabel = "Normalized Euclidean distance", ylabel = "Count", xlim = extrema(bins),
+        xticks = bins, ylim = (0, 9_000), yticks = 0:1_000:9_000, right_margin = 2Plots.mm)
+    annotate!(0.9*bins[end], 0.9*9_000, ("(a)", 12))
     filename = joinpath(directory, "MESAHIST.png")
     savefig(filename)
-    println("• Saved ESA Mahalanobis distance histogram to: ", filename)
+    println("• Saved ESA normalized Euclidean distance histogram to: ", filename)
 
     # JPL Mahalanobis distance
     bins = 0:0.25:3
     histogram(MsJPL, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
-        xlabel = "Mahalanobis distance", ylabel = "Count", xlim = extrema(bins),
+        xlabel = "Normalized Euclidean distance", ylabel = "Count", xlim = extrema(bins),
         xticks = bins, ylim = (0, 12_000), yticks = (0:2_000:12_000, string.(0:2_000:12_000)),
         right_margin = 2Plots.mm)
+    annotate!(0.9*bins[end], 0.9*12_000, ("(b)", 12))
     filename = joinpath(directory, "MJPLHIST.png")
     savefig(filename)
-    println("• Saved JPL Mahalanobis distance histogram to: ", filename)
+    println("• Saved JPL normalized Euclidean distance histogram to: ", filename)
 
     # Final time
     global_final_time = now()
