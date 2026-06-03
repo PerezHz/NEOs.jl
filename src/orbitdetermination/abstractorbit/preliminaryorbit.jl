@@ -138,8 +138,7 @@ function zero(::Type{GaussOrbit{D, T, U, O}}) where {D, T, U, O}
         r_vec, ρ)
 end
 
-iszero(x::GaussOrbit) = isempty(x.variables) && isempty(x.ores) &&
-    iszero(x.bwd) && iszero(x.fwd)
+iszero(x::GaussOrbit) = x == zero(typeof(x))
 
 # Check topocentric slant ranges are positive
 isphysical(x::GaussOrbit) = iszero(x) ? false : all(x.ρ .> 0)
@@ -267,8 +266,7 @@ function zero(::Type{MMOVOrbit{D, T, U, O}}) where {D, T, U, O}
                      ores, covariance, aes, Qs)
 end
 
-iszero(x::MMOVOrbit) = isempty(x.variables) && isempty(x.ores) &&
-    iszero(x.bwd) && iszero(x.fwd)
+iszero(x::MMOVOrbit) = x == zero(typeof(x))
 
 # Evaluate integrations and residuals in deltas
 function evaldeltas(orbit::MMOVOrbit{D, T, TaylorN{T}, O},

@@ -243,8 +243,7 @@ function zero(::Type{LeastSquaresOrbit{D, T, U, O, R, RR}}) where {D, T, U, O, R
                              ores, rres, fit, qs, Qs)
 end
 
-iszero(x::LeastSquaresOrbit) = isempty(x.variables) && isempty(x.ores) &&
-    iszero(x.bwd) && iszero(x.fwd)
+iszero(x::LeastSquaresOrbit) = x == zero(typeof(x))
 
 # Evaluate integrations and residuals in fit deltas
 function evalfit(orbit::OpticalLeastSquaresOrbit{D, T, TaylorN{T}, O}) where {D, T, O}
