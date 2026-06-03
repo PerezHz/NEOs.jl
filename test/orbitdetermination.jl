@@ -243,9 +243,9 @@ end
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-4)
-        @test dtutc2days(date(suboptical[1])) > last(orbit.bwd.t)
+        @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
         @test all( norm.(orbit.bwd.p, Inf) .< 2 )
-        @test dtutc2days(date(suboptical[end])) < last(orbit.fwd.t)
+        @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
         @test all( norm.(orbit.fwd.p, Inf) .< 2 )
         # Vector of residuals
         @test notout(orbit.ores) == 9
@@ -310,9 +310,9 @@ end
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
         @test epoch(orbit1) == epoch(orbit)
-        @test dtutc2days(date(suboptical[1])) > last(orbit1.bwd.t)
+        @test dtutc2days(date(suboptical[1])) > firsttime(orbit1)
         @test all( norm.(orbit1.bwd.p, Inf) .< 1.2 )
-        @test dtutc2days(date(suboptical[end])) < last(orbit1.fwd.t)
+        @test dtutc2days(date(suboptical[end])) < lasttime(orbit1)
         @test all( norm.(orbit1.fwd.p, Inf) .< 1.2 )
         # Vector of residuals
         @test notout(orbit1.ores) == 43
@@ -386,9 +386,9 @@ end
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(optical[4])), atol = 3e-4)
-        @test dtutc2days(date(optical[1])) > last(orbit.bwd.t)
+        @test dtutc2days(date(optical[1])) > firsttime(orbit)
         @test all( norm.(orbit.bwd.p, Inf) .< 2 )
-        @test dtutc2days(date(optical[end])) < last(orbit.fwd.t)
+        @test dtutc2days(date(optical[end])) < lasttime(orbit)
         @test all( norm.(orbit.fwd.p, Inf) .< 2 )
         # Vector of residuals
         @test notout(orbit.ores) == 6
@@ -470,9 +470,9 @@ end
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 5e-4)
-        @test dtutc2days(date(suboptical[1])) > last(orbit.bwd.t)
+        @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
         @test all( norm.(orbit.bwd.p, Inf) .< 2 )
-        @test dtutc2days(date(suboptical[end])) < last(orbit.fwd.t)
+        @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
         @test all( norm.(orbit.fwd.p, Inf) .< 2 )
         # Vector of residuals
         @test notout(orbit.ores) == 12
@@ -703,9 +703,9 @@ end
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical), atol = 7e-5)
-        @test dtutc2days(date(optical[1])) > last(orbit.bwd.t)
+        @test dtutc2days(date(optical[1])) > firsttime(orbit)
         @test all( norm.(orbit.bwd.p, Inf) .< 2 )
-        @test dtutc2days(date(optical[end])) < last(orbit.fwd.t)
+        @test dtutc2days(date(optical[end])) < lasttime(orbit)
         @test all( norm.(orbit.fwd.p, Inf) .< 2 )
         # Vector of residuals
         @test notout(orbit.ores) == 10
@@ -784,9 +784,9 @@ end
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 2e-3)
-        @test dtutc2days(date(suboptical[1])) > last(orbit.bwd.t)
+        @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
         @test all( norm.(orbit.bwd.p, Inf) .< 2 )
-        @test dtutc2days(date(suboptical[end])) < last(orbit.fwd.t)
+        @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
         @test all( norm.(orbit.fwd.p, Inf) .< 2 )
         # Vector of residuals
         @test notout(orbit.ores) == 16
@@ -849,9 +849,9 @@ end
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
         @test epoch(orbit1) == epoch(orbit)
-        @test dtutc2days(date(optical[1])) > last(orbit1.bwd.t)
+        @test dtutc2days(date(optical[1])) > firsttime(orbit1)
         @test all( norm.(orbit1.bwd.p, Inf) .< 2 )
-        @test dtutc2days(date(optical[end])) < last(orbit1.fwd.t)
+        @test dtutc2days(date(optical[end])) < lasttime(orbit1)
         @test all( norm.(orbit1.fwd.p, Inf) .< 2 )
         # Vector of residuals
         @test notout(orbit1.ores) == 19
@@ -938,9 +938,9 @@ end
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical), atol = 2e-5)
-        @test dtutc2days(date(optical[1])) > last(orbit.bwd.t)
+        @test dtutc2days(date(optical[1])) > firsttime(orbit)
         @test all( norm.(orbit.bwd.p, Inf) .< 2 )
-        @test dtutc2days(date(optical[end])) < last(orbit.fwd.t)
+        @test dtutc2days(date(optical[end])) < lasttime(orbit)
         @test all( norm.(orbit.fwd.p, Inf) .< 1e9 )
         # Vector of residuals
         @test notout(orbit.ores) == 7
@@ -1019,9 +1019,9 @@ end
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-3)
-        @test dtutc2days(date(suboptical[1])) > last(orbit.bwd.t)
+        @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
         @test all( norm.(orbit.bwd.p, Inf) .< 2 )
-        @test dtutc2days(date(suboptical[end])) < last(orbit.fwd.t)
+        @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
         @test all( norm.(orbit.fwd.p, Inf) .< 1e4 )
         # Vector of residuals
         @test notout(orbit.ores) == 18
@@ -1086,9 +1086,9 @@ end
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
         @test epoch(orbit1) == epoch(orbit)
-        @test dtutc2days(date(suboptical[1])) > last(orbit1.bwd.t)
+        @test dtutc2days(date(suboptical[1])) > firsttime(orbit1)
         @test all( norm.(orbit1.bwd.p, Inf) .< 1 )
-        @test dtutc2days(date(suboptical[end])) < last(orbit1.fwd.t)
+        @test dtutc2days(date(suboptical[end])) < lasttime(orbit1)
         @test all( norm.(orbit1.fwd.p, Inf) .< 1e15 )
         # Vector of residuals
         @test notout(orbit1.ores) == 97
@@ -1193,9 +1193,9 @@ end
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 3e-3)
-        @test dtutc2days(date(optical[1])) > last(orbit.bwd.t)
+        @test dtutc2days(date(optical[1])) > firsttime(orbit)
         @test all( norm.(orbit.bwd.p, Inf) .< 2 )
-        @test dtutc2days(date(optical[end])) < last(orbit.fwd.t)
+        @test dtutc2days(date(optical[end])) < lasttime(orbit)
         @test all( norm.(orbit.fwd.p, Inf) .< 2 )
         # Vector of residuals
         @test notout(orbit.ores) == 6
@@ -1301,11 +1301,11 @@ end
         @test issorted(orbit1.radar)
         # Backward (forward) integration
         @test epoch(orbit1) == datetime2julian(date(radar[2])) - PE.J2000
-        @test dtutc2days(date(optical[1])) > last(orbit1.bwd.t)
-        @test dtutc2days(date(radar[1])) > last(orbit1.bwd.t)
+        @test dtutc2days(date(optical[1])) > firsttime(orbit1)
+        @test dtutc2days(date(radar[1])) > firsttime(orbit1)
         @test all( norm.(orbit1.bwd.p, Inf) .< 2 )
-        @test dtutc2days(date(optical[end])) < last(orbit1.fwd.t)
-        @test dtutc2days(date(radar[end])) < last(orbit1.fwd.t)
+        @test dtutc2days(date(optical[end])) < lasttime(orbit1)
+        @test dtutc2days(date(radar[end])) < lasttime(orbit1)
         @test all( norm.(orbit1.fwd.p, Inf) .< 2 )
         # Vectors of residuals
         @test notout(orbit1.ores) == 24
@@ -1395,9 +1395,9 @@ end
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
         @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical[idxs]), atol = 6E+0)
-        @test dtutc2days(date(optical[1])) > last(orbit.bwd.t)
+        @test dtutc2days(date(optical[1])) > firsttime(orbit)
         @test all( norm.(orbit.bwd.p, Inf) .< 3.7 )
-        @test dtutc2days(date(optical[end])) < last(orbit.fwd.t)
+        @test dtutc2days(date(optical[end])) < lasttime(orbit)
         @test all( norm.(orbit.fwd.p, Inf) .< 2 )
         # Vector of residuals
         @test notout(orbit.ores) == 43

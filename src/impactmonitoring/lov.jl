@@ -103,6 +103,8 @@ dynamicalmodel(x::LineOfVariations) = x.dynamics
 
 epoch(x::LineOfVariations) = x.epoch
 nominaltime(x::LineOfVariations) = x.epoch
+firsttime(x::LineOfVariations) = min(lasttime(x.bwd), lasttime(x.fwd))
+lasttime(x::LineOfVariations) = max(lasttime(x.bwd), lasttime(x.fwd))
 
 sigma(::LineOfVariations{D, T}) where {D, T} = zero(T)
 
@@ -295,7 +297,7 @@ function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
     if differentiate(1, a) < 0
         bwd, fwd = flipsign(fwd), flipsign(bwd)
     end
-    domain = (last(bwd.t), last(fwd.t))
+    domain = (lasttime(bwd), lasttime(fwd))
 
     return LineOfVariations{D, T}(dynamicalmodel(IM), t0, coord, sun, domain, bwd, fwd)
 end

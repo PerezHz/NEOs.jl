@@ -59,13 +59,13 @@ function issuccessfulprop(sol::TaylorSolution, t::T; tol::T = 10.0) where {T <: 
     # Forward integration
     if issorted(sol.t)
         # Insufficient steps
-        sol.t[end] < t && return false
+        lasttime(sol) < t && return false
         # Step that covers t
         i = searchsortedfirst(sol.t, t) - 1
     # Backward integration
     elseif issorted(sol.t, rev = true)
         # Insufficient steps
-        sol.t[end] > t && return false
+        lasttime(sol) > t && return false
         # Step that covers t
         i = searchsortedfirst(sol.t, t, lt = !isless) - 1
     # This case should never happen

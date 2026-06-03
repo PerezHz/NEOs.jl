@@ -84,7 +84,7 @@ A preliminary orbit computed by Gauss method.
             τ_1::T, τ_3::T, ρ_vec::Matrix{U}, R_vec::Matrix{T}, D_0::U, D_mat::Matrix{U},
             a::U, b::U, c::U, r_2::U, r_vec::Matrix{U}, ρ::Vector{U}
         ) where {D, T <: Real, U <: Number, O <: AbstractOpticalVector{T}}
-        @assert first(bwd.t) == first(fwd.t) "Backward and forward integration initial \
+        @assert firsttime(bwd) == firsttime(fwd) "Backward and forward integration initial \
             times must match"
         @assert length(optical) == length(ores) "Number of observations must \
             match number of residuals"
@@ -221,7 +221,7 @@ A preliminary orbit computed by the minimization over the MOV method.
             ores::Vector{OpticalResidual{T, U}}, covariance::Matrix{T},
             aes::Matrix{T}, Qs::Vector{T}
         ) where {D, T <: Real, U <: Number, O <: AbstractOpticalVector{T}}
-        @assert first(bwd.t) == first(fwd.t) "Backward and forward integration initial \
+        @assert firsttime(bwd) == firsttime(fwd) "Backward and forward integration initial \
             times must match"
         @assert length(optical) == length(ores) "Number of observations must \
             match number of residuals"

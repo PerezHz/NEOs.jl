@@ -120,7 +120,7 @@ An asteroid least squares orbit.
             R <: Union{Nothing, AbstractRadarVector{T}},
             RR <: Union{Nothing, Vector{RadarResidual{T, U}}}
         }
-        @assert first(bwd.t) == first(fwd.t) "Backward and forward integration initial \
+        @assert firsttime(bwd) == firsttime(fwd) "Backward and forward integration initial \
             times must match"
         @assert length(optical) == length(ores) "Number of observations must \
             match number of residuals"

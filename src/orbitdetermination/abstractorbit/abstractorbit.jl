@@ -31,7 +31,21 @@ numvars(x::AbstractOrbit) = length(x.variables)
 
 Return the reference epoch of an orbit in TDB days since J2000.
 """
-epoch(x::AbstractOrbit) = first(x.bwd.t)
+epoch(x::AbstractOrbit) = firsttime(x.bwd)
+
+"""
+    firsttime(::AbstractOrbit)
+
+Return the earliest time covered by an orbit in TDB days since J2000.
+"""
+firsttime(x::AbstractOrbit) = min(lasttime(x.bwd), lasttime(x.fwd))
+
+"""
+    lasttime(::AbstractOrbit)
+
+Return the latest time covered by an orbit in TDB days since J2000.
+"""
+lasttime(x::AbstractOrbit) = max(lasttime(x.bwd), lasttime(x.fwd))
 
 # Number of observations
 noptical(x::AbstractOrbit) = length(x.optical)

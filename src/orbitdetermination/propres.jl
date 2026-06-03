@@ -50,9 +50,9 @@ Evaluate an ephemerides at time `t`, where `bwd` (`fwd`) is the backward
 """
 function bwdfwdeph(t::Number, bwd::TaylorSolution, fwd::TaylorSolution,
                    et::Bool = true, kmsec::Bool = true)
-    @assert first(bwd.t) == first(fwd.t) "Backward and forward initial times must match"
+    @assert firsttime(bwd) == firsttime(fwd) "Backward and forward initial times must match"
     _t_ = et ? t/daysec : t
-    _rv_ = _t_ <= first(bwd.t) ? bwd(_t_) : fwd(_t_)
+    _rv_ = _t_ <= firsttime(bwd) ? bwd(_t_) : fwd(_t_)
     rv = kmsec ? auday2kmsec(_rv_) : _rv_
     return rv
 end

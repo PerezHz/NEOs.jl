@@ -13,7 +13,7 @@ function warmuptests(dynamics, q00, jd0, nyears, params)
     @testset "$dynamics warmup (parse_eqs = $(params.parse_eqs))" begin
         fwd = NEOs.propagate(dynamics, q00, jd0, nyears, params)
         @test isa(fwd, DensePropagation2{Float64, Float64})
-        @test first(fwd.t) == jd0 - PE.J2000
+        @test firsttime(fwd) == jd0 - PE.J2000
         @test length(fwd.t) == 2
         @test size(fwd.p) == (1, NEOs.dof(Val(dynamics)))
     end
@@ -136,17 +136,17 @@ end
         @test sol_bwd == recovered_sol_bwd
         rm("test.jld2")
 
-        @test first(sol_bwd.t) == first(sol_fwd.t) == t0
-        @test (sol_bwd.t[end] - sol_bwd.t[1]) / yr ≈ -nyears
-        @test (sol_fwd.t[end] - sol_fwd.t[1]) / yr ≈ nyears
-        @test sol_fwd(first(sol_fwd.t)) == q0
+        @test firsttime(sol_bwd) == firsttime(sol_fwd) == t0
+        @test (lasttime(sol_bwd) - firsttime(sol_bwd)) / yr ≈ -nyears
+        @test (lasttime(sol_fwd) - firsttime(sol_fwd)) / yr ≈ nyears
+        @test sol_fwd(firsttime(sol_fwd)) == q0
         q_fwd_end = [-1.0168239304400228, -0.3800432452351079, -0.2685901784950398,
                      0.007623614213394988, -0.00961901551025335, -0.004682171726467166]
-        @test norm(sol_fwd(last(sol_fwd.t)) - q_fwd_end, Inf) < 1e-12
-        @test sol_bwd(first(sol_bwd.t)) == q0
+        @test norm(sol_fwd(lasttime(sol_fwd)) - q_fwd_end, Inf) < 1e-12
+        @test sol_bwd(firsttime(sol_bwd)) == q0
         q_bwd_end = [0.2689956497466164, 0.4198851302334139, 0.2438053951982368,
                      -0.018875911266050937, 0.0167349306087375, 0.007789382070881366]
-        @test norm(sol_bwd(last(sol_bwd.t))-q_bwd_end, Inf) < 1e-12
+        @test norm(sol_bwd(lasttime(sol_bwd)) - q_bwd_end, Inf) < 1e-12
 
         # Read optical astrometry file
         optical_2023DW = read_optical_mpc80(joinpath(TEST_DATA, "2023DW.txt"))
@@ -444,9 +444,9 @@ end
         sol = NEOs.propagate(dynamicsng, q0, jd0, nyears, params)
 
         # Sun's ephemeris
-        eph_su = selecteph(NEOs.sseph, su, first(sol.t), last(sol.t))
+        eph_su = selecteph(NEOs.sseph, su, firsttime(sol), lasttime(sol))
         # Earth's ephemeris
-        eph_ea = selecteph(NEOs.sseph, ea, first(sol.t), last(sol.t))
+        eph_ea = selecteph(NEOs.sseph, ea, firsttime(sol), lasttime(sol))
 
         # Apophis
         # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec

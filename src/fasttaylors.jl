@@ -171,9 +171,9 @@ function evaleph!(y::Vector{U}, et::U, bwd::DensePropagation2{T, U},
     # Convert time to TDB days since J2000
     t = et / daysec
     # Get index of bwd/fwd that interpolates at time t
-    ind::Int, δt::U = t <= first(bwd.t) ? timeindex(bwd, t) : timeindex(fwd, t)
+    ind::Int, δt::U = t <= firsttime(bwd) ? timeindex(bwd, t) : timeindex(fwd, t)
     # Evaluate bwd/fwd.p[ind] at δt
-    if t <= first(bwd.t)
+    if t <= firsttime(bwd)
         for i in eachindex(y)
             evaleph!(y[i], bwd.p[ind, i], δt)
         end
@@ -193,9 +193,9 @@ function evaleph!(y::Vector{U}, et::T, bwd::DensePropagation2{T, U},
     # Convert time to TDB days since J2000
     t = et / daysec
     # Get index of bwd/fwd that interpolates at time t
-    ind::Int, δt::T = t <= first(bwd.t) ? timeindex(bwd, t) : timeindex(fwd, t)
+    ind::Int, δt::T = t <= firsttime(bwd) ? timeindex(bwd, t) : timeindex(fwd, t)
     # Evaluate bwd/fwd.p[ind] at δt
-    if t <= first(bwd.t)
+    if t <= firsttime(bwd)
         for i in eachindex(y)
             evaleph!(y[i], bwd.p[ind, i], δt)
         end
@@ -215,9 +215,9 @@ function evaleph!(y::Vector{T}, et::T, bwd::DensePropagation2{T, T},
     # Convert time to TDB days since J2000
     t = et / daysec
     # Get index of bwd/fwd that interpolates at time t
-    ind::Int, δt::T = t <= first(bwd.t) ? timeindex(bwd, t) : timeindex(fwd, t)
+    ind::Int, δt::T = t <= firsttime(bwd) ? timeindex(bwd, t) : timeindex(fwd, t)
     # Evaluate bwd/fwd.p[ind] at δt
-    if t <= first(bwd.t)
+    if t <= firsttime(bwd)
         y .= evaluate(view(bwd.p, ind, eachindex(y)), δt)
     else
         y .= evaluate(view(fwd.p, ind, eachindex(y)), δt)

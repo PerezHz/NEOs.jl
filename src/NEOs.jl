@@ -9,7 +9,7 @@ import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, lo
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import StatsBase: weights
 import Tables: Schema, istable, rowaccess, rows, schema
-import TaylorIntegration: surfacecrossing
+import TaylorIntegration: surfacecrossing, firsttime, lasttime
 import TaylorSeries: evaluate, constant_term, identity!
 
 using AngleBetweenVectors, AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON,
@@ -92,9 +92,9 @@ export gm, frame, elements, iscircular, iselliptic, isparabolic, ishyperbolic, c
 export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
-export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, keplerian,
-       equinoctial, attributable, uncertaintyparameter, absolutemagnitude, diameter, mass,
-       shiftepoch
+export variables, epoch, firsttime, lasttime, noptical, nradar, minmaxdates, optical,
+       sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
+       absolutemagnitude, diameter, mass, shiftepoch
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
        orbitdetermination, linkage

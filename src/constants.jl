@@ -279,9 +279,9 @@ function print_sseph_summary()
         "Solar system ephemeris summary\n",
         t, rpad("Expansion order:", 21), SSEPHORDER, "\n",
         t, rpad("Number of bodies:", 21), SSEPHNBODIES, "\n",
-        t, rpad("Initial time:", 21), julian2datetime(first(sseph.t) + JD_J2000),
+        t, rpad("Initial time:", 21), julian2datetime(firsttime(sseph) + JD_J2000),
             " TDB", "\n",
-        t, rpad("Final time:", 21), julian2datetime(last(sseph.t) + JD_J2000),
+        t, rpad("Final time:", 21), julian2datetime(lasttime(sseph) + JD_J2000),
             " TDB", "\n",
     )
 end
