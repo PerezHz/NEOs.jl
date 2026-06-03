@@ -4,7 +4,6 @@
 #julia --project=@. main.jl
 using NEOs
 using Dates
-using TaylorSeries
 using TaylorIntegration
 using JLD2
 using SPICE: furnsh

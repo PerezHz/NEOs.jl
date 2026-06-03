@@ -4,7 +4,6 @@
 #julia --project=@. main.jl
 using NEOs
 using Dates
-using TaylorSeries
 using TaylorIntegration
 using JLD
 using PlanetaryEphemeris
@@ -40,7 +39,7 @@ ss16asteph_et = JLD.load(ss_eph_file, "ss16ast_eph")
 ### TaylorN variables setup
 if lyap
     ### setup TaylorN variables with order=1, numvars=7
-    TNvars = TaylorSeries.variables!("δx", order=1, numvars=7)
+    TNvars = set_variables("δx", order=1, numvars=7)
     # dq corresponding to solution OR7 for Bennu
     dq_OR7 = [7.11289905874202e-7, 3.492170211757043e-7, 1.49735641150018e-8, -3.610309907354978e-10, 7.835479079267429e-11, -2.100961626780984e-10, -4.550232586244751e-14]
     dq = dq_OR7
@@ -49,7 +48,7 @@ else
     #dq = Taylor1.(zeros(7), varorder)
     #dq[end][1] = 1e-14
     # dq: perturbation to nominal initial condition (TaylorN jet transport)
-    dq = TaylorSeries.variables!("δx", order=varorder, numvars=nv)
+    dq = set_variables("δx", order=varorder, numvars=nv)
     for i in 1:6
         dq[i][1][i] = 1e-8
     end
