@@ -369,23 +369,29 @@ end
         @test sol.t == solnp.t
         # TODO: fix roundoff differences near deep close approach in 2029
         @test norm(sol.p - solnp.p, Inf) / norm(solnp.p, Inf) < 4e-18 # 3.757708512785821e-20
-        # TaylorN-valued TaylorSolution serialization currently needs an upstream
-        # JLD2/TaylorSeries fix; scalar TaylorN serialization is covered below.
+        @test JLD2.writeas(typeof(sol)) == TaylorIntegration.TaylorSolutionNSerialization{Float64, 2}
+        jldsave("test.jld2"; sol)
+        recovered_sol = JLD2.load("test.jld2", "sol")
+        @test sol == recovered_sol
+        rm("test.jld2")
 
         params = Parameters(params; maxsteps = 1)
         sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, q0, jd0, nyears, params)
 
-        jldsave("test.jld2"; tvS, xvS, gvS)
+        @test JLD2.writeas(typeof(sol)) == TaylorIntegration.TaylorSolutionNSerialization{Float64, 2} 
+        jldsave("test.jld2"; sol, tvS, xvS, gvS)
+        recovered_sol = JLD2.load("test.jld2", "sol")
         recovered_tvS = JLD2.load("test.jld2", "tvS")
         recovered_xvS = JLD2.load("test.jld2", "xvS")
         recovered_gvS = JLD2.load("test.jld2", "gvS")
+        @test sol == recovered_sol
         @test tvS == recovered_tvS
         @test xvS == recovered_xvS
         @test gvS == recovered_gvS
         rm("test.jld2")
 
         # It is unlikely that such a short integration generates a non-trivial tvS, xvS and gvS.
-        # Therefore, to test TaylorNSerialization I suggest to generate random TaylorN and check
+        # Therefore, to test TaylorNSerialization we generate here a random TaylorN and check
         # it saves correctly...
         random_TaylorN = [cos(sum(dq .* rand(6))), sin(sum(dq .* rand(6))), tan(sum(dq .* rand(6)))]
         jldsave("test.jld2"; random_TaylorN)
@@ -422,6 +428,7 @@ end
         solnp = NEOs.propagate(dynamicsg, q0[1:6], jd0, nyears, params)
         @test sol.t == solnp.t
         @test norm(sol.p - solnp.p, Inf) < 1e-16
+        @test sol == solnp
 
         # Test parsed vs non-parsed propagation: nongravitational model
         params = Parameters(params, parse_eqs = true)
@@ -430,6 +437,7 @@ end
         solnp = NEOs.propagate(dynamicsng, q0, jd0, nyears, params)
         @test sol.t == solnp.t
         @test norm(sol.p - solnp.p, Inf) < 1e-16
+        @test sol == solnp
 
         # Propagate orbit (nongrav model)
         params = Parameters(params, maxsteps = 2_000, parse_eqs = true)
