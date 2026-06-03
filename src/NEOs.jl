@@ -49,17 +49,6 @@ using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update
       DensePropagation2, TaylorSolutionCallingArgs, timeindex
 using TaylorSeries: NumberNotSeries
 
-const _taylor_order = getfield(TaylorSeries, isdefined(TaylorSeries, :order) ? :order : :get_order)
-const _taylor_variables =
-    getfield(TaylorSeries, isdefined(TaylorSeries, :variables) ? :variables : :get_variables)
-const _taylor_variables_bang =
-    getfield(TaylorSeries, isdefined(TaylorSeries, Symbol("variables!")) ?
-        Symbol("variables!") : :set_variables)
-
-taylor_order(args...; kwargs...) = _taylor_order(args...; kwargs...)
-taylor_variables(args...; kwargs...) = _taylor_variables(args...; kwargs...)
-taylor_variables!(args...; kwargs...) = _taylor_variables_bang(args...; kwargs...)
-
 # Common
 export Parameters
 export d_EM_km, d_EM_au, MJD2000

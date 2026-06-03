@@ -336,7 +336,7 @@ function compute_radec(
     r_e_t_r = rv_e_t_r[1:3]
     evaleph!(rv_a_t_r, et_r_secs, xva[1], xva[2])
     r_a_t_r = rv_a_t_r[1:3]
-    order = taylor_order(r_a_t_r[1])
+    order = TaylorSeries.order(r_a_t_r[1])
     RV_r = obsposvelECI(observatory, et_r_secs)
     R_r = RV_r[1:3]
     r_r_t_r = r_e_t_r + R_r

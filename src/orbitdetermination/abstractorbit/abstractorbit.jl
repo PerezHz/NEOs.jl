@@ -97,7 +97,7 @@ initialcondition(orbit::AbstractOrbit, dof::Int, params::Parameters) =
 function jtperturbation(sigmas::AbstractVector{T}, variables::AbstractVector{Int},
                         Ndof::Int, order::Int, params::Parameters{T}) where {T <: Real}
     k = 1
-    vars = taylor_variables(T, order)
+    vars = TaylorSeries.variables(T, order)
     dq = [zero(vars[1]) for _ in 1:Ndof]
     for i in eachindex(dq)
         !(i in variables) && continue
@@ -420,7 +420,7 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
     t = epoch(orbit)
     mjd0 = t + MJD2000
     # Jet transport initial condition
-    q0 = orbit(t) + taylor_variables(T, 2)
+    q0 = orbit(t) + TaylorSeries.variables(T, 2)
     q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
     # Origin
     x0 = zeros(T, Npar)

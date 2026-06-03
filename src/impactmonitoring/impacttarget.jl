@@ -19,7 +19,7 @@ end
 ImpactTarget(gm::T, radius::T, eph::DensePropagation2{T, T}) where {T <: Real} =
     ImpactTarget{T}(gm, radius, eph)
 
-ImpactTarget(i::Int) = ImpactTarget(PE.μ[i], PLANET_RADII[i], _loadeph(i))
+ImpactTarget(i::Int) = ImpactTarget(PE.μ[i], PLANET_RADII[i], selecteph(sseph, i))
 ImpactTarget(s::String) = ImpactTarget(PLANET_NAMES_TO_INDEX[s])
 ImpactTarget(s::Symbol) = ImpactTarget(string(s))
 
