@@ -66,7 +66,8 @@ function PropresBuffer(
     ) where {D, T <: Real, U <: Number, V <: Number}
     t0 = dtutc2days(date(IM.orbit.optical[idxs[1]]))
     tf = dtutc2days(date(IM.orbit.optical[idxs[end]]))
-    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
+    tref = cte(cte(jd0)) - JD_J2000
+    tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(dynamicalmodel(IM), q0, jd0, tlim, params)
     res = [OpticalBuffer(q0[1]) for _ in eachindex(idxs)]
     return PropresBuffer{T, U, V}(prop, res)
@@ -77,7 +78,8 @@ function PropresBuffer(
         jd0::V, params::Parameters
     ) where {D, T <: Real, U <: Number, V <: Number}
     t0, tf = dtutc2days.(minmaxdates(IM))
-    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
+    tref = cte(cte(jd0)) - JD_J2000
+    tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(dynamicalmodel(IM), q0, jd0, tlim, params)
     res = [OpticalBuffer(q0[1]) for _ in 1:noptical(IM)]
     return PropresBuffer{T, U, V}(prop, res)

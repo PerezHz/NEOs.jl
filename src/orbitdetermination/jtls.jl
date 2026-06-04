@@ -436,16 +436,22 @@ function linkage(
     # Initialize buffer and set of residuals
     buffer = PropresBuffer(od, porbit(), jd0, params)
     res = init_residuals(T, od, porbit)
+    orbit = zero(OpticalLeastSquaresOrbit{D, T, T, O})
     # Select first scaling factor
     mags = Vector{Int}(undef, length(trks))
     propres!(res, od, porbit(), jd0, params; buffer)
+    if isempty(res)
+        verbose && @warn("Linkage did not converge within the given parameters \
+            or could not fit all the astrometry")
+        od.weights.weights .= w8s
+        return orbit
+    end
     for i in eachindex(mags)
         x = maximum(log10chi, view(res, indices(trks[i])))
         mags[i] = ceil(Int, x)
     end
     k = max(0, minimum(mags) - 1)
     # Main cycle
-    orbit = zero(OpticalLeastSquaresOrbit{D, T, T, O})
     for i in 1:maxiter
         # Scale down weights
         for j in idxs
@@ -475,6 +481,11 @@ function linkage(
         end
         # Scale up weights
         propres!(res, od, orbit(), jd0, params; buffer)
+        if isempty(res)
+            verbose && @warn("Linkage did not converge within the given parameters \
+                or could not fit all the astrometry")
+            break
+        end
         for i in eachindex(mags)
             x = maximum(log10chi, view(res, indices(trks[i])))
             mags[i] = ceil(Int, x)

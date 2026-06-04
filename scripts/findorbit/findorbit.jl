@@ -178,6 +178,7 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
     od = ODProblem(newtonian!, NEOs.optical(view(apps, 1:i)), weights = Veres17,
                    debias = Eggl20)
     orbitMID = linkage(od, orbitSA, params)
+    iszero(orbitMID) && return orbitSA
     # Step #2: JTLS with gravityonly!
     NEOs.update!(OD, od.optical)
     orbitMA = jtls(OD, orbitMID, params)
@@ -207,12 +208,36 @@ function multipleapparition(apps::AbstractApparitionVector, orbitMA::MultipleApp
     for i in eachindex(mags)
         iszero(mags[i]) && continue
         NEOs.update!(OD, NEOs.optical(view(apps, 1:i)))
-        orbitMA = linkage(OD, orbitMA, params)
+        orbit = linkage(OD, orbitMA, params)
+        iszero(orbit) && break
+        orbitMA = orbit
         # Break condition
         # isodvalid(OD, orbitMA, params) && break
         noptical(orbitMA) == noptical(apps) && break
     end
     return orbitMA
+end
+
+function orbitapptype(apps::AbstractApparitionVector, params::Parameters)
+    napps = length(apps)
+    napps > 0 || throw(ArgumentError("At least one apparition is required"))
+    return orbitapptype(Val(min(napps, 3)), apps, params)
+end
+
+function orbitapptype(::Val{1}, apps::AbstractApparitionVector, params::Parameters)
+    return singleapparition(apps, params)
+end
+
+function orbitapptype(::Val{2}, apps::AbstractApparitionVector, params::Parameters)
+    orbitSA = singleapparition(apps, params)
+    return bridge(apps, orbitSA, params)
+end
+
+function orbitapptype(::Val{3}, apps::AbstractApparitionVector, params::Parameters)
+    orbitSA = singleapparition(apps, params)
+    orbitMA = bridge(apps, orbitSA, params)
+    orbitMA isa MultipleApparitionOrbit || return orbitMA
+    return multipleapparition(apps, orbitMA, params)
 end
 
 function main()
@@ -260,17 +285,8 @@ function main()
 
     # Split observational arc into apparitions
     apps = apparitions(optical, Day(238))
-    # Single apparition orbit determination
-    orbit = singleapparition(apps, params)
-
-    if length(apps) > 1
-        # Bridge between single and multiple apparitions
-        orbit = bridge(apps, orbit, params)
-    end
-    if length(apps) > 2
-        # Multiple apparition orbit determination
-        orbit = multipleapparition(apps, orbit, params)
-    end
+    # Compute orbit by apparition type (single/multiple apparition)
+    orbit = orbitapptype(apps, params)
 
     # Shift epoch to the middle of the observational arc
     tmean = meanepoch(orbit)
