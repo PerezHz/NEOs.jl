@@ -74,6 +74,7 @@ export fetch_optical_mpc80, read_optical_mpc80, write_optical_mpc80
 export fetch_neocp_objects, read_neocp_objects, write_neocp_objects
 export fetch_optical_rwo, read_optical_rwo, write_optical_rwo
 export fetch_optical_ades, read_optical_ades, write_optical_ades
+export read_optical_astrometry
 export nobs, datediff, reduce_tracklets
 export wra, wdec, dra, ddec, unfold, compute_radec, residuals
 export fetch_radar_jpl, read_radar_jpl, write_radar_jpl

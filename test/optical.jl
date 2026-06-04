@@ -468,6 +468,19 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
     optical3 = read_optical_ades(filename)
     filter!(x -> Date(2000) < date(x) < Date(2025), optical3)
 
+    @testset "read_optical_astrometry" begin
+        mpc80_file = joinpath(TEST_DATA, "433.txt")
+        ades_file = joinpath(TEST_DATA, "433.xml")
+
+        @test read_optical_astrometry(mpc80_file) == read_optical_mpc80(mpc80_file)
+        @test read_optical_astrometry(mpc80_file; format = :obs80) ==
+            read_optical_mpc80(mpc80_file)
+        @test read_optical_astrometry(ades_file) == read_optical_ades(ades_file)
+        @test read_optical_astrometry(ades_file; format = "xml") ==
+            read_optical_ades(ades_file)
+        @test_throws ArgumentError read_optical_astrometry(mpc80_file; format = :unknown)
+    end
+
     @testset "Topocentric" begin
 
         using NEOs: TimeOfDay, isday, isnight, issatellite, isgeocentric,

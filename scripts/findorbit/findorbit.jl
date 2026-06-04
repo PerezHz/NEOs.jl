@@ -42,36 +42,34 @@ const SingleApparitionOrbit{O <: AbstractOpticalVector{Float64}} =
 const MultipleApparitionOrbit{O <: AbstractOpticalVector{Float64}} =
     LeastSquaresOrbit{typeof(gravityonly!), Float64, Float64, O, Nothing, Nothing}
 
-function normalize_astrometry_format(format::AbstractString)
+function fetch_astrometry_format(format::AbstractString)
     fmt = lowercase(strip(format))
     if fmt in ("auto", "ades", "xml")
-        return fmt == "xml" ? "ades" : fmt
+        return :ades
     elseif fmt in ("mpc80", "obs80")
-        return "mpc80"
+        return :mpc80
     else
         throw(ArgumentError("Unknown input format: $format. Use auto, ades, mpc80, or obs80."))
     end
 end
 
-function detect_astrometry_format(filename::AbstractString)
-    for line in eachline(filename)
-        stripped = strip(line)
-        isempty(stripped) && continue
-        return startswith(stripped, '<') ? "ades" : "mpc80"
-    end
-    throw(ArgumentError("Cannot detect astrometry format from empty file: $filename"))
-end
+fetch_optical_astrometry(input::AbstractString, ::Val{:ades}) =
+    fetch_optical_ades(input, MPC)
+
+fetch_optical_astrometry(input::AbstractString, ::Val{:mpc80}) =
+    fetch_optical_mpc80(input, MPC)
+
+astrometry_format(::AbstractVector{<:OpticalADES}) = "ades"
+astrometry_format(::AbstractVector{<:OpticalMPC80}) = "mpc80"
 
 function load_optical_astrometry(input::AbstractString, format::AbstractString)
-    fmt = normalize_astrometry_format(format)
     if isfile(input)
-        fmt = fmt == "auto" ? detect_astrometry_format(input) : fmt
-        optical = fmt == "ades" ? read_optical_ades(input) : read_optical_mpc80(input)
+        optical = read_optical_astrometry(input; format)
     else
-        fmt = fmt == "auto" ? "ades" : fmt
-        optical = fmt == "ades" ? fetch_optical_ades(input, MPC) : fetch_optical_mpc80(input, MPC)
+        fmt = fetch_astrometry_format(format)
+        optical = fetch_optical_astrometry(input, Val(fmt))
     end
-    return optical, fmt
+    return optical, astrometry_format(optical)
 end
 
 struct Apparition{T <: Real, O <: AbstractOpticalAstrometry{T}, V <: AbstractVector{O},
