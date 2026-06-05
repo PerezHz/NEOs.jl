@@ -63,9 +63,9 @@ lazy = true
     url = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls"
 
 [sseph_p100]
-git-tree-sha1 = "d4d91f0045063719c9bf581bf20bbc212327b2d0"
+git-tree-sha1 = "8f3a12b7e22feaeac4dffaffff50eb9c8ac57503"
 lazy = true
 
     [[sseph_p100.download]]
-    sha256 = "25b525ffef5c05cc51ee554760ae83107b9bd163577439470b60c2d4c7153a21"
-    url = "https://github.com/LuEdRaMo/sseph/raw/main/sseph343ast016_p100y_et.tar.gz"
+    sha256 = "eca7fc77d15a9b2a6623f0eccbcb7474c39d81910f8ca9f98f3588864ca6f0d2"
+    url = "https://github.com/PerezHz/sseph/raw/main/sseph343ast016_p100y_et.tar.gz"

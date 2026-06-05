@@ -84,7 +84,7 @@ using TaylorSeries
 # Pérez-Hernández (2022) OR6 solution 1-sigma uncertainties
 ss = [7.05E-9, 1.71E-9, 4.03E−9,        # au
       3.31E−11, 6.68E−11, 1.24E−10]     # au/day
-dq = set_variables("dx", numvars = 6, order = 2)
+dq = TaylorSeries.variables!("dx", numvars = 6, order = 2)
 q0 = q00 .+ 3ss .* dq
 ```
 and propagate it using the same syntax as before

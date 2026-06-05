@@ -37,14 +37,14 @@ end
 
 Equivalent to:
 
-`TaylorSeries.set_variables(T, names; order, numvars = length(c))`
+`TaylorSeries.variables!(T, names; order, numvars = length(c))`
 
 times a scaling given by `c`.
 """
 function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6);
                           order::Int = 5) where {T <: Real}
     # Set TaylorN variables
-    dq = set_variables(T, names; order, numvars = length(c))
+    dq = TaylorSeries.variables!(T, names; order, numvars = length(c))
     # Scale jet transport perturbation
     for i in eachindex(dq)
         dq[i][1][i] = c[i]
@@ -53,19 +53,19 @@ function scaled_variables(names::String = "δx", c::Vector{T} = fill(1e-6, 6);
 end
 
 # Check if an integration was successful
-function issuccessfulprop(sol::TaylorInterpolant, t::T; tol::T = 10.0) where {T <: Real}
-    # Zero TaylorInterpolant
+function issuccessfulprop(sol::TaylorSolution, t::T; tol::T = 10.0) where {T <: Real}
+    # Zero TaylorSolution
     iszero(sol) && return false
     # Forward integration
     if issorted(sol.t)
         # Insufficient steps
-        sol.t[end] < t && return false
+        lasttime(sol) < t && return false
         # Step that covers t
         i = searchsortedfirst(sol.t, t) - 1
     # Backward integration
     elseif issorted(sol.t, rev = true)
         # Insufficient steps
-        sol.t[end] > t && return false
+        lasttime(sol) > t && return false
         # Step that covers t
         i = searchsortedfirst(sol.t, t, lt = !isless) - 1
     # This case should never happen
@@ -73,7 +73,7 @@ function issuccessfulprop(sol::TaylorInterpolant, t::T; tol::T = 10.0) where {T 
         return false
     end
     # All coefficients are below tol
-    return all( norm.(view(sol.x, 1:i, :), Inf) .< tol )
+    return all( norm.(view(sol.p, 1:i, :), Inf) .< tol )
 end
 
 """
@@ -108,7 +108,7 @@ function _propagate(f::D, q0::Vector{U}, jd0::V, tmax::T, buffer::PropagationBuf
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
-    return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, orbit.t, orbit.p)
+    return TaylorSolution(collect((_jd0_ - JD_J2000) .+ orbit.t), collect(orbit.p))
 end
 
 """
@@ -155,8 +155,8 @@ function _propagate_root(f::D, q0::Vector{U}, jd0::V, tmax::T, buffer::Propagati
     # Epoch (plain)
     _jd0_ = cte(cte(jd0))
     # Output
-    return TaylorInterpolant{T, U, 2}(_jd0_ - JD_J2000, orbit.t, orbit.p),
-        orbit.tevents, orbit.xevents, orbit.gresids
+    sol = TaylorSolution(collect((_jd0_ - JD_J2000) .+ orbit.t), collect(orbit.p))
+    return sol, orbit.tevents, orbit.xevents, orbit.gresids
 end
 
 """

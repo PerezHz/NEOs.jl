@@ -1,16 +1,16 @@
 module NEOs
 
 # __precompile__(false)
-import Base: RefValue, isless, show, string, getindex, in, zero, iszero, isnan, summary,
-       firstindex, lastindex, first, last, wait, isdeprecated
+import Base: RefValue, isless, show, string, getindex, in, zero,
+       iszero, isnan, summary, firstindex, lastindex, first, last, wait, isdeprecated
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, longascnode,
-       meanmotion, meananomaly, timeperipass, numberofbodies
+       meanmotion, meananomaly, timeperipass, numberofbodies, selecteph
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
 import StatsBase: weights
 import Tables: Schema, istable, rowaccess, rows, schema
-import TaylorIntegration: surfacecrossing
-import TaylorSeries: get_order, evaluate, constant_term, identity!
+import TaylorIntegration: surfacecrossing, firsttime, lasttime
+import TaylorSeries: evaluate, constant_term, identity!
 
 using AngleBetweenVectors, AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON,
       LazyArtifacts, LinearAlgebra, Printf, Scratch, SPICE, TaylorIntegration,
@@ -28,12 +28,12 @@ using LinearAlgebra: inv!
 using LsqFit: curve_fit, vcov
 using OhMyThreads: tmap, tmap!, @allow_boxed_captures
 using Parameters: @with_kw, @unpack
-using PlanetaryEphemeris: TaylorInterpCallingArgs, TaylorInterpolant, au, su, ea, mo,
-      yr, RE, Rx, Ry, Rz, R_sun, α_p_sun, δ_p_sun, daysec, auday2kmsec, kmsec2auday,
+using PlanetaryEphemeris: au, su, ea, mo, yr, RE, Rx, Ry, Rz, R_sun, α_p_sun,
+      δ_p_sun, daysec, auday2kmsec, kmsec2auday,
       c_au_per_day, c_au_per_sec, c_cm_per_sec, semimajoraxis, eccentricity, inclination,
       longascnode, argperi, timeperipass, meanmotion, meananomaly, eccentricanomaly,
-      trueanomaly, selecteph, getinterpindex, pole_rotation, nbodyind,
-      t2c_jpl_de430, t2c_jpl_de430!, allocate_c2t_jpl_de430
+      trueanomaly, pole_rotation, nbodyind, t2c_jpl_de430,
+      t2c_jpl_de430!, allocate_c2t_jpl_de430
 using Preferences: @load_preference, @set_preferences!
 using QuadGK: quadgk
 using Roots: Bisection, find_zero, find_zeros
@@ -45,7 +45,8 @@ using SpecialFunctions: erf
 using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
 using StatsBase: mean, std
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update_cache!,
-      taylorstep!, set_psol!, nrconvergencecriterion
+      taylorstep!, set_psol!, nrconvergencecriterion, TaylorSolution, DensePropagation1,
+      DensePropagation2, TaylorSolutionCallingArgs, timeindex
 using TaylorSeries: NumberNotSeries
 
 # Common
@@ -73,6 +74,7 @@ export fetch_optical_mpc80, read_optical_mpc80, write_optical_mpc80
 export fetch_neocp_objects, read_neocp_objects, write_neocp_objects
 export fetch_optical_rwo, read_optical_rwo, write_optical_rwo
 export fetch_optical_ades, read_optical_ades, write_optical_ades
+export read_optical_astrometry
 export nobs, datediff, reduce_tracklets
 export wra, wdec, dra, ddec, unfold, compute_radec, residuals
 export fetch_radar_jpl, read_radar_jpl, write_radar_jpl
@@ -91,9 +93,9 @@ export gm, frame, elements, iscircular, iselliptic, isparabolic, ishyperbolic, c
 export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
-export variables, epoch, noptical, nradar, minmaxdates, optical, sigmas, snr, keplerian,
-       equinoctial, attributable, uncertaintyparameter, absolutemagnitude, diameter, mass,
-       shiftepoch
+export variables, epoch, firsttime, lasttime, noptical, nradar, minmaxdates, optical,
+       sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
+       absolutemagnitude, diameter, mass, shiftepoch
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
        orbitdetermination, linkage

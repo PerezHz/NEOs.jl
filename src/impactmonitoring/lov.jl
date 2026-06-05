@@ -19,7 +19,8 @@ struct LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
     bufferTN::PropresBuffer{T, TaylorN{T}, T}
 end
 
-get_order(x::LineOfVariationsBuffer) = get_order(x.bufferTN.prop.cache.x[1][0])
+TaylorSeries.order(x::LineOfVariationsBuffer) =
+    TaylorSeries.order(x.bufferTN.prop.cache.x[1][0])
 
 """
     LineOfVariationsBuffer(IM, lovorder, params)
@@ -53,7 +54,7 @@ function LineOfVariationsBuffer(IM::AbstractIMProblem{D, T}, lovorder::Int,
     end
     # Initial condition
     q00 = orbit()
-    q0TN = q00 + sigmas(orbit) .* get_variables(T, lovorder)
+    q0TN = q00 + sigmas(orbit) .* TaylorSeries.variables(T, lovorder)
     # Vectors of residuals
     resTN = init_optical_residuals(TaylorN{T}, IM)
     # Propagation and residuals buffers
@@ -102,10 +103,12 @@ dynamicalmodel(x::LineOfVariations) = x.dynamics
 
 epoch(x::LineOfVariations) = x.epoch
 nominaltime(x::LineOfVariations) = x.epoch
+firsttime(x::LineOfVariations) = min(lasttime(x.bwd), lasttime(x.fwd))
+lasttime(x::LineOfVariations) = max(lasttime(x.bwd), lasttime(x.fwd))
 
 sigma(::LineOfVariations{D, T}) where {D, T} = zero(T)
 
-get_order(x::LineOfVariations) = get_order(first(x.bwd.x))
+TaylorSeries.order(x::LineOfVariations) = TaylorSeries.order(first(x.bwd.p))
 
 function (x::LineOfVariations)(σ::Number)
     mjd0 = epoch(x) + MJD2000
@@ -114,7 +117,7 @@ function (x::LineOfVariations)(σ::Number)
 end
 
 (x::LineOfVariations)(σ::Number, domain::NTuple{2, <:Number}) =
-    x(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(get_order(x)))
+    x(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(TaylorSeries.order(x)))
 
 # Coordinate transformations
 lovtransform(::Real, x::AbstractVector, ::AbstractVector, ::Val{:cartesian},
@@ -150,10 +153,10 @@ function covariance(
     mjd0 = t0 + MJD2000
     jd0 = t0 + PE.J2000
     # Order with respect to LOV index
-    order = get_order(buffer)
+    order = TaylorSeries.order(buffer)
     # Jet transpot initial condition
     car00 = lovtransform(mjd0, coord00, sun, Val(coord), Val(:cartesian))
-    carTN = car00 + scalings .* get_variables(T, order)
+    carTN = car00 + scalings .* TaylorSeries.variables(T, order)
     # TaylorN propagation and residuals
     propres!(resTN, IM, carTN, jd0, params; buffer = bufferTN)
     # Covariance matrix in residuals space
@@ -228,7 +231,7 @@ function TaylorIntegration.jetcoeffs!(
         dq::AbstractArray{Taylor1{_S}, _N}, params,
         __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}
     ) where {_T <: Real, _S <: Number, _N}
-    order = get_order(t)
+    order = TaylorSeries.order(t)
     local IM, coord, buffer, _params_ = params
     @unpack t0, sun, scalings = buffer
     local mjd0 = t0 + MJD2000
@@ -284,17 +287,17 @@ function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
     # Taylor expansion of the line of variations
     _bwd_ = taylorinteg!(Val(true), lov!, coord00, zero(T), -σmax, lovtol,
                         cache, lovparams; maxsteps = lovsteps)
-    bwd = TaylorInterpolant{T, T, 2}(zero(T), _bwd_.t, _bwd_.p)
+    bwd = TaylorSolution(collect(_bwd_.t), collect(_bwd_.p))
     _fwd_ = taylorinteg!(Val(true), lov!, coord00, zero(T), σmax, lovtol,
                         cache, lovparams; maxsteps = lovsteps)
-    fwd = TaylorInterpolant{T, T, 2}(zero(T), _fwd_.t, _fwd_.p)
+    fwd = TaylorSolution(collect(_fwd_.t), collect(_fwd_.p))
     # The positive sigma direction is given by the semimajor axis
-    q0T1 = lovtransform(mjd0, fwd.x[1, :], sun, Val(coord), Val(:cartesian)) - sun
+    q0T1 = lovtransform(mjd0, fwd.p[1, :], sun, Val(coord), Val(:cartesian)) - sun
     a = semimajoraxis(q0T1..., μ_S, 0.0)
     if differentiate(1, a) < 0
         bwd, fwd = flipsign(fwd), flipsign(bwd)
     end
-    domain = (last(bwd.t), last(fwd.t))
+    domain = (lasttime(bwd), lasttime(fwd))
 
     return LineOfVariations{D, T}(dynamicalmodel(IM), t0, coord, sun, domain, bwd, fwd)
 end

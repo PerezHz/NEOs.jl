@@ -235,10 +235,6 @@ const CATALOGUE_MPC_CODES_2018 = [
 
 # Propagation
 
-# Abbreviation for a dense TaylorInterpolant
-const DensePropagation1{T, U} = TaylorInterpolant{T, U, 1, Vector{T}, Vector{Taylor1{U}}}
-const DensePropagation2{T, U} = TaylorInterpolant{T, U, 2, Vector{T}, Matrix{Taylor1{U}}}
-
 # Load Solar System, accelerations, newtonian potentials and TT-TDB 2000-2100 ephemeris
 const SSEPH_ARTIFACT_PATH = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
 const SSEPH_SOURCE = @load_preference("SSEPH_SOURCE", SSEPH_ARTIFACT_PATH)
@@ -262,11 +258,14 @@ function set_sseph_source(filename::AbstractString)
           restart your Julia session for this change to take effect!")
 end
 
-const sseph::DensePropagation2{Float64, Float64} = JLD2.load(SSEPH_SOURCE, "ss16ast_eph")
-const acceph::DensePropagation2{Float64, Float64} = JLD2.load(SSEPH_SOURCE, "acc_eph")
-const poteph::DensePropagation2{Float64, Float64} = JLD2.load(SSEPH_SOURCE, "pot_eph")
-const ttmtdb::DensePropagation1{Float64, Float64} = TaylorInterpolant(sseph.t0, sseph.t, sseph.x[:,end])
-const SSEPHORDER::Int = get_order(sseph.x[1])
+const sseph::DensePropagation2{Float64, Float64} =
+    JLD2.load(SSEPH_SOURCE, "ss16ast_eph")
+const acceph::DensePropagation2{Float64, Float64} =
+    JLD2.load(SSEPH_SOURCE, "acc_eph")
+const poteph::DensePropagation2{Float64, Float64} =
+    JLD2.load(SSEPH_SOURCE, "pot_eph")
+const ttmtdb::DensePropagation1{Float64, Float64} = TaylorSolution(sseph.t, sseph.p[:, end])
+const SSEPHORDER::Int = TaylorSeries.order(sseph.p[1])
 const SSEPHNBODIES::Int = numberofbodies(sseph)
 
 """
@@ -280,9 +279,9 @@ function print_sseph_summary()
         "Solar system ephemeris summary\n",
         t, rpad("Expansion order:", 21), SSEPHORDER, "\n",
         t, rpad("Number of bodies:", 21), SSEPHNBODIES, "\n",
-        t, rpad("Initial time:", 21), julian2datetime(sseph.t0 + JD_J2000),
+        t, rpad("Initial time:", 21), julian2datetime(firsttime(sseph) + JD_J2000),
             " TDB", "\n",
-        t, rpad("Final time:", 21), julian2datetime(sseph.t0 + sseph.t[end] + JD_J2000),
+        t, rpad("Final time:", 21), julian2datetime(lasttime(sseph) + JD_J2000),
             " TDB", "\n",
     )
 end

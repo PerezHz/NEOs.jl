@@ -1,21 +1,22 @@
 using ArgParse
 using NEOs, PlanetaryEphemeris, JLD2, Dates, Statistics, Printf
 using NEOs: AbstractOpticalAstrometry, AbstractOpticalVector, OpticalADES,
-            AbstractOrbit, log10chi
+            OpticalMPC80, AbstractOrbit, log10chi
 import NEOs: indices, numberofdays, noptical
 
 function parse_commandline()
     s = ArgParseSettings()
 
     # Program name (for usage & help screen)
-    s.prog = "findorb.jl"
+    s.prog = "findorbit.jl"
     # Desciption (for help screen)
     s.description = "Find an orbit from a set of optical astrometry"
 
     s.epilog = """
         Example:\n
         \n
-        julia -t 5 --project findorb.jl -i 2024YR4\n
+        julia -t 5 --project findorbit.jl -i 2024YR4\n
+        julia -t 5 --project findorbit.jl -i obs.obs -o obs.jld2\n
         \n
     """
 
@@ -26,16 +27,50 @@ function parse_commandline()
         "--output", "-o"
             help = "output .jld2 file"
             arg_type = String
+        "--format", "-f"
+            help = "input format: auto, ades, mpc80, or obs80"
+            arg_type = String
+            default = "auto"
     end
 
     return parse_args(s)
 end
 
-const SingleApparitionOrbit = LeastSquaresOrbit{typeof(newtonian!), Float64, Float64,
-        Vector{OpticalADES{Float64}}, Nothing, Nothing}
+const SingleApparitionOrbit{O <: AbstractOpticalVector{Float64}} =
+    LeastSquaresOrbit{typeof(newtonian!), Float64, Float64, O, Nothing, Nothing}
 
-const MultipleApparitionOrbit = LeastSquaresOrbit{typeof(gravityonly!), Float64, Float64,
-        Vector{OpticalADES{Float64}}, Nothing, Nothing}
+const MultipleApparitionOrbit{O <: AbstractOpticalVector{Float64}} =
+    LeastSquaresOrbit{typeof(gravityonly!), Float64, Float64, O, Nothing, Nothing}
+
+function fetch_astrometry_format(format::AbstractString)
+    fmt = lowercase(strip(format))
+    if fmt in ("auto", "ades", "xml")
+        return :ades
+    elseif fmt in ("mpc80", "obs80")
+        return :mpc80
+    else
+        throw(ArgumentError("Unknown input format: $format. Use auto, ades, mpc80, or obs80."))
+    end
+end
+
+fetch_optical_astrometry(input::AbstractString, ::Val{:ades}) =
+    fetch_optical_ades(input, MPC)
+
+fetch_optical_astrometry(input::AbstractString, ::Val{:mpc80}) =
+    fetch_optical_mpc80(input, MPC)
+
+astrometry_format(::AbstractVector{<:OpticalADES}) = "ades"
+astrometry_format(::AbstractVector{<:OpticalMPC80}) = "mpc80"
+
+function load_optical_astrometry(input::AbstractString, format::AbstractString)
+    if isfile(input)
+        optical = read_optical_astrometry(input; format)
+    else
+        fmt = fetch_astrometry_format(format)
+        optical = fetch_optical_astrometry(input, Val(fmt))
+    end
+    return optical, astrometry_format(optical)
+end
 
 struct Apparition{T <: Real, O <: AbstractOpticalAstrometry{T}, V <: AbstractVector{O},
                   I <: AbstractVector{Int}, B}
@@ -99,7 +134,8 @@ end
 
 function singleapparition(apps::AbstractApparitionVector, params::Parameters)
     # Single apparition orbit determination
-    orbitSA = zero(SingleApparitionOrbit)
+    optical = NEOs.optical(first(apps))
+    orbitSA = zero(SingleApparitionOrbit{typeof(optical)})
     sort!(apps, by = numberofdays, rev = true)
     od = ODProblem(newtonian!, NEOs.optical(apps[1]), weights = Veres17,
                    debias = Eggl20)
@@ -140,6 +176,7 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
     od = ODProblem(newtonian!, NEOs.optical(view(apps, 1:i)), weights = Veres17,
                    debias = Eggl20)
     orbitMID = linkage(od, orbitSA, params)
+    iszero(orbitMID) && return orbitSA
     # Step #2: JTLS with gravityonly!
     NEOs.update!(OD, od.optical)
     orbitMA = jtls(OD, orbitMID, params)
@@ -169,12 +206,36 @@ function multipleapparition(apps::AbstractApparitionVector, orbitMA::MultipleApp
     for i in eachindex(mags)
         iszero(mags[i]) && continue
         NEOs.update!(OD, NEOs.optical(view(apps, 1:i)))
-        orbitMA = linkage(OD, orbitMA, params)
+        orbit = linkage(OD, orbitMA, params)
+        iszero(orbit) && break
+        orbitMA = orbit
         # Break condition
         # isodvalid(OD, orbitMA, params) && break
         noptical(orbitMA) == noptical(apps) && break
     end
     return orbitMA
+end
+
+function orbitapptype(apps::AbstractApparitionVector, params::Parameters)
+    napps = length(apps)
+    napps > 0 || throw(ArgumentError("At least one apparition is required"))
+    return orbitapptype(Val(min(napps, 3)), apps, params)
+end
+
+function orbitapptype(::Val{1}, apps::AbstractApparitionVector, params::Parameters)
+    return singleapparition(apps, params)
+end
+
+function orbitapptype(::Val{2}, apps::AbstractApparitionVector, params::Parameters)
+    orbitSA = singleapparition(apps, params)
+    return bridge(apps, orbitSA, params)
+end
+
+function orbitapptype(::Val{3}, apps::AbstractApparitionVector, params::Parameters)
+    orbitSA = singleapparition(apps, params)
+    orbitMA = bridge(apps, orbitSA, params)
+    orbitMA isa MultipleApparitionOrbit || return orbitMA
+    return multipleapparition(apps, orbitMA, params)
 end
 
 function main()
@@ -195,16 +256,17 @@ function main()
     output::String = parsed_args["output"]
     println("• Output .jld2 file: ", output)
 
+    # Input astrometry format
+    format::String = parsed_args["format"]
+    println("• Requested input astrometry format: ", format)
+
     # Global initial time
     global_initial_time = now()
     println("• Run started at ", global_initial_time)
 
     # Load optical astrometry
-    if isfile(input)
-        optical = read_optical_ades(input)
-    else
-        optical = fetch_optical_ades(input, MPC)
-    end
+    optical, format = load_optical_astrometry(input, format)
+    println("• Loaded ", length(optical), " ", uppercase(format), " optical observations")
     filter!(!isdeprecated, optical)
 
     # Parameters
@@ -221,26 +283,27 @@ function main()
 
     # Split observational arc into apparitions
     apps = apparitions(optical, Day(238))
-    # Single apparition orbit determination
-    orbitSA = singleapparition(apps, params)
-
-    if length(apps) > 1
-        # Bridge between single and multiple apparitions
-        orbitMA = bridge(apps, orbitSA, params)
-    end
-    if length(apps) > 2
-        # Multiple apparition orbit determination
-        orbitMA = multipleapparition(apps, orbitMA, params)
-    end
+    # Compute orbit by apparition type (single/multiple apparition)
+    orbit = orbitapptype(apps, params)
 
     # Shift epoch to the middle of the observational arc
-    tmean = meanepoch(orbitMA)
-    orbitMA = shiftepoch(orbitMA, tmean + PE.J2000, params)
+    tmean = meanepoch(orbit)
+    orbit = shiftepoch(orbit, tmean + PE.J2000, params)
     printitle("Final orbit", "*")
-    println(summary(orbitMA))
+    println(summary(orbit))
+
+    # Print heliocentric ecliptic Keplerian elements (plus q, tp)
+    kep = keplerian(orbit, params)
+    H, dH = absolutemagnitude(orbit, params)
+    printitle("Keplerian elements", "*")
+    println(kep)
+    println("q  = ", @sprintf("%+.12E", pericenter(kep)), " au")
+    println("tp = ", @sprintf("%+.12E", timeperipass(kep)), " MJD TDB")
+    println("H  = ", @sprintf("%.3f", H), " +/- ", @sprintf("%.3f", dH), " mag")
+    println("")
 
     # Save orbit
-    jldsave(output; orbit = orbitMA)
+    jldsave(output; orbit)
     println("Final orbit saved to: ", output)
 
     # Final time

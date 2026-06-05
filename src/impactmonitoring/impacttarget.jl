@@ -19,7 +19,7 @@ end
 ImpactTarget(gm::T, radius::T, eph::DensePropagation2{T, T}) where {T <: Real} =
     ImpactTarget{T}(gm, radius, eph)
 
-ImpactTarget(i::Int) = ImpactTarget(PE.μ[i], PLANET_RADII[i], _loadeph(i))
+ImpactTarget(i::Int) = ImpactTarget(PE.μ[i], PLANET_RADII[i], selecteph(sseph, i))
 ImpactTarget(s::String) = ImpactTarget(PLANET_NAMES_TO_INDEX[s])
 ImpactTarget(s::Symbol) = ImpactTarget(string(s))
 
@@ -27,7 +27,9 @@ gm(x::ImpactTarget) = x.gm
 radius(x::ImpactTarget) = x.radius
 escapevelocity(x::ImpactTarget) = sqrt(2 * gm(x) / radius(x)) * (au/daysec)
 
-minmaxdays(x::ImpactTarget) = minmax(x.eph.t0, x.eph.t0 + x.eph.t[end])
+firsttime(x::ImpactTarget) = firsttime(x.eph)
+lasttime(x::ImpactTarget) = lasttime(x.eph)
+minmaxdays(x::ImpactTarget) = minmax(firsttime(x), lasttime(x))
 
 function isintimerange(t::Number, x::ImpactTarget)
     t0, tf = minmaxdays(x)

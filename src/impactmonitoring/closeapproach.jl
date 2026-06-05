@@ -57,13 +57,15 @@ nominalstate(x::CloseApproach) = [cte(x.x), cte(x.y), cte(x.z)]
 
 difft(x::CloseApproach, y::CloseApproach) = abs(nominaltime(x) - nominaltime(y))
 
-get_order(x::CloseApproach{T, U}) where {T, U <: AbstractSeries} = get_order(x.t)
+TaylorSeries.order(x::CloseApproach{T, U}) where {T, U <: AbstractSeries} =
+    TaylorSeries.order(x.t)
 
 domain_radius(x::CloseApproach) = max(ubound(x) - sigma(x), sigma(x) - lbound(x))
 
 convergence_radius(x::NumberNotSeries, ctol::Real) = ctol / zero(x)
 
-convergence_radius(x::AbstractSeries, ctol::Real) = (ctol / norm(x[end], Inf))^(1 / get_order(x))
+convergence_radius(x::AbstractSeries, ctol::Real) =
+    (ctol / norm(x[end], Inf))^(1 / TaylorSeries.order(x))
 
 function convergence_radius(x::CloseApproach, ctol::Real)
     return min(
@@ -105,7 +107,7 @@ end
 
 function radialvelocity(x::CloseApproachT1, σ::Real)
     dσ = deltasigma(x, σ)
-    n = get_order(x)
+    n = TaylorSeries.order(x)
     ξ, ζ, b = x.x[end], x.y[end], x.z[end]
     dξ, dζ, db = zero(ξ), zero(ζ), zero(b)
     for i in n-1:-1:0
@@ -123,7 +125,7 @@ end
 
 function concavity(x::CloseApproachT1, σ::Real)
     dσ = deltasigma(x, σ)
-    n = get_order(x)
+    n = TaylorSeries.order(x)
     ξ = x.x[end-1] + dσ * x.x[end]
     ζ = x.y[end-1] + dσ * x.y[end]
     b = x.z[end-1] + dσ * x.z[end]

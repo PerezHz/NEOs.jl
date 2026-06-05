@@ -32,7 +32,7 @@ const urls_lsk_spk = [
 
 # PlanetaryEphemeris.jl Solar System ephemeris name and URL
 const name_sseph = "sseph_p100"
-const url_sseph = "https://github.com/LuEdRaMo/sseph/raw/main/sseph343ast016_p100y_et.tar.gz"
+const url_sseph = "https://github.com/PerezHz/sseph/raw/main/sseph343ast016_p100y_et.tar.gz"
 
 # Collect names and URLs
 const urls = vcat(urls_lsk_spk, urls_debias, url_sseph)

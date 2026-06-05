@@ -31,7 +31,21 @@ numvars(x::AbstractOrbit) = length(x.variables)
 
 Return the reference epoch of an orbit in TDB days since J2000.
 """
-epoch(x::AbstractOrbit) = x.bwd.t0
+epoch(x::AbstractOrbit) = firsttime(x.bwd)
+
+"""
+    firsttime(::AbstractOrbit)
+
+Return the earliest time covered by an orbit in TDB days since J2000.
+"""
+firsttime(x::AbstractOrbit) = min(lasttime(x.bwd), lasttime(x.fwd))
+
+"""
+    lasttime(::AbstractOrbit)
+
+Return the latest time covered by an orbit in TDB days since J2000.
+"""
+lasttime(x::AbstractOrbit) = max(lasttime(x.bwd), lasttime(x.fwd))
 
 # Number of observations
 noptical(x::AbstractOrbit) = length(x.optical)
@@ -97,7 +111,7 @@ initialcondition(orbit::AbstractOrbit, dof::Int, params::Parameters) =
 function jtperturbation(sigmas::AbstractVector{T}, variables::AbstractVector{Int},
                         Ndof::Int, order::Int, params::Parameters{T}) where {T <: Real}
     k = 1
-    vars = get_variables(T, order)
+    vars = TaylorSeries.variables(T, order)
     dq = [zero(vars[1]) for _ in 1:Ndof]
     for i in eachindex(dq)
         !(i in variables) && continue
@@ -420,7 +434,7 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
     t = epoch(orbit)
     mjd0 = t + MJD2000
     # Jet transport initial condition
-    q0 = orbit(t) + get_variables(T, 2)
+    q0 = orbit(t) + TaylorSeries.variables(T, 2)
     q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
     # Origin
     x0 = zeros(T, Npar)

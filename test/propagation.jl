@@ -13,9 +13,9 @@ function warmuptests(dynamics, q00, jd0, nyears, params)
     @testset "$dynamics warmup (parse_eqs = $(params.parse_eqs))" begin
         fwd = NEOs.propagate(dynamics, q00, jd0, nyears, params)
         @test isa(fwd, DensePropagation2{Float64, Float64})
-        @test fwd.t0 == jd0 - PE.J2000
+        @test firsttime(fwd) == jd0 - PE.J2000
         @test length(fwd.t) == 2
-        @test size(fwd.x) == (1, NEOs.dof(Val(dynamics)))
+        @test size(fwd.p) == (1, NEOs.dof(Val(dynamics)))
     end
 end
 
@@ -100,8 +100,7 @@ end
     end
 
     using NEOs: chi, logchi, log10chi
-    using PlanetaryEphemeris: PlanetaryEphemerisSerialization, selecteph, ea, su, daysec,
-          auday2kmsec
+    using PlanetaryEphemeris: ea, su, daysec, auday2kmsec
     using Statistics
 
     @testset "Orbit propagation without nongravs: 2023 DW" begin
@@ -130,7 +129,6 @@ end
         sol_fwd = NEOs.propagate(dynamics, q0, jd0, nyears, params)
 
         # Check that solution saves correctly
-        @test JLD2.writeas(typeof(sol_fwd)) == PlanetaryEphemerisSerialization{Float64}
         jldsave("test.jld2"; sol_bwd, sol_fwd)
         recovered_sol_fwd = JLD2.load("test.jld2", "sol_fwd")
         recovered_sol_bwd = JLD2.load("test.jld2", "sol_bwd")
@@ -138,17 +136,17 @@ end
         @test sol_bwd == recovered_sol_bwd
         rm("test.jld2")
 
-        @test sol_bwd.t0 == sol_fwd.t0 == t0
-        @test (sol_bwd.t[end] - sol_bwd.t[1]) / yr ≈ -nyears
-        @test (sol_fwd.t[end] - sol_fwd.t[1]) / yr ≈ nyears
-        @test sol_fwd(sol_fwd.t0) == q0
+        @test firsttime(sol_bwd) == firsttime(sol_fwd) == t0
+        @test (lasttime(sol_bwd) - firsttime(sol_bwd)) / yr ≈ -nyears
+        @test (lasttime(sol_fwd) - firsttime(sol_fwd)) / yr ≈ nyears
+        @test sol_fwd(firsttime(sol_fwd)) == q0
         q_fwd_end = [-1.0168239304400228, -0.3800432452351079, -0.2685901784950398,
                      0.007623614213394988, -0.00961901551025335, -0.004682171726467166]
-        @test norm(sol_fwd(sol_fwd.t0 + sol_fwd.t[end]) - q_fwd_end, Inf) < 1e-12
-        @test sol_bwd(sol_bwd.t0) == q0
+        @test norm(sol_fwd(lasttime(sol_fwd)) - q_fwd_end, Inf) < 1e-12
+        @test sol_bwd(firsttime(sol_bwd)) == q0
         q_bwd_end = [0.2689956497466164, 0.4198851302334139, 0.2438053951982368,
                      -0.018875911266050937, 0.0167349306087375, 0.007789382070881366]
-        @test norm(sol_bwd(sol_bwd.t0 + sol_bwd.t[end])-q_bwd_end, Inf) < 1e-12
+        @test norm(sol_bwd(lasttime(sol_bwd)) - q_bwd_end, Inf) < 1e-12
 
         # Read optical astrometry file
         optical_2023DW = read_optical_mpc80(joinpath(TEST_DATA, "2023DW.txt"))
@@ -256,7 +254,6 @@ end
         sol = NEOs.propagate(dynamics, q0, jd0, nyears, params)
 
         # Check that solution saves correctly
-        @test JLD2.writeas(typeof(sol)) == PlanetaryEphemerisSerialization{Float64}
         jldsave("test.jld2"; sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol
@@ -325,31 +322,29 @@ end
         nms_del, nms_dop = nms(res_del), nms(res_dop)
         nrms_del, nrms_dop = nrms(res_del), nrms(res_dop)
 
-        @test mean_del ≈ 0.0768 atol=1e-4
-        @test mean_dop ≈ -0.5533 atol=1e-4
-        @test std_del ≈ 1.6094 atol=1e-4
+        @test mean_del ≈ 0.0818 atol=1e-4
+        @test mean_dop ≈ -0.5532 atol=1e-4
+        @test std_del ≈ 1.6031 atol=1e-4
         @test std_dop ≈ 1.5501 atol=1e-4
-        @test chi2_del ≈ 41.5429 atol=1e-4
-        @test chi2_dop ≈ 76.1602 atol=1e-4
-        @test nms_del ≈ 2.4438 atol=1e-4
-        @test nms_dop ≈ 2.6262 atol=1e-4
-        @test nrms_del ≈ 1.5633 atol=1e-4
-        @test nrms_dop ≈ 1.6206 atol=1e-4
+        @test chi2_del ≈ 41.2340 atol=2e-4
+        @test chi2_dop ≈ 76.1513 atol=1e-4
+        @test nms_del ≈ 2.4255 atol=1e-4
+        @test nms_dop ≈ 2.6259 atol=1e-4
+        @test nrms_del ≈ 1.5574 atol=1e-4
+        @test nrms_dop ≈ 1.6205 atol=1e-4
 
         res = vcat(res_ra, res_dec, res_del, res_dop)
 
         # Total statistics
-        @test mean(res) ≈ -0.0140 atol=1e-4
-        @test std(res) ≈ 0.3655 atol=1e-4
-        @test chi2(res) ≈ 121.6226 atol=1e-4
-        @test nms(res) ≈ 0.1337 atol=1e-4
-        @test nrms(res) ≈ 0.3656 atol=1e-4
+        @test mean(res) ≈ -0.0139 atol=1e-4
+        @test std(res) ≈ 0.3650 atol=1e-4
+        @test chi2(res) ≈ 121.3048 atol=1e-4
+        @test nms(res) ≈ 0.1333 atol=1e-4
+        @test nrms(res) ≈ 0.3651 atol=1e-4
 
     end
 
     @testset "Jet transport propagation and TaylorN serialization" begin
-
-        using PlanetaryEphemeris: TaylorInterpolantNSerialization
 
         # Test integration (Apophis)
 
@@ -373,8 +368,8 @@ end
         solnp = NEOs.propagate(dynamics, q0, jd0, 1.0, params)
         @test sol.t == solnp.t
         # TODO: fix roundoff differences near deep close approach in 2029
-        @test norm(sol.x - solnp.x, Inf) / norm(solnp.x, Inf) < 4e-18 # 3.757708512785821e-20
-        @test JLD2.writeas(typeof(sol)) == TaylorInterpolantNSerialization{Float64}
+        @test norm(sol.p - solnp.p, Inf) / norm(solnp.p, Inf) < 4e-18 # 3.757708512785821e-20
+        @test JLD2.writeas(typeof(sol)) == TaylorIntegration.TaylorSolutionNSerialization{Float64, 2}
         jldsave("test.jld2"; sol)
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol
@@ -383,7 +378,7 @@ end
         params = Parameters(params; maxsteps = 1)
         sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, q0, jd0, nyears, params)
 
-        @test JLD2.writeas(typeof(sol)) == TaylorInterpolantNSerialization{Float64}
+        @test JLD2.writeas(typeof(sol)) == TaylorIntegration.TaylorSolutionNSerialization{Float64, 2} 
         jldsave("test.jld2"; sol, tvS, xvS, gvS)
         recovered_sol = JLD2.load("test.jld2", "sol")
         recovered_tvS = JLD2.load("test.jld2", "tvS")
@@ -396,7 +391,7 @@ end
         rm("test.jld2")
 
         # It is unlikely that such a short integration generates a non-trivial tvS, xvS and gvS.
-        # Therefore, to test TaylorNSerialization I suggest to generate random TaylorN and check
+        # Therefore, to test TaylorNSerialization we generate here a random TaylorN and check
         # it saves correctly...
         random_TaylorN = [cos(sum(dq .* rand(6))), sin(sum(dq .* rand(6))), tan(sum(dq .* rand(6)))]
         jldsave("test.jld2"; random_TaylorN)
@@ -432,7 +427,7 @@ end
         params = Parameters(params, parse_eqs = false)
         solnp = NEOs.propagate(dynamicsg, q0[1:6], jd0, nyears, params)
         @test sol.t == solnp.t
-        @test norm(sol.x - solnp.x, Inf) < 1e-16
+        @test norm(sol.p - solnp.p, Inf) < 1e-16
         @test sol == solnp
 
         # Test parsed vs non-parsed propagation: nongravitational model
@@ -441,7 +436,7 @@ end
         params = Parameters(params, parse_eqs = false)
         solnp = NEOs.propagate(dynamicsng, q0, jd0, nyears, params)
         @test sol.t == solnp.t
-        @test norm(sol.x - solnp.x, Inf) < 1e-16
+        @test norm(sol.p - solnp.p, Inf) < 1e-16
         @test sol == solnp
 
         # Propagate orbit (nongrav model)
@@ -449,9 +444,9 @@ end
         sol = NEOs.propagate(dynamicsng, q0, jd0, nyears, params)
 
         # Sun's ephemeris
-        eph_su = selecteph(NEOs.sseph, su, sol.t0, sol.t0 + sol.t[end])
+        eph_su = selecteph(NEOs.sseph, su, firsttime(sol), lasttime(sol))
         # Earth's ephemeris
-        eph_ea = selecteph(NEOs.sseph, ea, sol.t0, sol.t0 + sol.t[end])
+        eph_ea = selecteph(NEOs.sseph, ea, firsttime(sol), lasttime(sol))
 
         # Apophis
         # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec

@@ -33,7 +33,8 @@ closeapproaches(x::Return) = x.CAs
 sigma(x::Return) = (lbound(x) + ubound(x)) / 2
 nominaltime(x::Return) = mean(nominaltime, x.CAs)
 
-get_order(x::Return{T, U}) where {T, U <: AbstractSeries} = get_order(x[1])
+TaylorSeries.order(x::Return{T, U}) where {T, U <: AbstractSeries} =
+    TaylorSeries.order(x[1])
 
 getindex(x::Return, i::Int) = x.CAs[i]
 getindex(x::Return, idxs::AbstractVector{Int}) = x.CAs[idxs]

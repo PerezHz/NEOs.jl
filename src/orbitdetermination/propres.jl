@@ -20,7 +20,8 @@ function PropresBuffer(
     ) where {D, T <: Real, U <: Number, V <: Number}
     t0 = dtutc2days(date(od.optical[idxs[1]]))
     tf = dtutc2days(date(od.optical[idxs[end]]))
-    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
+    tref = cte(cte(jd0)) - JD_J2000
+    tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
     res = [OpticalBuffer(q0[1]) for _ in eachindex(idxs)]
     return PropresBuffer{T, U, V}(prop, res)
@@ -31,7 +32,8 @@ function PropresBuffer(
         jd0::V, params::Parameters
     ) where {D, T <: Real, U <: Number, V <: Number}
     t0, tf = dtutc2days.(minmaxdates(od))
-    tlim = (t0 - params.bwdoffset, tf + params.fwdoffset)
+    tref = cte(cte(jd0)) - JD_J2000
+    tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
     res = [OpticalBuffer(q0[1]) for _ in 1:noptical(od)]
     return PropresBuffer{T, U, V}(prop, res)
@@ -48,11 +50,11 @@ Evaluate an ephemerides at time `t`, where `bwd` (`fwd`) is the backward
 - `et::Bool`: whether `t` is in ephemeris seconds since J2000 (default: `true`).
 - `kmsec::Bool`: whether to convert the state vector to [km, km/s] (default: `true`).
 """
-function bwdfwdeph(t::Number, bwd::TaylorInterpolant, fwd::TaylorInterpolant,
+function bwdfwdeph(t::Number, bwd::TaylorSolution, fwd::TaylorSolution,
                    et::Bool = true, kmsec::Bool = true)
-    @assert bwd.t0 == fwd.t0 "Backward and forward initial times must match"
+    @assert firsttime(bwd) == firsttime(fwd) "Backward and forward initial times must match"
     _t_ = et ? t/daysec : t
-    _rv_ = _t_ <= bwd.t0 ? bwd(_t_) : fwd(_t_)
+    _rv_ = _t_ <= firsttime(bwd) ? bwd(_t_) : fwd(_t_)
     rv = kmsec ? auday2kmsec(_rv_) : _rv_
     return rv
 end
@@ -103,8 +105,8 @@ function propres(
     # Backward (forward) integration
     bwd = _propagate(od.dynamics, q0, jd0, nyears_bwd, buffer.prop, params)
     fwd = _propagate(od.dynamics, q0, jd0, nyears_fwd, buffer.prop, params)
-    if !issuccessfulprop(bwd, t0 - _jd0_; tol = coeffstol) ||
-       !issuccessfulprop(fwd, tf - _jd0_; tol = coeffstol)
+    if !issuccessfulprop(bwd, t0 - JD_J2000; tol = coeffstol) ||
+       !issuccessfulprop(fwd, tf - JD_J2000; tol = coeffstol)
         return bwd, fwd, Vector{OpticalResidual{T, U}}()
     end
     # O-C residuals
@@ -136,8 +138,8 @@ function propres(
     # Backward (forward) integration
     bwd = _propagate(dynamics, q0, jd0, nyears_bwd, buffer.prop, params)
     fwd = _propagate(dynamics, q0, jd0, nyears_fwd, buffer.prop, params)
-    if !issuccessfulprop(bwd, t0 - _jd0_; tol = coeffstol) ||
-       !issuccessfulprop(fwd, tf - _jd0_; tol = coeffstol)
+    if !issuccessfulprop(bwd, t0 - JD_J2000; tol = coeffstol) ||
+       !issuccessfulprop(fwd, tf - JD_J2000; tol = coeffstol)
         return bwd, fwd, (Vector{OpticalResidual{T, U}}(), Vector{RadarResidual{T, U}}())
     end
     # O-C residuals
@@ -182,8 +184,8 @@ function propres!(
     # Backward (forward) integration
     bwd = _propagate(od.dynamics, q0, jd0, nyears_bwd, buffer.prop, params)
     fwd = _propagate(od.dynamics, q0, jd0, nyears_fwd, buffer.prop, params)
-    if !issuccessfulprop(bwd, t0 - _jd0_; tol = coeffstol) ||
-       !issuccessfulprop(fwd, tf - _jd0_; tol = coeffstol)
+    if !issuccessfulprop(bwd, t0 - JD_J2000; tol = coeffstol) ||
+       !issuccessfulprop(fwd, tf - JD_J2000; tol = coeffstol)
         empty!(res)
         return bwd, fwd
     end
@@ -216,8 +218,8 @@ function propres!(
     # Backward (forward) integration
     bwd = _propagate(dynamics, q0, jd0, nyears_bwd, buffer.prop, params)
     fwd = _propagate(dynamics, q0, jd0, nyears_fwd, buffer.prop, params)
-    if !issuccessfulprop(bwd, t0 - _jd0_; tol = coeffstol) ||
-       !issuccessfulprop(fwd, tf - _jd0_; tol = coeffstol)
+    if !issuccessfulprop(bwd, t0 - JD_J2000; tol = coeffstol) ||
+       !issuccessfulprop(fwd, tf - JD_J2000; tol = coeffstol)
         empty!(res[1])
         empty!(res[2])
         return bwd, fwd

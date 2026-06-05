@@ -96,29 +96,24 @@ function dot3D(
     return dot3D(y, x)
 end
 
-# Evaluate `y` at time `t` using `OhMyThreads.tmap`
-# This function is a multithreaded version of
-# (::TaylorInterpolant{T, U, 2})(t::TT) where {T, U, TT<:TaylorInterpCallingArgs{T,U}}
-# at
-# https://github.com/PerezHz/PlanetaryEphemeris.jl/src/interpolation/TaylorInterpolant.jl
-# TO DO: move this to PlanetaryEphemeris.jl
-function tpeeval(y::TaylorInterpolant{T, U, 2}, t::TT) where {T, U,
-                 TT <: TaylorInterpCallingArgs{T, U}}
-    # Get index of y.x that interpolates at time t
-    ind::Int, δt::TT = getinterpindex(y, t)
-    # Evaluate y.x[ind] at δt
-    return tmap(x -> x(δt), TT, view(y.x, ind, :))
+# Evaluate `y` at time `t` using `OhMyThreads.tmap`.
+function tpeeval(y::TaylorSolution{T, U, 2}, t::TT) where {T, U,
+                 TT <: TaylorSolutionCallingArgs{T, U}}
+    # Get index of y.p that interpolates at time t
+    ind::Int, δt::TT = timeindex(y, t)
+    # Evaluate y.p[ind] at δt
+    return tmap(x -> x(δt), TT, view(y.p, ind, :))
 end
 
 """
-    evaleph(eph::TaylorInterpolant, t::Taylor1, q)
+    evaleph(eph::TaylorSolution, t::Taylor1, q)
 
 Evaluate `eph` at time `t` with type given by `q`.
 """
-evaleph(eph::TaylorInterpolant, t::Taylor1, q::Taylor1{U}) where {U} =
+evaleph(eph::TaylorSolution, t::Taylor1, q::Taylor1{U}) where {U} =
     map(x -> Taylor1( x.coeffs * one(q[0]) ), tpeeval(eph, t))
 
-# evaleph(eph::TaylorInterpolant, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T <: Real} =
+# evaleph(eph::TaylorSolution, t::Taylor1, q::TaylorN{Taylor1{T}}) where {T <: Real} =
 #    one(q) * eph(t)
 
 evaleph(eph::NTuple{2, DensePropagation2{T, U}}, et::Number) where {T, U} =
@@ -161,10 +156,10 @@ function evaleph!(y::Vector{U}, et::U,
                   eph::DensePropagation2{T, T}) where {T <: Real, U <: Number}
     # Convert time from seconds to days (TDB) since J2000
     t = et / daysec
-    # Get index of bwd/fwd that interpolates at time t
-    ind::Int, δt::U = getinterpindex(eph, t)
-    # Evaluate bwd/fwd.x[ind] at δt
-    y .= evaluate(view(eph.x, ind, eachindex(y)), δt)
+    # Get index of eph.p that interpolates at time t
+    ind::Int, δt::U = timeindex(eph, t)
+    # Evaluate eph.p[ind] at δt
+    y .= evaluate(view(eph.p, ind, eachindex(y)), δt)
     # Convert state vector from [au, au/day] to [km, km/sec]
     auday2kmsec!(y)
 
@@ -176,15 +171,15 @@ function evaleph!(y::Vector{U}, et::U, bwd::DensePropagation2{T, U},
     # Convert time to TDB days since J2000
     t = et / daysec
     # Get index of bwd/fwd that interpolates at time t
-    ind::Int, δt::U = t <= bwd.t0 ? getinterpindex(bwd, t) : getinterpindex(fwd, t)
-    # Evaluate bwd/fwd.x[ind] at δt
-    if t <= bwd.t0
+    ind::Int, δt::U = t <= firsttime(bwd) ? timeindex(bwd, t) : timeindex(fwd, t)
+    # Evaluate bwd/fwd.p[ind] at δt
+    if t <= firsttime(bwd)
         for i in eachindex(y)
-            evaleph!(y[i], bwd.x[ind, i], δt)
+            evaleph!(y[i], bwd.p[ind, i], δt)
         end
     else
         for i in eachindex(y)
-            evaleph!(y[i], fwd.x[ind, i], δt)
+            evaleph!(y[i], fwd.p[ind, i], δt)
         end
     end
     # Convert state vector from [au, au/day] to [km, km/sec]
@@ -198,15 +193,15 @@ function evaleph!(y::Vector{U}, et::T, bwd::DensePropagation2{T, U},
     # Convert time to TDB days since J2000
     t = et / daysec
     # Get index of bwd/fwd that interpolates at time t
-    ind::Int, δt::T = t <= bwd.t0 ? getinterpindex(bwd, t) : getinterpindex(fwd, t)
-    # Evaluate bwd/fwd.x[ind] at δt
-    if t <= bwd.t0
+    ind::Int, δt::T = t <= firsttime(bwd) ? timeindex(bwd, t) : timeindex(fwd, t)
+    # Evaluate bwd/fwd.p[ind] at δt
+    if t <= firsttime(bwd)
         for i in eachindex(y)
-            evaleph!(y[i], bwd.x[ind, i], δt)
+            evaleph!(y[i], bwd.p[ind, i], δt)
         end
     else
         for i in eachindex(y)
-            evaleph!(y[i], fwd.x[ind, i], δt)
+            evaleph!(y[i], fwd.p[ind, i], δt)
         end
     end
     # Convert state vector from [au, au/day] to [km, km/sec]
@@ -220,12 +215,12 @@ function evaleph!(y::Vector{T}, et::T, bwd::DensePropagation2{T, T},
     # Convert time to TDB days since J2000
     t = et / daysec
     # Get index of bwd/fwd that interpolates at time t
-    ind::Int, δt::T = t <= bwd.t0 ? getinterpindex(bwd, t) : getinterpindex(fwd, t)
-    # Evaluate bwd/fwd.x[ind] at δt
-    if t <= bwd.t0
-        y .= evaluate(view(bwd.x, ind, eachindex(y)), δt)
+    ind::Int, δt::T = t <= firsttime(bwd) ? timeindex(bwd, t) : timeindex(fwd, t)
+    # Evaluate bwd/fwd.p[ind] at δt
+    if t <= firsttime(bwd)
+        y .= evaluate(view(bwd.p, ind, eachindex(y)), δt)
     else
-        y .= evaluate(view(fwd.x, ind, eachindex(y)), δt)
+        y .= evaluate(view(fwd.p, ind, eachindex(y)), δt)
     end
     # Convert state vector from [au, au/day] to [km, km/sec]
     auday2kmsec!(y)

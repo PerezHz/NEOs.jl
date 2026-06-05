@@ -223,9 +223,9 @@ function Ne(p1::Vector{S}, p2::Vector{S}, r_s_t0::Vector{S},
     # s = 1 -> point on ray path is at p2
     s = ds/ΔS
     # Rescale Taylor polynomial
-    s_p2_p1 = map(x->s*x, Taylor1.(p2-p1, get_order(s)))
+    s_p2_p1 = map(x->s*x, Taylor1.(p2-p1, TaylorSeries.order(s)))
     # Heliocentric position [au] of point on ray path at time t_tdb_jul [Julian days]
-    r_vec = Taylor1.(p1, get_order(s)) + s_p2_p1 - Taylor1.(r_s_t0, get_order(s))
+    r_vec = Taylor1.(p1, TaylorSeries.order(s)) + s_p2_p1 - Taylor1.(r_s_t0, TaylorSeries.order(s))
     # Heliocentric distance [au] of point on ray path at time t_tdb_jul [Julian days]
     r = sqrt( r_vec[1]^2 + r_vec[2]^2 + r_vec[3]^2 )
     # Compute heliocentric position vector of point on ray path wrt Sun's rotation pole
@@ -423,8 +423,7 @@ where ``f`` is the transmitter frequency [MHz] and ``\tau`` is the time-delay at
 reception time ``t``. Computed values include corrections due to Earth orientation,
 LOD and polar motion.
 
-The above works only with `TaylorInterpolant` ephemeris. See
-[`PlanetaryEphemeris.TaylorInterpolant`](@ref).
+The above works only with dense `TaylorSolution` ephemerides.
 """
 function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::Int = 10,
                        niter::Int = 10, xve::EarthEph = earthposvel, xvs::SunEph = sunposvel,
