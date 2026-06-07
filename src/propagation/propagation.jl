@@ -105,10 +105,9 @@ function _propagate(f::D, q0::Vector{U}, jd0::V, tmax::T, buffer::PropagationBuf
     # Propagate orbit
     orbit = taylorinteg!(Val(true), f, q0, zero(T), tmax * yr, abstol, cache, dparams;
                          maxsteps)
-    # Epoch (plain)
-    _jd0_ = cte(cte(jd0))
-    # Output
-    return TaylorSolution(collect((_jd0_ - JD_J2000) .+ orbit.t), collect(orbit.p))
+    # Time-shift in-place
+    orbit.t .+= cte(cte(jd0)) - JD_J2000
+    return TaylorSolution(orbit.t, orbit.p)
 end
 
 """
@@ -152,11 +151,10 @@ function _propagate_root(f::D, q0::Vector{U}, jd0::V, tmax::T, buffer::Propagati
     # Propagate orbit
     orbit = taylorinteg!(Val(true), f, rvelea, q0, zero(T), tmax * yr, abstol, cache,
                          dparams; maxsteps, eventorder, newtoniter, nrabstol)
-    # Epoch (plain)
-    _jd0_ = cte(cte(jd0))
-    # Output
-    sol = TaylorSolution(collect((_jd0_ - JD_J2000) .+ orbit.t), collect(orbit.p))
-    return sol, orbit.tevents, orbit.xevents, orbit.gresids
+    # Time-shift in-place
+    orbit.t .+= cte(cte(jd0)) - JD_J2000
+    # TODO: return root-finding TaylorSolution object; maybe just return orbit?
+    return TaylorSolution(orbit.t, orbit.p), orbit.tevents, orbit.xevents, orbit.gresids
 end
 
 """
