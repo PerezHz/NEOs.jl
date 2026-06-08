@@ -37,7 +37,7 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
       - name: Use TaylorSeries.jl perf-fix branch
-        run: julia --project=. -e 'using Pkg; Pkg.add(Pkg.PackageSpec(name="TaylorSeries", url="https://github.com/PerezHz/TaylorSeries.jl", rev="jp/some-perf-fixes")); ; Pkg.add(Pkg.PackageSpec(name="TaylorIntegration", url="https://github.com/PerezHz/TaylorIntegration.jl", rev="jp/TS-PR-415")); Pkg.instantiate()'
+        run: julia --project=. -e 'using Pkg; Pkg.add(Pkg.PackageSpec(name="TaylorSeries", url="https://github.com/PerezHz/TaylorSeries.jl", rev="jp/evaluate")); ; Pkg.add(Pkg.PackageSpec(name="TaylorIntegration", url="https://github.com/PerezHz/TaylorIntegration.jl", rev="jp/evaluate")); Pkg.instantiate()'
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         env:
