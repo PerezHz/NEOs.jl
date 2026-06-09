@@ -284,22 +284,28 @@ function evalfit(orbit::MixedLeastSquaresOrbit{D, T, TaylorN{T}, O, R}) where {D
 end
 
 """
-    shiftepoch(orbit, jdnew, params)
+    shiftepoch(orbit, jdnew, params; beyondarc = false)
 
 Shift the reference epoch of an `orbit` to `jdnew` [julian date TDB]. For a
 list of parameters see the `Propagation` section of [`Parameters`](@ref).
 
-!!! warning
-    Currently, jdnew must be within the observational arc of orbit. This
-    restriction may be removed in future versions.
+# Keyword arguments
+
+- `beyondarc::Bool`: allow `jdnew` outside the observational arc (default: `false`).
+    Large epoch shifts may fail if the requested propagation cannot be completed
+    with the current propagation parameters.
 """
 function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
-                    params::Parameters) where {D, T, O, R, RR}
-    # Check new epoch
+                    params::Parameters; beyondarc::Bool = false) where {D, T, O, R, RR}
+    # Requested epoch
     tnew = jdnew - PE.J2000
     d0, df = minmaxdates(orbit)
     t0, tf = dtutc2days(d0) - params.bwdoffset, dtutc2days(df) + params.fwdoffset
-    @assert t0 ≤ tnew ≤ tf "New epoch must be within the observational arc"
+    if beyondarc
+        t0, tf = min(t0, tnew - params.bwdoffset), max(tf, tnew + params.fwdoffset)
+    else
+        @assert t0 ≤ tnew ≤ tf "New epoch must be within the observational arc"
+    end
     # Unpack
     @unpack coeffstol, eph_su, eph_ea = params
     @unpack dynamics, variables, optical, tracklets, radar = orbit
@@ -309,7 +315,12 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
     Npar = length(variables)
     set_od_order(T, 2, Npar)
     # Scalar initial condition
-    q00::Vector{T} = initialcondition(orbit(tnew), variables, Ndof, params)
+    q00::Vector{T} = if !beyondarc || firsttime(orbit) ≤ tnew ≤ lasttime(orbit)
+        initialcondition(orbit(tnew), variables, Ndof, params)
+    else
+        propagate(dynamics, initialcondition(orbit(), variables, Ndof, params),
+            epoch(orbit) + PE.J2000, (tnew - epoch(orbit)) / yr, params)(tnew)
+    end
     # Backward (forward) integration
     nyears_bwd = -(tnew - t0) / yr
     nyears_fwd = (tf - tnew) / yr

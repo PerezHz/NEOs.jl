@@ -31,6 +31,9 @@ function parse_commandline()
             help = "input format: auto, ades, mpc80, or obs80"
             arg_type = String
             default = "auto"
+        "--epoch", "-e"
+            help = "solution epoch as a Julian Date in the TDB time scale"
+            arg_type = Float64
     end
 
     return parse_args(s)
@@ -260,6 +263,15 @@ function main()
     format::String = parsed_args["format"]
     println("• Requested input astrometry format: ", format)
 
+    # Solution epoch
+    solution_epoch = parsed_args["epoch"]
+    if isnothing(solution_epoch)
+        println("• Requested solution epoch: weighted mean epoch of observations")
+    else
+        println("• Requested solution epoch: ",
+                @sprintf("%.12f", solution_epoch), " JDTDB")
+    end
+
     # Global initial time
     global_initial_time = now()
     println("• Run started at ", global_initial_time)
@@ -286,9 +298,9 @@ function main()
     # Compute orbit by apparition type (single/multiple apparition)
     orbit = orbitapptype(apps, params)
 
-    # Shift epoch to the middle of the observational arc
-    tmean = meanepoch(orbit)
-    orbit = shiftepoch(orbit, tmean + PE.J2000, params)
+    # Shift epoch to requested epoch, or to the middle of the observational arc
+    jdsolution = isnothing(solution_epoch) ? meanepoch(orbit) + PE.J2000 : solution_epoch
+    orbit = shiftepoch(orbit, jdsolution, params; beyondarc = true)
     printitle("Final orbit", "*")
     println(summary(orbit))
 
