@@ -12,8 +12,8 @@ import Tables: Schema, istable, rowaccess, rows, schema
 import TaylorIntegration: surfacecrossing, firsttime, lasttime
 import TaylorSeries: evaluate, constant_term, identity!
 
-using AngleBetweenVectors, AutoHashEquals, Dates, HTTP, InteractiveUtils, JLD2, JSON,
-      LazyArtifacts, LinearAlgebra, Printf, Scratch, SPICE, TaylorIntegration,
+using AngleBetweenVectors, AutoHashEquals, Dates, Downloads, HTTP, InteractiveUtils, JLD2,
+      JSON, LazyArtifacts, LinearAlgebra, Printf, Scratch, SPICE, TaylorIntegration,
       TaylorSeries, XML
 
 using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
