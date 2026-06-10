@@ -89,9 +89,9 @@ function main()
 
     # Plots.jl settings
     default(
-        dpi = 300, titlefont = (12), guidefont = (12, :black),
-        tickfont = (8, :black), framestyle = :box, yminorgrid = false, xminorgrid = false,
-        legend = true #=margin = 0.25Measures.mm,=#
+        dpi = 300, titlefont = (24), guidefont = (24, :black),
+        tickfont = (18, :black), framestyle = :box, yminorgrid = false,
+        xminorgrid = false, legendfontsize = 18,
     )
 
     # Plot: Cumulative impact probability vs time
@@ -105,21 +105,27 @@ function main()
     x_NEOs = vcat(dates_NEOs[1:end-1], Date(2025, 9, 5))
     y_NEOs_Moon = vcat(log10.(CIPs_NEOs_Moon[1:end-1]), -10)
     y_NEOs_Earth = vcat(log10.(CIPs_NEOs_Earth[1:end-1]), -10)
+
     P = plot(
         xlabel = "Computation time", ylabel = "Impact probability",
         xticks = (xticksv, xtickss), yticks = (yticksv, ytickss),
         xlim = (Date(2024, 12, 15), Date(2025, 9, 15)), ylim = (-6, -1),
-        margin = 1.0Plots.mm, legend = (0.07, 0.14), legendfontsize = 8
+        legend = (0.75, 0.75), size = (16/9*800, 800),
+        bottom_margin = 8mm, left_margin = 9mm
     )
     plot!(P, x_NEOs, y_NEOs_Moon, label = "", linetype = :steppost,
-          color = UNAM_CYAN, linewidth = 1.75)
-    scatter!(P, [], [], label = "NEOs.jl (Moon)", color = UNAM_CYAN)
+          color = UNAM_CYAN, linewidth = 3)
+    scatter!(P, [], [], label = "NEOs.jl (Moon)", color = UNAM_CYAN,
+             markerstrokewidth = 0)
     plot!(P, x_NEOs, y_NEOs_Earth, label = "", linetype = :steppost,
-          color = UNAM_BLUE, linewidth = 1.75)
-    scatter!(P, [], [], label = "NEOs.jl (Earth)", color = UNAM_BLUE)
+          color = UNAM_BLUE, linewidth = 3)
+    scatter!(P, [], [], label = "NEOs.jl (Earth)", color = UNAM_BLUE,
+             markerstrokewidth = 0)
     plot!(P, x_NEOCC, y_NEOCC, label = "", linetype = :steppost,
-          color = UNAM_GOLD, linewidth = 1.75)
-    scatter!(P, [], [], label = "NEOCC (Earth)", color = UNAM_GOLD)
+          color = UNAM_GOLD, linewidth = 3)
+    scatter!(P, [], [], label = "NEOCC (Earth)", color = UNAM_GOLD,
+             markerstrokewidth = 0)
+
     filename = joinpath(directory, "2024YR4CIP.png")
     savefig(filename)
     println("• Cumulative impact probability plot saved to: ", filename)
