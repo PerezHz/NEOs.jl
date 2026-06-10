@@ -1,5 +1,5 @@
 using Distributed, ArgParse, Dates, JSON, JLD2
-using Plots, Colors, Printf
+using Plots, Colors, Measures, Printf
 
 ENV["GKSwstype"] = "100"
 
@@ -232,68 +232,87 @@ function main()
     println("• Saved orbit statistics: ", filename)
 
     # Plots.jl settings
-    default(dpi = 300, titlefont = (12), guidefont = (12, :black),
-            tickfont = (8, :black), framestyle = :box, yminorgrid = false,
-            xminorgrid = false, legend = true #=margin = 0.25Measures.mm,=#)
-
-    # Computation times histogram
-    bins = 0:5:60
-    histogram(ts .* 60, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
-        xlabel = "Computation time [s]", ylabel = "Count", xlim = extrema(bins),
-        xticks = bins, ylim = (0, 9_000), yticks = 0:1_000:9_000)
-    filename = joinpath(directory, "THIST.png")
-    savefig(filename)
-    println("• Saved computation times histogram to: ", filename)
+    default(
+        dpi = 300, titlefont = (24), guidefont = (24, :black),
+        tickfont = (18, :black), framestyle = :box, yminorgrid = false,
+        xminorgrid = false, legend = true, size = (3/2*600, 600)
+    )
 
     # NRMS histogram
     bins = 0:0.1:1
-    histogram(Qs, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
-        xlabel = "NRMS", ylabel = "Count", xlim = extrema(bins), xticks = bins,
-        ylim = (0, 9_000), yticks = 0:1_000:9_000)
-    annotate!(0.9*bins[end], 0.9*9_000, ("(a)", 12))
-    filename = joinpath(directory, "QHIST.png")
-    savefig(filename)
-    println("• Saved NRMS histogram to: ", filename)
+    P1 = histogram(
+        Qs; bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
+        xlabel = "NRMS", ylabel = "Count", xlim = extrema(bins),
+        xticks = bins, ylim = (0, 9_000), yticks = 0:1_000:9_000
+    )
+    _, xmax = xlims(P1)
+    _, ymax = ylims(P1)
+    annotate!(P1, 0.9xmax, 0.9ymax, ("(a)", 24))
 
     # SNR histogram
     bins = -3:0.5:7
-    histogram(log10.(Ss), bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
-        xlabel = "log₁₀(SNR)", ylabel = "Count", xlim = extrema(bins), xticks = -3:7,
-        ylim = (0, 7_000), yticks = 0:1_000:7_000)
-    annotate!(0.9*bins[end], 0.9*7_000, ("(b)", 12))
-    filename = joinpath(directory, "SHIST.png")
-    savefig(filename)
-    println("• Saved SNR histogram to: ", filename)
+    P2 = histogram(
+        log10.(Ss); bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
+        xlabel = "log₁₀(SNR)", ylabel = "Count", xlim = extrema(bins),
+        xticks = -3:7, ylim = (0, 7_000), yticks = 0:1_000:7_000,
+    )
+    _, xmax = xlims(P2)
+    _, ymax = ylims(P2)
+    annotate!(P2, 0.9xmax, 0.9ymax, ("(b)", 24))
+
+    # Computation times histogram
+    bins = 0:1:20
+    P3 = histogram(
+        ts .* 60; bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
+        xlabel = "Computation time [sec]", ylabel = "Count", xlim = extrema(bins),
+        xticks = bins[1:2:end], ylim = (0, 6_000), yticks = 0:1_000:6_000
+    )
+    _, xmax = xlims(P3)
+    _, ymax = ylims(P3)
+    annotate!(P3, 0.9xmax, 0.9ymax, ("(c)", 24))
 
     # Uncertainty parameters distance
-    bins = -0.5:9.5
-    histogram(Us, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
-        xlabel = "Uncertainty parameter", ylabel = "Count", xlim = extrema(bins), xticks = 0:9,
-        ylim = (0, 10_000), yticks = 0:1_000:10_000)
-    filename = joinpath(directory, "UHIST.png")
-    savefig(filename)
-    println("• Saved uncertainty parameters histogram to: ", filename)
+    bins = -0.5:10.5
+    P4 = histogram(
+        Us; bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
+        xlabel = "Uncertainty parameter", ylabel = "Count", xlim = extrema(bins),
+        xticks = 0:10, ylim = (0, 10_000), yticks = 0:1_000:10_000
+    )
+    _, xmax = xlims(P4)
+    _, ymax = ylims(P4)
+    annotate!(P4, 0.9xmax, 0.9ymax, ("(d)", 24))
 
     # ESA Mahalanobis distance
     bins = 0:0.25:3
-    histogram(MsESA, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
+    P5 = histogram(
+        MsESA; bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
         xlabel = "Normalized Euclidean distance", ylabel = "Count", xlim = extrema(bins),
-        xticks = bins, ylim = (0, 9_000), yticks = 0:1_000:9_000, right_margin = 2Plots.mm)
-    annotate!(0.9*bins[end], 0.9*9_000, ("(a)", 12))
-    filename = joinpath(directory, "MESAHIST.png")
-    savefig(filename)
-    println("• Saved ESA normalized Euclidean distance histogram to: ", filename)
+        xticks = bins[1:2:end], ylim = (0, 10_000), yticks = 0:1_000:10_000
+    )
+    _, xmax = xlims(P5)
+    _, ymax = ylims(P5)
+    annotate!(P5, 0.9xmax, 0.9ymax, ("(e)", 24))
 
     # JPL Mahalanobis distance
     bins = 0:0.25:3
-    histogram(MsJPL, bins = bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
-        xlabel = "Normalized Euclidean distance", ylabel = "Count", xlim = extrema(bins),
-        xticks = bins, ylim = (0, 12_000), yticks = (0:2_000:12_000, string.(0:2_000:12_000)),
-        right_margin = 2Plots.mm)
-    annotate!(0.9*bins[end], 0.9*12_000, ("(b)", 12))
-    filename = joinpath(directory, "MJPLHIST.png")
+    P6 = histogram(
+        MsJPL; bins, color = UNAM_CYAN, label = "", linewidth = 0.5,
+        xlabel = "Normalized Euclidean distance", ylabel = "Count",
+        xlim = extrema(bins), xticks = bins[1:2:end], ylim = (0, 14_000),
+        yticks = (0:2_000:14_000, string.(0:2_000:14_000)),
+    )
+    _, xmax = xlims(P6)
+    _, ymax = ylims(P6)
+    annotate!(P6, 0.9*xmax, 0.9ymax, ("(f)", 24))
+
+    l = @layout [a{0.5w} b{0.5w};
+                 c{0.5w} d{0.5w};
+                 e{0.5w} f{0.5w}]
+    P = plot(P1, P2, P3, P4, P5, P6, layout = l, size = (3*600, 3*600),
+        left_margin = 10mm, right_margin = 10mm)
+    filename = joinpath(directory, "ODHISTS.png")
     savefig(filename)
-    println("• Saved JPL normalized Euclidean distance histogram to: ", filename)
+    println("• Saved orbit determination histograms plot to: ", filename)
 
     # Final time
     global_final_time = now()

@@ -1,5 +1,5 @@
 using ArgParse, Dates, NEOs, PlanetaryEphemeris, TaylorSeries, LinearAlgebra, JLD2
-using Plots, Colors, Printf
+using Plots, Colors, Measures, Printf
 
 ENV["GKSwstype"] = "100"
 
@@ -35,6 +35,8 @@ computationtime(x::DateTime, y::DateTime) = @sprintf("%.2f", (y - x).value / 60_
 
 printitle(s::AbstractString, d::AbstractString) = println(d ^ length(s),
         '\n', s, '\n', d ^ length(s))
+
+emptystring(s) = ""
 
 function superscriptify(i::Int)
     if i < 0
@@ -101,46 +103,69 @@ function main()
 
     # Compute difference between JPL and NEOs
     ts = jds .- J2000
-    dx = Matrix{Float64}(undef, 4, length(ts))
+    dx = Matrix{Float64}(undef, 10, length(ts))
     for (i, t) in enumerate(ts)
-        jpl_minus_neos = auday2kmsec(jplrv[:, i] - (fwd(t)[1:6] - params.eph_su(t)))
-        jplsigma = auday2kmsec(jplsig[:, i])
-        dx[1, i] = norm(jpl_minus_neos[1:3])
-        dx[2, i] = norm(jplsigma[1:3])
-        dx[3, i] = norm(jpl_minus_neos[4:6])
-        dx[4, i] = norm(jplsigma[4:6])
+        dx[1:6, i] = auday2kmsec(jplrv[:, i] - (fwd(t)[1:6] - params.eph_su(t)))
+        ss = auday2kmsec(jplsig[:, i])
+        dx[7, i] = norm(dx[1:3, i])
+        dx[8, i] = norm(ss[1:3])
+        dx[9, i] = norm(dx[4:6, i])
+        dx[10, i] = norm(ss[4:6])
     end
 
     # Plot
-    default(dpi = 300, titlefont = (12), guidefont = (12, :black),
-            tickfont = (8, :black), framestyle = :box, yminorgrid = false,
-            xminorgrid = false, legend = true #=margin = 0.25Measures.mm,=#)
+    default(dpi = 300, titlefont = (24), guidefont = (24, :black),
+            tickfont = (18, :black), framestyle = :box, yminorgrid = false,
+            xminorgrid = false, legendfontsize = 18,)
 
     dates = @. julian2datetime(ts + J2000)
     xticksv = DateTime(2000):Year(10):DateTime(2100)
     xtickss = Dates.format.(xticksv, "yyyy")
     yticksv = -10:2:6
     ytickss = @. string("10", superscriptify(yticksv))
-    begin
-        plot(
-            xlabel = "Year [TDB]", ylabel = "Absolute difference",
-            xticks = (xticksv, xtickss), yticks = (yticksv, ytickss),
-            framestyle = :box, dpi = 300
-        )
-        plot!(dates, log10.(dx[1, :]), linewidth = 1.5, color = UNAM_CYAN,
-            linestyle = :solid, label = "Position difference [km]")
-        plot!(dates, log10.(dx[2, :]), linewidth = 1.5, color = UNAM_BLUE,
-            linestyle = :solid, label = "Position uncertainty [km]")
-        plot!(dates, log10.(dx[3, :]), linewidth = 1.5, color = :gold,
-            linestyle = :solid, label = "Velocity difference [km/s]")
-        plot!(dates, log10.(dx[4, :]), linewidth = 1.5, color = UNAM_GOLD,
-            linestyle = :solid, label = "Velocity uncertainty [km/s]")
 
-        # Save plot
-        filename = joinpath(directory, "propagation.png")
-        savefig(filename)
-        println("• Saved plot to: ", filename)
-    end
+    P1 = plot(
+        xlabel = "", ylabel = "Absolute difference",
+        xticks = (xticksv, emptystring.(xticksv)), yticks = (yticksv, ytickss),
+        framestyle = :box, dpi = 300, size = (16/9*800, 800), ylim = (-12, 6)
+    )
+    plot!(P1, dates, log10.(dx[7, :]), linewidth = 3, color = UNAM_CYAN,
+           linestyle = :solid, label = "Position difference [km]")
+    plot!(P1, dates, log10.(dx[8, :]), linewidth = 3, color = UNAM_BLUE,
+           linestyle = :solid, label = "Position uncertainty [km]")
+    plot!(P1, dates, log10.(dx[9, :]), linewidth = 3, color = :darkgoldenrod1,
+           linestyle = :solid, label = "Velocity difference [km/s]")
+    plot!(P1, dates, log10.(dx[10, :]), linewidth = 3, color = UNAM_GOLD,
+           linestyle = :solid, label = "Velocity uncertainty [km/s]")
+    xmin, xmax = xlims(P1)
+    ymin, ymax = ylims(P1)
+    x = DateTime(Dates.UTInstant(Millisecond(xmin + 0.1*(xmax - xmin))))
+    y = ymin + 0.9*(ymax - ymin)
+    annotate!(P1, x, y, ("(a)", 24))
+
+    P2 = plot(
+        xlabel = "Year [TDB]", ylabel = "Difference [×10⁴ km]",
+        xticks = (xticksv, xtickss),
+        ylim = (-3.2E4, 3.2E4), yticks = (-3E4:1E4:3E4, string.(-3:3)),
+        framestyle = :box, dpi = 300, size = (16/9*1000, 1000), legend = :bottomleft
+    )
+    plot!(P2, dates, dx[1, :], linewidth = 3, linestyle = :solid, label = "X")
+    plot!(P2, dates, dx[2, :], linewidth = 3, linestyle = :solid, label = "Y")
+    plot!(P2, dates, dx[3, :], linewidth = 3, linestyle = :solid, label = "Z")
+    xmin, xmax = xlims(P2)
+    ymin, ymax = ylims(P2)
+    x = DateTime(Dates.UTInstant(Millisecond(xmin + 0.1*(xmax - xmin))))
+    y = ymin + 0.9*(ymax - ymin)
+    annotate!(P2, x, y, ("(b)", 24))
+
+    l = @layout [a;
+                 b]
+    P = plot(P1, P2, layout = l, dpi = 300, left_margin = 9mm, bottom_margin = [-5mm 7mm])
+
+    # Save plot
+    filename = joinpath(directory, "propagation.png")
+    savefig(filename)
+    println("• Saved plot to: ", filename)
 
     # Final time
     global_final_time = now()

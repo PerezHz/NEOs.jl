@@ -174,9 +174,9 @@ end
     function preprocessing!(optical::AbstractVector{OpticalADES{T}}) where {T <: Real}
         filter!(!isdeprecated, optical)
         if numberofdays(optical) > 30
-            d0 = date(optical[j0])
             L0, Lf = 1, length(optical)
             j0 = something(findfirst(isdiscovery, optical), L0)
+            d0 = date(optical[j0])
             jf = something(findlast(x -> daysbetween(d0, date(x)) ≤ Day(30), optical), Lf)
             keepat!(optical, j0:jf)
         end
@@ -209,7 +209,7 @@ end
             χ2_rec, χ2_rej, fudge, max_per = 4.605, 5.991, 100.0, 30.0
         end
         return Parameters(;
-            maxsteps = 50_000, order = 15, abstol = 1E-12, parse_eqs = true,
+            maxsteps = 100_000, order = 15, abstol = 1E-12, parse_eqs = true,
             coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
             gaussorder = 2, safegauss = false, refscale = :log,
             tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
