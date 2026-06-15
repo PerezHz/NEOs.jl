@@ -1,7 +1,8 @@
 using ArgParse
 using NEOs, PlanetaryEphemeris, JLD2, Dates, Statistics, Printf
-using NEOs: AbstractOpticalAstrometry, AbstractOpticalVector, AbstractApparitionVector,
-            OpticalADES, OpticalMPC80, AbstractOrbit, log10chi, opticalindices
+using NEOs: AbstractOpticalAstrometry, AbstractOpticalVector, OpticalADES,
+            OpticalMPC80, AbstractOrbit, log10chi
+import NEOs: indices, numberofdays, noptical
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -44,6 +45,72 @@ const SingleApparitionOrbit{O <: AbstractOpticalVector{Float64}} =
 const MultipleApparitionOrbit{O <: AbstractOpticalVector{Float64}} =
     LeastSquaresOrbit{typeof(gravityonly!), Float64, Float64, O, Nothing, Nothing}
 
+function fetch_astrometry_format(format::AbstractString)
+    fmt = lowercase(strip(format))
+    if fmt in ("auto", "ades", "xml")
+        return :ades
+    elseif fmt in ("mpc80", "obs80")
+        return :mpc80
+    else
+        throw(ArgumentError("Unknown input format: $format. Use auto, ades, mpc80, or obs80."))
+    end
+end
+
+fetch_optical_astrometry(input::AbstractString, ::Val{:ades}) =
+    fetch_optical_ades(input, MPC)
+
+fetch_optical_astrometry(input::AbstractString, ::Val{:mpc80}) =
+    fetch_optical_mpc80(input, MPC)
+
+astrometry_format(::AbstractVector{<:OpticalADES}) = "ades"
+astrometry_format(::AbstractVector{<:OpticalMPC80}) = "mpc80"
+
+function looks_like_astrometry_file(input::AbstractString)
+    return !isempty(splitext(input)[2]) || occursin("/", input) || occursin("\\", input)
+end
+
+function load_optical_astrometry(input::AbstractString, format::AbstractString)
+    if isfile(input)
+        optical = read_optical_astrometry(input; format)
+    elseif looks_like_astrometry_file(input)
+        throw(ArgumentError("Input astrometry file not found: $input"))
+    else
+        fmt = fetch_astrometry_format(format)
+        optical = fetch_optical_astrometry(input, Val(fmt))
+    end
+    return optical, astrometry_format(optical)
+end
+
+struct Apparition{T <: Real, O <: AbstractOpticalAstrometry{T}, V <: AbstractVector{O},
+                  I <: AbstractVector{Int}, B}
+    optical::SubArray{O, 1, V, Tuple{I}, B}
+end
+
+const AbstractApparitionVector{T} = AbstractVector{Apparition{T, O, V, I, B}} where {O, V, I, B}
+
+indices(x::Apparition) = first(x.optical.indices)
+NEOs.optical(x::Apparition) = collect(x.optical)
+NEOs.optical(x::AbstractApparitionVector) = sort!(mapreduce(NEOs.optical, vcat, x))
+numberofdays(x::Apparition) = numberofdays(x.optical)
+noptical(x::Apparition) = length(x.optical)
+noptical(x::AbstractApparitionVector) = sum(noptical, x)
+
+apparitionrank(x::Apparition) = (noptical(x) >= 5, numberofdays(x), noptical(x))
+
+function apparitions(optical::AbstractOpticalVector{T},
+                     gap::Period = Day(30)) where {T <: Real}
+    sort!(optical)
+    apps = [[1]]
+    for i in 2:length(optical)
+        if date(optical[i]) - date(optical[i-1]) > gap
+            push!(apps, [i])
+        else
+            push!(apps[end], i)
+        end
+    end
+    return [Apparition(view(optical, i)) for i in apps]
+end
+
 computationtime(x::DateTime, y::DateTime) = @sprintf("%.2f", (y - x).value / 60_000)
 
 printitle(s::AbstractString, d::AbstractString) = println(d ^ length(s),
@@ -64,11 +131,23 @@ function initcond(A::AdmissibleRegion)
     ]
 end
 
+function meanepoch(x::AbstractOrbit)
+    t = Vector{Float64}(undef, noptical(x))
+    w = Vector{Float64}(undef, noptical(x))
+    for i in eachindex(x.optical)
+        t[i] = dtutc2days(x.optical[i])
+        δ = dec(x.optical[i])
+        σα, σδ = 1 / wra(x.ores[i]), 1 / wdec(x.ores[i])
+        w[i] = 1 / (σα^2 * cos(δ)^2 + σδ^2)
+    end
+    return mean(t, weights(w))
+end
+
 function singleapparition(apps::AbstractApparitionVector, params::Parameters)
     # Single apparition orbit determination
     optical = NEOs.optical(first(apps))
     orbitSA = zero(SingleApparitionOrbit{typeof(optical)})
-    sort!(apps, by = numberofdays, rev = true)
+    sort!(apps, by = apparitionrank, rev = true)
     od = ODProblem(newtonian!, NEOs.optical(apps[1]), weights = Veres17,
                    debias = Eggl20)
     for i in 1:2
@@ -96,7 +175,7 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
         if issubset(NEOs.optical(app), orbitSA.optical)
             mags[i] = zero(Float64)
         else
-            mags[i] = maximum(log10chi, view(res, opticalindices(app)))
+            mags[i] = maximum(log10chi, view(res, indices(app)))
         end
     end
     perm = sortperm(mags)
@@ -104,9 +183,8 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
     permute!(apps, perm)
     # Step #1: Linkage with newtonian!
     i = findfirst(>(0), mags)
-    idxs = isnothing(i) ? eachindex(apps) : 1:i
     params = Parameters(params; outrej = false)
-    od = ODProblem(newtonian!, NEOs.optical(view(apps, idxs)), weights = Veres17,
+    od = ODProblem(newtonian!, NEOs.optical(view(apps, 1:i)), weights = Veres17,
                    debias = Eggl20)
     orbitMID = linkage(od, orbitSA, params)
     iszero(orbitMID) && return orbitSA
@@ -114,7 +192,7 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
     NEOs.update!(OD, od.optical)
     orbitMA = jtls(OD, orbitMID, params)
     # Step #3: Outlier rejection
-    params = Parameters(params; outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,
+    params = Parameters(params; outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10),
                         fudge = 100.0, max_per = 33.3)
     orbitMA = jtls(OD, orbitMA, params)
     return orbitMA
@@ -130,7 +208,7 @@ function multipleapparition(apps::AbstractApparitionVector, orbitMA::MultipleApp
         if issubset(NEOs.optical(app), orbitMA.optical)
             mags[i] = zero(Float64)
         else
-            mags[i] = maximum(log10chi, view(res, opticalindices(app)))
+            mags[i] = maximum(log10chi, view(res, indices(app)))
         end
     end
     perm = sortperm(mags)
@@ -186,7 +264,7 @@ function main()
     println("• Input designation/astrometry file: ", input)
 
     # Output .jld2 file
-    output::Union{Nothing, String} = parsed_args["output"]
+    output::String = parsed_args["output"]
     println("• Output .jld2 file: ", output)
 
     # Input astrometry format
@@ -207,7 +285,7 @@ function main()
     println("• Run started at ", global_initial_time)
 
     # Load optical astrometry
-    optical, format = load_optical_astrometry(input; format)
+    optical, format = load_optical_astrometry(input, format)
     println("• Loaded ", length(optical), " ", uppercase(format), " optical observations")
     filter!(!isdeprecated, optical)
 
@@ -215,11 +293,11 @@ function main()
     params = Parameters(
         maxsteps = 20_000, order = 15, abstol = 1E-12, parse_eqs = true,
         coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
-        gaussorder = 2, safegauss = true, refscale = :log,
+        gaussorder = 2, safegauss = false, refscale = :log,
         tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
         jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
         jtlsproject = true, significance = 0.99, verbose = true,
-        outrej = true, χ2_rec = 9.21, χ2_rej = 10.0, fudge = 100.0,
+        outrej = true, χ2_rec = 7.0, χ2_rej = 8.0, fudge = 100.0,
         max_per = 33.3
     )
 
@@ -233,15 +311,20 @@ function main()
     orbit = shiftepoch(orbit, jdsolution, params; beyondarc = true)
     printitle("Final orbit", "*")
     println(summary(orbit))
-    printitle("Minor Planet Electronic Circular (MPEC)", "*")
-    print_mpec(orbit, params)
+
+    # Print heliocentric ecliptic Keplerian elements (plus q, tp)
+    kep = keplerian(orbit, params)
+    H, dH = absolutemagnitude(orbit, params)
+    printitle("Keplerian elements", "*")
+    println(kep)
+    println("q  = ", @sprintf("%+.12E", pericenter(kep)), " au")
+    println("tp = ", @sprintf("%+.12E", timeperipass(kep)), " MJD TDB")
+    println("H  = ", @sprintf("%.3f", H), " +/- ", @sprintf("%.3f", dH), " mag")
     println("")
 
     # Save orbit
-    if !isnothing(output)
-        jldsave(output; orbit)
-        println("Final orbit saved to: ", output)
-    end
+    jldsave(output; orbit)
+    println("Final orbit saved to: ", output)
 
     # Final time
     global_final_time = now()
