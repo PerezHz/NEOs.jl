@@ -163,7 +163,7 @@ function LeastSquaresOrbit(od::OpticalODProblem{D, T, O}, q00::Vector{T}, jd0::T
     # Jet transport initial condition
     variables = collect(1:6)
     if Ndof > 6
-        variables = vcat(variables, findall(!iszero, marsden_scalings) .+ 6)
+        variables = vcat(variables, findall(!iszero, params.marsden_scalings) .+ 6)
     end
     q00 = initialcondition(q00, variables, Ndof, params)
     dq = jtperturbation(fill(1E-8, 6), variables, Ndof, 2, params)

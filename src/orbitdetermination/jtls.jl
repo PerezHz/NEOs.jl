@@ -173,7 +173,7 @@ function updateorbit(orbit::AbstractOrbit{D, T, TaylorN{T}},
     # Barycentric initial condition
     q0 = orbit()
     # Geocentric attributable elements
-    attr = cartesian2attributable(q0(fit.x) - params.eph_ea(t0))
+    attr = cartesian2attributable(q0(fit.x)[1:6] - params.eph_ea(t0))
     ρ, v_ρ = attr[5], attr[6]
     h = H_max + 5 * log10(R_EA)
     # Admissible region
@@ -189,7 +189,8 @@ function updateorbit(orbit::AbstractOrbit{D, T, TaylorN{T}},
         q1 = attributable2cartesian(SVector{6, T}(attr[1], attr[2], attr[3],
                 attr[4], ρ, v_ρ)) + params.eph_ea(t0)
         # New deltas and covariance matrix
-        @. fit.x = (q1 - cte(q0)) / scalingfactor(q0)
+        q0cart = view(q0, 1:6)
+        @. fit.x[1:6] = (q1 - cte(q0cart)) / scalingfactor(q0cart)
         for method in lsmethods
             if typeof(method) == fit.routine
                 fit.Γ .= inv(normalmatrix(method, fit.x))
@@ -433,13 +434,15 @@ function linkage(
     idxs = indices(trks)
     # Original weights
     w8s = deepcopy(od.weights.weights)
+    # Dynamical initial condition
+    q0 = initialcondition(porbit, dof(od), params)
     # Initialize buffer and set of residuals
-    buffer = PropresBuffer(od, porbit(), jd0, params)
+    buffer = PropresBuffer(od, q0, jd0, params)
     res = init_residuals(T, od, porbit)
     orbit = zero(OpticalLeastSquaresOrbit{D, T, T, O})
     # Select first scaling factor
     mags = Vector{Int}(undef, length(trks))
-    propres!(res, od, porbit(), jd0, params; buffer)
+    propres!(res, od, q0, jd0, params; buffer)
     if isempty(res)
         verbose && @warn("Linkage did not converge within the given parameters \
             or could not fit all the astrometry")
@@ -480,7 +483,8 @@ function linkage(
             break
         end
         # Scale up weights
-        propres!(res, od, orbit(), jd0, params; buffer)
+        q0 = initialcondition(orbit, dof(od), params)
+        propres!(res, od, q0, jd0, params; buffer)
         if isempty(res)
             verbose && @warn("Linkage did not converge within the given parameters \
                 or could not fit all the astrometry")
