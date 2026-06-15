@@ -65,9 +65,15 @@ fetch_optical_astrometry(input::AbstractString, ::Val{:mpc80}) =
 astrometry_format(::AbstractVector{<:OpticalADES}) = "ades"
 astrometry_format(::AbstractVector{<:OpticalMPC80}) = "mpc80"
 
+function looks_like_astrometry_file(input::AbstractString)
+    return !isempty(splitext(input)[2]) || occursin("/", input) || occursin("\\", input)
+end
+
 function load_optical_astrometry(input::AbstractString, format::AbstractString)
     if isfile(input)
         optical = read_optical_astrometry(input; format)
+    elseif looks_like_astrometry_file(input)
+        throw(ArgumentError("Input astrometry file not found: $input"))
     else
         fmt = fetch_astrometry_format(format)
         optical = fetch_optical_astrometry(input, Val(fmt))
@@ -88,6 +94,8 @@ NEOs.optical(x::AbstractApparitionVector) = sort!(mapreduce(NEOs.optical, vcat, 
 numberofdays(x::Apparition) = numberofdays(x.optical)
 noptical(x::Apparition) = length(x.optical)
 noptical(x::AbstractApparitionVector) = sum(noptical, x)
+
+apparitionrank(x::Apparition) = (noptical(x) >= 5, numberofdays(x), noptical(x))
 
 function apparitions(optical::AbstractOpticalVector{T},
                      gap::Period = Day(30)) where {T <: Real}
@@ -139,7 +147,7 @@ function singleapparition(apps::AbstractApparitionVector, params::Parameters)
     # Single apparition orbit determination
     optical = NEOs.optical(first(apps))
     orbitSA = zero(SingleApparitionOrbit{typeof(optical)})
-    sort!(apps, by = numberofdays, rev = true)
+    sort!(apps, by = apparitionrank, rev = true)
     od = ODProblem(newtonian!, NEOs.optical(apps[1]), weights = Veres17,
                    debias = Eggl20)
     for i in 1:2
