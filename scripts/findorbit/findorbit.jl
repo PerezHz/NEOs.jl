@@ -227,6 +227,38 @@ function multipleapparition(apps::AbstractApparitionVector, orbitMA::MultipleApp
     return orbitMA
 end
 
+function nongravfit(orbit::LeastSquaresOrbit, optical::AbstractOpticalVector,
+                    params::Parameters)
+    # Use the gravity-only solution as the seed, then estimate A2 with nongravs!.
+    paramsNG = Parameters(params; marsden_scalings = (1E-14, 0.0, 0.0),
+                          jtlsproject = false, outrej = false)
+    od = ODProblem(nongravs!, optical, weights = Veres17, debias = Eggl20)
+    orbitNG = linkage(od, orbit, paramsNG; maxiter = 20)
+    if iszero(orbitNG)
+        println("• Non-gravitational refinement failed; keeping gravity-only orbit")
+        return orbit
+    elseif noptical(orbitNG) != length(optical)
+        println("• Non-gravitational refinement fit ", noptical(orbitNG), " of ",
+                length(optical), " observations; keeping gravity-only orbit")
+        return orbit
+    end
+    paramsNG = Parameters(paramsNG; outrej = params.outrej)
+    orbitNG = jtls(od, orbitNG, paramsNG)
+    if iszero(orbitNG)
+        println("• Non-gravitational refinement failed during outlier rejection; keeping gravity-only orbit")
+        return orbit
+    elseif noptical(orbitNG) != length(optical)
+        println("• Non-gravitational refinement fit ", noptical(orbitNG), " of ",
+                length(optical), " observations after outlier rejection; keeping gravity-only orbit")
+        return orbit
+    elseif !isfinite(nrms(orbitNG)) || nrms(orbitNG) > max(10, nrms(orbit))
+        println("• Non-gravitational refinement did not produce an acceptable NRMS; keeping gravity-only orbit")
+        return orbit
+    end
+    println("• Non-gravitational refinement accepted")
+    return orbitNG
+end
+
 function orbitapptype(apps::AbstractApparitionVector, params::Parameters)
     napps = length(apps)
     napps > 0 || throw(ArgumentError("At least one apparition is required"))
@@ -305,6 +337,7 @@ function main()
     apps = apparitions(optical, Day(238))
     # Compute orbit by apparition type (single/multiple apparition)
     orbit = orbitapptype(apps, params)
+    orbit = nongravfit(orbit, optical, params)
 
     # Shift epoch to requested epoch, or to the middle of the observational arc
     jdsolution = isnothing(solution_epoch) ? meanepoch(orbit) + PE.J2000 : solution_epoch
