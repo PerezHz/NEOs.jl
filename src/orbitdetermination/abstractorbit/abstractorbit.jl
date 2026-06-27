@@ -141,7 +141,7 @@ function initialcondition(q00::AbstractVector, variables::AbstractVector{Int},
     elseif length(q00) < Ndof
         q0 = zeros(eltype(q00), Ndof)
         q0[variables] .= q00
-        for i in 7:9
+        for i in 7:min(9, Ndof)
             q0[i] = iszero(q0[i]) ? marsden_coeffs[i-6] : q0[i]
         end
         return q0
@@ -260,6 +260,17 @@ end
 
 nms(x::AbstractOrbit) = chi2(x) / notoutobs(x)
 nrms(x::AbstractOrbit) = sqrt(nms(x))
+
+function opticalrms(x::AbstractOrbit)
+    S = zero(chi2(x))
+    N = 0
+    for res in x.ores
+        isoutlier(res) && continue
+        S += (ra(res) / wra(res))^2 + (dec(res) / wdec(res))^2
+        N += 2
+    end
+    return iszero(N) ? NaN * one(S) : sqrt(S / N)
+end
 
 """
     critical_value(::AbstractOrbit)
@@ -825,6 +836,7 @@ function summary(orbit::AbstractOrbit)
     t0 = epoch(orbit) + PE.J2000
     d0 = julian2datetime(t0)
     Q = nrms(orbit)
+    R = opticalrms(orbit)
     q0, σ0 = orbit(), sigmas(orbit)
     sq0 = [rpad(@sprintf("%+.12E", q0[i]), 25) for i in eachindex(q0)]
     sσ0 = [rpad(@sprintf("%+.12E", σ0[i]), 25) for i in eachindex(σ0)]
@@ -837,6 +849,7 @@ function summary(orbit::AbstractOrbit)
         "Dynamical model: $D\n",
         "Astrometry: $Nobs observations ($Nout outliers) spanning $Ndays days\n",
         "Epoch: $t0 JDTDB ($d0 TDB)\n",
+        "RMS: $R arcsec\n",
         "NRMS: $Q\n",
         repeat('-', 69), "\n",
         "Variable    Nominal value            Uncertainty              Units\n",
