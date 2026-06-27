@@ -14,6 +14,7 @@ function MPC80FileReader(text::AbstractString)
         # Windows uses \r\n as newline instead of \n
         text = replace(text, "\r\n" => '\n')
     end
+    text = replace(text, "\ufeff" => "", "\u200b" => "")
     N = count(==('\n'), text)
     L = length(text)
     optical = Vector{SubString{String}}(undef, N)
