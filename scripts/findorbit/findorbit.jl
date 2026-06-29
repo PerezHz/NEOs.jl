@@ -776,14 +776,14 @@ function main()
     # Parameters
     params = Parameters(
         maxsteps = 20_000, order = 15, abstol = 1E-12, parse_eqs = true,
-        coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
+        coeffstol = Inf, bwdoffset = 0.2, fwdoffset = 0.2,
         marsden_radial = use_cometary_nongravs ? COMETARY_MARSDEN_RADIAL :
                          (1.0, 1.0, 2.0, 0.0, 0.0),
         gaussorder = 2, safegauss = false, refscale = :log,
         tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
         jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
         jtlsproject = true, significance = 0.99, verbose = true,
-        outrej = false, χ2_rec = 4.0, χ2_rej = 5.0, fudge = 100.0,
+        outrej = true, χ2_rec = 4.0, χ2_rej = 5.0, fudge = 100.0,
         max_per = 33.3
     )
 
