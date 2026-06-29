@@ -4,6 +4,8 @@
 [![CI](https://github.com/PerezHz/NEOs.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/PerezHz/NEOs.jl/actions/workflows/CI.yml)
 [![Coverage Status](https://coveralls.io/repos/github/PerezHz/NEOs.jl/badge.svg?branch=main)](https://coveralls.io/github/PerezHz/NEOs.jl?branch=main)
 [![codecov](https://codecov.io/gh/PerezHz/NEOs.jl/branch/main/graph/badge.svg?token=F1IY79YP3J)](https://codecov.io/gh/PerezHz/NEOs.jl)
+[![](https://img.shields.io/badge/docs-latest-blue.svg)](https://PerezHz.github.io/NEOs.jl/latest) [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://PerezHz.github.io/NEOs.jl/stable)
+
 
 `NEOs.jl` is a Julia package for high-accuracy orbit determination and propagation of
 Near-Earth Objects. `NEOs.jl` exploits jet transport techniques via
