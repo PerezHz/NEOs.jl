@@ -158,7 +158,7 @@ function init_radar_residuals(
         outliers = falses(nradar(od))
     ) where {U <: Number}
     radar = view(od.radar, idxs)
-    return init_radar_residuals(U, radar, outliers)
+    return init_radar_residuals(U, radar, view(outliers, idxs))
 end
 
 function set_od_order(::Type{T}, varorder::Int, numvars::Int = 6) where {T <: Real}

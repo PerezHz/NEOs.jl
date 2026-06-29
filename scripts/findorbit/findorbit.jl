@@ -806,8 +806,15 @@ function main()
     # uses every optical observation and does not inspect residual outlier flags.
     kep = keplerian(orbit, params)
     H, dH = absolutemagnitude(orbit, params)
+    full_residuals_attached = false
     if !isempty(fit_excluded)
-        orbit = attachfullresiduals(orbit, optical, fit_excluded, params)
+        try
+            orbit = attachfullresiduals(orbit, optical, fit_excluded, params)
+            full_residuals_attached = true
+        catch err
+            println("• Could not compute residuals for held-out observations; ",
+                    "saving fit-only orbit (", typeof(err), ")")
+        end
     end
     ele255 = mpecele255(orbit, kep, H, params)
     printitle("Final orbit", "*")
@@ -826,9 +833,13 @@ function main()
     # Save orbit
     if isempty(fit_excluded)
         jldsave(output; orbit, ele255)
-    else
+    elseif full_residuals_attached
         heldout_optical = orbit.optical[fit_excluded]
         heldout_ores = orbit.ores[fit_excluded]
+        jldsave(output; orbit, fit_excluded, heldout_optical, heldout_ores, ele255)
+    else
+        heldout_optical = optical[fit_excluded]
+        heldout_ores = typeof(orbit.ores)()
         jldsave(output; orbit, fit_excluded, heldout_optical, heldout_ores, ele255)
     end
     println("Final orbit saved to: ", output)
