@@ -28,4 +28,5 @@ makedocs(
 
 deploydocs(
     repo = "github.com/PerezHz/NEOs.jl.git",
+    push_preview= true,
 )
