@@ -11,3 +11,4 @@ Manifest.toml
 *.DS_Store
 .vscode
 LocalPreferences.toml
+docs/build/
