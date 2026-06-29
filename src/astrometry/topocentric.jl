@@ -364,3 +364,80 @@ function obsposvelECI(::Val{:WGS84}, coords::SVector{3, T}, et::U;
 
     return vcat(posvelECI.r, posvelECI.v)
 end
+
+# Convert from the fixed-width USNO format to the IERS csv format
+# read by SatelliteToolboxTransformations
+function convert_usno_to_iers(filename::AbstractString)
+    lines = readlines(filename)
+    s = Vector{SubString}(undef, length(USNO_COLS))
+    newlines = Vector{String}(undef, length(lines)+1)
+    newlines[1] = "HEADER"
+    for (i, line) in enumerate(lines)
+        for (j, col) in enumerate(USNO_COLS)
+            s[j] = strip(line[col])
+        end
+        s[1], s[2], s[3], s[4] = s[4], s[1], s[2], s[3]
+        newlines[i+1] = join(s, ';')
+    end
+    write(filename, join(newlines, '\n'))
+    return nothing
+end
+
+# This function has been adapted from SatelliteToolboxTransformations._download_eop
+# to fetch the IERS EOP parameters in case the official server is down
+# TO DO: Move this to SatelliteToolboxTransformations
+function download_iers_eop(; force_download::Bool = false)
+
+    # Get the scratch space where the files are located.
+    eop_cache_dir      = get_scratch!(SatelliteToolboxTransformations, "eop_iau2000A", NEOs)
+    eop_file           = joinpath(eop_cache_dir, "finals2000A.all.csv")
+    eop_file_timestamp = joinpath(eop_cache_dir, "finals2000A.all.csv_timestamp")
+
+    # We need to verify if we must re-download the data.
+    download_eop = false
+
+    if force_download ||
+        isempty(readdir(eop_cache_dir)) ||
+        !isfile(eop_file) ||
+        !isfile(eop_file_timestamp)
+
+        download_eop = true
+
+    else
+        # In this case, we should read the time stamp and verify if the file
+        # must be re-downloaded.
+        try
+            str       = read(eop_file_timestamp, String)
+            tokens    = split(str, '\n')
+            timestamp = tokens |> first |> DateTime
+
+            if now() >= timestamp + Day(7)
+                download_eop = true
+            else
+                @debug "We found an EOP file that is less than 7 days old (timestamp = $timestamp). Hence, we will use it."
+            end
+        catch
+            # If any error occurred, we will download the data again.
+            download_eop = true
+
+        end
+    end
+
+    # If we need to re-download, we will rebuild the scratch space.
+    if download_eop
+        try
+            @info "Downloading the file 'finals2000A.all.csv' from '$IERS_EOP2000A_URL'..."
+            Downloads.download(IERS_EOP2000A_URL, eop_file)
+        catch
+            @info "Downloading the file 'finals2000A.all' from '$USNO_EOP2000A_URL'..."
+            Downloads.download(USNO_EOP2000A_URL, eop_file)
+            convert_usno_to_iers(eop_file)
+        end
+        open(eop_file_timestamp, "w") do f
+            write(f, string(now()))
+        end
+    end
+
+    # Read and parse the file.
+    return read_iers_eop(eop_file, Val(:IAU2000A))
+end

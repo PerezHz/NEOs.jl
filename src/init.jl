@@ -7,6 +7,9 @@ const OBSERVATORIES_MPC = Ref(ObservatoryMPC{Float64}[])
 # List of visual magnitude bands recognized by the MPC
 const MAGNITUDE_BANDS_MPC = Ref(MagnitudeBandMPC{Float64}[])
 
+# Earth orientation parameters (EOP) 2000
+const EOP_IAU2000A::EopIau2000A = download_iers_eop()
+
 function __init__()
     # Initialize scratch space
     global SCRATCH_PATH[] = @get_scratch!("NEOs")
