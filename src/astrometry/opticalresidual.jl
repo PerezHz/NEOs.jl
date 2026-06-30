@@ -108,7 +108,7 @@ function print_mpec_residuals(io::IO, x::AbstractOpticalVector,
     print(
         io,
         "Residuals in seconds of arc\n",
-        join(join.(eachrow(m), "   "), '\n')
+        join(join.(eachrow(m), "   "), '\n'), '\n'
     )
     return nothing
 end
