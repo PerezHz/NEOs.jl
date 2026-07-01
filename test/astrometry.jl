@@ -59,6 +59,11 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         text2 = read(filename2, String)
         convert_usno_to_iers(filename2)
         text3 = read(filename2, String)
+        if Sys.iswindows()
+            # Windows uses \r\n as newline instead of \n
+            text1 = replace(text1, "\r\n" => '\n')
+            text3 = replace(text3, "\r\n" => '\n')
+        end
         @test text1 == text3
         write(filename2, text2)
     end
