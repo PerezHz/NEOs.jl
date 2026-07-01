@@ -228,7 +228,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by June 30, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -250,6 +250,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 9
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -317,6 +318,7 @@ end
         # Vector of residuals
         @test notout(orbit1.ores) == 43
         @test nout(orbit1.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -371,7 +373,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by June 30, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -393,6 +395,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -455,7 +458,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by May 24, 2026
+        # Values by June 30, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -477,6 +480,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 12
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -534,7 +538,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by May 24, 2026
+        # Values by June 30, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -682,7 +686,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by June 30, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -710,6 +714,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 10
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -769,7 +774,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by June 30, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -791,6 +796,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 16
         @test nout(orbit.ores) == 2
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -856,6 +862,7 @@ end
         # Vector of residuals
         @test notout(orbit1.ores) == 19
         @test nout(orbit1.ores) == 2
+        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -917,7 +924,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by June 30, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -945,6 +952,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 7
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1004,7 +1012,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by June 30, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1026,6 +1034,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 18
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1093,6 +1102,7 @@ end
         # Vector of residuals
         @test notout(orbit1.ores) == 97
         @test nout(orbit1.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -1177,7 +1187,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by May 24, 2026
+        # Values by June 30, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1200,6 +1210,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1282,7 +1293,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by May 24, 2026
+        # Values by June 30, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1312,6 +1323,7 @@ end
         @test notout(orbit1.rres) == 5
         @test nout(orbit1.ores) == 0
         @test nout(orbit1.rres) == 0
+        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -1380,7 +1392,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by May 24, 2026
+        # Values by June 30, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1402,6 +1414,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 43
         @test nout(orbit.ores) == 1
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success

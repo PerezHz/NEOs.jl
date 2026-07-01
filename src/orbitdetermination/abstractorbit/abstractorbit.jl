@@ -579,6 +579,14 @@ section of [`Parameters`](@ref).
 mass(orbit::AbstractOrbit, params::Parameters) =
     mass(params.density, diameter(orbit, params))
 
+"""
+    print_mpec_residuals([io::IO], ::AbstractOrbit)
+
+Print to `io` the optical residuals of an orbit in the MPEC format.
+"""
+print_mpec_residuals(x::AbstractOrbit) = print_mpec_residuals(x.optical, x.ores)
+print_mpec_residuals(io::IO, x::AbstractOrbit) = print_mpec_residuals(io, x.optical, x.ores)
+
 function summary(orbit::AbstractOrbit)
     O = nameof(typeof(orbit))
     T, U = numtypes(orbit)

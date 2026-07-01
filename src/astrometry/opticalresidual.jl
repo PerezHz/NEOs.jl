@@ -68,6 +68,59 @@ function show(io::IO, x::OpticalResidual)
         @sprintf("%+.5f", cte(dec(x))), outlier_flag)
 end
 
+# Methods to print optical residuals in the MPEC format
+function mpec_residual(x::AbstractOpticalAstrometry, y::OpticalResidual)
+    sd = Dates.format(date(x), "yymmdd")
+    so = observatorycode(x)
+    α, δ = ra(y), dec(y)
+    sα = if abs(α) < 100
+        @sprintf("%5.1f", abs(α)) * if abs(α) < 0.05
+            "  "
+        else
+            α ≥ 0 ? "+ " : "- "
+        end
+    else
+        @sprintf("%5.2f", abs(α / 3_600)) * (α ≥ 0 ? "+ " : "- ")
+    end
+    sδ = if abs(δ) < 100
+        @sprintf("%5.1f", abs(δ)) * if abs(δ) < 0.05
+            "  "
+        else
+            δ ≥ 0 ? "+ " : "- "
+        end
+    else
+        @sprintf("%5.2f", abs(δ / 3_600)) * (δ ≥ 0 ? "+ " : "- ")
+    end
+    s = string(sd, " ", so, sα, sδ)
+    if isoutlier(y)
+        c = collect(s)
+        c[11], c[end] = '(', ')'
+        s = join(c)
+    end
+    return s
+end
+
+print_mpec_residuals(x::AbstractOpticalVector, y::AbstractResidualVector) =
+    print_mpec_residuals(stdout, x, y)
+
+function print_mpec_residuals(io::IO, x::AbstractOpticalVector,
+                              y::AbstractResidualVector)
+    @assert length(x) == length(y) "Observations and residuals vectors must have \
+        the same length"
+    L = length(x)
+    Nrows = ceil(Int, L / 3)
+    v = Vector{String}(undef, 3Nrows)
+    @. v[1:L] = mpec_residual(x, y)
+    @. v[L+1:end] = ""
+    m = reshape(v, Nrows, 3)
+    print(
+        io,
+        "Residuals in seconds of arc\n",
+        join(join.(eachrow(m), "   "), '\n'), '\n'
+    )
+    return nothing
+end
+
 # Evaluate methods
 evaluate(y::OpticalResidual{T, TaylorN{T}}, x::Vector{T}) where {T <: Real} =
     OpticalResidual{T, T}(y.ra(x), y.dec(x), y.wra, y.wdec, y.dra, y.ddec, y.corr, y.outlier)
