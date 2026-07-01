@@ -73,15 +73,23 @@ function mpec_residual(x::AbstractOpticalAstrometry, y::OpticalResidual)
     sd = Dates.format(date(x), "yymmdd")
     so = observatorycode(x)
     α, δ = ra(y), dec(y)
-    sα = @sprintf("%5.1f", abs(α)) * if abs(α) < 0.05
-        "  "
+    sα = if abs(α) < 100
+        @sprintf("%5.1f", abs(α)) * if abs(α) < 0.05
+            "  "
+        else
+            α ≥ 0 ? "+ " : "- "
+        end
     else
-        α ≥ 0 ? "+ " : "- "
+        @sprintf("%5.2f", abs(α / 3_600)) * (α ≥ 0 ? "+ " : "- ")
     end
-    sδ = @sprintf("%5.1f", abs(δ)) * if abs(δ) < 0.05
-        "  "
+    sδ = if abs(δ) < 100
+        @sprintf("%5.1f", abs(δ)) * if abs(δ) < 0.05
+            "  "
+        else
+            δ ≥ 0 ? "+ " : "- "
+        end
     else
-        δ ≥ 0 ? "+ " : "- "
+        @sprintf("%5.2f", abs(δ / 3_600)) * (δ ≥ 0 ? "+ " : "- ")
     end
     s = string(sd, " ", so, sα, sδ)
     if isoutlier(y)
