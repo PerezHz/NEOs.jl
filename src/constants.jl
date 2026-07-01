@@ -167,10 +167,14 @@ const EOPIAU = Union{EopIau1980, EopIau2000A}
 
 const IERS_EOP2000A_URL = "https://datacenter.iers.org/data/csv/finals2000A.all.csv"
 const USNO_EOP2000A_URL = "https://maia.usno.navy.mil/ser7/finals2000A.all"
+const IERS_EOP_HEADER = "MJD;Year;Month;Day;Type;x_pole;sigma_x_pole;y_pole;sigma_y_pole;\
+    x_rate;sigma_x_rate;y_rate;sigma_y_rate;Type;UT1-UTC;sigma_UT1-UTC;LOD;sigma_LOD;\
+    Type;dPsi;sigma_dPsi;dEpsilon;sigma_dEpsilon;dX;sigma_dX;dY;sigma_dY;Type;\
+    bulB/x_pole;bulB/y_pole;Type;bulB/UT-UTC;Type;bulB/dPsi;bulB/dEpsilon;bulB/dX;bulB/dY\n"
 const USNO_COLS = [
-    1:2, 3:4, 5:6, #=7:7,=# 8:15, #=16:16,=# 17:17, #=18:18,=# 19:27, 28:36,
-    #=37:37,=# 38:46, 47:55, #=56:57,=# 58:58, 59:68, 69:78, #=79:79,=# 80:86,
-    87:93, #=94:95,=# 96:96, #=97:97,=# 98:106, 107:115, #=116:116,=# 117:125,
+    1:2, 3:4, 5:6, 7:7, 8:15, 16:16, 17:17, 18:18, 19:27, 28:36,
+    37:37, 38:46, 47:55, 56:57, 58:58, 59:68, 69:78, 79:79, 80:86,
+    87:93, 94:95, 96:96, 97:97, 98:106, 107:115, 116:116, 117:125,
     126:134, 135:144, 145:154,  155:165, 166:175, 176:185
 ]
 
