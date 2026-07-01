@@ -61,7 +61,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         # Reference epoch [TDB]
         jd0 = 2459200.5                      # JD
-        mjd0 = jd0 + (MJD2000 - J2000)       # MJD
+        mjd0 = jd0 + (MJD2000 - PE.J2000)       # MJD
         # Sun's state vector at jd0
         sun = sseph(su, jd0 - PE.J2000)
 
@@ -72,7 +72,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # Keplerian elements
         e   = 0.19150886716
         q   = 0.74585305033                             # au
-        tp  = 2459101.04092537 + (MJD2000 - J2000)      # MJDTDB
+        tp  = 2459101.04092537 + (MJD2000 - PE.J2000)   # MJDTDB
         Ω   = 204.04199116                              # deg
         ω   = 126.65396094                              # deg
         i   = 3.336773201                               # deg
