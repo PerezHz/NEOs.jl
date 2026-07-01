@@ -104,7 +104,7 @@ end
 
         # Reference epoch [TDB]
         jd0 = 2459200.5                      # JD
-        mjd0 = jd0 + (MJD2000 - J2000)       # MJD
+        mjd0 = jd0 + (MJD2000 - PE.J2000)       # MJD
 
         # Cartesian state vector [au, au/day]
         rv = [−0.18034828526, 0.94069105951, 0.34573599029,
@@ -114,7 +114,7 @@ end
         # Keplerian elements
         e, de = 0.19150886716, 1.60E-9
         q, dq = 0.74585305033, 1.54E−9                           # au
-        tp, dtp = 2459101.04092537 + (MJD2000 - J2000), 1.17E−6  # MJDTDB
+        tp, dtp = 2459101.04092537 + (MJD2000 - PE.J2000), 1.17E−6  # MJDTDB
         Ω, dΩ = 204.04199116, 8.81E−6                            # deg
         ω, dω = 126.65396094, 9.37E−6                            # deg
         i, di = 3.336773201, 1.74E−7                             # deg
@@ -161,7 +161,7 @@ end
 
         # Reference epoch [TDB]
         jd0 = 2460894.5                      # JD
-        mjd0 = jd0 + (MJD2000 - J2000)       # MJD
+        mjd0 = jd0 + (MJD2000 - PE.J2000)       # MJD
 
         # Keplerian elements
         a, da = -0.2639243367163182, 5.5149E-7                          # au
@@ -171,7 +171,7 @@ end
         ω, dω = 128.0096924001076, 0.00021962	                        # deg
         Ω, dΩ =	322.1566239181344, 0.00021152	                        # deg
         M, dM = -606.8465596139827, 0.0016883                           # deg
-        tp, dtp = 2460977.982217865578 + (MJD2000 - J2000), 3.133E-5    # MJDTDB
+        tp, dtp = 2460977.982217865578 + (MJD2000 - PE.J2000), 3.133E-5    # MJDTDB
         kep = KeplerianElements(μ_S, mjd0, :ecliptic,
             SVector{6}(q, e, i, ω, Ω, tp),
             SMatrix{6, 6}(diagm([dq^2, de^2, di^2, dω^2, dΩ^2, dtp^2]))
@@ -228,7 +228,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by June 30, 2026
+        # Values by July 1, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -373,7 +373,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by June 30, 2026
+        # Values by July 1, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -458,7 +458,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by June 30, 2026
+        # Values by July 1, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -538,7 +538,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by June 30, 2026
+        # Values by July 1, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -686,7 +686,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by June 30, 2026
+        # Values by July 1, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -774,7 +774,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by June 30, 2026
+        # Values by July 1, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -924,7 +924,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by June 30, 2026
+        # Values by July 1, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -1012,7 +1012,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by June 30, 2026
+        # Values by July 1, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1187,7 +1187,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by June 30, 2026
+        # Values by July 1, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1293,7 +1293,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by June 30, 2026
+        # Values by July 1, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1392,7 +1392,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by June 30, 2026
+        # Values by July 1, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
