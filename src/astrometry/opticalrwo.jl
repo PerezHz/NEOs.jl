@@ -177,6 +177,8 @@ trackletid(x::OpticalRWO) = ""
 
 isdeprecated(x::OpticalRWO) = x.T == 'X'
 
+designation(x::OpticalRWO) = x.design
+
 # Print method for OpticalRWO
 show(io::IO, o::OpticalRWO) = print(io, o.design, " α: ", @sprintf("%.5f",
     rad2deg(o.ra)), "° δ: ", @sprintf("%.5f", rad2deg(o.dec)), "° t: ", o.date,

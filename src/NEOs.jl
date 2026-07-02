@@ -93,9 +93,10 @@ export gm, frame, elements, iscircular, iselliptic, isparabolic, ishyperbolic, c
 export curvature
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
-export variables, epoch, firsttime, lasttime, noptical, nradar, minmaxdates, optical,
-       sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
-       absolutemagnitude, diameter, mass, shiftepoch, print_mpec_residuals
+export variables, designation, epoch, firsttime, lasttime, noptical, nradar, minmaxdates,
+       optical, sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
+       absolutemagnitude, diameter, mass, shiftepoch, print_mpec_residuals,
+       print_mpec_elements
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
        orbitdetermination, linkage

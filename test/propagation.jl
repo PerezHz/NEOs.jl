@@ -378,7 +378,7 @@ end
         params = Parameters(params; maxsteps = 1)
         sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, q0, jd0, nyears, params)
 
-        @test JLD2.writeas(typeof(sol)) == TaylorIntegration.TaylorSolutionNSerialization{Float64, 2} 
+        @test JLD2.writeas(typeof(sol)) == TaylorIntegration.TaylorSolutionNSerialization{Float64, 2}
         jldsave("test.jld2"; sol, tvS, xvS, gvS)
         recovered_sol = JLD2.load("test.jld2", "sol")
         recovered_tvS = JLD2.load("test.jld2", "tvS")

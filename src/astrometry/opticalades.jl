@@ -128,6 +128,18 @@ isdiscovery(x::OpticalADES) = !isempty(x.disc)
 
 isdeprecated(x::OpticalADES) = !isempty(x.deprecated)
 
+function designation(x::OpticalADES)
+    # If there is no number, use temporary designation
+    if !isempty(x.permid)
+        des = x.permid
+    elseif !isempty(x.provid)
+        des = x.provid
+    else
+        des = x.trksub
+    end
+    return des
+end
+
 # Print method for OpticalADES
 function show(io::IO, o::OpticalADES)
     # If there is no number, use temporary designation
