@@ -200,18 +200,28 @@ OpticalADES(r::DataFrameRow) = OpticalADES{Float64}(
 function parse_optical_ades(text::String)
     # Parse XML
     node = parse(LazyNode, text)
-    L = length(children(node[2]))
+    # Locate the root <ades> element and its observation elements by node type:
+    # XML.jl >= 0.4 preserves inter-element whitespace as Text nodes, so positional
+    # indexing (node[2]) and unfiltered children iteration would hit Text nodes.
+    root = only(filter(n -> XML.nodetype(n) == XML.Element, children(node)))
+    obs = filter(n -> XML.nodetype(n) == XML.Element, children(root))
+    L = length(obs)
     # Construct DataFrame
     R = OpticalADES{Float64}
     names = fieldnames(R)
     df = DataFrame([fill(astrometrydefault(fieldtype(R, name)), L) for name in names],
         collect(names))
-    for (i, line) in enumerate(children(node[2]))
+    for (i, line) in enumerate(obs)
         for child in children(line)
+            XML.nodetype(child) == XML.Element || continue
             name = Symbol(lowercase(tag(child)))
             if name in names
                 type = fieldtype(R, name)
-                v = XML.value(first(child))
+                # first(child) relied on LazyNode iteration, removed in XML.jl 0.4;
+                # go through children (works on both 0.3 and 0.4)
+                grandchildren = children(child)
+                isempty(grandchildren) && continue
+                v = XML.value(first(grandchildren))
                 isnothing(v) && continue
                 x = strip(v)
                 df[i, name] = adesparse(name, type, x)
@@ -232,7 +242,7 @@ function parse_optical_ades(text::String)
         df.ra[i] = df.rastar[i] + df.deltara[i] / cos(df.dec[i])
     end
     # Source string
-    df.source = XML.write.(children(node[2]))
+    df.source = XML.write.(obs)
     # Parse observations
     optical = OpticalADES.(eachrow(df))
 
