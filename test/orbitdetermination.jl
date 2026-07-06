@@ -104,7 +104,7 @@ end
 
         # Reference epoch [TDB]
         jd0 = 2459200.5                      # JD
-        mjd0 = jd0 + (MJD2000 - J2000)       # MJD
+        mjd0 = jd0 + (MJD2000 - PE.J2000)       # MJD
 
         # Cartesian state vector [au, au/day]
         rv = [−0.18034828526, 0.94069105951, 0.34573599029,
@@ -114,7 +114,7 @@ end
         # Keplerian elements
         e, de = 0.19150886716, 1.60E-9
         q, dq = 0.74585305033, 1.54E−9                           # au
-        tp, dtp = 2459101.04092537 + (MJD2000 - J2000), 1.17E−6  # MJDTDB
+        tp, dtp = 2459101.04092537 + (MJD2000 - PE.J2000), 1.17E−6  # MJDTDB
         Ω, dΩ = 204.04199116, 8.81E−6                            # deg
         ω, dω = 126.65396094, 9.37E−6                            # deg
         i, di = 3.336773201, 1.74E−7                             # deg
@@ -161,7 +161,7 @@ end
 
         # Reference epoch [TDB]
         jd0 = 2460894.5                      # JD
-        mjd0 = jd0 + (MJD2000 - J2000)       # MJD
+        mjd0 = jd0 + (MJD2000 - PE.J2000)       # MJD
 
         # Keplerian elements
         a, da = -0.2639243367163182, 5.5149E-7                          # au
@@ -171,7 +171,7 @@ end
         ω, dω = 128.0096924001076, 0.00021962	                        # deg
         Ω, dΩ =	322.1566239181344, 0.00021152	                        # deg
         M, dM = -606.8465596139827, 0.0016883                           # deg
-        tp, dtp = 2460977.982217865578 + (MJD2000 - J2000), 3.133E-5    # MJDTDB
+        tp, dtp = 2460977.982217865578 + (MJD2000 - PE.J2000), 3.133E-5    # MJDTDB
         kep = KeplerianElements(μ_S, mjd0, :ecliptic,
             SVector{6}(q, e, i, ω, Ω, tp),
             SMatrix{6, 6}(diagm([dq^2, de^2, di^2, dω^2, dΩ^2, dtp^2]))
@@ -228,11 +228,12 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by July 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
+        @test designation(orbit) == "2023 DW"
         @test length(suboptical) == nobs(od) == nobs(orbit) == 9
         @test numberofdays(suboptical) == numberofdays(orbit) < 0.18
         @test minmaxdates(orbit) == (date(suboptical[1]), date(suboptical[end]))
@@ -250,6 +251,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 9
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -268,6 +270,7 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [-0.9867704701732631, 0.3781890325424674, 0.14094513213009532,
             -0.008773157203087259, -0.00947109649687576, -0.005654229864757284]
         JPL_KEP = [8.198835710815939E-01, 3.962989389356275E-01, 5.807184452352074E+00,
@@ -300,6 +303,7 @@ end
         # Check type
         @test isa(orbit1, OpticalOrbit{Float64})
         # Tracklets
+        @test designation(orbit1) == "2023 DW"
         @test length(suboptical) == nobs(od) == nobs(orbit1) == 43
         @test numberofdays(suboptical) == numberofdays(orbit1) < 2.76
         @test minmaxdates(orbit1) == (date(suboptical[1]), date(suboptical[end]))
@@ -317,6 +321,7 @@ end
         # Vector of residuals
         @test notout(orbit1.ores) == 43
         @test nout(orbit1.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -335,6 +340,7 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit1, params))
         jpl_compatibility_tests(orbit1, params, (3.1E-01, 4.5E-01, 5.7E-11, 8.2E-12, 6.3E-12),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -371,11 +377,12 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by July 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
+        @test designation(orbit) == "2005 TM173"
         @test length(optical) == nobs(od) == nobs(orbit) == 6
         @test numberofdays(optical) == numberofdays(orbit) < 1.95
         @test minmaxdates(orbit) == (date(optical[1]), date(optical[end]))
@@ -393,6 +400,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -411,6 +419,7 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [1.0042569058151192, 0.2231639040146286, 0.11513854178693468,
             -0.010824212819531798, 0.017428798232689943, 0.0071046780555307385]
         JPL_KEP = [2.872424697642789E+00, 6.749395051551541E-01, 1.282355986214476E+00,
@@ -455,11 +464,12 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by May 24, 2026
+        # Values by July 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
+        @test designation(orbit) == "2024 MK"
         @test length(suboptical) == nobs(od) == nobs(orbit) == 12
         @test numberofdays(suboptical) == numberofdays(orbit) < 42.8
         @test minmaxdates(orbit) == (date(suboptical[1]), date(suboptical[end]))
@@ -477,6 +487,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 12
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -495,13 +506,14 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [-0.12722461679828806, -0.9466098076903212, -0.4526816007640767,
             0.02048875631534963, -0.00022720097573790754, 0.00321302850930331]
         JPL_KEP = [2.232655272359251E+00, 5.480018648354085E-01, 8.456325272115306E+00,
             1.322293305412568E+01, 2.778787985886902E+02, 3.530120962605258E+02]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
         JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (1.6E-01, 2.4E0, 2.0E-11, 4.3E-12, 1.5E-12),
+        jpl_compatibility_tests(orbit, params, (1.6E-01, 2.4E0, 2.5E-11, 4.3E-12, 1.5E-12),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
@@ -534,7 +546,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by May 24, 2026
+        # Values by July 2, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -682,7 +694,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by July 2, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -693,6 +705,7 @@ end
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
+        @test designation(orbit) == "2008 EK68"
         @test length(optical) == nobs(od) == nobs(orbit) == 10
         @test numberofdays(optical) == numberofdays(orbit) < 0.05
         @test minmaxdates(orbit) == (date(optical[1]), date(optical[end]))
@@ -710,6 +723,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 10
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -728,6 +742,7 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [-0.9698405495747651, 0.24035304578776012, 0.10288276585828428,
             -0.009512301266159554, -0.01532548565855646, -0.00809464581680694]
         JPL_KEP = [1.484448954296998E+00, 3.966995063832199E-01, 3.961868860866990E+00,
@@ -769,11 +784,12 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by July 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
+        @test designation(orbit) == "2007 VV7"
         @test length(suboptical) == nobs(od) == nobs(orbit) == 18
         @test numberofdays(suboptical) == numberofdays(orbit) < 2.16
         @test minmaxdates(orbit) == (date(suboptical[1]), date(suboptical[end]))
@@ -791,6 +807,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 16
         @test nout(orbit.ores) == 2
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -809,6 +826,7 @@ end
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
             -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
         JPL_KEP = [1.776244846691859E+00, 4.381984418639090E-01, 7.819612775042287E-01,
@@ -839,6 +857,7 @@ end
         # Check type
         @test isa(orbit1, OpticalOrbit{Float64})
         # Tracklets
+        @test designation(orbit1) == "2007 VV7"
         @test length(optical) == nobs(od) == nobs(orbit1) == 21
         @test numberofdays(optical) == numberofdays(orbit1) < 3.03
         @test minmaxdates(orbit1) == (date(optical[1]), date(optical[end]))
@@ -856,6 +875,7 @@ end
         # Vector of residuals
         @test notout(orbit1.ores) == 19
         @test nout(orbit1.ores) == 2
+        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -877,6 +897,7 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit1, params))
         jpl_compatibility_tests(orbit1, params, (4.5E-04, 1.2E-02, 1.2E-10, 8.2E-11, 8.3E-11),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -917,7 +938,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by July 2, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -928,6 +949,7 @@ end
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
+        @test designation(orbit) == "2014 AA"
         @test length(optical) == nobs(od) == nobs(orbit) == 7
         @test numberofdays(optical) == numberofdays(orbit) < 0.05
         @test minmaxdates(orbit) == (date(optical[1]), date(optical[end]))
@@ -945,6 +967,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 7
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -963,6 +986,7 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [-0.1793421909678032, 0.8874121750891107, 0.3841434101167349,
             -0.017557851117612377, -0.005781634223099801, -0.0020075106081869185]
         JPL_KEP = [1.163575955666616E+00, 2.128185264087166E-01, 1.423597471953649E+00,
@@ -1004,11 +1028,12 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by May 24, 2026
+        # Values by July 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
+        @test designation(orbit) == "2008 TC3"
         @test length(suboptical) == nobs(od) == nobs(orbit) == 18
         @test numberofdays(suboptical) == numberofdays(orbit) < 0.34
         @test minmaxdates(orbit) == (date(suboptical[1]), date(suboptical[end]))
@@ -1026,6 +1051,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 18
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1044,6 +1070,7 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [0.9739760787551061, 0.21541704400792083, 0.09401075290627411,
             -0.00789675674941779, 0.0160619782715116, 0.006135361409943397]
         JPL_KEP = [1.273091758414584E+00, 2.870222798582721E-01, 2.341999526552296E+00,
@@ -1076,6 +1103,7 @@ end
         # Check type
         @test isa(orbit1, OpticalOrbit{Float64})
         # Tracklets
+        @test designation(orbit1) == "2008 TC3"
         @test length(suboptical) == nobs(od) == nobs(orbit1) == 97
         @test numberofdays(suboptical) == numberofdays(orbit1) < 0.70
         @test minmaxdates(orbit1) == (date(suboptical[1]), date(suboptical[end]))
@@ -1093,6 +1121,7 @@ end
         # Vector of residuals
         @test notout(orbit1.ores) == 97
         @test nout(orbit1.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -1111,6 +1140,7 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit1, params))
         jpl_compatibility_tests(orbit1, params, (1.7E-01, 1.9E-01, 2.2E-07, 1.8E-8, 1.4E-09),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -1177,12 +1207,13 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by May 24, 2026
+        # Values by July 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
         @test flag
+        @test designation(orbit) == "2023 QR6"
         @test length(optical) == nobs(od) == nobs(orbit) == 6
         @test numberofdays(optical) == numberofdays(orbit) < 6.22
         @test minmaxdates(orbit) == (date(optical[1]), date(optical[end]))
@@ -1200,6 +1231,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1218,6 +1250,7 @@ end
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [8.273613111662440E-01, -8.060979570468877E-01, -6.506021560333630E-01,
                    1.659953139139261E-02, -5.614155804560522E-03, 2.899959983103430E-03]
         JPL_KEP = [2.279881958167905E+00, 7.595854924208774E-01, 3.859999487009846E+01,
@@ -1282,11 +1315,12 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by May 24, 2026
+        # Values by July 2, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
         # Astrometry
+        @test designation(orbit1) == "99942"
         @test length(optical) == noptical(od1) == noptical(orbit1) == 24
         @test length(radar) == nradar(od1) == nradar(orbit1) == 5
         @test length(optical) + length(radar) == nobs(od1) == nobs(orbit1) == 24 + 5
@@ -1312,6 +1346,7 @@ end
         @test notout(orbit1.rres) == 5
         @test nout(orbit1.ores) == 0
         @test nout(orbit1.rres) == 0
+        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -1330,6 +1365,7 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit1, params))
         JPL_CAR = [-5.229992130937651E-01, 8.689454573480734E-01, 3.096174868699621E-01,
             -1.413639580483663E-02, -5.510379552549767E-03, -2.413003153288419E-03]
         JPL_KEP = [9.223295977030230E-01, 1.911190963976789E-01, 3.330797253820763E+00,
@@ -1380,11 +1416,12 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by May 24, 2026
+        # Values by July 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
         # Tracklets
+        @test designation(orbit) == "2020 NB1"
         @test length(optical) == nobs(od) == nobs(orbit) == 44
         @test numberofdays(optical) == numberofdays(orbit) < 3766
         @test minmaxdates(orbit) == (date(optical[1]), date(optical[end]))
@@ -1402,6 +1439,7 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 43
         @test nout(orbit.ores) == 1
+        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1420,6 +1458,7 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
+        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [4.848674283176028E-01, -1.256976941043074E+00, 7.558473824624909E-02,
                    2.837659541627720E-03, 1.669282318693257E-02, 4.630635236479733E-03]
         JPL_KEP = [2.315552902881586E+00, 8.475227263442291E-01, 3.315750642722048E+01,

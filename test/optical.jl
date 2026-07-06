@@ -38,6 +38,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test apophis.observatory == observatory(apophis) == search_observatory_code("691")
         @test apophis.source == apophis_s
 
+        @test designation(apophis) == "99942"
         @test measure(apophis) == (1.0739650841580173, 0.2952738332250385)
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)
@@ -226,6 +227,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         idxs = findfirst("END_OF_HEADER", apophis_s)
         @test apophis.header == apophis_s[1:first(idxs)-1]
 
+        @test designation(apophis) == "99942"
         @test measure(apophis) == (1.0739650841580173, 0.2952738332250385)
         @test rms(apophis) == (0.612, 0.612)
         @test debias(apophis) == (-0.247, 0.14)
@@ -387,6 +389,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test apophis.deprecated == ""
         @test replace(apophis.source, " " => "") == replace(apophis_s[64:end-9], " " => "")
 
+        @test designation(apophis) == "99942"
         @test measure(apophis) == (1.073965142335659, 0.2952737556548495)
         @test rms(apophis) == (1.0, 1.0)
         @test debias(apophis) == (0.0, 0.0)

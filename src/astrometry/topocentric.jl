@@ -371,15 +371,31 @@ function convert_usno_to_iers(filename::AbstractString)
     lines = readlines(filename)
     s = Vector{SubString}(undef, length(USNO_COLS))
     newlines = Vector{String}(undef, length(lines)+1)
-    newlines[1] = "HEADER"
+    newlines[1] = IERS_EOP_HEADER
     for (i, line) in enumerate(lines)
         for (j, col) in enumerate(USNO_COLS)
-            s[j] = strip(line[col])
+            s[j] = strip(view(line, col))
         end
-        s[1], s[2], s[3], s[4] = s[4], s[1], s[2], s[3]
-        newlines[i+1] = join(s, ';')
+        mjd = parse(Float64, s[5])
+        date = julian2datetime(mjd - MJD2000 + PE.J2000)
+        flag1 = isempty(s[7]) ? "" : (s[7] == "P" ? "prediction" : "final")
+        flag2 = isempty(s[15]) ? "" : (s[15] == "P" ? "prediction" : "final")
+        flag3 = isempty(s[22]) ? "" : (s[22] == "P" ? "prediction" : "final")
+        flag4 = isempty(s[29]) ? "" : "final"
+        flag5 = isempty(s[31]) ? "" : "final"
+        flag6 = isempty(s[32]) ? "" : "final"
+        newlines[i+1] = @sprintf(
+            "%.0f;%4d;%02d;%02d;%s;%s;%s;%s;%s;;;;;%s;%s;%s;%s;%s;%s;\
+            ;;;;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;;;%s;%s\n",
+            mjd, year(date), month(date), day(date),
+            flag1, s[9], s[10], s[12], s[13],
+            flag2, s[16], s[17], s[19], s[20],
+            flag3, s[24], s[25], s[27], s[28],
+            flag4, s[29], s[30], flag5, s[31],
+            flag6, s[32], s[33]
+        )
     end
-    write(filename, join(newlines, '\n'))
+    write(filename, join(newlines))
     return nothing
 end
 

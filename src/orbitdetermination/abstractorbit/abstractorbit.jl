@@ -26,6 +26,9 @@ dof(x::AbstractOrbit) = dof(Val(dynamicalmodel(x)))
 variables(x::AbstractOrbit) = x.variables
 numvars(x::AbstractOrbit) = length(x.variables)
 
+# Object designation
+designation(x::AbstractOrbit) = designation(last(x.optical))
+
 """
     epoch(::AbstractOrbit)
 
@@ -589,6 +592,67 @@ section of [`Parameters`](@ref).
 """
 mass(orbit::AbstractOrbit, params::Parameters) =
     mass(params.density, diameter(orbit, params))
+
+"""
+    print_mpec_residuals([io::IO], orbit)
+
+Print to `io` the optical residuals of an `orbit` in the MPEC format.
+"""
+print_mpec_residuals(x::AbstractOrbit) = print_mpec_residuals(x.optical, x.ores)
+print_mpec_residuals(io::IO, x::AbstractOrbit) = print_mpec_residuals(io, x.optical, x.ores)
+
+"""
+    print_mpec_elements([io::IO], orbit, params [, t])
+
+Print to `io` the keplerian elements of an `orbit` at time `t`
+[TDB days since J2000] in the MPEC format.
+"""
+print_mpec_elements(orbit::AbstractOrbit, params::Parameters, t::Real = epoch(orbit)) =
+    print_mpec_elements(stdout, orbit, params, t)
+
+# TO DO:
+# - Use MOID.jl to compute the minimum orbit intersection distance,
+# - Verify that the formulas for P_vec and Q_vec are correct.
+function print_mpec_elements(io::IO, orbit::AbstractOrbit, params::Parameters,
+                             t::Real = epoch(orbit))
+    jdt = t + PE.J2000 + ttmtdb(t) / daysec
+    dt = julian2datetime(jdt)
+    fd = day(dt) + Dates.value(dt - DateTime(Date(dt))) / (daysec * 1000)
+    G = params.slope
+    H = absolutemagnitude(orbit, params)[1]
+    U = uncertaintyparameter(orbit, params)
+    kep = keplerian(orbit, params, t)
+    n = meanmotion(kep)
+    M = meananomaly(kep)
+    e = eccentricity(kep)
+    a = semimajoraxis(kep)
+    i = inclination(kep)
+    ω = argperi(kep)
+    Ω = longascnode(kep)
+    P = (2π / yr) * sqrt(a^3 / μ_S)
+    P_vec = [
+        cosd(ω)*cosd(Ω) - sind(ω)*sind(Ω)*cosd(i),
+        cosd(ω)*sind(Ω) + sind(ω)*cosd(Ω)*cosd(i),
+        sind(ω)*sind(i)
+    ]
+    Q_vec = [
+        sind(ω)*cosd(Ω) + cosd(ω)*sind(Ω)*cosd(i),
+        cosd(ω)*cosd(Ω)*cosd(i) - sind(ω)*sind(Ω),
+        cosd(ω)*sind(i)
+    ]
+    print(
+        io,
+        "Orbital elements:\n",
+        @sprintf("%-56sEarth MOID = %.4f AU\n", designation(orbit), NaN),
+        @sprintf("Epoch %s %.8f TT = JDT %.8f%3sNEOs.jl\n", Dates.format(dt, "yyyy U"), fd, jdt, ""),
+        @sprintf("M%10.5f%14s(2000.0)%12sP%15sQ\n", M, "", "", ""),
+        @sprintf("n%13.8f%5sPeri.%11.5f%5s%+11.8f%5s%+11.8f\n", n, "", ω, "", P_vec[1], "", Q_vec[1]),
+        @sprintf("a%12.7f%6sNode %11.5f%5s%+11.8f%5s%+11.8f\n", a, "", Ω, "", P_vec[2], "", Q_vec[2]),
+        @sprintf("e%12.7f%6sIncl.%11.5f%5s%+11.8f%5s%+11.8f\n", e, "", i, "", P_vec[3], "", Q_vec[3]),
+        @sprintf("P%7.2f%11sH%8.2f%10sG%7.2f%11sU%4d\n", P, "", H, "", G, "", U),
+    )
+    return nothing
+end
 
 function summary(orbit::AbstractOrbit)
     O = nameof(typeof(orbit))

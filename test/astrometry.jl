@@ -1,9 +1,12 @@
 using NEOs
 using Dates
 using PlanetaryEphemeris
+using SatelliteToolboxTransformations
 using Test
 
 using NEOs: SCRATCH_PATH
+
+const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
 @testset "AbstractAstrometry" begin
 
@@ -43,6 +46,26 @@ using NEOs: SCRATCH_PATH
         @test haskey(dict["request"], "terms") && dict["request"]["terms"] == ["2008 TC3", "2014 AA"]
         @test haskey(dict["results"], "2008 TC3") && !isempty(dict["results"]["2008 TC3"])
         @test haskey(dict["results"], "2014 AA") && !isempty(dict["results"]["2014 AA"])
+    end
+
+    @testset "Earth Orientation Parameters" begin
+        using NEOs: EOP_IAU2000A, convert_usno_to_iers
+
+        @test isa(EOP_IAU2000A, EopIau2000A)
+
+        filename1 = joinpath(TEST_DATA, "finals2000A.all.csv")
+        filename2 = joinpath(TEST_DATA, "finals2000A.all")
+        text1 = read(filename1, String)
+        text2 = read(filename2, String)
+        convert_usno_to_iers(filename2)
+        text3 = read(filename2, String)
+        if Sys.iswindows()
+            # Windows uses \r\n as newline instead of \n
+            text1 = replace(text1, "\r\n" => '\n')
+            text3 = replace(text3, "\r\n" => '\n')
+        end
+        @test text1 == text3
+        write(filename2, text2)
     end
 
     @testset "CatalogueMPC" begin

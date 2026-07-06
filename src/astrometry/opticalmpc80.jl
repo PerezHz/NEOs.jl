@@ -100,6 +100,15 @@ isdiscovery(x::OpticalMPC80) = x.discovery == '*'
 
 isdeprecated(x::OpticalMPC80) = x.note2 == 'X'
 
+function designation(x::OpticalMPC80)
+    if isempty(x.number)
+        des = 'I' ≤ x.desig[1] ≤ 'K' ? unpackdesig(x.desig) : x.desig
+    else
+        des = unpacknum(x.number)
+    end
+    return des
+end
+
 # Print method for OpticalMPC80
 function show(io::IO, o::OpticalMPC80)
     # If there is no number, use temporary designation
