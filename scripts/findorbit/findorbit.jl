@@ -315,9 +315,6 @@ function finalrefinement(dynamics, orbit::LeastSquaresOrbit,
     elseif noptical(orbitFR) < noptical(orbit)
         println("• $label final refinement fit fewer observations than the seed; keeping previous orbit")
         return orbit
-    elseif isrmsregression(orbit, orbitFR)
-        printrmsregression("$label final refinement", orbit, orbitFR)
-        return orbit
     end
     candidate = orbitFR
     paramsFR = Parameters(paramsFR; outrej = params.outrej)
@@ -326,6 +323,10 @@ function finalrefinement(dynamics, orbit::LeastSquaresOrbit,
        (noptical(orbitFR) > noptical(candidate) ||
         (noptical(orbitFR) == noptical(candidate) && nrms(orbitFR) < nrms(candidate)))
         candidate = orbitFR
+    end
+    if isrmsregression(orbit, candidate)
+        printrmsregression("$label final refinement", orbit, candidate)
+        return orbit
     end
     if noptical(candidate) == length(optical)
         println("• $label final refinement accepted")
