@@ -217,6 +217,10 @@ end
 # between DCMs and Taylor1/TaylorN. The method below has been adapted from
 # SatelliteToolboxTransformations.jl, MIT-licensed
 # https://github.com/JuliaSpace/SatelliteToolboxTransformations.jl
+# NOTE: By SatelliteToolboxTransformations v1.2 the methods below are ambiguous with
+# respect to the original methods. Thus, I have commented them out but not deleted
+# them, as the operations between Taylor objects can still be optimized (09/07/26)
+#=
 for EOP in (:Nothing, :EopIau1980, :EopIau2000A)
     @eval begin
 
@@ -273,6 +277,7 @@ for EOP in (:Nothing, :EopIau1980, :EopIau2000A)
 
     end
 end
+=#
 
 """
     obsposvelECI(::AbstractOpticalAstrometry; kwargs...)
