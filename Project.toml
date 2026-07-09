@@ -1,6 +1,6 @@
 name = "NEOs"
 uuid = "b41c07a2-2abb-11e9-070a-c3c1b239e7df"
-version = "0.27.4"
+version = "0.27.5"
 authors = ["Jorge A. Pérez Hernández", "Luis Benet", "Luis Eduardo Ramírez Montoya"]
 
 [deps]
@@ -76,7 +76,7 @@ Quadmath = "1"
 RecipesBase = "1"
 Roots = "3"
 SPICE = "0.2"
-SatelliteToolboxTransformations = "1 - 1.1"
+SatelliteToolboxTransformations = "1"
 Scratch = "1.2"
 SpecialFunctions = "2"
 StaticArraysCore = "1.4"
