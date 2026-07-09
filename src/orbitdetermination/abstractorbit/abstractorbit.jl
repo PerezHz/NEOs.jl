@@ -599,9 +599,7 @@ Print to `io` the keplerian elements of an `orbit` at time `t`
 print_mpec_elements(orbit::AbstractOrbit, params::Parameters, t::Real = epoch(orbit)) =
     print_mpec_elements(stdout, orbit, params, t)
 
-# TO DO:
-# - Use MOID.jl to compute the minimum orbit intersection distance,
-# - Verify that the formulas for P_vec and Q_vec are correct.
+# TO DO: Use MOID.jl to compute the minimum orbit intersection distance
 function print_mpec_elements(io::IO, orbit::AbstractOrbit, params::Parameters,
                              t::Real = epoch(orbit))
     jdt = t + PE.J2000 + ttmtdb(t) / daysec
@@ -619,17 +617,18 @@ function print_mpec_elements(io::IO, orbit::AbstractOrbit, params::Parameters,
     ω = argperi(kep)
     Ω = longascnode(kep)
     P = (2π / yr) * sqrt(a^3 / μ_S)
-    P_vec = [
+    R = Rx(deg2rad(ϵ0_deg))'
+    P_vec = R * [
         cosd(ω)*cosd(Ω) - sind(ω)*sind(Ω)*cosd(i),
         cosd(ω)*sind(Ω) + sind(ω)*cosd(Ω)*cosd(i),
         sind(ω)*sind(i)
     ]
-    Q_vec = [
-        sind(ω)*cosd(Ω) + cosd(ω)*sind(Ω)*cosd(i),
-        cosd(ω)*cosd(Ω)*cosd(i) - sind(ω)*sind(Ω),
+    Q_vec = R * [
+        -sind(ω)*cosd(Ω) - cosd(ω)*sind(Ω)*cosd(i),
+        -sind(ω)*sind(Ω) + cosd(ω)*cosd(Ω)*cosd(i) ,
         cosd(ω)*sind(i)
     ]
-    print(
+    write(
         io,
         "Orbital elements:\n",
         @sprintf("%-56sEarth MOID = %.4f AU\n", designation(orbit), NaN),
@@ -640,6 +639,84 @@ function print_mpec_elements(io::IO, orbit::AbstractOrbit, params::Parameters,
         @sprintf("e%12.7f%6sIncl.%11.5f%5s%+11.8f%5s%+11.8f\n", e, "", i, "", P_vec[3], "", Q_vec[3]),
         @sprintf("P%7.2f%11sH%8.2f%10sG%7.2f%11sU%4d\n", P, "", H, "", G, "", U),
     )
+    return nothing
+end
+
+"""
+    print_mpec_ephemeris([io::IO], orbit, params [, ts])
+
+Print to `io` the geocentric ephemeris of an `orbit` at `ts`,
+a vector of time periods relative to the orbit's epoch
+(default: `-Day(7):Day(1):Day(7)`), in the MPEC format.
+"""
+print_mpec_ephemeris(orbit::AbstractOrbit, params::Parameters) =
+    print_mpec_ephemeris(stdout, orbit, params)
+
+function print_mpec_ephemeris(io::IO, orbit::AbstractOrbit, params::Parameters,
+                              ts::AbstractVector{T} = -Day(7):Day(1):Day(7)) where {T <: Period}
+    @unpack eph_su, eph_ea, slope = params
+    desig = designation(orbit)
+    kep = keplerian(orbit, params)
+    a = semimajoraxis(kep)
+    e = eccentricity(kep)
+    i = inclination(kep)
+    q = a * (1 - e)
+    H = absolutemagnitude(orbit, params)[1]
+    d0 = DateTime(Date(days2dtutc(epoch(orbit))))
+    lines = Vector{String}(undef, length(ts))
+    for i in eachindex(lines)
+        d = d0 + ts[i]
+        t = dtutc2days(d)
+        qs = eph_su(t)[1:3]
+        qe = eph_ea(t)[1:3]
+        qa = ecliptic2equatorial(kep(t + MJD2000))[1:3] + qs
+        qas = qa - qs
+        qae = qa - qe
+        qes = qe - qs
+        das = norm(qas)
+        dae = norm(qae)
+        hms = rad2hms(mod2pi(atan(qae[2], qae[1])))
+        dms = rad2dms(asin(qae[3] / dae))
+        elong = angle(qae, qes)
+        phase = angle(-qae, -qas)
+        V = H + 5 * log10(das * dae) - 2.5 * phase_integral(phase, slope)
+        lines[i] = @sprintf(
+            "%-14s%02d %02d %04.1f %s%02d %02d %02d%3s%6.4f%8.4f%8.1f%8.1f%8.1f\n",
+            Dates.format(d, "yyyy mm dd"), hms[1], hms[2], hms[3],
+            dms[1] ≥ 0 ? "+" : "-", abs(dms[1]), dms[2], dms[3], "",
+            dae, das, rad2deg(elong), rad2deg(phase), V
+        )
+    end
+    write(
+        io,
+        "Ephemeris:\n",
+        @sprintf("%-25sa,e,i = %.2f, %.2f, %d%19sq = %.4f\n", desig, a, e, i, "", q),
+        "Date    TT    R. A. (2000) Decl.     Delta      r    Elong.  Phase     V\n",
+        join(lines)
+    )
+    return nothing
+end
+
+"""
+    print_mpec([io::IO], orbit, params [, ts])
+
+Print to `io` the Minor Planet Electronic Circular (MPEC) corresponding
+to `orbit` with geocentric ephemeris at `ts`, a vector of time periods
+relative to the orbit's epoch (default: `-Day(7):Day(1):Day(7)`).
+"""
+print_mpec(orbit::AbstractOrbit, params::Parameters, ts::AbstractVector{T} =
+    -Day(7):Day(1):Day(7)) where {T <: Period} = print_mpec(stdout, orbit, params, ts)
+
+# TO DO: Print observations in 80-column format at the top of the MPEC
+function print_mpec(io::IO, orbit::AbstractOrbit, params::Parameters,
+                    ts::AbstractVector{T} = -Day(7):Day(1):Day(7)) where {T <: Period}
+    x = IOBuffer()
+    print_mpec_elements(x, orbit, params)
+    print(x, '\n')
+    print_mpec_residuals(x, orbit)
+    print(x, '\n')
+    print_mpec_ephemeris(x, orbit, params, ts)
+    print(io, String(take!(x)))
     return nothing
 end
 
