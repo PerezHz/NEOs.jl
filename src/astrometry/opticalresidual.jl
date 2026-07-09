@@ -113,7 +113,7 @@ function print_mpec_residuals(io::IO, x::AbstractOpticalVector,
     @. v[1:L] = mpec_residual(x, y)
     @. v[L+1:end] = ""
     m = reshape(v, Nrows, 3)
-    print(
+    write(
         io,
         "Residuals in seconds of arc\n",
         join(join.(eachrow(m), "   "), '\n'), '\n'
