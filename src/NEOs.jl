@@ -17,6 +17,7 @@ using AngleBetweenVectors, AutoHashEquals, Dates, Downloads, HTTP, InteractiveUt
       SPICE, TaylorIntegration, TaylorSeries, XML
 
 using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
+using AstroMOID: wisric_moid
 using DataFrames: AbstractDataFrame, AsTable, DataFrame, DataFrameRow, nrow, eachrow,
       eachcol, groupby, combine
 using Dates: epochms2datetime
@@ -95,7 +96,7 @@ export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
 export variables, designation, epoch, firsttime, lasttime, noptical, nradar, minmaxdates,
        optical, sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
-       absolutemagnitude, diameter, mass, shiftepoch, print_mpec_residuals,
+       absolutemagnitude, diameter, mass, shiftepoch, earthmoid, print_mpec_residuals,
        print_mpec_elements, print_mpec_ephemeris, print_mpec
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,

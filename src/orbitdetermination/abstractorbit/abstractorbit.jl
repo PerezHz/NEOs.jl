@@ -334,6 +334,25 @@ function keplerian(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
 end
 
 """
+    keplerian(Val(:earth), params [, t])
+
+Return the heliocentric ecliptic keplerian elements of the Earth
+at time `t` [TDB days since J2000] (default: `0.0`).
+
+See also [`cartesian2keplerian`](@ref).
+"""
+function keplerian(::Val{:earth}, params::Parameters{T}, t::T = 0.0) where {T <: Real}
+    # Unpack
+    @unpack eph_ea, eph_su = params
+    # Keplerian orbital elements
+    q0 = equatorial2ecliptic(eph_ea(t) - eph_su(t))
+    elements = cartesian2keplerian(q0, t + MJD2000; μ = μ_S)
+    Γ_kep = SMatrix{6, 6, T}(fill(NaN, 6, 6))
+    kep = KeplerianElements{T, T}(μ_S, t + MJD2000, :ecliptic, elements, Γ_kep)
+    return kep
+end
+
+"""
     equinoctial(orbit, params [, t])
 
 Return the heliocentric ecliptic equinoctial elements of an `orbit`
@@ -583,6 +602,31 @@ mass(orbit::AbstractOrbit, params::Parameters) =
     mass(params.density, diameter(orbit, params))
 
 """
+    earthmoid(orbit, params [, t])
+
+Return the Minimum Orbit Intersection Distance (MOID) [au] between `orbit`
+and the Earth at time t [TDB days since J2000] (default: `epoch(orbit)`).
+
+!!! reference
+    This function uses the algorithm by Wiśniowski & Rickman (2013) as
+    implemented in AstroMOID.jl. For a description of the method see:
+    - https://ui.adsabs.harvard.edu/abs/2013AcA....63..293W
+"""
+function earthmoid(orbit::AbstractOrbit, params::Parameters, t::Real = epoch(orbit))
+    # Asteroid's keplerian elements
+    kepA = keplerian(orbit, params, t)
+    # Earth's keplerian elements
+    kepB = keplerian(Val(:earth), params, t)
+    # MOID [au]
+    return wisric_moid(
+        semimajoraxis(kepA), eccentricity(kepA), deg2rad(argperi(kepA)),
+        deg2rad(longascnode(kepA)), deg2rad(inclination(kepA)),
+        semimajoraxis(kepB), eccentricity(kepB), deg2rad(argperi(kepB)),
+        deg2rad(longascnode(kepB)), deg2rad(inclination(kepB)),
+    )
+end
+
+"""
     print_mpec_residuals([io::IO], orbit)
 
 Print to `io` the optical residuals of an `orbit` in the MPEC format.
@@ -599,7 +643,6 @@ Print to `io` the keplerian elements of an `orbit` at time `t`
 print_mpec_elements(orbit::AbstractOrbit, params::Parameters, t::Real = epoch(orbit)) =
     print_mpec_elements(stdout, orbit, params, t)
 
-# TO DO: Use MOID.jl to compute the minimum orbit intersection distance
 function print_mpec_elements(io::IO, orbit::AbstractOrbit, params::Parameters,
                              t::Real = epoch(orbit))
     jdt = t + PE.J2000 + ttmtdb(t) / daysec
@@ -631,7 +674,7 @@ function print_mpec_elements(io::IO, orbit::AbstractOrbit, params::Parameters,
     write(
         io,
         "Orbital elements:\n",
-        @sprintf("%-56sEarth MOID = %.4f AU\n", designation(orbit), NaN),
+        @sprintf("%-56sEarth MOID = %.4f AU\n", designation(orbit), earthmoid(orbit, params, t)),
         @sprintf("Epoch %s %.8f TT = JDT %.8f%3sNEOs.jl\n", Dates.format(dt, "yyyy U"), fd, jdt, ""),
         @sprintf("M%10.5f%14s(2000.0)%12sP%15sQ\n", M, "", "", ""),
         @sprintf("n%13.8f%5sPeri.%11.5f%5s%+11.8f%5s%+11.8f\n", n, "", ω, "", P_vec[1], "", Q_vec[1]),
