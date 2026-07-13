@@ -1,6 +1,6 @@
 name = "NEOs"
 uuid = "b41c07a2-2abb-11e9-070a-c3c1b239e7df"
-version = "0.28.0"
+version = "0.28.1"
 authors = ["Jorge A. Pérez Hernández", "Luis Benet", "Luis Eduardo Ramírez Montoya"]
 
 [deps]
@@ -51,7 +51,7 @@ NEOsRecipesBaseExt = "RecipesBase"
 [compat]
 AngleBetweenVectors = "0.3"
 Artifacts = "1"
-AstroAngles = "0.1"
+AstroAngles = "0.2"
 AstroMOID = "0.1.0"
 AutoHashEquals = "2"
 DataFrames = "1.5"
