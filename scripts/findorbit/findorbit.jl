@@ -45,7 +45,7 @@ function parse_commandline()
             help = "use nongravs! with A1, A2 and A3 plus the standard Marsden water-ice radial law for the final refinement"
             action = :store_true
         "--exclude-fit", "-x"
-            help = "comma-separated 1-based observation indices/ranges to exclude from the fit but keep in the saved orbit residuals, e.g. 1,4,10-12"
+            help = "comma-separated 1-based input file line numbers/ranges to exclude from the fit but keep in the saved orbit residuals, e.g. 1,4,10-12"
             arg_type = String
             default = ""
     end
@@ -101,7 +101,8 @@ function load_optical_astrometry(input::AbstractString, format::AbstractString)
     return optical, astrometry_format(optical)
 end
 
-function parseexcludedindices(spec::AbstractString, n::Int)
+function parseexcludedindices(spec::AbstractString, n::Int;
+                              unit::AbstractString = "indices")
     idxs = Int[]
     for rawtoken in split(strip(spec), ',')
         token = replace(strip(rawtoken), ':' => '-')
@@ -121,11 +122,88 @@ function parseexcludedindices(spec::AbstractString, n::Int)
     end
     sort!(unique!(idxs))
     if any(i -> i < 1 || i > n, idxs)
-        throw(ArgumentError("--exclude-fit indices must be between 1 and $n"))
+        throw(ArgumentError("--exclude-fit $unit must be between 1 and $n"))
     elseif length(idxs) == n && n > 0
         throw(ArgumentError("--exclude-fit cannot exclude every observation"))
     end
     return idxs
+end
+
+function ismpc80twolinerline(line::AbstractString)
+    length(line) >= 15 && line[15] == 'S' && return true
+    length(line) >= 80 || return false
+    obscode = view(line, 78:80)
+    return obscode == "247" || obscode == "270"
+end
+
+function mpc80filerecords(filename::AbstractString)
+    lines = readlines(filename)
+    records = Dict{Int, String}()
+    i = 1
+    while i <= length(lines)
+        line = lines[i]
+        if isempty(strip(line))
+            i += 1
+        elseif ismpc80twolinerline(line)
+            i < length(lines) || throw(ArgumentError(string(
+                "MPC80 two-line observation starts at input file line $i, ",
+                "but the second line is missing"
+            )))
+            record = string(line, '\n', lines[i+1], '\n')
+            records[i] = record
+            records[i+1] = record
+            i += 2
+        else
+            records[i] = string(line, '\n')
+            i += 1
+        end
+    end
+    return records, length(lines)
+end
+
+function parsempc80record(record::AbstractString, linenumber::Int)
+    optical = NEOs.parse_optical_mpc80(record)
+    length(optical) == 1 || throw(ArgumentError(
+        "Input file line $linenumber does not map to exactly one MPC80 observation"
+    ))
+    return only(optical)
+end
+
+function lineexcludedindices(spec::AbstractString, input::AbstractString,
+                             optical::AbstractOpticalVector, format::AbstractString)
+    isempty(strip(spec)) && return Int[]
+    isfile(input) || throw(ArgumentError(
+        "--exclude-fit uses input file line numbers and requires a local astrometry file"
+    ))
+    format == "mpc80" || throw(ArgumentError(
+        "--exclude-fit file line numbers are currently supported for MPC80/OBS80 files only"
+    ))
+    records, nlines = mpc80filerecords(input)
+    linenumbers = parseexcludedindices(spec, nlines; unit = "file line numbers")
+    badlines = [line for line in linenumbers if !haskey(records, line)]
+    isempty(badlines) || throw(ArgumentError(string(
+        "--exclude-fit line(s) do not contain MPC80 optical astrometry: ",
+        join(badlines, ",")
+    )))
+    requested = [line => parsempc80record(records[line], line) for line in linenumbers]
+    excluded = Int[]
+    ignored = Int[]
+    for (line, obs) in requested
+        idx = findfirst(==(obs), optical)
+        if isnothing(idx)
+            push!(ignored, line)
+        else
+            push!(excluded, idx)
+        end
+    end
+    sort!(unique!(excluded))
+    if length(excluded) == length(optical) && !isempty(optical)
+        throw(ArgumentError("--exclude-fit cannot exclude every observation"))
+    elseif !isempty(ignored)
+        println("• Ignored ", length(ignored), " --exclude-fit file line(s) that ",
+                "are not present after parsing/filtering: ", join(ignored, ","))
+    end
+    return excluded
 end
 
 function includedindices(n::Int, excluded::AbstractVector{Int})
@@ -248,7 +326,7 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
     permute!(mags, perm)
     permute!(apps, perm)
     # Step #1: Linkage with newtonian!
-    i = findfirst(>(0), mags)
+    i = something(findfirst(>(0), mags), length(apps))
     params = Parameters(params; outrej = false)
     od = ODProblem(newtonian!, NEOs.optical(view(apps, 1:i)), weights = Veres17,
                    debias = Eggl20)
@@ -361,7 +439,8 @@ end
 function attachfullresiduals(orbit::LeastSquaresOrbit, optical::AbstractOpticalVector,
                              excluded::AbstractVector{Int}, params::Parameters)
     od = ODProblem(orbit.dynamics, optical, weights = Veres17, debias = Eggl20)
-    bwd, fwd, ores = propres(od, orbit(), epoch(orbit) + PE.J2000, params)
+    q0 = NEOs.initialcondition(orbit, NEOs.dof(od), params)
+    bwd, fwd, ores = propres(od, q0, epoch(orbit) + PE.J2000, params)
     length(ores) == length(optical) || error("Could not compute residuals for full input arc")
     flags = fitoutlierflags(orbit, optical)
     flags[excluded] .= true
@@ -440,232 +519,6 @@ function printmpeclikeresiduals(orbit::LeastSquaresOrbit)
         end
         println(join(rpad.(row, 31)))
     end
-    println("")
-    return nothing
-end
-
-function elefield!(line::Vector{Char}, range::UnitRange{Int}, value::AbstractString;
-                   align::Symbol = :left)
-    width = length(range)
-    s = length(value) > width ? value[1:width] :
-        align === :right ? lpad(value, width) : rpad(value, width)
-    for (i, c) in enumerate(s)
-        line[first(range) + i - 1] = c
-    end
-    return line
-end
-
-function elefield!(line::Vector{Char}, start0::Int, stop0::Int, value::AbstractString;
-                   align::Symbol = :left)
-    return elefield!(line, start0 + 1:stop0, value; align)
-end
-
-packeddatecode(x::Integer) = x <= 9 ? string(x) : string(Char('A' + x - 10))
-
-function packedcentury(year::Integer)
-    century = year ÷ 100
-    return string(Char('I' + century - 18))
-end
-
-function packeddate5(dt::DateTime)
-    return string(packedcentury(Dates.year(dt)),
-                  lpad(mod(Dates.year(dt), 100), 2, '0'),
-                  packeddatecode(Dates.month(dt)),
-                  packeddatecode(Dates.day(dt)))
-end
-
-function dayfraction(dt::DateTime)
-    midnight = DateTime(Dates.Date(dt))
-    return (dt - midnight).value / 86_400_000
-end
-
-function packeddate12(dt::DateTime)
-    frac = round(Int, dayfraction(dt) * 10_000_000)
-    if frac == 10_000_000
-        dt += Day(1)
-        frac = 0
-    end
-    return string(packedcentury(Dates.year(dt)),
-                  lpad(mod(Dates.year(dt), 100), 2, '0'),
-                  packeddatecode(Dates.month(dt)),
-                  packeddatecode(Dates.day(dt)),
-                  lpad(frac, 7, '0'))
-end
-
-packeddate5(mjd::Real) = packeddate5(julian2datetime(mjd + 2_400_000.5))
-packeddate12(mjd::Real) = packeddate12(julian2datetime(mjd + 2_400_000.5))
-
-function monthabbr(dt::DateTime)
-    months = ("Jan.", "Feb.", "Mar.", "Apr.", "May ", "June",
-              "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec.")
-    return months[Dates.month(dt)]
-end
-
-function daydecimal(dt::DateTime)
-    return Dates.day(dt) + dayfraction(dt)
-end
-
-function impliedfield(x::Real, scale::Real, width::Int)
-    n = round(Int, x * scale)
-    return lpad(n, width, '0')
-end
-
-anglefield(x::Real) = impliedfield(mod(x, 360.0), 1e7, 10)
-eccfield(x::Real) = impliedfield(x, 1e9, 10)
-qfield(x::Real) = x < 10 ? impliedfield(x, 1e9, 10) : @sprintf("%10.7f", x)
-
-function nonemptyproperty(x, names::Symbol...)
-    for name in names
-        hasproperty(x, name) || continue
-        value = strip(string(getproperty(x, name)))
-        isempty(value) || return value
-    end
-    return ""
-end
-
-function opticalids(x::AbstractOpticalAstrometry)
-    number = nonemptyproperty(x, :number)
-    desig = nonemptyproperty(x, :desig)
-    if length(number) == 1 && isletter(only(number)) && !isempty(desig)
-        return "", string(number, desig)
-    end
-    permid = nonemptyproperty(x, :permid)
-    provid = nonemptyproperty(x, :provid)
-    trksub = nonemptyproperty(x, :trksub)
-    permanent = !isempty(number) ? number : !isempty(permid) ? maybe_packnum(permid) : ""
-    provisional = !isempty(desig) ? desig : !isempty(provid) ? maybe_packdesig(provid) :
-                  trksub
-    return permanent, provisional
-end
-
-function maybe_packnum(s::AbstractString)
-    try
-        return packnum(s)
-    catch
-        return s
-    end
-end
-
-function maybe_packdesig(s::AbstractString)
-    try
-        return packdesig(s)
-    catch
-        return s
-    end
-end
-
-function packeddesignation(x::AbstractOpticalAstrometry)
-    permanent, provisional = opticalids(x)
-    isempty(permanent) || return permanent
-    isempty(provisional) || return provisional
-    return "UNKNOWN"
-end
-
-packeddesignation(orbit::LeastSquaresOrbit) = packeddesignation(first(orbit.optical))
-
-function setele255designation!(line::Vector{Char}, orbit::LeastSquaresOrbit)
-    permanent, provisional = opticalids(first(orbit.optical))
-    if !isempty(permanent)
-        elefield!(line, 0, 5, permanent; align = :right)
-    elseif !isempty(provisional)
-        elefield!(line, 4, 12, provisional)
-    end
-    return line
-end
-
-function ele255name(orbit::LeastSquaresOrbit)
-    id = packeddesignation(orbit)
-    if length(id) == 8 && isletter(id[1])
-        try
-            return unpackdesig(id[2:end])
-        catch
-            return id
-        end
-    elseif length(id) == 7
-        try
-            return unpackdesig(id)
-        catch
-            return id
-        end
-    end
-    return id
-end
-
-function orbitcoefficient(orbit::LeastSquaresOrbit, variable::Int)
-    j = findfirst(==(variable), variables(orbit))
-    return isnothing(j) ? 0.0 : orbit()[j]
-end
-
-hasorbitvariable(orbit::LeastSquaresOrbit, variable::Int) =
-    !isnothing(findfirst(==(variable), variables(orbit)))
-
-function usedopticaldates(orbit::LeastSquaresOrbit)
-    idxs = [i for i in eachindex(orbit.optical) if !isoutlier(orbit.ores[i])]
-    isempty(idxs) && return minmaxdates(orbit.optical)
-    return extrema(date(orbit.optical[i]) for i in idxs)
-end
-
-function cometngfield(x::Real, width::Int, precision::Int)
-    return @sprintf("%+*.*f", width, precision, x * 1e8)
-end
-
-function mpecele255(orbit::LeastSquaresOrbit, kep, H::Real, params::Parameters)
-    line = fill(' ', 255)
-    setele255designation!(line, orbit)
-    tp_mjd = timeperipass(kep)
-    tp_dt = julian2datetime(tp_mjd + 2_400_000.5)
-    firstobs, lastobs = usedopticaldates(orbit)
-    A2 = orbitcoefficient(orbit, 7)
-    A1 = orbitcoefficient(orbit, 8)
-    A3 = orbitcoefficient(orbit, 9)
-    isng = orbit.dynamics === nongravs! || hasorbitvariable(orbit, 7) ||
-           hasorbitvariable(orbit, 8) || hasorbitvariable(orbit, 9)
-
-    elefield!(line, 12, 24, packeddate12(tp_mjd))
-    elefield!(line, 24, 34, anglefield(argperi(kep)))
-    elefield!(line, 34, 44, anglefield(longascnode(kep)))
-    elefield!(line, 44, 54, anglefield(inclination(kep)))
-    elefield!(line, 54, 64, qfield(pericenter(kep)))
-    elefield!(line, 64, 74, eccfield(eccentricity(kep)))
-    elefield!(line, 75, 80, packeddate5(epoch(kep)))
-    elefield!(line, 80, 109, ele255name(orbit))
-    elefield!(line, 109, 120, "NEOs.jl")
-    elefield!(line, 121, 125, string(Dates.year(now())))
-    isfinite(H) && elefield!(line, 130, 134, @sprintf("%4.1f", H); align = :right)
-    elefield!(line, 135, 139, "10")
-    elefield!(line, 148, 150, lpad(mod(Dates.year(tp_dt), 100), 2, '0'))
-    elefield!(line, 151, 156, monthabbr(tp_dt))
-    elefield!(line, 156, 163, @sprintf("%7.4f", daydecimal(tp_dt)); align = :right)
-    elefield!(line, 165, 174, "NEOs.jl")
-    elefield!(line, 177, 181, string(min(notout(orbit.ores), 9999)); align = :right)
-    isng && elefield!(line, 181, 182, "*")
-    elefield!(line, 183, 188, packeddate5(firstobs))
-    elefield!(line, 189, 194, packeddate5(lastobs))
-    elefield!(line, 195, 196, "h")
-    elefield!(line, 197, 200, "M-v")
-    elefield!(line, 201, 205, "003E")
-    elefield!(line, 206, 207, "9")
-
-    if isng
-        elefield!(line, 221, 222, "2")
-        hasorbitvariable(orbit, 8) && elefield!(line, 224, 231, cometngfield(A1, 7, 4))
-        hasorbitvariable(orbit, 7) && elefield!(line, 233, 242, cometngfield(A2, 9, 6))
-        hasorbitvariable(orbit, 9) && elefield!(line, 244, 251, cometngfield(A3, 7, 4))
-    elseif iselliptic(kep)
-        recip = @sprintf("%9.6f", 1 / semimajoraxis(kep))
-        elefield!(line, 230, 239, recip; align = :right)
-        elefield!(line, 250, 251, "9")
-    end
-    elefield!(line, 251, 255, @sprintf("%4.1f", min(NEOs.opticalrms(orbit), 99.9));
-              align = :right)
-
-    return String(line)
-end
-
-function printele255(ele255::AbstractString)
-    printitle("MPC ele255 orbit line", "*")
-    println(ele255)
-    println("length = ", length(ele255), " characters")
     println("")
     return nothing
 end
@@ -759,7 +612,7 @@ function main()
     println("• Loaded ", length(optical), " ", uppercase(format), " optical observations")
     filter!(!isdeprecated, optical)
     sort!(optical)
-    fit_excluded = parseexcludedindices(exclude_fit_spec, length(optical))
+    fit_excluded = lineexcludedindices(exclude_fit_spec, input, optical, format)
     fit_optical = isempty(fit_excluded) ? optical :
                   optical[includedindices(length(optical), fit_excluded)]
     if !isempty(fit_excluded)
@@ -817,7 +670,6 @@ function main()
                     "saving fit-only orbit (", typeof(err), ")")
         end
     end
-    ele255 = mpecele255(orbit, kep, H, params)
     printitle("Final orbit", "*")
     println(summary(orbit))
 
@@ -829,19 +681,18 @@ function main()
     println("H  = ", @sprintf("%.3f", H), " +/- ", @sprintf("%.3f", dH), " mag")
     println("")
     printmpeclikeresiduals(orbit)
-    use_cometary_nongravs && printele255(ele255)
 
     # Save orbit
     if isempty(fit_excluded)
-        jldsave(output; orbit, ele255)
+        jldsave(output; orbit)
     elseif full_residuals_attached
         heldout_optical = orbit.optical[fit_excluded]
         heldout_ores = orbit.ores[fit_excluded]
-        jldsave(output; orbit, fit_excluded, heldout_optical, heldout_ores, ele255)
+        jldsave(output; orbit, fit_excluded, heldout_optical, heldout_ores)
     else
         heldout_optical = optical[fit_excluded]
         heldout_ores = typeof(orbit.ores)()
-        jldsave(output; orbit, fit_excluded, heldout_optical, heldout_ores, ele255)
+        jldsave(output; orbit, fit_excluded, heldout_optical, heldout_ores)
     end
     println("Final orbit saved to: ", output)
 
