@@ -261,13 +261,13 @@ impact monitoring problem `IM`. For a list of parameters, see the
 
 - `coord::Symbol`: coordinates for the LOV; accepted values are: `:cartesian`
     (default), `:equinoctial`, `:keplerian` and `:attributable`.
-- `σmax::Real`: maximum (absolute) value of the LOV index (default: `3.0`).
+- `σmax::Real`: maximum (absolute) value of the LOV index (default: `5.0`).
 - `lovorder::Int`: order of Taylor expansions wrt LOV index (default: `4`).
 - `lovtol::Real`: absolute tolerance used to integrate the LOV (default: `1E-8`).
 - `lovsteps::Int`: maximum number of steps for the integration (default: `100`).
 """
 function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
-                          coord::Symbol = :cartesian, σmax::Real = 3.0,
+                          coord::Symbol = :cartesian, σmax::Real = 5.0,
                           lovorder::Int = 4, lovtol::Real = 1E-8,
                           lovsteps::Int = 100) where {D, T <: Real}
     # Line of variations buffer
@@ -297,7 +297,12 @@ function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
     if differentiate(1, a) < 0
         bwd, fwd = flipsign(fwd), flipsign(bwd)
     end
+    # Assemble the LOV
     domain = (lasttime(bwd), lasttime(fwd))
+    lov = LineOfVariations{D, T}(dynamicalmodel(IM), t0, coord, sun, domain, bwd, fwd)
+    if (-σmax < lbound(lov)) || (ubound(lov) < σmax)
+        @warn "Line of variations does not cover the desired interval"
+    end
 
-    return LineOfVariations{D, T}(dynamicalmodel(IM), t0, coord, sun, domain, bwd, fwd)
+    return lov
 end

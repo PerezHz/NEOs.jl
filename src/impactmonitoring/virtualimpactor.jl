@@ -196,7 +196,7 @@ function VirtualImpactor(
     return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
 end
 
-function virtualimpactors(RT::ReturnT1{T}; ctol::Real = T(Inf), σmax::Real = 3.0,
+function virtualimpactors(RT::ReturnT1{T}; ctol::Real = T(Inf), σmax::Real = 5.0,
                           no_pts::Int = 100, dmax::Real = zero(T)) where {T <: Real}
     # Allocate memory
     VIs = Vector{VirtualImpactor{T}}(undef, 0)
@@ -255,7 +255,7 @@ function virtualimpactors(RT::ReturnT1{T}; ctol::Real = T(Inf), σmax::Real = 3.
     return newVIs
 end
 
-function virtualimpactors(RTs::ShowerT1{T}; ctol::Real = T(Inf), σmax::Real = 3.0,
+function virtualimpactors(RTs::ShowerT1{T}; ctol::Real = T(Inf), σmax::Real = 5.0,
                           no_pts::Int = 100, dmax::Real = zero(T)) where {T <: Real}
     # Search for virtual impactors in each return
     _VIs_ = virtualimpactors.(RTs; ctol, σmax, no_pts, dmax)
