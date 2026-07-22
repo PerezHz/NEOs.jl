@@ -294,14 +294,10 @@ function singleapparition(apps::AbstractApparitionVector, params::Parameters)
     sort!(apps, by = apparitionrank, rev = true)
     od = ODProblem(newtonian!, NEOs.optical(apps[1]), weights = Veres17,
                    debias = Eggl20)
-    for i in 1:2
-        for app in apps
-            NEOs.update!(od, NEOs.optical(app))
-            if i == 1
-                orbitSA = gaussiod(od, params)
-            else
-                orbitSA = tsaiod(od, params; initcond)
-            end
+    for app in apps
+        NEOs.update!(od, NEOs.optical(app))
+        for i in 1:2
+            orbitSA = i == 1 ? gaussiod(od, params) : tsaiod(od, params; initcond)
             isodvalid(od, orbitSA, params) && break
         end
         isodvalid(od, orbitSA, params) && break
@@ -384,9 +380,10 @@ function finalrefinement(dynamics, orbit::LeastSquaresOrbit,
     paramsFR = Parameters(params; marsden_scalings = scalings,
                           jtlsproject = false, outrej = false)
     od = ODProblem(dynamics, optical, weights = Veres17, debias = Eggl20)
-    orbitFR = noptical(orbit) < length(optical) ?
-              linkage(od, orbit, paramsFR; maxiter = 20) :
-              jtls(od, orbit, paramsFR)
+    seed = withoutoutliers(orbit)
+    orbitFR = noptical(seed) < length(optical) ?
+              linkage(od, seed, paramsFR; maxiter = 20) :
+              jtls(od, seed, paramsFR)
     if iszero(orbitFR)
         println("• $label final refinement failed; keeping previous orbit")
         return orbit
@@ -418,6 +415,14 @@ end
 function withoutlier(res::NEOs.OpticalResidual{T, U}, outlier::Bool) where {T, U}
     return NEOs.OpticalResidual{T, U}(
         ra(res), dec(res), wra(res), wdec(res), dra(res), ddec(res), corr(res), outlier
+    )
+end
+
+function withoutoutliers(orbit::LeastSquaresOrbit)
+    return LeastSquaresOrbit(
+        orbit.dynamics, orbit.variables, orbit.optical, orbit.tracklets, orbit.radar,
+        orbit.bwd, orbit.fwd, [withoutlier(res, false) for res in orbit.ores],
+        orbit.rres, orbit.fit, orbit.qs, orbit.Qs
     )
 end
 
