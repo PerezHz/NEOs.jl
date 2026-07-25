@@ -51,7 +51,7 @@ NEOsRecipesBaseExt = "RecipesBase"
 [compat]
 AngleBetweenVectors = "0.3"
 Artifacts = "1"
-AstroAngles = "0.2"
+AstroAngles = "0.3"
 AstroMOID = "0.1.0"
 AutoHashEquals = "2"
 DataFrames = "1.5"
