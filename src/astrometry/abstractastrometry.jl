@@ -104,6 +104,7 @@ mag(x::AbstractOpticalAstrometry) = x.mag
 cataloguecode(x::AbstractOpticalAstrometry) = catalogue(x).code
 vconversion(x::AbstractOpticalAstrometry) = band(x).v_conversion
 observatorycode(x::AbstractOpticalAstrometry) = observatory(x).code
+timeofday(x::AbstractOpticalAstrometry) = x.timeofday
 
 """
     AbstractRadarAstrometry{T} <: AbstractAstrometryObservation{T}

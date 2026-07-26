@@ -164,6 +164,7 @@ astrometrydefault(::Type{String}) = ""
 astrometrydefault(::Type{Bool}) = false
 astrometrydefault(::Type{DateTime}) = DateTime(2000, 1, 1)
 astrometrydefault(::Type{T}) where {T <: Real} = T(NaN)
+astrometrydefault(::Type{TimeOfDay}) = unknowntod()
 astrometrydefault(::Type{CatalogueMPC}) = unknowncat()
 astrometrydefault(::Type{ObservatoryMPC{T}}) where {T <: Real} = unknownobs(T)
 astrometrydefault(::Type{MagnitudeBandMPC{T}}) where {T <: Real} = unknownband(T)

@@ -82,6 +82,8 @@ An optical astrometric observation in Minor Planet Center 80-column format.
     info2::String
     observatory::ObservatoryMPC{T}
     source::String
+    # Internal
+    timeofday::TimeOfDay
 end
 
 # AbstractAstrometryObservation interface
@@ -146,11 +148,12 @@ function mpc80parse(name, ::Type{T}, x) where {T <: Real}
 end
 
 OpticalMPC80(r::DataFrameRow) = OpticalMPC80{Float64}(
-    r.number, r.desig, r.discovery, r.note1, r.note2, r.date, r.ra, r.dec,
-    r.info1, r.mag, r.band, r.catalogue, r.info2, r.observatory, r.source
+    r.number, r.desig, r.discovery, r.note1, r.note2, r.date, r.ra,
+    r.dec, r.info1, r.mag, r.band, r.catalogue, r.info2, r.observatory,
+    r.source, r.timeofday
 )
 
-function parse_optical_mpc80(text::AbstractString)
+function parse_optical_mpc80(text::AbstractString; eop::EOPIAU = EOP_IAU2000A)
     # File reader
     reader = MPC80FileReader(text)
     L = length(reader.optical)
@@ -186,7 +189,9 @@ function parse_optical_mpc80(text::AbstractString)
         df.observatory[i] = ObservatoryMPC(obs; frame, coords)
     end
     # Source string
-    df.source = reader.optical
+    df.source .= reader.optical
+    # Time of day
+    tmap!((x, y) -> TimeOfDay(x, y; eop), df.timeofday, df.observatory, df.date)
     # Parse observations
     optical = OpticalMPC80.(eachrow(df))
     # Eliminate repeated entries
@@ -198,35 +203,41 @@ function parse_optical_mpc80(text::AbstractString)
 end
 
 """
-    fetch_optical_mpc80(id, source)
+    fetch_optical_mpc80(id, source; kwargs...)
 
 Return the optical astrometry of minor body `id` in the Minor Planet Center
 80-column format. The `source` of the observations can be either `MPC` or
 `NEOCP`.
+
+# Keyword arguments
+
+- `eop::EOPIAU`: Earth Orientation Parameters (default: `EOP_IAU2000A`).
 
 !!! reference
     The Minor Planet Center observations APIs are described at:
     - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/get-obs/
     - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/get-obs-neocp/
 """
-function fetch_optical_mpc80(id::AbstractString, ::Type{MPC})
+function fetch_optical_mpc80(id::AbstractString, ::Type{MPC};
+                             eop::EOPIAU = EOP_IAU2000A)
     # Get and parse HTTP response
     text = fetch_http_text(MPC; mode = 2, id = id, format = "OBS80")
     # Parse JSON
     dict = JSON.parse(text)
     # Parse observations
-    optical = parse_optical_mpc80(dict[1]["OBS80"])
+    optical = parse_optical_mpc80(dict[1]["OBS80"]; eop)
 
     return optical
 end
 
-function fetch_optical_mpc80(id::AbstractString, ::Type{NEOCP})
+function fetch_optical_mpc80(id::AbstractString, ::Type{NEOCP};
+                             eop::EOPIAU = EOP_IAU2000A)
     # Get and parse HTTP response
     text = fetch_http_text(NEOCP; mode = 1, id = id, format = "OBS80")
     # Parse JSON
     dict = JSON.parse(text)
     # Parse observations
-    optical = parse_optical_mpc80(dict[1]["OBS80"])
+    optical = parse_optical_mpc80(dict[1]["OBS80"]; eop)
 
     return optical
 end
@@ -234,16 +245,20 @@ end
 # Read / write
 
 """
-    read_optical_mpc80(filename)
+    read_optical_mpc80(filename; kwargs...)
 
 Read from `filename` a vector of optical astrometry in the Minor Planet
 Center 80-column format.
+
+# Keyword arguments
+
+- `eop::EOPIAU`: Earth Orientation Parameters (default: `EOP_IAU2000A`).
 """
-function read_optical_mpc80(filename::AbstractString)
+function read_optical_mpc80(filename::AbstractString; eop::EOPIAU = EOP_IAU2000A)
     # Read file
     text = read(filename, String)
     # Parse observations
-    optical = parse_optical_mpc80(text)
+    optical = parse_optical_mpc80(text; eop)
 
     return optical
 end

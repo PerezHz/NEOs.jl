@@ -200,9 +200,9 @@ end
 # https://doi.org/10.1016/j.icarus.2017.05.021
 function rexveres17(optical::AbstractOpticalVector{T}) where {T <: Real}
     # Construct DataFrame
-    df = DataFrame(observatory = observatory.(optical), TimeOfDay = TimeOfDay.(optical))
-    # Group by observatory and TimeOfDay
-    gdf = groupby(df, [:observatory, :TimeOfDay])
+    df = DataFrame(observatory = observatory.(optical), timeofday = timeofday.(optical))
+    # Group by observatory and timeofday
+    gdf = groupby(df, [:observatory, :timeofday])
     # Number of observations per tracklet
     cdf = combine(gdf, nrow)
     # Count observations in each group
