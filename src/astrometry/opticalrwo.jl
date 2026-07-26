@@ -158,6 +158,8 @@ An optical astrometric observation in the RWO format.
     sel_M::Int
     source::String
     header::String
+    # Internal
+    timeofday::TimeOfDay
 end
 
 # AbstractAstrometryObservation interface
@@ -233,10 +235,10 @@ OpticalRWO(r::DataFrameRow) = OpticalRWO{Float64}(
     r.design, r.K, r.T, r.N, r.date, r.date_accuracy, r.ra, r.ra_accuracy,
     r.ra_rms, r.ra_flag, r.ra_bias, r.ra_resid, r.dec, r.dec_accuracy, r.dec_rms,
     r.dec_flag, r.dec_bias, r.dec_resid, r.mag, r.mag_band, r.mag_rms, r.mag_resid,
-    r.catalogue, r.observatory, r.chi, r.sel_A, r.sel_M, r.source, r.header
+    r.catalogue, r.observatory, r.chi, r.sel_A, r.sel_M, r.source, r.header, r.timeofday
 )
 
-function parse_optical_rwo(text::AbstractString)
+function parse_optical_rwo(text::AbstractString; eop::EOPIAU = EOP_IAU2000A)
     # File reader
     reader = RWOFileReader(text)
     L = length(reader.optical)
@@ -274,9 +276,11 @@ function parse_optical_rwo(text::AbstractString)
         df.observatory[i] = ObservatoryMPC(obs; frame, coords)
     end
     # Source string
-    df.source = reader.optical
+    df.source .= reader.optical
     # File header
     df.header .= reader.header
+    # Time of day
+    tmap!((x, y) -> TimeOfDay(x, y; eop), df.timeofday, df.observatory, df.date)
     # Parse observations
     optical = OpticalRWO.(eachrow(df))
     # Eliminate repeated entries
@@ -288,29 +292,35 @@ function parse_optical_rwo(text::AbstractString)
 end
 
 """
-    fetch_optical_rwo(id, source)
+    fetch_optical_rwo(id, source; kwargs...)
 
 Return the optical astrometry of minor body `id` in the RWO format.
 The `source` of the observations can be either `NEOCC` or `NEODyS2`.
+
+# Keyword arguments
+
+- `eop::EOPIAU`: Earth Orientation Parameters (default: `EOP_IAU2000A`).
 
 !!! reference
     The NEOCC observations API is described at:
     - https://neo.ssa.esa.int/computer-access
 """
-function fetch_optical_rwo(id::AbstractString, ::Type{NEOCC})
+function fetch_optical_rwo(id::AbstractString, ::Type{NEOCC};
+                           eop::EOPIAU = EOP_IAU2000A)
     # Get and parse HTTP response
     text = fetch_http_text(NEOCC; id = replace(id, " " => ""))
     # Parse observations
-    optical = parse_optical_rwo(text)
+    optical = parse_optical_rwo(text; eop)
 
     return optical
 end
 
-function fetch_optical_rwo(id::AbstractString, ::Type{NEODyS2})
+function fetch_optical_rwo(id::AbstractString, ::Type{NEODyS2};
+                           eop::EOPIAU = EOP_IAU2000A)
     # Get and parse HTTP response
     text = fetch_http_text(NEODyS2; id = replace(id, " " => ""))
     # Parse observations
-    optical = parse_optical_rwo(text)
+    optical = parse_optical_rwo(text; eop)
 
     return optical
 end
@@ -318,15 +328,19 @@ end
 # Read / write
 
 """
-    read_optical_rwo(filename)
+    read_optical_rwo(filename; kwargs...)
 
 Read from `filename` a vector of optical astrometry in the RWO format.
+
+# Keyword arguments
+
+- `eop::EOPIAU`: Earth Orientation Parameters (default: `EOP_IAU2000A`).
 """
-function read_optical_rwo(filename::AbstractString)
+function read_optical_rwo(filename::AbstractString; eop::EOPIAU = EOP_IAU2000A)
     # Read file
     text = read(filename, String)
     # Parse observations
-    optical = parse_optical_rwo(text)
+    optical = parse_optical_rwo(text; eop)
 
     return optical
 end

@@ -486,13 +486,13 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
     @testset "Topocentric" begin
 
-        using NEOs: TimeOfDay, isday, isnight, issatellite, isgeocentric,
-              sunriseset, obsposECEF, obsposvelECI, parse_optical_ades
+        using NEOs: isday, isnight, issatellite, isgeocentric, sunriseset,
+                    obsposECEF, obsposvelECI, parse_optical_ades
 
         # TimeOfDay
-        light1 = TimeOfDay.(optical1)
-        light2 = TimeOfDay.(optical2)
-        light3 = TimeOfDay.(optical3)
+        light1 = timeofday.(optical1)
+        light2 = timeofday.(optical2)
+        light3 = timeofday.(optical3)
 
         mask1, mask2, mask3 = @. isday(light1), isday(light2), isday(light3)
         @test count(mask1) == count(mask2) == count(mask3) == 0
