@@ -129,6 +129,7 @@ trackletid(x::OpticalADES) = x.trkid
 isdiscovery(x::OpticalADES) = !isempty(x.disc)
 
 isdeprecated(x::OpticalADES) = !isempty(x.deprecated)
+isoutlier(x::OpticalADES) = isdeprecated(x) || abs(corr(x)) ≥ 1
 
 function designation(x::OpticalADES)
     # If there is no number, use temporary designation

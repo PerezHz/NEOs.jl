@@ -6,15 +6,20 @@ Supertype for the optical astrometry debiasing schemes interface.
 Every debiasing scheme `D{T}` must:
 - be a mutable subtype of `AbstractDebiasingScheme{T}`,
 - implement a `D(::AbstractOpticalVector{T})` constructor,
-- override `debias(::D)`,
-- override `getid(::D)`,
+- override `getid(::D)` and `debias(::D)`.
 - override `update!(::D{T}, ::AbstractOpticalVector{T})`.
 """
 abstract type AbstractDebiasingScheme{T} <: AbstractAstrometryErrorModel{T} end
 
+# AbstractDebiasingScheme interface
+nobs(x::AbstractDebiasingScheme) = length(debias(x))
+
+debias(x::AbstractDebiasingScheme, i::Int) = debias(x)[i]
+debias(x::AbstractDebiasingScheme, i::AbstractVector{Int}) = view(debias(x), i)
+
 # Print method for AbstractDebiasingScheme
 show(io::IO, x::AbstractDebiasingScheme) = print(io, getid(x),
-    " debiasing scheme with ", length(debias(x)), " observations")
+    " debiasing scheme with ", nobs(x), " observations")
 
 """
     ZeroDebiasing{T} <: AbstractDebiasingScheme{T}
@@ -30,11 +35,9 @@ function ZeroDebiasing(optical::AbstractOpticalVector{T}) where {T <: Real}
     return ZeroDebiasing{T}([(zero(T), zero(T)) for _ in eachindex(optical)])
 end
 
-# Override debias
-debias(x::ZeroDebiasing) = x.debias
-
-# Override getid
+# Override getid and debias
 getid(::ZeroDebiasing) = "Zero"
+debias(x::ZeroDebiasing) = x.debias
 
 # Override update!
 function update!(x::ZeroDebiasing{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
@@ -56,11 +59,9 @@ function SourceDebiasing(optical::AbstractOpticalVector{T}) where {T <: Real}
     return SourceDebiasing{T}(debias.(optical))
 end
 
-# Override debias
-debias(x::SourceDebiasing) = x.debias
-
-# Override getid
+# Override getid and debias
 getid(::SourceDebiasing) = "Source"
+debias(x::SourceDebiasing) = x.debias
 
 # Override update!
 function update!(x::SourceDebiasing{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
@@ -92,11 +93,9 @@ function Farnocchia15(optical::AbstractOpticalVector{T}) where {T <: Real}
     return Farnocchia15{T}(debias, catcodes, truth, resol, table)
 end
 
-# Override debias
-debias(x::Farnocchia15) = x.debias
-
-# Override getid
+# Override getid and debias
 getid(::Farnocchia15) = "Farnocchia et al. (2015)"
+debias(x::Farnocchia15) = x.debias
 
 # Override update!
 function update!(x::Farnocchia15{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
@@ -130,11 +129,9 @@ function Eggl20(optical::AbstractOpticalVector{T}, hires::Bool = false) where {T
     return Eggl20{T}(debias, hires, catcodes, truth, resol, table)
 end
 
-# Override debias
-debias(x::Eggl20) = x.debias
-
-# Override getid
+# Override getid and debias
 getid(x::Eggl20) = string("Eggl et al. (2020)", x.hires ? " [high resolution]" : "")
+debias(x::Eggl20) = x.debias
 
 # Override update!
 function update!(x::Eggl20{T}, optical::AbstractOpticalVector{T}) where {T <: Real}

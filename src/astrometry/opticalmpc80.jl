@@ -100,6 +100,7 @@ trackletid(x::OpticalMPC80) = ""
 isdiscovery(x::OpticalMPC80) = x.discovery == '*'
 
 isdeprecated(x::OpticalMPC80) = x.note2 == 'X'
+isoutlier(x::OpticalMPC80) = isdeprecated(x)
 
 function designation(x::OpticalMPC80)
     if isempty(x.number)
