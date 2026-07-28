@@ -178,6 +178,7 @@ corr(::OpticalRWO{T}) where {T <: Real} = zero(T)
 trackletid(x::OpticalRWO) = ""
 
 isdeprecated(x::OpticalRWO) = x.T == 'X'
+isoutlier(x::OpticalRWO) = iszero(x.sel_A)
 
 designation(x::OpticalRWO) = x.design
 
