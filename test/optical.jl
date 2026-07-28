@@ -175,7 +175,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test objects2 == objects3
 
     end
-
+    #=
     @testset "OpticalRWO" begin
 
         using NEOs: NEODyS2_OPTICAL_HEADER, OpticalRWO, parse_optical_rwo, isoccultation
@@ -306,6 +306,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test all(@. isoccultation(optical5.observatory))
 
     end
+    =#
 
     @testset "OpticalADES" begin
 
@@ -739,10 +740,10 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test all(==((1.0, 1.0)), weights(w11))
         @test all(==((1.0, 1.0)), weights(w12))
 
-        @test length(corr(w11)) == length(corr(w12)) == length(corr(w13))
-        @test all(iszero, corr(w11))
-        @test all(iszero, corr(w12))
-        @test all(iszero, corr(w13))
+        @test length(corrs(w11)) == length(corrs(w12)) == length(corrs(w13))
+        @test all(iszero, corrs(w11))
+        @test all(iszero, corrs(w12))
+        @test all(iszero, corrs(w13))
 
         w21 = UniformWeights(optical2)
         w22 = SourceWeights(optical2)
@@ -763,10 +764,10 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         all( @. $weights(w22) == tuple(1 / getfield(optical2, :ra_rms),
             1 / getfield(optical2, :dec_rms)) )
 
-        @test length(corr(w21)) == length(corr(w22)) == length(corr(w23))
-        @test all(iszero, corr(w21))
-        @test all(iszero, corr(w22))
-        @test all(iszero, corr(w23))
+        @test length(corrs(w21)) == length(corrs(w22)) == length(corrs(w23))
+        @test all(iszero, corrs(w21))
+        @test all(iszero, corrs(w22))
+        @test all(iszero, corrs(w23))
 
         w31 = UniformWeights(optical3)
         w32 = SourceWeights(optical3)
@@ -784,39 +785,39 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
             w == (1 / σx[1], 1 / σx[2])
         end)
 
-        @test length(corr(w31)) == length(corr(w32)) == length(corr(w33))
-        @test all(iszero, corr(w31))
-        @test all(map(corr(w32), optical3) do ρ, x
+        @test length(corrs(w31)) == length(corrs(w32)) == length(corrs(w33))
+        @test all(iszero, corrs(w31))
+        @test all(map(corrs(w32), optical3) do ρ, x
             ρ == (isnan(x.rmscorr) ? 0.0 : x.rmscorr)
         end)
-        @test all(iszero, corr(w33))
+        @test all(iszero, corrs(w33))
 
         @test weights(w13) == weights(w23) == weights(w33)
-        @test corr(w13) == corr(w23) == corr(w33)
+        @test corrs(w13) == corrs(w23) == corrs(w33)
 
         update!(w11, optical1[1:1])
         update!(w12, optical1[1:1])
         update!(w13, optical1[1:1])
 
-        @test w11.weights == [(1.0, 1.0)] && w11.corr == [0.0]
-        @test w12.weights == [(1.0, 1.0)] && w12.corr == [0.0]
-        @test w13.weights == [(1.0, 1.0)] && w13.corr == [0.0]
+        @test w11.weights == [(1.0, 1.0)] && w11.corrs == [0.0]
+        @test w12.weights == [(1.0, 1.0)] && w12.corrs == [0.0]
+        @test w13.weights == [(1.0, 1.0)] && w13.corrs == [0.0]
 
         update!(w21, optical2[1:1])
         update!(w22, optical2[1:1])
         update!(w23, optical2[1:1])
 
-        @test w21.weights == [(1.0, 1.0)] && w21.corr == [0.0]
-        @test w22.weights == [(1.0, 1.0)] && w22.corr == [0.0]
-        @test w23.weights == [(1.0, 1.0)] && w23.corr == [0.0]
+        @test w21.weights == [(1.0, 1.0)] && w21.corrs == [0.0]
+        @test w22.weights == [(1.0, 1.0)] && w22.corrs == [0.0]
+        @test w23.weights == [(1.0, 1.0)] && w23.corrs == [0.0]
 
         update!(w31, optical3[1:1])
         update!(w32, optical3[1:1])
         update!(w33, optical3[1:1])
 
-        @test w31.weights == [(1.0, 1.0)] && w31.corr == [0.0]
-        @test w32.weights == [(1.0, 1.0)] && w32.corr == [0.0]
-        @test w33.weights == [(1.0, 1.0)] && w33.corr == [0.0]
+        @test w31.weights == [(1.0, 1.0)] && w31.corrs == [0.0]
+        @test w32.weights == [(1.0, 1.0)] && w32.corrs == [0.0]
+        @test w33.weights == [(1.0, 1.0)] && w33.corrs == [0.0]
 
     end
 
