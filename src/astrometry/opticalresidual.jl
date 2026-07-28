@@ -216,11 +216,11 @@ function init_optical_residuals(
     w8s = weights(wsm, idxs)
     bias = debias(dsm, idxs)
     korrs = corrs(wsm, idxs)
-    outliers = outliers(wsm, idxs)
+    outs = outliers(wsm, idxs)
     res = Vector{OpticalResidual{T, U}}(undef, length(idxs))
     for i in eachindex(res)
         res[i] = OpticalResidual{T, U}(zero(U), zero(U), w8s[i]..., bias[i]...,
-                                       korrs[i], outliers[i])
+                                       korrs[i], outs[i])
     end
     return res
 end

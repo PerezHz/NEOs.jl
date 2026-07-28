@@ -151,8 +151,8 @@ end
         # Read optical astrometry file
         optical_2023DW = read_optical_mpc80(joinpath(TEST_DATA, "2023DW.txt"))
         # Make weigths and debiasing corrections
-        w8s = weights(Veres17(optical_2023DW))
-        bias = debias(Eggl20(optical_2023DW))
+        w8s = Veres17(optical_2023DW)
+        bias = Eggl20(optical_2023DW)
 
         # Compute normalized residuals
         _res_ = NEOs.residuals(
@@ -166,8 +166,8 @@ end
         @test iszero(zero(eltype(_res_)))
         @test all(@. isa(string(_res_), String))
         @test all(@. residual(_res_) == tuple(ra(_res_), dec(_res_)))
-        @test all(@. weight(_res_) == w8s)
-        @test all(@. debias(_res_) == bias)
+        @test all(@. weight(_res_) == $weights(w8s))
+        @test all(@. debias(_res_) == $debias(bias))
         @test sqrt(chi2(_res_)) ≤ sum(chi, _res_)
         @test all(@. logchi(_res_) < log10chi(_res_) || chi(_res_) > 1)
 
@@ -206,8 +206,8 @@ end
         @test iszero(zero(eltype(_res1_)))
         @test all(@. isa(string(_res1_), String))
         @test all(@. residual(_res1_) == tuple(ra(_res1_), dec(_res1_)))
-        @test all(@. weight(_res1_) == w8s)
-        @test all(@. debias(_res1_) == bias)
+        @test all(@. weight(_res1_) == $weights(w8s))
+        @test all(@. debias(_res1_) == $debias(bias))
         @test sqrt(chi2(_res1_)) ≤ sum(chi, _res1_)
         @test all(@. logchi(_res1_) < log10chi(_res1_) || chi(_res1_) > 1)
 
@@ -262,8 +262,8 @@ end
         # Read optical astrometry file
         optical_Apophis = read_optical_mpc80(joinpath(TEST_DATA, "99942_Tholen_etal_2013.dat"))
         # Make weights and debiasing corrections
-        w8s = weights(Veres17(optical_Apophis))
-        bias = debias(Eggl20(optical_Apophis))
+        w8s = Veres17(optical_Apophis)
+        bias = Eggl20(optical_Apophis)
 
         # Compute optical astrometry residuals
         res_optical = NEOs.residuals(
@@ -277,8 +277,8 @@ end
         @test iszero(zero(eltype(res_optical)))
         @test all(@. isa(string(res_optical), String))
         @test all(@. residual(res_optical) == tuple(ra(res_optical), dec(res_optical)))
-        @test all(@. weight(res_optical) == w8s)
-        @test all(@. debias(res_optical) == bias)
+        @test all(@. weight(res_optical) == $weights(w8s))
+        @test all(@. debias(res_optical) == $debias(bias))
         @test sqrt(chi2(res_optical)) ≤ sum(chi, res_optical)
         @test all(@. logchi(res_optical) < log10chi(res_optical) || chi(res_optical) > 1)
 
@@ -461,8 +461,8 @@ end
         # Read optical astrometry file
         optical_Apophis = read_optical_mpc80(joinpath(TEST_DATA, "99942_Tholen_etal_2013.dat"))
         # Make weights and debiasing corrections
-        w8s = weights(Veres17(optical_Apophis))
-        bias = debias(Eggl20(optical_Apophis))
+        w8s = Veres17(optical_Apophis)
+        bias = Eggl20(optical_Apophis)
 
         # Compute optical astrometry residuals
         res_optical = NEOs.residuals(optical_Apophis, w8s, bias;
@@ -474,8 +474,8 @@ end
         @test iszero(zero(eltype(res_optical)))
         @test all(@. isa(string(res_optical), String))
         @test all(@. residual(res_optical) == tuple(ra(res_optical), dec(res_optical)))
-        @test all(@. weight(res_optical) == w8s)
-        @test all(@. debias(res_optical) == bias)
+        @test all(@. weight(res_optical) == $weights(w8s))
+        @test all(@. debias(res_optical) == $debias(bias))
         @test sqrt(chi2(res_optical)) ≤ sum(chi, res_optical)
         # @test all(@. logchi(res_optical) < log10chi(res_optical) || chi(res_optical) > 1)
 

@@ -129,7 +129,7 @@ end
 function init_radar_residuals(
         ::Type{U}, od::MixedODProblem,
         idxs::AbstractVector{Int} = radarindices(od),
-        outliers = falses(nradar(x))
+        outliers = falses(nradar(od))
     ) where {U <: Number}
     radar = view(od.radar, idxs)
     return init_radar_residuals(U, radar, outliers)
