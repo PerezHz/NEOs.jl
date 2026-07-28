@@ -153,12 +153,10 @@ function init_optical_residuals(::Type{V}, orbit::AbstractOrbit{D, T, U}) where 
                                 T <: Real, U <: Number, V <: Number}
     # Initialize vector of optical residuals
     res = Vector{OpticalResidual{T, V}}(undef, noptical(orbit))
-    for i in eachindex(res)
-        ra, dec = zero(V), zero(V)
-        @unpack wra, wdec, dra, ddec, corr, outlier = orbit.ores[i]
-        res[i] = OpticalResidual{T, V}(ra, dec, wra, wdec, dra, ddec, corr, outlier)
+    for (i, r) in enumerate(orbit.ores)
+        res[i] = OpticalResidual{T, V}(zero(V), zero(V), wra(r), wdec(r), dra(r),
+                                       ddec(r), corr(r), isoutlier(r))
     end
-
     return res
 end
 

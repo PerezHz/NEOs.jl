@@ -52,7 +52,7 @@ end
 # Override getid, weights, corrs and outliers
 getid(::UniformWeights) = "Uniform"
 weights(x::UniformWeights) = x.weights
-corrs(x::UniformWeights) = x.corr
+corrs(x::UniformWeights) = x.corrs
 outliers(x::UniformWeights) = x.outliers
 
 # Override update!
@@ -86,7 +86,7 @@ end
 # Override getid, weights, corrs and outliers
 getid(::SourceWeights) = "Source"
 weights(x::SourceWeights) = x.weights
-corrs(x::SourceWeights) = x.corr
+corrs(x::SourceWeights) = x.corrs
 outliers(x::SourceWeights) = x.outliers
 
 # Override update!
@@ -124,7 +124,7 @@ end
 # Override getid, weights, corrs and outliers
 getid(::Veres17) = "Veres et al. (2017)"
 weights(x::Veres17) = x.weights
-corrs(x::Veres17) = x.corr
+corrs(x::Veres17) = x.corrs
 outliers(x::Veres17) = x.outliers
 
 # Override update!
