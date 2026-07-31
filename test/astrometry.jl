@@ -277,7 +277,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # Fetch obervatory information
         obs = fetch_observatory_information("G96")
         @test obs["created_at"] == "Sat, 25 May 2019 00:11:26 GMT"
-        @test obs["firstdate"] == "2007-09-14"
+        @test obs["firstdate"] == "2004-09-22"
         @test isnothing(obs["lastdate"])
         @test obs["longitude"] == "249.21128"
         @test obs["name"] == "University of Arizona Mt. Lemmon Survey"
