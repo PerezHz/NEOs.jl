@@ -9,7 +9,9 @@ using Test
 
 using NEOs: OpticalMPC80, RadarJPL, AbstractOpticalVector, RadarResidual, KeplerianElements,
       EquinoctialElements, AttributableElements, μ_S, indices, equatorial2ecliptic,
-      ecliptic2equatorial, numtypes, sseph, covariance
+      ecliptic2equatorial, numtypes, sseph, covariance, scalartype, opticaltype, radartype,
+      dof, hasradar
+
 using Statistics: mean
 
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
@@ -222,13 +224,21 @@ end
            significance = 0.99, outrej = false, parse_eqs = false
         )
         params = Parameters(params, parse_eqs = true)
+
         # Orbit determination problem
         od = ODProblem(newtonian!, suboptical)
+
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 9, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -376,10 +386,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, optical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 9, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -464,10 +481,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, suboptical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by July 9, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -550,7 +574,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by July 9, 2026
+        # Values by July 31, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -695,10 +719,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, optical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 9, 2026
+        # Values by July 31, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -786,10 +817,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, suboptical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 9, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -942,10 +980,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, optical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 9, 2026
+        # Values by July 31, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -1033,10 +1078,24 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, suboptical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
+
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 9, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1214,10 +1273,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, optical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by July 9, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1307,6 +1373,13 @@ end
         # Orbit determination problem (only optical astrometry)
         od0 = ODProblem(newtonian!, optical)
 
+        @test isa(string(od0), String)
+        @test scalartype(od0) == Float64
+        @test opticaltype(od0) == OpticalMPC80{Float64}
+        @test radartype(od0) == Nothing && !hasradar(od0)
+        @test dof(od0) == 6
+        @test NEOs.optical(od0) == optical && isnothing(NEOs.radar(od0))
+
         # Preliminary orbit (only optical astrometry)
         loadjpleph()
         jd0 = datetime2julian(DateTime(2005, 1, 29))
@@ -1323,10 +1396,17 @@ end
         # Orbit determination problem (both optical and radar astrometry)
         od1 = ODProblem(newtonian!, optical, radar)
 
+        @test isa(string(od1), String)
+        @test scalartype(od1) == Float64
+        @test opticaltype(od1) == OpticalMPC80{Float64}
+        @test radartype(od1) == RadarJPL{Float64} && hasradar(od1)
+        @test dof(od1) == 6
+        @test NEOs.optical(od1) == optical && NEOs.radar(od1) == radar
+
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by July 9, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1420,6 +1500,14 @@ end
         # Orbit determination problem with only the observations from 2020
         idxs = findall(x -> date(x) > Date(2020), optical)
         od = ODProblem(newtonian!, optical[idxs]; weights = Veres17, debias = Eggl20)
+
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == optical[idxs] && isnothing(NEOs.radar(od))
+
         # Orbit Determination with only the observations from 2020
         orbit = initialorbitdetermination(od, params)
 
@@ -1428,7 +1516,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by July 9, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
