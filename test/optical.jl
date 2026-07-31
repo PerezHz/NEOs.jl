@@ -175,7 +175,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test objects2 == objects3
 
     end
-    #=
+
     @testset "OpticalRWO" begin
 
         using NEOs: NEODyS2_OPTICAL_HEADER, OpticalRWO, parse_optical_rwo, isoccultation
@@ -306,7 +306,6 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test all(@. isoccultation(optical5.observatory))
 
     end
-    =#
 
     @testset "OpticalADES" begin
 
@@ -736,14 +735,41 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test getid(w12) == "Source"
         @test getid(w13) == "Veres et al. (2017)"
 
-        @test length(weights(w11)) == length(weights(w12)) == length(weights(w13))
-        @test all(==((1.0, 1.0)), weights(w11))
-        @test all(==((1.0, 1.0)), weights(w12))
+        ww11, ww12, ww13 = weights(w11), weights(w12), weights(w13)
+        @test length(ww11) == length(ww12) == length(ww13)
+        @test all(==((1.0, 1.0)), ww11)
+        @test all(==((1.0, 1.0)), ww12)
+        @test ww11 == weights.(Ref(w11), eachindex(ww11)) == weights(w11, eachindex(ww11))
+        @test ww12 == weights.(Ref(w12), eachindex(ww12)) == weights(w12, eachindex(ww12))
+        @test ww13 == weights.(Ref(w13), eachindex(ww13)) == weights(w13, eachindex(ww13))
 
-        @test length(corrs(w11)) == length(corrs(w12)) == length(corrs(w13))
-        @test all(iszero, corrs(w11))
-        @test all(iszero, corrs(w12))
-        @test all(iszero, corrs(w13))
+        cw11, cw12, cw13 = corrs(w11), corrs(w12), corrs(w13)
+        @test length(cw11) == length(cw12) == length(cw13)
+        @test all(iszero, cw11)
+        @test all(iszero, cw12)
+        @test all(iszero, cw13)
+        @test cw11 == corrs.(Ref(w11), eachindex(cw11)) == corrs(w11, eachindex(cw11))
+        @test cw12 == corrs.(Ref(w12), eachindex(cw12)) == corrs(w12, eachindex(cw12))
+        @test cw13 == corrs.(Ref(w13), eachindex(cw13)) == corrs(w13, eachindex(cw13))
+
+        ow11, ow12, ow13 = outliers(w11), outliers(w12), outliers(w13)
+        @test length(ow11) == length(ow12) == length(ow13)
+        @test all(!, ow11)
+        @test all(!, ow12)
+        @test all(!, ow13)
+        @test ow11 == outliers.(Ref(w11), eachindex(ow11)) == outliers(w11, eachindex(ow11))
+        @test ow12 == outliers.(Ref(w12), eachindex(ow12)) == outliers(w12, eachindex(ow12))
+        @test ow13 == outliers.(Ref(w13), eachindex(ow13)) == outliers(w13, eachindex(ow13))
+
+        setoutlier!.(Ref(w11), eachindex(ow11), Ref(true))
+        setoutlier!.(Ref(w12), eachindex(ow12), Ref(true))
+        setoutlier!.(Ref(w13), eachindex(ow13), Ref(true))
+        @test all(ow11) && all(ow12) && all(ow13)
+
+        setoutlier!(w11, eachindex(ow11), falses(length(ow11)))
+        setoutlier!(w12, eachindex(ow12), falses(length(ow12)))
+        setoutlier!(w13, eachindex(ow13), falses(length(ow13)))
+        @test all(!, ow11) && all(!, ow12) && all(!, ow13)
 
         w21 = UniformWeights(optical2)
         w22 = SourceWeights(optical2)
@@ -754,20 +780,42 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test getid(w22) == "Source"
         @test getid(w23) == "Veres et al. (2017)"
 
-        @test length(weights(w21)) == length(weights(w22)) == length(weights(w23))
-        @test all(==((1.0, 1.0)), weights(w21))
-        @test all(map(weights(w22), optical2) do w, x
-            σx = rms(x)
-            w == (1 / σx[1], 1 / σx[2])
-        end)
-
-        all( @. $weights(w22) == tuple(1 / getfield(optical2, :ra_rms),
+        ww21, ww22, ww23 = weights(w21), weights(w22), weights(w23)
+        @test length(ww21) == length(ww22) == length(ww23)
+        @test all(==((1.0, 1.0)), ww21)
+        @test all( @. ww22 == tuple(1 / getfield(optical2, :ra_rms),
             1 / getfield(optical2, :dec_rms)) )
+        @test ww21 == weights.(Ref(w21), eachindex(ww21)) == weights(w21, eachindex(ww21))
+        @test ww22 == weights.(Ref(w22), eachindex(ww22)) == weights(w22, eachindex(ww22))
+        @test ww23 == weights.(Ref(w23), eachindex(ww23)) == weights(w23, eachindex(ww23))
 
-        @test length(corrs(w21)) == length(corrs(w22)) == length(corrs(w23))
-        @test all(iszero, corrs(w21))
-        @test all(iszero, corrs(w22))
-        @test all(iszero, corrs(w23))
+        cw21, cw22, cw23 = corrs(w21), corrs(w22), corrs(w23)
+        @test length(cw21) == length(cw22) == length(cw23)
+        @test all(iszero, cw21)
+        @test all(iszero, cw22)
+        @test all(iszero, cw23)
+        @test cw21 == corrs.(Ref(w21), eachindex(cw21)) == corrs(w21, eachindex(cw21))
+        @test cw22 == corrs.(Ref(w22), eachindex(cw22)) == corrs(w22, eachindex(cw22))
+        @test cw23 == corrs.(Ref(w23), eachindex(cw23)) == corrs(w23, eachindex(cw23))
+
+        ow21, ow22, ow23 = outliers(w21), outliers(w22), outliers(w23)
+        @test length(ow21) == length(ow22) == length(ow23)
+        @test all(!, ow21)
+        @test count(ow22) == count(isoutlier, optical2)
+        @test all(!, ow23)
+        @test ow21 == outliers.(Ref(w21), eachindex(ow21)) == outliers(w21, eachindex(ow21))
+        @test ow22 == outliers.(Ref(w22), eachindex(ow22)) == outliers(w22, eachindex(ow22))
+        @test ow23 == outliers.(Ref(w23), eachindex(ow23)) == outliers(w23, eachindex(ow23))
+
+        setoutlier!.(Ref(w21), eachindex(ow21), Ref(true))
+        setoutlier!.(Ref(w22), eachindex(ow22), Ref(true))
+        setoutlier!.(Ref(w23), eachindex(ow23), Ref(true))
+        @test all(ow21) && all(ow22) && all(ow23)
+
+        setoutlier!(w21, eachindex(ow21), falses(length(ow21)))
+        setoutlier!(w22, eachindex(ow22), falses(length(ow22)))
+        setoutlier!(w23, eachindex(ow23), falses(length(ow23)))
+        @test all(!, ow21) && all(!, ow22) && all(!, ow23)
 
         w31 = UniformWeights(optical3)
         w32 = SourceWeights(optical3)
@@ -778,46 +826,73 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test getid(w32) == "Source"
         @test getid(w33) == "Veres et al. (2017)"
 
-        @test length(weights(w31)) == length(weights(w32)) == length(weights(w33))
-        @test all(==((1.0, 1.0)), weights(w31))
-        @test all(map(weights(w32), optical3) do w, x
+        ww31, ww32, ww33 = weights(w31), weights(w32), weights(w33)
+        @test length(ww31) == length(ww32) == length(ww33)
+        @test all(==((1.0, 1.0)), ww31)
+        @test all(map(ww32, optical3) do w, x
             σx = rms(x)
             w == (1 / σx[1], 1 / σx[2])
         end)
+        @test ww31 == weights.(Ref(w31), eachindex(ww31)) == weights(w31, eachindex(ww31))
+        @test ww32 == weights.(Ref(w32), eachindex(ww32)) == weights(w32, eachindex(ww32))
+        @test ww33 == weights.(Ref(w33), eachindex(ww33)) == weights(w33, eachindex(ww33))
 
-        @test length(corrs(w31)) == length(corrs(w32)) == length(corrs(w33))
-        @test all(iszero, corrs(w31))
-        @test all(map(corrs(w32), optical3) do ρ, x
+        cw31, cw32, cw33 = corrs(w31), corrs(w32), corrs(w33)
+        @test length(cw31) == length(cw32) == length(cw33)
+        @test all(iszero, cw31)
+        @test all(map(cw32, optical3) do ρ, x
             ρ == (isnan(x.rmscorr) ? 0.0 : x.rmscorr)
         end)
-        @test all(iszero, corrs(w33))
+        @test all(iszero, cw33)
+        @test cw31 == corrs.(Ref(w31), eachindex(cw31)) == corrs(w31, eachindex(cw31))
+        @test cw32 == corrs.(Ref(w32), eachindex(cw32)) == corrs(w32, eachindex(cw32))
+        @test cw33 == corrs.(Ref(w33), eachindex(cw33)) == corrs(w33, eachindex(cw33))
 
-        @test weights(w13) == weights(w23) == weights(w33)
-        @test corrs(w13) == corrs(w23) == corrs(w33)
+        ow31, ow32, ow33 = outliers(w31), outliers(w32), outliers(w33)
+        @test length(ow31) == length(ow32) == length(ow33)
+        @test all(!, ow31)
+        @test all(!, ow32)
+        @test all(!, ow33)
+        @test ow31 == outliers.(Ref(w31), eachindex(ow31)) == outliers(w31, eachindex(ow31))
+        @test ow32 == outliers.(Ref(w32), eachindex(ow32)) == outliers(w32, eachindex(ow32))
+        @test ow33 == outliers.(Ref(w33), eachindex(ow33)) == outliers(w33, eachindex(ow33))
+
+        setoutlier!.(Ref(w31), eachindex(ow31), Ref(true))
+        setoutlier!.(Ref(w32), eachindex(ow32), Ref(true))
+        setoutlier!.(Ref(w33), eachindex(ow33), Ref(true))
+        @test all(ow31) && all(ow32) && all(ow33)
+
+        setoutlier!(w31, eachindex(ow31), falses(length(ow31)))
+        setoutlier!(w32, eachindex(ow32), falses(length(ow32)))
+        setoutlier!(w33, eachindex(ow33), falses(length(ow33)))
+        @test all(!, ow31) && all(!, ow32) && all(!, ow33)
+
+        @test ww13 == ww23 == ww33
+        @test cw13 == cw23 == cw33
 
         update!(w11, optical1[1:1])
         update!(w12, optical1[1:1])
         update!(w13, optical1[1:1])
 
-        @test w11.weights == [(1.0, 1.0)] && w11.corrs == [0.0]
-        @test w12.weights == [(1.0, 1.0)] && w12.corrs == [0.0]
-        @test w13.weights == [(1.0, 1.0)] && w13.corrs == [0.0]
+        @test w11.weights == [(1.0, 1.0)] && w11.corrs == [0.0] && w11.outliers == [false]
+        @test w12.weights == [(1.0, 1.0)] && w12.corrs == [0.0] && w12.outliers == [false]
+        @test w13.weights == [(1.0, 1.0)] && w13.corrs == [0.0] && w13.outliers == [false]
 
         update!(w21, optical2[1:1])
         update!(w22, optical2[1:1])
         update!(w23, optical2[1:1])
 
-        @test w21.weights == [(1.0, 1.0)] && w21.corrs == [0.0]
-        @test w22.weights == [(1.0, 1.0)] && w22.corrs == [0.0]
-        @test w23.weights == [(1.0, 1.0)] && w23.corrs == [0.0]
+        @test w21.weights == [(1.0, 1.0)] && w21.corrs == [0.0] && w21.outliers == [false]
+        @test w22.weights == [(1.0, 1.0)] && w22.corrs == [0.0] && w22.outliers == [false]
+        @test w23.weights == [(1.0, 1.0)] && w23.corrs == [0.0] && w23.outliers == [false]
 
         update!(w31, optical3[1:1])
         update!(w32, optical3[1:1])
         update!(w33, optical3[1:1])
 
-        @test w31.weights == [(1.0, 1.0)] && w31.corrs == [0.0]
-        @test w32.weights == [(1.0, 1.0)] && w32.corrs == [0.0]
-        @test w33.weights == [(1.0, 1.0)] && w33.corrs == [0.0]
+        @test w31.weights == [(1.0, 1.0)] && w31.corrs == [0.0] && w31.outliers == [false]
+        @test w32.weights == [(1.0, 1.0)] && w32.corrs == [0.0] && w32.outliers == [false]
+        @test w33.weights == [(1.0, 1.0)] && w33.corrs == [0.0] && w33.outliers == [false]
 
     end
 
