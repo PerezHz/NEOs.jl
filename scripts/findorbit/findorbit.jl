@@ -1,5 +1,5 @@
 using ArgParse
-using NEOs, PlanetaryEphemeris, JLD2, Dates, Statistics, Printf
+using NEOs, PlanetaryEphemeris, JLD2, Dates, LinearAlgebra, Statistics, Printf
 using NEOs: AbstractOpticalAstrometry, AbstractOpticalVector, OpticalADES,
             OpticalMPC80, AbstractOrbit, log10chi
 import NEOs: indices, numberofdays, noptical
@@ -48,6 +48,9 @@ function parse_commandline()
             help = "comma-separated 1-based input file line numbers/ranges to exclude from the fit but keep in the saved orbit residuals, e.g. 1,4,10-12"
             arg_type = String
             default = ""
+        "--no-mags-res"
+            help = "do not print magnitude residuals in the final residual table"
+            action = :store_true
     end
 
     return parse_args(s)
@@ -62,6 +65,7 @@ const MultipleApparitionOrbit{O <: AbstractOpticalVector{Float64}} =
 const A2_NONGRAV_SCALINGS = (1E-14, 0.0, 0.0)
 const COMETARY_NONGRAV_SCALINGS = (1E-8, 1E-8, 1E-8)
 const COMETARY_MARSDEN_RADIAL = (0.111262, 2.808, 2.15, 5.093, 4.6142)
+const JUPITER_SEMIMAJOR_AXIS_AU = 5.20336301
 const MAX_RMS_REGRESSION_FACTOR = 1.5
 const MAX_RMS_REGRESSION_ARCSEC = 0.5
 
@@ -355,15 +359,21 @@ function multipleapparition(apps::AbstractApparitionVector, orbitMA::MultipleApp
     perm = sortperm(mags)
     permute!(mags, perm)
     permute!(apps, perm)
+    accepted = [apps[i] for i in eachindex(apps) if iszero(mags[i])]
     for i in eachindex(mags)
         iszero(mags[i]) && continue
-        NEOs.update!(OD, NEOs.optical(view(apps, 1:i)))
+        trial_apps = push!(copy(accepted), apps[i])
+        NEOs.update!(OD, NEOs.optical(trial_apps))
         orbit = linkage(OD, orbitMA, params)
-        iszero(orbit) && break
+        iszero(orbit) && continue
         if isrmsregression(orbitMA, orbit)
             printrmsregression("Apparition linkage", orbitMA, orbit)
-            break
+            continue
+        elseif isfitloss(orbitMA, orbit)
+            printfitloss("Apparition linkage", orbitMA, orbit)
+            continue
         end
+        push!(accepted, apps[i])
         orbitMA = orbit
         # Break condition
         # isodvalid(OD, orbitMA, params) && break
@@ -441,6 +451,44 @@ function fitoutlierflags(orbit::LeastSquaresOrbit, optical::AbstractOpticalVecto
     return flags
 end
 
+function nfitoptical(orbit::LeastSquaresOrbit)
+    return count(!isoutlier, orbit.ores)
+end
+
+function retainedfitoptical(previous::LeastSquaresOrbit, candidate::LeastSquaresOrbit)
+    flags = fitoutlierflags(candidate, previous.optical)
+    return count(eachindex(previous.optical)) do i
+        !isoutlier(previous.ores[i]) && !flags[i]
+    end
+end
+
+function isfitloss(previous::LeastSquaresOrbit, candidate::LeastSquaresOrbit)
+    return retainedfitoptical(previous, candidate) < nfitoptical(previous)
+end
+
+function printfitloss(label::AbstractString, previous::LeastSquaresOrbit,
+                      candidate::LeastSquaresOrbit)
+    lost = nfitoptical(previous) - retainedfitoptical(previous, candidate)
+    println("• $label rejected: would discard $lost previously fitted observation(s)")
+    return nothing
+end
+
+function missingopticalindices(orbit::LeastSquaresOrbit, optical::AbstractOpticalVector)
+    used = falses(length(orbit.optical))
+    missing = Int[]
+    for i in eachindex(optical)
+        j = findfirst(eachindex(orbit.optical)) do k
+            return !used[k] && optical[i] == orbit.optical[k]
+        end
+        if isnothing(j)
+            push!(missing, i)
+        else
+            used[j] = true
+        end
+    end
+    return missing
+end
+
 function attachfullresiduals(orbit::LeastSquaresOrbit, optical::AbstractOpticalVector,
                              excluded::AbstractVector{Int}, params::Parameters)
     od = ODProblem(orbit.dynamics, optical, weights = Veres17, debias = Eggl20)
@@ -485,47 +533,217 @@ function residualarcsec(res::NEOs.OpticalResidual)
     return ra(res) / wra(res), dec(res) / wdec(res)
 end
 
+residualsignchar(x::Real, ax::Real) = iszero(ax) ? ' ' : x > 0 ? '+' : x < 0 ? '-' : ' '
+
 function mpeclikeresidualvalue(x::Real)
     if !isfinite(x)
         return "  NaN"
     end
-    signchar = x > 0 ? '+' : x < 0 ? '-' : ' '
     ax = abs(x)
     if ax < 60
-        return @sprintf("%4.1f%c", ax, signchar)
+        rounded = round(ax; digits = 1)
+        return @sprintf("%4.1f%c", rounded, residualsignchar(x, rounded))
     else
-        dx = ax / 3600
-        return dx < 10 ? @sprintf("%4.2f%c", dx, signchar) :
-                         @sprintf("%5.2f%c", dx, signchar)
+        rounded = round(ax / 3600; digits = 2)
+        return rounded < 10 ? @sprintf("%4.2f%c", rounded, residualsignchar(x, rounded)) :
+                              @sprintf("%5.2f%c", rounded, residualsignchar(x, rounded))
     end
+end
+
+function magnituderesiduals(orbit::LeastSquaresOrbit, H::Real, params::Parameters)
+    res = fill(NaN, length(orbit.optical))
+    isfinite(H) || return res
+    for i in eachindex(orbit.optical)
+        optical = orbit.optical[i]
+        observed_v = mag(optical) + vconversion(optical)
+        isfinite(observed_v) || continue
+        t = dtutc2days(optical)
+        xa = orbit(t)[1:3]
+        xe = params.eph_ea(t)[1:3]
+        xs = params.eph_su(t)[1:3]
+        d_BS = norm(xa - xs)
+        d_OS = norm(xe - xs)
+        d_BO = norm(xa - xe)
+        phase = acos(clamp((d_BO^2 + d_BS^2 - d_OS^2) / (2 * d_BO * d_BS), -1, 1))
+        phase_integral = NEOs.phase_integral(phase, params.slope)
+        isfinite(phase_integral) && phase_integral > 0 || continue
+        computed_v = H + 5 * log10(d_BS * d_BO) - 2.5 * log10(phase_integral)
+        res[i] = observed_v - computed_v
+    end
+    return res
+end
+
+function mpeclikemagresidualvalue(x::Real)
+    isfinite(x) || return "      "
+    signchar = x < 0 ? '-' : '+'
+    return lpad(@sprintf("%c%.2f", signchar, abs(x)), 6)
 end
 
 function mpeclikedatecode(x::AbstractOpticalAstrometry)
     return Dates.format(date(x), dateformat"yymmdd")
 end
 
-function mpeclikeresidualentry(x::AbstractOpticalAstrometry, res::NEOs.OpticalResidual)
+function mpeclikeresidualentry(x::AbstractOpticalAstrometry, res::NEOs.OpticalResidual,
+                               magres::Union{Nothing, Real} = nothing)
     α, δ = residualarcsec(res)
     αs, δs = mpeclikeresidualvalue(α), mpeclikeresidualvalue(δ)
-    values = isoutlier(res) ? "($αs  $δs)" : " $αs  $δs "
+    if isnothing(magres)
+        values = isoutlier(res) ? "($αs  $δs)" : " $αs  $δs "
+    else
+        ms = mpeclikemagresidualvalue(magres)
+        values = isoutlier(res) ? "($αs  $δs  $ms)" : " $αs  $δs  $ms "
+    end
     return string(rpad(mpeclikedatecode(x), 6), "  ",
                   rpad(string(observatorycode(x)), 3), " ", values)
 end
 
-function printmpeclikeresiduals(orbit::LeastSquaresOrbit)
-    printitle("Residuals in seconds of arc", "*")
+function printmpeclikeresiduals(orbit::LeastSquaresOrbit, H::Real, params::Parameters;
+                                include_mags::Bool = true)
+    title = include_mags ? "Residuals in seconds of arc and magnitudes" :
+            "Residuals in seconds of arc"
+    printitle(title, "*")
     perm = sortperm(collect(eachindex(orbit.optical)), by = i -> date(orbit.optical[i]))
-    entries = [mpeclikeresidualentry(orbit.optical[i], orbit.ores[i]) for i in perm]
+    magres = include_mags ? magnituderesiduals(orbit, H, params) : nothing
+    entries = [mpeclikeresidualentry(orbit.optical[i], orbit.ores[i],
+                                     include_mags ? magres[i] : nothing) for i in perm]
+    entry_width = include_mags ? 40 : 31
     nrows = ceil(Int, length(entries) / 3)
     for i in 1:nrows
         row = String[]
         for j in i:nrows:length(entries)
             push!(row, entries[j])
         end
-        println(join(rpad.(row, 31)))
+        println(join(rpad.(row, entry_width)))
     end
     println("")
     return nothing
+end
+
+function pystringliteral(s::AbstractString)
+    return string('"', replace(s, "\\" => "\\\\", "\"" => "\\\""), '"')
+end
+
+function pyele220arg(x::AbstractString)
+    return pystringliteral(x)
+end
+
+function pyele220arg(x::Integer)
+    return string(x)
+end
+
+function pyele220arg(x::Real)
+    isfinite(x) && return @sprintf("%.15g", x)
+    isnan(x) && return "float(\"nan\")"
+    return x > 0 ? "float(\"inf\")" : "float(\"-inf\")"
+end
+
+function ele220inputname(input::AbstractString, format::AbstractString,
+                         fallback::AbstractString)
+    if isfile(input) && format == "mpc80"
+        line = rpad(readline(input), 12)
+        return strip(line[6:12])
+    end
+    return fallback
+end
+
+function notoutoptical(orbit::LeastSquaresOrbit)
+    return [orbit.optical[i] for i in eachindex(orbit.optical) if !isoutlier(orbit.ores[i])]
+end
+
+function ele220argumentlist(name::AbstractString, orbit::LeastSquaresOrbit, kep, H::Real,
+                            params::Parameters, gap_days::Int)
+    optical = notoutoptical(orbit)
+    isempty(optical) && throw(ArgumentError("Cannot build ele220 arguments with zero fitted observations"))
+    tbegin, tend = extrema(date.(optical))
+    args = Any[
+        name,
+        timeperipass(kep) + 2_400_000.5,
+        mod(meananomaly(kep), 360),
+        mod(argperi(kep), 360),
+        mod(longascnode(kep), 360),
+        inclination(kep),
+        pericenter(kep),
+        eccentricity(kep),
+        H,
+        NEOs.opticalrms(orbit),
+        length(optical),
+        length(apparitions(collect(optical), Day(gap_days))),
+        dtutc2jdtdb(tbegin),
+        dtutc2jdtdb(tend),
+        epoch(kep) + 2_400_000.5,
+        uncertaintyparameter(orbit, params),
+    ]
+    return join(pyele220arg.(args), ", ")
+end
+
+function printele220arguments(name::AbstractString, orbit::LeastSquaresOrbit, kep, H::Real,
+                              params::Parameters, gap_days::Int)
+    printitle("MPC ele220 arguments", "*")
+    println(ele220argumentlist(name, orbit, kep, H, params, gap_days))
+    println("")
+    return nothing
+end
+
+function propagatedsigma(kep, gradient::AbstractVector{<:Real})
+    variance = dot(gradient, NEOs.covariance(kep) * gradient)
+    if variance < 0
+        return abs(variance) <= 100 * eps(typeof(float(variance))) ? 0.0 : NaN
+    end
+    return sqrt(variance)
+end
+
+function pericentersigma(kep)
+    gradient = zeros(length(elements(kep)))
+    if iselliptic(kep)
+        a, e = semimajoraxis(kep), eccentricity(kep)
+        gradient[1] = 1 - e
+        gradient[2] = -a
+    else
+        gradient[1] = 1
+    end
+    return propagatedsigma(kep, gradient)
+end
+
+function timeperipasssigma(kep)
+    gradient = zeros(length(elements(kep)))
+    if iselliptic(kep)
+        a, M, n = semimajoraxis(kep), meananomaly(kep), meanmotion(kep)
+        gradient[1] = -3 * M / (2 * a * n)
+        gradient[6] = -1 / n
+    else
+        gradient[6] = 1
+    end
+    return propagatedsigma(kep, gradient)
+end
+
+function tisserandjupiter(kep; a_jupiter::Real = JUPITER_SEMIMAJOR_AXIS_AU)
+    a, e, inc = semimajoraxis(kep), eccentricity(kep), inclination(kep)
+    radicand = (a / a_jupiter) * (1 - e^2)
+    radicand < 0 && return NaN
+    return a_jupiter / a + 2 * cosd(inc) * sqrt(radicand)
+end
+
+function tisserandjupitersigma(kep; a_jupiter::Real = JUPITER_SEMIMAJOR_AXIS_AU)
+    a, e, inc = semimajoraxis(kep), eccentricity(kep), inclination(kep)
+    radicand = (a / a_jupiter) * (1 - e^2)
+    radicand <= 0 && return NaN
+    root = sqrt(radicand)
+    dT_da = -a_jupiter / a^2 + cosd(inc) * (1 - e^2) / (a_jupiter * root)
+    dT_de = -2 * a * e * cosd(inc) / (a_jupiter * root)
+    dT_di = -2 * root * sind(inc) * (pi / 180)
+    gradient = zeros(length(elements(kep)))
+    if iselliptic(kep)
+        gradient[1] = dT_da
+        gradient[2] = dT_de
+    else
+        q = pericenter(kep)
+        da_dq = 1 / (1 - e)
+        da_de = q / (1 - e)^2
+        gradient[1] = dT_da * da_dq
+        gradient[2] = dT_de + dT_da * da_de
+    end
+    gradient[3] = dT_di
+    return propagatedsigma(kep, gradient)
 end
 
 function orbitapptype(apps::AbstractApparitionVector, params::Parameters)
@@ -608,6 +826,9 @@ function main()
         println("• Requested observations excluded from fit: ", exclude_fit_spec)
     end
 
+    # Residual table options
+    print_mag_residuals::Bool = !parsed_args["no-mags-res"]
+
     # Global initial time
     global_initial_time = now()
     println("• Run started at ", global_initial_time)
@@ -666,9 +887,15 @@ function main()
     kep = keplerian(orbit, params)
     H, dH = absolutemagnitude(orbit, params)
     full_residuals_attached = false
-    if !isempty(fit_excluded)
+    auto_excluded = missingopticalindices(orbit, optical)
+    residual_excluded = sort!(unique!(vcat(fit_excluded, auto_excluded)))
+    if !isempty(auto_excluded)
+        println("• Keeping ", length(auto_excluded),
+                " automatically skipped observation(s) as outliers in residual output")
+    end
+    if !isempty(residual_excluded)
         try
-            orbit = attachfullresiduals(orbit, optical, fit_excluded, params)
+            orbit = attachfullresiduals(orbit, optical, residual_excluded, params)
             full_residuals_attached = true
         catch err
             println("• Could not compute residuals for held-out observations; ",
@@ -681,23 +908,31 @@ function main()
     # Print heliocentric ecliptic Keplerian elements (plus q, tp)
     printitle("Keplerian elements", "*")
     println(kep)
-    println("q  = ", @sprintf("%+.12E", pericenter(kep)), " au")
-    println("tp = ", @sprintf("%+.12E", timeperipass(kep)), " MJD TDB")
+    println("q  = ", @sprintf("%+.12E", pericenter(kep)), " +/- ",
+            @sprintf("%.12E", pericentersigma(kep)), " au")
+    println("tp = ", @sprintf("%+.12E", timeperipass(kep)), " +/- ",
+            @sprintf("%.12E", timeperipasssigma(kep)), " MJD TDB")
+    println("Tj = ", @sprintf("%.8f", tisserandjupiter(kep)), " +/- ",
+            @sprintf("%.8f", tisserandjupitersigma(kep)))
     println("H  = ", @sprintf("%.3f", H), " +/- ", @sprintf("%.3f", dH), " mag")
     println("")
-    printmpeclikeresiduals(orbit)
+    ele220_name = ele220inputname(input, format, designation(orbit))
+    printele220arguments(ele220_name, orbit, kep, H, params, gap_days)
+    printmpeclikeresiduals(orbit, H, params; include_mags = print_mag_residuals)
 
     # Save orbit
-    if isempty(fit_excluded)
+    if isempty(residual_excluded)
         jldsave(output; orbit)
     elseif full_residuals_attached
-        heldout_optical = orbit.optical[fit_excluded]
-        heldout_ores = orbit.ores[fit_excluded]
-        jldsave(output; orbit, fit_excluded, heldout_optical, heldout_ores)
+        heldout_optical = orbit.optical[residual_excluded]
+        heldout_ores = orbit.ores[residual_excluded]
+        jldsave(output; orbit, fit_excluded = residual_excluded,
+                heldout_optical, heldout_ores)
     else
-        heldout_optical = optical[fit_excluded]
+        heldout_optical = optical[residual_excluded]
         heldout_ores = typeof(orbit.ores)()
-        jldsave(output; orbit, fit_excluded, heldout_optical, heldout_ores)
+        jldsave(output; orbit, fit_excluded = residual_excluded,
+                heldout_optical, heldout_ores)
     end
     println("Final orbit saved to: ", output)
 
