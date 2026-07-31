@@ -32,8 +32,8 @@ function curvature(ts::AbstractVector{T}, αs::AbstractVector{T}, δs::AbstractV
     # Initial guess for coefficients
     p0 = ones(T, 3)
     # Fit a second order polynomial to ra/dec
-    fit_α = curve_fit(polymodel, ts, αs, wtα, p0)
-    fit_δ = curve_fit(polymodel, ts, δs, wtδ, p0)
+    fit_α = curve_fit(polymodel, ts, αs, PrecisionWeights(wtα), p0)
+    fit_δ = curve_fit(polymodel, ts, δs, PrecisionWeights(wtδ), p0)
     # Ra/dec covariance matrix
     Γ_α = vcov(fit_α)
     Γ_δ = vcov(fit_δ)
