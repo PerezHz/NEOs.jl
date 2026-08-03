@@ -6,16 +6,29 @@ Supertype for the optical astrometry weighting schemes interface.
 Every weighting scheme `W{T}` must:
 - be a mutable subtype of `AbstractWeightingScheme{T}`,
 - implement a `W(::AbstractOpticalVector{T})` constructor,
-- override `weights(::W)`,
-- override `corr(::W)`,
-- override `getid(::W)`,
+- override `getid(::W)`, `weights(::W)`, `corrs(::W)` and `outliers(::W)`.
 - override `update!(::W{T}, ::AbstractOpticalVector{T})`.
 """
 abstract type AbstractWeightingScheme{T} <: AbstractAstrometryErrorModel{T} end
 
+# AbstractWeightingScheme interface
+nobs(x::AbstractWeightingScheme) = length(weights(x))
+
+weights(x::AbstractWeightingScheme, i::Int) = weights(x)[i]
+corrs(x::AbstractWeightingScheme, i::Int) = corrs(x)[i]
+outliers(x::AbstractWeightingScheme, i::Int) = outliers(x)[i]
+
+weights(x::AbstractWeightingScheme, i::AbstractVector{Int}) = view(weights(x), i)
+corrs(x::AbstractWeightingScheme, i::AbstractVector{Int}) = view(corrs(x), i)
+outliers(x::AbstractWeightingScheme, i::AbstractVector{Int}) = view(outliers(x), i)
+
+setoutlier!(x::AbstractWeightingScheme, i::Int, y::Bool) = outliers(x)[i] = y
+setoutlier!(x::AbstractWeightingScheme, i::AbstractVector{Int}, y::AbstractVector{Bool}) =
+    outliers(x, i) .= y
+
 # Print method for AbstractWeightingScheme
 show(io::IO, x::AbstractWeightingScheme) = print(io, getid(x),
-    " weighting scheme with ", length(weights(x)), " observations")
+    " weighting scheme with ", nobs(x), " observations")
 
 """
     UniformWeights{T} <: AbstractWeightingScheme{T}
@@ -24,29 +37,29 @@ Uniform optical astrometry weighting scheme.
 """
 mutable struct UniformWeights{T} <: AbstractWeightingScheme{T}
     weights::Vector{NTuple{2, T}}
-    corr::Vector{T}
+    corrs::Vector{T}
+    outliers::BitVector
 end
 
 # Constructor
 function UniformWeights(optical::AbstractOpticalVector{T}) where {T <: Real}
     weights = [(one(T), one(T)) for _ in eachindex(optical)]
-    corr = [zero(T) for _ in eachindex(optical)]
-    return UniformWeights{T}(weights, corr)
+    corrs = [zero(T) for _ in eachindex(optical)]
+    outliers = isdeprecated.(optical)
+    return UniformWeights{T}(weights, corrs, outliers)
 end
 
-# Override weights
-weights(x::UniformWeights) = x.weights
-
-# Override corr
-corr(x::UniformWeights) = x.corr
-
-# Override getid
+# Override getid, weights, corrs and outliers
 getid(::UniformWeights) = "Uniform"
+weights(x::UniformWeights) = x.weights
+corrs(x::UniformWeights) = x.corrs
+outliers(x::UniformWeights) = x.outliers
 
 # Override update!
 function update!(x::UniformWeights{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
     x.weights = [(one(T), one(T)) for _ in eachindex(optical)]
-    x.corr = [zero(T) for _ in eachindex(optical)]
+    x.corrs = [zero(T) for _ in eachindex(optical)]
+    x.outliers = isdeprecated.(optical)
     return nothing
 end
 
@@ -57,7 +70,8 @@ Source optical astrometry weighting scheme.
 """
 mutable struct SourceWeights{T} <: AbstractWeightingScheme{T}
     weights::Vector{NTuple{2, T}}
-    corr::Vector{T}
+    corrs::Vector{T}
+    outliers::BitVector
 end
 
 # Constructors
@@ -65,23 +79,22 @@ function SourceWeights(optical::AbstractOpticalVector{T}) where {T <: Real}
     σs = rms.(optical)
     weights = @. tuple(1 / first(σs), 1 / last(σs))
     corrs = corr.(optical)
-    return SourceWeights{T}(weights, corrs)
+    outliers = isoutlier.(optical)
+    return SourceWeights{T}(weights, corrs, outliers)
 end
 
-# Override weights
-weights(x::SourceWeights) = x.weights
-
-# Override corr
-corr(x::SourceWeights) = x.corr
-
-# Override getid
+# Override getid, weights, corrs and outliers
 getid(::SourceWeights) = "Source"
+weights(x::SourceWeights) = x.weights
+corrs(x::SourceWeights) = x.corrs
+outliers(x::SourceWeights) = x.outliers
 
 # Override update!
 function update!(x::SourceWeights{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
     σs = rms.(optical)
     x.weights = @. tuple(1 / first(σs), 1 / last(σs))
-    x.corr = corr.(optical)
+    x.corrs = corr.(optical)
+    x.outliers = isoutlier.(optical)
     return nothing
 end
 
@@ -96,29 +109,29 @@ Veres et al. (2017) optical astrometry weighting scheme.
 """
 mutable struct Veres17{T} <: AbstractWeightingScheme{T}
     weights::Vector{NTuple{2, T}}
-    corr::Vector{T}
+    corrs::Vector{T}
+    outliers::BitVector
 end
 
 # Constructor
 function Veres17(optical::AbstractOpticalVector{T}) where {T <: Real}
     weights = w8sveres17(optical)
-    corr = [zero(T) for _ in eachindex(optical)]
-    return Veres17{T}(weights, corr)
+    corrs = [zero(T) for _ in eachindex(optical)]
+    outliers = isdeprecated.(optical)
+    return Veres17{T}(weights, corrs, outliers)
 end
 
-# Override weights
-weights(x::Veres17) = x.weights
-
-# Override corr
-corr(x::Veres17) = x.corr
-
-# Override getid
+# Override getid, weights, corrs and outliers
 getid(::Veres17) = "Veres et al. (2017)"
+weights(x::Veres17) = x.weights
+corrs(x::Veres17) = x.corrs
+outliers(x::Veres17) = x.outliers
 
 # Override update!
 function update!(x::Veres17{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
     x.weights = w8sveres17(optical)
-    x.corr = [zero(T) for _ in eachindex(optical)]
+    x.corrs = [zero(T) for _ in eachindex(optical)]
+    x.outliers = isdeprecated.(optical)
     return nothing
 end
 
@@ -200,9 +213,9 @@ end
 # https://doi.org/10.1016/j.icarus.2017.05.021
 function rexveres17(optical::AbstractOpticalVector{T}) where {T <: Real}
     # Construct DataFrame
-    df = DataFrame(observatory = observatory.(optical), TimeOfDay = TimeOfDay.(optical))
-    # Group by observatory and TimeOfDay
-    gdf = groupby(df, [:observatory, :TimeOfDay])
+    df = DataFrame(observatory = observatory.(optical), timeofday = timeofday.(optical))
+    # Group by observatory and timeofday
+    gdf = groupby(df, [:observatory, :timeofday])
     # Number of observations per tracklet
     cdf = combine(gdf, nrow)
     # Count observations in each group

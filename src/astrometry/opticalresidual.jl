@@ -55,6 +55,8 @@ wdec(x::OpticalResidual) = x.wdec
 dra(x::OpticalResidual) = x.dra
 ddec(x::OpticalResidual) = x.ddec
 corr(x::OpticalResidual) = x.corr
+setoutlier(x::OpticalResidual{T, U}, y::Bool) where {T, U} = OpticalResidual{T, U}(
+    ra(x), dec(x), wra(x), wdec(x), dra(x), ddec(x), corr(x), y)
 
 # Definition of zero OpticalResidual
 zero(::Type{OpticalResidual{T, U}}) where {T, U} = OpticalResidual{T, U}(
@@ -113,7 +115,7 @@ function print_mpec_residuals(io::IO, x::AbstractOpticalVector,
     @. v[1:L] = mpec_residual(x, y)
     @. v[L+1:end] = ""
     m = reshape(v, Nrows, 3)
-    print(
+    write(
         io,
         "Residuals in seconds of arc\n",
         join(join.(eachrow(m), "   "), '\n'), '\n'
@@ -202,29 +204,29 @@ function anglediff(x::Number, y::Number)
     end
 end
 
+# Initialize vector of optical residuals
 function init_optical_residuals(
-        ::Type{U}, optical::AbstractOpticalVector{T}, w8s::AbstractVector{NTuple{2, T}},
-        bias::AbstractVector{NTuple{2, T}}, corrs::AbstractVector{T},
-        outliers::AbstractVector{Bool}
+        ::Type{U},
+        wsm::AbstractWeightingScheme{T},
+        dsm::AbstractDebiasingScheme{T},
+        idxs::AbstractVector{Int} = 1:nobs(wsm)
     ) where {T <: Real, U <: Number}
-    # Check consistency between arrays
-    @assert length(optical) == length(w8s) == length(bias) == length(outliers)
-    # Initialize vector of residuals
-    res = Vector{OpticalResidual{T, U}}(undef, length(optical))
-    for i in eachindex(optical)
-        ra, dec = zero(U), zero(U)
-        wra, wdec = w8s[i]
-        dra, ddec = bias[i]
-        corr = corrs[i]
-        outlier = -1 < corr < 1 ? outliers[i] : true
-        res[i] = OpticalResidual{T, U}(ra, dec, wra, wdec, dra, ddec, corr, outlier)
+    @assert nobs(wsm) == nobs(dsm) "Weighting and debiasing schemes must have the \
+        same number of observations"
+    w8s = weights(wsm, idxs)
+    bias = debias(dsm, idxs)
+    korrs = corrs(wsm, idxs)
+    outs = outliers(wsm, idxs)
+    res = Vector{OpticalResidual{T, U}}(undef, length(idxs))
+    for i in eachindex(res)
+        res[i] = OpticalResidual{T, U}(zero(U), zero(U), w8s[i]..., bias[i]...,
+                                       korrs[i], outs[i])
     end
-
     return res
 end
 
 """
-    residuals(optical, w8s, bias [, corrs [, outliers]]; kwargs...) where {T <: Real}
+    residuals(optical, wsm, dsm; kwargs...) where {T <: Real}
 
 Compute the observed minus computed residuals for a vector of optical astrometry.
 Corrections due to Earth orientation, LOD and polar motion are computed by default.
@@ -234,12 +236,8 @@ See also [`OpticalResidual`](@ref) and [`compute_radec`](@ref).
 # Arguments
 
 - `optical::AbstractOpticalVector{T}`: optical astrometry.
-- `w8s::AbstractVector{NTuple{2, T}}`: statistical weights.
-- `bias::AbstractVector{NTuple{2, T}}`: debiasing corrections.
-- `corrs::AbstractVector{T}`: correlations (default:
-    `zeros(T, length(optical))`).
-- `outliers::AbstractVector{Bool}`: outlier flags (default:
-    `falses(length(optical))`).
+- `wsm::AbstractWeightingScheme{T}`: weighting scheme.
+- `dsm::AbstractDebiasingScheme{T}`: debiasing scheme.
 
 # Keyword arguments
 
@@ -248,15 +246,15 @@ See also [`OpticalResidual`](@ref) and [`compute_radec`](@ref).
 - `xvs`: Sun ephemeris (default: `sunposvel`).
 - `xva`: asteroid ephemeris.
 
-All ephemeris must take [et seconds since J2000] and return [barycentric position in km
-and velocity in km/sec].
+All ephemeris must take [et seconds since J2000] and return [barycentric position in
+km and velocity in km/sec].
 """
-function residuals(optical::AbstractOpticalVector{T},
-                   w8s::AbstractVector{NTuple{2, T}},
-                   bias::AbstractVector{NTuple{2, T}},
-                   corrs::AbstractVector{T} = zeros(T, length(optical)),
-                   outliers::AbstractVector{Bool} = falses(length(optical));
-                   xva::AstEph, kwargs...) where {AstEph, T <: Real}
+function residuals(
+        optical::AbstractOpticalVector{T},
+        wsm::AbstractWeightingScheme{T},
+        dsm::AbstractDebiasingScheme{T};
+        xva::AstEph, kwargs...
+    ) where {AstEph, T <: Real}
     # UTC time of first optical observation
     utc1 = date(optical[1])
     # TDB seconds since J2000.0 for first optical observation
@@ -268,7 +266,7 @@ function residuals(optical::AbstractOpticalVector{T},
     # Buffer
     buffer = [OpticalBuffer(a1_et1) for _ in eachindex(optical)]
     # Vector of residuals
-    res = init_optical_residuals(U, optical, w8s, bias, corrs, outliers)
+    res = init_optical_residuals(U, wsm, dsm)
     residuals!(res, optical, buffer; xva, kwargs...)
 
     return res

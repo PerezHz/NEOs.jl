@@ -17,6 +17,7 @@ using AngleBetweenVectors, AutoHashEquals, Dates, Downloads, HTTP, InteractiveUt
       SPICE, TaylorIntegration, TaylorSeries, XML
 
 using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
+using AstroMOID: wisric_moid
 using DataFrames: AbstractDataFrame, AsTable, DataFrame, DataFrameRow, nrow, eachrow,
       eachcol, groupby, combine
 using Dates: epochms2datetime
@@ -25,7 +26,7 @@ using Distributions: Chisq, Normal, Uniform, cdf, quantile
 using Healpix: Resolution, ang2pixRing
 using HORIZONS: smb_spk
 using LinearAlgebra: inv!
-using LsqFit: curve_fit, vcov
+using LsqFit: PrecisionWeights, curve_fit, vcov
 using OhMyThreads: tmap, tmap!, @allow_boxed_captures
 using Parameters: @with_kw, @unpack
 using PlanetaryEphemeris: au, su, ea, mo, yr, RE, Rx, Ry, Rz, R_sun, α_p_sun,
@@ -63,9 +64,10 @@ export UniformWeights, SourceWeights, Veres17
 export ZeroDebiasing, SourceDebiasing, Farnocchia15, Eggl20
 export numberofdays, unpacknum, packnum, unpackdesig, packdesig,
        fetch_designation_information, fetch_mpec_information
-export date, measure, observatory, rms, debias, corr, ra, dec, mag, band, catalogue,
-       cataloguecode, observatorycode, vconversion, isdiscovery, isdeprecated, trackletid,
-       frequency, residual, weight, weights, isoutlier, nout, notout, notoutobs
+export date, measure, observatory, rms, debias, ra, dec, mag, band, catalogue,
+       cataloguecode, observatorycode, vconversion, timeofday, isdiscovery, isdeprecated,
+       trackletid, frequency, residual, weight, weights, corr, corrs, isoutlier, outliers,
+       setoutlier, setoutlier!, nout, notout, notoutobs
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
 export update_observatories_mpc, search_observatory_code, fetch_observatory_information
@@ -95,8 +97,8 @@ export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
 export variables, designation, epoch, firsttime, lasttime, noptical, nradar, minmaxdates,
        optical, sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
-       absolutemagnitude, diameter, mass, shiftepoch, print_mpec_residuals,
-       print_mpec_elements
+       absolutemagnitude, diameter, mass, shiftepoch, earthmoid, print_mpec_residuals,
+       print_mpec_elements, print_mpec_ephemeris, print_mpec
 export topo2bary, bary2topo, attr2bary, tsaiod
 export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
        orbitdetermination, linkage

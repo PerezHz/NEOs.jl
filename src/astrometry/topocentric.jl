@@ -24,18 +24,20 @@ isnight(x::TimeOfDay) = x.light == :night
 issatellite(x::TimeOfDay) = x.light == :satellite
 isgeocentric(x::TimeOfDay) = x.light == :geocentric
 
+isunknown(x::TimeOfDay) = x.light == :unknown
+unknowntod() = TimeOfDay(:unknown, DateTime(2000, 1, 1, 12), DateTime(2000, 1, 1, 12), 0)
+
 # Print method for TimeOfDay
 function show(io::IO, m::TimeOfDay)
     print(io, uppercasefirst(string(m.light)), " from ", Date(m.start), " to ",
         Date(m.stop), " at UTC", @sprintf("%+d", m.utc))
 end
 
-# Constructors
-TimeOfDay(x::AbstractOpticalAstrometry; eop::EOPIAU = EOP_IAU2000A) =
-    TimeOfDay(observatory(x), date(x); eop)
-
+# Constructor
 function TimeOfDay(observatory::ObservatoryMPC, date::DateTime; eop::EOPIAU = EOP_IAU2000A)
-    if isgeocentric(observatory)
+    if !(DateTime(2000, 1, 1, 12) ≤ date ≤ DateTime(2100, 1, 1, 12))
+        return unknowntod()
+    elseif  isgeocentric(observatory)
         return TimeOfDay(:geocentric, Date(date), Date(date), 0)
     elseif issatellite(observatory) || isoccultation(observatory)
         return TimeOfDay(:satellite, date, date, 0)
@@ -217,6 +219,10 @@ end
 # between DCMs and Taylor1/TaylorN. The method below has been adapted from
 # SatelliteToolboxTransformations.jl, MIT-licensed
 # https://github.com/JuliaSpace/SatelliteToolboxTransformations.jl
+# NOTE: By SatelliteToolboxTransformations v1.2 the methods below are ambiguous with
+# respect to the original methods. Thus, I have commented them out but not deleted
+# them, as the operations between Taylor objects can still be optimized (09/07/26)
+#=
 for EOP in (:Nothing, :EopIau1980, :EopIau2000A)
     @eval begin
 
@@ -273,6 +279,7 @@ for EOP in (:Nothing, :EopIau1980, :EopIau2000A)
 
     end
 end
+=#
 
 """
     obsposvelECI(::AbstractOpticalAstrometry; kwargs...)

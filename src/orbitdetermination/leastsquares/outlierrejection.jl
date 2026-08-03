@@ -24,14 +24,17 @@ end
 """
     outlier_rejection!(res, x, Γ [, cache]; kwargs...)
 
-Reject outliers in a vector of optical residuals `res` using the Carpino et al. (2003)
-algorithm. The residuals are evaluated at `x` and have a covariance matrix `Γ`. A
-pre-allocated `cache` can be passed to save memory.
+Reject outliers in a vector of optical residuals `res` using the
+Carpino et al. (2003) algorithm. The residuals are evaluated at `x`
+and have a covariance matrix `Γ`. A pre-allocated `cache` can be
+passed to save memory.
 
 See also [`carpino_smoothing`](@ref).
 
 # Keyword arguments
 
+- `mro::AbstractVector{Bool}`: manually rejected observations
+    (default: `falses(length(res))`).
 - `χ2_rec::Real`: recovery threshold (default: `7.0`).
 - `χ2_rej::Real`: rejection threshold (default: `8.0`).
 - `fudge::Real`: rejection fudge term coefficient (default: `400.0`).
@@ -42,10 +45,14 @@ See also [`carpino_smoothing`](@ref).
     See:
     - https://doi.org/10.1016/S0019-1035(03)00051-4
 """
-function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
-    x::Vector{T}, Γ::Matrix{T}, cache::OutlierRejectionCache{T} =
-    OutlierRejectionCache(T, length(res)); χ2_rec::T = 7.0, χ2_rej::T = 8.0,
-    fudge::T = 400.0, α::T = 0.25, max_per::T = 10.0) where {T <: Real}
+function outlier_rejection!(
+        res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
+        x::Vector{T}, Γ::Matrix{T},
+        cache::OutlierRejectionCache{T} = OutlierRejectionCache(T, length(res));
+        mro::AbstractVector{Bool} = falses(length(res)),
+        χ2_rec::T = 7.0, χ2_rej::T = 8.0,
+        fudge::T = 400.0, α::T = 0.25, max_per::T = 10.0
+    ) where {T <: Real}
     # Number of residuals
     L = length(res)
     # Unfold
@@ -99,15 +106,16 @@ function outlier_rejection!(res::AbstractVector{OpticalResidual{T, TaylorN{T}}},
     χ2_rej = max(χ2_rej + carpino_smoothing(N_sel, fudge), α * χ2_max)
     # Rejection / recovery loop
     @inbounds for i in idxs
+        # Manually rejected observation
+        if mro[i]
+            res[i] = setoutlier(res[i], true)
         # Reject
-        if χ2s[i] > χ2_rej && N_drop < max_drop && !mask[i]
-            res[i] = OpticalResidual{T, TaylorN{T}}(ra(res[i]), dec(res[i]), wra(res[i]),
-                wdec(res[i]), dra(res[i]), ddec(res[i]), corr(res[i]), true)
+        elseif χ2s[i] > χ2_rej && N_drop < max_drop && !mask[i]
+            res[i] = setoutlier(res[i], true)
             N_drop += 1
         # Recover
         elseif χ2s[i] < χ2_rec && mask[i]
-            res[i] = OpticalResidual{T, TaylorN{T}}(ra(res[i]), dec(res[i]), wra(res[i]),
-                wdec(res[i]), dra(res[i]), ddec(res[i]), corr(res[i]), false)
+            res[i] = setoutlier(res[i], false)
             N_drop -= 1
         end
     end

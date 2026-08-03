@@ -1,13 +1,13 @@
 """
     OpticalTracklet{T} <: AbstractOpticalAstrometry{T}
 
-The averague of a set of optical astrometry taken by the
-same observatory on the same night.
+The average of a set of optical astrometry taken by the
+same observatory on the same time of day.
 
 # Fields
 
 - `observatory::ObservatoryMPC{T}`: observing station.
-- `night::TimeOfDay`: night of observation.
+- `timeofday::TimeOfDay`: observation time of day.
 - `date::DateTime`: mean date of observation.
 - `ra::T`: mean right ascension [rad].
 - `dec::T`: mean declination [rad].
@@ -20,7 +20,7 @@ same observatory on the same night.
 """
 @auto_hash_equals fields = (date, ra, dec, observatory) struct OpticalTracklet{T} <: AbstractOpticalAstrometry{T}
     observatory::ObservatoryMPC{T}
-    night::TimeOfDay
+    timeofday::TimeOfDay
     date::DateTime
     ra::T
     dec::T
@@ -121,7 +121,7 @@ end
 # Outer constructor
 function OpticalTracklet(x::NamedTuple)
     # Unpack
-    @unpack date, ra, dec, observatory, mag, night, indices = x
+    @unpack date, ra, dec, observatory, mag, timeofday, indices = x
     # Number of observations
     nobs = minimum(length, x)
     # Zero or one observations
@@ -129,7 +129,7 @@ function OpticalTracklet(x::NamedTuple)
         throw(ArgumentError("Zero observations do not constitute a tracklet"))
     elseif isone(nobs)
         return OpticalTracklet(
-            observatory[1], night[1], date[1], ra[1], dec[1],
+            observatory[1], timeofday[1], date[1], ra[1], dec[1],
             zero(ra[1]), zero(dec[1]), mag[1], nobs, collect(indices)
         )
     end
@@ -172,7 +172,7 @@ function OpticalTracklet(x::NamedTuple)
     v_α = polymodel(t_mean, diffcoeffs(ra_coef))
     v_δ = polymodel(t_mean, diffcoeffs(dec_coef))
 
-    return OpticalTracklet(observatory[i], night[i], d_mean, α, δ, v_α, v_δ,
+    return OpticalTracklet(observatory[i], timeofday[i], d_mean, α, δ, v_α, v_δ,
                            h, nobs, collect(indices))
 end
 
@@ -180,7 +180,7 @@ end
     reduce_tracklets(::AbstractOpticalVector)
 
 Return a vector of optical tracklets where each element corresponds to a
-batch of observations taken by the same observatory on the same night.
+batch of observations taken by the same observatory on the same time of day.
 The reduction is performed via polynomial regression.
 """
 reduce_tracklets
@@ -193,14 +193,14 @@ for O in nameof.(subtypes(AbstractOpticalAstrometry))
             df = DataFrame(
                 date = date.(optical), ra = ra.(optical), dec = dec.(optical),
                 observatory = observatory.(optical), mag = mag.(optical),
-                night = tmap(TimeOfDay, TimeOfDay, optical), trkid = trackletid.(optical),
+                timeofday = timeofday.(optical), trkid = trackletid.(optical),
                 indices = eachindex(optical)
             )
             # Group by ...
             if hasfield($O, :trkid)
                 gdf = groupby(df, [:trkid])
             else
-                gdf = groupby(df, [:observatory, :night])
+                gdf = groupby(df, [:observatory, :timeofday])
             end
             # Reduce tracklets
             cdf = combine(gdf, AsTable(:) => OpticalTracklet => :tracklets; threads)

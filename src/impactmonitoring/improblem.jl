@@ -48,12 +48,13 @@ function minmaxdates(x::IMProblem)
     return t0, tf
 end
 
+# Initialize vector of optical residuals
 function init_optical_residuals(
-        ::Type{U}, x::AbstractIMProblem{D, T}
+        ::Type{U}, IM::AbstractIMProblem{D, T}
     ) where {D, T <: Real, U <: Number}
-    # Initialize vector of optical residuals
-    res = Vector{OpticalResidual{T, U}}(undef, length(x.orbit.ores))
-    for (i, r) in enumerate(x.orbit.ores)
+    @unpack orbit = IM
+    res = Vector{OpticalResidual{T, U}}(undef, length(orbit.ores))
+    for (i, r) in enumerate(orbit.ores)
         res[i] = OpticalResidual{T, U}(zero(U), zero(U), wra(r), wdec(r), dra(r), ddec(r),
                                        corr(r), isoutlier(r))
     end

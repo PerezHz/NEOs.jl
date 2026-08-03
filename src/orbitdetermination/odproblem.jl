@@ -95,12 +95,10 @@ nobs(x::ODProblem) = noptical(x) + nradar(x)
 opticalindices(x::ODProblem) = eachindex(x.optical)
 radarindices(x::MixedODProblem) = eachindex(x.radar)
 
-opticaloutliers(x::ODProblem) = falses(noptical(x))
-radaroutliers(x::MixedODProblem) = falses(nradar(x))
-
 weights(x::ODProblem) = weights(x.weights)
 debias(x::ODProblem) = debias(x.debias)
-corr(x::ODProblem) = corr(x.weights)
+corrs(x::ODProblem) = corrs(x.weights)
+outliers(x::ODProblem) = outliers(x.weights)
 
 function minmaxdates(x::ODProblem)
     t0, tf = minmaxdates(x.optical)
@@ -121,19 +119,27 @@ function update!(x::AbstractODProblem{D, T},
     return nothing
 end
 
-function init_optical_residuals(::Type{U}, od::ODProblem, idxs = opticalindices(od),
-                                outliers = opticaloutliers(od)) where {U <: Number}
-    optical = view(od.optical, idxs)
-    w8s = view(weights(od), idxs)
-    bias = view(debias(od), idxs)
-    corrs = view(corr(od), idxs)
-    return init_optical_residuals(U, optical, w8s, bias, corrs, view(outliers, idxs))
+function init_optical_residuals(
+        ::Type{U}, od::ODProblem,
+        idxs::AbstractVector{Int} = opticalindices(od),
+        outlier_flags::AbstractVector{Bool} = outliers(od),
+    ) where {U <: Number}
+    res = init_optical_residuals(U, od.weights, od.debias, idxs)
+    flags = length(outlier_flags) == length(idxs) ? outlier_flags : view(outlier_flags, idxs)
+    for i in eachindex(res)
+        res[i] = setoutlier(res[i], flags[i])
+    end
+    return res
 end
 
-function init_radar_residuals(::Type{U}, od::MixedODProblem, idxs = radarindices(od),
-                              outliers = radaroutliers(od)) where {U <: Number}
+function init_radar_residuals(
+        ::Type{U}, od::MixedODProblem,
+        idxs::AbstractVector{Int} = radarindices(od),
+        outliers = falses(nradar(od))
+    ) where {U <: Number}
     radar = view(od.radar, idxs)
-    return init_radar_residuals(U, radar, view(outliers, idxs))
+    outlier_flags = length(outliers) == length(idxs) ? outliers : view(outliers, idxs)
+    return init_radar_residuals(U, radar, outlier_flags)
 end
 
 function set_od_order(::Type{T}, varorder::Int, numvars::Int = 6) where {T <: Real}

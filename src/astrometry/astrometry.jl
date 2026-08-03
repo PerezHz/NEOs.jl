@@ -14,10 +14,9 @@ include("opticalrwo.jl")
 include("opticalades.jl")
 include("opticaltracklet.jl")
 include("computeradec.jl")
-include("opticalresidual.jl")
 include("weightingscheme.jl")
 include("debiasingscheme.jl")
-
+include("opticalresidual.jl")
 """
     read_optical_astrometry(filename; format = :auto)
 

@@ -109,6 +109,8 @@ An optical astrometric observation in the Minor Planet Center ADES format.
     remarks::String
     deprecated::String
     source::String
+    # Internal
+    timeofday::TimeOfDay
 end
 
 # AbstractAstrometryObservation interface
@@ -127,6 +129,7 @@ trackletid(x::OpticalADES) = x.trkid
 isdiscovery(x::OpticalADES) = !isempty(x.disc)
 
 isdeprecated(x::OpticalADES) = !isempty(x.deprecated)
+isoutlier(x::OpticalADES) = isdeprecated(x) || abs(corr(x)) ≥ 1
 
 function designation(x::OpticalADES)
     # If there is no number, use temporary designation
@@ -194,10 +197,10 @@ OpticalADES(r::DataFrameRow) = OpticalADES{Float64}(
     r.rmstime, r.ra, r.dec, r.rastar, r.decstar, r.deltara, r.deltadec,
     r.rmsra, r.rmsdec, r.rmscorr, r.astcat, r.mag, r.rmsmag, r.band,
     r.photcat, r.ref, r.disc, r.subfmt, r.prectime, r.precra, r.precdec,
-    r.unctime, r.notes, r.remarks, r.deprecated, r.source
+    r.unctime, r.notes, r.remarks, r.deprecated, r.source, r.timeofday
 )
 
-function parse_optical_ades(text::String)
+function parse_optical_ades(text::String; eop::EOPIAU = EOP_IAU2000A)
     # Parse XML
     node = parse(LazyNode, text)
     # Locate the root <ades> element and its observation elements by node type:
@@ -242,7 +245,9 @@ function parse_optical_ades(text::String)
         df.ra[i] = df.rastar[i] + df.deltara[i] / cos(df.dec[i])
     end
     # Source string
-    df.source = XML.write.(obs)
+    df.source .= XML.write.(obs)
+    # Time of day
+    tmap!((x, y) -> TimeOfDay(x, y; eop), df.timeofday, df.stn, df.obstime)
     # Parse observations
     optical = OpticalADES.(eachrow(df))
 
@@ -250,49 +255,59 @@ function parse_optical_ades(text::String)
 end
 
 """
-    fetch_optical_ades(id, source)
+    fetch_optical_ades(id, source; kwargs...)
 
 Return the optical astrometry of minor body `id` in the Minor Planet Center
 ADES format. The `source` of the observations can be either `MPC` or `NEOCP`.
+
+# Keyword arguments
+
+- `eop::EOPIAU`: Earth Orientation Parameters (default: `EOP_IAU2000A`).
 
 !!! reference
     The Minor Planet Center observations APIs are described at:
     - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/get-obs/
     - https://docs.minorplanetcenter.net/mpc-ops-docs/apis/get-obs-neocp/
 """
-function fetch_optical_ades(id::AbstractString, ::Type{MPC})
+function fetch_optical_ades(id::AbstractString, ::Type{MPC};
+                            eop::EOPIAU = EOP_IAU2000A)
     # Get and parse HTTP response
     text = fetch_http_text(MPC; mode = 2, id = id, format = "XML")
     # Parse JSON
     dict = JSON.parse(text)
     # Parse observations
-    optical = parse_optical_ades(dict[1]["XML"])
+    optical = parse_optical_ades(dict[1]["XML"]; eop)
 
     return optical
 end
 
-function fetch_optical_ades(id::AbstractString, ::Type{NEOCP})
+function fetch_optical_ades(id::AbstractString, ::Type{NEOCP};
+                            eop::EOPIAU = EOP_IAU2000A)
     # Get and parse HTTP response
     text = fetch_http_text(NEOCP; mode = 1, id = id, format = "XML")
     # Parse JSON
     dict = JSON.parse(text)
     # Parse observations
-    optical = parse_optical_ades(dict[1]["XML"])
+    optical = parse_optical_ades(dict[1]["XML"]; eop)
 
     return optical
 end
 
 """
-    read_optical_ades(filename)
+    read_optical_ades(filename; kwargs...)
 
 Read from `filename` a vector of optical astrometry in the Minor Planet
 Center ADES format.
+
+# Keyword arguments
+
+- `eop::EOPIAU`: Earth Orientation Parameters (default: `EOP_IAU2000A`).
 """
-function read_optical_ades(filename::AbstractString)
+function read_optical_ades(filename::AbstractString; eop::EOPIAU = EOP_IAU2000A)
     # Read file
     text = read(filename, String)
     # Parse observations
-    optical = parse_optical_ades(text)
+    optical = parse_optical_ades(text; eop)
 
     return optical
 end

@@ -275,8 +275,9 @@ function jtls(
         all(>(0), diag(fit.Γ)) || break
         # Outlier rejection
         if outrej
+            mro = view(outliers(od), oidxs)
             outlier_rejection!(view(res, oidxs), fit.x, fit.Γ, orcache;
-                χ2_rec, χ2_rej, fudge, max_per)
+                mro, χ2_rec, χ2_rej, fudge, max_per)
         end
         # Update orbit
         orbits[i] = updateorbit(LeastSquaresOrbit(
@@ -374,8 +375,9 @@ function jtls(
         all(>(0), diag(fit.Γ)) || break
         # Outlier rejection
         if outrej
+            mro = view(outliers(od), oidxs)
             outlier_rejection!(view(res[1], oidxs), fit.x, fit.Γ, orcache;
-                χ2_rec, χ2_rej, fudge, max_per)
+                mro, χ2_rec, χ2_rej, fudge, max_per)
         end
         # Update orbit
         orbits[i] = updateorbit(LeastSquaresOrbit(

@@ -9,7 +9,9 @@ using Test
 
 using NEOs: OpticalMPC80, RadarJPL, AbstractOpticalVector, RadarResidual, KeplerianElements,
       EquinoctialElements, AttributableElements, μ_S, indices, equatorial2ecliptic,
-      ecliptic2equatorial, numtypes, sseph, covariance
+      ecliptic2equatorial, numtypes, sseph, covariance, scalartype, opticaltype, radartype,
+      dof, hasradar
+
 using Statistics: mean
 
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
@@ -222,13 +224,21 @@ end
            significance = 0.99, outrej = false, parse_eqs = false
         )
         params = Parameters(params, parse_eqs = true)
+
         # Orbit determination problem
         od = ODProblem(newtonian!, suboptical)
+
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
 
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 2, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -251,7 +261,6 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 9
         @test nout(orbit.ores) == 0
-        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -270,7 +279,6 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [-0.9867704701732631, 0.3781890325424674, 0.14094513213009532,
             -0.008773157203087259, -0.00947109649687576, -0.005654229864757284]
         JPL_KEP = [8.198835710815939E-01, 3.962989389356275E-01, 5.807184452352074E+00,
@@ -292,6 +300,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
         @test 5.4E7 < Ma < Mc < Mb < 6.3E8
+        # MPEC
+        @test isnothing(print_mpec(orbit, params))
+        println()
 
         # Add observations
         suboptical = iodsuboptical(optical, 15)
@@ -321,7 +332,6 @@ end
         # Vector of residuals
         @test notout(orbit1.ores) == 43
         @test nout(orbit1.ores) == 0
-        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -340,7 +350,6 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit1, params))
         jpl_compatibility_tests(orbit1, params, (3.1E-01, 4.5E-01, 5.7E-11, 8.2E-12, 6.3E-12),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -356,6 +365,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit1, params)
         @test 6.4E7 < Ma < Mc < Mb < 7.4E8
+        # MPEC
+        @test isnothing(print_mpec(orbit1, params))
+        println()
     end
 
     @testset "Unsafe Gauss Method" begin
@@ -374,10 +386,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, optical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 2, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -400,7 +419,6 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
-        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -419,7 +437,6 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [1.0042569058151192, 0.2231639040146286, 0.11513854178693468,
             -0.010824212819531798, 0.017428798232689943, 0.0071046780555307385]
         JPL_KEP = [2.872424697642789E+00, 6.749395051551541E-01, 1.282355986214476E+00,
@@ -441,6 +458,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
         @test 9.4E7 < Ma < Mc < Mb < 1.2E9
+        # MPEC
+        @test isnothing(print_mpec(orbit, params))
+        println()
     end
 
     @testset "Gauss Method with ADAM refinement" begin
@@ -461,10 +481,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, suboptical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by July 2, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -487,7 +514,6 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 12
         @test nout(orbit.ores) == 0
-        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -506,7 +532,6 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [-0.12722461679828806, -0.9466098076903212, -0.4526816007640767,
             0.02048875631534963, -0.00022720097573790754, 0.00321302850930331]
         JPL_KEP = [2.232655272359251E+00, 5.480018648354085E-01, 8.456325272115306E+00,
@@ -528,6 +553,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
         @test 2.2E9 < Ma < Mc < Mb < 2.8E10
+        # MPEC
+        @test isnothing(print_mpec(orbit, params))
+        println()
     end
 
     @testset "Admissible region" begin
@@ -546,7 +574,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by July 2, 2026
+        # Values by July 31, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -691,10 +719,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, optical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 2, 2026
+        # Values by July 31, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -723,7 +758,6 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 10
         @test nout(orbit.ores) == 0
-        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -742,7 +776,6 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [-0.9698405495747651, 0.24035304578776012, 0.10288276585828428,
             -0.009512301266159554, -0.01532548565855646, -0.00809464581680694]
         JPL_KEP = [1.484448954296998E+00, 3.966995063832199E-01, 3.961868860866990E+00,
@@ -764,6 +797,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
         @test 4.3E4 < Ma < Mc < Mb < 5.2E5
+        # MPEC
+        @test isnothing(print_mpec(orbit, params))
+        println()
     end
 
     @testset "Outlier Rejection" begin
@@ -781,10 +817,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, suboptical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 2, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -807,7 +850,6 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 16
         @test nout(orbit.ores) == 2
-        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -826,7 +868,6 @@ end
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
             -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
         JPL_KEP = [1.776244846691859E+00, 4.381984418639090E-01, 7.819612775042287E-01,
@@ -848,6 +889,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
         @test 2.2E6 < Ma < Mc < Mb < 2.8E7
+        # MPEC
+        @test isnothing(print_mpec(orbit, params))
+        println()
 
         # Add remaining observations
         NEOs.update!(od, optical)
@@ -875,7 +919,6 @@ end
         # Vector of residuals
         @test notout(orbit1.ores) == 19
         @test nout(orbit1.ores) == 2
-        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -897,7 +940,6 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit1, params))
         jpl_compatibility_tests(orbit1, params, (4.5E-04, 1.2E-02, 1.2E-10, 8.2E-11, 8.3E-11),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -913,6 +955,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit1, params)
         @test 2.2E6 < Ma < Mc < Mb < 2.7E7
+        # MPEC
+        @test isnothing(print_mpec(orbit1, params))
+        println()
     end
 
     @testset "Interesting NEOs" begin
@@ -935,10 +980,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, optical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 2, 2026
+        # Values by July 31, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -967,7 +1019,6 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 7
         @test nout(orbit.ores) == 0
-        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -986,7 +1037,6 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [-0.1793421909678032, 0.8874121750891107, 0.3841434101167349,
             -0.017557851117612377, -0.005781634223099801, -0.0020075106081869185]
         JPL_KEP = [1.163575955666616E+00, 2.128185264087166E-01, 1.423597471953649E+00,
@@ -1008,6 +1058,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
         @test 7.0E3 < Ma < Mc < Mb < 8.1E4
+        # MPEC
+        @test isnothing(print_mpec(orbit, params))
+        println()
 
         # 2008 TC3 entered the Earth's atmosphere around October 7, 2008, 02:46 UTC
 
@@ -1025,10 +1078,24 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, suboptical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
+
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 2, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1051,7 +1118,6 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 18
         @test nout(orbit.ores) == 0
-        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1070,7 +1136,6 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [0.9739760787551061, 0.21541704400792083, 0.09401075290627411,
             -0.00789675674941779, 0.0160619782715116, 0.006135361409943397]
         JPL_KEP = [1.273091758414584E+00, 2.870222798582721E-01, 2.341999526552296E+00,
@@ -1092,6 +1157,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
         @test 1.3E4 < Ma < Mc < Mb < 1.7E5
+        # MPEC
+        @test isnothing(print_mpec(orbit, params))
+        println()
 
         # Add observations
         suboptical = iodsuboptical(optical, 10)
@@ -1121,7 +1189,6 @@ end
         # Vector of residuals
         @test notout(orbit1.ores) == 97
         @test nout(orbit1.ores) == 0
-        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -1140,7 +1207,6 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit1, params))
         jpl_compatibility_tests(orbit1, params, (1.7E-01, 1.9E-01, 2.2E-07, 1.8E-8, 1.4E-09),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -1160,6 +1226,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit1, params)
         @test 1.4E4 < Ma < Mc < Mb < 1.7E5
+        # MPEC
+        @test isnothing(print_mpec(orbit1, params))
+        println()
     end
 
     @testset "research/2025CMDA/orbitdetermination.jl" begin
@@ -1204,10 +1273,17 @@ end
         # Orbit determination problem
         od = ODProblem(newtonian!, optical)
 
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
+
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by July 2, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1231,7 +1307,6 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
-        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1250,7 +1325,6 @@ end
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [8.273613111662440E-01, -8.060979570468877E-01, -6.506021560333630E-01,
                    1.659953139139261E-02, -5.614155804560522E-03, 2.899959983103430E-03]
         JPL_KEP = [2.279881958167905E+00, 7.595854924208774E-01, 3.859999487009846E+01,
@@ -1272,6 +1346,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
         @test 2.2E11 < Ma < Mc < Mb < 2.8E12
+        # MPEC
+        @test isnothing(print_mpec(orbit, params))
+        println()
     end
 
     @testset "Radar astrometry" begin
@@ -1296,6 +1373,13 @@ end
         # Orbit determination problem (only optical astrometry)
         od0 = ODProblem(newtonian!, optical)
 
+        @test isa(string(od0), String)
+        @test scalartype(od0) == Float64
+        @test opticaltype(od0) == OpticalMPC80{Float64}
+        @test radartype(od0) == Nothing && !hasradar(od0)
+        @test dof(od0) == 6
+        @test NEOs.optical(od0) == optical && isnothing(NEOs.radar(od0))
+
         # Preliminary orbit (only optical astrometry)
         loadjpleph()
         jd0 = datetime2julian(DateTime(2005, 1, 29))
@@ -1312,10 +1396,17 @@ end
         # Orbit determination problem (both optical and radar astrometry)
         od1 = ODProblem(newtonian!, optical, radar)
 
+        @test isa(string(od1), String)
+        @test scalartype(od1) == Float64
+        @test opticaltype(od1) == OpticalMPC80{Float64}
+        @test radartype(od1) == RadarJPL{Float64} && hasradar(od1)
+        @test dof(od1) == 6
+        @test NEOs.optical(od1) == optical && NEOs.radar(od1) == radar
+
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by July 2, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1346,7 +1437,6 @@ end
         @test notout(orbit1.rres) == 5
         @test nout(orbit1.ores) == 0
         @test nout(orbit1.rres) == 0
-        @test isnothing(print_mpec_residuals(orbit1))
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -1365,7 +1455,6 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit1, params))
         JPL_CAR = [-5.229992130937651E-01, 8.689454573480734E-01, 3.096174868699621E-01,
             -1.413639580483663E-02, -5.510379552549767E-03, -2.413003153288419E-03]
         JPL_KEP = [9.223295977030230E-01, 1.911190963976789E-01, 3.330797253820763E+00,
@@ -1387,6 +1476,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit1, params)
         @test 1.0E11 < Ma < Mc < Mb < 1.4E12
+        # MPEC
+        @test isnothing(print_mpec(orbit1, params))
+        println()
     end
 
     @testset "Linkage" begin
@@ -1408,6 +1500,14 @@ end
         # Orbit determination problem with only the observations from 2020
         idxs = findall(x -> date(x) > Date(2020), optical)
         od = ODProblem(newtonian!, optical[idxs]; weights = Veres17, debias = Eggl20)
+
+        @test isa(string(od), String)
+        @test scalartype(od) == Float64
+        @test opticaltype(od) == OpticalMPC80{Float64}
+        @test radartype(od) == Nothing && !hasradar(od)
+        @test dof(od) == 6
+        @test NEOs.optical(od) == optical[idxs] && isnothing(NEOs.radar(od))
+
         # Orbit Determination with only the observations from 2020
         orbit = initialorbitdetermination(od, params)
 
@@ -1416,7 +1516,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by July 2, 2026
+        # Values by July 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1439,7 +1539,6 @@ end
         # Vector of residuals
         @test notout(orbit.ores) == 43
         @test nout(orbit.ores) == 1
-        @test isnothing(print_mpec_residuals(orbit))
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1458,7 +1557,6 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        @test isnothing(print_mpec_elements(orbit, params))
         JPL_CAR = [4.848674283176028E-01, -1.256976941043074E+00, 7.558473824624909E-02,
                    2.837659541627720E-03, 1.669282318693257E-02, 4.630635236479733E-03]
         JPL_KEP = [2.315552902881586E+00, 8.475227263442291E-01, 3.315750642722048E+01,
@@ -1480,6 +1578,9 @@ end
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
         @test 1.0E+10 < Ma < Mc < Mb < 1.3E+11
+        # MPEC
+        @test isnothing(print_mpec(orbit, params))
+        println()
     end
 
 end
