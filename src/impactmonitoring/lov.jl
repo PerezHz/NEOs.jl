@@ -240,7 +240,7 @@ function TaylorIntegration.jetcoeffs!(
         ordnext = ord + 1
         carT1 = lovtransform(mjd0, reduceorder.(q, ord), sun, Val(coord), Val(:cartesian))
         dx = @. (carT1 - cte(carT1)) / scalings
-        ΓT1_coord = ΓTN_coord(dx)
+        ΓT1_coord = Matrix(ΓTN_coord)(dx)
         F = weakfield(ΓT1_coord, ord)
         for i in eachindex(F)
             TaylorSeries.identity!(dq[i], F[i], ord)
