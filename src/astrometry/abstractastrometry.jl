@@ -64,7 +64,7 @@ dtutc2et(x::AbstractAstrometryObservation) = dtutc2et(date(x))
 
 function numberofdays(x::AbstractObservationVector)
     t0, tf = extrema(date, x)
-    return (tf - t0).value / 86_400_000
+    return (tf - t0).value / daymillisec
 end
 
 minmaxdates(x::AbstractObservationVector) = extrema(date, x)

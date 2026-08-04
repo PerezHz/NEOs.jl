@@ -68,5 +68,5 @@ Return the timespan of a vector of dates in days.
 """
 function numberofdays(dates::AbstractVector{DateTime})
     t0, tf = extrema(dates)
-    return (tf - t0).value / 86_400_000
+    return (tf - t0).value / daymillisec
 end
