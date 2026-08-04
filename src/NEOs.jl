@@ -67,7 +67,7 @@ export numberofdays, unpacknum, packnum, unpackdesig, packdesig,
 export date, measure, observatory, rms, debias, ra, dec, mag, band, catalogue,
        cataloguecode, observatorycode, vconversion, timeofday, isdiscovery, isdeprecated,
        trackletid, frequency, residual, weight, weights, corr, corrs, isoutlier, outliers,
-       setoutlier, setoutlier!, nout, notout, notoutobs
+       setoutlier, setoutlier!, nout, notout, notoutobs, apparitions
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
 export update_observatories_mpc, search_observatory_code, fetch_observatory_information
