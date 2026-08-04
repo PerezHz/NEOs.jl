@@ -51,6 +51,9 @@ function parse_commandline()
         "--no-mags-res"
             help = "do not print magnitude residuals in the final residual table"
             action = :store_true
+        "--no-track-res"
+            help = "do not print along-track and cross-track residuals in the final residual table"
+            action = :store_true
     end
 
     return parse_args(s)
@@ -533,6 +536,281 @@ function residualarcsec(res::NEOs.OpticalResidual)
     return ra(res) / wra(res), dec(res) / wdec(res)
 end
 
+dot3(x::AbstractVector, y::AbstractVector) = x[1]*y[1] + x[2]*y[2] + x[3]*y[3]
+norm3(x::AbstractVector) = sqrt(dot3(x, x))
+
+function asteroidstatekmsec(orbit::LeastSquaresOrbit, et)
+    t = et / PlanetaryEphemeris.daysec
+    sol = NEOs.cte(t) <= epoch(orbit) ? orbit.bwd : orbit.fwd
+    return PlanetaryEphemeris.auday2kmsec(sol(t))
+end
+
+denseephstatekmsec(eph, et) =
+    PlanetaryEphemeris.auday2kmsec(eph(et / PlanetaryEphemeris.daysec))
+
+# Differentiate the topocentric light-time RA/Dec model with respect to receive ET.
+# Returned rates are arcsec/sec; only their direction is used for along/cross residuals.
+function computedradecrate(x::AbstractOpticalAstrometry, orbit::LeastSquaresOrbit,
+                           params::Parameters; niter::Int = 5)
+    et0 = dtutc2et(date(x))
+    et_r_secs = NEOs.Taylor1([et0, one(et0)], 1)
+
+    rv_s_t_r = denseephstatekmsec(params.eph_su, et_r_secs)
+    r_s_t_r = rv_s_t_r[1:3]
+    rv_e_t_r = denseephstatekmsec(params.eph_ea, et_r_secs)
+    r_e_t_r = rv_e_t_r[1:3]
+    rv_a_t_r = asteroidstatekmsec(orbit, et_r_secs)
+    r_a_t_r = rv_a_t_r[1:3]
+    RV_r = obsposvelECI(observatory(x), et_r_secs)
+    R_r = RV_r[1:3]
+    r_r_t_r = r_e_t_r + R_r
+
+    ρ_vec_r = r_a_t_r - r_r_t_r
+    ρ_r = norm3(ρ_vec_r)
+    τ_D = ρ_r / NEOs.clightkms
+    et_b_secs = et_r_secs - τ_D
+    e_D_vec = r_r_t_r - r_s_t_r
+    e_D = norm3(e_D_vec)
+
+    local r_a_t_b, r_s_t_b
+    for _ in 1:niter
+        rv_a_t_b = asteroidstatekmsec(orbit, et_b_secs)
+        r_a_t_b = rv_a_t_b[1:3]
+        v_a_t_b = rv_a_t_b[4:6]
+        ρ_vec_r = r_a_t_b - r_r_t_r
+        ρ_r = norm3(ρ_vec_r)
+        rv_s_t_b = denseephstatekmsec(params.eph_su, et_b_secs)
+        r_s_t_b = rv_s_t_b[1:3]
+        p_D_vec = r_a_t_b - r_s_t_b
+        p_D = norm3(p_D_vec)
+        Δτ_rel_D = NEOs.shapiro_delay(e_D, p_D, ρ_r)
+        p_dot_23 = dot3(ρ_vec_r, v_a_t_b) / ρ_r
+        Δt_2 = (τ_D - ρ_r / NEOs.clightkms - Δτ_rel_D) /
+               (1.0 - p_dot_23 / NEOs.clightkms)
+        τ_D -= Δt_2
+        et_b_secs = et_r_secs - τ_D
+    end
+
+    rv_a_t_b = asteroidstatekmsec(orbit, et_b_secs)
+    r_a_t_b = rv_a_t_b[1:3]
+    ρ_vec_r = r_a_t_b - r_r_t_r
+    ρ_r = norm3(ρ_vec_r)
+    rv_s_t_b = denseephstatekmsec(params.eph_su, et_b_secs)
+    r_s_t_b = rv_s_t_b[1:3]
+
+    E_H_vec = r_r_t_r - r_s_t_r
+    U_vec = ρ_vec_r
+    U_norm = ρ_r
+    u_vec = U_vec / U_norm
+    Q_vec = r_a_t_b - r_s_t_b
+    q_vec = Q_vec / norm3(Q_vec)
+    E_H = norm3(E_H_vec)
+    e_vec = E_H_vec / E_H
+    g1 = NEOs.g1coeff / (E_H / PlanetaryEphemeris.au)
+    g2 = 1 + dot3(q_vec, e_vec)
+    u1_vec = U_norm * (u_vec + (g1 / g2) *
+        (dot3(u_vec, q_vec) * e_vec - dot3(e_vec, u_vec) * q_vec))
+    u1_norm = norm3(u1_vec)
+
+    αdot_rad = (u1_vec[1][0] * u1_vec[2][1] - u1_vec[2][0] * u1_vec[1][1]) /
+               (u1_vec[1][0]^2 + u1_vec[2][0]^2)
+    δ_rad = asin(u1_vec[3] / u1_norm)
+    return rad2arcsec(αdot_rad), rad2arcsec(δ_rad[1])
+end
+
+function alongcrossresidualarcsec(x::AbstractOpticalAstrometry, res::NEOs.OpticalResidual,
+                                  orbit::LeastSquaresOrbit, params::Parameters)
+    α, δ = residualarcsec(res)
+    αdot, δdot = computedradecrate(x, orbit, params)
+    vα = αdot * cos(dec(x))
+    vδ = δdot
+    speed = hypot(vα, vδ)
+    isfinite(speed) && !iszero(speed) || return NaN, NaN
+    uα, uδ = vα / speed, vδ / speed
+    return α * uα + δ * uδ, -α * uδ + δ * uα
+end
+
+function computedradecarcsec(x::AbstractOpticalAstrometry, orbit::LeastSquaresOrbit,
+                             params::Parameters)
+    return computedradecarcsec(observatory(x), date(x), orbit, params)
+end
+
+function computedradecarcsec(obs, date::DateTime, orbit::LeastSquaresOrbit,
+                             params::Parameters)
+    return compute_radec(obs, date;
+        xvs = et -> denseephstatekmsec(params.eph_su, et),
+        xve = et -> denseephstatekmsec(params.eph_ea, et),
+        xva = et -> asteroidstatekmsec(orbit, et)
+    )
+end
+
+function tangentoffsetsarcsec(α::AbstractVector{<:Real}, δ::AbstractVector{<:Real},
+                              δref::Real)
+    ξ = [NEOs.anglediff(a, first(α)) * cos(δref) for a in α]
+    η = [d - first(δ) for d in δ]
+    return ξ, η
+end
+
+function linearslope(x::AbstractVector{<:Real}, y::AbstractVector{<:Real})
+    length(x) >= 2 || return NaN
+    x̄, ȳ = mean(x), mean(y)
+    dx = x .- x̄
+    denom = sum(abs2, dx)
+    iszero(denom) && return NaN
+    return sum(dx .* (y .- ȳ)) / denom
+end
+
+function positionangledeg(vα::Real, vδ::Real)
+    speed = hypot(vα, vδ)
+    isfinite(speed) && !iszero(speed) || return NaN
+    return mod(rad2deg(atan(vα, vδ)), 360)
+end
+
+function elevationdeg(obs, date::DateTime, orbit::LeastSquaresOrbit, params::Parameters)
+    αas, δas = computedradecarcsec(obs, date, orbit, params)
+    α, δ = arcsec2rad(αas), arcsec2rad(δas)
+    lineofsight = [cos(δ) * cos(α), cos(δ) * sin(α), sin(δ)]
+    zenith = obsposvelECI(obs, dtutc2et(date))[1:3]
+    z_norm = norm3(zenith)
+    isfinite(z_norm) && !iszero(z_norm) || return NaN
+    sin_elevation = clamp(dot3(lineofsight, zenith) / z_norm, -1, 1)
+    return rad2deg(asin(sin_elevation))
+end
+
+function alongcrossrate(vαobs::Real, vδobs::Real, vαeph::Real, vδeph::Real)
+    all(isfinite, (vαobs, vδobs, vαeph, vδeph)) || return NaN, NaN
+    speed = hypot(vαeph, vδeph)
+    iszero(speed) && return NaN, NaN
+    uα, uδ = vαeph / speed, vδeph / speed
+    dvα, dvδ = vαobs - vαeph, vδobs - vδeph
+    return dvα * uα + dvδ * uδ, -dvα * uδ + dvδ * uα
+end
+
+motionspeed(vα::Real, vδ::Real) = all(isfinite, (vα, vδ)) ? hypot(vα, vδ) : NaN
+
+function motionratevalue(x::Real, width::Int = 11)
+    isfinite(x) || return " " ^ width
+    return lpad(@sprintf("%+.2f", x), width)
+end
+
+function motionanglevalue(x::Real, width::Int = 7)
+    isfinite(x) || return " " ^ width
+    return lpad(@sprintf("%.1f", x), width)
+end
+
+function motionelevationvalue(x::Real, width::Int = 7)
+    isfinite(x) || return " " ^ width
+    return lpad(@sprintf("%+.1f", x), width)
+end
+
+function motiontrackletkey(x::AbstractOpticalAstrometry)
+    id = strip(trackletid(x))
+    if !isempty(id)
+        return (:id, id)
+    elseif hasproperty(x, :trksub) && !isempty(strip(getproperty(x, :trksub)))
+        return (:trksub, strip(getproperty(x, :trksub)))
+    else
+        return (:station_timeofday, observatorycode(x), timeofday(x))
+    end
+end
+
+function motiontrackletindices(optical::AbstractOpticalVector)
+    perm = sortperm(collect(eachindex(optical)), by = i -> date(optical[i]))
+    groups = Vector{Vector{Int}}()
+    current = Int[]
+    current_key = nothing
+    for i in perm
+        key = motiontrackletkey(optical[i])
+        if isempty(current) || key == current_key
+            push!(current, i)
+        else
+            push!(groups, current)
+            current = [i]
+        end
+        current_key = key
+    end
+    isempty(current) || push!(groups, current)
+    return groups
+end
+
+function trackletmotion(idxs::AbstractVector{Int}, orbit::LeastSquaresOrbit,
+                        params::Parameters)
+    idxs = sort(collect(idxs), by = i -> date(orbit.optical[i]))
+    optical = orbit.optical[idxs]
+    dates = date.(optical)
+    jds = dtutc2jdtdb.(dates)
+    t0 = mean(jds)
+    tmin = @. (jds - t0) * 1_440
+    span = (maximum(dates) - minimum(dates)).value / 60_000
+    δref = mean(dec.(optical))
+
+    αobs = rad2arcsec.(ra.(optical))
+    δobs = rad2arcsec.(dec.(optical))
+    ξobs, ηobs = tangentoffsetsarcsec(αobs, δobs, δref)
+    vαobs = linearslope(tmin, ξobs)
+    vδobs = linearslope(tmin, ηobs)
+
+    if length(optical) == 1
+        αdot, δdot = computedradecrate(only(optical), orbit, params)
+        vαeph, vδeph = 60 * αdot * cos(dec(only(optical))), 60 * δdot
+    else
+        eph = [computedradecarcsec(x, orbit, params) for x in optical]
+        αeph = first.(eph)
+        δeph = last.(eph)
+        ξeph, ηeph = tangentoffsetsarcsec(αeph, δeph, δref)
+        vαeph = linearslope(tmin, ξeph)
+        vδeph = linearslope(tmin, ηeph)
+    end
+
+    dAT, dCT = alongcrossrate(vαobs, vδobs, vαeph, vδeph)
+    return (
+        date = jdtdb2dtutc(t0),
+        observatory = observatorycode(first(optical)),
+        nobs = length(idxs),
+        nout = count(isoutlier, orbit.ores[idxs]),
+        span = span,
+        elevation = elevationdeg(observatory(first(optical)), jdtdb2dtutc(t0),
+                                 orbit, params),
+        vαobs = vαobs,
+        vδobs = vδobs,
+        speedobs = motionspeed(vαobs, vδobs),
+        vαeph = vαeph,
+        vδeph = vδeph,
+        speedeph = motionspeed(vαeph, vδeph),
+        dAT = dAT,
+        dCT = dCT,
+        PAobs = positionangledeg(vαobs, vδobs),
+        PAeph = positionangledeg(vαeph, vδeph),
+    )
+end
+
+function printmotionbytracklet(orbit::LeastSquaresOrbit, params::Parameters)
+    printitle("Motion by tracklet", "*")
+    println("Rates and dAT/dCT are arcsec/min; elevation and PA are degrees.")
+    println("RAcosD is dRA*cosDec; dAT/dCT are observed-minus-ephemeris rates.")
+    header = string(
+        rpad("Date", 6), "  ", rpad("Obs", 3), "  ", lpad("N", 3), "  ",
+        lpad("Out", 3), "  ", lpad("Span", 8), "  ", lpad("Elev", 7), "  ",
+        lpad("RAcosD obs", 11), "  ", lpad("Dec obs", 9), "  ", lpad("Speed obs", 9), "  ",
+        lpad("RAcosD eph", 11), "  ", lpad("Dec eph", 9), "  ",
+        lpad("Speed eph", 9), "  ", lpad("dAT", 9), "  ", lpad("dCT", 9), "  ",
+        lpad("PAobs", 7), "  ", lpad("PAeph", 7)
+    )
+    println(header)
+    for idxs in motiontrackletindices(orbit.optical)
+        m = trackletmotion(idxs, orbit, params)
+        @printf("%-6s  %-3s  %3d  %3d  %8.2f  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s\n",
+                Dates.format(m.date, dateformat"yymmdd"), m.observatory, m.nobs, m.nout,
+                m.span, motionelevationvalue(m.elevation), motionratevalue(m.vαobs),
+                motionratevalue(m.vδobs, 9), motionratevalue(m.speedobs, 9), motionratevalue(m.vαeph),
+                motionratevalue(m.vδeph, 9), motionratevalue(m.speedeph, 9),
+                motionratevalue(m.dAT, 9), motionratevalue(m.dCT, 9),
+                motionanglevalue(m.PAobs), motionanglevalue(m.PAeph))
+    end
+    println("")
+    return nothing
+end
+
 residualsignchar(x::Real, ax::Real) = iszero(ax) ? ' ' : x > 0 ? '+' : x < 0 ? '-' : ' '
 
 function mpeclikeresidualvalue(x::Real)
@@ -583,31 +861,66 @@ function mpeclikedatecode(x::AbstractOpticalAstrometry)
     return Dates.format(date(x), dateformat"yymmdd")
 end
 
-function mpeclikeresidualentry(x::AbstractOpticalAstrometry, res::NEOs.OpticalResidual,
-                               magres::Union{Nothing, Real} = nothing)
-    α, δ = residualarcsec(res)
-    αs, δs = mpeclikeresidualvalue(α), mpeclikeresidualvalue(δ)
-    if isnothing(magres)
-        values = isoutlier(res) ? "($αs  $δs)" : " $αs  $δs "
-    else
-        ms = mpeclikemagresidualvalue(magres)
-        values = isoutlier(res) ? "($αs  $δs  $ms)" : " $αs  $δs  $ms "
+function mpeclikeresidualheader(include_track::Bool, include_mags::Bool)
+    parts = String[lpad("RA", 5), lpad("Dec", 5)]
+    if include_track
+        append!(parts, (lpad("AT", 5), lpad("CT", 5)))
     end
+    if include_mags
+        push!(parts, lpad("Mag", 6))
+    end
+    return string(rpad("Date", 6), "  ", rpad("Obs", 3), "  ", join(parts, "  "))
+end
+
+function mpeclikeresidualentry(x::AbstractOpticalAstrometry, res::NEOs.OpticalResidual,
+                               radec::Tuple{<:Real, <:Real},
+                               atct::Union{Nothing, Tuple{<:Real, <:Real}} = nothing,
+                               magres::Union{Nothing, Real} = nothing)
+    αs, δs = mpeclikeresidualvalue.(radec)
+    parts = String[αs, δs]
+    if !isnothing(atct)
+        ats, cts = mpeclikeresidualvalue.(atct)
+        append!(parts, (ats, cts))
+    end
+    if !isnothing(magres)
+        push!(parts, mpeclikemagresidualvalue(magres))
+    end
+    values = join(parts, "  ")
+    values = isoutlier(res) ? "($values)" : " $values "
     return string(rpad(mpeclikedatecode(x), 6), "  ",
                   rpad(string(observatorycode(x)), 3), " ", values)
 end
 
 function printmpeclikeresiduals(orbit::LeastSquaresOrbit, H::Real, params::Parameters;
-                                include_mags::Bool = true)
-    title = include_mags ? "Residuals in seconds of arc and magnitudes" :
-            "Residuals in seconds of arc"
+                                include_mags::Bool = true,
+                                include_track::Bool = true)
+    title = if include_track
+        include_mags ? "Residuals in seconds of arc (RA, Dec, AT, CT) and magnitudes" :
+                       "Residuals in seconds of arc (RA, Dec, AT, CT)"
+    else
+        include_mags ? "Residuals in seconds of arc and magnitudes" :
+                       "Residuals in seconds of arc"
+    end
     printitle(title, "*")
     perm = sortperm(collect(eachindex(orbit.optical)), by = i -> date(orbit.optical[i]))
     magres = include_mags ? magnituderesiduals(orbit, H, params) : nothing
-    entries = [mpeclikeresidualentry(orbit.optical[i], orbit.ores[i],
-                                     include_mags ? magres[i] : nothing) for i in perm]
-    entry_width = include_mags ? 40 : 31
+    radec = [residualarcsec(orbit.ores[i]) for i in perm]
+    atct = include_track ?
+        [alongcrossresidualarcsec(orbit.optical[i], orbit.ores[i], orbit, params) for i in perm] :
+        nothing
+    entries = [mpeclikeresidualentry(orbit.optical[i], orbit.ores[i], radec[j],
+                                     include_track ? atct[j] : nothing,
+                                     include_mags ? magres[i] : nothing)
+               for (j, i) in enumerate(perm)]
+    if isempty(entries)
+        println("")
+        return nothing
+    end
+    entry_width = include_mags ? (include_track ? 54 : 40) : (include_track ? 45 : 31)
     nrows = ceil(Int, length(entries) / 3)
+    ncols = ceil(Int, length(entries) / nrows)
+    header = mpeclikeresidualheader(include_track, include_mags)
+    println(join(rpad.(fill(header, ncols), entry_width)))
     for i in 1:nrows
         row = String[]
         for j in i:nrows:length(entries)
@@ -746,6 +1059,43 @@ function tisserandjupitersigma(kep; a_jupiter::Real = JUPITER_SEMIMAJOR_AXIS_AU)
     return propagatedsigma(kep, gradient)
 end
 
+keplerianelementnames(kep) =
+    iselliptic(kep) ? ["a", "e", "i", "ω", "Ω", "M"] :
+                      ["q", "e", "i", "ω", "Ω", "tp"]
+
+function snrratio(nominal::Real, uncertainty::Real)
+    isfinite(nominal) && isfinite(uncertainty) && uncertainty >= 0 || return NaN
+    iszero(uncertainty) && return iszero(nominal) ? NaN : Inf
+    return abs(nominal) / uncertainty
+end
+
+function snrvalue(x::Real)
+    isnan(x) && return lpad("NaN", 16)
+    isinf(x) && return lpad("Inf", 16)
+    return lpad(@sprintf("%.6E", x), 16)
+end
+
+function printkepleriansnrs(kep)
+    rows = collect(zip(keplerianelementnames(kep), elements(kep), sigmas(kep)))
+    names = first.(rows)
+    if !("q" in names)
+        push!(rows, ("q", pericenter(kep), pericentersigma(kep)))
+    end
+    if !("tp" in names)
+        push!(rows, ("tp", timeperipass(kep), timeperipasssigma(kep)))
+    end
+    push!(rows, ("Tj", tisserandjupiter(kep), tisserandjupitersigma(kep)))
+
+    printitle("Keplerian SNRs", "*")
+    println("SNR = |nominal value| / uncertainty")
+    println(rpad("Variable", 12), lpad("SNR", 16))
+    for (name, nominal, uncertainty) in rows
+        println(rpad(name, 12), snrvalue(snrratio(nominal, uncertainty)))
+    end
+    println("")
+    return nothing
+end
+
 function orbitapptype(apps::AbstractApparitionVector, params::Parameters)
     napps = length(apps)
     napps > 0 || throw(ArgumentError("At least one apparition is required"))
@@ -828,6 +1178,7 @@ function main()
 
     # Residual table options
     print_mag_residuals::Bool = !parsed_args["no-mags-res"]
+    print_track_residuals::Bool = !parsed_args["no-track-res"]
 
     # Global initial time
     global_initial_time = now()
@@ -861,7 +1212,7 @@ function main()
                          (1.0, 1.0, 2.0, 0.0, 0.0),
         gaussorder = 2, safegauss = false, refscale = :log,
         tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
-        jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
+        jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 30,
         jtlsproject = true, significance = 0.99, verbose = true,
         outrej = true, χ2_rec = 4.0, χ2_rej = 5.0, fudge = 100.0,
         max_per = 33.3
@@ -916,9 +1267,12 @@ function main()
             @sprintf("%.8f", tisserandjupitersigma(kep)))
     println("H  = ", @sprintf("%.3f", H), " +/- ", @sprintf("%.3f", dH), " mag")
     println("")
+    printkepleriansnrs(kep)
     ele220_name = ele220inputname(input, format, designation(orbit))
     printele220arguments(ele220_name, orbit, kep, H, params, gap_days)
-    printmpeclikeresiduals(orbit, H, params; include_mags = print_mag_residuals)
+    printmotionbytracklet(orbit, params)
+    printmpeclikeresiduals(orbit, H, params; include_mags = print_mag_residuals,
+                           include_track = print_track_residuals)
 
     # Save orbit
     if isempty(residual_excluded)
