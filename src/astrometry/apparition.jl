@@ -38,6 +38,15 @@ numberofdays(x::AbstractApparitionVector) = sum(numberofdays, x)
 noptical(x::Apparition) = length(x.optical)
 noptical(x::AbstractApparitionVector) = sum(noptical, x)
 
+# Print methods for Apparition
+show(io::IO, x::Apparition) = print(io, "Apparition with ", noptical(x), " observation(s)")
+
+function show(io::IO, ::MIME"text/plain", x::Apparition)
+    print(io, noptical(x), "-observation Apparition{", eltype(x.optical), "}\n")
+    Base.print_array(IOContext(io, :limit => true), x.optical)
+    return nothing
+end
+
 """
     apparitions(::AbstractOpticalVector; kwargs...)
 
