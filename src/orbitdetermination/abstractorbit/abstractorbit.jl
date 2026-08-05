@@ -80,7 +80,7 @@ end
 # Timespan of the observation window in days
 function numberofdays(x::AbstractOrbit)
     t0, tf = minmaxdates(x)
-    return (tf - t0).value / 86_400_000
+    return (tf - t0).value / daymillisec
 end
 
 # Return the optical astrometry in an orbit

@@ -65,7 +65,7 @@ function numberofdays(trks::AbstractVector{OpticalTracklet{<:Real}})
         dates[i] = extrema(date, view(trks[i].optical, trks[i].indices))
     end
     t0, tf = minimum(first, dates), maximum(last, dates)
-    return (tf - t0).value / 86_400_000
+    return (tf - t0).value / daymillisec
 end
 =#
 

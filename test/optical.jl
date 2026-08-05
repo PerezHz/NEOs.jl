@@ -627,10 +627,10 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
        @test maximum(norm, @. obsposvelECI(optical4) - obsposvelECI(_optical4_)) < eps()
     end
 
-    @testset "Tracklet" begin
+    using NEOs: OpticalTracklet, OpticalMPC80, OpticalRWO, OpticalADES,
+                indices, reduce_tracklets, isunknown, closest_tracklet
 
-        using NEOs: OpticalTracklet, OpticalMPC80, OpticalRWO, OpticalADES,
-            indices, reduce_tracklets, isunknown, closest_tracklet
+    @testset "Tracklet" begin
 
         # Reduce tracklets
         @test_throws ArgumentError reduce_tracklets(OpticalMPC80{Float64}[])
@@ -718,6 +718,35 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         @test string.(trks1[mask13]) == string.(trks3[mask31])
         @test string.(trks2[mask23]) == string.(trks3[mask32])
+
+    end
+
+    @testset "Apparition" begin
+
+        apps1 = apparitions(optical1)
+        apps2 = apparitions(optical2)
+        apps3 = apparitions(optical3)
+
+        @test all(Base.Fix2(isa, String), string.(apps1))
+        @test all(Base.Fix2(isa, String), string.(apps2))
+        @test all(Base.Fix2(isa, String), string.(apps3))
+
+        @test length(apps1) == length(apps2) == length(apps3)
+        @test indices(apps1) == eachindex(optical1)
+        @test indices(apps2) == eachindex(optical2)
+        @test indices(apps3) == eachindex(optical3)
+
+        @test optical(apps1) == optical1
+        @test optical(apps2) == optical2
+        @test optical(apps3) == optical3
+
+        @test numberofdays(apps1) < numberofdays(optical1)
+        @test numberofdays(apps2) < numberofdays(optical2)
+        @test numberofdays(apps3) < numberofdays(optical3)
+
+        @test noptical(apps1) == length(optical1)
+        @test noptical(apps2) == length(optical2)
+        @test noptical(apps3) == length(optical3)
 
     end
 

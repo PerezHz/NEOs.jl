@@ -311,6 +311,8 @@ const abstol = 1.0E-30
 
 # 1 rad = 57.29577951308232 deg
 const onerad = rad2deg(1.0)
+# 1 day = 86,400,000 millisec
+const daymillisec = 1_000 * daysec
 
 # Vector of GM's (DE430 values) [au^2 / day^3]
 const μ_DE430 = PE.μ

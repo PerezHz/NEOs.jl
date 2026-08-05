@@ -52,7 +52,7 @@ using TaylorSeries: NumberNotSeries
 
 # Common
 export Parameters
-export d_EM_km, d_EM_au, MJD2000
+export daymillisec, d_EM_km, d_EM_au, MJD2000
 export julian2etsecs, etsecs2julian, dtutc2et, et2dtutc, dtutc2jdtdb, jdtdb2dtutc,
        et_to_200X, days_to_200X, dtutc_to_200X, dtutc2days, days2dtutc, rad2arcsec,
        arcsec2rad, mas2rad, range2delay, rangerate2doppler, chi2, nms, nrms
@@ -67,7 +67,7 @@ export numberofdays, unpacknum, packnum, unpackdesig, packdesig,
 export date, measure, observatory, rms, debias, ra, dec, mag, band, catalogue,
        cataloguecode, observatorycode, vconversion, timeofday, isdiscovery, isdeprecated,
        trackletid, frequency, residual, weight, weights, corr, corrs, isoutlier, outliers,
-       setoutlier, setoutlier!, nout, notout, notoutobs
+       setoutlier, setoutlier!, nout, notout, notoutobs, apparitions
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
 export update_observatories_mpc, search_observatory_code, fetch_observatory_information
