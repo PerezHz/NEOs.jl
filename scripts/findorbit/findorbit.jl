@@ -71,6 +71,7 @@ const COMETARY_MARSDEN_RADIAL = (0.111262, 2.808, 2.15, 5.093, 4.6142)
 const JUPITER_SEMIMAJOR_AXIS_AU = 5.20336301
 const MAX_RMS_REGRESSION_FACTOR = 1.5
 const MAX_RMS_REGRESSION_ARCSEC = 0.5
+const MOON_EPH = NEOs.selecteph(NEOs.sseph, NEOs.mo)
 
 function fetch_astrometry_format(format::AbstractString)
     fmt = lowercase(strip(format))
@@ -677,6 +678,25 @@ function elevationdeg(obs, date::DateTime, orbit::LeastSquaresOrbit, params::Par
     return rad2deg(asin(sin_elevation))
 end
 
+function vectorangledeg(x::AbstractVector, y::AbstractVector)
+    nx, ny = norm3(x), norm3(y)
+    all(isfinite, (nx, ny)) && !iszero(nx) && !iszero(ny) || return NaN
+    return rad2deg(acos(clamp(dot3(x, y) / (nx * ny), -1, 1)))
+end
+
+function ephemerisgeometry(t::Real, orbit::LeastSquaresOrbit, params::Parameters)
+    xa = orbit(t)[1:3]
+    xe = params.eph_ea(t)[1:3]
+    xs = params.eph_su(t)[1:3]
+    xm = MOON_EPH(t)[1:3]
+    geocentric = xa - xe
+    return (
+        solar_elongation = vectorangledeg(geocentric, xs - xe),
+        lunar_elongation = vectorangledeg(geocentric, xm - xe),
+        geocentric_distance = norm3(geocentric),
+    )
+end
+
 function alongcrossrate(vαobs::Real, vδobs::Real, vαeph::Real, vδeph::Real)
     all(isfinite, (vαobs, vδobs, vαeph, vδeph)) || return NaN, NaN
     speed = hypot(vαeph, vδeph)
@@ -703,35 +723,13 @@ function motionelevationvalue(x::Real, width::Int = 7)
     return lpad(@sprintf("%+.1f", x), width)
 end
 
-function motiontrackletkey(x::AbstractOpticalAstrometry)
-    id = strip(trackletid(x))
-    if !isempty(id)
-        return (:id, id)
-    elseif hasproperty(x, :trksub) && !isempty(strip(getproperty(x, :trksub)))
-        return (:trksub, strip(getproperty(x, :trksub)))
-    else
-        return (:station_timeofday, observatorycode(x), timeofday(x))
-    end
+function motiondistancevalue(x::Real, width::Int = 9)
+    isfinite(x) || return " " ^ width
+    return lpad(@sprintf("%.5f", x), width)
 end
 
-function motiontrackletindices(optical::AbstractOpticalVector)
-    perm = sortperm(collect(eachindex(optical)), by = i -> date(optical[i]))
-    groups = Vector{Vector{Int}}()
-    current = Int[]
-    current_key = nothing
-    for i in perm
-        key = motiontrackletkey(optical[i])
-        if isempty(current) || key == current_key
-            push!(current, i)
-        else
-            push!(groups, current)
-            current = [i]
-        end
-        current_key = key
-    end
-    isempty(current) || push!(groups, current)
-    return groups
-end
+motiontrackletindices(orbit::LeastSquaresOrbit) = indices.(orbit.tracklets)
+
 
 function trackletmotion(idxs::AbstractVector{Int}, orbit::LeastSquaresOrbit,
                         params::Parameters)
@@ -763,6 +761,7 @@ function trackletmotion(idxs::AbstractVector{Int}, orbit::LeastSquaresOrbit,
     end
 
     dAT, dCT = alongcrossrate(vαobs, vδobs, vαeph, vδeph)
+    geometry = ephemerisgeometry(t0 - PE.J2000, orbit, params)
     return (
         date = jdtdb2dtutc(t0),
         observatory = observatorycode(first(optical)),
@@ -771,6 +770,9 @@ function trackletmotion(idxs::AbstractVector{Int}, orbit::LeastSquaresOrbit,
         span = span,
         elevation = elevationdeg(observatory(first(optical)), jdtdb2dtutc(t0),
                                  orbit, params),
+        solar_elongation = geometry.solar_elongation,
+        lunar_elongation = geometry.lunar_elongation,
+        geocentric_distance = geometry.geocentric_distance,
         vαobs = vαobs,
         vδobs = vδobs,
         speedobs = motionspeed(vαobs, vδobs),
@@ -786,22 +788,25 @@ end
 
 function printmotionbytracklet(orbit::LeastSquaresOrbit, params::Parameters)
     printitle("Motion by tracklet", "*")
-    println("Rates and dAT/dCT are arcsec/min; elevation and PA are degrees.")
+    println("Rates and dAT/dCT are arcsec/min; elevation, elongations and PA are degrees; GeoDist is au.")
     println("RAcosD is dRA*cosDec; dAT/dCT are observed-minus-ephemeris rates.")
     header = string(
         rpad("Date", 6), "  ", rpad("Obs", 3), "  ", lpad("N", 3), "  ",
         lpad("Out", 3), "  ", lpad("Span", 8), "  ", lpad("Elev", 7), "  ",
+        lpad("SolEl", 7), "  ", lpad("LunEl", 7), "  ", lpad("GeoDist", 9), "  ",
         lpad("RAcosD obs", 11), "  ", lpad("Dec obs", 9), "  ", lpad("Speed obs", 9), "  ",
         lpad("RAcosD eph", 11), "  ", lpad("Dec eph", 9), "  ",
         lpad("Speed eph", 9), "  ", lpad("dAT", 9), "  ", lpad("dCT", 9), "  ",
         lpad("PAobs", 7), "  ", lpad("PAeph", 7)
     )
     println(header)
-    for idxs in motiontrackletindices(orbit.optical)
+    for idxs in motiontrackletindices(orbit)
         m = trackletmotion(idxs, orbit, params)
-        @printf("%-6s  %-3s  %3d  %3d  %8.2f  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s\n",
+        @printf("%-6s  %-3s  %3d  %3d  %8.2f  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s\n",
                 Dates.format(m.date, dateformat"yymmdd"), m.observatory, m.nobs, m.nout,
-                m.span, motionelevationvalue(m.elevation), motionratevalue(m.vαobs),
+                m.span, motionelevationvalue(m.elevation),
+                motionanglevalue(m.solar_elongation), motionanglevalue(m.lunar_elongation),
+                motiondistancevalue(m.geocentric_distance), motionratevalue(m.vαobs),
                 motionratevalue(m.vδobs, 9), motionratevalue(m.speedobs, 9), motionratevalue(m.vαeph),
                 motionratevalue(m.vδeph, 9), motionratevalue(m.speedeph, 9),
                 motionratevalue(m.dAT, 9), motionratevalue(m.dCT, 9),
