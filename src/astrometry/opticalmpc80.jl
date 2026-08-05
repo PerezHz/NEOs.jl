@@ -15,6 +15,7 @@ function MPC80FileReader(text::AbstractString)
         text = replace(text, "\r\n" => '\n')
     end
     text = replace(text, "\ufeff" => "", "\u200b" => "")
+    isempty(text) || endswith(text, "\n") || (text = string(text, '\n'))
     N = count(==('\n'), text)
     L = length(text)
     optical = Vector{SubString{String}}(undef, N)
