@@ -54,6 +54,17 @@ function parse_commandline()
         "--no-track-res"
             help = "do not print along-track and cross-track residuals in the final residual table"
             action = :store_true
+        "--force-all-fit"
+            help = "keep the final refinement that fits every non-manually-excluded observation, even if its RMS is worse than the linked seed"
+            action = :store_true
+        "--max-rms-jump-factor"
+            help = "maximum allowed RMS increase factor when accepting a linked/refined orbit"
+            arg_type = Float64
+            default = 1.5
+        "--max-rms-jump-arcsec"
+            help = "minimum candidate RMS in arcsec before the RMS jump guard rejects a linked/refined orbit"
+            arg_type = Float64
+            default = 0.5
     end
 
     return parse_args(s)
@@ -233,7 +244,7 @@ numberofdays(x::Apparition) = numberofdays(x.optical)
 noptical(x::Apparition) = length(x.optical)
 noptical(x::AbstractApparitionVector) = sum(noptical, x)
 
-apparitionrank(x::Apparition) = (noptical(x) >= 5, numberofdays(x), noptical(x))
+apparitionrank(x::Apparition) = (noptical(x) >= 5, noptical(x), numberofdays(x))
 
 function apparitions(optical::AbstractOpticalVector{T},
                      gap::Period = Day(30)) where {T <: Real}
@@ -258,11 +269,13 @@ isodvalid(od::ODProblem, orbit::LeastSquaresOrbit, params::Parameters) =
         noptical(od) == noptical(orbit) && critical_value(orbit) < params.significance &&
         all(!isnan, sigmas(orbit))
 
-function isrmsregression(previous::LeastSquaresOrbit, candidate::LeastSquaresOrbit)
+function isrmsregression(previous::LeastSquaresOrbit, candidate::LeastSquaresOrbit;
+                         max_factor::Real = MAX_RMS_REGRESSION_FACTOR,
+                         max_arcsec::Real = MAX_RMS_REGRESSION_ARCSEC)
     previous_rms, candidate_rms = NEOs.opticalrms(previous), NEOs.opticalrms(candidate)
     return isfinite(previous_rms) && isfinite(candidate_rms) &&
-           candidate_rms > MAX_RMS_REGRESSION_ARCSEC &&
-           candidate_rms > MAX_RMS_REGRESSION_FACTOR * previous_rms
+           candidate_rms > max_arcsec &&
+           candidate_rms > max_factor * previous_rms
 end
 
 function printrmsregression(label::AbstractString, previous::LeastSquaresOrbit,
@@ -348,7 +361,9 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
 end
 
 function multipleapparition(apps::AbstractApparitionVector, orbitMA::MultipleApparitionOrbit,
-                            params::Parameters)
+                            params::Parameters;
+                            max_rms_jump_factor::Real = MAX_RMS_REGRESSION_FACTOR,
+                            max_rms_jump_arcsec::Real = MAX_RMS_REGRESSION_ARCSEC)
     # Multiple apparition orbit determination
     OD = ODProblem(gravityonly!, NEOs.optical(apps), weights = Veres17, debias = Eggl20)
     _, _, res = propres(OD, orbitMA(), epoch(orbitMA) + PE.J2000, params)
@@ -370,7 +385,8 @@ function multipleapparition(apps::AbstractApparitionVector, orbitMA::MultipleApp
         NEOs.update!(OD, NEOs.optical(trial_apps))
         orbit = linkage(OD, orbitMA, params)
         iszero(orbit) && continue
-        if isrmsregression(orbitMA, orbit)
+        if isrmsregression(orbitMA, orbit; max_factor = max_rms_jump_factor,
+                           max_arcsec = max_rms_jump_arcsec)
             printrmsregression("Apparition linkage", orbitMA, orbit)
             continue
         elseif isfitloss(orbitMA, orbit)
@@ -388,7 +404,10 @@ end
 
 function finalrefinement(dynamics, orbit::LeastSquaresOrbit,
                          optical::AbstractOpticalVector, params::Parameters;
-                         marsden_scalings = params.marsden_scalings)
+                         marsden_scalings = params.marsden_scalings,
+                         force_all_fit::Bool = false,
+                         max_rms_jump_factor::Real = MAX_RMS_REGRESSION_FACTOR,
+                         max_rms_jump_arcsec::Real = MAX_RMS_REGRESSION_ARCSEC)
     label = dynamics === nongravs! ? "Non-gravitational" : "Gravity-only"
     scalings = dynamics === nongravs! ? marsden_scalings : params.marsden_scalings
     paramsFR = Parameters(params; marsden_scalings = scalings,
@@ -413,7 +432,9 @@ function finalrefinement(dynamics, orbit::LeastSquaresOrbit,
         (noptical(orbitFR) == noptical(candidate) && nrms(orbitFR) < nrms(candidate)))
         candidate = orbitFR
     end
-    if isrmsregression(orbit, candidate)
+    if isrmsregression(orbit, candidate; max_factor = max_rms_jump_factor,
+                       max_arcsec = max_rms_jump_arcsec) &&
+       !(force_all_fit && noptical(candidate) == length(optical))
         printrmsregression("$label final refinement", orbit, candidate)
         return orbit
     end
@@ -1101,26 +1122,36 @@ function printkepleriansnrs(kep)
     return nothing
 end
 
-function orbitapptype(apps::AbstractApparitionVector, params::Parameters)
+function orbitapptype(apps::AbstractApparitionVector, params::Parameters;
+                      max_rms_jump_factor::Real = MAX_RMS_REGRESSION_FACTOR,
+                      max_rms_jump_arcsec::Real = MAX_RMS_REGRESSION_ARCSEC)
     napps = length(apps)
     napps > 0 || throw(ArgumentError("At least one apparition is required"))
-    return orbitapptype(Val(min(napps, 3)), apps, params)
+    return orbitapptype(Val(min(napps, 3)), apps, params;
+                        max_rms_jump_factor, max_rms_jump_arcsec)
 end
 
-function orbitapptype(::Val{1}, apps::AbstractApparitionVector, params::Parameters)
+function orbitapptype(::Val{1}, apps::AbstractApparitionVector, params::Parameters;
+                      max_rms_jump_factor::Real = MAX_RMS_REGRESSION_FACTOR,
+                      max_rms_jump_arcsec::Real = MAX_RMS_REGRESSION_ARCSEC)
     return singleapparition(apps, params)
 end
 
-function orbitapptype(::Val{2}, apps::AbstractApparitionVector, params::Parameters)
+function orbitapptype(::Val{2}, apps::AbstractApparitionVector, params::Parameters;
+                      max_rms_jump_factor::Real = MAX_RMS_REGRESSION_FACTOR,
+                      max_rms_jump_arcsec::Real = MAX_RMS_REGRESSION_ARCSEC)
     orbitSA = singleapparition(apps, params)
     return bridge(apps, orbitSA, params)
 end
 
-function orbitapptype(::Val{3}, apps::AbstractApparitionVector, params::Parameters)
+function orbitapptype(::Val{3}, apps::AbstractApparitionVector, params::Parameters;
+                      max_rms_jump_factor::Real = MAX_RMS_REGRESSION_FACTOR,
+                      max_rms_jump_arcsec::Real = MAX_RMS_REGRESSION_ARCSEC)
     orbitSA = singleapparition(apps, params)
     orbitMA = bridge(apps, orbitSA, params)
     orbitMA isa MultipleApparitionOrbit || return orbitMA
-    return multipleapparition(apps, orbitMA, params)
+    return multipleapparition(apps, orbitMA, params;
+                              max_rms_jump_factor, max_rms_jump_arcsec)
 end
 
 function main()
@@ -1184,6 +1215,16 @@ function main()
     # Residual table options
     print_mag_residuals::Bool = !parsed_args["no-mags-res"]
     print_track_residuals::Bool = !parsed_args["no-track-res"]
+    force_all_fit::Bool = parsed_args["force-all-fit"]
+    force_all_fit && println("• Final refinement will keep all fitted observations if it converges")
+    max_rms_jump_factor::Float64 = parsed_args["max-rms-jump-factor"]
+    max_rms_jump_arcsec::Float64 = parsed_args["max-rms-jump-arcsec"]
+    max_rms_jump_factor >= 1 ||
+        throw(ArgumentError("--max-rms-jump-factor must be at least 1"))
+    max_rms_jump_arcsec >= 0 ||
+        throw(ArgumentError("--max-rms-jump-arcsec must be non-negative"))
+    println("• RMS jump guard: factor ", max_rms_jump_factor,
+            ", active above ", max_rms_jump_arcsec, " arcsec")
 
     # Global initial time
     global_initial_time = now()
@@ -1226,9 +1267,10 @@ function main()
     # Split observational arc into apparitions
     apps = apparitions(fit_optical, Day(split_gap_days))
     # Compute orbit by apparition type (single/multiple apparition)
-    orbit = orbitapptype(apps, params)
+    orbit = orbitapptype(apps, params; max_rms_jump_factor, max_rms_jump_arcsec)
     orbit = finalrefinement(final_dynamics, orbit, fit_optical, params;
-                            marsden_scalings = nongrav_scalings)
+                            marsden_scalings = nongrav_scalings,
+                            force_all_fit, max_rms_jump_factor, max_rms_jump_arcsec)
 
     # Shift epoch to requested epoch, or to the middle of the observational arc
     jdsolution = isnothing(solution_epoch) ? meanepoch(orbit) + PE.J2000 : solution_epoch
