@@ -465,10 +465,37 @@ function update!(ls::LevenbergMarquardt{T}, res::AbstractResidualSet{T, TaylorN{
     return nothing
 end
 
-function _lsmethods(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
-                    idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
-    return [Newton(res, x0, idxs), DifferentialCorrections(res, x0, idxs),
-            LevenbergMarquardt(res, x0, idxs)]
+# Default methods for tryls
+function _lsmethods(
+        res::AbstractResidualSet{T, TaylorN{T}}, x0::AbstractVector{T},
+        idxs::AbstractVector{Int} = eachindex(x0)
+    ) where {T <: Real}
+    return (
+        Newton(res, x0, idxs),
+        DifferentialCorrections(res, x0, idxs),
+        LevenbergMarquardt(res, x0, idxs)
+    )
+end
+
+# Base case: we ran out of methods
+_tryls(res, x0, cache, methods::Tuple{}) = zero(LeastSquaresFit{eltype(x0)})
+
+# Recursive step
+function _tryls(res, x0, cache, methods::Tuple)
+    method = first(methods)
+    update!(method, res, x0, cache.idxs)
+    fit = leastsquares!(method, cache)
+    if fit.success
+        return fit
+    else
+        return _tryls(res, x0, cache, Base.tail(methods))
+    end
+end
+
+# Main entry point
+function tryls(res::AbstractResidualSet{T, TaylorN{T}}, x0::AbstractVector{T},
+               cache::LeastSquaresCache{T}, methods::Tuple) where {T <: Real}
+    return _tryls(res, x0, cache, methods)
 end
 
 """
@@ -486,26 +513,11 @@ See also [`LeastSquaresCache`](@ref), [`AbstractLeastSquaresMethod`](@ref),
 
 - `maxiter::Int`: maximum number of iterations (default: `25`).
 """
-function tryls(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
-               idxs::AbstractVector{Int} = eachindex(x0);
-               maxiter::Int = 25) where {T <: Real}
+function tryls(
+        res::AbstractResidualSet{T, TaylorN{T}}, x0::AbstractVector{T},
+        idxs::AbstractVector{Int} = eachindex(x0); maxiter::Int = 25
+    ) where {T <: Real}
     cache = LeastSquaresCache(x0, idxs, maxiter)
     methods = _lsmethods(res, x0, idxs)
     return tryls(res, x0, cache, methods)
-end
-
-function tryls(res::AbstractResidualSet{T, TaylorN{T}},
-               x0::Vector{T},
-               cache::LeastSquaresCache{T},
-               methods::Vector{AbstractLeastSquaresMethod{T}}) where {T <: Real}
-    # Allocate memory
-    fit = zero(LeastSquaresFit{T})
-    # Least squares methods in order
-    for i in eachindex(methods)
-        update!(methods[i], res, x0, cache.idxs)
-        fit = leastsquares!(methods[i], cache)
-        fit.success && break
-    end
-
-    return fit
 end

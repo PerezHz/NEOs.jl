@@ -80,12 +80,13 @@ end
 # Incrementally add observations to fit
 
 # Add as much tracklets as possible per iteration
-function addoptical!(::Val{true}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
-                     lscache::LeastSquaresCache{T},
-                     lsmethods::Vector{AbstractLeastSquaresMethod{T}},
-                     trksin::TrackletVector{T}, trksout::TrackletVector{T},
-                     res::Vector{OpticalResidual{T, TaylorN{T}}},
-                     x0::Vector{T}, params::Parameters{T}) where {T <: Real}
+function addoptical!(
+        ::Val{true}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
+        lscache::LeastSquaresCache{T}, lsmethods::Tuple,
+        trksin::TrackletVector{T}, trksout::TrackletVector{T},
+        res::Vector{OpticalResidual{T, TaylorN{T}}},
+        x0::Vector{T}, params::Parameters{T}
+    ) where {T <: Real}
     while !isempty(trksout)
         extra = indices(trksout[1])
         fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods)
@@ -102,12 +103,13 @@ function addoptical!(::Val{true}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
 end
 
 # Add at most one tracklet per iteration
-function addoptical!(::Val{false}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
-                     lscache::LeastSquaresCache{T},
-                     lsmethods::Vector{AbstractLeastSquaresMethod{T}},
-                     trksin::TrackletVector{T}, trksout::TrackletVector{T},
-                     res::Vector{OpticalResidual{T, TaylorN{T}}},
-                     x0::Vector{T}, params::Parameters{T}) where {T <: Real}
+function addoptical!(
+        ::Val{false}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
+        lscache::LeastSquaresCache{T}, lsmethods::Tuple,
+        trksin::TrackletVector{T}, trksout::TrackletVector{T},
+        res::Vector{OpticalResidual{T, TaylorN{T}}},
+        x0::Vector{T}, params::Parameters{T}
+    ) where {T <: Real}
     if critical_value(view(res, oidxs), fit) < params.significance && !isempty(trksout)
         extra = indices(trksout[1])
         fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods)
@@ -123,13 +125,13 @@ function addoptical!(::Val{false}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
     return oidxs, fit
 end
 
-function addobservations!(od::MixedODProblem, oidxs::Vector{Int}, ridxs::Vector{Int},
-                          fit::LeastSquaresFit{T}, lscache::LeastSquaresCache{T},
-                          lsmethods::Vector{AbstractLeastSquaresMethod{T}},
-                          trksin::TrackletVector{T}, trksout::TrackletVector{T},
-                          radarin::AbstractRadarVector{T}, radarout::AbstractRadarVector{T},
-                          res::AbstractResidualSet{T, TaylorN{T}},
-                          x0::Vector{T}, params::Parameters{T}) where {T <: Real}
+function addobservations!(
+        od::MixedODProblem, oidxs::Vector{Int}, ridxs::Vector{Int},
+        fit::LeastSquaresFit{T}, lscache::LeastSquaresCache{T}, lsmethods::Tuple,
+        trksin::TrackletVector{T}, trksout::TrackletVector{T},
+        radarin::AbstractRadarVector{T}, radarout::AbstractRadarVector{T},
+        res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T}, params::Parameters{T}
+    ) where {T <: Real}
     # Add optical astrometry
     while !isempty(trksout)
         extra = indices(trksout[1])
@@ -159,8 +161,7 @@ function addobservations!(od::MixedODProblem, oidxs::Vector{Int}, ridxs::Vector{
     return oidxs, ridxs, fit
 end
 
-function updateorbit(orbit::AbstractOrbit{D, T, TaylorN{T}},
-                     lsmethods::Vector{AbstractLeastSquaresMethod{T}},
+function updateorbit(orbit::AbstractOrbit{D, T, TaylorN{T}}, lsmethods::Tuple,
                      params::Parameters{T}) where {D, T <: Real}
     # Unpack parameters
     @unpack jtlsproject, H_max = params
