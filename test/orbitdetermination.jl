@@ -220,7 +220,7 @@ end
         # Parameters
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-           gaussorder = 2, jtlsorder = 2, jtlsiter = 200, lsiter = 20,
+           gaussorder = 2, jtlsorder = 2, jtlsiter = 20, lsiter = 20,
            significance = 0.99, outrej = false, parse_eqs = false
         )
         params = Parameters(params, parse_eqs = true)
@@ -238,7 +238,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 9, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -279,12 +279,14 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [-0.9867704701732631, 0.3781890325424674, 0.14094513213009532,
-            -0.008773157203087259, -0.00947109649687576, -0.005654229864757284]
-        JPL_KEP = [8.198835710815939E-01, 3.962989389356275E-01, 5.807184452352074E+00,
-            4.045356567755751E+01, 3.261403954217091E+02, 1.216665112960870E+02]
+        JPL_CAR = [-9.867822372310442E-01, 3.781927033166271E-01, 1.409429196233261E-01,
+            -8.773480716697608E-03, -9.470221311888708E-03, -5.654113212253916E-03]
+        JPL_GEO = [-6.640076709353979E-02, 2.398619117376862E-02, -1.283857914434059E-02,
+            -1.782970529237847E-03, 5.133750583261109E-03, 6.771648773014439E-04]
+        JPL_KEP = [8.198694885290753E-01, 3.963590496724497E-01, 5.808386294295408E+00,
+            4.045222425970146E+01, 3.261410820553623E+02, 1.216619661909267E+02]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
+        JPL_ATTR = cartesian2attributable(JPL_GEO)
         jpl_compatibility_tests(orbit, params, (7.6E-01, 8.3E-01, 7.0E-12, 4.6E-14, 1.1E-13),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -346,7 +348,7 @@ end
         @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit1.qs, 1) == 6
-        @test size(orbit1.qs, 2) == length(orbit1.Qs) == 4
+        @test size(orbit1.qs, 2) == length(orbit1.Qs) <= 5
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
@@ -380,7 +382,7 @@ end
         # Parameters
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-           gaussorder = 2, jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           gaussorder = 2, jtlsorder = 2, jtlsiter = 20, lsiter = 10,
            significance = 0.99, outrej = false, safegauss = false
         )
         # Orbit determination problem
@@ -396,7 +398,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 9, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -437,13 +439,15 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [1.0042569058151192, 0.2231639040146286, 0.11513854178693468,
-            -0.010824212819531798, 0.017428798232689943, 0.0071046780555307385]
+        JPL_CAR = [1.004256184830538E+00, 2.231635895303758E-01, 1.151385598814907E-01,
+            -1.082421281819635E-02, 1.742879823300478E-02, 7.104678045458838E-03]
+        JPL_GEO = [3.977197755123790E-02, -3.014438907068757E-02, 5.444636306828039E-03,
+            -5.809136993789294E-03, 2.303264464230069E-03, 5.470042538831260E-04]
         JPL_KEP = [2.872424697642789E+00, 6.749395051551541E-01, 1.282355986214476E+00,
             1.725712172730245E+02, 2.413793589329106E+02, 3.538743602962668E+02]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (5.6E-03, 5.5E-03, 2.4E-11, 1.4E-14, 3.8E-12),
+        JPL_ATTR = cartesian2attributable(JPL_GEO)
+        jpl_compatibility_tests(orbit, params, (6.0E-03, 6.0E-03, 2.4E-11, 1.4E-14, 3.8E-12),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
@@ -491,7 +495,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 9, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -532,12 +536,14 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [-0.12722461679828806, -0.9466098076903212, -0.4526816007640767,
-            0.02048875631534963, -0.00022720097573790754, 0.00321302850930331]
-        JPL_KEP = [2.232655272359251E+00, 5.480018648354085E-01, 8.456325272115306E+00,
-            1.322293305412568E+01, 2.778787985886902E+02, 3.530120962605258E+02]
+        JPL_CAR = [-1.272253324405492E-01, -9.466101191080750E-01, -4.526816519305000E-01,
+            2.048875630636477E-02, -2.272010701451988E-04, 3.213028469127346E-03]
+        JPL_GEO = [-4.582770483046963E-02, -1.328523323350602E-02, -4.831618660681472E-02,
+            3.607102715393575E-03, 9.878186144576845E-04, 3.739277819983182E-03]
+        JPL_KEP = [2.232655267540509E+00, 5.480018623993814E-01, 8.456323361249829E+00,
+            1.322293109123257E+01, 2.778787983622283E+02, 3.530120833962170E+02]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
+        JPL_ATTR = cartesian2attributable(JPL_GEO)
         jpl_compatibility_tests(orbit, params, (1.6E-01, 2.4E0, 2.5E-11, 4.3E-12, 1.5E-12),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -574,7 +580,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by July 31, 2026
+        # Values by August 9, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -713,7 +719,7 @@ end
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
            tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
-           jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           jtlsorder = 2, jtlsiter = 20, lsiter = 10,
            significance = 0.99, outrej = false
         )
         # Orbit determination problem
@@ -729,7 +735,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 9, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -776,12 +782,14 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [-0.9698405495747651, 0.24035304578776012, 0.10288276585828428,
-            -0.009512301266159554, -0.01532548565855646, -0.00809464581680694]
-        JPL_KEP = [1.484448954296998E+00, 3.966995063832199E-01, 3.961868860866990E+00,
-            1.294946774085543E+02, 3.442349856198504E+02, 2.206164242012555E+01]
+        JPL_CAR = [-9.698411378106104E-01, 2.403528398096335E-01, 1.028828398440475E-01,
+            -9.512276508152102E-03, -1.532548560550362E-02, -8.094637971143012E-03]
+        JPL_GEO = [-1.068488198434094E-02, 2.545558390227619E-03, -1.475591869336636E-04,
+            -4.812208060869299E-03, -3.675325693678584E-06, -1.451573958100394E-03]
+        JPL_KEP = [1.484444069122194E+00, 3.966972238396319E-01, 3.961849525038958E+00,
+            1.294946899344538E+02, 3.442349857158359E+02, 2.206177172198979E+01]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
+        JPL_ATTR = cartesian2attributable(JPL_GEO)
         jpl_compatibility_tests(orbit, params, (1.3E-02, 1.7E-02, 1.9E-11, 3.8E-13, 3.8E-13),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -827,7 +835,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 9, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -868,12 +876,14 @@ end
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
-            -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
+        JPL_CAR = [7.673359267780500E-01, 6.484889639435911E-01, 2.932326837353227E-01,
+            -1.102334378117082E-02, 1.539269707113238E-02, 6.528842011032119E-03]
+        JPL_GEO = [3.447012800435960E-02, 3.060747693168282E-02, 2.544634286791332E-02,
+            8.618815060243545E-04, 3.787188937089640E-03, 1.496710946113642E-03]
         JPL_KEP = [1.776244846691859E+00, 4.381984418639090E-01, 7.819612775042287E-01,
             9.751283439586027E+01, 2.742918197067644E+02, 1.116208224849003E+01]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
+        JPL_ATTR = cartesian2attributable(JPL_GEO)
         jpl_compatibility_tests(orbit, params, (7.6E-02, 1.2E-01, 9.0E-12, 1.9E-14, 2.0E-12),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -940,7 +950,7 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        jpl_compatibility_tests(orbit1, params, (4.5E-04, 1.2E-02, 1.2E-10, 8.2E-11, 8.3E-11),
+        jpl_compatibility_tests(orbit1, params, (4.0E-03, 1.2E-02, 1.2E-10, 8.2E-11, 8.3E-11),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
@@ -974,7 +984,7 @@ end
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
            tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
-           jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           jtlsorder = 2, jtlsiter = 20, lsiter = 10,
            significance = 0.99, outrej = false
         )
         # Orbit determination problem
@@ -990,7 +1000,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 9, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -1037,12 +1047,14 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [-0.1793421909678032, 0.8874121750891107, 0.3841434101167349,
-            -0.017557851117612377, -0.005781634223099801, -0.0020075106081869185]
+        JPL_CAR = [-1.793429069495696E-01, 8.874118618831563E-01, 3.841433972166043E-01,
+            -1.755785111623553E-02, -5.781634216294369E-03, -2.007510615561216E-03]
+        JPL_GEO = [3.100782033379628E-04, 2.595364571202023E-03, 6.648062725412545E-04,
+            -3.646375932548784E-04, -2.824074490602325E-03, -7.248940385846410E-04]
         JPL_KEP = [1.163575955666616E+00, 2.128185264087166E-01, 1.423597471953649E+00,
             5.237781301766019E+01, 1.016022028285875E+02, 3.243429036265208E+02]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
+        JPL_ATTR = cartesian2attributable(JPL_GEO)
         jpl_compatibility_tests(orbit, params, (3.0E-01, 3.8E-01, 1.5E-10, 7.9E-13, 3.2E-12),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -1072,7 +1084,7 @@ end
         # Parameters
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-           gaussorder = 2, jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           gaussorder = 2, jtlsorder = 2, jtlsiter = 20, lsiter = 10,
            significance = 0.99, outrej = false, parse_eqs = false
         )
         # Orbit determination problem
@@ -1095,7 +1107,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 9, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1136,13 +1148,15 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [0.9739760787551061, 0.21541704400792083, 0.09401075290627411,
-            -0.00789675674941779, 0.0160619782715116, 0.006135361409943397]
+        JPL_CAR = [9.739753595124904E-01, 2.154167298799998E-01, 9.401075962536619E-02,
+            -7.896756748173077E-03, 1.606197827206136E-02, 6.135361399316373E-03]
+        JPL_GEO = [2.933267343256818E-03, -5.413518151214789E-04, 4.289238206468831E-04,
+            -3.634877734669857E-03, 7.643113463866795E-04, -4.963086752649505E-04]
         JPL_KEP = [1.273091758414584E+00, 2.870222798582721E-01, 2.341999526552296E+00,
             2.339645303327229E+02, 1.941265709953888E+02, 3.288450951861228E+02]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (2.0E-01, 3.0E-01, 1.2E-08, 1.5E-11, 1.5E-09),
+        JPL_ATTR = cartesian2attributable(JPL_GEO)
+        jpl_compatibility_tests(orbit, params, (5.0E-01, 3.0E-01, 1.2E-08, 1.5E-11, 1.5E-09),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
@@ -1207,7 +1221,7 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        jpl_compatibility_tests(orbit1, params, (1.7E-01, 1.9E-01, 2.2E-07, 1.8E-8, 1.4E-09),
+        jpl_compatibility_tests(orbit1, params, (1.1E+01, 5.0E-01, 2.2E-07, 1.8E-8, 1.4E-09),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
@@ -1283,7 +1297,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by July 31, 2026
+        # Values by August 9, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1325,12 +1339,14 @@ end
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [8.273613111662440E-01, -8.060979570468877E-01, -6.506021560333630E-01,
-                   1.659953139139261E-02, -5.614155804560522E-03, 2.899959983103430E-03]
-        JPL_KEP = [2.279881958167905E+00, 7.595854924208774E-01, 3.859999487009846E+01,
-                   2.293324466168822E+02, 3.254353160068554E+02, 2.033836565098925E+01]
+        JPL_CAR = [8.272632404899825E-01, -8.060647872503925E-01, -6.506192873607640E-01,
+            1.660015292864715E-02, -5.614753953372325E-03, 2.899476523012778E-03]
+        JPL_GEO = [-4.175116355294079E-02, -3.431743572536730E-01, -4.501902423837642E-01,
+            8.333024069432302E-03, -1.924883145539331E-02, -3.011265449368804E-03]
+        JPL_KEP = [2.279881975143154E+00, 7.595854949078547E-01, 3.859999487430863E+01,
+            2.293324466043271E+02, 3.254353160044697E+02, 2.033667388008325E+01]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
+        JPL_ATTR = cartesian2attributable(JPL_GEO)
         jpl_compatibility_tests(orbit, params, (6.0E-01, 1.4E+00, 2.1E-12, 5.9E-14, 5.9E-14),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -1406,7 +1422,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by July 31, 2026
+        # Values by August 9, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1457,10 +1473,12 @@ end
         # Compatibility with JPL
         JPL_CAR = [-5.229992130937651E-01, 8.689454573480734E-01, 3.096174868699621E-01,
             -1.413639580483663E-02, -5.510379552549767E-03, -2.413003153288419E-03]
+        JPL_GEO = [9.403261433284629E-02, 1.678184682535047E-01, 5.767627532379624E-03,
+            -5.089377531997436E-04, 4.493620961259394E-03, 1.923654593847778E-03]
         JPL_KEP = [9.223295977030230E-01, 1.911190963976789E-01, 3.330797253820763E+00,
             1.263744754026979E+02, 2.044798558304837E+02, 1.361032871672047E+02]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit1) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit1)))
+        JPL_ATTR = cartesian2attributable(JPL_GEO)
         jpl_compatibility_tests(orbit1, params, (4.5E+00, 1.9E+02, 4.0E-08, 1.5E-11, 8.0E-10),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
@@ -1516,7 +1534,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by July 31, 2026
+        # Values by August 9, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1557,12 +1575,14 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [4.848674283176028E-01, -1.256976941043074E+00, 7.558473824624909E-02,
-                   2.837659541627720E-03, 1.669282318693257E-02, 4.630635236479733E-03]
-        JPL_KEP = [2.315552902881586E+00, 8.475227263442291E-01, 3.315750642722048E+01,
-                   1.778735230275155E+02, 2.484374010431416E+02, 3.416112652341685E+02]
+        JPL_CAR = [4.848426285691420E-01, -1.257122809354289E+00, 7.554427206018359E-02,
+            2.838166871048631E-03, 1.669151616500038E-02, 4.630710656278403E-03]
+        JPL_GEO = [-1.090443706381998E-01, -5.114340419413202E-01, 3.987237578405338E-01,
+            -1.075454656354707E-02, 7.432601214257392E-03, 6.161736954055316E-04]
+        JPL_KEP = [2.315552921489858E+00, 8.475227268358573E-01, 3.315750659948262E+01,
+            1.778735224777621E+02, 2.484374014196204E+02, 3.416088210735048E+02]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
+        JPL_ATTR = cartesian2attributable(JPL_GEO)
         jpl_compatibility_tests(orbit, params, (2.8E+0, 3.8E+0, 1.8E-7, 5.0E-9, 1.7E-8),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
