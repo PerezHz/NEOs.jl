@@ -169,21 +169,22 @@ end
 
 getid(::Newton) = "Newton"
 
-function lsstep(ls::Newton{T}, x::Vector{T}) where {T <: Real}
+function lsstep(ls::Newton, x::AbstractVector)
+    # Unpack
+    @unpack GQ, dQ, HQ, d2Q, nobs, npar = ls
     # Evaluate gradient and hessian
-    evaluate!(ls.GQ, x, ls.dQ)
-    evaluate!(ls.HQ, x, ls.d2Q)
+    evaluate!(GQ, x, dQ)
+    evaluate!(HQ, x, d2Q)
     # Invert hessian
-    lud2Q = lu!(ls.d2Q; check = false)
-    !issuccess(lud2Q) && return Vector{T}(undef, 0), false
+    lud2Q = lu!(d2Q; check = false)
+    !issuccess(lud2Q) && return empty(x), false
     invd2Q = inv!(lud2Q)
     # Newton update rule
-    Δx = -invd2Q * ls.dQ
+    Δx = -invd2Q * dQ
     # Normal matrix
-    C = (ls.nobs/2) * ls.d2Q
+    C = (nobs/2) * d2Q
     # Error metric
-    error = (Δx') * C * Δx / ls.npar
-
+    error = (Δx') * C * Δx / npar
     return Δx, error > 0
 end
 
@@ -257,19 +258,20 @@ end
 
 getid(::DifferentialCorrections) = "Differential Corrections"
 
-function lsstep(ls::DifferentialCorrections{T}, x::Vector{T}) where {T <: Real}
+function lsstep(ls::DifferentialCorrections, x::AbstractVector)
+    # Unpack
+    @unpack D, Dx, C, Cx, npar = ls
     # Evaluate D and C matrices
-    evaluate!(ls.D, x, ls.Dx)
-    evaluate!(ls.C, x, ls.Cx)
+    evaluate!(D, x, Dx)
+    evaluate!(C, x, Cx)
     # Invert C matrix
-    luCx = lu!(ls.Cx; check = false)
-    !issuccess(luCx) && return Vector{T}(undef, 0), false
+    luCx = lu!(Cx; check = false)
+    !issuccess(luCx) && return empty(x), false
     invCx = inv!(luCx)
     # Differential corrections update rule
-    Δx = -invCx * ls.Dx
+    Δx = -invCx * Dx
     # Error metric
-    error = (Δx') * ls.Cx * Δx / ls.npar
-
+    error = (Δx') * Cx * Δx / npar
     return Δx, error > 0
 end
 
@@ -408,30 +410,31 @@ end
 
 getid(::LevenbergMarquardt) = "Levenberg-Marquardt"
 
-function lsstep(ls::LevenbergMarquardt{T}, x::Vector{T}) where {T <: Real}
+function lsstep(ls::LevenbergMarquardt, x::AbstractVector)
+    # Unpack
+    @unpack GQ, dQ, HQ, d2Q, λ, idxs, Q = ls
     # Evaluate gradient and hessian
-    evaluate!(ls.GQ, x, ls.dQ)
-    evaluate!(ls.HQ, x, ls.d2Q)
+    evaluate!(GQ, x, dQ)
+    evaluate!(HQ, x, d2Q)
     # Modified Hessian
-    for i in axes(ls.d2Q, 1)
-        ls.d2Q[i, i] *= (1 + ls.λ)
+    for i in axes(d2Q, 1)
+        d2Q[i, i] +=  λ * abs(d2Q[i, i])
     end
     # Invert hessian
-    lud2Q = lu!(ls.d2Q; check = false)
-    !issuccess(lud2Q) && return Vector{T}(undef, 0), false
+    lud2Q = lu!(d2Q; check = false)
+    !issuccess(lud2Q) && return empty(x), false
     invd2Q = inv!(lud2Q)
     # Levenberg-Marquardt update rule
-    Δx = -invd2Q * ls.dQ
-    _x_ = deepcopy(x)
-    _x_[ls.idxs] .+= Δx
+    Δx = -invd2Q * dQ
+    y = deepcopy(x)
+    y[idxs] .+= Δx
     # Update λ
-    if 0 < ls.Q(_x_) < ls.Q(x)
+    if 0 < Q(y) < Q(x)
         ls.λ /= 10
     else
         ls.λ *= 10
-        Δx .= zero(T)
+        Δx .= zero(eltype(x))
     end
-
     return Δx, true
 end
 
@@ -439,7 +442,7 @@ function normalmatrix(ls::LevenbergMarquardt, x::AbstractVector)
     @unpack HQ, d2Q, λ, nobs = ls
     evaluate!(HQ, x, d2Q)
     for i in axes(d2Q, 1)
-        d2Q[i, i] *= (1 + λ)
+        d2Q[i, i] += λ * abs(d2Q[i, i])
     end
     return (nobs / 2) * d2Q
 end
