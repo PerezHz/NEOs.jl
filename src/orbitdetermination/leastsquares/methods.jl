@@ -439,11 +439,8 @@ function lsstep(ls::LevenbergMarquardt, x::AbstractVector)
 end
 
 function normalmatrix(ls::LevenbergMarquardt, x::AbstractVector)
-    @unpack HQ, d2Q, λ, nobs = ls
+    @unpack HQ, d2Q, nobs = ls
     evaluate!(HQ, x, d2Q)
-    for i in axes(d2Q, 1)
-        d2Q[i, i] += λ * abs(d2Q[i, i])
-    end
     return (nobs / 2) * d2Q
 end
 
