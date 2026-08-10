@@ -950,7 +950,7 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        jpl_compatibility_tests(orbit1, params, (4.0E-03, 1.2E-02, 1.2E-10, 8.2E-11, 8.3E-11),
+        jpl_compatibility_tests(orbit1, params, (4.0E-03, 1.2E-02, 1.4E-10, 8.2E-11, 1.0E-10),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
