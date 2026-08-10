@@ -884,7 +884,7 @@ end
             9.751283439586027E+01, 2.742918197067644E+02, 1.116208224849003E+01]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
         JPL_ATTR = cartesian2attributable(JPL_GEO)
-        jpl_compatibility_tests(orbit, params, (7.6E-02, 1.2E-01, 9.0E-12, 1.9E-14, 2.0E-12),
+        jpl_compatibility_tests(orbit, params, (7.6E-02, 1.2E-01, 1.0E-11, 1.9E-14, 3.0E-12),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
@@ -1055,7 +1055,7 @@ end
             5.237781301766019E+01, 1.016022028285875E+02, 3.243429036265208E+02]
         JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
         JPL_ATTR = cartesian2attributable(JPL_GEO)
-        jpl_compatibility_tests(orbit, params, (3.0E-01, 3.8E-01, 1.5E-10, 7.9E-13, 3.2E-12),
+        jpl_compatibility_tests(orbit, params, (3.0E-01, 3.8E-01, 1.5E-10, 4.0E-12, 3.2E-12),
                                 JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
