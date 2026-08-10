@@ -52,7 +52,7 @@ nongravitational accelerations model:
 
 # Least Squares
 
-- `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `5`).
+- `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `10`).
 - `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
 - `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `6`).
 - `significance::T`: chi-square significance level (default: `0.99`).
@@ -106,7 +106,7 @@ nongravitational accelerations model:
     mmovproject::Bool = true
     tsaorder::Int = 6
     # Least Squares
-    lsiter::Int = 5
+    lsiter::Int = 10
     jtlsiter::Int = 5
     jtlsorder::Int = 6
     significance::T = 0.99
