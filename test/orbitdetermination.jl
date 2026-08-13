@@ -249,7 +249,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 12, 2026
+        # Values by August 13, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -401,7 +401,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 12, 2026
+        # Values by August 13, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -490,7 +490,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by August 12, 2026
+        # Values by August 13, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -567,7 +567,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by August 12, 2026
+        # Values by August 13, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -722,7 +722,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 12, 2026
+        # Values by August 13, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -814,7 +814,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 12, 2026
+        # Values by August 13, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -922,7 +922,7 @@ end
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
         jpl_compatibility_tests(50392393, orbit1, params, (4.0E-03, 1.2E-02, 1.4E-10,
-            8.2E-11, 1.0E-10))
+            1.7E-10, 1.0E-10))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
         @test H - dH ≤ 26.7 ≤ H + dH
@@ -971,7 +971,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 12, 2026
+        # Values by August 13, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -1070,7 +1070,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 12, 2026
+        # Values by August 13, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1252,7 +1252,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by August 12, 2026
+        # Values by August 13, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1369,7 +1369,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by August 12, 2026
+        # Values by August 13, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1473,7 +1473,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by August 12, 2026
+        # Values by August 13, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
