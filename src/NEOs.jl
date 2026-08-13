@@ -3,6 +3,7 @@ module NEOs
 # __precompile__(false)
 import Base: RefValue, isless, show, string, getindex, in, zero,
        iszero, isnan, summary, firstindex, lastindex, first, last, wait, isdeprecated
+import LinearAlgebra: issuccess
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, longascnode,
        meanmotion, meananomaly, timeperipass, numberofbodies, selecteph

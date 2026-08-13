@@ -90,7 +90,7 @@ function addoptical!(
     while !isempty(trksout)
         extra = indices(trksout[1])
         fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods)
-        !fit_new.success && break
+        !issuccess(fit_new) && break
         fit = fit_new
         tracklet = popfirst!(trksout)
         push!(trksin, tracklet)
@@ -113,7 +113,7 @@ function addoptical!(
     if critical_value(view(res, oidxs), fit) < params.significance && !isempty(trksout)
         extra = indices(trksout[1])
         fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods)
-        !fit_new.success && return oidxs, fit
+        !issuccess(fit_new) && return oidxs, fit
         fit = fit_new
         tracklet = popfirst!(trksout)
         push!(trksin, tracklet)
@@ -136,7 +136,7 @@ function addobservations!(
     while !isempty(trksout)
         extra = indices(trksout[1])
         fit_new = tryls((res[1][oidxs ∪ extra], res[2][ridxs]), x0, lscache, lsmethods)
-        !fit_new.success && break
+        !issuccess(fit_new) && break
         fit = fit_new
         tracklet = popfirst!(trksout)
         push!(trksin, tracklet)
@@ -149,7 +149,7 @@ function addobservations!(
         extra = findfirst(==(radarout[1]), od.radar)
         isnothing(extra) && break
         fit_new = tryls((res[1][oidxs], res[2][ridxs ∪ extra]), x0, lscache, lsmethods)
-        !fit_new.success && break
+        !issuccess(fit_new) && break
         fit = fit_new
         radar = popfirst!(radarout)
         push!(radarin, radar)
@@ -267,7 +267,7 @@ function jtls(
         isempty(res) && break
         # Orbit fit
         fit = tryls(view(res, oidxs), x0, lscache, lsmethods)
-        !fit.success && break
+        !issuccess(fit) && break
         # Incrementally add observations to fit
         oidxs, fit = addoptical!(Val(mode), oidxs, fit, lscache, lsmethods,
                                  trksin, trksout, res, x0, params)
@@ -367,7 +367,7 @@ function jtls(
         any(isempty, res) && break
         # Orbit fit
         fit = tryls((res[1][oidxs], res[2][ridxs]), x0, lscache, lsmethods)
-        !fit.success && break
+        !issuccess(fit) && break
         # Incrementally add observations to fit
         oidxs, ridxs, fit = addobservations!(od, oidxs, ridxs, fit, lscache, lsmethods,
             trksin, trksout, radarin, radarout, res, x0, params)
