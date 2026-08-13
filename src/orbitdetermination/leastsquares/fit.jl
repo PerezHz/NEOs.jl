@@ -24,13 +24,19 @@ LeastSquaresFit(::Type{T}, method::Type{<:AbstractLeastSquaresMethod}) where {T 
 # Definition of zero LeastSquaresFit{T}
 zero(::Type{LeastSquaresFit{T}}) where {T <: Real} = LeastSquaresFit(false,
     Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), AbstractLeastSquaresMethod)
+iszero(x::LeastSquaresFit{T}) where {T} = x == zero(LeastSquaresFit{T})
+
+issuccess(x::LeastSquaresFit) = x.success
 
 # Print method for LeastSquaresFit
 function show(io::IO, x::LeastSquaresFit)
-    success_s = x.success ? "Succesful" : "Unsuccesful"
-    routine_s = string(x.routine)
+    success_s = issuccess(x) ? "Succesful" : "Unsuccesful"
+    routine_s = iszero(x) ? "fit" : string(x.routine)
     print(io, success_s, " ", routine_s)
 end
+
+targetfunction(x::AbstractLeastSquaresMethod{T}, fit::LeastSquaresFit{T}) where {T} =
+    !issuccess(fit) ? T(Inf) : evaluate(targetfunction(x), fit.x)
 
 # project(::AbstractVector{T}, Γ::AbstractMatrix{T}) where {T <: Real} =
 #    fill(T(NaN), size(Γ))

@@ -90,7 +90,7 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
         isempty(res) && break
         # Least squares fit
         fit = tryls(res, x0, lscache, lsmethods)
-        !fit.success && break
+        !issuccess(fit) && break
         x1 .= fit.x
         # Current Q
         Q = nms(res)

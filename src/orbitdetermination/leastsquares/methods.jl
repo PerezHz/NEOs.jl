@@ -5,6 +5,8 @@ Supertype for the least squares interface.
 """
 abstract type AbstractLeastSquares{T <: Real} end
 
+numtype(::AbstractLeastSquares{T}) where {T} = T
+
 """
     AbstractLeastSquaresCache{T} <: AbstractLeastSquares{T}
 
@@ -123,16 +125,6 @@ function leastsquares(method::Type{<:AbstractLeastSquaresMethod{T}},
     return fit
 end
 
-mutable struct Newton{T} <: AbstractLeastSquaresMethod{T}
-    nobs::Int
-    npar::Int
-    Q::TaylorN{T}
-    GQ::Vector{TaylorN{T}}
-    HQ::Matrix{TaylorN{T}}
-    dQ::Vector{T}
-    d2Q::Matrix{T}
-end
-
 """
     Newton(res, x0 [, idxs])
 
@@ -146,6 +138,19 @@ See also [`leastsquares`](@ref).
     See sections 5.2 and 5.3 of:
     - https://doi.org/10.1017/CBO9781139175371
 """
+mutable struct Newton{T} <: AbstractLeastSquaresMethod{T}
+    nobs::Int
+    npar::Int
+    Q::TaylorN{T}
+    GQ::Vector{TaylorN{T}}
+    HQ::Matrix{TaylorN{T}}
+    dQ::Vector{T}
+    d2Q::Matrix{T}
+end
+
+getid(::Newton) = "Newton"
+targetfunction(x::Newton) = x.Q
+
 function Newton(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
                 idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
     # Number of observations and degrees of freedom
@@ -166,8 +171,6 @@ function Newton(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
 
     return Newton{T}(nobs, npar, Q, GQ, HQ, dQ, d2Q)
 end
-
-getid(::Newton) = "Newton"
 
 function lsstep(ls::Newton, x::AbstractVector)
     # Unpack
@@ -216,16 +219,6 @@ function update!(ls::Newton{T}, res::AbstractResidualSet{T, TaylorN{T}}, x0::Vec
     return nothing
 end
 
-mutable struct DifferentialCorrections{T} <: AbstractLeastSquaresMethod{T}
-    nobs::Int
-    npar::Int
-    Q::TaylorN{T}
-    D::Vector{TaylorN{T}}
-    C::Matrix{TaylorN{T}}
-    Dx::Vector{T}
-    Cx::Matrix{T}
-end
-
 """
     DifferentialCorrections(res, x0 [, idxs])
 
@@ -239,6 +232,19 @@ See also [`leastsquares`](@ref).
     See sections 5.2 and 5.3 of:
     - https://doi.org/10.1017/CBO9781139175371
 """
+mutable struct DifferentialCorrections{T} <: AbstractLeastSquaresMethod{T}
+    nobs::Int
+    npar::Int
+    Q::TaylorN{T}
+    D::Vector{TaylorN{T}}
+    C::Matrix{TaylorN{T}}
+    Dx::Vector{T}
+    Cx::Matrix{T}
+end
+
+getid(::DifferentialCorrections) = "Differential Corrections"
+targetfunction(x::DifferentialCorrections) = x.Q
+
 function DifferentialCorrections(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
                                  idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
     # Number of observations and degrees of freedom
@@ -255,8 +261,6 @@ function DifferentialCorrections(res::AbstractResidualSet{T, TaylorN{T}}, x0::Ve
 
     return DifferentialCorrections{T}(nobs, npar, Q, D, C, Dx, Cx)
 end
-
-getid(::DifferentialCorrections) = "Differential Corrections"
 
 function lsstep(ls::DifferentialCorrections, x::AbstractVector)
     # Unpack
@@ -359,18 +363,6 @@ function ξTH(res::AbstractResidualSet{T, TaylorN{T}}, V::AbstractVector{TaylorN
     return ξTHv, H
 end
 
-mutable struct LevenbergMarquardt{T} <: AbstractLeastSquaresMethod{T}
-    nobs::Int
-    npar::Int
-    idxs::Vector{Int}
-    λ::T
-    Q::TaylorN{T}
-    GQ::Vector{TaylorN{T}}
-    HQ::Matrix{TaylorN{T}}
-    dQ::Vector{T}
-    d2Q::Matrix{T}
-end
-
 """
     LevenbergMarquardt(res, x0 [, idxs])
 
@@ -385,6 +377,21 @@ See also [`leastsquares`](@ref).
     See section 15.5.2 of:
     - https://numerical.recipes
 """
+mutable struct LevenbergMarquardt{T} <: AbstractLeastSquaresMethod{T}
+    nobs::Int
+    npar::Int
+    idxs::Vector{Int}
+    λ::T
+    Q::TaylorN{T}
+    GQ::Vector{TaylorN{T}}
+    HQ::Matrix{TaylorN{T}}
+    dQ::Vector{T}
+    d2Q::Matrix{T}
+end
+
+getid(::LevenbergMarquardt) = "Levenberg-Marquardt"
+targetfunction(x::LevenbergMarquardt) = x.Q
+
 function LevenbergMarquardt(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
                             idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
     # Number of observations and degrees of freedom
@@ -407,8 +414,6 @@ function LevenbergMarquardt(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{
 
     return LevenbergMarquardt{T}(nobs, npar, idxs, λ, Q, GQ, HQ, dQ, d2Q)
 end
-
-getid(::LevenbergMarquardt) = "Levenberg-Marquardt"
 
 function lsstep(ls::LevenbergMarquardt, x::AbstractVector)
     # Unpack
@@ -481,24 +486,24 @@ function _lsmethods(
 end
 
 # Base case: we ran out of methods
-_tryls(res, x0, cache, methods::Tuple{}) = zero(LeastSquaresFit{eltype(x0)})
+_tryls(fit, res, x0, cache, methods::Tuple{}) = fit
 
 # Recursive step
-function _tryls(res, x0, cache, methods::Tuple)
+function _tryls(fit, res, x0, cache, methods::Tuple)
     method = first(methods)
     update!(method, res, x0, cache.idxs)
-    fit = leastsquares!(method, cache)
-    if fit.success
-        return fit
-    else
-        return _tryls(res, x0, cache, Base.tail(methods))
+    newfit = leastsquares!(method, cache)
+    if issuccess(newfit) && 0 < targetfunction(method, newfit) < targetfunction(method, fit)
+        fit = newfit
     end
+    return _tryls(fit, res, x0, cache, Base.tail(methods))
 end
 
 # Main entry point
-function tryls(res::AbstractResidualSet{T, TaylorN{T}}, x0::AbstractVector{T},
-               cache::LeastSquaresCache{T}, methods::Tuple) where {T <: Real}
-    return _tryls(res, x0, cache, methods)
+function tryls(res::AbstractResidualSet, x0::AbstractVector,
+               cache::LeastSquaresCache, methods::Tuple)
+    fit = zero(LeastSquaresFit{eltype(x0)})
+    return _tryls(fit, res, x0, cache, methods)
 end
 
 """
