@@ -308,10 +308,11 @@ function meanepoch(x::AbstractOrbit)
     return mean(t, weights(w))
 end
 
-function singleapparition(apps::AbstractApparitionVector, params::Parameters)
+function singleapparitionseeds(apps::AbstractApparitionVector, params::Parameters)
     # Single apparition orbit determination
     optical = NEOs.optical(first(apps))
     orbitSA = zero(SingleApparitionOrbit{typeof(optical)})
+    seeds = SingleApparitionOrbit[]
     sort!(apps, by = apparitionrank, rev = true)
     od = ODProblem(newtonian!, NEOs.optical(apps[1]), weights = Veres17,
                    debias = Eggl20)
@@ -321,8 +322,16 @@ function singleapparition(apps::AbstractApparitionVector, params::Parameters)
             orbitSA = i == 1 ? gaussiod(od, params) : tsaiod(od, params; initcond)
             isodvalid(od, orbitSA, params) && break
         end
-        isodvalid(od, orbitSA, params) && break
+        isodvalid(od, orbitSA, params) && push!(seeds, orbitSA)
     end
+    return seeds
+end
+
+function singleapparition(apps::AbstractApparitionVector, params::Parameters)
+    optical = NEOs.optical(first(apps))
+    seeds = singleapparitionseeds(apps, params)
+    isempty(seeds) && return zero(SingleApparitionOrbit{typeof(optical)})
+    orbitSA = first(seeds)
     return orbitSA
 end
 
@@ -749,6 +758,11 @@ function motiondistancevalue(x::Real, width::Int = 9)
     return lpad(@sprintf("%.5f", x), width)
 end
 
+function motionarcvalue(x::Real, width::Int = 9)
+    isfinite(x) || return " " ^ width
+    return lpad(@sprintf("%.2f", x), width)
+end
+
 motiontrackletindices(orbit::LeastSquaresOrbit) = indices.(orbit.tracklets)
 
 
@@ -794,6 +808,8 @@ function trackletmotion(idxs::AbstractVector{Int}, orbit::LeastSquaresOrbit,
         solar_elongation = geometry.solar_elongation,
         lunar_elongation = geometry.lunar_elongation,
         geocentric_distance = geometry.geocentric_distance,
+        arcobs = motionspeed(vαobs, vδobs) * span,
+        arceph = motionspeed(vαeph, vδeph) * span,
         vαobs = vαobs,
         vδobs = vδobs,
         speedobs = motionspeed(vαobs, vδobs),
@@ -809,12 +825,13 @@ end
 
 function printmotionbytracklet(orbit::LeastSquaresOrbit, params::Parameters)
     printitle("Motion by tracklet", "*")
-    println("Rates and dAT/dCT are arcsec/min; elevation, elongations and PA are degrees; GeoDist is au.")
+    println("Rates and dAT/dCT are arcsec/min; POS arclengths are arcsec; elevation, elongations and PA are degrees; GeoDist is au.")
     println("RAcosD is dRA*cosDec; dAT/dCT are observed-minus-ephemeris rates.")
     header = string(
         rpad("Date", 6), "  ", rpad("Obs", 3), "  ", lpad("N", 3), "  ",
         lpad("Out", 3), "  ", lpad("Span", 8), "  ", lpad("Elev", 7), "  ",
         lpad("SolEl", 7), "  ", lpad("LunEl", 7), "  ", lpad("GeoDist", 9), "  ",
+        lpad("Arc obs", 9), "  ", lpad("Arc eph", 9), "  ",
         lpad("RAcosD obs", 11), "  ", lpad("Dec obs", 9), "  ", lpad("Speed obs", 9), "  ",
         lpad("RAcosD eph", 11), "  ", lpad("Dec eph", 9), "  ",
         lpad("Speed eph", 9), "  ", lpad("dAT", 9), "  ", lpad("dCT", 9), "  ",
@@ -823,11 +840,12 @@ function printmotionbytracklet(orbit::LeastSquaresOrbit, params::Parameters)
     println(header)
     for idxs in motiontrackletindices(orbit)
         m = trackletmotion(idxs, orbit, params)
-        @printf("%-6s  %-3s  %3d  %3d  %8.2f  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s\n",
+        @printf("%-6s  %-3s  %3d  %3d  %8.2f  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s\n",
                 Dates.format(m.date, dateformat"yymmdd"), m.observatory, m.nobs, m.nout,
                 m.span, motionelevationvalue(m.elevation),
                 motionanglevalue(m.solar_elongation), motionanglevalue(m.lunar_elongation),
-                motiondistancevalue(m.geocentric_distance), motionratevalue(m.vαobs),
+                motiondistancevalue(m.geocentric_distance), motionarcvalue(m.arcobs),
+                motionarcvalue(m.arceph), motionratevalue(m.vαobs),
                 motionratevalue(m.vδobs, 9), motionratevalue(m.speedobs, 9), motionratevalue(m.vαeph),
                 motionratevalue(m.vδeph, 9), motionratevalue(m.speedeph, 9),
                 motionratevalue(m.dAT, 9), motionratevalue(m.dCT, 9),
@@ -1137,21 +1155,48 @@ function orbitapptype(::Val{1}, apps::AbstractApparitionVector, params::Paramete
     return singleapparition(apps, params)
 end
 
+function preferorbit(candidate::LeastSquaresOrbit, best::Union{Nothing, LeastSquaresOrbit})
+    isnothing(best) && return candidate
+    if noptical(candidate) != noptical(best)
+        return noptical(candidate) > noptical(best) ? candidate : best
+    end
+    return NEOs.opticalrms(candidate) < NEOs.opticalrms(best) ? candidate : best
+end
+
 function orbitapptype(::Val{2}, apps::AbstractApparitionVector, params::Parameters;
                       max_rms_jump_factor::Real = MAX_RMS_REGRESSION_FACTOR,
                       max_rms_jump_arcsec::Real = MAX_RMS_REGRESSION_ARCSEC)
-    orbitSA = singleapparition(apps, params)
-    return bridge(apps, orbitSA, params)
+    optical = NEOs.optical(first(apps))
+    seeds = singleapparitionseeds(copy(apps), params)
+    isempty(seeds) && return zero(SingleApparitionOrbit{typeof(optical)})
+    best = nothing
+    for orbitSA in seeds
+        candidate = bridge(copy(apps), orbitSA, params)
+        iszero(candidate) && continue
+        best = preferorbit(candidate, best)
+    end
+    return isnothing(best) ? first(seeds) : best
 end
 
 function orbitapptype(::Val{3}, apps::AbstractApparitionVector, params::Parameters;
                       max_rms_jump_factor::Real = MAX_RMS_REGRESSION_FACTOR,
                       max_rms_jump_arcsec::Real = MAX_RMS_REGRESSION_ARCSEC)
-    orbitSA = singleapparition(apps, params)
-    orbitMA = bridge(apps, orbitSA, params)
-    orbitMA isa MultipleApparitionOrbit || return orbitMA
-    return multipleapparition(apps, orbitMA, params;
-                              max_rms_jump_factor, max_rms_jump_arcsec)
+    optical = NEOs.optical(first(apps))
+    seeds = singleapparitionseeds(copy(apps), params)
+    isempty(seeds) && return zero(SingleApparitionOrbit{typeof(optical)})
+    best = nothing
+    for orbitSA in seeds
+        trialapps = copy(apps)
+        orbitMA = bridge(trialapps, orbitSA, params)
+        iszero(orbitMA) && continue
+        candidate = orbitMA isa MultipleApparitionOrbit ?
+                    multipleapparition(trialapps, orbitMA, params;
+                                       max_rms_jump_factor, max_rms_jump_arcsec) :
+                    orbitMA
+        iszero(candidate) && continue
+        best = preferorbit(candidate, best)
+    end
+    return isnothing(best) ? first(seeds) : best
 end
 
 function main()
