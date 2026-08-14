@@ -76,82 +76,82 @@ function solve_lagrange(a::TaylorN{T}, b::TaylorN{T}, c::TaylorN{T};
     return sol
 end
 
-# Find the best combination of three observations for Gauss' method.
-# See the line after equation (27) of https://doi.org/10.1016/j.icarus.2007.11.033
-function gausstriplet(::Val{true}, optical::AbstractOpticalVector,
-                      tracklets::AbstractTrackletVector)
-    # Unfold tracklets
-    a, b, c = view(optical, indices(tracklets[1])), view(optical, indices(tracklets[2])),
-              view(optical, indices(tracklets[3]))
-    # All possible triplets of indices
-    CI = CartesianIndices((length(a), length(b), length(c)))
-    # Allocate memory
-    triplet = [0, 0, 0]
-    τ = typemax(Int)
-    # Check all possible triplets of indices
-    for ci in CI
-        # Unfold indices
-        i, j, k = ci.I
-        # Minimize asymmetry
-        τ1 = (date(b[j]) - date(a[i])).value
-        τ3 = (date(c[k]) - date(b[j])).value
-        _τ_ = abs(τ3 - τ1)
-        # Update triplet and τ
-        if _τ_ < τ
-            triplet .= i, j, k
-            τ = _τ_
-        end
-    end
-    # Unfold triplet
-    i, j, k = triplet
-    # Update observatories, dates, α and δ
-    observatories = [observatory(a[i]), observatory(b[j]), observatory(c[k])]
-    dates = [date(a[i]), date(b[j]), date(c[k])]
-    α = [ra(a[i]), ra(b[j]), ra(c[k])]
-    δ = [dec(a[i]), dec(b[j]), dec(c[k])]
-    # Sort triplet
-    idxs = sortperm(dates)
-    permute!(observatories, idxs)
-    permute!(dates, idxs)
-    permute!(α, idxs)
-    permute!(δ, idxs)
+"""
+    gaussmetric(a, b, c; kwargs...)
 
-    return observatories, dates, α, δ
+Heuristic metric to quantify how fit a triplet `(a, b, c)` of optical
+astrometry is for Gauss' method.
+
+# Keyword arguments
+
+- `τmin::Real`: minimum desired total time span in days (default: `1`).
+- `τmax::Real`: maximum desired total time span in days (default: `30`).
+
+!!! note
+    This function assumes that `date(a) < date(b) < date(c)`.
+"""
+function gaussmetric(a::AbstractOpticalAstrometry, b::AbstractOpticalAstrometry,
+                     c::AbstractOpticalAstrometry; τmin::Real = 1, τmax::Real = 30)
+    τ1 = daysbetween(a, b)
+    τ3 = daysbetween(b, c)
+    τ = τ1 + τ3
+    x = τ / sqrt(τmin * τmax)
+    return ((τ3 - τ1) / τ)^2 + 0.5 * (x + 1/x)
 end
 
-function gausstriplet(::Val{false}, optical::AbstractOpticalVector,
-                      tracklets::AbstractTrackletVector)
-    # Allocate memory
-    triplet = [0, 0, 0]
-    τa, τb = 0, typemax(Int)
-    # Check all possible triplets of indices
-    L = length(optical)
-    for i in 1:L-2, j in i+1:L-1, k in j+1:L
-        # Maximize timespan and minimize asymmetry
-        τ1 = (date(optical[j]) - date(optical[i])).value
-        τ3 = (date(optical[k]) - date(optical[j])).value
-        _τa_, _τb_ = abs(τ1) + abs(τ3), abs(τ3 - τ1)
-        # Update triplet and τ
-        if _τa_ > τa || (_τa_ == τa && _τb_ < τb)
-            triplet .= i, j, k
-            τa, τb = _τa_, _τb_
+function _gausstriplets(X::AbstractOpticalVector, nbest::Int, τmin::Real,
+                        τmax::Real, cutoff::Real)
+    L = length(X)
+    triplets = [(0, 0, 0, Inf) for _ in 1:min(nbest, binomial(L, 3))]
+    for i in 1:L-2
+        xi = X[i]
+        for j in i+1:L-1
+            xj = X[j]
+            daysbetween(xi, xj) > cutoff && break
+            for k in j+1:L
+                xk = X[k]
+                daysbetween(xi, xk) > cutoff && break
+                m = gaussmetric(xi, xj, xk; τmin, τmax)
+                if m < triplets[end][4]
+                    triplet = (i, j, k, m)
+                    l = searchsortedfirst(triplets, triplet, by = last)
+                    triplets[l+1:end] .= triplets[l:end-1]
+                    triplets[l] = triplet
+                end
+            end
         end
     end
-    # Unfold triplet
-    i, j, k = triplet
-    # Update observatories, dates, α and δ
-    observatories = observatory.(optical[triplet])
-    dates = date.(optical[triplet])
-    α = ra.(optical[triplet])
-    δ = dec.(optical[triplet])
-    # Sort triplet
-    idxs = sortperm(dates)
-    permute!(observatories, idxs)
-    permute!(dates, idxs)
-    permute!(α, idxs)
-    permute!(δ, idxs)
+    return triplets
+end
 
-    return observatories, dates, α, δ
+isgausstriplet(x::Tuple{Int, Int, Int, T}) where {T <: Real} = !isinf(x[4])
+
+"""
+    gausstriplets(X, nbest; kwargs...)
+
+Find the `nbest` triplets with the smallest value of [`gaussmetric`](@ref)
+in a vector of optical astrometry `X`. Returns a vector of tuples, where
+each element contains three indices followed by the value of the metric.
+
+# Keyword arguments
+
+- `τmin::Real`: minimum desired total time span in days (default: `1`).
+- `τmax::Real`: maximum desired total time span in days (default: `30`).
+
+!!! note
+    This function assumes that `X` is sorted according to `date`.
+"""
+function gausstriplets(X::AbstractOpticalVector, nbest::Int = 10;
+                       τmin::Real = 1, τmax::Real = 30)
+    # First pass: use τmax as cutoff to aggressively prune the search space
+    triplets = _gausstriplets(X, nbest, τmin, τmax, τmax)
+    # Fallback: rerun the search without the τmax early-exit constraint
+    if !isempty(triplets) && !isgausstriplet(triplets[1])
+        triplets = _gausstriplets(X, nbest, τmin, τmax, Inf)
+    end
+    # Clean up: remove any uninitialized slots
+    filter!(isgausstriplet, triplets)
+    return triplets
 end
 
 """
@@ -167,45 +167,50 @@ Method` section of [`Parameters`](@ref).
 """
 function gaussmethod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where {D, T, O}
     # Unpack
-    @unpack safegauss, gaussorder, eph_su = params
+    @unpack gaussorder, safegauss, gaussntrip, eph_su = params
     @unpack dynamics, optical, tracklets = od
     variables = collect(1:6)
-    # Find best triplet of observations
-    observatories, dates, α, δ = gausstriplet(Val(safegauss), optical, tracklets)
-    # Julian day of middle observation
-    _jd0_ = dtutc2jdtdb(dates[2])
-    # Scaling factors
-    scalings = fill(π / (180 * 3_600), 6)
-    # Jet transport perturbation (ra/dec)
-    dq = [scalings[i] * TaylorN(i, order = gaussorder) for i in 1:6]
-    # Gauss method solutions
-    τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2s, r_vec, ρ =
-        gaussmethod(observatories, dates, α .+ dq[1:3], δ .+ dq[4:6], params)
-    # Preliminary orbits
-    orbits = Vector{GaussOrbit{D, T, T, O}}(undef, length(r_2s))
-    for i in eachindex(orbits)
-        # Epoch (corrected for light-time)
-        jd0 = _jd0_ - cte(ρ[2, i]) / c_au_per_day
-        # Jet transport initial condition
-        q0 = r_vec[:, 2, i] + eph_su(jd0 - JD_J2000)
-        # Propagation and residuals
-        bwd, fwd, res = propres(od, q0, jd0, params)
-        if isempty(res)
-            orbits[i] = zero(GaussOrbit{D, T, T, O})
-            continue
+    dq = [arcsec2rad(1) * TaylorN(i, order = gaussorder) for i in 1:6]
+    # Find the triplets with the smallest gaussmetric
+    safegauss = safegauss && length(tracklets) ≥ 3
+    τmin, τmax = params.gaussτmin, params.gaussτmax
+    triplets = gausstriplets(safegauss ? tracklets : optical, gaussntrip; τmin, τmax)
+    # Iterate triplets
+    orbits = Vector{GaussOrbit{D, T, T, O}}(undef, 0)
+    sizehint!(orbits, 3 * length(triplets))
+    for triplet in triplets
+        # Current triplet
+        trks = view(safegauss ? tracklets : optical, [triplet[1], triplet[2], triplet[3]])
+        observatories, dates, α, δ = observatory.(trks), date.(trks), ra.(trks), dec.(trks)
+        # Julian day of middle observation
+        _jd0_ = dtutc2jdtdb(dates[2])
+        # Gauss method solutions
+        τ_1, τ_3, ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2s, r_vec, ρ =
+            gaussmethod(observatories, dates, α .+ dq[1:3], δ .+ dq[4:6], params)
+        # Iterate solutions
+        for i in eachindex(r_2s)
+            # Epoch (corrected for light-time)
+            jd0 = _jd0_ - cte(ρ[2, i]) / c_au_per_day
+            # Jet transport initial condition
+            q0 = r_vec[:, 2, i] + eph_su(jd0 - JD_J2000)
+            # Propagation and residuals
+            bwd, fwd, res = propres(od, q0, jd0, params)
+            isempty(res) && continue
+            # Current Q
+            Q = nms(res)
+            # Covariance matrix
+            x0 = zeros(T, 6)
+            nobs = 2 * notout(res)
+            C = (nobs/2) * TS.hessian(Q)
+            Γ = project(q0, x0, inv(C))
+            # Update orbit
+            push!(orbits,
+                evaldeltas(GaussOrbit(
+                    dynamics, variables, optical, tracklets, bwd, fwd, res, Γ, τ_1, τ_3,
+                    ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2s[i], r_vec[:, :, i], ρ[:, i]
+                ))
+            )
         end
-        # Current Q
-        Q = nms(res)
-        # Covariance matrix
-        x0 = zeros(T, 6)
-        nobs = 2 * notout(res)
-        C = (nobs/2) * TS.hessian(Q)
-        Γ = project(q0, x0, inv(C))
-        # Update orbit
-        orbits[i] = evaldeltas(GaussOrbit(
-            dynamics, variables, optical, tracklets, bwd, fwd, res, Γ, τ_1, τ_3,
-            ρ_vec, R_vec, D_0, D_mat, a, b, c, r_2s[i], r_vec[:, :, i], ρ[:, i]
-        ))
     end
     # Sort orbits by nms
     sort!(orbits, by = nms)
@@ -317,7 +322,7 @@ See also [`gaussmethod`](@ref).
 function gaussiod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where {D,
                   T <: Real, O <: AbstractOpticalVector{T}}
     # Unpack
-    @unpack safegauss, significance, verbose = params
+    @unpack significance, verbose = params
     @unpack optical, tracklets = od
     # Set jet transport variables
     Npar = numvars(Val(od.dynamics), params)
@@ -326,14 +331,8 @@ function gaussiod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where {D
     set_od_order(params, Npar)
     # Pre-allocate orbit
     orbit = zero(LeastSquaresOrbit{D, T, T, O, Nothing, Nothing})
-    # This function requires...
-    if safegauss
-        # exactly 3 tracklets
-        length(tracklets) != 3 && return orbit
-    else
-        # at least 3 observations
-        length(optical) < 3 && return orbit
-    end
+    # This function requires at least 3 observations
+    length(optical) < 3 && return orbit
     # Preliminary orbits
     porbits = gaussmethod(od, params)
     # Filter preliminary orbits
@@ -358,7 +357,7 @@ function gaussiod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where {D
             return orbit
         end
         # Refine via Minimization over the MOV
-        j = safegauss ? 2 : closest_tracklet(epoch(porbits[i]), tracklets)
+        j = closest_tracklet(epoch(porbits[i]), tracklets)
         nobs(tracklets[j]) < 2 && continue
         for scale in (:log, :linear)
             # Subset of optical to be included in the calculation

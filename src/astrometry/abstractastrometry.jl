@@ -62,6 +62,12 @@ isless(a::AbstractAstrometryObservation, b::AbstractAstrometryObservation) = dat
 dtutc2days(x::AbstractAstrometryObservation) = dtutc2days(date(x))
 dtutc2et(x::AbstractAstrometryObservation) = dtutc2et(date(x))
 
+daysbetween(x::DateTime, y::DateTime) = (y - x).value / daymillisec
+daysbetween(x::DateTime, y::AbstractAstrometryObservation) = daysbetween(x, date(y))
+daysbetween(x::AbstractAstrometryObservation, y::DateTime) = daysbetween(date(x), y)
+daysbetween(x::AbstractAstrometryObservation, y::AbstractAstrometryObservation) =
+    daysbetween(date(x), date(y))
+
 function numberofdays(x::AbstractObservationVector)
     t0, tf = extrema(date, x)
     return (tf - t0).value / daymillisec
