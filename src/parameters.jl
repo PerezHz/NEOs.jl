@@ -36,9 +36,9 @@ nongravitational accelerations model:
 - `safegauss::Bool`: if true, use the tracklets to search for Gauss triplets;
     otherwise, use the observations directly (default: `true`).
 - `gaussntrip::Int`: number of Gauss triplets to try (default: `1`).
-- `gaussτmin::T`: minimum desired total time span for [`gaussmetric`](@ref)
+- `gaussτmin::T`: minimum desired total time span for `gaussmetric`
     in days (default: `1`).
-- `gaussτmax::T`: maximum desired total time span for [`gaussmetric`](@ref)
+- `gaussτmax::T`: maximum desired total time span for `gaussmetric`
     in days (default: `30`).
 - `refscale::Symbol`: horizontal scale for ADAM refinement of Gauss preliminary
     orbit (default: `:log`).
