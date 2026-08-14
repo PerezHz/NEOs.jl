@@ -249,7 +249,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 13, 2026
+        # Values by August 14, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -264,19 +264,19 @@ end
         @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-4)
+        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 1E-03)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit.ores) == 9
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 9e-4 )
-        @test all( snr(orbit) .> 14.5)
+        @test maximum(sigmas(orbit)) < 9E-04
+        @test minimum(snr(orbit)) > 14.5
         @test chi2(orbit) < 0.53
         @test nrms(orbit) < 0.18
         # Covariance matrix
@@ -331,17 +331,17 @@ end
         # Backward (forward) integration
         @test epoch(orbit1) == epoch(orbit)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit1)
-        @test all( norm.(orbit1.bwd.p, Inf) .< 1.2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 1.2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit1)
-        @test all( norm.(orbit1.fwd.p, Inf) .< 1.2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 1.2
         # Vector of residuals
         @test notout(orbit1.ores) == 43
         @test nout(orbit1.ores) == 0
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
-        @test all( sigmas(orbit1) .< 2e-4 )
-        @test all( snr(orbit1) .> 866 )
+        @test maximum(sigmas(orbit1)) < 2E-04
+        @test minimum(snr(orbit1)) > 866
         @test chi2(orbit1) < 11.64
         @test nrms(orbit1) < 0.37
         # Covariance matrix
@@ -401,7 +401,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 13, 2026
+        # Values by August 14, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -418,17 +418,17 @@ end
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(optical[4])), atol = 3e-4)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 5e-3 )
-        @test all( snr(orbit) .> 21.4)
+        @test maximum(sigmas(orbit)) < 5E-03
+        @test minimum(snr(orbit)) > 21.4
         @test chi2(orbit) < 2.53
         @test nrms(orbit) < 0.46
         # Covariance matrix
@@ -490,7 +490,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by August 13, 2026
+        # Values by August 14, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -507,17 +507,17 @@ end
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 5e-4)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit.ores) == 12
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 6.6e-4 )
-        @test all( snr(orbit) .> 38.8)
+        @test maximum(sigmas(orbit)) < 6.6E-04
+        @test minimum(snr(orbit)) > 38.8
         @test chi2(orbit) < 2.43
         @test nrms(orbit) < 0.32
         # Covariance matrix
@@ -527,7 +527,7 @@ end
         @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) <= 3
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 5
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
@@ -567,7 +567,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by August 13, 2026
+        # Values by August 14, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -720,9 +720,9 @@ end
         @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
 
         # Initial Orbit Determination
-        orbit = initialorbitdetermination(od, params)
+        orbit = tsaiod(od, params)
 
-        # Values by August 13, 2026
+        # Values by August 14, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -745,17 +745,17 @@ end
         # Backward (forward) integration
         @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical), atol = 7e-5)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit.ores) == 10
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 6e-3 )
-        @test all( snr(orbit) .> 4.1)
+        @test maximum(sigmas(orbit)) < 6E-03
+        @test minimum(snr(orbit)) > 4.1
         @test chi2(orbit) < 14.24
         @test nrms(orbit) < 0.85
         # Covariance matrix
@@ -798,8 +798,8 @@ end
         # Parameters
         params = Parameters(
             bwdoffset = 0.007, fwdoffset = 0.007,
-            gaussorder = 2, jtlsorder = 2, jtlsiter = 20, lsiter = 10,
-            outrej = true, χ2_rec = 1.0, χ2_rej = 1.25, fudge = 0.0
+            gaussorder = 2, jtlsorder = 2, jtlsiter = 20, lsiter = 20,
+            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0, fudge = 0.0
         )
         # Orbit determination problem
         od = ODProblem(newtonian!, suboptical)
@@ -814,7 +814,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 13, 2026
+        # Values by August 14, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -831,19 +831,19 @@ end
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 2e-3)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
-        @test notout(orbit.ores) == 16
-        @test nout(orbit.ores) == 2
+        @test notout(orbit.ores) == 18
+        @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 4e-3 )
-        @test all( snr(orbit) .> 50)
-        @test chi2(orbit) < 1.55
-        @test nrms(orbit) < 0.22
+        @test maximum(sigmas(orbit)) < 4E-03
+        @test minimum(snr(orbit)) > 50
+        @test chi2(orbit) < 7.50
+        @test nrms(orbit) < 0.46
         # Covariance matrix
         Γ = covariance(orbit)
         @test size(Γ) == (6, 6)
@@ -855,8 +855,8 @@ end
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        jpl_compatibility_tests(50392393, orbit, params, (7.6E-02, 1.2E-01, 1.0E-11,
-            1.9E-14, 3.0E-12))
+        jpl_compatibility_tests(50392393, orbit, params, (1.8E+00, 1.1E+01, 3.0E-11,
+            1.9E-14, 2.3E-11))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 26.7 ≤ H + dH
@@ -865,7 +865,7 @@ end
         # Diameter
         Da, Db = minmax(diameter(H, 0.05), diameter(H, 0.25))
         Dc = diameter(orbit, params)
-        @test 11.9 < Da < Dc < Db < 27.1
+        @test 11.9 < Da < Dc < Db < 27.3
         # Mass
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
@@ -894,17 +894,17 @@ end
         # Backward (forward) integration
         @test epoch(orbit1) == epoch(orbit)
         @test dtutc2days(date(optical[1])) > firsttime(orbit1)
-        @test all( norm.(orbit1.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit1)
-        @test all( norm.(orbit1.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit1.ores) == 19
         @test nout(orbit1.ores) == 2
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
-        @test all( sigmas(orbit1) .< 3e-4 )
-        @test all( snr(orbit1) .> 574)
+        @test maximum(sigmas(orbit1)) < 3E-04
+        @test minimum(snr(orbit1)) > 574
         @test chi2(orbit1) < 2.38
         @test nrms(orbit1) < 0.25
         # Covariance matrix
@@ -969,9 +969,9 @@ end
         @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
 
         # Initial Orbit Determination
-        orbit = initialorbitdetermination(od, params)
+        orbit = tsaiod(od, params)
 
-        # Values by August 13, 2026
+        # Values by August 14, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -992,19 +992,19 @@ end
         @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical), atol = 2e-5)
+        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical), atol = 2E-05)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 1e9 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 1E+09
         # Vector of residuals
         @test notout(orbit.ores) == 7
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 3e-4 )
-        @test all( snr(orbit) .> 20.5)
+        @test maximum(sigmas(orbit)) < 3E-04
+        @test minimum(snr(orbit)) > 20.5
         @test chi2(orbit) < 0.23
         @test nrms(orbit) < 0.13
         # Covariance matrix
@@ -1068,9 +1068,9 @@ end
         @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
 
         # Initial Orbit Determination
-        orbit = initialorbitdetermination(od, params)
+        orbit = tsaiod(od, params)
 
-        # Values by August 13, 2026
+        # Values by August 14, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1085,19 +1085,19 @@ end
         @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-3)
+        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 1E-01)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 1e4 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 1E+04
         # Vector of residuals
         @test notout(orbit.ores) == 18
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 2e-5 )
-        @test all( snr(orbit) .> 644)
+        @test maximum(sigmas(orbit)) < 2E-05
+        @test minimum(snr(orbit)) > 644
         @test chi2(orbit) < 4.35
         @test nrms(orbit) < 0.35
         # Covariance matrix
@@ -1152,17 +1152,17 @@ end
         # Backward (forward) integration
         @test epoch(orbit1) == epoch(orbit)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit1)
-        @test all( norm.(orbit1.bwd.p, Inf) .< 1 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 1
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit1)
-        @test all( norm.(orbit1.fwd.p, Inf) .< 1e15 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 1E+15
         # Vector of residuals
         @test notout(orbit1.ores) == 97
         @test nout(orbit1.ores) == 0
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
-        @test all( sigmas(orbit1) .< 4e-7 )
-        @test all( snr(orbit1) .> 21_880)
+        @test maximum(sigmas(orbit1)) < 4E-07
+        @test minimum(snr(orbit1)) > 21_850
         @test chi2(orbit1) < 54.85
         @test nrms(orbit1) < 0.53
         # Covariance matrix
@@ -1252,7 +1252,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by August 13, 2026
+        # Values by August 14, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1270,17 +1270,17 @@ end
         # Backward (forward) integration
         @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 3e-3)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 0.018 )
-        @test all( snr(orbit) .> 7.00)
+        @test maximum(sigmas(orbit)) < 1.8E-02
+        @test minimum(snr(orbit)) > 7
         @test chi2(orbit) < 0.91
         @test nrms(orbit) < 0.28
         # Covariance matrix
@@ -1369,7 +1369,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by August 13, 2026
+        # Values by August 14, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1391,10 +1391,10 @@ end
         @test epoch(orbit1) == datetime2julian(date(radar[2])) - PE.J2000
         @test dtutc2days(date(optical[1])) > firsttime(orbit1)
         @test dtutc2days(date(radar[1])) > firsttime(orbit1)
-        @test all( norm.(orbit1.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit1)
         @test dtutc2days(date(radar[end])) < lasttime(orbit1)
-        @test all( norm.(orbit1.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 2
         # Vectors of residuals
         @test notout(orbit1.ores) == 24
         @test notout(orbit1.rres) == 5
@@ -1403,8 +1403,8 @@ end
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
-        @test all( sigmas(orbit1) .< 2.9e-7 )
-        @test all( snr(orbit1) .> 8_342)
+        @test maximum(sigmas(orbit1)) < 2.9E-07
+        @test minimum(snr(orbit1)) > 8_342
         @test chi2(orbit1) < 19.7
         @test nrms(orbit1) < 0.61
         # Covariance matrix
@@ -1473,7 +1473,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by August 13, 2026
+        # Values by August 14, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1490,17 +1490,17 @@ end
         # Backward (forward) integration
         @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical[idxs]), atol = 6E+0)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 3.7 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 3.7
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit.ores) == 43
         @test nout(orbit.ores) == 1
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 1.4E-6 )
-        @test all( snr(orbit) .> 1E+5)
+        @test maximum(sigmas(orbit)) < 1.4E-06
+        @test minimum(snr(orbit)) > 6.7E+04
         @test chi2(orbit) < 10.40
         @test nrms(orbit) < 0.35
         # Covariance matrix

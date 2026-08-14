@@ -100,9 +100,9 @@ export variables, designation, epoch, firsttime, lasttime, noptical, nradar, min
        optical, sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
        absolutemagnitude, diameter, mass, shiftepoch, earthmoid, print_mpec_residuals,
        print_mpec_elements, print_mpec_ephemeris, print_mpec
-export topo2bary, bary2topo, attr2bary, tsaiod
-export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
-       orbitdetermination, linkage
+export topo2bary, bary2topo, attr2bary, tsaiod, mmov
+export gaussmetric, gausstriplets, gaussmethod, gaussiod
+export jtls, issinglearc, initialorbitdetermination, orbitdetermination, linkage
 # Impact monitoring
 export ImpactTarget, IMProblem, BPlane, MTP, bopik, mtp, targetplane, crosssection,
        valsecchi_circle
