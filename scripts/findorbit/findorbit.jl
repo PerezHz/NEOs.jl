@@ -65,6 +65,18 @@ function parse_commandline()
             help = "minimum candidate RMS in arcsec before the RMS jump guard rejects a linked/refined orbit"
             arg_type = Float64
             default = 0.5
+        "--ephem-days"
+            help = "post-fit ephemeris horizon in days after the latest observation; 0 disables it"
+            arg_type = Float64
+            default = 0.0
+        "--ephem-step"
+            help = "post-fit ephemeris step in days"
+            arg_type = Float64
+            default = 1.0
+        "--ephem-obscode"
+            help = "MPC observatory code for the post-fit ephemeris"
+            arg_type = String
+            default = "500"
     end
 
     return parse_args(s)
@@ -583,16 +595,22 @@ denseephstatekmsec(eph, et) =
 # Returned rates are arcsec/sec; only their direction is used for along/cross residuals.
 function computedradecrate(x::AbstractOpticalAstrometry, orbit::LeastSquaresOrbit,
                            params::Parameters; niter::Int = 5)
-    et0 = dtutc2et(date(x))
+    xva = et -> asteroidstatekmsec(orbit, et)
+    return computedradecrate(observatory(x), date(x), xva, params; niter)
+end
+
+function computedradecrate(obs, date::DateTime, xva, params::Parameters;
+                           niter::Int = 5)
+    et0 = dtutc2et(date)
     et_r_secs = NEOs.Taylor1([et0, one(et0)], 1)
 
     rv_s_t_r = denseephstatekmsec(params.eph_su, et_r_secs)
     r_s_t_r = rv_s_t_r[1:3]
     rv_e_t_r = denseephstatekmsec(params.eph_ea, et_r_secs)
     r_e_t_r = rv_e_t_r[1:3]
-    rv_a_t_r = asteroidstatekmsec(orbit, et_r_secs)
+    rv_a_t_r = xva(et_r_secs)
     r_a_t_r = rv_a_t_r[1:3]
-    RV_r = obsposvelECI(observatory(x), et_r_secs)
+    RV_r = obsposvelECI(obs, et_r_secs)
     R_r = RV_r[1:3]
     r_r_t_r = r_e_t_r + R_r
 
@@ -605,7 +623,7 @@ function computedradecrate(x::AbstractOpticalAstrometry, orbit::LeastSquaresOrbi
 
     local r_a_t_b, r_s_t_b
     for _ in 1:niter
-        rv_a_t_b = asteroidstatekmsec(orbit, et_b_secs)
+        rv_a_t_b = xva(et_b_secs)
         r_a_t_b = rv_a_t_b[1:3]
         v_a_t_b = rv_a_t_b[4:6]
         ρ_vec_r = r_a_t_b - r_r_t_r
@@ -622,7 +640,7 @@ function computedradecrate(x::AbstractOpticalAstrometry, orbit::LeastSquaresOrbi
         et_b_secs = et_r_secs - τ_D
     end
 
-    rv_a_t_b = asteroidstatekmsec(orbit, et_b_secs)
+    rv_a_t_b = xva(et_b_secs)
     r_a_t_b = rv_a_t_b[1:3]
     ρ_vec_r = r_a_t_b - r_r_t_r
     ρ_r = norm3(ρ_vec_r)
@@ -699,6 +717,10 @@ end
 
 function elevationdeg(obs, date::DateTime, orbit::LeastSquaresOrbit, params::Parameters)
     αas, δas = computedradecarcsec(obs, date, orbit, params)
+    return elevationdeg(obs, date, αas, δas)
+end
+
+function elevationdeg(obs, date::DateTime, αas::Real, δas::Real)
     α, δ = arcsec2rad(αas), arcsec2rad(δas)
     lineofsight = [cos(δ) * cos(α), cos(δ) * sin(α), sin(δ)]
     zenith = obsposvelECI(obs, dtutc2et(date))[1:3]
@@ -715,16 +737,163 @@ function vectorangledeg(x::AbstractVector, y::AbstractVector)
 end
 
 function ephemerisgeometry(t::Real, orbit::LeastSquaresOrbit, params::Parameters)
-    xa = orbit(t)[1:3]
+    return ephemerisgeometry(t, orbit(t)[1:3], params)
+end
+
+function ephemerisgeometry(t::Real, xa::AbstractVector, params::Parameters)
     xe = params.eph_ea(t)[1:3]
     xs = params.eph_su(t)[1:3]
     xm = MOON_EPH(t)[1:3]
     geocentric = xa - xe
+    heliocentric = xa - xs
     return (
         solar_elongation = vectorangledeg(geocentric, xs - xe),
         lunar_elongation = vectorangledeg(geocentric, xm - xe),
         geocentric_distance = norm3(geocentric),
+        heliocentric_distance = norm3(heliocentric),
+        phase_angle = vectorangledeg(-geocentric, -heliocentric),
     )
+end
+
+function postfitpropagation(orbit::LeastSquaresOrbit, tmin::Real, tmax::Real,
+                            params::Parameters; jet::Bool = false)
+    t0 = epoch(orbit)
+    variables = NEOs.variables(orbit)
+    Ndof = NEOs.dof(orbit)
+    q0 = NEOs.initialcondition(orbit, Ndof, params)
+    if jet
+        T = eltype(q0)
+        NEOs.set_od_order(T, 1, length(variables))
+        q0 += NEOs.jtperturbation(ones(T, Ndof), variables, Ndof, 1, params)
+    end
+    margin = 0.1
+    tlo = min(tmin, t0) - margin
+    thi = max(tmax, t0) + margin
+    bwd = NEOs.propagate(NEOs.dynamicalmodel(orbit), q0, t0 + PE.J2000,
+                         (tlo - t0) / PlanetaryEphemeris.yr, params)
+    fwd = NEOs.propagate(NEOs.dynamicalmodel(orbit), q0, t0 + PE.J2000,
+                         (thi - t0) / PlanetaryEphemeris.yr, params)
+    return (; epoch = t0, bwd, fwd)
+end
+
+function postfitstate(eph, t)
+    sol = NEOs.cte(t) <= eph.epoch ? eph.bwd : eph.fwd
+    return sol(t)
+end
+
+postfitstatekmsec(eph, et) =
+    PlanetaryEphemeris.auday2kmsec(postfitstate(eph, et / PlanetaryEphemeris.daysec))
+
+function skyplaneuncertainty(obs, date::DateTime, eph, orbit::LeastSquaresOrbit,
+                             params::Parameters)
+    αas, δas = compute_radec(obs, date;
+        xvs = et -> denseephstatekmsec(params.eph_su, et),
+        xve = et -> denseephstatekmsec(params.eph_ea, et),
+        xva = et -> postfitstatekmsec(eph, et),
+    )
+    δ0 = NEOs.cte(δas)
+    tangent = [αas * cos(arcsec2rad(δ0)), δas]
+    x0 = zeros(length(NEOs.variables(orbit)))
+    Γ = Matrix(NEOs.project(tangent, x0, NEOs.covariance(orbit)))
+    eig = eigen(Symmetric(Γ))
+    order = sortperm(eig.values; rev = true)
+    major_index, minor_index = order[1], order[2]
+    major = sqrt(max(eig.values[major_index], 0.0))
+    minor = sqrt(max(eig.values[minor_index], 0.0))
+    major_axis = eig.vectors[:, major_index]
+    pa = mod(rad2deg(atan(major_axis[1], major_axis[2])), 180)
+    return major, minor, pa
+end
+
+function formathms(αas::Real)
+    total_ms = mod(round(Int, αas * 1_000 / 15), 86_400_000)
+    h, rem_ms = divrem(total_ms, 3_600_000)
+    m, rem_ms = divrem(rem_ms, 60_000)
+    return @sprintf("%02d:%02d:%06.3f", h, m, rem_ms / 1_000)
+end
+
+function formatdms(δas::Real)
+    sign = signbit(δas) ? '-' : '+'
+    total_ms = round(Int, abs(δas) * 1_000)
+    d, rem_ms = divrem(total_ms, 3_600_000)
+    m, rem_ms = divrem(rem_ms, 60_000)
+    return @sprintf("%c%02d:%02d:%05.2f", sign, d, m, rem_ms / 1_000)
+end
+
+function ephemerisnumber(x::Real, width::Int, digits::Int)
+    isfinite(x) || return " " ^ width
+    value = @sprintf("%.*f", digits, x)
+    length(value) <= width && return lpad(value, width)
+    return lpad(@sprintf("%.2e", x), width)
+end
+
+function ephemerisoffsets(days::Real, step::Real)
+    offsets = collect(0.0:step:days)
+    isempty(offsets) && push!(offsets, 0.0)
+    if days - last(offsets) > 10eps(Float64) * max(1.0, abs(days))
+        push!(offsets, Float64(days))
+    end
+    return offsets
+end
+
+function printpostfitephemeris(orbit::LeastSquaresOrbit, params::Parameters, H::Real,
+                               days::Real, step::Real, obs)
+    days > 0 || return nothing
+    _, start = minmaxdates(orbit)
+    dates = [start + Millisecond(round(Int, offset * PlanetaryEphemeris.daysec * 1_000))
+             for offset in ephemerisoffsets(days, step)]
+    times = dtutc2days.(dates)
+    scalar_eph = postfitpropagation(orbit, minimum(times), maximum(times), params)
+    jet_eph = postfitpropagation(orbit, minimum(times), maximum(times), params; jet = true)
+    xva = et -> postfitstatekmsec(scalar_eph, et)
+
+    printitle("Post-fit ephemeris", "*")
+    println("Observatory: ", obs.code, " (", obs.name, ")",
+            "; times are UTC; RA/Dec are astrometric J2000.")
+    println("Rate is arcsec/min; elevation, elongations and PA are degrees; distances are au.")
+    println("SigMaj/SigMin are formal linearized 1-sigma sky-plane axes in arcsec; SigPA is east of north.")
+    println(
+        rpad("Date UTC", 20), "  ", rpad("RA", 12), "  ", rpad("Dec", 12), "  ",
+        lpad("Elev", 6), "  ", lpad("Rate", 8), "  ", lpad("PA", 6), "  ",
+        lpad("SolEl", 6), "  ", lpad("LunEl", 6), "  ", lpad("GeoDist", 9), "  ",
+        lpad("r", 8), "  ", lpad("V", 6), "  ", lpad("SigMaj", 10), "  ",
+        lpad("SigMin", 10), "  ", lpad("SigPA", 6),
+    )
+    for (date, t) in zip(dates, times)
+        αas, δas = compute_radec(obs, date;
+            xvs = et -> denseephstatekmsec(params.eph_su, et),
+            xve = et -> denseephstatekmsec(params.eph_ea, et),
+            xva,
+        )
+        αdot, δdot = computedradecrate(obs, date, xva, params)
+        vα = 60 * αdot * cos(arcsec2rad(δas))
+        vδ = 60 * δdot
+        rate = motionspeed(vα, vδ)
+        pa = positionangledeg(vα, vδ)
+        geometry = ephemerisgeometry(t, postfitstate(scalar_eph, t)[1:3], params)
+        elevation = elevationdeg(obs, date, αas, δas)
+        phase = deg2rad(geometry.phase_angle)
+        Φ = NEOs.phase_integral(phase, params.slope)
+        V = H + 5 * log10(geometry.geocentric_distance * geometry.heliocentric_distance) -
+            2.5 * log10(Φ)
+        σmajor, σminor, σpa = skyplaneuncertainty(obs, date, jet_eph, orbit, params)
+        println(
+            rpad(Dates.format(date, "yyyy-mm-ddTHH:MM:SS"), 20), "  ",
+            rpad(formathms(αas), 12), "  ", rpad(formatdms(δas), 12), "  ",
+            ephemerisnumber(elevation, 6, 1), "  ", ephemerisnumber(rate, 8, 2), "  ",
+            ephemerisnumber(pa, 6, 1), "  ",
+            ephemerisnumber(geometry.solar_elongation, 6, 1), "  ",
+            ephemerisnumber(geometry.lunar_elongation, 6, 1), "  ",
+            ephemerisnumber(geometry.geocentric_distance, 9, 6), "  ",
+            ephemerisnumber(geometry.heliocentric_distance, 8, 4), "  ",
+            ephemerisnumber(V, 6, 2), "  ",
+            ephemerisnumber(σmajor, 10, 3), "  ",
+            ephemerisnumber(σminor, 10, 3), "  ",
+            ephemerisnumber(σpa, 6, 1),
+        )
+    end
+    println("")
+    return nothing
 end
 
 function alongcrossrate(vαobs::Real, vδobs::Real, vαeph::Real, vδeph::Real)
@@ -1271,6 +1440,23 @@ function main()
     println("• RMS jump guard: factor ", max_rms_jump_factor,
             ", active above ", max_rms_jump_arcsec, " arcsec")
 
+    # Post-fit ephemeris options
+    ephem_days::Float64 = parsed_args["ephem-days"]
+    ephem_step::Float64 = parsed_args["ephem-step"]
+    ephem_obscode::String = parsed_args["ephem-obscode"]
+    ephem_days >= 0 || throw(ArgumentError("--ephem-days must be non-negative"))
+    ephem_step > 0 || throw(ArgumentError("--ephem-step must be positive"))
+    ephem_observatory = ephem_days > 0 ? search_observatory_code(ephem_obscode) : nothing
+    if ephem_days > 0
+        NEOs.isunknown(ephem_observatory) && throw(ArgumentError(
+            "Unknown MPC observatory code for --ephem-obscode: $ephem_obscode"
+        ))
+        println("• Post-fit ephemeris: ", ephem_days, " days at ", ephem_step,
+                "-day steps from observatory ", ephem_obscode)
+    else
+        println("• Post-fit ephemeris: disabled")
+    end
+
     # Global initial time
     global_initial_time = now()
     println("• Run started at ", global_initial_time)
@@ -1362,6 +1548,14 @@ function main()
     printkepleriansnrs(kep)
     ele220_name = ele220inputname(input, format, designation(orbit))
     printele220arguments(ele220_name, orbit, kep, H, params, gap_days)
+    try
+        printpostfitephemeris(orbit, params, H, ephem_days, ephem_step,
+                              ephem_observatory)
+    catch err
+        print("• Could not compute post-fit ephemeris: ")
+        showerror(stdout, err)
+        println("")
+    end
     printmotionbytracklet(orbit, params)
     printmpeclikeresiduals(orbit, H, params; include_mags = print_mag_residuals,
                            include_track = print_track_residuals)
