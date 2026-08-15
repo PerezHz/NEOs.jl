@@ -20,42 +20,42 @@ od = ODProblem(newtonian!, optical[2:5];
 orbit0 = initialorbitdetermination(od, params)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌ Warning: Updating TaylorSeries.default_space[]; existing TaylorN and HomogeneousPolynomial objects keep their original JetSpace, while future default-space constructors use the new default JetSpace.
 │   old_order = 6
 │   old_numvars = 2
-│   new_order = 6
+│   new_order = 2
 │   new_numvars = 6
 └ @ TaylorSeries ~/.julia/packages/TaylorSeries/cvwIM/src/hash_tables.jl:260
-* Minimization over the MOV converged in 82 iterations to:
+* Gauss method converged to:
 
-MMOVOrbit{Float64, Float64}
+GaussOrbit{Float64, Float64}
 ---------------------------------------------------------------------
 Dynamical model: newtonian!
 Astrometry: 4 observations (0 outliers) spanning 0.01686793 days
-Epoch: 2.460647755951347e6 JDTDB (2024-12-03T06:08:34.196 TDB)
-NRMS: 0.0899891381241944
+Epoch: 2.460647753172229e6 JDTDB (2024-12-03T06:04:34.081 TDB)
+NRMS: 0.25584875255906153
 ---------------------------------------------------------------------
 Variable    Nominal value            Uncertainty              Units
-x           +3.137841708475E-01      +3.638986004768E-03      au
-y           +8.546439351441E-01      +4.151600480394E-03      au
-z           +3.706973545827E-01      +1.816439822198E-03      au
-vx          -2.030382076632E-02      +4.694678019981E-03      au/day
-vy          +6.586641040766E-04      +5.934949393757E-03      au/day
-vz          +3.767844555672E-04      +2.375009323265E-03      au/day
+x           +3.135426356231E-01      +2.003704837490E-03      au
+y           +8.543020227057E-01      +2.286978413354E-03      au
+z           +3.705475689434E-01      +1.000228272087E-03      au
+vx          -2.031308753882E-02      +3.527122548342E-03      au/day
+vy          +7.036904268434E-04      +4.317568634695E-03      au/day
+vz          +3.757768532813E-04      +1.776374588777E-03      au/day
 
-* Jet Transport Least Squares converged in 1 iterations to:
+* Jet Transport Least Squares converged in 3 iterations to:
 
 LeastSquaresOrbit{Float64, Float64}
 ---------------------------------------------------------------------
 Dynamical model: newtonian!
 Astrometry: 4 observations (0 outliers) spanning 0.01686793 days
-Epoch: 2.460647755951347e6 JDTDB (2024-12-03T06:08:34.196 TDB)
-NRMS: 0.08998908097632848
+Epoch: 2.460647753172229e6 JDTDB (2024-12-03T06:04:34.081 TDB)
+NRMS: 0.09008177214704376
 ---------------------------------------------------------------------
 Variable    Nominal value            Uncertainty              Units
-x           +3.137851230787E-01      +3.549117326997E-03      au
-y           +8.546450215120E-01      +4.049072235980E-03      au
-z           +3.706978298993E-01      +1.771580885061E-03      au
-vx          -2.030465274824E-02      +4.611959003451E-03      au/day
-vy          +6.575417427444E-04      +5.822793444250E-03      au/day
-vz          +3.763595690677E-04      +2.332730661437E-03      au/day</code></pre><div class="admonition is-success" id="Parameters-87b8244983b3b2e6"><header class="admonition-header">Parameters<a class="admonition-anchor" href="#Parameters-87b8244983b3b2e6" title="Permalink"></a></header><div class="admonition-body"><p>Some of the most important parameters used in <code>initialorbitdetermination</code> are:</p><ul><li><code>bwdoffset/fwdoffset</code>: how much time [in days] to integrate beyond the first/last observation.</li><li><code>tsaorder/gaussorder/jtlsorder</code>: the degree of the jet transport expansions used in different sections of the orbit determination routine.</li><li><code>lsiter/jtlsiter</code>: the maximum number of iterations for normal and jet transport least squares.</li><li><code>significance</code>: chi-square significance level, used to decide whether an orbit is acceptable.</li></ul></div></div><p><code>orbit0</code> is an instance of <code>LeastSquaresOrbit</code>, a struct containing all the information from the orbit determination process. For instance, from <code>orbit0</code> we can compute common quality metrics, e.g.:</p><pre><code class="language-julia hljs"># Normalized mean square residual
+x           +3.138037846419E-01      +2.834937576285E-03      au
+y           +8.546000868834E-01      +3.235718041455E-03      au
+z           +3.706779306017E-01      +1.415169369089E-03      au
+vx          -2.026097921353E-02      +3.817683524350E-03      au/day
+vy          +7.146292350606E-04      +4.783797152658E-03      au/day
+vz          +3.987180988079E-04      +1.928952810765E-03      au/day</code></pre><div class="admonition is-success" id="Parameters-87b8244983b3b2e6"><header class="admonition-header">Parameters<a class="admonition-anchor" href="#Parameters-87b8244983b3b2e6" title="Permalink"></a></header><div class="admonition-body"><p>Some of the most important parameters used in <code>initialorbitdetermination</code> are:</p><ul><li><code>bwdoffset/fwdoffset</code>: how much time [in days] to integrate beyond the first/last observation.</li><li><code>tsaorder/gaussorder/jtlsorder</code>: the degree of the jet transport expansions used in different sections of the orbit determination routine.</li><li><code>lsiter/jtlsiter</code>: the maximum number of iterations for normal and jet transport least squares.</li><li><code>significance</code>: chi-square significance level, used to decide whether an orbit is acceptable.</li></ul></div></div><p><code>orbit0</code> is an instance of <code>LeastSquaresOrbit</code>, a struct containing all the information from the orbit determination process. For instance, from <code>orbit0</code> we can compute common quality metrics, e.g.:</p><pre><code class="language-julia hljs"># Normalized mean square residual
 nrms(orbit0)
 # Signal to noise ratio
 snr(orbit0)
@@ -66,7 +66,7 @@ jd0 = epoch(orbit0) + J2000
 nyears_fwd = (datetime2julian(DateTime(2024, 12, 3, 16, 15)) - jd0) / yr
 q0 = orbit0(epoch(orbit0))
 
-fwd = NEOs.propagate(newtonian!, q0, jd0, nyears_fwd, params)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">tspan: (9102.75595134683, 9103.177083333489), x: 6 Float64 variables</code></pre><p>to visualize the asteroid&#39;s orbit approaching Earth</p><pre><code class="language-julia hljs">using Plots
+fwd = NEOs.propagate(newtonian!, q0, jd0, nyears_fwd, params)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">tspan: (9102.753172229044, 9103.177083333489), x: 6 Float64 variables</code></pre><p>to visualize the asteroid&#39;s orbit approaching Earth</p><pre><code class="language-julia hljs">using Plots
 
 t0, tf = epoch(orbit0), epoch(orbit0) + 10/24
 
@@ -74,7 +74,7 @@ plot(params.eph_ea, t0, tf, xlabel = &quot;x [au]&quot;, ylabel = &quot;y [au]&q
     label = &quot;Earth&quot;, color = :green, linewidth = 2, N = 1_000,
     projection = :xy, legend = :bottomleft)
 plot!(fwd, t0, tf, label = &quot;2024 XA1 (4 obs)&quot;, color = :deepskyblue,
-    linewidth = 2, N = 1_000, projection = :xy)</code></pre><img src="65dc81d6.svg" alt="Example block output"/></div></div><h2 id="Orbit-refinement"><a class="docs-heading-anchor" href="#Orbit-refinement">Orbit refinement</a><a id="Orbit-refinement-1"></a><a class="docs-heading-anchor-permalink" href="#Orbit-refinement" title="Permalink"></a></h2><p>Now, to refine the orbit of 2024 XA1, we simply include the remaining observations into the orbit determination problem:</p><pre><code class="language-julia hljs"># Update orbit determination problem and parameters
+    linewidth = 2, N = 1_000, projection = :xy)</code></pre><img src="68703512.svg" alt="Example block output"/></div></div><h2 id="Orbit-refinement"><a class="docs-heading-anchor" href="#Orbit-refinement">Orbit refinement</a><a id="Orbit-refinement-1"></a><a class="docs-heading-anchor-permalink" href="#Orbit-refinement" title="Permalink"></a></h2><p>Now, to refine the orbit of 2024 XA1, we simply include the remaining observations into the orbit determination problem:</p><pre><code class="language-julia hljs"># Update orbit determination problem and parameters
 NEOs.update!(od, optical)
 params = Parameters(params; jtlsorder = 4, outrej = true, χ2_rec = sqrt(9.21),
                     χ2_rej = sqrt(10), fudge = 100.0, max_per = 34.0)
@@ -85,39 +85,45 @@ orbit1 = orbitdetermination(od, orbit0, params)</code></pre><pre class="document
 ┌ Warning: Catalogues NEOs.CatalogueMPC[Unknown catalogue] do not correspond to an MPC catalogue code.
 │ Setting debiasing corrections equal to zero in 2 observations.
 └ @ NEOs ~/work/NEOs.jl/NEOs.jl/src/astrometry/debiasingscheme.jl:224
-* Refinement of LeastSquaresOrbit via MMOV converged in 125 iterations to:
+┌ Warning: Updating TaylorSeries.default_space[]; existing TaylorN and HomogeneousPolynomial objects keep their original JetSpace, while future default-space constructors use the new default JetSpace.
+│   old_order = 2
+│   old_numvars = 6
+│   new_order = 4
+│   new_numvars = 6
+└ @ TaylorSeries ~/.julia/packages/TaylorSeries/cvwIM/src/hash_tables.jl:260
+* Refinement of LeastSquaresOrbit via MMOV converged in 1 iterations to:
 
 MMOVOrbit{Float64, Float64}
 ---------------------------------------------------------------------
 Dynamical model: newtonian!
 Astrometry: 79 observations (0 outliers) spanning 0.45479831 days
-Epoch: 2.4606477559545226e6 JDTDB (2024-12-03T06:08:34.471 TDB)
-NRMS: 582.9387420886018
+Epoch: 2.4606477559516868e6 JDTDB (2024-12-03T06:08:34.226 TDB)
+NRMS: 1653.882752160306
 ---------------------------------------------------------------------
 Variable    Nominal value            Uncertainty              Units
-x           +3.134511217165E-01      +1.725794023700E-08      au
-y           +8.542434011205E-01      +4.791064886555E-09      au
-z           +3.705205152364E-01      +NaN                     au
-vx          -2.130700828459E-02      +NaN                     au/day
-vy          -2.292012653384E-04      +NaN                     au/day
-vz          -3.992727843721E-05      +NaN                     au/day
+x           +3.137917107338E-01      +NaN                     au
+y           +8.545724926065E-01      +NaN                     au
+z           +3.706557358476E-01      +NaN                     au
+vx          -2.063931024365E-02      +NaN                     au/day
+vy          +9.720351245817E-04      +NaN                     au/day
+vz          +5.713536913144E-04      +NaN                     au/day
 
 * Jet Transport Least Squares converged in 6 iterations to:
 
 LeastSquaresOrbit{Float64, Float64}
 ---------------------------------------------------------------------
 Dynamical model: newtonian!
-Astrometry: 79 observations (12 outliers) spanning 0.45479831 days
-Epoch: 2.4606477559545226e6 JDTDB (2024-12-03T06:08:34.471 TDB)
-NRMS: 0.4754563413116035
+Astrometry: 79 observations (13 outliers) spanning 0.45479831 days
+Epoch: 2.4606477559516868e6 JDTDB (2024-12-03T06:08:34.226 TDB)
+NRMS: 0.46133299003059813
 ---------------------------------------------------------------------
 Variable    Nominal value            Uncertainty              Units
-x           +3.130671900790E-01      +8.528117066212E-08      au
-y           +8.538260424997E-01      +9.506261074010E-08      au
-z           +3.703395027903E-01      +4.209915985880E-08      au
-vx          -2.059768038985E-02      +2.146336387504E-07      au/day
-vy          +4.536598762432E-04      +2.369493558571E-07      au/day
-vz          +2.372429991286E-04      +1.048569739603E-07      au/day</code></pre><div class="admonition is-success" id="Parameters-36bf6d72829f0862"><header class="admonition-header">Parameters<a class="admonition-anchor" href="#Parameters-36bf6d72829f0862" title="Permalink"></a></header><div class="admonition-body"><p>The <code>outrej</code> parameter turns on/off the outlier rejection, which is based on the algorithm described by [<a href="../references/#Carpino2003">11</a>]. In that context, <code>χ2_rec</code> and <code>χ2_rej</code> are the recovery and rejection thresholds, respectively; <code>fudge</code> corresponds to the coefficient of the fudge term and <code>max_per</code> indicates the maximum percentage of observations that can be rejected.</p></div></div><div class="admonition is-info" id="Note-9a4c2f90f46f0bd8"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-9a4c2f90f46f0bd8" title="Permalink"></a></header><div class="admonition-body"><p>We can compare <code>orbit0</code> with <code>orbit1</code></p><pre><code class="language-julia hljs">jd1 = epoch(orbit1) + J2000
+x           +3.130672381714E-01      +9.383083164572E-08      au
+y           +8.538260291584E-01      +1.046302975512E-07      au
+z           +3.703394972245E-01      +4.636571633070E-08      au
+vx          -2.059763766988E-02      +2.409879723910E-07      au/day
+vy          +4.537116937858E-04      +2.662821163037E-07      au/day
+vz          +2.372629975553E-04      +1.179108815476E-07      au/day</code></pre><div class="admonition is-success" id="Parameters-36bf6d72829f0862"><header class="admonition-header">Parameters<a class="admonition-anchor" href="#Parameters-36bf6d72829f0862" title="Permalink"></a></header><div class="admonition-body"><p>The <code>outrej</code> parameter turns on/off the outlier rejection, which is based on the algorithm described by [<a href="../references/#Carpino2003">11</a>]. In that context, <code>χ2_rec</code> and <code>χ2_rej</code> are the recovery and rejection thresholds, respectively; <code>fudge</code> corresponds to the coefficient of the fudge term and <code>max_per</code> indicates the maximum percentage of observations that can be rejected.</p></div></div><div class="admonition is-info" id="Note-9a4c2f90f46f0bd8"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-9a4c2f90f46f0bd8" title="Permalink"></a></header><div class="admonition-body"><p>We can compare <code>orbit0</code> with <code>orbit1</code></p><pre><code class="language-julia hljs">jd1 = epoch(orbit1) + J2000
 q1 = orbit1(epoch(orbit1))
 
 fwd1 = NEOs.propagate(newtonian!, q1, jd1, nyears_fwd, params)
@@ -125,4 +131,4 @@ fwd1 = NEOs.propagate(newtonian!, q1, jd1, nyears_fwd, params)
 t0, tf = epoch(orbit1), epoch(orbit1) + 10/24
 
 plot!(fwd1, t0, tf, label = &quot;2024 XA1 (79 obs)&quot;, color = :red,
-    linewidth = 2, N = 1_000, projection = :xy)</code></pre><img src="364a7aa9.svg" alt="Example block output"/></div></div><h2 id="References"><a class="docs-heading-anchor" href="#References">References</a><a id="References-1"></a><a class="docs-heading-anchor-permalink" href="#References" title="Permalink"></a></h2><div class="citation noncanonical"><dl><dt>[6]</dt><dd><div>L. E. Ramírez-Montoya, J. A. Pérez-Hernández and L. Benet. <a href="https://doi.org/10.1007/s10569-025-10246-2"><em>Jet transport applications to the preliminary orbit determination problem</em></a>. Celestial Mechanics and Dynamical Astronomy <strong>137</strong>, 16 (2025).</div></dd><dt>[7]</dt><dd><div>A. Milani and G. Gronchi. <a href="https://doi.org/10.1017/CBO9781139175371"><em>Theory of Orbit Determination</em></a> (Cambridge University Press, 2010).</div></dd><dt>[8]</dt><dd><div>P. Vereš, D. Farnocchia, S. R. Chesley and A. B. Chamberlin. <a href="https://www.sciencedirect.com/science/article/pii/S0019103517301987"><em>Statistical analysis of astrometric errors for the most productive asteroid surveys</em></a>. Icarus <strong>296</strong>, 139–149 (2017).</div></dd><dt>[9]</dt><dd><div>D. Farnocchia, S. Chesley, A. Chamberlin and D. Tholen. <a href="https://www.sciencedirect.com/science/article/pii/S0019103514004953"><em>Star catalog position and proper motion corrections in asteroid astrometry</em></a>. Icarus <strong>245</strong>, 94–111 (2015).</div></dd><dt>[10]</dt><dd><div>S. Eggl, D. Farnocchia, A. B. Chamberlin and S. R. Chesley. <a href="https://www.sciencedirect.com/science/article/pii/S0019103519305329"><em>Star catalog position and proper motion corrections in asteroid astrometry II: The Gaia era</em></a>. Icarus <strong>339</strong>, 113596 (2020).</div></dd><dt>[11]</dt><dd><div>M. Carpino, A. Milani and S. R. Chesley. <a href="https://www.sciencedirect.com/science/article/pii/S0019103503000514"><em>Error statistics of asteroid optical astrometric observations</em></a>. Icarus <strong>166</strong>, 248–270 (2003).</div></dd></dl></div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../propagation/">« Propagation</a><a class="docs-footer-nextpage" href="../impactmonitoring/">Impact monitoring »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 13 August 2026 18:00">Thursday 13 August 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+    linewidth = 2, N = 1_000, projection = :xy)</code></pre><img src="52849259.svg" alt="Example block output"/></div></div><h2 id="References"><a class="docs-heading-anchor" href="#References">References</a><a id="References-1"></a><a class="docs-heading-anchor-permalink" href="#References" title="Permalink"></a></h2><div class="citation noncanonical"><dl><dt>[6]</dt><dd><div>L. E. Ramírez-Montoya, J. A. Pérez-Hernández and L. Benet. <a href="https://doi.org/10.1007/s10569-025-10246-2"><em>Jet transport applications to the preliminary orbit determination problem</em></a>. Celestial Mechanics and Dynamical Astronomy <strong>137</strong>, 16 (2025).</div></dd><dt>[7]</dt><dd><div>A. Milani and G. Gronchi. <a href="https://doi.org/10.1017/CBO9781139175371"><em>Theory of Orbit Determination</em></a> (Cambridge University Press, 2010).</div></dd><dt>[8]</dt><dd><div>P. Vereš, D. Farnocchia, S. R. Chesley and A. B. Chamberlin. <a href="https://www.sciencedirect.com/science/article/pii/S0019103517301987"><em>Statistical analysis of astrometric errors for the most productive asteroid surveys</em></a>. Icarus <strong>296</strong>, 139–149 (2017).</div></dd><dt>[9]</dt><dd><div>D. Farnocchia, S. Chesley, A. Chamberlin and D. Tholen. <a href="https://www.sciencedirect.com/science/article/pii/S0019103514004953"><em>Star catalog position and proper motion corrections in asteroid astrometry</em></a>. Icarus <strong>245</strong>, 94–111 (2015).</div></dd><dt>[10]</dt><dd><div>S. Eggl, D. Farnocchia, A. B. Chamberlin and S. R. Chesley. <a href="https://www.sciencedirect.com/science/article/pii/S0019103519305329"><em>Star catalog position and proper motion corrections in asteroid astrometry II: The Gaia era</em></a>. Icarus <strong>339</strong>, 113596 (2020).</div></dd><dt>[11]</dt><dd><div>M. Carpino, A. Milani and S. R. Chesley. <a href="https://www.sciencedirect.com/science/article/pii/S0019103503000514"><em>Error statistics of asteroid optical astrometric observations</em></a>. Icarus <strong>166</strong>, 248–270 (2003).</div></dd></dl></div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../propagation/">« Propagation</a><a class="docs-footer-nextpage" href="../impactmonitoring/">Impact monitoring »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Saturday 15 August 2026 00:01">Saturday 15 August 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
