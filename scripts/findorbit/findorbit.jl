@@ -1,8 +1,7 @@
 using ArgParse
 using NEOs, PlanetaryEphemeris, JLD2, Dates, Statistics, Printf
-using NEOs: AbstractOpticalAstrometry, AbstractOpticalVector, OpticalADES,
-            OpticalMPC80, AbstractOrbit, log10chi
-import NEOs: indices, numberofdays, noptical
+using NEOs: AbstractOpticalAstrometry, AbstractOpticalVector, AbstractApparitionVector,
+            OpticalADES, OpticalMPC80, AbstractOrbit, log10chi, indices
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -70,34 +69,6 @@ function load_optical_astrometry(input::AbstractString, format::AbstractString)
         optical = fetch_optical_astrometry(input, Val(fmt))
     end
     return optical, astrometry_format(optical)
-end
-
-struct Apparition{T <: Real, O <: AbstractOpticalAstrometry{T}, V <: AbstractVector{O},
-                  I <: AbstractVector{Int}, B}
-    optical::SubArray{O, 1, V, Tuple{I}, B}
-end
-
-const AbstractApparitionVector{T} = AbstractVector{Apparition{T, O, V, I, B}} where {O, V, I, B}
-
-indices(x::Apparition) = first(x.optical.indices)
-NEOs.optical(x::Apparition) = collect(x.optical)
-NEOs.optical(x::AbstractApparitionVector) = sort!(mapreduce(NEOs.optical, vcat, x))
-numberofdays(x::Apparition) = numberofdays(x.optical)
-noptical(x::Apparition) = length(x.optical)
-noptical(x::AbstractApparitionVector) = sum(noptical, x)
-
-function apparitions(optical::AbstractOpticalVector{T},
-                     gap::Period = Day(30)) where {T <: Real}
-    sort!(optical)
-    apps = [[1]]
-    for i in 2:length(optical)
-        if date(optical[i]) - date(optical[i-1]) > gap
-            push!(apps, [i])
-        else
-            push!(apps[end], i)
-        end
-    end
-    return [Apparition(view(optical, i)) for i in apps]
 end
 
 computationtime(x::DateTime, y::DateTime) = @sprintf("%.2f", (y - x).value / 60_000)
