@@ -461,28 +461,40 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
     end
 
     # Load optical astrometry
-    filename = joinpath(TEST_DATA, "433.txt")
-    optical1 = read_optical_mpc80(filename)
-    filter!(x -> Date(2000) < date(x) < Date(2025), optical1)
-    filename = joinpath(TEST_DATA, "433.rwo")
-    optical2 = read_optical_rwo(filename)
-    filter!(x -> Date(2000) < date(x) < Date(2025), optical2)
-    filename = joinpath(TEST_DATA, "433.xml")
-    optical3 = read_optical_ades(filename)
-    filter!(x -> Date(2000) < date(x) < Date(2025), optical3)
+    mpc80_file = joinpath(TEST_DATA, "433.txt")
+    rwo_file = joinpath(TEST_DATA, "433.rwo")
+    ades_file = joinpath(TEST_DATA, "433.xml")
 
-    @testset "read_optical_astrometry" begin
-        mpc80_file = joinpath(TEST_DATA, "433.txt")
-        ades_file = joinpath(TEST_DATA, "433.xml")
+    optical1 = read_optical_mpc80(mpc80_file)
+    optical2 = read_optical_rwo(rwo_file)
+    optical3 = read_optical_ades(ades_file)
 
-        @test read_optical_astrometry(mpc80_file) == read_optical_mpc80(mpc80_file)
-        @test read_optical_astrometry(mpc80_file; format = :obs80) ==
-            read_optical_mpc80(mpc80_file)
-        @test read_optical_astrometry(ades_file) == read_optical_ades(ades_file)
-        @test read_optical_astrometry(ades_file; format = "xml") ==
-            read_optical_ades(ades_file)
-        @test_throws ArgumentError read_optical_astrometry(mpc80_file; format = :unknown)
+    @testset "load_optical_astrometry" begin
+        mpc80_optical, format = load_optical_astrometry(mpc80_file)
+        @test mpc80_optical == optical1 && format == "mpc80"
+        mpc80_optical, format = load_optical_astrometry(mpc80_file; format = :obs80)
+        @test mpc80_optical == optical1 && format == "mpc80"
+        # Note: I've commented out the tests below to limit the number of calls
+        # made to the MPC Observations API during the tests (@LuEdRaMo, 16/08/26)
+        # mpc80_optical, format = load_optical_astrometry("433"; format = :mpc80)
+        # @test issubset(optical1, mpc80_optical) && format == "mpc80"
+
+        ades_optical, format = load_optical_astrometry(ades_file)
+        @test ades_optical == optical3 && format == "ades"
+        ades_optical, format = load_optical_astrometry(ades_file; format = "xml")
+        @test ades_optical == optical3 && format == "ades"
+        # Note: I've commented out the tests below to limit the number of calls
+        # made to the MPC Observations API during the tests (@LuEdRaMo, 16/08/26)
+        # ades_optical, format = load_optical_astrometry("433"; format = :ades)
+        # @test issubset(optical3, ades_optical) && format == "ades"
+
+        @test_throws ArgumentError load_optical_astrometry(mpc80_file; format = :unknown)
+        @test_throws ArgumentError load_optical_astrometry("433"; format = :unknown)
     end
+
+    filter!(x -> Date(2000) < date(x) < Date(2025), optical1)
+    filter!(x -> Date(2000) < date(x) < Date(2025), optical2)
+    filter!(x -> Date(2000) < date(x) < Date(2025), optical3)
 
     @testset "Topocentric" begin
 
