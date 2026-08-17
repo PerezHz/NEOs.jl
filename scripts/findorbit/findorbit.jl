@@ -113,8 +113,9 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
     permute!(apps, perm)
     # Step #1: Linkage with newtonian!
     i = findfirst(>(0), mags)
+    idxs = isnothing(i) ? eachindex(apps) : 1:i
     params = Parameters(params; outrej = false)
-    od = ODProblem(newtonian!, NEOs.optical(view(apps, 1:i)), weights = Veres17,
+    od = ODProblem(newtonian!, NEOs.optical(view(apps, idxs)), weights = Veres17,
                    debias = Eggl20)
     orbitMID = linkage(od, orbitSA, params)
     iszero(orbitMID) && return orbitSA
@@ -206,7 +207,7 @@ function main()
     println("• Run started at ", global_initial_time)
 
     # Load optical astrometry
-    optical, format = load_optical_astrometry(input, format)
+    optical, format = load_optical_astrometry(input; format)
     println("• Loaded ", length(optical), " ", uppercase(format), " optical observations")
     filter!(!isdeprecated, optical)
 
