@@ -1,8 +1,7 @@
 using ArgParse
 using NEOs, PlanetaryEphemeris, JLD2, Dates, Statistics, Printf
-using NEOs: AbstractOpticalAstrometry, AbstractOpticalVector, OpticalADES,
-            OpticalMPC80, AbstractOrbit, log10chi
-import NEOs: indices, numberofdays, noptical
+using NEOs: AbstractOpticalAstrometry, AbstractOpticalVector, AbstractApparitionVector,
+            OpticalADES, OpticalMPC80, AbstractOrbit, log10chi, indices
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -41,64 +40,6 @@ const SingleApparitionOrbit{O <: AbstractOpticalVector{Float64}} =
 
 const MultipleApparitionOrbit{O <: AbstractOpticalVector{Float64}} =
     LeastSquaresOrbit{typeof(gravityonly!), Float64, Float64, O, Nothing, Nothing}
-
-function fetch_astrometry_format(format::AbstractString)
-    fmt = lowercase(strip(format))
-    if fmt in ("auto", "ades", "xml")
-        return :ades
-    elseif fmt in ("mpc80", "obs80")
-        return :mpc80
-    else
-        throw(ArgumentError("Unknown input format: $format. Use auto, ades, mpc80, or obs80."))
-    end
-end
-
-fetch_optical_astrometry(input::AbstractString, ::Val{:ades}) =
-    fetch_optical_ades(input, MPC)
-
-fetch_optical_astrometry(input::AbstractString, ::Val{:mpc80}) =
-    fetch_optical_mpc80(input, MPC)
-
-astrometry_format(::AbstractVector{<:OpticalADES}) = "ades"
-astrometry_format(::AbstractVector{<:OpticalMPC80}) = "mpc80"
-
-function load_optical_astrometry(input::AbstractString, format::AbstractString)
-    if isfile(input)
-        optical = read_optical_astrometry(input; format)
-    else
-        fmt = fetch_astrometry_format(format)
-        optical = fetch_optical_astrometry(input, Val(fmt))
-    end
-    return optical, astrometry_format(optical)
-end
-
-struct Apparition{T <: Real, O <: AbstractOpticalAstrometry{T}, V <: AbstractVector{O},
-                  I <: AbstractVector{Int}, B}
-    optical::SubArray{O, 1, V, Tuple{I}, B}
-end
-
-const AbstractApparitionVector{T} = AbstractVector{Apparition{T, O, V, I, B}} where {O, V, I, B}
-
-indices(x::Apparition) = first(x.optical.indices)
-NEOs.optical(x::Apparition) = collect(x.optical)
-NEOs.optical(x::AbstractApparitionVector) = sort!(mapreduce(NEOs.optical, vcat, x))
-numberofdays(x::Apparition) = numberofdays(x.optical)
-noptical(x::Apparition) = length(x.optical)
-noptical(x::AbstractApparitionVector) = sum(noptical, x)
-
-function apparitions(optical::AbstractOpticalVector{T},
-                     gap::Period = Day(30)) where {T <: Real}
-    sort!(optical)
-    apps = [[1]]
-    for i in 2:length(optical)
-        if date(optical[i]) - date(optical[i-1]) > gap
-            push!(apps, [i])
-        else
-            push!(apps[end], i)
-        end
-    end
-    return [Apparition(view(optical, i)) for i in apps]
-end
 
 computationtime(x::DateTime, y::DateTime) = @sprintf("%.2f", (y - x).value / 60_000)
 
@@ -172,8 +113,9 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
     permute!(apps, perm)
     # Step #1: Linkage with newtonian!
     i = findfirst(>(0), mags)
+    idxs = isnothing(i) ? eachindex(apps) : 1:i
     params = Parameters(params; outrej = false)
-    od = ODProblem(newtonian!, NEOs.optical(view(apps, 1:i)), weights = Veres17,
+    od = ODProblem(newtonian!, NEOs.optical(view(apps, idxs)), weights = Veres17,
                    debias = Eggl20)
     orbitMID = linkage(od, orbitSA, params)
     iszero(orbitMID) && return orbitSA
@@ -265,7 +207,7 @@ function main()
     println("• Run started at ", global_initial_time)
 
     # Load optical astrometry
-    optical, format = load_optical_astrometry(input, format)
+    optical, format = load_optical_astrometry(input; format)
     println("• Loaded ", length(optical), " ", uppercase(format), " optical observations")
     filter!(!isdeprecated, optical)
 

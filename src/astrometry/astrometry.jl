@@ -7,6 +7,7 @@ include("observatorympc.jl")
 include("magnitudeband.jl")
 include("topocentric.jl")
 include("sources.jl")
+
 # Optical astrometry
 include("opticalmpc80.jl")
 include("neocpobject.jl")
@@ -18,6 +19,17 @@ include("computeradec.jl")
 include("weightingscheme.jl")
 include("debiasingscheme.jl")
 include("opticalresidual.jl")
+
+"""
+    numberofdays(::AbstractVector)
+
+Return the timespan of a vector of dates in days.
+"""
+function numberofdays(dates::AbstractVector{DateTime})
+    t0, tf = extrema(dates)
+    return (tf - t0).value / daymillisec
+end
+
 """
     read_optical_astrometry(filename; format = :auto)
 
@@ -29,6 +41,49 @@ function read_optical_astrometry(filename::AbstractString; format = :auto)
     fmt = fmt === :auto ? _detect_optical_astrometry_format(filename) : fmt
     return _read_optical_astrometry(Val(fmt), filename)
 end
+
+_read_optical_astrometry(::Val{:ades}, filename::AbstractString) =
+    read_optical_ades(filename)
+
+_read_optical_astrometry(::Val{:mpc80}, filename::AbstractString) =
+    read_optical_mpc80(filename)
+
+"""
+    fetch_optical_astrometry(input; format = :auto)
+
+Fetch optical astrometry for small-body `input` in the specified format.
+Supported formats are `:auto`, `:ades`, `:mpc80`, and `:obs80`.
+"""
+function fetch_optical_astrometry(input::AbstractString; format = :auto)
+    fmt = _normalize_optical_astrometry_format(format)
+    fmt = fmt === :auto ? :ades : fmt
+    return _fetch_optical_astrometry(Val(fmt), input)
+end
+
+_fetch_optical_astrometry(::Val{:ades}, input::AbstractString) =
+    fetch_optical_ades(input, MPC)
+
+_fetch_optical_astrometry(::Val{:mpc80}, input::AbstractString) =
+    fetch_optical_mpc80(input, MPC)
+
+"""
+    load_optical_astrometry(input; format = :auto)
+
+Load optical astrometry from `input` in the specified format.
+Argument `input` can be either a file or a designation.
+Supported formats are `:auto`, `:ades`, `:mpc80`, and `:obs80`.
+"""
+function load_optical_astrometry(input::AbstractString; format = :auto)
+    if isfile(input)
+        optical = read_optical_astrometry(input; format)
+    else
+        optical = fetch_optical_astrometry(input; format)
+    end
+    return optical, astrometry_format(optical)
+end
+
+astrometry_format(::AbstractVector{<:OpticalADES}) = "ades"
+astrometry_format(::AbstractVector{<:OpticalMPC80}) = "mpc80"
 
 function _normalize_optical_astrometry_format(format)
     fmt = lowercase(strip(String(format)))
@@ -52,22 +107,7 @@ function _detect_optical_astrometry_format(filename::AbstractString)
     throw(ArgumentError("Cannot detect astrometry format from empty file: $filename"))
 end
 
-_read_optical_astrometry(::Val{:ades}, filename::AbstractString) =
-    read_optical_ades(filename)
-
-_read_optical_astrometry(::Val{:mpc80}, filename::AbstractString) =
-    read_optical_mpc80(filename)
 # Radar astrometry
 include("radarjpl.jl")
 include("radarrwo.jl")
 include("radarresidual.jl")
-
-"""
-    numberofdays(::AbstractVector)
-
-Return the timespan of a vector of dates in days.
-"""
-function numberofdays(dates::AbstractVector{DateTime})
-    t0, tf = extrema(dates)
-    return (tf - t0).value / daymillisec
-end
