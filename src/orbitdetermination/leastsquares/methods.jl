@@ -91,9 +91,7 @@ function leastsquares!(ls::AbstractLeastSquaresMethod{T},
     # TO DO: use pinv for badly conditioned normal matrices
     Γ = inv(C)
     # Update fit
-    if all(diag(Γ) .> 0)
-        fit = LeastSquaresFit(true, xs[:, i], Γ, typeof(ls))
-    end
+    fit = LeastSquaresFit(true, xs[:, i], Γ, typeof(ls))
 
     return fit
 end
