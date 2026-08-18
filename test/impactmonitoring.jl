@@ -279,7 +279,8 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         params = Parameters(
             maxsteps = 100, order = 15, abstol = 1E-12, parse_eqs = true,
             coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-            gaussorder = 2, tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
+            gaussorder = 2, safegauss = false, ngaustrip = 1,
+            tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
             jtlsorder = 2, jtlsiter = 20, lsiter = 10,
             significance = 0.99, outrej = false
         )
