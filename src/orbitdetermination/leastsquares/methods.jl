@@ -89,10 +89,11 @@ function leastsquares!(ls::AbstractLeastSquaresMethod{T},
     C = normalmatrix(ls, xs[:, i])
     # Covariance matrix
     # TO DO: use pinv for badly conditioned normal matrices
-    Γ = inv(C)
-    # Update fit
-    fit = LeastSquaresFit(true, xs[:, i], Γ, typeof(ls))
-
+    luC = lu!(C; check = false)
+    if issuccess(luC)
+        Γ = inv!(luC)
+        fit = LeastSquaresFit(true, xs[:, i], Γ, typeof(ls))
+    end
     return fit
 end
 
