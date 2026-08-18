@@ -123,7 +123,7 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
     NEOs.update!(OD, od.optical)
     orbitMA = jtls(OD, orbitMID, params)
     # Step #3: Outlier rejection
-    params = Parameters(params; outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10),
+    params = Parameters(params; outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,
                         fudge = 100.0, max_per = 33.3)
     orbitMA = jtls(OD, orbitMA, params)
     return orbitMA
@@ -195,7 +195,7 @@ function main()
     println("• Input designation/astrometry file: ", input)
 
     # Output .jld2 file
-    output::String = parsed_args["output"]
+    output::Union{Nothing, String} = parsed_args["output"]
     println("• Output .jld2 file: ", output)
 
     # Input astrometry format
@@ -215,11 +215,11 @@ function main()
     params = Parameters(
         maxsteps = 20_000, order = 15, abstol = 1E-12, parse_eqs = true,
         coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
-        gaussorder = 2, safegauss = false, refscale = :log,
+        gaussorder = 2, safegauss = true, refscale = :log,
         tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
         jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
         jtlsproject = true, significance = 0.99, verbose = true,
-        outrej = true, χ2_rec = 7.0, χ2_rej = 8.0, fudge = 100.0,
+        outrej = true, χ2_rec = 9.21, χ2_rej = 10.0, fudge = 100.0,
         max_per = 33.3
     )
 
@@ -234,19 +234,16 @@ function main()
     printitle("Final orbit", "*")
     println(summary(orbit))
 
-    # Print heliocentric ecliptic Keplerian elements (plus q, tp)
-    kep = keplerian(orbit, params)
-    H, dH = absolutemagnitude(orbit, params)
-    printitle("Keplerian elements", "*")
-    println(kep)
-    println("q  = ", @sprintf("%+.12E", pericenter(kep)), " au")
-    println("tp = ", @sprintf("%+.12E", timeperipass(kep)), " MJD TDB")
-    println("H  = ", @sprintf("%.3f", H), " +/- ", @sprintf("%.3f", dH), " mag")
+    # Print MPEC
+    printitle("Minor Planet Electronic Circular (MPEC)", "*")
+    print_mpec(orbit, params)
     println("")
 
     # Save orbit
-    jldsave(output; orbit)
-    println("Final orbit saved to: ", output)
+    if !isnothing(output)
+        jldsave(output; orbit)
+        println("Final orbit saved to: ", output)
+    end
 
     # Final time
     global_final_time = now()
