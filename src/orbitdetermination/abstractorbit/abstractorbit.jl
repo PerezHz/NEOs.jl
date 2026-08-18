@@ -13,6 +13,9 @@ Every orbit has:
 """
 abstract type AbstractOrbit{D, T <: Real, U <: Number} end
 
+# Abbreviations
+const AbstractOrbitVector{D, T, U} = AbstractVector{<:AbstractOrbit{D, T, U}} where {D, T, U}
+
 # Numeric types
 numtypes(::AbstractOrbit{D, T, U}) where {D, T, U} = T, U
 
@@ -54,6 +57,7 @@ lasttime(x::AbstractOrbit) = max(lasttime(x.bwd), lasttime(x.fwd))
 noptical(x::AbstractOrbit) = length(x.optical)
 nradar(x::AbstractOrbit) = hasradar(x) ? length(x.radar) : 0
 nobs(x::AbstractOrbit) = noptical(x) + nradar(x)
+iscomplete(od::ODProblem, orbit::AbstractOrbit) = nobs(od) == nobs(orbit)
 
 function notoutobs(x::AbstractOrbit)
     N = notoutobs(x.ores)
@@ -89,6 +93,16 @@ radar(x::AbstractOrbit) = hasradar(x) ? x.radar : nothing
 
 # Evaluation in time method
 (x::AbstractOrbit)(t = epoch(x)) = t <= epoch(x) ? x.bwd(t) : x.fwd(t)
+
+# Variables fitted via orbit determination
+function fittedvariables(Ndof::Int, params::Parameters)
+    @unpack marsden_scalings = params
+    variables = collect(1:6)
+    if Ndof > 6
+        variables = vcat(variables, findall(!iszero, marsden_scalings) .+ 6)
+    end
+    return variables
+end
 
 # Initial condition and jet transport perturbation
 function initialcondition(q00::AbstractVector{T}, variables::AbstractVector{Int},
@@ -130,6 +144,15 @@ end
 
 jtperturbation(orbit::AbstractOrbit, variables::AbstractVector{Int}, Ndof::Int, order::Int,
     params::Parameters) = jtperturbation(sigmas(orbit), variables, Ndof, order, params)
+
+function jtinitialcondition(od::ODProblem, orbit::AbstractOrbit, params::Parameters)
+    @unpack jtlsorder = params
+    Ndof = dof(od)
+    q00 = initialcondition(orbit, Ndof, params)
+    variables = fittedvariables(Ndof, params)
+    dq = jtperturbation(orbit, variables, Ndof, jtlsorder, params)
+    return q00 + dq
+end
 
 # Number of outlier / non-outlier residuals
 function nout(x::AbstractOrbit)
