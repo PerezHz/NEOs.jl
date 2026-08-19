@@ -1,3 +1,6 @@
+# Evaluate a polynomial with coefficients p in every element of x
+polymodel(x, p) = map(Base.Fix2(evalpoly, p), x)
+
 """
     curvature(::AbstractOpticalVector, ::AbstractWeightingScheme)
 
@@ -41,12 +44,12 @@ function curvature(ts::AbstractVector{T}, αs::AbstractVector{T}, δs::AbstractV
     # Mean time of observation
     t_mean = mean(ts)
     # Evaluate ra/dec and its derivatives at mean time
-    α = mod2pi(polymodel(t_mean, fit_α.param))
-    δ = polymodel(t_mean, fit_δ.param)
-    v_α = polymodel(t_mean, diffcoeffs(fit_α.param))
-    v_δ = polymodel(t_mean, diffcoeffs(fit_δ.param))
-    a_α = polymodel(t_mean, diffcoeffs(diffcoeffs(fit_α.param)))
-    a_δ = polymodel(t_mean, diffcoeffs(diffcoeffs(fit_δ.param)))
+    α = mod2pi(evalpoly(t_mean, fit_α.param))
+    δ = evalpoly(t_mean, fit_δ.param)
+    v_α = evalpoly(t_mean, diffcoeffs(fit_α.param))
+    v_δ = evalpoly(t_mean, diffcoeffs(fit_δ.param))
+    a_α = evalpoly(t_mean, diffcoeffs(diffcoeffs(fit_α.param)))
+    a_δ = evalpoly(t_mean, diffcoeffs(diffcoeffs(fit_δ.param)))
     # Trigonometric functions
     sin_δ, cos_δ = sincos(δ)
     # Proper motion
