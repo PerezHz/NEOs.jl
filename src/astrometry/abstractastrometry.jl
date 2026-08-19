@@ -56,6 +56,8 @@ abstract type AbstractAstrometryObservation{T <: Real} <: AbstractAstrometry end
 
 const AbstractObservationVector{T} = AbstractVector{<:AbstractAstrometryObservation{T}} where {T}
 
+numtype(::AbstractAstrometryObservation{T}) where {T} = T
+
 # Order in AbstractAstrometryObservation is given by date
 isless(a::AbstractAstrometryObservation, b::AbstractAstrometryObservation) = date(a) < date(b)
 

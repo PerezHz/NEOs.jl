@@ -69,10 +69,25 @@ function numberofdays(trks::AbstractVector{OpticalTracklet{<:Real}})
 end
 =#
 
-# Print method for OpticalTracklet
-function show(io::IO, x::OpticalTracklet)
-    print(io, nobs(x), " observation tracklet around ", date(x),
-          " at ", observatory(x).name)
+# Print methods for OpticalTracklet
+show(io::IO, x::OpticalTracklet) = print(io, "Tracklet with ", nobs(x),
+    " observation(s) around ", date(x), " at ", observatory(x).name)
+
+function show(io::IO, ::MIME"text/plain", x::OpticalTracklet)
+    t = repeat(' ', 4)
+    print(io,
+        nobs(x), "-observation Tracklet{", numtype(x), "}\n",
+        t, rpad("Observatory: ", 21),  observatory(x).name, '\n',
+        t, rpad("Date: ", 21),         date(x), '\n',
+        t, rpad("Attributable: ", 21), "[",
+            @sprintf("%.5f", rad2deg(ra(x))),   ", ",
+            @sprintf("%.5f", rad2deg(dec(x))),  ", ",
+            @sprintf("%.5f", rad2deg(vra(x))),  ", ",
+            @sprintf("%.5f", rad2deg(vdec(x))), ", ",
+            @sprintf("%.2f", mag(x)),
+        "]",
+    )
+    return nothing
 end
 
 # Return the milliseconds between two dates
