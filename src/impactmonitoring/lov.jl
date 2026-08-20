@@ -72,8 +72,8 @@ A parametrization of the line of variations (LOV).
 
 - `dynamics::D`: dynamical model.
 - `epoch::T`: reference epoch [days since J2000 TDB].
-- `sun::Vector{T}`: Sun's barycentric cartesian state vector at `epoch` [au, au/day].
 - `coord::Symbol`: integration coordinates.
+- `sun::Vector{T}`: Sun's barycentric cartesian state vector at `epoch` [au, au/day].
 - `domain::NTuple{2, T}`: integrated domain.
 - `bwd/fwd::DensePropagation2{T, T}`: backward (forward) integration.
 """
