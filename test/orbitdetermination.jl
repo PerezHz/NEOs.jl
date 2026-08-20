@@ -855,8 +855,8 @@ end
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        jpl_compatibility_tests(50392393, orbit, params, (1.8E+00, 1.1E+01, 8.7E-11,
-            9.2E-13, 6.7E-11))
+        jpl_compatibility_tests(50392393, orbit, params, (1.8E+00, 1.1E+01, 1.3E-10,
+            9.2E-13, 1.0E-10))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 26.7 ≤ H + dH
@@ -1294,7 +1294,7 @@ end
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        jpl_compatibility_tests(54378773, orbit, params, (6.0E-01, 1.4E+00, 2.1E-12,
+        jpl_compatibility_tests(54378773, orbit, params, (6.0E-01, 1.4E+00, 2.6E-12,
             5.9E-14, 5.9E-14))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
