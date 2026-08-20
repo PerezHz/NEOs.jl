@@ -58,6 +58,11 @@ nongravitational accelerations model:
 # Least Squares
 
 - `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `10`).
+- `lsQtol::T`: target function absolute tolerance (default: `1E-3`).
+- `lsMtol::T`: Mahalanobis distance tolerance (default: `1E-3`).
+
+# Jet Transport Least Squares
+
 - `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
 - `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `6`).
 - `significance::T`: chi-square significance level (default: `0.99`).
@@ -115,6 +120,9 @@ nongravitational accelerations model:
     tsaorder::Int = 6
     # Least Squares
     lsiter::Int = 10
+    lsQtol::T = 1E-3
+    lsMtol::T = 1E-3
+    # Jet Transport Least Squares
     jtlsiter::Int = 5
     jtlsorder::Int = 6
     significance::T = 0.99

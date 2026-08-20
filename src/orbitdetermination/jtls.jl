@@ -152,9 +152,10 @@ function addoptical!(
         res::Vector{OpticalResidual{T, TaylorN{T}}},
         x0::Vector{T}, params::Parameters{T}
     ) where {T <: Real}
+    Qtol, Mtol = params.lsQtol, params.lsMtol
     while !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods)
+        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods; Qtol, Mtol)
         !issuccess(fit_new) && break
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -175,9 +176,10 @@ function addoptical!(
         res::Vector{OpticalResidual{T, TaylorN{T}}},
         x0::Vector{T}, params::Parameters{T}
     ) where {T <: Real}
+    Qtol, Mtol = params.lsQtol, params.lsMtol
     if critical_value(view(res, oidxs), fit) < params.significance && !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods)
+        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods; Qtol, Mtol)
         !issuccess(fit_new) && return oidxs, fit
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -197,10 +199,12 @@ function addobservations!(
         radarin::AbstractRadarVector{T}, radarout::AbstractRadarVector{T},
         res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T}, params::Parameters{T}
     ) where {T <: Real}
+    Qtol, Mtol = params.lsQtol, params.lsMtol
     # Add optical astrometry
     while !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls((res[1][oidxs ∪ extra], res[2][ridxs]), x0, lscache, lsmethods)
+        fit_new = tryls((res[1][oidxs ∪ extra], res[2][ridxs]), x0, lscache, lsmethods;
+                         Qtol, Mtol)
         !issuccess(fit_new) && break
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -213,7 +217,8 @@ function addobservations!(
     while !isempty(radarout)
         extra = findfirst(==(radarout[1]), od.radar)
         isnothing(extra) && break
-        fit_new = tryls((res[1][oidxs], res[2][ridxs ∪ extra]), x0, lscache, lsmethods)
+        fit_new = tryls((res[1][oidxs], res[2][ridxs ∪ extra]), x0, lscache, lsmethods;
+                        Qtol, Mtol)
         !issuccess(fit_new) && break
         fit = fit_new
         radar = popfirst!(radarout)
@@ -307,6 +312,7 @@ function jtls(
         buffer = JTLSBuffer(od, orbit, params)
     end
     # Unpack
+    Qtol, Mtol = params.lsQtol, params.lsMtol
     @unpack jtlsorder, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
             fudge, max_per = params
     @unpack orbits, res, Qs, q00s, outs, prbuffer, lscache, orcache = buffer
@@ -333,7 +339,7 @@ function jtls(
         bwd, fwd = propres!(res, od, q0, jd0, params; buffer = prbuffer)
         isempty(res) && break
         # Orbit fit
-        fit = tryls(view(res, oidxs), x0, lscache, lsmethods)
+        fit = tryls(view(res, oidxs), x0, lscache, lsmethods; Qtol, Mtol)
         !issuccess(fit) && break
         # Incrementally add observations to fit
         oidxs, fit = addoptical!(Val(mode), oidxs, fit, lscache, lsmethods,
@@ -380,6 +386,7 @@ function jtls(
         buffer = JTLSBuffer(od, orbit, params)
     end
     # Unpack
+    Qtol, Mtol = params.lsQtol, params.lsMtol
     @unpack jtlsorder, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
             fudge, max_per = params
     @unpack orbits, res, Qs, q00s, outs, prbuffer, lscache, orcache = buffer
@@ -407,7 +414,7 @@ function jtls(
         bwd, fwd = propres!(res, od, q0, jd0, params; buffer = prbuffer)
         any(isempty, res) && break
         # Orbit fit
-        fit = tryls((res[1][oidxs], res[2][ridxs]), x0, lscache, lsmethods)
+        fit = tryls((res[1][oidxs], res[2][ridxs]), x0, lscache, lsmethods; Qtol, Mtol)
         !issuccess(fit) && break
         # Incrementally add observations to fit
         oidxs, ridxs, fit = addobservations!(od, oidxs, ridxs, fit, lscache, lsmethods,
