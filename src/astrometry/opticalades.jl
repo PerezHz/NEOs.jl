@@ -190,36 +190,26 @@ function adesparse(name, ::Type{T}, x) where {T <: Real}
     end
 end
 
-OpticalADES(r::DataFrameRow) = OpticalADES{Float64}(
-    r.permid, r.provid, r.trksub, r.obsid, r.trkid, r.mode, r.stn, r.sys, r.ctr,
-    r.pos1, r.pos2, r.pos3, r.vel1, r.vel2, r.vel3, r.poscov11, r.poscov12,
-    r.poscov13, r.poscov22, r.poscov23, r.poscov33, r.prog, r.obstime,
-    r.rmstime, r.ra, r.dec, r.rastar, r.decstar, r.deltara, r.deltadec,
-    r.rmsra, r.rmsdec, r.rmscorr, r.astcat, r.mag, r.rmsmag, r.band,
-    r.photcat, r.ref, r.disc, r.subfmt, r.prectime, r.precra, r.precdec,
-    r.unctime, r.notes, r.remarks, r.deprecated, r.source, r.timeofday
-)
-
-function parse_optical_ades(text::String; eop::EOPIAU = EOP_IAU2000A)
-    # Parse XML
-    node = parse(LazyNode, text)
-    # Locate the root <ades> element and its observation elements by node type:
-    # XML.jl >= 0.4 preserves inter-element whitespace as Text nodes, so positional
-    # indexing (node[2]) and unfiltered children iteration would hit Text nodes.
-    root = only(filter(n -> XML.nodetype(n) == XML.Element, children(node)))
-    obs = filter(n -> XML.nodetype(n) == XML.Element, children(root))
-    L = length(obs)
-    # Construct DataFrame
-    R = OpticalADES{Float64}
-    names = fieldnames(R)
-    df = DataFrame([fill(astrometrydefault(fieldtype(R, name)), L) for name in names],
-        collect(names))
-    for (i, line) in enumerate(obs)
-        for child in children(line)
-            XML.nodetype(child) == XML.Element || continue
-            name = Symbol(lowercase(tag(child)))
-            if name in names
-                type = fieldtype(R, name)
+@eval begin
+    function parse_optical_ades(text::String; eop::EOPIAU = EOP_IAU2000A)
+        # Parse XML
+        node = parse(LazyNode, text)
+        # Locate the root <ades> element and its observation elements by node type:
+        # XML.jl >= 0.4 preserves inter-element whitespace as Text nodes, so positional
+        # indexing (node[2]) and unfiltered children iteration would hit Text nodes.
+        root = only(filter(n -> XML.nodetype(n) == XML.Element, children(node)))
+        obs = filter(n -> XML.nodetype(n) == XML.Element, children(root))
+        isempty(obs) && return OpticalADES{Float64}[]
+        # Main parse loop
+        optical = Vector{OpticalADES{Float64}}(undef, length(obs))
+        for (i, line) in enumerate(obs)
+            $([:(
+                $(name) = astrometrydefault($(fieldtype(OpticalADES{Float64}, name)))
+            ) for name in fieldnames(OpticalADES{Float64}) if name ∉ (:timeofday, :source)
+            ]...)
+            for child in children(line)
+                XML.nodetype(child) == XML.Element || continue
+                name = lowercase(tag(child))
                 # first(child) relied on LazyNode iteration, removed in XML.jl 0.4;
                 # go through children (works on both 0.3 and 0.4)
                 grandchildren = children(child)
@@ -227,31 +217,53 @@ function parse_optical_ades(text::String; eop::EOPIAU = EOP_IAU2000A)
                 v = XML.value(first(grandchildren))
                 isnothing(v) && continue
                 x = strip(v)
-                df[i, name] = adesparse(name, type, x)
+                $(
+                    let
+                        fields = [n for n in fieldnames(OpticalADES{Float64}) if n ∉ (:timeofday, :source)]
+                        expr = :(nothing)
+                        for name in reverse(fields)
+                            T = fieldtype(OpticalADES{Float64}, name)
+                            sname = string(name)
+                            qname = QuoteNode(name)
+                            expr = :(
+                                if name == $sname
+                                    $(name) = adesparse($qname, $T, x)
+                                else
+                                    $expr
+                                end
+                            )
+                        end
+                        expr
+                    end
+                )
             end
+            # Satellite observatories
+            if istwoliner(stn)
+                frame = isempty(sys) ? stn.frame : sys
+                coords = SVector{3, Float64}(pos1, pos2, pos3)
+                stn = ObservatoryMPC(stn; frame, coords)
+            end
+            # Occultation observations
+            if mode == "OCC"
+                dec = decstar + deltadec
+                ra = rastar + deltara / cos(dec)
+            end
+            # Source string
+            source = XML.write(line)
+            # Time of day
+            timeofday = TimeOfDay(stn, obstime; eop)
+            # Assemble observation
+            optical[i] = OpticalADES{Float64}($(
+                [name for name in fieldnames(OpticalADES{Float64})]...
+            ))
         end
-    end
-    # Satellite observatories
-    mask = findall(istwoliner, df.stn)
-    for i in mask
-        frame = isempty(df.sys[i]) ? df.stn[i].frame : df.sys[i]
-        coords = SVector{3, Float64}(df.pos1[i], df.pos2[i], df.pos3[i])
-        df.stn[i] = ObservatoryMPC(df.stn[i]; frame, coords)
-    end
-    # Occultation observations
-    mask = findall(==("OCC"), df.mode)
-    for i in mask
-        df.dec[i] = df.decstar[i] + df.deltadec[i]
-        df.ra[i] = df.rastar[i] + df.deltara[i] / cos(df.dec[i])
-    end
-    # Source string
-    df.source .= XML.write.(obs)
-    # Time of day
-    tmap!((x, y) -> TimeOfDay(x, y; eop), df.timeofday, df.stn, df.obstime)
-    # Parse observations
-    optical = OpticalADES.(eachrow(df))
+        # Eliminate repeated entries
+        unique!(optical)
+        # Sort by date
+        sort!(optical)
 
-    return optical
+        return optical
+    end
 end
 
 """

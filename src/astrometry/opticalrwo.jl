@@ -232,64 +232,59 @@ function rwoparse(_, ::Type{Bool}, x)
     end
 end
 
-OpticalRWO(r::DataFrameRow) = OpticalRWO{Float64}(
-    r.design, r.K, r.T, r.N, r.date, r.date_accuracy, r.ra, r.ra_accuracy,
-    r.ra_rms, r.ra_flag, r.ra_bias, r.ra_resid, r.dec, r.dec_accuracy, r.dec_rms,
-    r.dec_flag, r.dec_bias, r.dec_resid, r.mag, r.mag_band, r.mag_rms, r.mag_resid,
-    r.catalogue, r.observatory, r.chi, r.sel_A, r.sel_M, r.source, r.header, r.timeofday
-)
-
-function parse_optical_rwo(text::AbstractString; eop::EOPIAU = EOP_IAU2000A)
-    # File reader
-    reader = RWOFileReader(text)
-    L = length(reader.optical)
-    shift = get_rwo_optical_shift(reader.source)
-    columns = get_rwo_optical_columns(reader.source)
-    # Construct DataFrame
-    R = OpticalRWO{Float64}
-    names, types = fieldnames(R), fieldtypes(R)
-    df = DataFrame([fill(astrometrydefault(fieldtype(R, name)), L) for name in names],
-        collect(names))
-    for (i, line) in enumerate(reader.optical)
-        for (name, type, idxs) in zip(names, types, columns)
-            x = strip(view(line, idxs))
-            df[i, name] = rwoparse(name, type, x)
+@eval begin
+    function parse_optical_rwo(text::AbstractString; eop::EOPIAU = EOP_IAU2000A)
+        # File reader
+        reader = RWOFileReader(text)
+        shift = get_rwo_optical_shift(reader.source)
+        columns = get_rwo_optical_columns(reader.source)
+        isempty(reader.optical) && return OpticalRWO{Float64}[]
+        # Main parse loop
+        optical = Vector{OpticalRWO{Float64}}(undef, length(reader.optical))
+        for (i, line) in enumerate(reader.optical)
+            $([:(
+                $(name) = rwoparse(
+                    $(QuoteNode(name)),
+                    $(fieldtype(OpticalRWO{Float64}, name)),
+                    strip(view(line, columns[$c]))
+                )
+            ) for (c, name) in enumerate(
+                [n for n in fieldnames(OpticalRWO{Float64}) if n ∉ (:source, :header, :timeofday)]
+            )]...)
+            # Two line observations (skip observations with a 'x' note, e.g. 2010 BO127)
+            if istwoliner(observatory) && T != 'x'
+                subline = view(line, 199+shift:length(line))
+                if isoccultation(observatory) || issatellite(observatory)
+                    frame = subline[35+shift] == '1' ? "ICRF_KM" : "ICRF_AU"
+                else
+                    frame = observatory.frame
+                end
+                vals = split(subline)
+                coords = SVector{3, Float64}(
+                    parse(Float64, vals[end-3]),
+                    parse(Float64, vals[end-2]),
+                    parse(Float64, vals[end-1])
+                )
+                observatory = ObservatoryMPC(observatory; frame, coords)
+            end
+            # Source string
+            source = string(line)
+            # File header
+            header = string(reader.header)
+            # Time of day
+            timeofday = TimeOfDay(observatory, date; eop)
+            # Assemble observation
+            optical[i] = OpticalRWO{Float64}($(
+                [name for name in fieldnames(OpticalRWO{Float64})]...
+            ))
         end
-    end
-    # Two-line observations
-    mask = findall(istwoliner, df.observatory)
-    for i in mask
-        # Skip observations with a 'x' note (e.g. 2010 BO127)
-        df.T[i] == 'x' && continue
-        obs = df.observatory[i]
-        line = view(reader.optical[i], 199+shift:length(reader.optical[i]))
-        if isoccultation(obs) || issatellite(obs)
-            frame = line[35+shift] == '1' ? "ICRF_KM" : "ICRF_AU"
-        else
-            frame = obs.frame
-        end
-        vals = split(line)
-        coords = SVector{3, Float64}(
-            parse(Float64, vals[end-3]),
-            parse(Float64, vals[end-2]),
-            parse(Float64, vals[end-1])
-        )
-        df.observatory[i] = ObservatoryMPC(obs; frame, coords)
-    end
-    # Source string
-    df.source .= reader.optical
-    # File header
-    df.header .= reader.header
-    # Time of day
-    tmap!((x, y) -> TimeOfDay(x, y; eop), df.timeofday, df.observatory, df.date)
-    # Parse observations
-    optical = OpticalRWO.(eachrow(df))
-    # Eliminate repeated entries
-    unique!(optical)
-    # Sort by date
-    sort!(optical)
+        # Eliminate repeated entries
+        unique!(optical)
+        # Sort by date
+        sort!(optical)
 
-    return optical
+        return optical
+    end
 end
 
 """

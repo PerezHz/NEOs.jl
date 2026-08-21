@@ -155,39 +155,40 @@ end
 get_rwo_radar_columns(x::Symbol) = x == :NEOCC ?
     NEOCC_RADAR_COLUMNS : NEODyS2_RADAR_COLUMNS
 
-RadarRWO(r::DataFrameRow) = RadarRWO{Float64}(
-    r.design, r.K, r.T, r.N, r.date, r.measure, r.accuracy, r.rms, r.flag,
-    r.bias, r.resid, r.trx, r.rcx, r.chi, r.S, r.source, r.header
-)
-
-function parse_radar_rwo(text::String)
-    # File reader
-    reader = RWOFileReader(text)
-    L = length(reader.radar)
-    columns = get_rwo_radar_columns(reader.source)
-    # Construct DataFrame
-    R = RadarRWO{Float64}
-    names, types = fieldnames(R), fieldtypes(R)
-    df = DataFrame([fill(astrometrydefault(fieldtype(R, name)), L) for name in names],
-        collect(names))
-    for (i, line) in enumerate(reader.radar)
-        for (name, type, idxs) in zip(names, types, columns)
-            x = strip(view(line, idxs))
-            df[i, name] = rwoparse(name, type, x)
+@eval begin
+    function parse_radar_rwo(text::AbstractString)
+        # File reader
+        reader = RWOFileReader(text)
+        columns = get_rwo_radar_columns(reader.source)
+        isempty(reader.radar) && return RadarRWO{Float64}[]
+        # Main parse loop
+        radar = Vector{RadarRWO{Float64}}(undef, length(reader.radar))
+        for (i, line) in enumerate(reader.radar)
+            $([:(
+                $(name) = rwoparse(
+                    $(QuoteNode(name)),
+                    $(fieldtype(RadarRWO{Float64}, name)),
+                    strip(view(line, columns[$c]))
+                )
+            ) for (c, name) in enumerate(
+                [n for n in fieldnames(RadarRWO{Float64}) if n ∉ (:source, :header)]
+            )]...)
+            # Source string
+            source = string(line)
+            # File header
+            header = string(reader.header)
+            # Assemble observation
+            radar[i] = RadarRWO{Float64}($(
+                    [name for name in fieldnames(RadarRWO{Float64})]...
+            ))
         end
-    end
-    # Source string
-    df.source = reader.radar
-    # File header
-    df.header .= reader.header
-    # Parse observations
-    radar = RadarRWO.(eachrow(df))
-    # Eliminate repeated entries
-    unique!(radar)
-    # Sort by date
-    sort!(radar)
+        # Eliminate repeated entries
+        unique!(radar)
+        # Sort by date
+        sort!(radar)
 
-    return radar
+        return radar
+    end
 end
 
 """
