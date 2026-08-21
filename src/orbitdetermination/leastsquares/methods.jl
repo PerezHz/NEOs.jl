@@ -52,14 +52,21 @@ Every least squares `method`:
 """
 abstract type AbstractLeastSquaresMethod{T} <: AbstractLeastSquares{T} end
 
+isrejected(::AbstractLeastSquaresMethod, Δx) = false
+
 """
-    leastsquares!(ls, cache)
+    leastsquares!(ls, cache; kwargs...)
 
 Minimize the target function in `ls` via least squares, using the
 containers in `cache` to save intermediate results.
+
+# Keyword arguments
+
+- `Qtol::Real`: target function absolute tolerance (default: `1E-3`).
+- `Mtol::Real`: Mahalanobis distance tolerance (default: `1E-3`).
 """
-function leastsquares!(ls::AbstractLeastSquaresMethod{T},
-                       cache::LeastSquaresCache{T}) where {T <: Real}
+function leastsquares!(ls::AbstractLeastSquaresMethod{T}, cache::LeastSquaresCache{T};
+                       Qtol::T = 1E-3, Mtol::T = 1E-3) where {T <: Real}
     # Allocate memory for least squares fit
     fit = LeastSquaresFit(T, typeof(ls))
     # Unfold
@@ -80,8 +87,14 @@ function leastsquares!(ls::AbstractLeastSquaresMethod{T},
         xs[idxs, i+1] .= xs[idxs, i] + Δx
         Qs[i+1] = evaluate(ls.Q, xs[:, i+1])
         Qs[i+1] < 0 && return fit
-        # TO DO: break if Q has not changed significantly in
-        # 3-5 iterations
+        # Convergence condition
+        if !isrejected(ls, Δx)
+            C = normalmatrix(ls, xs[:, i])
+            M = dot(Δx, C, Δx) / length(idxs)
+            if abs(Qs[i+1] - Qs[i]) < Qtol || (M > 0 && sqrt(M) < Mtol)
+                break
+            end
+        end
     end
     # Choose best iteration
     i = argmin(Qs)
@@ -108,19 +121,20 @@ subset of the parameters.
 # Keyword argument
 
 - `maxiter::Int`: maximum number of iterations (default: `25`).
+- `Qtol::Real`: target function absolute tolerance (default: `1E-3`).
+- `Mtol::Real`: Mahalanobis distance tolerance (default: `1E-3`).
 """
 function leastsquares(method::Type{<:AbstractLeastSquaresMethod{T}},
-                      res::AbstractResidualSet{T, TaylorN{T}},
-                      x0::Vector{T}, idxs::AbstractVector{Int} = eachindex(x0);
-                      maxiter::Int = 25) where {T <: Real}
+                      res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
+                      idxs::AbstractVector{Int} = eachindex(x0); maxiter::Int = 25,
+                      Qtol::T = 1E-3, Mtol::T = 1E-3) where {T <: Real}
     # Consistency checks
     @assert length(idxs) ≤ length(x0) == get_numvars()
     # Initialize least squares method and cache
     ls = method(res, x0, idxs)
     cache = LeastSquaresCache(x0, idxs, maxiter)
     # Main loop
-    fit = leastsquares!(ls, cache)
-
+    fit = leastsquares!(ls, cache; Qtol, Mtol)
     return fit
 end
 
@@ -185,9 +199,9 @@ function lsstep(ls::Newton, x::AbstractVector)
     Δx = -invd2Q * dQ
     # Normal matrix
     C = (nobs/2) * d2Q
-    # Error metric
-    error = (Δx') * C * Δx / npar
-    return Δx, error > 0
+    # Squared Mahalanobis distance
+    M = dot(Δx, C, Δx) / npar
+    return Δx, M > 0
 end
 
 function normalmatrix(ls::Newton, x::AbstractVector)
@@ -273,9 +287,9 @@ function lsstep(ls::DifferentialCorrections, x::AbstractVector)
     invCx = inv!(luCx)
     # Differential corrections update rule
     Δx = -invCx * Dx
-    # Error metric
-    error = (Δx') * Cx * Δx / npar
-    return Δx, error > 0
+    # Squared Mahalanobis distance
+    M = dot(Δx, Cx, Δx) / npar
+    return Δx, M > 0
 end
 
 function normalmatrix(ls::DifferentialCorrections, x::AbstractVector)
@@ -390,6 +404,7 @@ end
 
 getid(::LevenbergMarquardt) = "Levenberg-Marquardt"
 targetfunction(x::LevenbergMarquardt) = x.Q
+isrejected(::LevenbergMarquardt, Δx) = iszero(Δx)
 
 function LevenbergMarquardt(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
                             idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
@@ -485,24 +500,24 @@ function _lsmethods(
 end
 
 # Base case: we ran out of methods
-_tryls(fit, res, x0, cache, methods::Tuple{}) = fit
+_tryls(fit, res, x0, cache, methods::Tuple{}; kwargs...) = fit
 
 # Recursive step
-function _tryls(fit, res, x0, cache, methods::Tuple)
+function _tryls(fit, res, x0, cache, methods::Tuple; kwargs...)
     method = first(methods)
     update!(method, res, x0, cache.idxs)
-    newfit = leastsquares!(method, cache)
+    newfit = leastsquares!(method, cache; kwargs...)
     if issuccess(newfit) && 0 < targetfunction(method, newfit) < targetfunction(method, fit)
         fit = newfit
     end
-    return _tryls(fit, res, x0, cache, Base.tail(methods))
+    return _tryls(fit, res, x0, cache, Base.tail(methods); kwargs...)
 end
 
 # Main entry point
 function tryls(res::AbstractResidualSet, x0::AbstractVector,
-               cache::LeastSquaresCache, methods::Tuple)
+               cache::LeastSquaresCache, methods::Tuple; kwargs...)
     fit = zero(LeastSquaresFit{eltype(x0)})
-    return _tryls(fit, res, x0, cache, methods)
+    return _tryls(fit, res, x0, cache, methods; kwargs...)
 end
 
 """
@@ -519,12 +534,15 @@ See also [`LeastSquaresCache`](@ref), [`AbstractLeastSquaresMethod`](@ref),
 # Keyword Argument
 
 - `maxiter::Int`: maximum number of iterations (default: `25`).
+- `Qtol::Real`: target function absolute tolerance (default: `1E-3`).
+- `Mtol::Real`: Mahalanobis distance tolerance (default: `1E-3`).
 """
 function tryls(
         res::AbstractResidualSet{T, TaylorN{T}}, x0::AbstractVector{T},
-        idxs::AbstractVector{Int} = eachindex(x0); maxiter::Int = 25
+        idxs::AbstractVector{Int} = eachindex(x0); maxiter::Int = 25,
+        Qtol::T = 1E-3, Mtol::T = 1E-3
     ) where {T <: Real}
     cache = LeastSquaresCache(x0, idxs, maxiter)
     methods = _lsmethods(res, x0, idxs)
-    return tryls(res, x0, cache, methods)
+    return tryls(res, x0, cache, methods; Qtol, Mtol)
 end
