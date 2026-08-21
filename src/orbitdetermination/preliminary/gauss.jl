@@ -225,9 +225,9 @@ function gaussmethod(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Dat
         "Gauss method requires exactly three observations"
     # Check observations are in temporal order
     @assert issorted(dates) "Observations must be in temporal order"
-    # Times of observation [et, days since J2000]
-    t_et = dtutc2et.(dates)
-    t_days = t_et ./ daysec
+    # Times of observation [Julian date UTC, days since J2000 TDB]
+    jds_utc = datetime2julian.(dates)
+    t_days = dtutc2et.(dates) ./ daysec
     # Time intervals
     τ_1 = t_days[1] - t_days[2]
     τ_3 = t_days[3] - t_days[2]
@@ -235,7 +235,7 @@ function gaussmethod(observatories::Vector{ObservatoryMPC{T}}, dates::Vector{Dat
     # Topocentric (line-of-sight) unit vectors
     ρ_vec = reduce(hcat, topounit.(α, δ))
     # Geocentric state vector of the observer [au, au/day]
-    g_vec = @. kmsec2auday(obsposvelECI(observatories, t_et))
+    g_vec = @. kmsec2auday(obsposvelECI(observatories, jds_utc))
     # Heliocentric state vector of the Earth [au, au/day]
     G_vec = @. params.eph_ea(t_days) - params.eph_su(t_days)
     # Observer's heliocentric positions [au, au/day]

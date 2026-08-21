@@ -435,9 +435,11 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::
     xva1et0 = xva(et_r_secs_0)[1]
     # et_r_secs_0 as a Taylor polynomial
     et_r_secs = Taylor1([et_r_secs_0,one(et_r_secs_0)].*one(xva1et0), tord)
+    utc_r_secs = et_r_secs - tdb_utc(et_r_secs)
+    utc_r_days = JD_J2000 + utc_r_secs / daysec
     # Compute geocentric position/velocity of receiving antenna in
     # inertial frame [km, km/sec]
-    RV_r = obsposvelECI(observatory, et_r_secs)
+    RV_r = obsposvelECI(observatory, utc_r_days)
     R_r = RV_r[1:3]
     # Earth's barycentric position and velocity at receive time
     r_e_t_r = xve(et_r_secs)[1:3]

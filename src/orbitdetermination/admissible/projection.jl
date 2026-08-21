@@ -74,16 +74,17 @@ function attr2bary(A::AdmissibleRegion{T}, a::Vector{U},
     # Unfold
     α, δ, v_α, v_δ, ρ, v_ρ = a
     # Admissible region reference epoch
-    # Note: we concluded both t and et should not include the relativistic
-    # correction -ρ/c for consistency (05/12/2025)
+    # Note: we concluded both t and jd_utc should not include the relativistic
+    # correction -ρ/c for consistency (20/08/2026)
     t = dtutc2days(A.date) # - ρ / c_au_per_day
-    # TO DO: `et::TaylorN` is too slow for `mmov` due to
+    # TO DO: `jd_utc::TaylorN` is too slow for `mmov` due to
     # SatelliteToolboxTransformations overloads in src/observations/topocentric.jl
-    et = dtutc2et(A.date) # - cte(cte(ρ)) / c_au_per_sec
+    jd_utc = datetime2julian(A.date) # - cte(cte(ρ)) / c_au_per_day
     # Line of sight vectors
     ρ_unit, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Heliocentric position of the observer
-    q = params.eph_ea(t) + kmsec2auday(obsposvelECI(A.observatory, et)) - params.eph_su(t)
+    q = params.eph_ea(t) + kmsec2auday(obsposvelECI(A.observatory, jd_utc)) -
+        params.eph_su(t)
     # Barycentric position
     r = q[1:3] + ρ * ρ_unit + params.eph_su(t)[1:3]
     # Barycentric velocity
