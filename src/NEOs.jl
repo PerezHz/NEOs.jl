@@ -19,8 +19,7 @@ using AngleBetweenVectors, AutoHashEquals, Dates, Downloads, HTTP, InteractiveUt
 
 using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
 using AstroMOID: wisric_moid
-using DataFrames: AbstractDataFrame, AsTable, DataFrame, DataFrameRow, nrow, eachrow,
-      eachcol, groupby, combine
+using DataFrames: AsTable, DataFrame, nrow, groupby, combine
 using Dates: epochms2datetime
 using DelimitedFiles: readdlm
 using Distributions: Chisq, Normal, Uniform, cdf, quantile

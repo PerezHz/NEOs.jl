@@ -148,59 +148,55 @@ function mpc80parse(name, ::Type{T}, x) where {T <: Real}
     end
 end
 
-OpticalMPC80(r::DataFrameRow) = OpticalMPC80{Float64}(
-    r.number, r.desig, r.discovery, r.note1, r.note2, r.date, r.ra,
-    r.dec, r.info1, r.mag, r.band, r.catalogue, r.info2, r.observatory,
-    r.source, r.timeofday
-)
-
-function parse_optical_mpc80(text::AbstractString; eop::EOPIAU = EOP_IAU2000A)
-    # File reader
-    reader = MPC80FileReader(text)
-    L = length(reader.optical)
-    # Construct DataFrame
-    R = OpticalMPC80{Float64}
-    names, types = fieldnames(R), fieldtypes(R)
-    df = DataFrame([fill(astrometrydefault(fieldtype(R, name)), L) for name in names],
-        collect(names))
-    for (i, line) in enumerate(reader.optical)
-        for (name, type, idxs) in zip(names, types, MPC80_OPTICAL_COLUMNS)
-            x = strip(view(line, idxs))
-            df[i, name] = mpc80parse(name, type, x)
+@eval begin
+    function parse_optical_mpc80(text::AbstractString; eop::EOPIAU = EOP_IAU2000A)
+        # File reader
+        reader = MPC80FileReader(text)
+        isempty(reader.optical) && return OpticalMPC80{Float64}[]
+        # Main parse loop
+        optical = Vector{OpticalMPC80{Float64}}(undef, length(reader.optical))
+        for (i, line) in enumerate(reader.optical)
+            $([:(
+                $(name) = mpc80parse(
+                    $(QuoteNode(name)),
+                    $(fieldtype(OpticalMPC80{Float64}, name)),
+                    strip(view(line, $idxs))
+                )
+            ) for (name, idxs) in zip(fieldnames(OpticalMPC80{Float64}), MPC80_OPTICAL_COLUMNS)
+            if name ∉ (:source, :timeofday)]...)
+            # Two line observations (skip observations with a 'x' note, e.g. 2010 BO127)
+            if istwoliner(observatory) && note2 != 'x'
+                subline = view(line, 82:162)
+                I1, I2, I3 = isroving(observatory) ? (35:44, 46:55, 57:61) :
+                    (35:45, 47:57, 59:69)
+                if isoccultation(observatory) || issatellite(observatory)
+                    frame = subline[33] == '1' ? "ICRF_KM" : "ICRF_AU"
+                else
+                    frame = observatory.frame
+                end
+                coords = SVector{3, Float64}(
+                    parse(Float64, replace(view(subline, I1), " " => "")),
+                    parse(Float64, replace(view(subline, I2), " " => "")),
+                    parse(Float64, replace(view(subline, I3), " " => ""))
+                )
+                observatory = ObservatoryMPC(observatory; frame, coords)
+            end
+            # Source string
+            source = string(line)
+            # Time of day
+            timeofday = TimeOfDay(observatory, date; eop)
+            # Assemble observation
+            optical[i] = OpticalMPC80{Float64}($(
+                    [name for name in fieldnames(OpticalMPC80{Float64})]...
+            ))
         end
-    end
-    # Two line observations
-    mask = findall(istwoliner, df.observatory)
-    for i in mask
-        # Skip observations with a 'x' note (e.g. 2010 BO127)
-        df.note2[i] == 'x' && continue
-        obs = df.observatory[i]
-        line = view(reader.optical[i], 82:162)
-        I1, I2, I3 = isroving(obs) ? (35:44, 46:55, 57:61) : (35:45, 47:57, 59:69)
-        if isoccultation(obs) || issatellite(obs)
-            frame = line[33] == '1' ? "ICRF_KM" : "ICRF_AU"
-        else
-            frame = obs.frame
-        end
-        coords = SVector{3, Float64}(
-            parse(Float64, replace(view(line, I1), " " => "")),
-            parse(Float64, replace(view(line, I2), " " => "")),
-            parse(Float64, replace(view(line, I3), " " => ""))
-        )
-        df.observatory[i] = ObservatoryMPC(obs; frame, coords)
-    end
-    # Source string
-    df.source .= reader.optical
-    # Time of day
-    tmap!((x, y) -> TimeOfDay(x, y; eop), df.timeofday, df.observatory, df.date)
-    # Parse observations
-    optical = OpticalMPC80.(eachrow(df))
-    # Eliminate repeated entries
-    unique!(optical)
-    # Sort by date
-    sort!(optical)
+        # Eliminate repeated entries
+        unique!(optical)
+        # Sort by date
+        sort!(optical)
 
-    return optical
+        return optical
+    end
 end
 
 """
