@@ -87,6 +87,34 @@ function numberofdays(x::AbstractOrbit)
     return (tf - t0).value / daymillisec
 end
 
+function meandate(x::AbstractOrbit)
+    T, _ = numtypes(x)
+    t = Vector{T}(undef, noptical(x))
+    w = Vector{T}(undef, noptical(x))
+    for (i, (obs, res)) in enumerate(zip(optical(x), x.ores))
+        δ = dec(obs)
+        σα, σδ = 1 / wra(res), 1 / wdec(res)
+        t[i] = datetime2julian(obs) - PE.J2000
+        w[i] = 1 / (σα^2 * cos(δ)^2 + σδ^2)
+    end
+    tmean = mean(t, weights(w))
+    return julian2datetime(tmean + PE.J2000)
+end
+
+"""
+    meanepoch(::Union{ODProblem, AbstractOrbit})
+
+Return the weighted mean optical observational epoch
+in TDB days since J2000.
+
+See also [`meandate`](@ref).
+
+!!! reference
+    See equation (15) of:
+    - https://doi.org/10.1007/s10569-024-10225-z
+"""
+meanepoch(x) = dtutc2days(meandate(x))
+
 # Return the optical astrometry in an orbit
 optical(x::AbstractOrbit) = x.optical
 radar(x::AbstractOrbit) = hasradar(x) ? x.radar : nothing
