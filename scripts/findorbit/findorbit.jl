@@ -61,18 +61,6 @@ function initcond(A::AdmissibleRegion)
     ]
 end
 
-function meanepoch(x::AbstractOrbit)
-    t = Vector{Float64}(undef, noptical(x))
-    w = Vector{Float64}(undef, noptical(x))
-    for i in eachindex(x.optical)
-        t[i] = dtutc2days(x.optical[i])
-        δ = dec(x.optical[i])
-        σα, σδ = 1 / wra(x.ores[i]), 1 / wdec(x.ores[i])
-        w[i] = 1 / (σα^2 * cos(δ)^2 + σδ^2)
-    end
-    return mean(t, weights(w))
-end
-
 function singleapparition(apps::AbstractApparitionVector, params::Parameters)
     # Single apparition orbit determination
     optical = NEOs.optical(first(apps))
@@ -228,13 +216,9 @@ function main()
     # Compute orbit by apparition type (single/multiple apparition)
     orbit = orbitapptype(apps, params)
 
-    # Shift epoch to the middle of the observational arc
-    tmean = meanepoch(orbit)
-    orbit = shiftepoch(orbit, tmean + PE.J2000, params)
+    # Final orbit
     printitle("Final orbit", "*")
     println(summary(orbit))
-
-    # Print MPEC
     printitle("Minor Planet Electronic Circular (MPEC)", "*")
     print_mpec(orbit, params)
     println("")
