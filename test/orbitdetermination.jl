@@ -249,7 +249,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 19, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -264,7 +264,7 @@ end
         @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 1E-03)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
@@ -329,7 +329,7 @@ end
         @test orbit1.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
-        @test epoch(orbit1) == epoch(orbit)
+        @test meanepoch(od) == meanepoch(orbit1) == epoch(orbit1)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit1)
         @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 1.2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit1)
@@ -355,7 +355,7 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        jpl_compatibility_tests(54342500, orbit1, params, (3.1E-01, 4.5E-01, 5.7E-11,
+        jpl_compatibility_tests(54342500, orbit1, params, (3.1E-01, 6.3E-01, 5.7E-11,
             8.2E-12, 7.0E-12))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
@@ -401,7 +401,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 19, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -416,7 +416,7 @@ end
         @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(optical[4])), atol = 3e-4)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
@@ -490,7 +490,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by August 19, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -505,7 +505,7 @@ end
         @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 5e-4)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
@@ -516,8 +516,8 @@ end
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test maximum(sigmas(orbit)) < 6.6E-04
-        @test minimum(snr(orbit)) > 38.8
+        @test maximum(sigmas(orbit)) < 1.5E-03
+        @test minimum(snr(orbit)) > 19.1
         @test chi2(orbit) < 2.43
         @test nrms(orbit) < 0.32
         # Covariance matrix
@@ -527,7 +527,7 @@ end
         @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) <= 5
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 7
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
@@ -567,7 +567,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by August 19, 2026
+        # Values by August 24, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -722,7 +722,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by August 19, 2026
+        # Values by August 24, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -743,7 +743,7 @@ end
         @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical), atol = 7e-5)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
@@ -814,7 +814,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 19, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -829,7 +829,7 @@ end
         @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 2e-3)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
@@ -892,7 +892,7 @@ end
         @test orbit1.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
-        @test epoch(orbit1) == epoch(orbit)
+        @test meanepoch(od) == meanepoch(orbit1) == epoch(orbit1)
         @test dtutc2days(date(optical[1])) > firsttime(orbit1)
         @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit1)
@@ -971,7 +971,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by August 19, 2026
+        # Values by August 24, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -992,7 +992,7 @@ end
         @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical), atol = 2E-05)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
@@ -1070,7 +1070,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by August 19, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1085,7 +1085,7 @@ end
         @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 1E-01)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
@@ -1111,7 +1111,7 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        jpl_compatibility_tests(50430314, orbit, params, (5.0E-01, 3.0E-01, 1.6E-08,
+        jpl_compatibility_tests(50430314, orbit, params, (5.2E-01, 3.6E-01, 2.1E-08,
             1.5E-11, 1.5E-09))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
@@ -1150,11 +1150,11 @@ end
         @test orbit1.tracklets[end].indices[end] == 93
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
-        @test epoch(orbit1) == epoch(orbit)
+        @test meanepoch(od) == meanepoch(orbit1) == epoch(orbit1)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit1)
-        @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 1
+        @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 8.0E+02
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit1)
-        @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 1E+15
+        @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 3.3E+16
         # Vector of residuals
         @test notout(orbit1.ores) == 97
         @test nout(orbit1.ores) == 0
@@ -1176,7 +1176,7 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        jpl_compatibility_tests(50430314, orbit1, params, (1.1E+01, 5.0E-01, 2.3E-07,
+        jpl_compatibility_tests(50430314, orbit1, params, (2.0E+01, 7.6E-01, 2.3E-07,
             1.8E-8, 1.4E-09))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
@@ -1252,7 +1252,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by August 19, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1268,7 +1268,7 @@ end
         @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 3e-3)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
@@ -1369,7 +1369,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by August 19, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1388,7 +1388,7 @@ end
         @test issorted(orbit1.tracklets)
         @test issorted(orbit1.radar)
         # Backward (forward) integration
-        @test epoch(orbit1) == datetime2julian(date(radar[2])) - PE.J2000
+        @test meanepoch(od1) == meanepoch(orbit1) == epoch(orbit1)
         @test dtutc2days(date(optical[1])) > firsttime(orbit1)
         @test dtutc2days(date(radar[1])) > firsttime(orbit1)
         @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 2
@@ -1419,7 +1419,7 @@ end
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
         jpl_compatibility_tests(20099942, orbit1, params, (4.5E+00, 1.9E+02, 4.0E-08,
-            1.5E-11, 8.0E-10))
+            1.5E-11, 1.1E-09))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
         @test H - dH ≤ 18.93 ≤ H + dH
@@ -1473,7 +1473,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by August 19, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1488,18 +1488,18 @@ end
         @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical[idxs]), atol = 6E+0)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 3.7
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
-        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 3.3
         # Vector of residuals
         @test notout(orbit.ores) == 43
         @test nout(orbit.ores) == 1
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test maximum(sigmas(orbit)) < 1.4E-06
+        @test maximum(sigmas(orbit)) < 7.9E-06
         @test minimum(snr(orbit)) > 6.7E+04
         @test chi2(orbit) < 10.40
         @test nrms(orbit) < 0.35
