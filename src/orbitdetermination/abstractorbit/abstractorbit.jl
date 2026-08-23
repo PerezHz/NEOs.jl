@@ -133,34 +133,50 @@ function fittedvariables(Ndof::Int, params::Parameters)
 end
 
 # Initial condition and jet transport perturbation
-function initialcondition(q00::AbstractVector{T}, variables::AbstractVector{Int},
-                          dof::Int, params::Parameters{T}) where {T <: Real}
-    if length(q00) == dof
+function initialcondition(q00::AbstractVector, variables::AbstractVector{Int},
+                          Ndof::Int, params::Parameters)
+    @unpack marsden_coeffs = params
+    if length(q00) == Ndof
         return q00
-    elseif length(q00) < dof
-        q0 = zeros(T, dof)
+    elseif length(q00) < Ndof
+        q0 = zeros(eltype(q00), Ndof)
         q0[variables] .= q00
         for i in 7:9
-            q0[i] = iszero(q0[i]) ? params.marsden_coeffs[i-6] : q0[i]
+            q0[i] = iszero(q0[i]) ? marsden_coeffs[i-6] : q0[i]
         end
         return q0
     else
-        throw(ArgumentError("The number of degrees of freedom `dof` cannot be smaller \
+        throw(ArgumentError("The number of degrees of freedom `Ndof` cannot be smaller \
             than the length of the preliminary initial condition `q00`"))
     end
 end
 
-initialcondition(orbit::AbstractOrbit, dof::Int, params::Parameters) =
-    initialcondition(orbit(), variables(orbit), dof, params)
+function initialcondition(orbit::AbstractOrbit, jd::Real, Ndof::Int, params::Parameters)
+    @unpack bwdoffset, fwdoffset = params
+    t = jd - PE.J2000
+    d0, df = minmaxdates(orbit)
+    t0, tf = dtutc2days(d0), dtutc2days(df)
+    if t0 ≤ t ≤ tf
+        q00 = orbit(t)
+    else
+        q00 = initialcondition(orbit(), variables(orbit), dof(orbit), params)
+        offset = t > epoch(orbit) ? fwdoffset : -bwdoffset
+        nyears = (t - epoch(orbit) + offset) / yr
+        prop = propagate(dynamicalmodel(orbit), q00, epoch(orbit) + PE.J2000, nyears, params)
+        q00 = prop(t)
+    end
+    return initialcondition(q00, variables(orbit), Ndof, params)
+end
 
-function jtperturbation(sigmas::AbstractVector{T}, variables::AbstractVector{Int},
-                        Ndof::Int, order::Int, params::Parameters{T}) where {T <: Real}
+function jtperturbation(sigmas::AbstractVector, variables::AbstractVector{Int},
+                        Ndof::Int, order::Int, params::Parameters)
+    @unpack marsden_scalings = params
     k = 1
-    vars = TaylorSeries.variables(T, order)
+    vars = TaylorSeries.variables(eltype(sigmas), order)
     dq = [zero(vars[1]) for _ in 1:Ndof]
     for i in eachindex(dq)
         !(i in variables) && continue
-        scaling = 1 ≤ i ≤ 6 ? 1E-8 : params.marsden_scalings[i-6]
+        scaling = 1 ≤ i ≤ 6 ? 1E-8 : marsden_scalings[i-6]
         if i ≤ length(sigmas) && !isnan(sigmas[i])
             scaling = sigmas[i]
         end
@@ -173,10 +189,11 @@ end
 jtperturbation(orbit::AbstractOrbit, variables::AbstractVector{Int}, Ndof::Int, order::Int,
     params::Parameters) = jtperturbation(sigmas(orbit), variables, Ndof, order, params)
 
-function jtinitialcondition(od::ODProblem, orbit::AbstractOrbit, params::Parameters)
+function jtinitialcondition(od::ODProblem, orbit::AbstractOrbit, jd0::Real,
+                            params::Parameters)
     @unpack jtlsorder = params
     Ndof = dof(od)
-    q00 = initialcondition(orbit, Ndof, params)
+    q00 = initialcondition(orbit, jd0, Ndof, params)
     variables = fittedvariables(Ndof, params)
     dq = jtperturbation(orbit, variables, Ndof, jtlsorder, params)
     return q00 + dq
@@ -359,16 +376,17 @@ function keplerian(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
     # Set jet transport variables
     Npar, Ndof = numvars(orbit), dof(orbit)
     set_od_order(T, 2, Npar)
-    # Orbit reference epoch [TDB days since J2000]
+    # Orbit reference epoch [days since J2000 TDB, julian days TDB]
     t0 = epoch(orbit)
+    jd0 = t0 + PE.J2000
     # Jet transport initial condition
-    q00 = initialcondition(orbit, Ndof, params)
+    q00 = initialcondition(orbit, jd0, Ndof, params)
     dq = jtperturbation(ones(T, Npar), variables(orbit), Ndof, 2, params)
     q0 = q00 + dq
     if t != t0
         offset = t > t0 ? fwdoffset : -bwdoffset
         nyears = (t - t0 + offset) / yr
-        prop = propagate(dynamicalmodel(orbit), q0, t0 + PE.J2000, nyears, params)
+        prop = propagate(dynamicalmodel(orbit), q0, jd0, nyears, params)
         q0 = prop(t)
     end
     q0 = equatorial2ecliptic(q0[1:6] - eph_su(t))
@@ -419,16 +437,17 @@ function equinoctial(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
     # Set jet transport variables
     Npar, Ndof = numvars(orbit), dof(orbit)
     set_od_order(T, 2, Npar)
-    # Orbit reference epoch [TDB days since J2000]
+    # Orbit reference epoch [days since J2000 TDB, julian days TDB]
     t0 = epoch(orbit)
+    jd0 = t0 + PE.J2000
     # Jet transport initial condition
-    q00 = initialcondition(orbit, Ndof, params)
+    q00 = initialcondition(orbit, jd0, Ndof, params)
     dq = jtperturbation(ones(T, Npar), variables(orbit), Ndof, 2, params)
     q0 = q00 + dq
     if t != t0
         offset = t > t0 ? fwdoffset : -bwdoffset
         nyears = (t - t0 + offset) / yr
-        prop = propagate(dynamicalmodel(orbit), q0, t0 + PE.J2000, nyears, params)
+        prop = propagate(dynamicalmodel(orbit), q0, jd0, nyears, params)
         q0 = prop(t)
     end
     q0 = equatorial2ecliptic(q0[1:6] - params.eph_su(t))
@@ -460,16 +479,17 @@ function attributable(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
     # Set jet transport variables
     Npar, Ndof = numvars(orbit), dof(orbit)
     set_od_order(T, 2, Npar)
-    # Orbit reference epoch [TDB days since J2000]
+    # Orbit reference epoch [days since J2000 TDB, julian days TDB]
     t0 = epoch(orbit)
+    jd0 = t0 + PE.J2000
     # Jet transport initial condition
-    q00 = initialcondition(orbit, Ndof, params)
+    q00 = initialcondition(orbit, jd0, Ndof, params)
     dq = jtperturbation(ones(T, Npar), variables(orbit), Ndof, 2, params)
     q0 = q00 + dq
     if t != t0
         offset = t > t0 ? fwdoffset : -bwdoffset
         nyears = (t - t0 + offset) / yr
-        prop = propagate(dynamicalmodel(orbit), q0, t0 + PE.J2000, nyears, params)
+        prop = propagate(dynamicalmodel(orbit), q0, jd0, nyears, params)
         q0 = prop(t)
     end
     q0 = q0[1:6] - eph_ea(t)
