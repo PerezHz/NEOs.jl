@@ -47,7 +47,8 @@ function JTLSBuffer(od::AbstractODProblem{D, T}, orbit::AbstractOrbit,
     # Jet transport initial condition
     Ndof = dof(od)
     Npar = numvars(Val(od.dynamics), params)
-    q0 = jtinitialcondition(od, orbit, params)
+    jd0 = epoch(orbit) + PE.J2000
+    q0 = jtinitialcondition(od, orbit, jd0, params)
     # Memory allocation
     res = init_residuals(TaylorN{T}, od, orbit)
     O, R = Vector{opticaltype(od)}, Vector{radartype(od)}
@@ -56,7 +57,7 @@ function JTLSBuffer(od::AbstractODProblem{D, T}, orbit::AbstractOrbit,
     Qs = Vector{T}(undef, jtlsiter + 1)
     q00s = Matrix{T}(undef, Ndof, jtlsiter+1)
     outs = outrej ? Vector{Int}(undef, jtlsiter) : nothing
-    prbuffer = PropresBuffer(od, q0, epoch(orbit) + PE.J2000, params)
+    prbuffer = PropresBuffer(od, q0, jd0, params)
     lscache = LeastSquaresCache(zeros(T, Npar), 1:Npar, lsiter)
     orcache = OutlierRejectionCache(T, noptical(od))
     return JTLSBuffer{D, T, typeof(res), typeof(orbits)}(res, orbits, Qs, q00s, outs,
@@ -317,10 +318,10 @@ function jtls(
             fudge, max_per = params
     @unpack orbits, res, Qs, q00s, outs, prbuffer, lscache, orcache = buffer
     # Reference epoch [Julian days TDB]
-    jd0 = epoch(orbit) + PE.J2000
+    jd0 = meanepoch(od) + PE.J2000
     # Jet transport initial condition
     variables = fittedvariables(Ndof, params)
-    q0 = jtinitialcondition(od, orbit, params)
+    q0 = jtinitialcondition(od, orbit, jd0, params)
     # Least squares methods
     x0 = zeros(T, Npar)
     lsmethods = _lsmethods(res, x0, 1:Npar)
@@ -391,10 +392,10 @@ function jtls(
             fudge, max_per = params
     @unpack orbits, res, Qs, q00s, outs, prbuffer, lscache, orcache = buffer
     # Reference epoch [Julian days TDB]
-    jd0 = epoch(orbit) + PE.J2000
+    jd0 = meanepoch(od) + PE.J2000
     # Jet transport initial condition
     variables = fittedvariables(Ndof, params)
-    q0 = jtinitialcondition(od, orbit, params)
+    q0 = jtinitialcondition(od, orbit, jd0, params)
     # Least squares methods
     x0 = zeros(T, Npar)
     lsmethods = _lsmethods(res, x0, 1:Npar)

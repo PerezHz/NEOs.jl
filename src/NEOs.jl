@@ -3,6 +3,7 @@ module NEOs
 # __precompile__(false)
 import Base: RefValue, isless, show, string, getindex, in, zero,
        iszero, isnan, summary, firstindex, lastindex, first, last, wait, isdeprecated
+import Dates: datetime2julian
 import LinearAlgebra: issuccess
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, longascnode,
@@ -97,8 +98,8 @@ export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
 export variables, designation, epoch, firsttime, lasttime, noptical, nradar, minmaxdates,
        optical, sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
-       absolutemagnitude, diameter, mass, shiftepoch, earthmoid, print_mpec_residuals,
-       print_mpec_elements, print_mpec_ephemeris, print_mpec
+       absolutemagnitude, diameter, mass, shiftepoch, meandate, meanepoch, earthmoid,
+       print_mpec_residuals, print_mpec_elements, print_mpec_ephemeris, print_mpec
 export topo2bary, bary2topo, attr2bary, tsaiod, mmov
 export gaussmetric, gausstriplets, gaussmethod, gaussiod
 export jtls, issinglearc, initialorbitdetermination, orbitdetermination, linkage

@@ -128,7 +128,7 @@ Earth-Centered Earth-Fixed (ECEF) reference frame.
     (default: `EOP_IAU2000A`).
 """
 obsposECEF(x::AbstractAstrometryObservation; eop::EOPIAU = EOP_IAU2000A) =
-    obsposECEF(observatory(x), datetime2julian(date(x)); eop)
+    obsposECEF(observatory(x), datetime2julian(x); eop)
 
 obsposECEF(obs::ObservatoryMPC, jd_utc::Number; eop::EOPIAU = EOP_IAU2000A) =
     obsposECEF(Val(Symbol(obs.frame)), obs.coords, jd_utc; eop)
@@ -227,7 +227,7 @@ the `SatelliteToolboxTransformations.EopIau1980` type and passing it to the
 `eop` keyword argument in the function call.
 """
 obsposvelECI(x::AbstractAstrometryObservation; eop::EOPIAU = EOP_IAU2000A) =
-    obsposvelECI(observatory(x), datetime2julian(date(x)); eop)
+    obsposvelECI(observatory(x), datetime2julian(x); eop)
 
 obsposvelECI(obs::ObservatoryMPC, jd_utc::Number; eop::EOPIAU = EOP_IAU2000A) =
     obsposvelECI(Val(Symbol(obs.frame)), obs.coords, jd_utc; eop)

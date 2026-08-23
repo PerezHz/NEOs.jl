@@ -61,8 +61,9 @@ numtype(::AbstractAstrometryObservation{T}) where {T} = T
 # Order in AbstractAstrometryObservation is given by date
 isless(a::AbstractAstrometryObservation, b::AbstractAstrometryObservation) = date(a) < date(b)
 
-dtutc2days(x::AbstractAstrometryObservation) = dtutc2days(date(x))
 dtutc2et(x::AbstractAstrometryObservation) = dtutc2et(date(x))
+dtutc2days(x::AbstractAstrometryObservation) = dtutc2days(date(x))
+datetime2julian(x::AbstractAstrometryObservation) = datetime2julian(date(x))
 
 daysbetween(x::DateTime, y::DateTime) = (y - x).value / daymillisec
 daysbetween(x::DateTime, y::AbstractAstrometryObservation) = daysbetween(x, date(y))
