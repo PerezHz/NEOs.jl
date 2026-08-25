@@ -92,8 +92,10 @@ const A2_NONGRAV_SCALINGS = (1E-14, 0.0, 0.0)
 const COMETARY_NONGRAV_SCALINGS = (1E-8, 1E-8, 1E-8)
 const COMETARY_MARSDEN_RADIAL = (0.111262, 2.808, 2.15, 5.093, 4.6142)
 const JUPITER_SEMIMAJOR_AXIS_AU = 5.20336301
+const C3_AUDAY2_TO_KMSEC2 = (au / daysec)^2
 const MAX_RMS_REGRESSION_FACTOR = 1.5
 const MAX_RMS_REGRESSION_ARCSEC = 0.5
+const MAX_ACCEPTABLE_NRMS = 10.0
 const MOON_EPH = NEOs.selecteph(NEOs.sseph, NEOs.mo)
 
 function fetch_astrometry_format(format::AbstractString)
@@ -348,10 +350,13 @@ function singleapparition(apps::AbstractApparitionVector, params::Parameters)
 end
 
 function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
-                params::Parameters)
+                params::Parameters;
+                max_rms_jump_factor::Real = MAX_RMS_REGRESSION_FACTOR,
+                max_rms_jump_arcsec::Real = MAX_RMS_REGRESSION_ARCSEC)
     # Bridge between single and multiple apparitions
     OD = ODProblem(gravityonly!, NEOs.optical(apps), weights = Veres17, debias = Eggl20)
     _, _, res = propres(OD, orbitSA(), epoch(orbitSA) + PE.J2000, params)
+    length(res) == length(OD.optical) || return orbitSA
     mags = Vector{Float64}(undef, length(apps))
     for (i, app) in enumerate(apps)
         if issubset(NEOs.optical(app), orbitSA.optical)
@@ -370,10 +375,26 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
                    debias = Eggl20)
     orbitMID = linkage(od, orbitSA, params)
     iszero(orbitMID) && return orbitSA
+    if isrmsregression(orbitSA, orbitMID; max_factor = max_rms_jump_factor,
+                       max_arcsec = max_rms_jump_arcsec)
+        printrmsregression("Initial apparition linkage", orbitSA, orbitMID)
+        return orbitSA
+    elseif isfitloss(orbitSA, orbitMID)
+        printfitloss("Initial apparition linkage", orbitSA, orbitMID)
+        return orbitSA
+    end
     # Step #2: JTLS with gravityonly!
     NEOs.update!(OD, od.optical)
     orbitMA = jtls(OD, orbitMID, params)
     iszero(orbitMA) && return orbitMID
+    if isrmsregression(orbitMID, orbitMA; max_factor = max_rms_jump_factor,
+                       max_arcsec = max_rms_jump_arcsec)
+        printrmsregression("Initial gravity-only refinement", orbitMID, orbitMA)
+        return orbitMID
+    elseif isfitloss(orbitMID, orbitMA)
+        printfitloss("Initial gravity-only refinement", orbitMID, orbitMA)
+        return orbitMID
+    end
     # Step #3: Outlier rejection
     params = Parameters(params; outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10),
                         fudge = 100.0, max_per = 33.3)
@@ -400,11 +421,14 @@ function multipleapparition(apps::AbstractApparitionVector, orbitMA::MultipleApp
     permute!(mags, perm)
     permute!(apps, perm)
     accepted = [apps[i] for i in eachindex(apps) if iszero(mags[i])]
+    # Keep accepted inliers stable while growing the arc; final refinement
+    # performs global outlier rejection after all linkable apparitions are present.
+    linkage_params = Parameters(params; outrej = false)
     for i in eachindex(mags)
         iszero(mags[i]) && continue
         trial_apps = push!(copy(accepted), apps[i])
         NEOs.update!(OD, NEOs.optical(trial_apps))
-        orbit = linkage(OD, orbitMA, params)
+        orbit = linkage(OD, orbitMA, linkage_params)
         iszero(orbit) && continue
         if isrmsregression(orbitMA, orbit; max_factor = max_rms_jump_factor,
                            max_arcsec = max_rms_jump_arcsec)
@@ -452,6 +476,10 @@ function finalrefinement(dynamics, orbit::LeastSquaresOrbit,
        (noptical(orbitFR) > noptical(candidate) ||
         (noptical(orbitFR) == noptical(candidate) && nrms(orbitFR) < nrms(candidate)))
         candidate = orbitFR
+    end
+    if !isfinite(nrms(candidate)) || nrms(candidate) >= MAX_ACCEPTABLE_NRMS
+        println("• $label final refinement failed fit-quality check; keeping previous orbit")
+        return orbit
     end
     if isrmsregression(orbit, candidate; max_factor = max_rms_jump_factor,
                        max_arcsec = max_rms_jump_arcsec) &&
@@ -1197,7 +1225,7 @@ function ele220argumentlist(name::AbstractString, orbit::LeastSquaresOrbit, kep,
         dtutc2jdtdb(tbegin),
         dtutc2jdtdb(tend),
         epoch(kep) + 2_400_000.5,
-        uncertaintyparameter(orbit, params),
+        ishyperbolic(kep) ? 9 : uncertaintyparameter(orbit, params),
     ]
     return join(pyele220arg.(args), ", ")
 end
@@ -1272,6 +1300,59 @@ function tisserandjupitersigma(kep; a_jupiter::Real = JUPITER_SEMIMAJOR_AXIS_AU)
     return propagatedsigma(kep, gradient)
 end
 
+function heliocentricc3(kep)
+    return -gm(kep) / semimajoraxis(kep)
+end
+
+function heliocentricc3sigma(kep)
+    μ, a = gm(kep), semimajoraxis(kep)
+    gradient = zeros(length(elements(kep)))
+    if iselliptic(kep)
+        gradient[1] = μ / a^2
+    else
+        q, e = pericenter(kep), eccentricity(kep)
+        gradient[1] = -μ * (e - 1) / q^2
+        gradient[2] = μ / q
+    end
+    return propagatedsigma(kep, gradient)
+end
+
+function geocentricc3(attr)
+    _, δdeg, vαdeg, vδdeg, ρ, vρ = elements(attr)
+    δ = deg2rad(δdeg)
+    vα, vδ = deg2rad(vαdeg), deg2rad(vδdeg)
+    η2 = vα^2 * cos(δ)^2 + vδ^2
+    return vρ^2 + ρ^2 * η2 - 2 * gm(attr) / ρ
+end
+
+function geocentricc3sigma(attr)
+    _, δdeg, vαdeg, vδdeg, ρ, vρ = elements(attr)
+    δ = deg2rad(δdeg)
+    vα, vδ = deg2rad(vαdeg), deg2rad(vδdeg)
+    η2 = vα^2 * cos(δ)^2 + vδ^2
+    gradient = zeros(length(elements(attr)))
+    gradient[2] = -2 * ρ^2 * vα^2 * cos(δ) * sin(δ) * (pi / 180)
+    gradient[3] = 2 * ρ^2 * vα * cos(δ)^2 * (pi / 180)
+    gradient[4] = 2 * ρ^2 * vδ * (pi / 180)
+    gradient[5] = 2 * ρ * η2 + 2 * gm(attr) / ρ^2
+    gradient[6] = 2 * vρ
+    return propagatedsigma(attr, gradient)
+end
+
+function c3classification(c3::Real, σ::Real)
+    isfinite(c3) && isfinite(σ) && σ >= 0 || return "classification unavailable"
+    c3 + σ < 0 && return "two-body bound at >1σ"
+    c3 - σ > 0 && return "two-body unbound at >1σ"
+    return "bound/unbound indeterminate at 1σ"
+end
+
+function printc3(label::AbstractString, c3::Real, σ::Real)
+    c3_km, σ_km = C3_AUDAY2_TO_KMSEC2 .* (c3, σ)
+    println(rpad(label, 10), "= ", @sprintf("%+.8E", c3_km), " +/- ",
+            @sprintf("%.8E", σ_km), " km²/s² (", c3classification(c3, σ), ")")
+    return nothing
+end
+
 keplerianelementnames(kep) =
     iselliptic(kep) ? ["a", "e", "i", "ω", "Ω", "M"] :
                       ["q", "e", "i", "ω", "Ω", "tp"]
@@ -1325,9 +1406,14 @@ function orbitapptype(::Val{1}, apps::AbstractApparitionVector, params::Paramete
 end
 
 function preferorbit(candidate::LeastSquaresOrbit, best::Union{Nothing, LeastSquaresOrbit})
-    isnothing(best) && return candidate
-    if noptical(candidate) != noptical(best)
-        return noptical(candidate) > noptical(best) ? candidate : best
+    candidate_nrms = NEOs.nrms(candidate)
+    isfinite(candidate_nrms) && candidate_nrms < MAX_ACCEPTABLE_NRMS || return best
+    if isnothing(best) || !isfinite(NEOs.nrms(best)) || NEOs.nrms(best) >= MAX_ACCEPTABLE_NRMS
+        return candidate
+    end
+    candidate_nfit, best_nfit = nfitoptical(candidate), nfitoptical(best)
+    if candidate_nfit != best_nfit
+        return candidate_nfit > best_nfit ? candidate : best
     end
     return NEOs.opticalrms(candidate) < NEOs.opticalrms(best) ? candidate : best
 end
@@ -1340,7 +1426,8 @@ function orbitapptype(::Val{2}, apps::AbstractApparitionVector, params::Paramete
     isempty(seeds) && return zero(SingleApparitionOrbit{typeof(optical)})
     best = nothing
     for orbitSA in seeds
-        candidate = bridge(copy(apps), orbitSA, params)
+        candidate = bridge(copy(apps), orbitSA, params;
+                           max_rms_jump_factor, max_rms_jump_arcsec)
         iszero(candidate) && continue
         best = preferorbit(candidate, best)
     end
@@ -1356,7 +1443,8 @@ function orbitapptype(::Val{3}, apps::AbstractApparitionVector, params::Paramete
     best = nothing
     for orbitSA in seeds
         trialapps = copy(apps)
-        orbitMA = bridge(trialapps, orbitSA, params)
+        orbitMA = bridge(trialapps, orbitSA, params;
+                         max_rms_jump_factor, max_rms_jump_arcsec)
         iszero(orbitMA) && continue
         candidate = orbitMA isa MultipleApparitionOrbit ?
                     multipleapparition(trialapps, orbitMA, params;
@@ -1364,6 +1452,11 @@ function orbitapptype(::Val{3}, apps::AbstractApparitionVector, params::Paramete
                     orbitMA
         iszero(candidate) && continue
         best = preferorbit(candidate, best)
+        if noptical(candidate) == noptical(apps) &&
+           critical_value(candidate) < params.significance &&
+           all(!isnan, sigmas(candidate))
+            return candidate
+        end
     end
     return isnothing(best) ? first(seeds) : best
 end
@@ -1499,6 +1592,9 @@ function main()
     apps = apparitions(fit_optical, Day(split_gap_days))
     # Compute orbit by apparition type (single/multiple apparition)
     orbit = orbitapptype(apps, params; max_rms_jump_factor, max_rms_jump_arcsec)
+    iszero(orbit) && error(
+        "Unable to determine a preliminary orbit from the fitted observations"
+    )
     orbit = finalrefinement(final_dynamics, orbit, fit_optical, params;
                             marsden_scalings = nongrav_scalings,
                             force_all_fit, max_rms_jump_factor, max_rms_jump_arcsec)
@@ -1514,6 +1610,7 @@ function main()
     # Compute elements and H before attaching held-out observations because H currently
     # uses every optical observation and does not inspect residual outlier flags.
     kep = keplerian(orbit, params)
+    attr = attributable(orbit, params)
     H, dH = absolutemagnitude(orbit, params)
     full_residuals_attached = false
     auto_excluded = missingopticalindices(orbit, optical)
@@ -1543,6 +1640,8 @@ function main()
             @sprintf("%.12E", timeperipasssigma(kep)), " MJD TDB")
     println("Tj = ", @sprintf("%.8f", tisserandjupiter(kep)), " +/- ",
             @sprintf("%.8f", tisserandjupitersigma(kep)))
+    printc3("C3(Sun)", heliocentricc3(kep), heliocentricc3sigma(kep))
+    printc3("C3(Earth)", geocentricc3(attr), geocentricc3sigma(attr))
     println("H  = ", @sprintf("%.3f", H), " +/- ", @sprintf("%.3f", dH), " mag")
     println("")
     printkepleriansnrs(kep)
