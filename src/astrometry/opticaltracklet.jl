@@ -15,8 +15,8 @@ same observatory on the same time of day.
 - `vdec::T`: mean declination velocity [rad/day].
 - `mag::T`: mean apparent magnitude.
 - `nobs::Int`: number of observations.
-- `idxs::Vector{Int}`: indices of the original optical astrometry
-    vector which are included in the tracklet.
+- `indices::Vector{Int}`: indices of the original optical
+    astrometry vector which are included in the tracklet.
 """
 @auto_hash_equals fields = (date, ra, dec, observatory) struct OpticalTracklet{T} <: AbstractOpticalAstrometry{T}
     observatory::ObservatoryMPC{T}
@@ -65,14 +65,29 @@ function numberofdays(trks::AbstractVector{OpticalTracklet{<:Real}})
         dates[i] = extrema(date, view(trks[i].optical, trks[i].indices))
     end
     t0, tf = minimum(first, dates), maximum(last, dates)
-    return (tf - t0).value / 86_400_000
+    return (tf - t0).value / daymillisec
 end
 =#
 
-# Print method for OpticalTracklet
-function show(io::IO, x::OpticalTracklet)
-    print(io, nobs(x), " observation tracklet around ", date(x),
-          " at ", observatory(x).name)
+# Print methods for OpticalTracklet
+show(io::IO, x::OpticalTracklet) = print(io, "Tracklet with ", nobs(x),
+    " observation(s) around ", date(x), " at ", observatory(x).name)
+
+function show(io::IO, ::MIME"text/plain", x::OpticalTracklet)
+    t = repeat(' ', 4)
+    print(io,
+        nobs(x), "-observation Tracklet{", numtype(x), "}\n",
+        t, rpad("Observatory: ", 21),  observatory(x).name, '\n',
+        t, rpad("Date: ", 21),         date(x), '\n',
+        t, rpad("Attributable: ", 21), "[",
+            @sprintf("%.5f", rad2deg(ra(x))),   ", ",
+            @sprintf("%.5f", rad2deg(dec(x))),  ", ",
+            @sprintf("%.5f", rad2deg(vra(x))),  ", ",
+            @sprintf("%.5f", rad2deg(vdec(x))), ", ",
+            @sprintf("%.2f", mag(x)),
+        "]",
+    )
+    return nothing
 end
 
 # Return the milliseconds between two dates
@@ -83,31 +98,47 @@ datediff(a::OpticalTracklet, b::OpticalTracklet) = datediff(date(a), date(b))
 closest_tracklet(t::Real, y::AbstractTrackletVector) =
     findmin(@. abs(t - dtutc2days(date(y))))[2]
 
-# Evaluate a polynomial with coefficients p in every element of x
-polymodel(x, p) = map(y -> evalpoly(y, p), x)
-
 # Normalized mean square residual for polynomial fit
-polyerror(x) = sum(x .^ 2) / length(x)
+function polynms(x::AbstractVector{T}, y::AbstractVector{T},
+                 coeffs::AbstractVector{T}) where {T <: Real}
+    χ = zero(T)
+    @inbounds for i in eachindex(x, y)
+        χ += abs2(y[i] - evalpoly(x[i], coeffs))
+    end
+    return χ / length(x)
+end
 
 # Fit a polynomial to points `(x, y)`. The order of the polynomial is increased
-# until `polyerror` is less than `tol`
+# until `polynms` is less than `tol`
 function polyfit(x::AbstractVector{T}, y::AbstractVector{T};
-                 tol::T = 1e-4) where {T <: Real}
+                 tol::T = 1E-4) where {T <: Real}
+    # x and y must be the same length and non-empty
+    @assert length(x) == length(y) > 0
+    # Vandermonde matrix
+    V = Matrix{T}(undef, length(x), 7)
+    for j in axes(V, 2)
+        flag = isone(j)
+        for i in axes(V, 1)
+            if flag
+                V[i, j] = one(T)
+            else
+                V[i, j] = V[i, j-1] * x[i]
+            end
+        end
+    end
     # Avoid odd and high orders (to have a defined concavity and avoid overfit)
-    for order in [1, 2, 4, 6]
-        # Initial guess for coefficients
-        coeffs = ones(T, order+1)
-        # Polynomial fit
-        fit = curve_fit(polymodel, x, y, coeffs)
+    for order in (1, 2, 4, 6)
+        # Solve the linear least squares problem (V * coeffs = y) via QR factorization
+        coeffs = view(V, :, 1:order+1) \ y
         # Convergence condition
-        if polyerror(fit.resid) < tol || order == 6
-            return fit.param
+        if polynms(x, y, coeffs) < tol || order == 6
+            return coeffs
         end
     end
 end
 
 # Compute the mean of a vector, but skip NaNs
-skipnanmean(x::AbstractVector) = mean(filter(!isnan, x))
+skipnanmean(x::AbstractVector) = mean(Iterators.filter(!isnan, x))
 
 # Return the coefficients of the derivative of a polynomial with coefficients `x`
 function diffcoeffs(x::AbstractVector{T}) where {T <: Real}
@@ -137,18 +168,16 @@ function OpticalTracklet(x::NamedTuple)
     if !allunique(date)
         @warn "Two or or more observations have the same date"
     end
-    # Observation times [JDTDB]
-    jds = dtutc2jdtdb.(date)
-    # Observation times [Julian days since first observation]
+    # Observation times [Julian date UTC]
+    jds = datetime2julian.(date)
+    # Mean observation time [Julian days since first observation UTC]
     ts = jds .- jds[1]
-    # Mean observation date [Julian days since first observation]
     t_mean = mean(ts)
     # Mean observation date [UTC]
-    d_mean = jdtdb2dtutc(jds[1] + t_mean)
-    # Points in top quarter
-    N_top = count(x -> x > 3π/2, ra)
-    # Points in bottom quarter
-    N_bottom = count(x -> x < π/2, ra)
+    d_mean = julian2datetime(jds[1] + t_mean)
+    # Points in top/bottom quarter
+    N_top = count(>(3π/2), ra)
+    N_bottom = count(<(π/2), ra)
     # Discontinuity
     if !iszero(N_top) && !iszero(N_bottom)
         for (i, y) in enumerate(ra)
@@ -166,11 +195,11 @@ function OpticalTracklet(x::NamedTuple)
         h = mag[i]
     else
         i = 1
-        α, δ = mod2pi(polymodel(t_mean, ra_coef)), polymodel(t_mean, dec_coef)
+        α, δ = mod2pi(evalpoly(t_mean, ra_coef)), evalpoly(t_mean, dec_coef)
         h = skipnanmean(mag)
     end
-    v_α = polymodel(t_mean, diffcoeffs(ra_coef))
-    v_δ = polymodel(t_mean, diffcoeffs(dec_coef))
+    v_α = evalpoly(t_mean, diffcoeffs(ra_coef))
+    v_δ = evalpoly(t_mean, diffcoeffs(dec_coef))
 
     return OpticalTracklet(observatory[i], timeofday[i], d_mean, α, δ, v_α, v_δ,
                            h, nobs, collect(indices))

@@ -26,6 +26,7 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
               μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2) where {D,
               T <: Real, O <: AbstractOpticalVector{T}}
     # Unpack
+    Qtol, Mtol = params.lsQtol, params.lsMtol
     @unpack adamiter, adammode, adamQtol, mmovproject, significance = params
     @unpack dynamics = od
     variables = collect(1:6)
@@ -89,8 +90,8 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
         bwd, fwd = propres!(res, od, q, jd0 - ae[5]/c_au_per_day, params; buffer, idxs)
         isempty(res) && break
         # Least squares fit
-        fit = tryls(res, x0, lscache, lsmethods)
-        !fit.success && break
+        fit = tryls(res, x0, lscache, lsmethods; Qtol, Mtol)
+        !issuccess(fit) && break
         x1 .= fit.x
         # Current Q
         Q = nms(res)

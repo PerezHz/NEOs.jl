@@ -32,11 +32,16 @@ nongravitational accelerations model:
 
 # Gauss Method
 
-- `safegauss::Bool`: whether to try Gauss Method only when exactly three tracklets
-    are available (default: `true`).
+- `gaussorder::Int`: order of the jet transport perturbation (default: `2`).
+- `safegauss::Bool`: if true, use the tracklets to search for Gauss triplets;
+    otherwise, use the observations directly (default: `true`).
+- `gaussntrip::Int`: number of Gauss triplets to try (default: `1`).
+- `gaussτmin::T`: minimum desired total time span for `gaussmetric`
+    in days (default: `1`).
+- `gaussτmax::T`: maximum desired total time span for `gaussmetric`
+    in days (default: `30`).
 - `refscale::Symbol`: horizontal scale for ADAM refinement of Gauss preliminary
     orbit (default: `:log`).
-- `gaussorder::Int`: order of the jet transport perturbation (default: `6`).
 
 # Minimization over the MOV
 
@@ -52,7 +57,12 @@ nongravitational accelerations model:
 
 # Least Squares
 
-- `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `5`).
+- `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `10`).
+- `lsQtol::T`: target function absolute tolerance (default: `1E-3`).
+- `lsMtol::T`: Mahalanobis distance tolerance (default: `1E-3`).
+
+# Jet Transport Least Squares
+
 - `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
 - `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `6`).
 - `significance::T`: chi-square significance level (default: `0.99`).
@@ -94,9 +104,12 @@ nongravitational accelerations model:
     eph_su::DensePropagation2{T, T} = selecteph(sseph, su)
     eph_ea::DensePropagation2{T, T} = selecteph(sseph, ea)
     # Gauss' Method
+    gaussorder::Int = 2
     safegauss::Bool = true
+    gaussntrip::Int = 1
+    gaussτmin::T = 1.0
+    gaussτmax::T = 30.0
     refscale::Symbol = :log
-    gaussorder::Int = 6
     # Minimization over the MOV
     H_max::T = 34.5
     a_max::T = 100.0
@@ -106,7 +119,10 @@ nongravitational accelerations model:
     mmovproject::Bool = true
     tsaorder::Int = 6
     # Least Squares
-    lsiter::Int = 5
+    lsiter::Int = 10
+    lsQtol::T = 1E-3
+    lsMtol::T = 1E-3
+    # Jet Transport Least Squares
     jtlsiter::Int = 5
     jtlsorder::Int = 6
     significance::T = 0.99

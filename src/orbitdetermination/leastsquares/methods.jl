@@ -5,6 +5,8 @@ Supertype for the least squares interface.
 """
 abstract type AbstractLeastSquares{T <: Real} end
 
+numtype(::AbstractLeastSquares{T}) where {T} = T
+
 """
     AbstractLeastSquaresCache{T} <: AbstractLeastSquares{T}
 
@@ -50,14 +52,21 @@ Every least squares `method`:
 """
 abstract type AbstractLeastSquaresMethod{T} <: AbstractLeastSquares{T} end
 
+isrejected(::AbstractLeastSquaresMethod, Δx) = false
+
 """
-    leastsquares!(ls, cache)
+    leastsquares!(ls, cache; kwargs...)
 
 Minimize the target function in `ls` via least squares, using the
 containers in `cache` to save intermediate results.
+
+# Keyword arguments
+
+- `Qtol::Real`: target function absolute tolerance (default: `1E-3`).
+- `Mtol::Real`: Mahalanobis distance tolerance (default: `1E-3`).
 """
-function leastsquares!(ls::AbstractLeastSquaresMethod{T},
-                       cache::LeastSquaresCache{T}) where {T <: Real}
+function leastsquares!(ls::AbstractLeastSquaresMethod{T}, cache::LeastSquaresCache{T};
+                       Qtol::T = 1E-3, Mtol::T = 1E-3) where {T <: Real}
     # Allocate memory for least squares fit
     fit = LeastSquaresFit(T, typeof(ls))
     # Unfold
@@ -78,8 +87,14 @@ function leastsquares!(ls::AbstractLeastSquaresMethod{T},
         xs[idxs, i+1] .= xs[idxs, i] + Δx
         Qs[i+1] = evaluate(ls.Q, xs[:, i+1])
         Qs[i+1] < 0 && return fit
-        # TO DO: break if Q has not changed significantly in
-        # 3-5 iterations
+        # Convergence condition
+        if !isrejected(ls, Δx)
+            C = normalmatrix(ls, xs[:, i])
+            M = dot(Δx, C, Δx) / length(idxs)
+            if abs(Qs[i+1] - Qs[i]) < Qtol || (M > 0 && sqrt(M) < Mtol)
+                break
+            end
+        end
     end
     # Choose best iteration
     i = argmin(Qs)
@@ -87,12 +102,11 @@ function leastsquares!(ls::AbstractLeastSquaresMethod{T},
     C = normalmatrix(ls, xs[:, i])
     # Covariance matrix
     # TO DO: use pinv for badly conditioned normal matrices
-    Γ = inv(C)
-    # Update fit
-    if all(diag(Γ) .> 0)
+    luC = lu!(C; check = false)
+    if issuccess(luC)
+        Γ = inv!(luC)
         fit = LeastSquaresFit(true, xs[:, i], Γ, typeof(ls))
     end
-
     return fit
 end
 
@@ -107,30 +121,21 @@ subset of the parameters.
 # Keyword argument
 
 - `maxiter::Int`: maximum number of iterations (default: `25`).
+- `Qtol::Real`: target function absolute tolerance (default: `1E-3`).
+- `Mtol::Real`: Mahalanobis distance tolerance (default: `1E-3`).
 """
 function leastsquares(method::Type{<:AbstractLeastSquaresMethod{T}},
-                      res::AbstractResidualSet{T, TaylorN{T}},
-                      x0::Vector{T}, idxs::AbstractVector{Int} = eachindex(x0);
-                      maxiter::Int = 25) where {T <: Real}
+                      res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
+                      idxs::AbstractVector{Int} = eachindex(x0); maxiter::Int = 25,
+                      Qtol::T = 1E-3, Mtol::T = 1E-3) where {T <: Real}
     # Consistency checks
     @assert length(idxs) ≤ length(x0) == get_numvars()
     # Initialize least squares method and cache
     ls = method(res, x0, idxs)
     cache = LeastSquaresCache(x0, idxs, maxiter)
     # Main loop
-    fit = leastsquares!(ls, cache)
-
+    fit = leastsquares!(ls, cache; Qtol, Mtol)
     return fit
-end
-
-mutable struct Newton{T} <: AbstractLeastSquaresMethod{T}
-    nobs::Int
-    npar::Int
-    Q::TaylorN{T}
-    GQ::Vector{TaylorN{T}}
-    HQ::Matrix{TaylorN{T}}
-    dQ::Vector{T}
-    d2Q::Matrix{T}
 end
 
 """
@@ -146,6 +151,19 @@ See also [`leastsquares`](@ref).
     See sections 5.2 and 5.3 of:
     - https://doi.org/10.1017/CBO9781139175371
 """
+mutable struct Newton{T} <: AbstractLeastSquaresMethod{T}
+    nobs::Int
+    npar::Int
+    Q::TaylorN{T}
+    GQ::Vector{TaylorN{T}}
+    HQ::Matrix{TaylorN{T}}
+    dQ::Vector{T}
+    d2Q::Matrix{T}
+end
+
+getid(::Newton) = "Newton"
+targetfunction(x::Newton) = x.Q
+
 function Newton(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
                 idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
     # Number of observations and degrees of freedom
@@ -167,29 +185,29 @@ function Newton(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
     return Newton{T}(nobs, npar, Q, GQ, HQ, dQ, d2Q)
 end
 
-getid(::Newton) = "Newton"
-
-function lsstep(ls::Newton{T}, x::Vector{T}) where {T <: Real}
+function lsstep(ls::Newton, x::AbstractVector)
+    # Unpack
+    @unpack GQ, dQ, HQ, d2Q, nobs, npar = ls
     # Evaluate gradient and hessian
-    evaluate!(ls.GQ, x, ls.dQ)
-    evaluate!(ls.HQ, x, ls.d2Q)
+    evaluate!(GQ, x, dQ)
+    evaluate!(HQ, x, d2Q)
     # Invert hessian
-    lud2Q = lu!(ls.d2Q; check = false)
-    !issuccess(lud2Q) && return Vector{T}(undef, 0), false
+    lud2Q = lu!(d2Q; check = false)
+    !issuccess(lud2Q) && return empty(x), false
     invd2Q = inv!(lud2Q)
     # Newton update rule
-    Δx = -invd2Q * ls.dQ
+    Δx = -invd2Q * dQ
     # Normal matrix
-    C = (ls.nobs/2) * ls.d2Q
-    # Error metric
-    error = (Δx') * C * Δx / ls.npar
-
-    return Δx, error > 0
+    C = (nobs/2) * d2Q
+    # Squared Mahalanobis distance
+    M = dot(Δx, C, Δx) / npar
+    return Δx, M > 0
 end
 
-function normalmatrix(ls::Newton{T}, x::Vector{T}) where {T <: Real}
-    evaluate!(ls.HQ, x, ls.d2Q)
-    return (ls.nobs / 2) * ls.d2Q
+function normalmatrix(ls::Newton, x::AbstractVector)
+    @unpack HQ, d2Q, nobs = ls
+    evaluate!(HQ, x, d2Q)
+    return (nobs / 2) * d2Q
 end
 
 function update!(ls::Newton{T}, res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
@@ -214,16 +232,6 @@ function update!(ls::Newton{T}, res::AbstractResidualSet{T, TaylorN{T}}, x0::Vec
     return nothing
 end
 
-mutable struct DifferentialCorrections{T} <: AbstractLeastSquaresMethod{T}
-    nobs::Int
-    npar::Int
-    Q::TaylorN{T}
-    D::Vector{TaylorN{T}}
-    C::Matrix{TaylorN{T}}
-    Dx::Vector{T}
-    Cx::Matrix{T}
-end
-
 """
     DifferentialCorrections(res, x0 [, idxs])
 
@@ -237,6 +245,19 @@ See also [`leastsquares`](@ref).
     See sections 5.2 and 5.3 of:
     - https://doi.org/10.1017/CBO9781139175371
 """
+mutable struct DifferentialCorrections{T} <: AbstractLeastSquaresMethod{T}
+    nobs::Int
+    npar::Int
+    Q::TaylorN{T}
+    D::Vector{TaylorN{T}}
+    C::Matrix{TaylorN{T}}
+    Dx::Vector{T}
+    Cx::Matrix{T}
+end
+
+getid(::DifferentialCorrections) = "Differential Corrections"
+targetfunction(x::DifferentialCorrections) = x.Q
+
 function DifferentialCorrections(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
                                  idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
     # Number of observations and degrees of freedom
@@ -254,27 +275,27 @@ function DifferentialCorrections(res::AbstractResidualSet{T, TaylorN{T}}, x0::Ve
     return DifferentialCorrections{T}(nobs, npar, Q, D, C, Dx, Cx)
 end
 
-getid(::DifferentialCorrections) = "Differential Corrections"
-
-function lsstep(ls::DifferentialCorrections{T}, x::Vector{T}) where {T <: Real}
+function lsstep(ls::DifferentialCorrections, x::AbstractVector)
+    # Unpack
+    @unpack D, Dx, C, Cx, npar = ls
     # Evaluate D and C matrices
-    evaluate!(ls.D, x, ls.Dx)
-    evaluate!(ls.C, x, ls.Cx)
+    evaluate!(D, x, Dx)
+    evaluate!(C, x, Cx)
     # Invert C matrix
-    luCx = lu!(ls.Cx; check = false)
-    !issuccess(luCx) && return Vector{T}(undef, 0), false
+    luCx = lu!(Cx; check = false)
+    !issuccess(luCx) && return empty(x), false
     invCx = inv!(luCx)
     # Differential corrections update rule
-    Δx = -invCx * ls.Dx
-    # Error metric
-    error = (Δx') * ls.Cx * Δx / ls.npar
-
-    return Δx, error > 0
+    Δx = -invCx * Dx
+    # Squared Mahalanobis distance
+    M = dot(Δx, Cx, Δx) / npar
+    return Δx, M > 0
 end
 
-function normalmatrix(ls::DifferentialCorrections{T}, x::Vector{T}) where {T <: Real}
-    evaluate!(ls.C, x, ls.Cx)
-    return ls.Cx
+function normalmatrix(ls::DifferentialCorrections, x::AbstractVector)
+    @unpack C, Cx = ls
+    evaluate!(C, x, Cx)
+    return Cx
 end
 
 function update!(ls::DifferentialCorrections{T}, res::AbstractResidualSet{T, TaylorN{T}},
@@ -355,18 +376,6 @@ function ξTH(res::AbstractResidualSet{T, TaylorN{T}}, V::AbstractVector{TaylorN
     return ξTHv, H
 end
 
-mutable struct LevenbergMarquardt{T} <: AbstractLeastSquaresMethod{T}
-    nobs::Int
-    npar::Int
-    idxs::Vector{Int}
-    λ::T
-    Q::TaylorN{T}
-    GQ::Vector{TaylorN{T}}
-    HQ::Matrix{TaylorN{T}}
-    dQ::Vector{T}
-    d2Q::Matrix{T}
-end
-
 """
     LevenbergMarquardt(res, x0 [, idxs])
 
@@ -381,6 +390,22 @@ See also [`leastsquares`](@ref).
     See section 15.5.2 of:
     - https://numerical.recipes
 """
+mutable struct LevenbergMarquardt{T} <: AbstractLeastSquaresMethod{T}
+    nobs::Int
+    npar::Int
+    idxs::Vector{Int}
+    λ::T
+    Q::TaylorN{T}
+    GQ::Vector{TaylorN{T}}
+    HQ::Matrix{TaylorN{T}}
+    dQ::Vector{T}
+    d2Q::Matrix{T}
+end
+
+getid(::LevenbergMarquardt) = "Levenberg-Marquardt"
+targetfunction(x::LevenbergMarquardt) = x.Q
+isrejected(::LevenbergMarquardt, Δx) = iszero(Δx)
+
 function LevenbergMarquardt(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
                             idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
     # Number of observations and degrees of freedom
@@ -404,41 +429,38 @@ function LevenbergMarquardt(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{
     return LevenbergMarquardt{T}(nobs, npar, idxs, λ, Q, GQ, HQ, dQ, d2Q)
 end
 
-getid(::LevenbergMarquardt) = "Levenberg-Marquardt"
-
-function lsstep(ls::LevenbergMarquardt{T}, x::Vector{T}) where {T <: Real}
+function lsstep(ls::LevenbergMarquardt, x::AbstractVector)
+    # Unpack
+    @unpack GQ, dQ, HQ, d2Q, λ, idxs, Q = ls
     # Evaluate gradient and hessian
-    evaluate!(ls.GQ, x, ls.dQ)
-    evaluate!(ls.HQ, x, ls.d2Q)
+    evaluate!(GQ, x, dQ)
+    evaluate!(HQ, x, d2Q)
     # Modified Hessian
-    for i in axes(ls.d2Q, 1)
-        ls.d2Q[i, i] *= (1 + ls.λ)
+    for i in axes(d2Q, 1)
+        d2Q[i, i] +=  λ * abs(d2Q[i, i])
     end
     # Invert hessian
-    lud2Q = lu!(ls.d2Q; check = false)
-    !issuccess(lud2Q) && return Vector{T}(undef, 0), false
+    lud2Q = lu!(d2Q; check = false)
+    !issuccess(lud2Q) && return empty(x), false
     invd2Q = inv!(lud2Q)
     # Levenberg-Marquardt update rule
-    Δx = -invd2Q * ls.dQ
-    _x_ = deepcopy(x)
-    _x_[ls.idxs] .+= Δx
+    Δx = -invd2Q * dQ
+    y = deepcopy(x)
+    y[idxs] .+= Δx
     # Update λ
-    if 0 < ls.Q(_x_) < ls.Q(x)
+    if 0 < Q(y) < Q(x)
         ls.λ /= 10
     else
         ls.λ *= 10
-        Δx .= zero(T)
+        Δx .= zero(eltype(x))
     end
-
     return Δx, true
 end
 
-function normalmatrix(ls::LevenbergMarquardt{T}, x::Vector{T}) where {T <: Real}
-    evaluate!(ls.HQ, x, ls.d2Q)
-    for i in axes(ls.d2Q, 1)
-        ls.d2Q[i, i] *= (1 + ls.λ)
-    end
-    return (ls.nobs / 2) * ls.d2Q
+function normalmatrix(ls::LevenbergMarquardt, x::AbstractVector)
+    @unpack HQ, d2Q, nobs = ls
+    evaluate!(HQ, x, d2Q)
+    return (nobs / 2) * d2Q
 end
 
 function update!(ls::LevenbergMarquardt{T}, res::AbstractResidualSet{T, TaylorN{T}},
@@ -465,10 +487,37 @@ function update!(ls::LevenbergMarquardt{T}, res::AbstractResidualSet{T, TaylorN{
     return nothing
 end
 
-function _lsmethods(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
-                    idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
-    return [Newton(res, x0, idxs), DifferentialCorrections(res, x0, idxs),
-            LevenbergMarquardt(res, x0, idxs)]
+# Default methods for tryls
+function _lsmethods(
+        res::AbstractResidualSet{T, TaylorN{T}}, x0::AbstractVector{T},
+        idxs::AbstractVector{Int} = eachindex(x0)
+    ) where {T <: Real}
+    return (
+        Newton(res, x0, idxs),
+        DifferentialCorrections(res, x0, idxs),
+        LevenbergMarquardt(res, x0, idxs)
+    )
+end
+
+# Base case: we ran out of methods
+_tryls(fit, res, x0, cache, methods::Tuple{}; kwargs...) = fit
+
+# Recursive step
+function _tryls(fit, res, x0, cache, methods::Tuple; kwargs...)
+    method = first(methods)
+    update!(method, res, x0, cache.idxs)
+    newfit = leastsquares!(method, cache; kwargs...)
+    if issuccess(newfit) && 0 < targetfunction(method, newfit) < targetfunction(method, fit)
+        fit = newfit
+    end
+    return _tryls(fit, res, x0, cache, Base.tail(methods); kwargs...)
+end
+
+# Main entry point
+function tryls(res::AbstractResidualSet, x0::AbstractVector,
+               cache::LeastSquaresCache, methods::Tuple; kwargs...)
+    fit = zero(LeastSquaresFit{eltype(x0)})
+    return _tryls(fit, res, x0, cache, methods; kwargs...)
 end
 
 """
@@ -485,27 +534,15 @@ See also [`LeastSquaresCache`](@ref), [`AbstractLeastSquaresMethod`](@ref),
 # Keyword Argument
 
 - `maxiter::Int`: maximum number of iterations (default: `25`).
+- `Qtol::Real`: target function absolute tolerance (default: `1E-3`).
+- `Mtol::Real`: Mahalanobis distance tolerance (default: `1E-3`).
 """
-function tryls(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
-               idxs::AbstractVector{Int} = eachindex(x0);
-               maxiter::Int = 25) where {T <: Real}
+function tryls(
+        res::AbstractResidualSet{T, TaylorN{T}}, x0::AbstractVector{T},
+        idxs::AbstractVector{Int} = eachindex(x0); maxiter::Int = 25,
+        Qtol::T = 1E-3, Mtol::T = 1E-3
+    ) where {T <: Real}
     cache = LeastSquaresCache(x0, idxs, maxiter)
     methods = _lsmethods(res, x0, idxs)
-    return tryls(res, x0, cache, methods)
-end
-
-function tryls(res::AbstractResidualSet{T, TaylorN{T}},
-               x0::Vector{T},
-               cache::LeastSquaresCache{T},
-               methods::Vector{AbstractLeastSquaresMethod{T}}) where {T <: Real}
-    # Allocate memory
-    fit = zero(LeastSquaresFit{T})
-    # Least squares methods in order
-    for i in eachindex(methods)
-        update!(methods[i], res, x0, cache.idxs)
-        fit = leastsquares!(methods[i], cache)
-        fit.success && break
-    end
-
-    return fit
+    return tryls(res, x0, cache, methods; Qtol, Mtol)
 end

@@ -350,7 +350,7 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
     prop = propagate(dynamics, q0, epoch(orbit) + PE.J2000, nyears, params)
     x0 = zeros(T, Npar)
     Γ = project(prop(tnew)[variables], x0, covariance(orbit))
-    fit = LeastSquaresFit{T}(orbit.fit.success, x0, Γ, orbit.fit.routine)
+    fit = LeastSquaresFit{T}(issuccess(orbit.fit), x0, Γ, orbit.fit.routine)
 
     return LeastSquaresOrbit(
         dynamics, variables, optical, tracklets, radar, bwd, fwd,

@@ -88,7 +88,7 @@ end
 
 # Constructor
 function Farnocchia15(optical::AbstractOpticalVector{T}) where {T <: Real}
-    catcodes, truth, resol, table = select_debiasing_table("2014")
+    catcodes, truth, resol, table = select_debiasing_table(T, "2014")
     debias = debiasing(optical, catcodes, truth, resol, table)
     return Farnocchia15{T}(debias, catcodes, truth, resol, table)
 end
@@ -124,7 +124,7 @@ end
 # Default constructor
 function Eggl20(optical::AbstractOpticalVector{T}, hires::Bool = false) where {T <: Real}
     id = hires ? "hires2018" : "2018"
-    catcodes, truth, resol, table = select_debiasing_table(id)
+    catcodes, truth, resol, table = select_debiasing_table(T, id)
     debias = debiasing(optical, catcodes, truth, resol, table)
     return Eggl20{T}(debias, hires, catcodes, truth, resol, table)
 end
@@ -141,46 +141,45 @@ end
 
 # Return the catalogue codes, truth catalogue, resolution and bias matrix of the
 # corresponding debiasing scheme. The possible values for `id` are:
-# - `2014` corresponds to https://doi.org/10.1016/j.icarus.2014.07.033,
-# - `2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596 (default),
-# - `hires2018` corresponds to https://doi.org/10.1016/j.icarus.2019.113596
-#     (high resolution).
-function select_debiasing_table(id::String = "2018")
+# - `2014` (Farnocchia et al. 2015):
+#    * Truth catalogue: PPM-XL [t]
+#    * Source: https://doi.org/10.1016/j.icarus.2014.07.033
+# - `2018` (Eggl et al. 2020, default):
+#    * Truth catalogue: Gaia DR2 [V]
+#    * Source: https://doi.org/10.1016/j.icarus.2019.113596
+# - `hires2018` (Eggl et al. 2020, high resolution):
+#    * Truth catalogue: Gaia DR2 [V]
+#    * Source: https://doi.org/10.1016/j.icarus.2019.113596
+function select_debiasing_table(::Type{T}, id::String = "2018") where {T <: Real}
     # Debiasing tables are loaded "lazily" via Julia artifacts,
     # according to rules in Artifacts.toml
+    comment_char, comments = '!', true
     if id == "2018"
+        NSIDE = 64
+        truth = "V"
+        dims = (49152, 104)
+        catcodes = CATALOGUE_MPC_CODES_2018
         debias_path = artifact"debias_2018"
-        catcodes = CATALOGUE_MPC_CODES_2018
-        # The healpix tesselation resolution of the bias map from
-        # https://doi.org/10.1016/j.icarus.2019.113596
-        NSIDE = 64
-        # In 2018 debias table Gaia DR2 catalogue is regarded as the truth
-        truth = "V"
     elseif id == "hires2018"
-        debias_path = artifact"debias_hires2018"
-        catcodes = CATALOGUE_MPC_CODES_2018
-        # The healpix tesselation resolution of the high-resolution bias map from
-        # https://doi.org/10.1016/j.icarus.2019.113596
         NSIDE = 256
-        # In 2018 debias table Gaia DR2 catalogue is regarded as the truth
         truth = "V"
+        dims = (786432, 104)
+        catcodes = CATALOGUE_MPC_CODES_2018
+        debias_path = artifact"debias_hires2018"
     elseif id == "2014"
-        debias_path = artifact"debias_2014"
-        catcodes = CATALOGUE_MPC_CODES_2014
-        # The healpix tesselation resolution of the bias map from
-        # https://doi.org/10.1016/j.icarus.2014.07.033
         NSIDE = 64
-        # In 2014 debias table PPMXL catalogue is regarded as the truth
         truth = "t"
+        dims = (49152, 76)
+        catcodes = CATALOGUE_MPC_CODES_2014
+        debias_path = artifact"debias_2014"
     else
         @error "Unknown bias map: $(id). Possible values are `2014`, `2018` \
             and `hires2018`."
     end
-
     # Debias table file
     bias_file = joinpath(debias_path, "bias.dat")
     # Read bias matrix
-    table = readdlm(bias_file, comment_char = '!', comments = true)
+    table = readdlm(bias_file, T; comment_char, comments, dims)
     # Initialize healpix Resolution variable
     resol = Resolution(NSIDE)
     # Compatibility between bias matrix and resolution
@@ -264,9 +263,9 @@ function debiasing(obs::AbstractOpticalAstrometry{T}, catcodes::Vector{Char},
         # Handle edge case: in new MPC catalogue nomenclature, "UCAC-5" -> "Y";
         # but in debias tables "UCAC-5" -> "W"
         if catcode == "Y"
-            cat_ind = findfirst(x -> x == "W", catcodes)
+            cat_ind = findfirst(==("W"), catcodes)
         else
-            cat_ind = findfirst(x -> x == catcode, catcodes)
+            cat_ind = findfirst(==(catcode), catcodes)
         end
 
         # Read dRA, pmRA, dDEC, pmDEC data from bias.dat
@@ -274,16 +273,18 @@ function debiasing(obs::AbstractOpticalAstrometry{T}, catcodes::Vector{Char},
         # dDEC: position correction in DEC at epoch J2000.0 [arcsec]
         # pmRA: proper motion correction in RA*cos(DEC) [mas/yr]
         # pmDEC: proper motion correction in DEC [mas/yr]
-        dRA, dDEC, pmRA, pmDEC = table[pix_ind, 4*cat_ind-3:4*cat_ind]
+        dRA, dDEC, pmRA, pmDEC = view(table, pix_ind, 4*cat_ind-3:4*cat_ind)
         # Seconds since J2000 (TDB)
-        et_secs_i = dtutc2et(date(obs))
-        # Seconds sinde J2000 (TT)
+        et_secs_i = dtutc2et(obs)
+        # Seconds since J2000 (TT)
+        # Note: Should the line below be changed to:
+        # tt_secs_i = et_secs_i + ttmtdb(et_secs_i/daysec) ?
         tt_secs_i = et_secs_i - ttmtdb(et_secs_i/daysec)
         # Years since J2000
         yrs_J2000_tt = tt_secs_i/(daysec*yr)
-        # Total debiasing correction in right ascension (arcsec)
+        # Total debiasing correction in right ascension [arcsec]
         α_corr = dRA + yrs_J2000_tt*pmRA/1_000
-        # Total debiasing correction in declination (arcsec)
+        # Total debiasing correction in declination [arcsec]
         δ_corr = dDEC + yrs_J2000_tt*pmDEC/1_000
     end
 

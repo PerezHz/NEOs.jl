@@ -56,15 +56,24 @@ abstract type AbstractAstrometryObservation{T <: Real} <: AbstractAstrometry end
 
 const AbstractObservationVector{T} = AbstractVector{<:AbstractAstrometryObservation{T}} where {T}
 
+numtype(::AbstractAstrometryObservation{T}) where {T} = T
+
 # Order in AbstractAstrometryObservation is given by date
 isless(a::AbstractAstrometryObservation, b::AbstractAstrometryObservation) = date(a) < date(b)
 
-dtutc2days(x::AbstractAstrometryObservation) = dtutc2days(date(x))
 dtutc2et(x::AbstractAstrometryObservation) = dtutc2et(date(x))
+dtutc2days(x::AbstractAstrometryObservation) = dtutc2days(date(x))
+datetime2julian(x::AbstractAstrometryObservation) = datetime2julian(date(x))
+
+daysbetween(x::DateTime, y::DateTime) = (y - x).value / daymillisec
+daysbetween(x::DateTime, y::AbstractAstrometryObservation) = daysbetween(x, date(y))
+daysbetween(x::AbstractAstrometryObservation, y::DateTime) = daysbetween(date(x), y)
+daysbetween(x::AbstractAstrometryObservation, y::AbstractAstrometryObservation) =
+    daysbetween(date(x), date(y))
 
 function numberofdays(x::AbstractObservationVector)
     t0, tf = extrema(date, x)
-    return (tf - t0).value / 86_400_000
+    return (tf - t0).value / daymillisec
 end
 
 minmaxdates(x::AbstractObservationVector) = extrema(date, x)

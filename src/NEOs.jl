@@ -3,6 +3,8 @@ module NEOs
 # __precompile__(false)
 import Base: RefValue, isless, show, string, getindex, in, zero,
        iszero, isnan, summary, firstindex, lastindex, first, last, wait, isdeprecated
+import Dates: datetime2julian
+import LinearAlgebra: issuccess
 import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, longascnode,
        meanmotion, meananomaly, timeperipass, numberofbodies, selecteph
@@ -18,8 +20,7 @@ using AngleBetweenVectors, AutoHashEquals, Dates, Downloads, HTTP, InteractiveUt
 
 using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
 using AstroMOID: wisric_moid
-using DataFrames: AbstractDataFrame, AsTable, DataFrame, DataFrameRow, nrow, eachrow,
-      eachcol, groupby, combine
+using DataFrames: AsTable, DataFrame, nrow, groupby, combine
 using Dates: epochms2datetime
 using DelimitedFiles: readdlm
 using Distributions: Chisq, Normal, Uniform, cdf, quantile
@@ -52,7 +53,7 @@ using TaylorSeries: NumberNotSeries
 
 # Common
 export Parameters
-export d_EM_km, d_EM_au, MJD2000
+export daymillisec, d_EM_km, d_EM_au, MJD2000
 export julian2etsecs, etsecs2julian, dtutc2et, et2dtutc, dtutc2jdtdb, jdtdb2dtutc,
        et_to_200X, days_to_200X, dtutc_to_200X, dtutc2days, days2dtutc, rad2arcsec,
        arcsec2rad, mas2rad, range2delay, rangerate2doppler, chi2, nms, nrms
@@ -67,7 +68,7 @@ export numberofdays, unpacknum, packnum, unpackdesig, packdesig,
 export date, measure, observatory, rms, debias, ra, dec, mag, band, catalogue,
        cataloguecode, observatorycode, vconversion, timeofday, isdiscovery, isdeprecated,
        trackletid, frequency, residual, weight, weights, corr, corrs, isoutlier, outliers,
-       setoutlier, setoutlier!, nout, notout, notoutobs
+       setoutlier, setoutlier!, nout, notout, notoutobs, apparitions
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value
 export update_observatories_mpc, search_observatory_code, fetch_observatory_information
@@ -76,7 +77,7 @@ export fetch_optical_mpc80, read_optical_mpc80, write_optical_mpc80
 export fetch_neocp_objects, read_neocp_objects, write_neocp_objects
 export fetch_optical_rwo, read_optical_rwo, write_optical_rwo
 export fetch_optical_ades, read_optical_ades, write_optical_ades
-export read_optical_astrometry
+export read_optical_astrometry, fetch_optical_astrometry, load_optical_astrometry
 export nobs, datediff, reduce_tracklets
 export wra, wdec, dra, ddec, unfold, compute_radec, residuals
 export fetch_radar_jpl, read_radar_jpl, write_radar_jpl
@@ -97,11 +98,11 @@ export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
 export variables, designation, epoch, firsttime, lasttime, noptical, nradar, minmaxdates,
        optical, sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
-       absolutemagnitude, diameter, mass, shiftepoch, earthmoid, print_mpec_residuals,
-       print_mpec_elements, print_mpec_ephemeris, print_mpec
-export topo2bary, bary2topo, attr2bary, tsaiod
-export mmov, gaussmethod, gaussiod, jtls, issinglearc, initialorbitdetermination,
-       orbitdetermination, linkage
+       absolutemagnitude, diameter, mass, shiftepoch, meandate, meanepoch, earthmoid,
+       print_mpec_residuals, print_mpec_elements, print_mpec_ephemeris, print_mpec
+export topo2bary, bary2topo, attr2bary, tsaiod, mmov
+export gaussmetric, gausstriplets, gaussmethod, gaussiod
+export jtls, issinglearc, initialorbitdetermination, orbitdetermination, linkage
 # Impact monitoring
 export ImpactTarget, IMProblem, BPlane, MTP, bopik, mtp, targetplane, crosssection,
        valsecchi_circle

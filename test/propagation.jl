@@ -326,7 +326,7 @@ end
         @test mean_dop ≈ -0.5532 atol=1e-3
         @test std_del ≈ 1.6031 atol=1e-3
         @test std_dop ≈ 1.5501 atol=1e-3
-        @test chi2_del ≈ 41.2340 atol=2e-3
+        @test chi2_del ≈ 41.2252 atol=2e-3
         @test chi2_dop ≈ 76.1513 atol=1e-3
         @test nms_del ≈ 2.4255 atol=1e-3
         @test nms_dop ≈ 2.6259 atol=1e-3
@@ -338,7 +338,7 @@ end
         # Total statistics
         @test mean(res) ≈ -0.0139 atol=1e-3
         @test std(res) ≈ 0.3650 atol=1e-3
-        @test chi2(res) ≈ 121.3048 atol=1e-3
+        @test chi2(res) ≈ 121.2958 atol=1e-3
         @test nms(res) ≈ 0.1333 atol=1e-3
         @test nrms(res) ≈ 0.3651 atol=1e-3
 

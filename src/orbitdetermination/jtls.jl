@@ -1,3 +1,69 @@
+"""
+    JTLSBuffer{
+        D,
+        T <: Real,
+        R <: AbstractResidualSet{T, TaylorN{T}},
+        O <: AbstractOrbitVector{D, T, T}
+    } <: AbstractBuffer
+
+Pre-allocated memory for [`jtls`](@ref).
+
+# Fields
+
+- `res::R`:set of astrometric residuals.
+- `orbits::Vector{O}`: orbit history.
+- `Qs::Vector{T}`: nrms history.
+- `q00s::Matrix{T}`: initial conditions history.
+- `outs::Union{Nothing, Vector{Int}}`: number of non rejected observations history.
+- `prbuffer::PropresBuffer{T, TaylorN{T}, T}`: buffer for [`propres`](@ref).
+- `lscache::LeastSquaresCache{T}`: buffer for [`leastsquares!`](@ref).
+- `orcache::Union{Nothing, OutlierRejectionCache{T}}`:  buffer for
+    [`outlier_rejection!`](@ref).
+"""
+struct JTLSBuffer{
+        D,
+        T <: Real,
+        R <: AbstractResidualSet{T, TaylorN{T}},
+        O <: AbstractOrbitVector{D, T, T}
+    } <: AbstractBuffer
+    res::R
+    orbits::O
+    Qs::Vector{T}
+    q00s::Matrix{T}
+    outs::Union{Nothing, Vector{Int}}
+    prbuffer::PropresBuffer{T, TaylorN{T}, T}
+    lscache::LeastSquaresCache{T}
+    orcache::Union{Nothing, OutlierRejectionCache{T}}
+end
+
+# Abbreviation
+const AbstractJTLSBuffer{D, T} = JTLSBuffer{D, T, R, O} where {R, O}
+
+# Constructor
+function JTLSBuffer(od::AbstractODProblem{D, T}, orbit::AbstractOrbit,
+                    params::Parameters) where {D, T <: Real}
+    # Unpack
+    @unpack jtlsorder, jtlsiter, lsiter, outrej = params
+    # Jet transport initial condition
+    Ndof = dof(od)
+    Npar = numvars(Val(od.dynamics), params)
+    jd0 = epoch(orbit) + PE.J2000
+    q0 = jtinitialcondition(od, orbit, jd0, params)
+    # Memory allocation
+    res = init_residuals(TaylorN{T}, od, orbit)
+    O, R = Vector{opticaltype(od)}, Vector{radartype(od)}
+    orbits = Vector{hasradar(od) ? MixedLeastSquaresOrbit{D, T, T, O, R} :
+        OpticalLeastSquaresOrbit{D, T, T, O}}(undef, jtlsiter)
+    Qs = Vector{T}(undef, jtlsiter + 1)
+    q00s = Matrix{T}(undef, Ndof, jtlsiter+1)
+    outs = outrej ? Vector{Int}(undef, jtlsiter) : nothing
+    prbuffer = PropresBuffer(od, q0, jd0, params)
+    lscache = LeastSquaresCache(zeros(T, Npar), 1:Npar, lsiter)
+    orcache = OutlierRejectionCache(T, noptical(od))
+    return JTLSBuffer{D, T, typeof(res), typeof(orbits)}(res, orbits, Qs, q00s, outs,
+        prbuffer, lscache, orcache)
+end
+
 # Initial subset of optical astrometry for jtls
 function _initialtracklets(trksa::AbstractTrackletVector{T},
                            trksb::AbstractTrackletVector{T}) where {T <: Real}
@@ -80,16 +146,18 @@ end
 # Incrementally add observations to fit
 
 # Add as much tracklets as possible per iteration
-function addoptical!(::Val{true}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
-                     lscache::LeastSquaresCache{T},
-                     lsmethods::Vector{AbstractLeastSquaresMethod{T}},
-                     trksin::TrackletVector{T}, trksout::TrackletVector{T},
-                     res::Vector{OpticalResidual{T, TaylorN{T}}},
-                     x0::Vector{T}, params::Parameters{T}) where {T <: Real}
+function addoptical!(
+        ::Val{true}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
+        lscache::LeastSquaresCache{T}, lsmethods::Tuple,
+        trksin::TrackletVector{T}, trksout::TrackletVector{T},
+        res::Vector{OpticalResidual{T, TaylorN{T}}},
+        x0::Vector{T}, params::Parameters{T}
+    ) where {T <: Real}
+    Qtol, Mtol = params.lsQtol, params.lsMtol
     while !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods)
-        !fit_new.success && break
+        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods; Qtol, Mtol)
+        !issuccess(fit_new) && break
         fit = fit_new
         tracklet = popfirst!(trksout)
         push!(trksin, tracklet)
@@ -102,16 +170,18 @@ function addoptical!(::Val{true}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
 end
 
 # Add at most one tracklet per iteration
-function addoptical!(::Val{false}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
-                     lscache::LeastSquaresCache{T},
-                     lsmethods::Vector{AbstractLeastSquaresMethod{T}},
-                     trksin::TrackletVector{T}, trksout::TrackletVector{T},
-                     res::Vector{OpticalResidual{T, TaylorN{T}}},
-                     x0::Vector{T}, params::Parameters{T}) where {T <: Real}
+function addoptical!(
+        ::Val{false}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
+        lscache::LeastSquaresCache{T}, lsmethods::Tuple,
+        trksin::TrackletVector{T}, trksout::TrackletVector{T},
+        res::Vector{OpticalResidual{T, TaylorN{T}}},
+        x0::Vector{T}, params::Parameters{T}
+    ) where {T <: Real}
+    Qtol, Mtol = params.lsQtol, params.lsMtol
     if critical_value(view(res, oidxs), fit) < params.significance && !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods)
-        !fit_new.success && return oidxs, fit
+        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods; Qtol, Mtol)
+        !issuccess(fit_new) && return oidxs, fit
         fit = fit_new
         tracklet = popfirst!(trksout)
         push!(trksin, tracklet)
@@ -123,18 +193,20 @@ function addoptical!(::Val{false}, oidxs::Vector{Int}, fit::LeastSquaresFit{T},
     return oidxs, fit
 end
 
-function addobservations!(od::MixedODProblem, oidxs::Vector{Int}, ridxs::Vector{Int},
-                          fit::LeastSquaresFit{T}, lscache::LeastSquaresCache{T},
-                          lsmethods::Vector{AbstractLeastSquaresMethod{T}},
-                          trksin::TrackletVector{T}, trksout::TrackletVector{T},
-                          radarin::AbstractRadarVector{T}, radarout::AbstractRadarVector{T},
-                          res::AbstractResidualSet{T, TaylorN{T}},
-                          x0::Vector{T}, params::Parameters{T}) where {T <: Real}
+function addobservations!(
+        od::MixedODProblem, oidxs::Vector{Int}, ridxs::Vector{Int},
+        fit::LeastSquaresFit{T}, lscache::LeastSquaresCache{T}, lsmethods::Tuple,
+        trksin::TrackletVector{T}, trksout::TrackletVector{T},
+        radarin::AbstractRadarVector{T}, radarout::AbstractRadarVector{T},
+        res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T}, params::Parameters{T}
+    ) where {T <: Real}
+    Qtol, Mtol = params.lsQtol, params.lsMtol
     # Add optical astrometry
     while !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls((res[1][oidxs ∪ extra], res[2][ridxs]), x0, lscache, lsmethods)
-        !fit_new.success && break
+        fit_new = tryls((res[1][oidxs ∪ extra], res[2][ridxs]), x0, lscache, lsmethods;
+                         Qtol, Mtol)
+        !issuccess(fit_new) && break
         fit = fit_new
         tracklet = popfirst!(trksout)
         push!(trksin, tracklet)
@@ -146,8 +218,9 @@ function addobservations!(od::MixedODProblem, oidxs::Vector{Int}, ridxs::Vector{
     while !isempty(radarout)
         extra = findfirst(==(radarout[1]), od.radar)
         isnothing(extra) && break
-        fit_new = tryls((res[1][oidxs], res[2][ridxs ∪ extra]), x0, lscache, lsmethods)
-        !fit_new.success && break
+        fit_new = tryls((res[1][oidxs], res[2][ridxs ∪ extra]), x0, lscache, lsmethods;
+                        Qtol, Mtol)
+        !issuccess(fit_new) && break
         fit = fit_new
         radar = popfirst!(radarout)
         push!(radarin, radar)
@@ -159,8 +232,7 @@ function addobservations!(od::MixedODProblem, oidxs::Vector{Int}, ridxs::Vector{
     return oidxs, ridxs, fit
 end
 
-function updateorbit(orbit::AbstractOrbit{D, T, TaylorN{T}},
-                     lsmethods::Vector{AbstractLeastSquaresMethod{T}},
+function updateorbit(orbit::AbstractOrbit{D, T, TaylorN{T}}, lsmethods::Tuple,
                      params::Parameters{T}) where {D, T <: Real}
     # Unpack parameters
     @unpack jtlsproject, H_max = params
@@ -201,8 +273,19 @@ function updateorbit(orbit::AbstractOrbit{D, T, TaylorN{T}},
     return evalfit(orbit)
 end
 
+function convergenceconditions(i::Int, Qs::AbstractVector, outs, params::Parameters)
+    @unpack outrej = params
+    if i > 1
+        C1 = abs(Qs[i-1] - Qs[i]) < 0.01
+        C2 = outrej ? (outs[i-1] == outs[i]) : true
+        C3 = i > 2 && Qs[i-2] < Qs[i-1] < Qs[i]
+        return (C1 && C2) || C3
+    end
+    return false
+end
+
 """
-    jtls(od, orbit, params [, mode::Bool])
+    jtls(od, orbit, params [, mode::Bool]; kwargs...)
 
 Given an orbit determination problem `od`, return a `LeastSquaresOrbit`
 computed via the Jet Transport Least Squares method, starting from a
@@ -212,67 +295,58 @@ section of [`Parameters`](@ref).
 The `mode` optional argument determines how many tracklets are added
 to the fit per iteration, either as much as possible (`true`, default)
 or one (`false`).
+
+# Keyword arguments
+
+- `buffer::Union{Nothing, JTLSBuffer}`: pre-allocated memory (default: `nothing`).
 """
 function jtls(
         od::OpticalODProblem{D, T, O}, orbit::AbstractOrbit,
-        params::Parameters{T}, mode::Bool = true
+        params::Parameters{T}, mode::Bool = true;
+        buffer::Union{Nothing, AbstractJTLSBuffer{D, T}} = nothing
     ) where {D, T <: Real, O <: AbstractOpticalVector{T}}
-    # Unpack parameters
-    @unpack jtlsorder, lsiter, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
-            fudge, max_per, marsden_scalings = params
-    # Number of degrees of freedom
-    Ndof = dof(od)
     # Set jet transport variables
+    Ndof = dof(od)
     Npar = numvars(Val(od.dynamics), params)
     set_od_order(params, Npar)
+    # Buffer
+    if isnothing(buffer)
+        buffer = JTLSBuffer(od, orbit, params)
+    end
+    # Unpack
+    Qtol, Mtol = params.lsQtol, params.lsMtol
+    @unpack jtlsorder, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
+            fudge, max_per = params
+    @unpack orbits, res, Qs, q00s, outs, prbuffer, lscache, orcache = buffer
     # Reference epoch [Julian days TDB]
-    jd0 = epoch(orbit) + PE.J2000
-    # Pre-allocate memory
-    orbits = zeros(OpticalLeastSquaresOrbit{D, T, T, O}, jtlsiter)
-    q00s = Matrix{T}(undef, Ndof, jtlsiter+1)
-    Qs = fill(T(Inf), jtlsiter+1)
+    jd0 = meanepoch(od) + PE.J2000
     # Jet transport initial condition
-    q00s[:, 1] = initialcondition(orbit, Ndof, params)
-    variables = collect(1:6)
-    if Ndof > 6
-        variables = vcat(variables, findall(!iszero, marsden_scalings) .+ 6)
-    end
-    dq = jtperturbation(orbit, variables, Ndof, jtlsorder, params)
-    q0 = q00s[:, 1] + dq
-    # Initialize buffer and set of residuals
-    buffer = PropresBuffer(od, q0, jd0, params)
-    res = init_residuals(TaylorN{T}, od, orbit)
-    # Origin
+    variables = fittedvariables(Ndof, params)
+    q0 = jtinitialcondition(od, orbit, jd0, params)
+    # Least squares methods
     x0 = zeros(T, Npar)
-    # Least squares cache and methods
-    lscache = LeastSquaresCache(x0, 1:Npar, lsiter)
     lsmethods = _lsmethods(res, x0, 1:Npar)
-    # Initial subset of optical astrometry for orbit fit
+    # Initial subset of astrometry for orbit fit
     trksin, trksout, oidxs = _initialtracklets(od.tracklets, orbit.tracklets)
-    # Outlier rejection
-    if outrej
-        orcache = OutlierRejectionCache(T, noptical(od))
-        outs = zeros(Int, jtlsiter)
-    end
     # Jet Transport Least Squares
+    TS.evaluate!(q0, x0, view(q00s, :, 1))
     for i in 1:jtlsiter
         # Initial conditions
-        @. q0 = q00s[:, i] + dq
+        TS.constant_term!.(q0, view(q00s, :, i))
         # Decide whether q0 is suitable for jtls
         if jtlsmask
             isjtlsfit(od, q0, jd0, params) || break
         end
         # Propagation & residuals
-        bwd, fwd = propres!(res, od, q0, jd0, params; buffer)
+        bwd, fwd = propres!(res, od, q0, jd0, params; buffer = prbuffer)
         isempty(res) && break
         # Orbit fit
-        fit = tryls(view(res, oidxs), x0, lscache, lsmethods)
-        !fit.success && break
+        fit = tryls(view(res, oidxs), x0, lscache, lsmethods; Qtol, Mtol)
+        !issuccess(fit) && break
         # Incrementally add observations to fit
         oidxs, fit = addoptical!(Val(mode), oidxs, fit, lscache, lsmethods,
                                  trksin, trksout, res, x0, params)
         fit.Γ .= project(q0[variables], fit)
-        all(>(0), diag(fit.Γ)) || break
         # Outlier rejection
         if outrej
             mro = view(outliers(od), oidxs)
@@ -284,95 +358,70 @@ function jtls(
             od.dynamics, variables, od.optical[oidxs], trksin, nothing, bwd, fwd,
             res[oidxs], nothing, fit, q00s[variables, 1:i], Qs[1:i]
         ), lsmethods, params)
-        Qs[i] = orbits[i].Qs[end] = nrms(res, orbits[i].fit)
+        Qs[i] = orbits[i].Qs[end] = nrms(orbits[i])
         if outrej
             outs[i] = notout(orbits[i])
         end
         # Convergence conditions
-        if i > 1
-            C1 = abs(Qs[i-1] - Qs[i]) < 0.01
-            C2 = outrej ? (outs[i-1] == outs[i]) : true
-            C1 && C2 && break
+        if convergenceconditions(i, Qs, outs, params)
+            any(isnan, sigmas(orbits[i])) && @warn "Final covariance matrix \
+                is not positive-definite"
+            return orbits[i]
         end
-        i > 2 && issorted(view(Qs, i-2:i)) && break
         # Update initial condition
-        q00s[:, i+1] .= q0(orbits[i].fit.x)
+        TS.evaluate!(q0, fit.x, view(q00s, :, i+1))
     end
-    # Find complete solutions
-    mask = findall(o -> nobs(o) == nobs(od), orbits)
-    # Choose best solution
-    if isempty(mask)
-        _, k = findmin(nrms, orbits)
-    else
-        _, k = findmin(nrms, view(orbits, mask))
-        k = mask[k]
-    end
-
-    return orbits[k]
+    return zero(eltype(orbits))
 end
 
 function jtls(
         od::MixedODProblem{D, T, O, R}, orbit::AbstractOrbit,
-        params::Parameters{T}
+        params::Parameters{T}, mode::Bool = true;
+        buffer::Union{Nothing, AbstractJTLSBuffer{D, T}} = nothing
     ) where {D, T <: Real, O <: AbstractOpticalVector{T}, R <: AbstractRadarVector{T}}
-    # Unpack parameters
-    @unpack jtlsorder, lsiter, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
-            fudge, max_per, marsden_scalings = params
-    # Number of degrees of freedom
-    Ndof = dof(od)
     # Set jet transport variables
+    Ndof = dof(od)
     Npar = numvars(Val(od.dynamics), params)
     set_od_order(params, Npar)
+    # Buffer
+    if isnothing(buffer)
+        buffer = JTLSBuffer(od, orbit, params)
+    end
+    # Unpack
+    Qtol, Mtol = params.lsQtol, params.lsMtol
+    @unpack jtlsorder, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
+            fudge, max_per = params
+    @unpack orbits, res, Qs, q00s, outs, prbuffer, lscache, orcache = buffer
     # Reference epoch [Julian days TDB]
-    jd0 = epoch(orbit) + PE.J2000
-    # Pre-allocate memory
-    orbits = zeros(MixedLeastSquaresOrbit{D, T, T, O, R}, jtlsiter)
-    q00s = Matrix{T}(undef, Ndof, jtlsiter+1)
-    Qs = fill(T(Inf), jtlsiter+1)
+    jd0 = meanepoch(od) + PE.J2000
     # Jet transport initial condition
-    q00s[:, 1] = initialcondition(orbit, Ndof, params)
-    variables = collect(1:6)
-    if Ndof > 6
-        variables = vcat(variables, findall(!iszero, marsden_scalings) .+ 6)
-    end
-    dq = jtperturbation(orbit, variables, Ndof, jtlsorder, params)
-    q0 = q00s[:, 1] + dq
-    # Initialize buffer and set of residuals
-    buffer = PropresBuffer(od, q0, jd0, params)
-    res = init_residuals(TaylorN{T}, od, orbit)
-    # Origin
+    variables = fittedvariables(Ndof, params)
+    q0 = jtinitialcondition(od, orbit, jd0, params)
+    # Least squares methods
     x0 = zeros(T, Npar)
-    # Least squares cache and methods
-    lscache = LeastSquaresCache(x0, 1:Npar, lsiter)
     lsmethods = _lsmethods(res, x0, 1:Npar)
-    # Initial subset of optical astrometry for orbit fit
+    # Initial subset of astrometry for orbit fit
     trksin, trksout, oidxs = _initialtracklets(od.tracklets, orbit.tracklets)
-    # Initial subset of radar astrometry for orbit fit
     radarin, radarout, ridxs = _initialradar(od, orbit)
-    # Outlier rejection
-    if outrej
-        orcache = OutlierRejectionCache(T, noptical(od))
-        outs = zeros(Int, jtlsiter)
-    end
     # Jet Transport Least Squares
+    TS.evaluate!(q0, x0, view(q00s, :, 1))
     for i in 1:jtlsiter
         # Initial conditions
-        @. q0 = q00s[:, i] + dq
+        TS.constant_term!.(q0, view(q00s, :, i))
         # Decide whether q0 is suitable for jtls
         # if jtlsmask
         #     isjtlsfit(od, q0, jd0, params) || break
         # end
         # Propagation & residuals
-        bwd, fwd = propres!(res, od, q0, jd0, params; buffer)
+        bwd, fwd = propres!(res, od, q0, jd0, params; buffer = prbuffer)
         any(isempty, res) && break
         # Orbit fit
-        fit = tryls((res[1][oidxs], res[2][ridxs]), x0, lscache, lsmethods)
-        !fit.success && break
+        fit = tryls((res[1][oidxs], res[2][ridxs]), x0, lscache, lsmethods; Qtol, Mtol)
+        !issuccess(fit) && break
         # Incrementally add observations to fit
         oidxs, ridxs, fit = addobservations!(od, oidxs, ridxs, fit, lscache, lsmethods,
             trksin, trksout, radarin, radarout, res, x0, params)
         fit.Γ .= project(q0[variables], fit)
-        all(>(0), diag(fit.Γ)) || break
         # Outlier rejection
         if outrej
             mro = view(outliers(od), oidxs)
@@ -384,31 +433,20 @@ function jtls(
             od.dynamics, variables, od.optical[oidxs], trksin, od.radar[ridxs], bwd, fwd,
             res[1][oidxs], res[2][ridxs], fit, q00s[variables, 1:i], Qs[1:i]
         ), lsmethods, params)
-        Qs[i] = orbits[i].Qs[end] = nrms(res, orbits[i].fit)
+        Qs[i] = orbits[i].Qs[end] = nrms(orbits[i])
         if outrej
             outs[i] = notout(orbits[i])
         end
         # Convergence conditions
-        if i > 1
-            C1 = abs(Qs[i-1] - Qs[i]) < 0.01
-            C2 = outrej ? (outs[i-1] == outs[i]) : true
-            C1 && C2 && break
+        if convergenceconditions(i, Qs, outs, params)
+            any(isnan, sigmas(orbits[i])) && @warn "Final covariance matrix \
+                is not positive-definite"
+            return orbits[i]
         end
-        i > 2 && issorted(view(Qs, i-2:i)) && break
         # Update initial condition
-        q00s[:, i+1] .= q0(orbits[i].fit.x)
+        TS.evaluate!(q0, fit.x, view(q00s, :, i+1))
     end
-    # Find complete solutions
-    mask = findall(o -> nobs(o) == nobs(od), orbits)
-    # Choose best solution
-    if isempty(mask)
-        _, k = findmin(nrms, orbits)
-    else
-        _, k = findmin(nrms, view(orbits, mask))
-        k = mask[k]
-    end
-
-    return orbits[k]
+    return zero(eltype(orbits))
 end
 
 """
@@ -437,7 +475,7 @@ function linkage(
     # Original weights
     w8s = deepcopy(od.weights.weights)
     # Dynamical initial condition
-    q0 = initialcondition(porbit, dof(od), params)
+    q0 = initialcondition(porbit, jd0, dof(od), params)
     # Initialize buffer and set of residuals
     buffer = PropresBuffer(od, q0, jd0, params)
     res = init_residuals(T, od, porbit)
@@ -485,7 +523,7 @@ function linkage(
             break
         end
         # Scale up weights
-        q0 = initialcondition(orbit, dof(od), params)
+        q0 = initialcondition(orbit, jd0, dof(od), params)
         propres!(res, od, q0, jd0, params; buffer)
         if isempty(res)
             verbose && @warn("Linkage did not converge within the given parameters \

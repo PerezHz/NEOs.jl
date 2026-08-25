@@ -58,7 +58,7 @@ function compute_radec(
     rv_a_t_r = xva(et_r_secs)
     r_a_t_r = rv_a_t_r[1:3]
     # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
-    RV_r = obsposvelECI(observatory, et_r_secs)
+    RV_r = obsposvelECI(observatory, datetime2julian(t_r_utc))
     R_r = RV_r[1:3]
     # Receiver barycentric position and velocity at receive time
     r_r_t_r = r_e_t_r + R_r
@@ -198,7 +198,7 @@ function compute_radec(
     evaleph!(rv_a_t_r, et_r_secs, xva[1], xva[2])
     r_a_t_r = rv_a_t_r[1:3]
     # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
-    RV_r = obsposvelECI(observatory, et_r_secs)
+    RV_r = obsposvelECI(observatory, datetime2julian(t_r_utc))
     R_r = RV_r[1:3]
     # Receiver barycentric position and velocity at receive time
     r_r_t_r = r_e_t_r + R_r
@@ -337,7 +337,7 @@ function compute_radec(
     evaleph!(rv_a_t_r, et_r_secs, xva[1], xva[2])
     r_a_t_r = rv_a_t_r[1:3]
     order = TaylorSeries.order(r_a_t_r[1])
-    RV_r = obsposvelECI(observatory, et_r_secs)
+    RV_r = obsposvelECI(observatory, datetime2julian(t_r_utc))
     R_r = RV_r[1:3]
     r_r_t_r = r_e_t_r + R_r
     E_H_vec = e_D_vec  = r_r_t_r - r_s_t_r

@@ -461,28 +461,40 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
     end
 
     # Load optical astrometry
-    filename = joinpath(TEST_DATA, "433.txt")
-    optical1 = read_optical_mpc80(filename)
-    filter!(x -> Date(2000) < date(x) < Date(2025), optical1)
-    filename = joinpath(TEST_DATA, "433.rwo")
-    optical2 = read_optical_rwo(filename)
-    filter!(x -> Date(2000) < date(x) < Date(2025), optical2)
-    filename = joinpath(TEST_DATA, "433.xml")
-    optical3 = read_optical_ades(filename)
-    filter!(x -> Date(2000) < date(x) < Date(2025), optical3)
+    mpc80_file = joinpath(TEST_DATA, "433.txt")
+    rwo_file = joinpath(TEST_DATA, "433.rwo")
+    ades_file = joinpath(TEST_DATA, "433.xml")
 
-    @testset "read_optical_astrometry" begin
-        mpc80_file = joinpath(TEST_DATA, "433.txt")
-        ades_file = joinpath(TEST_DATA, "433.xml")
+    optical1 = read_optical_mpc80(mpc80_file)
+    optical2 = read_optical_rwo(rwo_file)
+    optical3 = read_optical_ades(ades_file)
 
-        @test read_optical_astrometry(mpc80_file) == read_optical_mpc80(mpc80_file)
-        @test read_optical_astrometry(mpc80_file; format = :obs80) ==
-            read_optical_mpc80(mpc80_file)
-        @test read_optical_astrometry(ades_file) == read_optical_ades(ades_file)
-        @test read_optical_astrometry(ades_file; format = "xml") ==
-            read_optical_ades(ades_file)
-        @test_throws ArgumentError read_optical_astrometry(mpc80_file; format = :unknown)
+    @testset "load_optical_astrometry" begin
+        mpc80_optical, format = load_optical_astrometry(mpc80_file)
+        @test mpc80_optical == optical1 && format == "mpc80"
+        mpc80_optical, format = load_optical_astrometry(mpc80_file; format = :obs80)
+        @test mpc80_optical == optical1 && format == "mpc80"
+        # Note: I've commented out the tests below to limit the number of calls
+        # made to the MPC Observations API during the tests (@LuEdRaMo, 16/08/26)
+        # mpc80_optical, format = load_optical_astrometry("433"; format = :mpc80)
+        # @test issubset(optical1, mpc80_optical) && format == "mpc80"
+
+        ades_optical, format = load_optical_astrometry(ades_file)
+        @test ades_optical == optical3 && format == "ades"
+        ades_optical, format = load_optical_astrometry(ades_file; format = "xml")
+        @test ades_optical == optical3 && format == "ades"
+        # Note: I've commented out the tests below to limit the number of calls
+        # made to the MPC Observations API during the tests (@LuEdRaMo, 16/08/26)
+        # ades_optical, format = load_optical_astrometry("433"; format = :ades)
+        # @test issubset(optical3, ades_optical) && format == "ades"
+
+        @test_throws ArgumentError load_optical_astrometry(mpc80_file; format = :unknown)
+        @test_throws ArgumentError load_optical_astrometry("433"; format = :unknown)
     end
+
+    filter!(x -> Date(2000) < date(x) < Date(2025), optical1)
+    filter!(x -> Date(2000) < date(x) < Date(2025), optical2)
+    filter!(x -> Date(2000) < date(x) < Date(2025), optical3)
 
     @testset "Topocentric" begin
 
@@ -627,10 +639,10 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
        @test maximum(norm, @. obsposvelECI(optical4) - obsposvelECI(_optical4_)) < eps()
     end
 
-    @testset "Tracklet" begin
+    using NEOs: OpticalTracklet, OpticalMPC80, OpticalRWO, OpticalADES,
+                indices, reduce_tracklets, isunknown, closest_tracklet
 
-        using NEOs: OpticalTracklet, OpticalMPC80, OpticalRWO, OpticalADES,
-            indices, reduce_tracklets, isunknown, closest_tracklet
+    @testset "Tracklet" begin
 
         # Reduce tracklets
         @test_throws ArgumentError reduce_tracklets(OpticalMPC80{Float64}[])
@@ -718,6 +730,35 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         @test string.(trks1[mask13]) == string.(trks3[mask31])
         @test string.(trks2[mask23]) == string.(trks3[mask32])
+
+    end
+
+    @testset "Apparition" begin
+
+        apps1 = apparitions(optical1)
+        apps2 = apparitions(optical2)
+        apps3 = apparitions(optical3)
+
+        @test all(Base.Fix2(isa, String), string.(apps1))
+        @test all(Base.Fix2(isa, String), string.(apps2))
+        @test all(Base.Fix2(isa, String), string.(apps3))
+
+        @test length(apps1) == length(apps2) == length(apps3)
+        @test indices(apps1) == eachindex(optical1)
+        @test indices(apps2) == eachindex(optical2)
+        @test indices(apps3) == eachindex(optical3)
+
+        @test optical(apps1) == optical1
+        @test optical(apps2) == optical2
+        @test optical(apps3) == optical3
+
+        @test numberofdays(apps1) < numberofdays(optical1)
+        @test numberofdays(apps2) < numberofdays(optical2)
+        @test numberofdays(apps3) < numberofdays(optical3)
+
+        @test noptical(apps1) == length(optical1)
+        @test noptical(apps2) == length(optical2)
+        @test noptical(apps3) == length(optical3)
 
     end
 

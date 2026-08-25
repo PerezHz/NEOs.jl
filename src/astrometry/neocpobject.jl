@@ -77,39 +77,39 @@ function neocpparse(name, ::Type{T}, x) where {T <: Real}
     return y
 end
 
-NEOCPObject(r::DataFrameRow) = NEOCPObject{Float64}(
-    r.desig, r.score, r.date, r.ra, r.dec, r.V, r.updated,
-    r.nobs, r.arc, r.H, r.notseen, r.source
-)
-
-function parse_neocp_objects(text::AbstractString)
-    # Parse lines
-    lines = split(text, '\n', keepempty = false)
-    # Note: Some objects that were moved to the PCCP have a very long arc length,
-    # hence having a registry with more than 101 columns (see e.g. P22aZna)
-    filter!(x -> length(x) == 101, lines)
-    L = length(lines)
-    # Construct DataFrame
-    R = NEOCPObject{Float64}
-    names, types = fieldnames(R), fieldtypes(R)
-    df = DataFrame([fill(astrometrydefault(fieldtype(R, name)), L) for name in names],
-        collect(names))
-    for (i, line) in enumerate(lines)
-        for (name, type, idxs) in zip(names, types, NEOCP_OBJECT_COLUMNS)
-            x = strip(view(line, idxs))
-            df[i, name] = neocpparse(name, type, x)
+@eval begin
+    function parse_neocp_objects(text::AbstractString)
+        # Parse lines
+        lines = split(text, '\n', keepempty = false)
+        # Note: Some objects that were moved to the PCCP have a very long arc length,
+        # hence having a registry with more than 101 columns (see e.g. P22aZna)
+        filter!(x -> length(x) == 101, lines)
+        isempty(lines) && return NEOCPObject{Float64}[]
+        # Main parse loop
+        objects = Vector{NEOCPObject{Float64}}(undef, length(lines))
+        for (i, line) in enumerate(lines)
+            $([:(
+                $(name) = neocpparse(
+                    $(QuoteNode(name)),
+                    $(fieldtype(NEOCPObject{Float64}, name)),
+                    strip(view(line, $idxs))
+                )
+            ) for (name, idxs) in zip(fieldnames(NEOCPObject{Float64}), NEOCP_OBJECT_COLUMNS)
+            if name != :source]...)
+            # Source string
+            source = string(line)
+            # Assemble object
+            objects[i] = NEOCPObject{Float64}($(
+                [name for name in fieldnames(NEOCPObject{Float64})]...
+            ))
         end
-    end
-    # Source string
-    df.source = lines
-    # Parse objects
-    objects = NEOCPObject.(eachrow(df))
-    # Eliminate repeated entries
-    unique!(objects)
-    # Sort by date
-    sort!(objects)
+        # Eliminate repeated entries
+        unique!(objects)
+        # Sort by date
+        sort!(objects)
 
-    return objects
+        return objects
+    end
 end
 
 """

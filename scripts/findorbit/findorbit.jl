@@ -1,8 +1,7 @@
 using ArgParse
 using NEOs, PlanetaryEphemeris, JLD2, Dates, LinearAlgebra, Statistics, Printf
-using NEOs: AbstractOpticalAstrometry, AbstractOpticalVector, OpticalADES,
-            OpticalMPC80, AbstractOrbit, log10chi
-import NEOs: indices, numberofdays, noptical
+using NEOs: AbstractOpticalAstrometry, AbstractOpticalVector, AbstractApparitionVector,
+            OpticalADES, OpticalMPC80, AbstractOrbit, log10chi, indices
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -97,42 +96,6 @@ const MAX_RMS_REGRESSION_FACTOR = 1.5
 const MAX_RMS_REGRESSION_ARCSEC = 0.5
 const MAX_ACCEPTABLE_NRMS = 10.0
 const MOON_EPH = NEOs.selecteph(NEOs.sseph, NEOs.mo)
-
-function fetch_astrometry_format(format::AbstractString)
-    fmt = lowercase(strip(format))
-    if fmt in ("auto", "ades", "xml")
-        return :ades
-    elseif fmt in ("mpc80", "obs80")
-        return :mpc80
-    else
-        throw(ArgumentError("Unknown input format: $format. Use auto, ades, mpc80, or obs80."))
-    end
-end
-
-fetch_optical_astrometry(input::AbstractString, ::Val{:ades}) =
-    fetch_optical_ades(input, MPC)
-
-fetch_optical_astrometry(input::AbstractString, ::Val{:mpc80}) =
-    fetch_optical_mpc80(input, MPC)
-
-astrometry_format(::AbstractVector{<:OpticalADES}) = "ades"
-astrometry_format(::AbstractVector{<:OpticalMPC80}) = "mpc80"
-
-function looks_like_astrometry_file(input::AbstractString)
-    return !isempty(splitext(input)[2]) || occursin("/", input) || occursin("\\", input)
-end
-
-function load_optical_astrometry(input::AbstractString, format::AbstractString)
-    if isfile(input)
-        optical = read_optical_astrometry(input; format)
-    elseif looks_like_astrometry_file(input)
-        throw(ArgumentError("Input astrometry file not found: $input"))
-    else
-        fmt = fetch_astrometry_format(format)
-        optical = fetch_optical_astrometry(input, Val(fmt))
-    end
-    return optical, astrometry_format(optical)
-end
 
 function parseexcludedindices(spec::AbstractString, n::Int;
                               unit::AbstractString = "indices")
@@ -244,35 +207,7 @@ function includedindices(n::Int, excluded::AbstractVector{Int})
     return [i for i in 1:n if !(i in excludedset)]
 end
 
-struct Apparition{T <: Real, O <: AbstractOpticalAstrometry{T}, V <: AbstractVector{O},
-                  I <: AbstractVector{Int}, B}
-    optical::SubArray{O, 1, V, Tuple{I}, B}
-end
-
-const AbstractApparitionVector{T} = AbstractVector{Apparition{T, O, V, I, B}} where {O, V, I, B}
-
-indices(x::Apparition) = first(x.optical.indices)
-NEOs.optical(x::Apparition) = collect(x.optical)
-NEOs.optical(x::AbstractApparitionVector) = sort!(mapreduce(NEOs.optical, vcat, x))
-numberofdays(x::Apparition) = numberofdays(x.optical)
-noptical(x::Apparition) = length(x.optical)
-noptical(x::AbstractApparitionVector) = sum(noptical, x)
-
-apparitionrank(x::Apparition) = (noptical(x) >= 5, noptical(x), numberofdays(x))
-
-function apparitions(optical::AbstractOpticalVector{T},
-                     gap::Period = Day(30)) where {T <: Real}
-    sort!(optical)
-    apps = [[1]]
-    for i in 2:length(optical)
-        if date(optical[i]) - date(optical[i-1]) > gap
-            push!(apps, [i])
-        else
-            push!(apps[end], i)
-        end
-    end
-    return [Apparition(view(optical, i)) for i in apps]
-end
+apparitionrank(x) = (noptical(x) >= 5, noptical(x), numberofdays(x))
 
 computationtime(x::DateTime, y::DateTime) = @sprintf("%.2f", (y - x).value / 60_000)
 
@@ -308,18 +243,6 @@ function initcond(A::AdmissibleRegion)
         (sum(A.ρ_domain) / 2, v_ρ, :linear),
         (A.ρ_domain[2], v_ρ, :linear),
     ]
-end
-
-function meanepoch(x::AbstractOrbit)
-    t = Vector{Float64}(undef, noptical(x))
-    w = Vector{Float64}(undef, noptical(x))
-    for i in eachindex(x.optical)
-        t[i] = dtutc2days(x.optical[i])
-        δ = dec(x.optical[i])
-        σα, σδ = 1 / wra(x.ores[i]), 1 / wdec(x.ores[i])
-        w[i] = 1 / (σα^2 * cos(δ)^2 + σδ^2)
-    end
-    return mean(t, weights(w))
 end
 
 function singleapparitionseeds(apps::AbstractApparitionVector, params::Parameters)
@@ -369,9 +292,10 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
     permute!(mags, perm)
     permute!(apps, perm)
     # Step #1: Linkage with newtonian!
-    i = something(findfirst(>(0), mags), length(apps))
+    i = findfirst(>(0), mags)
+    idxs = isnothing(i) ? eachindex(apps) : 1:i
     params = Parameters(params; outrej = false)
-    od = ODProblem(newtonian!, NEOs.optical(view(apps, 1:i)), weights = Veres17,
+    od = ODProblem(newtonian!, NEOs.optical(view(apps, idxs)), weights = Veres17,
                    debias = Eggl20)
     orbitMID = linkage(od, orbitSA, params)
     iszero(orbitMID) && return orbitSA
@@ -396,7 +320,7 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
         return orbitMID
     end
     # Step #3: Outlier rejection
-    params = Parameters(params; outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10),
+    params = Parameters(params; outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,
                         fudge = 100.0, max_per = 33.3)
     orbitRJ = jtls(OD, orbitMA, params)
     return iszero(orbitRJ) ? orbitMA : orbitRJ
@@ -566,7 +490,7 @@ end
 function attachfullresiduals(orbit::LeastSquaresOrbit, optical::AbstractOpticalVector,
                              excluded::AbstractVector{Int}, params::Parameters)
     od = ODProblem(orbit.dynamics, optical, weights = Veres17, debias = Eggl20)
-    q0 = NEOs.initialcondition(orbit, NEOs.dof(od), params)
+    q0 = NEOs.initialcondition(orbit, epoch(orbit) + PE.J2000, NEOs.dof(od), params)
     bwd, fwd, ores = propres(od, q0, epoch(orbit) + PE.J2000, params)
     length(ores) == length(optical) || error("Could not compute residuals for full input arc")
     flags = fitoutlierflags(orbit, optical)
@@ -788,7 +712,7 @@ function postfitpropagation(orbit::LeastSquaresOrbit, tmin::Real, tmax::Real,
     t0 = epoch(orbit)
     variables = NEOs.variables(orbit)
     Ndof = NEOs.dof(orbit)
-    q0 = NEOs.initialcondition(orbit, Ndof, params)
+    q0 = NEOs.initialcondition(orbit, epoch(orbit) + PE.J2000, Ndof, params)
     if jet
         T = eltype(q0)
         NEOs.set_od_order(T, 1, length(variables))
@@ -1476,7 +1400,7 @@ function main()
     println("• Input designation/astrometry file: ", input)
 
     # Output .jld2 file
-    output::String = parsed_args["output"]
+    output::Union{Nothing, String} = parsed_args["output"]
     println("• Output .jld2 file: ", output)
 
     # Input astrometry format
@@ -1555,7 +1479,7 @@ function main()
     println("• Run started at ", global_initial_time)
 
     # Load optical astrometry
-    optical, format = load_optical_astrometry(input, format)
+    optical, format = load_optical_astrometry(input; format)
     println("• Loaded ", length(optical), " ", uppercase(format), " optical observations")
     filter!(!isdeprecated, optical)
     sort!(optical)
@@ -1577,10 +1501,10 @@ function main()
     # Parameters
     params = Parameters(
         maxsteps = 20_000, order = 15, abstol = 1E-12, parse_eqs = true,
-        coeffstol = Inf, bwdoffset = 0.2, fwdoffset = 0.2,
+        coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
         marsden_radial = use_cometary_nongravs ? COMETARY_MARSDEN_RADIAL :
                          (1.0, 1.0, 2.0, 0.0, 0.0),
-        gaussorder = 2, safegauss = false, refscale = :log,
+        gaussorder = 2, safegauss = true, refscale = :log,
         tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
         jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 30,
         jtlsproject = true, significance = 0.99, verbose = true,
@@ -1599,13 +1523,14 @@ function main()
                             marsden_scalings = nongrav_scalings,
                             force_all_fit, max_rms_jump_factor, max_rms_jump_arcsec)
 
-    # Shift epoch to requested epoch, or to the middle of the observational arc
-    jdsolution = isnothing(solution_epoch) ? meanepoch(orbit) + PE.J2000 : solution_epoch
-    try
-        orbit = shiftepoch(orbit, jdsolution, params; beyondarc = true)
-    catch err
-        println("• Could not shift final orbit epoch; keeping orbit at fitted epoch (",
-                typeof(err), ")")
+    # JTLS fits at the weighted mean observational epoch; only shift when requested.
+    if !isnothing(solution_epoch)
+        try
+            orbit = shiftepoch(orbit, solution_epoch, params; beyondarc = true)
+        catch err
+            println("• Could not shift final orbit epoch; keeping orbit at fitted epoch (",
+                    typeof(err), ")")
+        end
     end
     # Compute elements and H before attaching held-out observations because H currently
     # uses every optical observation and does not inspect residual outlier flags.
@@ -1660,20 +1585,22 @@ function main()
                            include_track = print_track_residuals)
 
     # Save orbit
-    if isempty(residual_excluded)
-        jldsave(output; orbit)
-    elseif full_residuals_attached
-        heldout_optical = orbit.optical[residual_excluded]
-        heldout_ores = orbit.ores[residual_excluded]
-        jldsave(output; orbit, fit_excluded = residual_excluded,
-                heldout_optical, heldout_ores)
-    else
-        heldout_optical = optical[residual_excluded]
-        heldout_ores = typeof(orbit.ores)()
-        jldsave(output; orbit, fit_excluded = residual_excluded,
-                heldout_optical, heldout_ores)
+    if !isnothing(output)
+        if isempty(residual_excluded)
+            jldsave(output; orbit)
+        elseif full_residuals_attached
+            heldout_optical = orbit.optical[residual_excluded]
+            heldout_ores = orbit.ores[residual_excluded]
+            jldsave(output; orbit, fit_excluded = residual_excluded,
+                    heldout_optical, heldout_ores)
+        else
+            heldout_optical = optical[residual_excluded]
+            heldout_ores = typeof(orbit.ores)()
+            jldsave(output; orbit, fit_excluded = residual_excluded,
+                    heldout_optical, heldout_ores)
+        end
+        println("Final orbit saved to: ", output)
     end
-    println("Final orbit saved to: ", output)
 
     # Final time
     global_final_time = now()

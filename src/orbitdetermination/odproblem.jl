@@ -109,6 +109,32 @@ function minmaxdates(x::ODProblem)
     return t0, tf
 end
 
+"""
+    meandate(::Union{ODProblem, AbstractOrbit})
+
+Return the `DateTime` [UTC] corresponding to the
+weighted mean optical observational epoch.
+
+See also [`meanepoch`](@ref).
+
+!!! reference
+    See equation (15) of:
+    - https://doi.org/10.1007/s10569-024-10225-z
+"""
+function meandate(x::ODProblem)
+    T = scalartype(x)
+    t = Vector{T}(undef, noptical(x))
+    w = Vector{T}(undef, noptical(x))
+    for (i, (obs, weight)) in enumerate(zip(optical(x), weights(x)))
+        δ = dec(obs)
+        σα, σδ = inv.(weight)
+        t[i] = datetime2julian(obs) - PE.J2000
+        w[i] = 1 / (σα^2 * cos(δ)^2 + σδ^2)
+    end
+    tmean = mean(t, weights(w))
+    return julian2datetime(tmean + PE.J2000)
+end
+
 function update!(x::AbstractODProblem{D, T},
                  optical::AbstractOpticalVector{T}) where {D, T <: Real}
     # Update ODProblem fields

@@ -43,7 +43,7 @@ function TimeOfDay(observatory::ObservatoryMPC, date::DateTime; eop::EOPIAU = EO
         return TimeOfDay(:satellite, date, date, 0)
     end
     # Hours from UTC
-    utc = hours_from_UTC(observatory, dtutc2et(date); eop)
+    utc = hours_from_UTC(observatory, datetime2julian(date); eop)
     # Today's sunrise / sunset
     today = sunriseset(observatory, date; eop)
     # Yesterday's sunrise / sunset
@@ -65,16 +65,16 @@ end
 # Return the naive hour difference between longitude `lon` [rad] and UTC.
 hours_from_UTC(lon::Real) = ceil(Int, 12*lon/π - 0.5)
 
-function hours_from_UTC(observatory::ObservatoryMPC, et::Number;
+function hours_from_UTC(observatory::ObservatoryMPC, jd_utc::Number;
                         eop::EOPIAU = EOP_IAU2000A)
-    lon, _ = lonlat(observatory, et; eop)
+    lon, _ = lonlat(observatory, jd_utc; eop)
     return hours_from_UTC(lon)
 end
 
 # Return the geocentric longitude and latitude [rad] of an observatory.
-function lonlat(observatory::ObservatoryMPC, et::Number; eop::EOPIAU = EOP_IAU2000A)
+function lonlat(observatory::ObservatoryMPC, jd_utc::Number; eop::EOPIAU = EOP_IAU2000A)
     # Observer's position in ITRF (ECEF) frame [m]
-    posECEF = obsposECEF(observatory, et; eop) * 1_000
+    posECEF = obsposECEF(observatory, jd_utc; eop) * 1_000
     # Transform from ITRF (ECEF) [m] to Geocentric [m]
     lat, lon, _ = ecef_to_geocentric(posECEF)
 
@@ -98,7 +98,7 @@ function sunriseset(observatory::ObservatoryMPC, date::DateTime;
     δ = 0.006918 - 0.399912*cos(γ) + 0.070257*sin(γ) - 0.006758*cos(2γ) + 0.000907*sin(2γ)
         - 0.002697*cos(3γ) + 0.00148*sin(3γ)
     # Longitude and latitude [rad]
-    lon, lat = lonlat(observatory, dtutc2et(date); eop)
+    lon, lat = lonlat(observatory, datetime2julian(date); eop)
     # Solar hour angle [deg]
     ha_sunrise = acosd(cosd(90.833)/cos(lat)/cos(δ) - tan(lat)*tan(δ))
     ha_sunset = -ha_sunrise
@@ -128,15 +128,15 @@ Earth-Centered Earth-Fixed (ECEF) reference frame.
     (default: `EOP_IAU2000A`).
 """
 obsposECEF(x::AbstractAstrometryObservation; eop::EOPIAU = EOP_IAU2000A) =
-    obsposECEF(observatory(x), dtutc2et(x); eop)
+    obsposECEF(observatory(x), datetime2julian(x); eop)
 
-obsposECEF(obs::ObservatoryMPC, et::Number; eop::EOPIAU = EOP_IAU2000A) =
-    obsposECEF(Val(Symbol(obs.frame)), obs.coords, et; eop)
+obsposECEF(obs::ObservatoryMPC, jd_utc::Number; eop::EOPIAU = EOP_IAU2000A) =
+    obsposECEF(Val(Symbol(obs.frame)), obs.coords, jd_utc; eop)
 
-function obsposECEF(::Val{:MPC}, coords::SVector{3, T}, et::U;
-                    eop::EOPIAU = EOP_IAU2000A) where {T <: Real, U <: Number}
+function obsposECEF(::Val{:MPC}, coords::SVector{3}, jd_utc::Number;
+                    eop::EOPIAU = EOP_IAU2000A)
     # One with correct type (and order)
-    oneU = one(et)
+    oneU = one(jd_utc)
     # Cilindrical coordinates of the observer's position in ITRF (ECEF) frame
     # λ: longitude East of the prime meridian [rad]
     # u: distance from spin axis ( ρ * cos(ϕ')) [km]
@@ -149,23 +149,19 @@ function obsposECEF(::Val{:MPC}, coords::SVector{3, T}, et::U;
     x = u * cos(λ)
     y = u * sin(λ)
     z = v
-    posECEF = SVector{3, U}(x * oneU, y * oneU, z * oneU)
+    posECEF = SVector{3, typeof(jd_utc)}(x * oneU, y * oneU, z * oneU)
 
     return posECEF
 end
 
-function obsposECEF(::Val{:ICRF_KM}, coords::SVector{3, T}, et::U;
-                    eop::EOPIAU = EOP_IAU2000A) where {T <: Real, U <: Number}
+function obsposECEF(::Val{:ICRF_KM}, coords::SVector{3}, jd_utc::Number;
+                    eop::EOPIAU = EOP_IAU2000A)
     # Zero and one with correct type (and order)
-    zeroU, oneU = zero(et), one(et)
-    # UTC seconds
-    utc_secs = et - tdb_utc(et)
-    # Julian days UTC
-    jd_utc = JD_J2000 + utc_secs/daysec
+    zeroU, oneU = zero(jd_utc), one(jd_utc)
     # Cartesian coordinates of the observer's state vector in GCRF (ECI) frame [km]
     posECI = coords * oneU
-    velECI = SVector{3, U}(zeroU, zeroU, zeroU)
-    accECI = SVector{3, U}(zeroU, zeroU, zeroU)
+    velECI = SVector{3, typeof(jd_utc)}(zeroU, zeroU, zeroU)
+    accECI = SVector{3, typeof(jd_utc)}(zeroU, zeroU, zeroU)
     posvelECI = OrbitStateVector(jd_utc, posECI, velECI, accECI)
     # Transform state vector from:
     # GCRF: Geocentric Celestial Reference Frame (ECI)
@@ -176,18 +172,14 @@ function obsposECEF(::Val{:ICRF_KM}, coords::SVector{3, T}, et::U;
     return posvelECEF.r
 end
 
-function obsposECEF(::Val{:ICRF_AU}, coords::SVector{3, T}, et::U;
-                    eop::EOPIAU = EOP_IAU2000A) where {T <: Real, U <: Number}
+function obsposECEF(::Val{:ICRF_AU}, coords::SVector{3}, jd_utc::Number;
+                    eop::EOPIAU = EOP_IAU2000A)
     # Zero and one with correct type (and order)
-    zeroU, oneU = zero(et), one(et)
-    # UTC seconds
-    utc_secs = et - tdb_utc(et)
-    # Julian days UTC
-    jd_utc = JD_J2000 + utc_secs/daysec
+    zeroU, oneU = zero(jd_utc), one(jd_utc)
     # Cartesian coordinates of the observer's state vector in GCRF (ECI) frame [km]
     posECI = coords * oneU * au
-    velECI = SVector{3, U}(zeroU, zeroU, zeroU)
-    accECI = SVector{3, U}(zeroU, zeroU, zeroU)
+    velECI = SVector{3, typeof(jd_utc)}(zeroU, zeroU, zeroU)
+    accECI = SVector{3, typeof(jd_utc)}(zeroU, zeroU, zeroU)
     posvelECI = OrbitStateVector(jd_utc, posECI, velECI, accECI)
     # Transform state vector from:
     # GCRF: Geocentric Celestial Reference Frame (ECI)
@@ -198,10 +190,10 @@ function obsposECEF(::Val{:ICRF_AU}, coords::SVector{3, T}, et::U;
     return posvelECEF.r
 end
 
-function obsposECEF(::Val{:WGS84}, coords::SVector{3, T}, et::U;
-                    eop::EOPIAU = EOP_IAU2000A) where {T <: Real, U <: Number}
+function obsposECEF(::Val{:WGS84}, coords::SVector{3}, jd_utc::Number;
+                    eop::EOPIAU = EOP_IAU2000A)
     # One with correct type (and order)
-    oneU = one(et)
+    oneU = one(jd_utc)
     # Geodetic coordinates of the observer's position in WGS84 (ECEF) frame
     # lon: East longitude [rad]
     # lat: latitude [rad]
@@ -213,6 +205,89 @@ function obsposECEF(::Val{:WGS84}, coords::SVector{3, T}, et::U;
     posECEF = geodetic_to_ecef(lat, lon, alt) / 1_000
 
     return posECEF
+end
+
+"""
+    obsposvelECI(::AbstractOpticalAstrometry; kwargs...)
+
+Return the observer's geocentric cartesian state vector [km, km/sec] in
+Earth-Centered Inertial (ECI) reference frame.
+
+# Keyword argument
+
+- `eop::Union{EopIau1980, EopIau2000A}`: Earth Orientation Parameters
+    (default: `EOP_IAU2000A`).
+
+# Extended help
+
+By default, the IAU200A Earth orientation model is used to transform
+from  Earth-centered, Earth-fixed (ECEF) frame to ECI frame. Other Earth
+orientation  models, such as the IAU1976/80 model, can be used by importing
+the `SatelliteToolboxTransformations.EopIau1980` type and passing it to the
+`eop` keyword argument in the function call.
+"""
+obsposvelECI(x::AbstractAstrometryObservation; eop::EOPIAU = EOP_IAU2000A) =
+    obsposvelECI(observatory(x), datetime2julian(x); eop)
+
+obsposvelECI(obs::ObservatoryMPC, jd_utc::Number; eop::EOPIAU = EOP_IAU2000A) =
+    obsposvelECI(Val(Symbol(obs.frame)), obs.coords, jd_utc; eop)
+
+function obsposvelECI(::Val{:MPC}, coords::SVector{3}, jd_utc::Number;
+                      eop::EOPIAU = EOP_IAU2000A)
+    # Zero of correct type (and order)
+    zeroU = zero(jd_utc)
+    # Cartesian coordinates of the observer's state vector in ITRF (ECEF) frame [km]
+    posECEF = obsposECEF(Val(:MPC), coords, jd_utc; eop)
+    velECEF = SVector{3, typeof(jd_utc)}(zeroU, zeroU, zeroU)
+    accECEF = SVector{3, typeof(jd_utc)}(zeroU, zeroU, zeroU)
+    posvelECEF = OrbitStateVector(jd_utc, posECEF, velECEF, accECEF)
+    # Transform state vector from:
+    # ITRF: International Terrestrial Reference Frame (ECEF)
+    # to:
+    # GCRF: Geocentric Celestial Reference Frame (ECI)
+    posvelECI = sv_ecef_to_eci(posvelECEF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
+
+    return vcat(posvelECI.r, posvelECI.v)
+end
+
+function obsposvelECI(::Val{:ICRF_KM}, coords::SVector{3}, jd_utc::Number;
+                      eop::EOPIAU = EOP_IAU2000A)
+    # One with correct type (and order)
+    zeroU, oneU = zero(jd_utc), one(jd_utc)
+    # Cartesian coordinates of the observer's state vector in GCRF (ECI) frame [km]
+    posECI = coords * oneU
+    velECI = SVector{3, typeof(jd_utc)}(zeroU, zeroU, zeroU)
+
+    return vcat(posECI, velECI)
+end
+
+function obsposvelECI(::Val{:ICRF_AU}, coords::SVector{3}, jd_utc::Number;
+                      eop::EOPIAU = EOP_IAU2000A)
+    # One with correct type (and order)
+    zeroU, oneU = zero(jd_utc), one(jd_utc)
+    # Cartesian coordinates of the observer's state vector in GCRF (ECI) frame [km]
+    posECI = coords * oneU * au
+    velECI = SVector{3, typeof(jd_utc)}(zeroU, zeroU, zeroU)
+
+    return vcat(posECI, velECI)
+end
+
+function obsposvelECI(::Val{:WGS84}, coords::SVector{3}, jd_utc::Number;
+                      eop::EOPIAU = EOP_IAU2000A)
+    # Zero of correct type (and order)
+    zeroU = zero(jd_utc)
+    # Cartesian coordinates of the observer's state vector in ITRF (ECEF) frame [km]
+    posECEF = obsposECEF(Val(:WGS84), coords, jd_utc; eop)
+    velECEF = SVector{3, typeof(jd_utc)}(zeroU, zeroU, zeroU)
+    accECEF = SVector{3, typeof(jd_utc)}(zeroU, zeroU, zeroU)
+    posvelECEF = OrbitStateVector(jd_utc, posECEF, velECEF, accECEF)
+    # Transform state vector from:
+    # ITRF: International Terrestrial Reference Frame (ECEF)
+    # to:
+    # GCRF: Geocentric Celestial Reference Frame (ECI)
+    posvelECI = sv_ecef_to_eci(posvelECEF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
+
+    return vcat(posvelECI.r, posvelECI.v)
 end
 
 # TODO: avoid sv_ecef_to_ecef and sv_ecef_to_eci overloads by defining proper product
@@ -280,97 +355,6 @@ for EOP in (:Nothing, :EopIau1980, :EopIau2000A)
     end
 end
 =#
-
-"""
-    obsposvelECI(::AbstractOpticalAstrometry; kwargs...)
-
-Return the observer's geocentric cartesian state vector [km, km/sec] in
-Earth-Centered Inertial (ECI) reference frame.
-
-# Keyword argument
-
-- `eop::Union{EopIau1980, EopIau2000A}`: Earth Orientation Parameters
-    (default: `EOP_IAU2000A`).
-
-# Extended help
-
-By default, the IAU200A Earth orientation model is used to transform
-from  Earth-centered, Earth-fixed (ECEF) frame to ECI frame. Other Earth
-orientation  models, such as the IAU1976/80 model, can be used by importing
-the `SatelliteToolboxTransformations.EopIau1980` type and passing it to the
-`eop` keyword argument in the function call.
-"""
-obsposvelECI(x::AbstractAstrometryObservation; eop::EOPIAU = EOP_IAU2000A) =
-    obsposvelECI(observatory(x), dtutc2et(x); eop)
-
-obsposvelECI(obs::ObservatoryMPC, et::Number; eop::EOPIAU = EOP_IAU2000A) =
-    obsposvelECI(Val(Symbol(obs.frame)), obs.coords, et; eop)
-
-function obsposvelECI(::Val{:MPC}, coords::SVector{3, T}, et::U;
-                      eop::EOPIAU = EOP_IAU2000A) where {T <: Real, U <: Number}
-    # Zero of correct type (and order)
-    zeroU = zero(et)
-    # UTC seconds
-    utc_secs = et - tdb_utc(et)
-    # Julian days UTC
-    jd_utc = JD_J2000 + utc_secs/daysec
-    # Cartesian coordinates of the observer's state vector in ITRF (ECEF) frame [km]
-    posECEF = obsposECEF(Val(:MPC), coords, et; eop)
-    velECEF = SVector{3, U}(zeroU, zeroU, zeroU)
-    accECEF = SVector{3, U}(zeroU, zeroU, zeroU)
-    posvelECEF = OrbitStateVector(jd_utc, posECEF, velECEF, accECEF)
-    # Transform state vector from:
-    # ITRF: International Terrestrial Reference Frame (ECEF)
-    # to:
-    # GCRF: Geocentric Celestial Reference Frame (ECI)
-    posvelECI = sv_ecef_to_eci(posvelECEF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
-
-    return vcat(posvelECI.r, posvelECI.v)
-end
-
-function obsposvelECI(::Val{:ICRF_KM}, coords::SVector{3, T}, et::U;
-                      eop::EOPIAU = EOP_IAU2000A) where {T <: Real, U <: Number}
-    # One with correct type (and order)
-    zeroU, oneU = zero(et), one(et)
-    # Cartesian coordinates of the observer's state vector in GCRF (ECI) frame [km]
-    posECI = coords * oneU
-    velECI = SVector{3, U}(zeroU, zeroU, zeroU)
-
-    return vcat(posECI, velECI)
-end
-
-function obsposvelECI(::Val{:ICRF_AU}, coords::SVector{3, T}, et::U;
-                      eop::EOPIAU = EOP_IAU2000A) where {T <: Real, U <: Number}
-    # One with correct type (and order)
-    zeroU, oneU = zero(et), one(et)
-    # Cartesian coordinates of the observer's state vector in GCRF (ECI) frame [km]
-    posECI = coords * oneU * au
-    velECI = SVector{3, U}(zeroU, zeroU, zeroU)
-
-    return vcat(posECI, velECI)
-end
-
-function obsposvelECI(::Val{:WGS84}, coords::SVector{3, T}, et::U;
-                      eop::EOPIAU = EOP_IAU2000A) where {T <: Real, U <: Number}
-    # Zero of correct type (and order)
-    zeroU = zero(et)
-    # UTC seconds
-    utc_secs = et - tdb_utc(et)
-    # Julian days UTC
-    jd_utc = JD_J2000 + utc_secs/daysec
-    # Cartesian coordinates of the observer's state vector in ITRF (ECEF) frame [km]
-    posECEF = obsposECEF(Val(:WGS84), coords, et; eop)
-    velECEF = SVector{3, U}(zeroU, zeroU, zeroU)
-    accECEF = SVector{3, U}(zeroU, zeroU, zeroU)
-    posvelECEF = OrbitStateVector(jd_utc, posECEF, velECEF, accECEF)
-    # Transform state vector from:
-    # ITRF: International Terrestrial Reference Frame (ECEF)
-    # to:
-    # GCRF: Geocentric Celestial Reference Frame (ECI)
-    posvelECI = sv_ecef_to_eci(posvelECEF, Val(:ITRF), Val(:GCRF), jd_utc, eop)
-
-    return vcat(posvelECI.r, posvelECI.v)
-end
 
 # Convert from the fixed-width USNO format to the IERS csv format
 # read by SatelliteToolboxTransformations

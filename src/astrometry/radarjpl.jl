@@ -60,36 +60,37 @@ jplparse(_, ::Type{DateTime}, x) = DateTime(x, RADAR_JPL_DATEFORMAT)
 jplparse(_, ::Type{ObservatoryMPC{T}}, x) where {T <: Real} =
     search_observatory_code(JPL_TO_MPC_OBSCODES[x])
 
-RadarJPL(r::DataFrameRow) = RadarJPL{Float64}(
-    r.des, r.epoch, r.value, r.sigma, r.units, r.freq,
-    r.rcvr, r.xmit, r.bp
-)
-
-function parse_radar_jpl(text::AbstractString)
-    # Parse JSON
-    dict = JSON.parse(text)
-    filter!(x -> haskey(JPL_TO_MPC_OBSCODES, x[7]) && haskey(JPL_TO_MPC_OBSCODES, x[8]),
-            dict["data"])
-    L = length(dict["data"])
-    iszero(L) && return RadarJPL{Float64}[]
-    # Construct DataFrame
-    R = RadarJPL{Float64}
-    names, types = fieldnames(R), fieldtypes(R)
-    df = DataFrame([fill(astrometrydefault(fieldtype(R, name)), L) for name in names],
-        collect(names))
-    for (i, line) in enumerate(dict["data"])
-        for (name, type, x) in zip(names, types, line)
-            df[i, name] = jplparse(name, type, x)
+@eval begin
+    function parse_radar_jpl(text::AbstractString)
+        # Parse JSON
+        dict = JSON.parse(text)
+        filter!(x -> haskey(JPL_TO_MPC_OBSCODES, x[7]) && haskey(JPL_TO_MPC_OBSCODES, x[8]),
+                dict["data"])
+        isempty(dict["data"]) && return RadarJPL{Float64}[]
+        # Main parse loop
+        radar = Vector{RadarJPL{Float64}}(undef, length(dict["data"]))
+        for (i, line) in enumerate(dict["data"])
+            $([:(
+                $(name) = jplparse(
+                    $(QuoteNode(name)),
+                    $(fieldtype(RadarJPL{Float64}, name)),
+                    line[$c]
+                )
+            ) for (c, name) in enumerate(
+                [n for n in fieldnames(RadarJPL{Float64})]
+            )]...)
+            # Assemble observation
+            radar[i] = RadarJPL{Float64}($(
+                [name for name in fieldnames(RadarJPL{Float64})]...
+            ))
         end
-    end
-    # Parse observations
-    radar = RadarJPL.(eachrow(df))
-    # Eliminate repeated entries
-    unique!(radar)
-    # Sort by date
-    sort!(radar)
+        # Eliminate repeated entries
+        unique!(radar)
+        # Sort by date
+        sort!(radar)
 
-    return radar
+        return radar
+    end
 end
 
 """

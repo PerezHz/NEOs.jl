@@ -44,10 +44,10 @@ function AdmissibleRegion(date::DateTime, α::T, δ::T, v_α::T, v_δ::T,
     @unpack eph_ea, eph_su, H_max, a_max = params
     # Topocentric unit vector and partials
     ρ, ρ_α, ρ_δ = topounitpdv(α, δ)
-    # Time of observation [days (et seconds) since J2000]
-    t_days, t_et = dtutc2days(date), dtutc2et(date)
+    # Time of observation [days since J2000 TDB, Julian days UTC]
+    t_days, jd_utc = dtutc2days(date), datetime2julian(date)
     # Heliocentric position of the observer
-    q = eph_ea(t_days) + kmsec2auday(obsposvelECI(observatory, t_et)) - eph_su(t_days)
+    q = eph_ea(t_days) + kmsec2auday(obsposvelECI(observatory, jd_utc)) - eph_su(t_days)
     # Admissible region coefficients
     coeffs = arcoeffs(α, δ, v_α, v_δ, ρ, ρ_α, ρ_δ, q)
     # Maximum range (heliocentric energy constraint)

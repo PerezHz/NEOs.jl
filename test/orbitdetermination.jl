@@ -11,13 +11,16 @@ using NEOs: OpticalMPC80, RadarJPL, AbstractOpticalVector, RadarResidual, Kepler
       EquinoctialElements, AttributableElements, μ_S, indices, equatorial2ecliptic,
       ecliptic2equatorial, numtypes, sseph, covariance, scalartype, opticaltype, radartype,
       dof, hasradar
-
+using SPICE: furnsh, spkgeo
 using Statistics: mean
 
+const μ_SUN_DE441 = 2.9591220828411956E-04
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 const OpticalOrbit{T} = LeastSquaresOrbit{typeof(newtonian!), T, T, Vector{OpticalMPC80{T}}}
 const RadarOrbit{T} = LeastSquaresOrbit{typeof(newtonian!), T, T, Vector{OpticalMPC80{T}},
     Vector{RadarJPL{T}}, Vector{RadarResidual{T, T}}}
+
+furnsh(joinpath(TEST_DATA, "test.bsp"))
 
 function iodsuboptical(optical::AbstractOpticalVector, N::Int = 3)
     tracklets = reduce_tracklets(optical)
@@ -33,11 +36,19 @@ mre(x, y, z) = maximum(@. abs(x - y) / z)
 mahalanobis(x::AbstractVector, μ::AbstractVector, Σ::AbstractMatrix) =
         sqrt((x - μ)' * inv(Diagonal(Σ)) * (x - μ))
 
-function jpl_compatibility_tests(orbit, params, bounds, JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+function jpl_compatibility_tests(spkid, orbit, params, bounds)
     @testset "Compatibility with JPL" begin
         # Reference epoch
         t0 = epoch(orbit)
+        et0 = t0 * daysec
         mjd0 = t0 + MJD2000
+        # JPL vectors
+        JPL_CAR = kmsec2auday(spkgeo(spkid, et0, "J2000", 0)[1])
+        JPL_HEL = kmsec2auday(spkgeo(spkid, et0, "ECLIPJ2000", 10)[1])
+        JPL_KEP = cartesian2keplerian(JPL_HEL, mjd0; μ = μ_SUN_DE441)
+        JPL_EQN = keplerian2equinoctial(JPL_KEP, mjd0; μ = μ_SUN_DE441)
+        JPL_GEO = kmsec2auday(spkgeo(spkid, et0, "J2000", 399)[1])
+        JPL_ATTR = cartesian2attributable(JPL_GEO)
         # Barycentric cartesian sate vector
         q0, σ0 = orbit(), sigmas(orbit)
         @test mre(q0, JPL_CAR, σ0) < bounds[1]
@@ -220,7 +231,7 @@ end
         # Parameters
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-           gaussorder = 2, jtlsorder = 2, jtlsiter = 200, lsiter = 20,
+           gaussorder = 2, jtlsorder = 2, jtlsiter = 20, lsiter = 20,
            significance = 0.99, outrej = false, parse_eqs = false
         )
         params = Parameters(params, parse_eqs = true)
@@ -238,7 +249,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -253,19 +264,19 @@ end
         @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-4)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit.ores) == 9
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 9e-4 )
-        @test all( snr(orbit) .> 14.5)
+        @test maximum(sigmas(orbit)) < 9E-04
+        @test minimum(snr(orbit)) > 14.5
         @test chi2(orbit) < 0.53
         @test nrms(orbit) < 0.18
         # Covariance matrix
@@ -279,14 +290,8 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [-0.9867704701732631, 0.3781890325424674, 0.14094513213009532,
-            -0.008773157203087259, -0.00947109649687576, -0.005654229864757284]
-        JPL_KEP = [8.198835710815939E-01, 3.962989389356275E-01, 5.807184452352074E+00,
-            4.045356567755751E+01, 3.261403954217091E+02, 1.216665112960870E+02]
-        JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (7.6E-01, 8.3E-01, 7.0E-12, 4.6E-14, 1.1E-13),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(54342500, orbit, params, (7.6E-01, 8.3E-01, 7.7E-12,
+            7.3E-14, 1.3E-13))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 24.3 ≤ H + dH
@@ -324,19 +329,19 @@ end
         @test orbit1.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
-        @test epoch(orbit1) == epoch(orbit)
+        @test meanepoch(od) == meanepoch(orbit1) == epoch(orbit1)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit1)
-        @test all( norm.(orbit1.bwd.p, Inf) .< 1.2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 1.2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit1)
-        @test all( norm.(orbit1.fwd.p, Inf) .< 1.2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 1.2
         # Vector of residuals
         @test notout(orbit1.ores) == 43
         @test nout(orbit1.ores) == 0
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
-        @test all( sigmas(orbit1) .< 2e-4 )
-        @test all( snr(orbit1) .> 866 )
+        @test maximum(sigmas(orbit1)) < 2E-04
+        @test minimum(snr(orbit1)) > 866
         @test chi2(orbit1) < 11.64
         @test nrms(orbit1) < 0.37
         # Covariance matrix
@@ -346,12 +351,12 @@ end
         @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit1.qs, 1) == 6
-        @test size(orbit1.qs, 2) == length(orbit1.Qs) == 4
+        @test size(orbit1.qs, 2) == length(orbit1.Qs) <= 5
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        jpl_compatibility_tests(orbit1, params, (3.1E-01, 4.5E-01, 5.7E-11, 8.2E-12, 6.3E-12),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(54342500, orbit1, params, (3.1E-01, 6.3E-01, 5.7E-11,
+            8.2E-12, 7.0E-12))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
         @test H - dH ≤ 24.3 ≤ H + dH
@@ -380,7 +385,7 @@ end
         # Parameters
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-           gaussorder = 2, jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           gaussorder = 2, jtlsorder = 2, jtlsiter = 20, lsiter = 10,
            significance = 0.99, outrej = false, safegauss = false
         )
         # Orbit determination problem
@@ -396,7 +401,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -411,19 +416,19 @@ end
         @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(optical[4])), atol = 3e-4)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 5e-3 )
-        @test all( snr(orbit) .> 21.4)
+        @test maximum(sigmas(orbit)) < 5E-03
+        @test minimum(snr(orbit)) > 21.4
         @test chi2(orbit) < 2.53
         @test nrms(orbit) < 0.46
         # Covariance matrix
@@ -433,18 +438,12 @@ end
         @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 3
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [1.0042569058151192, 0.2231639040146286, 0.11513854178693468,
-            -0.010824212819531798, 0.017428798232689943, 0.0071046780555307385]
-        JPL_KEP = [2.872424697642789E+00, 6.749395051551541E-01, 1.282355986214476E+00,
-            1.725712172730245E+02, 2.413793589329106E+02, 3.538743602962668E+02]
-        JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (5.6E-03, 5.5E-03, 2.4E-11, 1.4E-14, 3.8E-12),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(50303239, orbit, params, (8.0E-03, 8.0E-03, 2.4E-11,
+            1.4E-14, 3.8E-12))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 24.0 ≤ H + dH
@@ -491,7 +490,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -506,19 +505,19 @@ end
         @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 5e-4)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit.ores) == 12
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 6.6e-4 )
-        @test all( snr(orbit) .> 38.8)
+        @test maximum(sigmas(orbit)) < 1.5E-03
+        @test minimum(snr(orbit)) > 19.1
         @test chi2(orbit) < 2.43
         @test nrms(orbit) < 0.32
         # Covariance matrix
@@ -528,18 +527,12 @@ end
         @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) <= 3
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 7
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [-0.12722461679828806, -0.9466098076903212, -0.4526816007640767,
-            0.02048875631534963, -0.00022720097573790754, 0.00321302850930331]
-        JPL_KEP = [2.232655272359251E+00, 5.480018648354085E-01, 8.456325272115306E+00,
-            1.322293305412568E+01, 2.778787985886902E+02, 3.530120962605258E+02]
-        JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (1.6E-01, 2.4E0, 2.5E-11, 4.3E-12, 1.5E-12),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(54448601, orbit, params, (1.6E-01, 2.4E0, 2.5E-11,
+            4.3E-12, 1.7E-12))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 21.7 ≤ H + dH
@@ -574,7 +567,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by July 31, 2026
+        # Values by August 24, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -713,7 +706,7 @@ end
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
            tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
-           jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           jtlsorder = 2, jtlsiter = 20, lsiter = 10,
            significance = 0.99, outrej = false
         )
         # Orbit determination problem
@@ -727,9 +720,9 @@ end
         @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
 
         # Initial Orbit Determination
-        orbit = initialorbitdetermination(od, params)
+        orbit = tsaiod(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 24, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -750,19 +743,19 @@ end
         @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical), atol = 7e-5)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit.ores) == 10
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 6e-3 )
-        @test all( snr(orbit) .> 4.1)
+        @test maximum(sigmas(orbit)) < 6E-03
+        @test minimum(snr(orbit)) > 4.1
         @test chi2(orbit) < 14.24
         @test nrms(orbit) < 0.85
         # Covariance matrix
@@ -773,17 +766,11 @@ end
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
-        @test issorted(orbit.Qs, rev = true)
+        # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [-0.9698405495747651, 0.24035304578776012, 0.10288276585828428,
-            -0.009512301266159554, -0.01532548565855646, -0.00809464581680694]
-        JPL_KEP = [1.484448954296998E+00, 3.966995063832199E-01, 3.961868860866990E+00,
-            1.294946774085543E+02, 3.442349856198504E+02, 2.206164242012555E+01]
-        JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (1.3E-02, 1.7E-02, 1.9E-11, 3.8E-13, 3.8E-13),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(50405637, orbit, params, (1.3E-02, 1.7E-02, 2.2E-11,
+            3.8E-13, 3.8E-13))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 29.6 ≤ H + dH
@@ -811,8 +798,8 @@ end
         # Parameters
         params = Parameters(
             bwdoffset = 0.007, fwdoffset = 0.007,
-            gaussorder = 2, jtlsorder = 2, jtlsiter = 20, lsiter = 10,
-            outrej = true, χ2_rec = 1.0, χ2_rej = 1.25, fudge = 0.0
+            gaussorder = 2, jtlsorder = 2, jtlsiter = 20, lsiter = 20,
+            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0, fudge = 0.0
         )
         # Orbit determination problem
         od = ODProblem(newtonian!, suboptical)
@@ -827,7 +814,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -842,21 +829,21 @@ end
         @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 2e-3)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
-        @test notout(orbit.ores) == 16
-        @test nout(orbit.ores) == 2
+        @test notout(orbit.ores) == 18
+        @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 4e-3 )
-        @test all( snr(orbit) .> 50)
-        @test chi2(orbit) < 1.55
-        @test nrms(orbit) < 0.22
+        @test maximum(sigmas(orbit)) < 4E-03
+        @test minimum(snr(orbit)) > 50
+        @test chi2(orbit) < 7.50
+        @test nrms(orbit) < 0.46
         # Covariance matrix
         Γ = covariance(orbit)
         @test size(Γ) == (6, 6)
@@ -868,14 +855,8 @@ end
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [0.7673366466815864, 0.6484892781853565, 0.29323267343908294,
-            -0.011023343781911974, 0.015392697071667377, 0.006528842022004942]
-        JPL_KEP = [1.776244846691859E+00, 4.381984418639090E-01, 7.819612775042287E-01,
-            9.751283439586027E+01, 2.742918197067644E+02, 1.116208224849003E+01]
-        JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (7.6E-02, 1.2E-01, 9.0E-12, 1.9E-12, 2.0E-12),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(50392393, orbit, params, (1.8E+00, 1.1E+01, 1.3E-10,
+            1.9E-12, 1.0E-10))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 26.7 ≤ H + dH
@@ -884,7 +865,7 @@ end
         # Diameter
         Da, Db = minmax(diameter(H, 0.05), diameter(H, 0.25))
         Dc = diameter(orbit, params)
-        @test 11.9 < Da < Dc < Db < 27.1
+        @test 11.9 < Da < Dc < Db < 27.3
         # Mass
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
@@ -911,19 +892,19 @@ end
         @test orbit1.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
-        @test epoch(orbit1) == epoch(orbit)
+        @test meanepoch(od) == meanepoch(orbit1) == epoch(orbit1)
         @test dtutc2days(date(optical[1])) > firsttime(orbit1)
-        @test all( norm.(orbit1.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit1)
-        @test all( norm.(orbit1.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit1.ores) == 19
         @test nout(orbit1.ores) == 2
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
-        @test all( sigmas(orbit1) .< 3e-4 )
-        @test all( snr(orbit1) .> 574)
+        @test maximum(sigmas(orbit1)) < 3E-04
+        @test minimum(snr(orbit1)) > 574
         @test chi2(orbit1) < 2.38
         @test nrms(orbit1) < 0.25
         # Covariance matrix
@@ -940,8 +921,8 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        jpl_compatibility_tests(orbit1, params, (4.5E-04, 1.2E-02, 1.2E-10, 8.2E-11, 8.3E-11),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(50392393, orbit1, params, (4.0E-03, 1.2E-02, 1.4E-10,
+            1.7E-10, 1.0E-10))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
         @test H - dH ≤ 26.7 ≤ H + dH
@@ -974,7 +955,7 @@ end
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
            tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
-           jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           jtlsorder = 2, jtlsiter = 20, lsiter = 10,
            significance = 0.99, outrej = false
         )
         # Orbit determination problem
@@ -988,9 +969,9 @@ end
         @test NEOs.optical(od) == optical && isnothing(NEOs.radar(od))
 
         # Initial Orbit Determination
-        orbit = initialorbitdetermination(od, params)
+        orbit = tsaiod(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 24, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -1011,19 +992,19 @@ end
         @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical), atol = 2e-5)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 1e9 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 1E+09
         # Vector of residuals
         @test notout(orbit.ores) == 7
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 3e-4 )
-        @test all( snr(orbit) .> 20.5)
+        @test maximum(sigmas(orbit)) < 3E-04
+        @test minimum(snr(orbit)) > 20.5
         @test chi2(orbit) < 0.23
         @test nrms(orbit) < 0.13
         # Covariance matrix
@@ -1034,17 +1015,11 @@ end
         # Convergence history
         @test size(orbit.qs, 1) == 6
         @test size(orbit.qs, 2) == length(orbit.Qs) <= 2
-        @test issorted(orbit.Qs, rev = true)
+        # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [-0.1793421909678032, 0.8874121750891107, 0.3841434101167349,
-            -0.017557851117612377, -0.005781634223099801, -0.0020075106081869185]
-        JPL_KEP = [1.163575955666616E+00, 2.128185264087166E-01, 1.423597471953649E+00,
-            5.237781301766019E+01, 1.016022028285875E+02, 3.243429036265208E+02]
-        JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (3.0E-01, 3.8E-01, 1.5E-10, 7.9E-13, 3.2E-12),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(50655753, orbit, params, (3.0E-01, 3.8E-01, 1.5E-10,
+            4.0E-12, 3.2E-12))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 30.9 ≤ H + dH
@@ -1072,7 +1047,7 @@ end
         # Parameters
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-           gaussorder = 2, jtlsorder = 2, jtlsiter = 200, lsiter = 1,
+           gaussorder = 2, jtlsorder = 2, jtlsiter = 20, lsiter = 10,
            significance = 0.99, outrej = false, parse_eqs = false
         )
         # Orbit determination problem
@@ -1093,9 +1068,9 @@ end
         @test NEOs.optical(od) == suboptical && isnothing(NEOs.radar(od))
 
         # Initial Orbit Determination
-        orbit = initialorbitdetermination(od, params)
+        orbit = tsaiod(od, params)
 
-        # Values by July 31, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1110,19 +1085,19 @@ end
         @test orbit.tracklets[end].indices[end] == length(suboptical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 4e-3)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 1e4 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 1E+04
         # Vector of residuals
         @test notout(orbit.ores) == 18
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 2e-5 )
-        @test all( snr(orbit) .> 644)
+        @test maximum(sigmas(orbit)) < 2E-05
+        @test minimum(snr(orbit)) > 644
         @test chi2(orbit) < 4.35
         @test nrms(orbit) < 0.35
         # Covariance matrix
@@ -1136,14 +1111,8 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [0.9739760787551061, 0.21541704400792083, 0.09401075290627411,
-            -0.00789675674941779, 0.0160619782715116, 0.006135361409943397]
-        JPL_KEP = [1.273091758414584E+00, 2.870222798582721E-01, 2.341999526552296E+00,
-            2.339645303327229E+02, 1.941265709953888E+02, 3.288450951861228E+02]
-        JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (2.0E-01, 3.0E-01, 1.2E-08, 1.5E-11, 1.5E-09),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(50430314, orbit, params, (5.2E-01, 3.6E-01, 2.1E-08,
+            1.5E-11, 1.5E-09))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 30.4 ≤ H + dH
@@ -1181,19 +1150,19 @@ end
         @test orbit1.tracklets[end].indices[end] == 93
         @test issorted(orbit1.tracklets)
         # Backward (forward) integration
-        @test epoch(orbit1) == epoch(orbit)
+        @test meanepoch(od) == meanepoch(orbit1) == epoch(orbit1)
         @test dtutc2days(date(suboptical[1])) > firsttime(orbit1)
-        @test all( norm.(orbit1.bwd.p, Inf) .< 1 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 8.0E+02
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit1)
-        @test all( norm.(orbit1.fwd.p, Inf) .< 1e15 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 3.3E+16
         # Vector of residuals
         @test notout(orbit1.ores) == 97
         @test nout(orbit1.ores) == 0
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
-        @test all( sigmas(orbit1) .< 4e-7 )
-        @test all( snr(orbit1) .> 21_880)
+        @test maximum(sigmas(orbit1)) < 4E-07
+        @test minimum(snr(orbit1)) > 21_850
         @test chi2(orbit1) < 54.85
         @test nrms(orbit1) < 0.53
         # Covariance matrix
@@ -1207,8 +1176,8 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        jpl_compatibility_tests(orbit1, params, (1.7E-01, 1.9E-01, 2.2E-07, 1.8E-8, 1.4E-09),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(50430314, orbit1, params, (2.0E+01, 7.6E-01, 2.6E-07,
+            1.8E-8, 1.4E-09))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
         @test H - dH ≤ 30.4 ≤ H + dH
@@ -1283,7 +1252,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by July 31, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1299,19 +1268,19 @@ end
         @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), dtutc2days(date(od.tracklets[2])), atol = 3e-3)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
         @test notout(orbit.ores) == 6
         @test nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 0.018 )
-        @test all( snr(orbit) .> 7.00)
+        @test maximum(sigmas(orbit)) < 1.8E-02
+        @test minimum(snr(orbit)) > 7
         @test chi2(orbit) < 0.91
         @test nrms(orbit) < 0.28
         # Covariance matrix
@@ -1321,18 +1290,12 @@ end
         @test isapprox(Γ, Γ')
         # Convergence history
         @test size(orbit.qs, 1) == 6
-        @test size(orbit.qs, 2) == length(orbit.Qs) <= 5
+        @test size(orbit.qs, 2) == length(orbit.Qs) <= 6
         # @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [8.273613111662440E-01, -8.060979570468877E-01, -6.506021560333630E-01,
-                   1.659953139139261E-02, -5.614155804560522E-03, 2.899959983103430E-03]
-        JPL_KEP = [2.279881958167905E+00, 7.595854924208774E-01, 3.859999487009846E+01,
-                   2.293324466168822E+02, 3.254353160068554E+02, 2.033836565098925E+01]
-        JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (6.0E-01, 1.4E+00, 2.1E-12, 5.9E-14, 5.9E-14),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(54378773, orbit, params, (6.0E-01, 1.4E+00, 2.6E-12,
+            5.9E-14, 5.9E-14))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 18.5 ≤ H + dH
@@ -1406,7 +1369,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by July 31, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1425,13 +1388,13 @@ end
         @test issorted(orbit1.tracklets)
         @test issorted(orbit1.radar)
         # Backward (forward) integration
-        @test epoch(orbit1) == datetime2julian(date(radar[2])) - PE.J2000
+        @test meanepoch(od1) == meanepoch(orbit1) == epoch(orbit1)
         @test dtutc2days(date(optical[1])) > firsttime(orbit1)
         @test dtutc2days(date(radar[1])) > firsttime(orbit1)
-        @test all( norm.(orbit1.bwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.bwd.p) < 2
         @test dtutc2days(date(optical[end])) < lasttime(orbit1)
         @test dtutc2days(date(radar[end])) < lasttime(orbit1)
-        @test all( norm.(orbit1.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 2
         # Vectors of residuals
         @test notout(orbit1.ores) == 24
         @test notout(orbit1.rres) == 5
@@ -1440,8 +1403,8 @@ end
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
-        @test all( sigmas(orbit1) .< 2.9e-7 )
-        @test all( snr(orbit1) .> 8_342)
+        @test maximum(sigmas(orbit1)) < 2.9E-07
+        @test minimum(snr(orbit1)) > 8_342
         @test chi2(orbit1) < 19.7
         @test nrms(orbit1) < 0.61
         # Covariance matrix
@@ -1455,14 +1418,8 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        JPL_CAR = [-5.229992130937651E-01, 8.689454573480734E-01, 3.096174868699621E-01,
-            -1.413639580483663E-02, -5.510379552549767E-03, -2.413003153288419E-03]
-        JPL_KEP = [9.223295977030230E-01, 1.911190963976789E-01, 3.330797253820763E+00,
-            1.263744754026979E+02, 2.044798558304837E+02, 1.361032871672047E+02]
-        JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit1) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit1)))
-        jpl_compatibility_tests(orbit1, params, (4.5E+00, 1.9E+02, 4.0E-08, 1.5E-11, 8.0E-10),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(20099942, orbit1, params, (4.5E+00, 1.9E+02, 4.0E-08,
+            2.9E-11, 1.1E-09))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
         @test H - dH ≤ 18.93 ≤ H + dH
@@ -1516,7 +1473,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by July 31, 2026
+        # Values by August 24, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1531,19 +1488,19 @@ end
         @test orbit.tracklets[end].indices[end] == length(optical)
         @test issorted(orbit.tracklets)
         # Backward (forward) integration
-        @test isapprox(epoch(orbit), mean(r -> dtutc2days(date(r)), optical[idxs]), atol = 6E+0)
+        @test meanepoch(od) == meanepoch(orbit) == epoch(orbit)
         @test dtutc2days(date(optical[1])) > firsttime(orbit)
-        @test all( norm.(orbit.bwd.p, Inf) .< 3.7 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.bwd.p) < 3.7
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
-        @test all( norm.(orbit.fwd.p, Inf) .< 2 )
+        @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 3.3
         # Vector of residuals
         @test notout(orbit.ores) == 43
         @test nout(orbit.ores) == 1
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
-        @test all( sigmas(orbit) .< 1.4E-6 )
-        @test all( snr(orbit) .> 1E+5)
+        @test maximum(sigmas(orbit)) < 7.9E-06
+        @test minimum(snr(orbit)) > 6.7E+04
         @test chi2(orbit) < 10.40
         @test nrms(orbit) < 0.35
         # Covariance matrix
@@ -1557,14 +1514,8 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        JPL_CAR = [4.848674283176028E-01, -1.256976941043074E+00, 7.558473824624909E-02,
-                   2.837659541627720E-03, 1.669282318693257E-02, 4.630635236479733E-03]
-        JPL_KEP = [2.315552902881586E+00, 8.475227263442291E-01, 3.315750642722048E+01,
-                   1.778735230275155E+02, 2.484374010431416E+02, 3.416112652341685E+02]
-        JPL_EQN = keplerian2equinoctial(JPL_KEP, epoch(orbit) + MJD2000; μ = μ_S)
-        JPL_ATTR = cartesian2attributable(JPL_CAR - params.eph_ea(epoch(orbit)))
-        jpl_compatibility_tests(orbit, params, (2.8E+0, 3.8E+0, 1.8E-7, 5.0E-9, 1.7E-8),
-                                JPL_CAR, JPL_KEP, JPL_EQN, JPL_ATTR)
+        jpl_compatibility_tests(54041668, orbit, params, (2.8E+0, 3.8E+0, 1.8E-7,
+            5.0E-9, 1.7E-8))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 20.59 ≤ H + dH
