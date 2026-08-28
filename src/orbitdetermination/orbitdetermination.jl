@@ -30,6 +30,7 @@ function iodinitcond(A::AdmissibleRegion)
     ]
 end
 
+#=
 """
     issinglearc(::AbstractOpticalVector, arc::Day)
 
@@ -37,6 +38,7 @@ Check whether a (sorted) vector of optical astrometry is a single observational
 arc, i.e. no two consecutive observations are more than `arc` days apart.
 """
 issinglearc(x::AbstractOpticalVector, arc::Day = Day(30)) = all(diff(date.(x)) .< arc)
+=#
 
 """
     initialorbitdetermination(od, params; kwargs...)

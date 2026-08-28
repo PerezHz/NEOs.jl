@@ -249,7 +249,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 24, 2026
+        # Values by August 28, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -270,8 +270,8 @@ end
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
-        @test notout(orbit.ores) == 9
-        @test nout(orbit.ores) == 0
+        @test notout(orbit) == notout(orbit.ores) == 9
+        @test nout(orbit) == nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -335,8 +335,8 @@ end
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit1)
         @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 1.2
         # Vector of residuals
-        @test notout(orbit1.ores) == 43
-        @test nout(orbit1.ores) == 0
+        @test notout(orbit1) == notout(orbit1.ores) == 43
+        @test nout(orbit1) == nout(orbit1.ores) == 0
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -401,7 +401,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 24, 2026
+        # Values by August 28, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -422,8 +422,8 @@ end
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
-        @test notout(orbit.ores) == 6
-        @test nout(orbit.ores) == 0
+        @test notout(orbit) == notout(orbit.ores) == 6
+        @test nout(orbit) == nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -490,7 +490,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by August 24, 2026
+        # Values by August 28, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -511,8 +511,8 @@ end
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
-        @test notout(orbit.ores) == 12
-        @test nout(orbit.ores) == 0
+        @test notout(orbit) == notout(orbit.ores) == 12
+        @test nout(orbit) == nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -567,7 +567,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by August 24, 2026
+        # Values by August 28, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -722,7 +722,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by August 24, 2026
+        # Values by August 28, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -749,8 +749,8 @@ end
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
-        @test notout(orbit.ores) == 10
-        @test nout(orbit.ores) == 0
+        @test notout(orbit) == notout(orbit.ores) == 10
+        @test nout(orbit) == nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -814,7 +814,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 24, 2026
+        # Values by August 28, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -835,8 +835,8 @@ end
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
-        @test notout(orbit.ores) == 18
-        @test nout(orbit.ores) == 0
+        @test notout(orbit) == notout(orbit.ores) == 18
+        @test nout(orbit) == nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -898,8 +898,8 @@ end
         @test dtutc2days(date(optical[end])) < lasttime(orbit1)
         @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 2
         # Vector of residuals
-        @test notout(orbit1.ores) == 19
-        @test nout(orbit1.ores) == 2
+        @test notout(orbit1) == notout(orbit1.ores) == 19
+        @test nout(orbit1) == nout(orbit1.ores) == 2
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -971,7 +971,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by August 24, 2026
+        # Values by August 28, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -998,8 +998,8 @@ end
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 1E+09
         # Vector of residuals
-        @test notout(orbit.ores) == 7
-        @test nout(orbit.ores) == 0
+        @test notout(orbit) == notout(orbit.ores) == 7
+        @test nout(orbit) == nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1070,7 +1070,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by August 24, 2026
+        # Values by August 28, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1091,8 +1091,8 @@ end
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 1E+04
         # Vector of residuals
-        @test notout(orbit.ores) == 18
-        @test nout(orbit.ores) == 0
+        @test notout(orbit) == notout(orbit.ores) == 18
+        @test nout(orbit) == nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1156,8 +1156,8 @@ end
         @test dtutc2days(date(suboptical[end])) < lasttime(orbit1)
         @test maximum(Base.Fix2(norm, Inf), orbit1.fwd.p) < 3.3E+16
         # Vector of residuals
-        @test notout(orbit1.ores) == 97
-        @test nout(orbit1.ores) == 0
+        @test notout(orbit1) == notout(orbit1.ores) == 97
+        @test nout(orbit1) == nout(orbit1.ores) == 0
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -1252,7 +1252,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by August 24, 2026
+        # Values by August 28, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1274,8 +1274,8 @@ end
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 2
         # Vector of residuals
-        @test notout(orbit.ores) == 6
-        @test nout(orbit.ores) == 0
+        @test notout(orbit) == notout(orbit.ores) == 6
+        @test nout(orbit) == nout(orbit.ores) == 0
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success
@@ -1369,7 +1369,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by August 24, 2026
+        # Values by August 28, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1398,8 +1398,10 @@ end
         # Vectors of residuals
         @test notout(orbit1.ores) == 24
         @test notout(orbit1.rres) == 5
+        @test notout(orbit1) == notout((orbit1.ores, orbit1.rres)) == 24 + 5
         @test nout(orbit1.ores) == 0
         @test nout(orbit1.rres) == 0
+        @test nout(orbit1) == nout((orbit1.ores, orbit1.rres)) == 0
         # Least squares fit
         @test isa(string(orbit1.fit), String)
         @test orbit1.fit.success
@@ -1473,7 +1475,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by August 24, 2026
+        # Values by August 28, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1494,8 +1496,8 @@ end
         @test dtutc2days(date(optical[end])) < lasttime(orbit)
         @test maximum(Base.Fix2(norm, Inf), orbit.fwd.p) < 3.3
         # Vector of residuals
-        @test notout(orbit.ores) == 43
-        @test nout(orbit.ores) == 1
+        @test notout(orbit) == notout(orbit.ores) == 43
+        @test nout(orbit) == nout(orbit.ores) == 1
         # Least squares fit
         @test isa(string(orbit.fit), String)
         @test orbit.fit.success

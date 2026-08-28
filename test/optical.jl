@@ -38,6 +38,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test apophis.observatory == observatory(apophis) == search_observatory_code("691")
         @test apophis.source == apophis_s
 
+        @test NEOs.numtype(apophis) == Float64
         @test designation(apophis) == "99942"
         @test measure(apophis) == (1.0739650841580173, 0.2952738332250385)
         @test rms(apophis) == (1.0, 1.0)
@@ -121,6 +122,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test isa(X85177_p, Vector{NEOCPObject{Float64}})
         @test isone(length(X85177_p))
         X85177 = first(X85177_p)
+        @test NEOs.numtype(X85177) == Float64
         @test X85177.desig == "X85177"
         @test X85177.score == 100
         @test X85177.date == date(X85177) == DateTime("2025-05-24T14:24:00")
@@ -227,6 +229,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         idxs = findfirst("END_OF_HEADER", apophis_s)
         @test apophis.header == apophis_s[1:first(idxs)-1]
 
+        @test NEOs.numtype(apophis) == Float64
         @test designation(apophis) == "99942"
         @test measure(apophis) == (1.0739650841580173, 0.2952738332250385)
         @test rms(apophis) == (0.612, 0.612)
@@ -389,6 +392,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test apophis.deprecated == ""
         @test replace(apophis.source, " " => "") == replace(apophis_s[64:end-9], " " => "")
 
+        @test NEOs.numtype(apophis) == Float64
         @test designation(apophis) == "99942"
         @test measure(apophis) == (1.073965142335659, 0.2952737556548495)
         @test rms(apophis) == (1.0, 1.0)
@@ -640,7 +644,8 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
     end
 
     using NEOs: OpticalTracklet, OpticalMPC80, OpticalRWO, OpticalADES,
-                indices, reduce_tracklets, isunknown, closest_tracklet
+                indices, reduce_tracklets, isunknown, closest_tracklet,
+                daysbetween
 
     @testset "Tracklet" begin
 
@@ -657,6 +662,14 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test isa(trks2, Vector{OpticalTracklet{Float64}})
         @test isa(trks3, Vector{OpticalTracklet{Float64}})
         @test length(trks1) == length(trks2) > length(trks3)
+
+        @test all(Base.Fix2(isa, String), string.(trks1))
+        @test all(Base.Fix2(isa, String), string.(trks2))
+        @test all(Base.Fix2(isa, String), string.(trks3))
+
+        @test isa(string(trks1), String)
+        @test isa(string(trks2), String)
+        @test isa(string(trks3), String)
 
         @test nobs(trks1) == length(optical1)
         @test nobs(trks2) == length(optical2)
@@ -695,6 +708,19 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         @test maximum(datediff.(trks1[mask13], trks3[mask31])) == 0
         @test maximum(datediff.(trks2[mask23], trks3[mask32])) == 0
+
+        @test all(@.(
+            daysbetween(trks1[mask13], trks3[mask31]) ==
+            daysbetween(date(trks1[mask13]), trks3[mask31]) ==
+            daysbetween(trks1[mask13], date(trks3[mask31])) ==
+            daysbetween(date(trks1[mask13]), date(trks3[mask31]))
+        ))
+        @test all(@.(
+            daysbetween(trks2[mask23], trks3[mask32]) ==
+            daysbetween(date(trks2[mask23]), trks3[mask32]) ==
+            daysbetween(trks2[mask23], date(trks3[mask32])) ==
+            daysbetween(date(trks2[mask23]), date(trks3[mask32]))
+        ))
 
         @test maximum(abs, ra.(trks1[mask13]) - ra.(trks3[mask31])) < 2.8e-7
         @test maximum(abs, ra.(trks2[mask23]) - ra.(trks3[mask32])) < 2.8e-7
@@ -742,6 +768,10 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test all(Base.Fix2(isa, String), string.(apps1))
         @test all(Base.Fix2(isa, String), string.(apps2))
         @test all(Base.Fix2(isa, String), string.(apps3))
+
+        @test isa(string(apps1), String)
+        @test isa(string(apps2), String)
+        @test isa(string(apps3), String)
 
         @test length(apps1) == length(apps2) == length(apps3)
         @test indices(apps1) == eachindex(optical1)
