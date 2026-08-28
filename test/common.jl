@@ -26,10 +26,38 @@ using Test
         @test load_preference(NEOs, "SSEPH_SOURCE") == SSEPH_ARTIFACT_PATH
     end
 
+    @testset "Unit conversions" begin
+		θs = LinRange(0, 2π, 100)
+		@test all(isapprox(arcsec2rad(rad2arcsec(θ)), θ) for θ in θs)
+		@test all(isapprox(mas2rad(rad2mas(θ)), θ) for θ in θs)
+
+		τs = [1.9202850713e8, 1.9580817079e8, 1.0268298605e8, 9.744910761e7, 9.743930871e7]
+		νs = [-100849.1434, -102512.9059, -103799.8178, 8186.8, -118256.8]
+
+		ρs = [2.878434907929e7, 2.935090640881e7, 1.539179239135e7, 1.460725375015e7, 1.4605784932e7]
+		vρs = [548781.7898, 557835.37894, 564838.24255, -44549.38095, 643507.50398]
+
+		rtol = 4 * sqrt(eps(Float64))
+		@test all(isapprox(range2delay(ρ), τ) for (ρ, τ) in zip(ρs, τs))
+            @test all(isapprox(rangerate2doppler(vρ, 2380.0), ν; rtol) for (vρ, ν) in zip(vρs, νs))
+    end
+
     @testset "Time conversions" begin
-        t0 = now()
-        @test et2dtutc(dtutc2et(t0)) == t0
-        @test jdtdb2dtutc(dtutc2jdtdb(t0)) == t0
+        d0 = now()
+		et = dtutc2et(d0)
+		t0 = dtutc2days(d0)
+		jd = dtutc2jdtdb(d0)
+
+        @test et2dtutc(et) == d0
+		@test days2dtutc(t0) == d0
+        @test jdtdb2dtutc(jd) == d0
+		@test isapprox(etsecs2julian(julian2etsecs(jd)), jd)
+
+		y1 = et_to_200X(et)
+		y2 = days_to_200X(t0)
+		y3 = dtutc_to_200X(d0)
+
+		@test isapprox(y1, y2) && isapprox(y2, y3)
     end
 
     @testset "JPL ephemerides" begin
