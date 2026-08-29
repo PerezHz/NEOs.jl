@@ -183,6 +183,20 @@ function closeapproach!(A::RootFindingEvent, B::RootFindingEvent, x, params, t; 
     return nothing
 end
 
+# Reuse a scratch series for nested evaluations; ordinary numeric evaluations do not need it.
+function _evaluate_root!(g_dg::AbstractVector{Taylor1{U}}, dt_nr::U,
+                         g_dg_val::AbstractVector{U}, ::U) where {U <: Number}
+    evaluate!(g_dg, dt_nr, g_dg_val)
+    return nothing
+end
+
+function _evaluate_root!(g_dg::AbstractVector{Taylor1{U}}, dt_nr::U,
+                         g_dg_val::AbstractVector{U}, evalaux::U) where
+        {U <: Union{Taylor1,TaylorN}}
+    evaluate!(g_dg, dt_nr, g_dg_val, evalaux)
+    return nothing
+end
+
 # Specialized version of TaylorIntegration.findroot!
 function findroot(g_tupl_old::RootFindingEvent{U}, g_tupl::RootFindingEvent{U},
                   δt_old::T, buffer::RootFindingBuffer{T, U}; nrabstol::T = eps(T),
@@ -190,7 +204,7 @@ function findroot(g_tupl_old::RootFindingEvent{U}, g_tupl::RootFindingEvent{U},
     # Check if g changes sign in the given interval
     surfacecrossing(g_tupl_old, g_tupl, 0) || return false, scalarzero(g_tupl)
     # Unpack
-    @unpack g_constant, g_dg, g_dg_val = buffer
+    @unpack g_constant, g_dg, g_dg_val, evalaux = buffer
     # Select expansion for Newton-Raphson
     for i in eachindex(last(g_tupl))
         g_constant[1][i] = constant_term(last(g_tupl_old)[i])
@@ -210,10 +224,10 @@ function findroot(g_tupl_old::RootFindingEvent{U}, g_tupl::RootFindingEvent{U},
     dt_nr = (a * cte(g_tupl) - b * cte(g_tupl_old)) / (cte(g_tupl) - cte(g_tupl_old))
     # Newton-Raphson iterations
     nriter = 1
-    evaluate!(g_dg, dt_nr, view(g_dg_val, :))
+    _evaluate_root!(g_dg, dt_nr, g_dg_val, evalaux)
     while nrconvergencecriterion(g_dg_val[1], nrabstol, nriter, newtoniter)
         dt_nr = dt_nr - g_dg_val[1] / g_dg_val[2]
-        evaluate!(g_dg, dt_nr, view(g_dg_val, :))
+        _evaluate_root!(g_dg, dt_nr, g_dg_val, evalaux)
         nriter += 1
     end
     nriter == newtoniter + 1 && @warn("""

@@ -329,7 +329,7 @@ function jtls(
     # Initial subset of astrometry for orbit fit
     trksin, trksout, oidxs = _initialtracklets(od.tracklets, orbit.tracklets)
     # Jet Transport Least Squares
-    TS.evaluate!(q0, x0, view(q00s, :, 1))
+    TS.evaluate!(q0, x0, view(q00s, :, 1); sorting = false)
     for i in 1:jtlsiter
         # Initial conditions
         TS.constant_term!.(q0, view(q00s, :, i))
@@ -369,7 +369,7 @@ function jtls(
             return orbits[i]
         end
         # Update initial condition
-        TS.evaluate!(q0, fit.x, view(q00s, :, i+1))
+        TS.evaluate!(q0, fit.x, view(q00s, :, i+1); sorting = false)
     end
     return zero(eltype(orbits))
 end
@@ -404,7 +404,7 @@ function jtls(
     trksin, trksout, oidxs = _initialtracklets(od.tracklets, orbit.tracklets)
     radarin, radarout, ridxs = _initialradar(od, orbit)
     # Jet Transport Least Squares
-    TS.evaluate!(q0, x0, view(q00s, :, 1))
+    TS.evaluate!(q0, x0, view(q00s, :, 1); sorting = false)
     for i in 1:jtlsiter
         # Initial conditions
         TS.constant_term!.(q0, view(q00s, :, i))
@@ -444,7 +444,7 @@ function jtls(
             return orbits[i]
         end
         # Update initial condition
-        TS.evaluate!(q0, fit.x, view(q00s, :, i+1))
+        TS.evaluate!(q0, fit.x, view(q00s, :, i+1); sorting = false)
     end
     return zero(eltype(orbits))
 end

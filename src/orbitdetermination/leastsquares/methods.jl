@@ -179,8 +179,8 @@ function Newton(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
         end
     end
     # Evaluate gradient and hessian
-    dQ = evaluate(GQ, x0)
-    d2Q = evaluate(HQ, x0)
+    dQ = evaluate(GQ, x0; sorting = false)
+    d2Q = evaluate(HQ, x0; sorting = false)
 
     return Newton{T}(nobs, npar, Q, GQ, HQ, dQ, d2Q)
 end
@@ -189,8 +189,8 @@ function lsstep(ls::Newton, x::AbstractVector)
     # Unpack
     @unpack GQ, dQ, HQ, d2Q, nobs, npar = ls
     # Evaluate gradient and hessian
-    evaluate!(GQ, x, dQ)
-    evaluate!(HQ, x, d2Q)
+    evaluate!(GQ, x, dQ; sorting = false)
+    evaluate!(HQ, x, d2Q; sorting = false)
     # Invert hessian
     lud2Q = lu!(d2Q; check = false)
     !issuccess(lud2Q) && return empty(x), false
@@ -206,7 +206,7 @@ end
 
 function normalmatrix(ls::Newton, x::AbstractVector)
     @unpack HQ, d2Q, nobs = ls
-    evaluate!(HQ, x, d2Q)
+    evaluate!(HQ, x, d2Q; sorting = false)
     return (nobs / 2) * d2Q
 end
 
@@ -226,8 +226,8 @@ function update!(ls::Newton{T}, res::AbstractResidualSet{T, TaylorN{T}}, x0::Vec
         end
     end
     # Evaluate gradient and hessian
-    evaluate!(ls.GQ, x0, ls.dQ)
-    evaluate!(ls.HQ, x0, ls.d2Q)
+    evaluate!(ls.GQ, x0, ls.dQ; sorting = false)
+    evaluate!(ls.HQ, x0, ls.d2Q; sorting = false)
 
     return nothing
 end
@@ -269,8 +269,8 @@ function DifferentialCorrections(res::AbstractResidualSet{T, TaylorN{T}}, x0::Ve
     # Deprecated term
     # C -> C + ξTH(res, V, B, idxs)
     # Evaluate D and C matrices
-    Dx = evaluate(D, x0)
-    Cx = evaluate(C, x0)
+    Dx = evaluate(D, x0; sorting = false)
+    Cx = evaluate(C, x0; sorting = false)
 
     return DifferentialCorrections{T}(nobs, npar, Q, D, C, Dx, Cx)
 end
@@ -279,8 +279,8 @@ function lsstep(ls::DifferentialCorrections, x::AbstractVector)
     # Unpack
     @unpack D, Dx, C, Cx, npar = ls
     # Evaluate D and C matrices
-    evaluate!(D, x, Dx)
-    evaluate!(C, x, Cx)
+    evaluate!(D, x, Dx; sorting = false)
+    evaluate!(C, x, Cx; sorting = false)
     # Invert C matrix
     luCx = lu!(Cx; check = false)
     !issuccess(luCx) && return empty(x), false
@@ -294,7 +294,7 @@ end
 
 function normalmatrix(ls::DifferentialCorrections, x::AbstractVector)
     @unpack C, Cx = ls
-    evaluate!(C, x, Cx)
+    evaluate!(C, x, Cx; sorting = false)
     return Cx
 end
 
@@ -309,8 +309,8 @@ function update!(ls::DifferentialCorrections{T}, res::AbstractResidualSet{T, Tay
     # Deprecated term
     # C -> C + ξTH(res, V, B, idxs)
     # Evaluate D and C matrices
-    evaluate!(ls.D, x0, ls.Dx)
-    evaluate!(ls.C, x0, ls.Cx)
+    evaluate!(ls.D, x0, ls.Dx; sorting = false)
+    evaluate!(ls.C, x0, ls.Cx; sorting = false)
 
     return nothing
 end
@@ -423,8 +423,8 @@ function LevenbergMarquardt(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{
         end
     end
     # Evaluate gradient and hessian
-    dQ = evaluate(GQ, x0)
-    d2Q = evaluate(HQ, x0)
+    dQ = evaluate(GQ, x0; sorting = false)
+    d2Q = evaluate(HQ, x0; sorting = false)
 
     return LevenbergMarquardt{T}(nobs, npar, idxs, λ, Q, GQ, HQ, dQ, d2Q)
 end
@@ -433,8 +433,8 @@ function lsstep(ls::LevenbergMarquardt, x::AbstractVector)
     # Unpack
     @unpack GQ, dQ, HQ, d2Q, λ, idxs, Q = ls
     # Evaluate gradient and hessian
-    evaluate!(GQ, x, dQ)
-    evaluate!(HQ, x, d2Q)
+    evaluate!(GQ, x, dQ; sorting = false)
+    evaluate!(HQ, x, d2Q; sorting = false)
     # Modified Hessian
     for i in axes(d2Q, 1)
         d2Q[i, i] +=  λ * abs(d2Q[i, i])
@@ -459,7 +459,7 @@ end
 
 function normalmatrix(ls::LevenbergMarquardt, x::AbstractVector)
     @unpack HQ, d2Q, nobs = ls
-    evaluate!(HQ, x, d2Q)
+    evaluate!(HQ, x, d2Q; sorting = false)
     return (nobs / 2) * d2Q
 end
 
@@ -481,8 +481,8 @@ function update!(ls::LevenbergMarquardt{T}, res::AbstractResidualSet{T, TaylorN{
         end
     end
     # Evaluate gradient and hessian
-    evaluate!(ls.GQ, x0, ls.dQ)
-    evaluate!(ls.HQ, x0, ls.d2Q)
+    evaluate!(ls.GQ, x0, ls.dQ; sorting = false)
+    evaluate!(ls.HQ, x0, ls.d2Q; sorting = false)
 
     return nothing
 end
