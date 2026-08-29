@@ -2,7 +2,8 @@ using ArgParse, Distributed, ChunkSplitters, StaticArraysCore
 using HTTP, JSON, DataFrames, CSV, Printf, Statistics
 @everywhere using NEOs, Dates, PlanetaryEphemeris, TaylorSeries
 @everywhere using NEOs: PropresBuffer, PropagationBuffer, OpticalBuffer, OpticalADES,
-                  AbstractOrbit, KeplerianElements, ObservatoryMPC, parse_optical_rwo,
+                  OpticalMPC80, AbstractOpticalVector, AbstractOrbit, OpticalODProblem,
+                  KeplerianElements, ObservatoryMPC, parse_optical_rwo,
                   argoldensearch, evaldeltas, init_optical_residuals, indices,
                   _lsmethods, μ_S, equatorial2ecliptic, _propagate
 @everywhere import NEOs: initialcondition, keplerian
@@ -11,11 +12,6 @@ const NEOCP_ORBITS_HEADER = "Object   H     G    Epoch    M         Peri.      \
       Node       Incl.        e           n         a                     NObs \
       NOpp   Arc    r.m.s.       Orbit ID"
 
-@everywhere const OD{D, T} = ODProblem{D, T, Vector{OpticalADES{T}},
-    Nothing, Veres17{T}, Eggl20{T}}
-@everywhere const VariantOrbit{T} = MMOVOrbit{typeof(newtonian!),
-    T, T, Vector{OpticalADES{T}}}
-
 function parse_commandline(dict::AbstractDict = Dict())
     s = ArgParseSettings(add_version = true, version = "0.3")
 
@@ -23,7 +19,7 @@ function parse_commandline(dict::AbstractDict = Dict())
     s.prog = "mcmov.jl"
     # Desciption (for help screen)
     s.description = "Sample the manifold of variations (MOV) of a NEOCP \
-    object using jet transport-assisted monte carlo."
+    object or a local optical astrometry file using jet transport-assisted monte carlo."
 
     s.epilog = """
         Example:\n
@@ -31,12 +27,22 @@ function parse_commandline(dict::AbstractDict = Dict())
         # Sample the MOV of P22hRXJ with 10 workers and 5 threads each\n
         julia -p 10 -t 5 --project mcmov.jl -i P22hRXJ -t 0000000Hz3SX -s linear --scout\n
         \n
+        # Sample the MOV of a local MPC80/OBS80 astrometry file\n
+        julia -p 10 -t 5 --project mcmov.jl -i observations.obs --refine\n
+        \n
+        # Use all observations to define the attributable for a singleton cadence\n
+        julia -p 10 -t 1 --project mcmov.jl -i observations.obs --full-arc-attributable\n
+        \n
     """
 
     @add_arg_table! s begin
         "--input", "-i"
-            help = "NEOCP designation (trksub)"
+            help = "NEOCP designation (trksub) or local astrometry file"
             arg_type = String
+        "--format", "-f"
+            help = "local input format: auto, ades, mpc80, or obs80"
+            arg_type = String
+            default = "auto"
         "--output", "-o"
             help = "Output file"
             arg_type = String
@@ -66,6 +72,9 @@ function parse_commandline(dict::AbstractDict = Dict())
         "--refine"
             help = "Refine the first grid"
             action = :store_true
+        "--full-arc-attributable"
+            help = "define the admissible region from a regression over the full arc; requires one observatory"
+            action = :store_true
         "--scout"
             help = "Fetch JPL Scout data and save it into a .csv file"
             action = :store_true
@@ -91,9 +100,31 @@ computationtime(x::DateTime, y::DateTime) = @sprintf("%.2f", (y - x).value / 60_
 printitle(s::AbstractString, d::AbstractString) = println(d ^ length(s), '\n', s,
     '\n', d ^ length(s))
 
+function fullarcattributable(optical::AbstractOpticalVector)
+    length(optical) >= 3 || throw(ArgumentError(
+        "--full-arc-attributable requires at least three observations"
+    ))
+    stations = observatory.(optical)
+    all(==(first(stations)), stations) || throw(ArgumentError(
+        "--full-arc-attributable requires all observations to use the same observatory"
+    ))
+    return NEOs.OpticalTracklet((
+        date = date.(optical), ra = ra.(optical), dec = dec.(optical),
+        observatory = stations, mag = mag.(optical),
+        timeofday = NEOs.timeofday.(optical), indices = eachindex(optical),
+    ))
+end
+
+function outputdesignation(optical::AbstractVector{<:OpticalMPC80})
+    obs = last(optical)
+    return strip(isempty(obs.number) ? obs.desig : obs.number)
+end
+
+outputdesignation(optical::AbstractOpticalVector) = designation(last(optical))
+
 @everywhere initialcondition(x::AbstractOrbit) = x(), epoch(x) + PE.J2000
 
-function chi(x::AbstractVector{VariantOrbit{T}}) where {T <: Real}
+function chi(x::AbstractVector{<:MMOVOrbit})
     Qmin, i = findmin(nms, x)
     nobs = 2 * noptical(x[i])
     χs = @. sqrt(nobs * ( nms(x) - Qmin ))
@@ -218,7 +249,7 @@ end
 
 @everywhere function radec_next_day(day_after_epoch::DateTime,
                                     observer::ObservatoryMPC{T},
-                                    orbits::AbstractVector{VariantOrbit{T}},
+                                    orbits::AbstractVector{<:MMOVOrbit},
                                     params::Parameters{T}) where {T <: Real}
     radec = Vector{NTuple{2, T}}(undef, length(orbits))
     q0, jd0 = initialcondition(orbits[1])
@@ -305,9 +336,10 @@ function neocp_orbits_format(input::AbstractString,
     return join(orbits_lines, '\n')
 end
 
-@everywhere function mcmov(od::OD{typeof(newtonian!), T}, A::AdmissibleRegion{T},
+@everywhere function mcmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T},
                            points::AbstractVector{NTuple{2, T}}, bounds::AbstractVector{T},
-                           scale::Symbol, params::Parameters{T}) where {T <: Real}
+                           scale::Symbol, params::Parameters{T}) where {D, T <: Real, O}
+    dynamics = od.dynamics
     # Attributable elements (plain)
     ae = Vector{T}(undef, 6)
     ae[1:4] .= A.ra, A.dec, A.vra, A.vdec
@@ -343,7 +375,7 @@ end
     lscache = LeastSquaresCache(x0, 1:4, 20)
     lsmethods = _lsmethods(res, x0, 1:4)
     # Manifold of variations
-    orbits = [zero(VariantOrbit{T}) for _ in eachindex(points)]
+    orbits = [zero(MMOVOrbit{D, T, T, O}) for _ in eachindex(points)]
     # Iterate mov points
     for (i, point) in enumerate(points)
         # Attributable elements (plain)
@@ -370,16 +402,20 @@ end
         # Current Q
         Q = nms(res)
         Q(fit.x) < 0 && continue
-        # Covariance matrix
-        C = (nobs/2) * TS.hessian(Q, fit.x)
-        covariance = inv(C)
-        # Residuals space to barycentric coordinates jacobian
-        jacobian = Matrix(TS.jacobian(q - constant_term(q), fit.x))
-        # Update orbit
-        orbits[i] = evaldeltas(MMOVOrbit(
-            newtonian!, variables, od.optical, od.tracklets, bwd, fwd,
-            res, covariance, jacobian, [AE(fit.x);;], [Q(fit.x)]
-        ), fit.x)
+        try
+            # Covariance matrix
+            C = (nobs/2) * TS.hessian(Q, fit.x)
+            covariance = inv(C)
+            # Project the residual-space covariance into barycentric coordinates
+            Γ = project(q, fit.x, covariance)
+            # Update orbit
+            orbits[i] = evaldeltas(MMOVOrbit(
+                dynamics, variables, od.optical, od.tracklets, bwd, fwd,
+                res, Γ, [AE(fit.x);;], [Q(fit.x)]
+            ), fit.x)
+        catch
+            continue
+        end
     end
 
     return orbits
@@ -397,14 +433,22 @@ function mcmov(dict::AbstractDict = Dict(); write_output::Bool = true)
     Nworkers, Nthreads = nworkers(), Threads.nthreads()
     println("• Detected $Nworkers worker(s) with $Nthreads thread(s) each")
 
-    # Input asteroid desgination
+    # Input NEOCP designation or local astrometry file
     input::String = parsed_args["input"]
-    println("• Input NEOCP designation (trksub): ", input)
+    local_input = isfile(input)
+    println(local_input ? "• Input astrometry file: " :
+                          "• Input NEOCP designation (trksub): ", input)
+
+    # Local astrometry format
+    format::String = parsed_args["format"]
+    local_input && println("• Requested input astrometry format: ", format)
 
     # Output file
     if write_output
-        output::String = isnothing(parsed_args["output"]) ? input * ".neosjl" :
-            parsed_args["output"]
+        default_output = local_input ? first(splitext(input)) * ".neosjl" :
+                         input * ".neosjl"
+        output::String = isnothing(parsed_args["output"]) ? default_output :
+                         parsed_args["output"]
         println("• Output file: ", output)
     else
         output = ""
@@ -431,6 +475,10 @@ function mcmov(dict::AbstractDict = Dict(); write_output::Bool = true)
     refine_grid = parsed_args["refine"]
     println("• Refine the first grid?: ", refine_grid)
 
+    # Define the attributable using the complete observational arc?
+    use_full_arc_attributable = parsed_args["full-arc-attributable"]
+    println("• Use full-arc attributable?: ", use_full_arc_attributable)
+
     # Fetching JPl Scout data?
     fetch_scout = parsed_args["scout"]
     println("• Fetch Scout data?: ", fetch_scout)
@@ -442,6 +490,12 @@ function mcmov(dict::AbstractDict = Dict(); write_output::Bool = true)
     # Fetch MPC NEOCP data?
     fetch_neocp = parsed_args["neocp"]
     println("• Fetch NEOCP data?: ", fetch_neocp)
+
+    if local_input && any((fetch_scout, fetch_neoscan, fetch_neocp))
+        throw(ArgumentError(
+            "--scout, --neoscan and --neocp require a NEOCP designation, not a local file"
+        ))
+    end
 
     # Initial time
     initial_time = now()
@@ -455,15 +509,33 @@ function mcmov(dict::AbstractDict = Dict(); write_output::Bool = true)
     # Get MPC NEOCP data for same object, if requested by user
     neocp_string = fetch_neocp ? fetch_neocp_orbits(input, write_output) : ""
 
-    # Fetch optical astrometry
-    optical_all = fetch_optical_ades(input, NEOCP)
+    # Load optical astrometry
+    optical_all = if local_input
+        optical = read_optical_astrometry(input; format)
+        filter!(!isdeprecated, optical)
+        sort!(optical)
+        isempty(optical) && throw(ArgumentError(
+            "No usable optical observations found in $input"
+        ))
+        println("• Loaded ", length(optical), " ", uppercase(NEOs.astrometry_format(optical)),
+                " optical observations")
+        optical
+    else
+        fetch_optical_ades(input, NEOCP)
+    end
     trkids::Vector{String} = parsed_args["trkids"]
     # If `trkids` is empty use all the astrometry; else, use only trkids contained in `trkids`
-    optical = isempty(trkids) ? optical_all : filter(x->x.trkid in trkids, optical_all)
-    println("• `trkids` included in run: ", unique(map(x->x.trkid, optical_all)))
+    if !isempty(trkids) && !(eltype(optical_all) <: OpticalADES)
+        throw(ArgumentError("--trkids is supported only for ADES astrometry"))
+    end
+    optical = isempty(trkids) ? optical_all : filter(x -> x.trkid in trkids, optical_all)
+    isempty(optical) && throw(ArgumentError("No observations match the requested --trkids"))
+    if eltype(optical_all) <: OpticalADES
+        println("• `trkids` included in run: ", unique(map(x -> x.trkid, optical)))
+    end
     # Orbit determination problem
     od = ODProblem(newtonian!, optical)
-    od.weights.weights .= fetch_neodys_weights(input)
+    local_input || (od.weights.weights .= fetch_neodys_weights(input))
     # Parameters
     params = Parameters(
         maxsteps = 1_000, order = 15, abstol = 1E-12, parse_eqs = true,
@@ -472,7 +544,18 @@ function mcmov(dict::AbstractDict = Dict(); write_output::Bool = true)
         significance = 0.99, jtlsproject = true, outrej = false,
     )
     # Admissible region
-    tracklet = first(od.tracklets)
+    tracklet = if use_full_arc_attributable
+        fullarcattributable(optical)
+    else
+        i = findfirst(tracklet -> nobs(tracklet) >= 2, od.tracklets)
+        isnothing(i) && throw(ArgumentError(
+            "All reduced tracklets are singletons; use --full-arc-attributable " *
+            "when the observations form a single-observatory arc"
+        ))
+        od.tracklets[i]
+    end
+    println("• Admissible-region attributable: ", nobs(tracklet),
+            " observation(s) spanning ", @sprintf("%.6f", numberofdays(optical)), " days")
     A = AdmissibleRegion(tracklet, params)
     # Backward offset must take into consideration the -ρ/c relativistic
     # correction to the epoch
@@ -542,7 +625,8 @@ function mcmov(dict::AbstractDict = Dict(); write_output::Bool = true)
 
     # Save results
     reference_epoch = dtutc2days(tracklet)
-    orbits_string = neocp_orbits_format(input, reference_epoch, norbits,
+    object_name = local_input ? outputdesignation(optical) : input
+    orbits_string = neocp_orbits_format(object_name, reference_epoch, norbits,
         view(orbits, 2:Norbits), params)
     if write_output
         write(output, orbits_string)
