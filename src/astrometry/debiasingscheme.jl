@@ -274,12 +274,8 @@ function debiasing(obs::AbstractOpticalAstrometry{T}, catcodes::Vector{Char},
         # pmRA: proper motion correction in RA*cos(DEC) [mas/yr]
         # pmDEC: proper motion correction in DEC [mas/yr]
         dRA, dDEC, pmRA, pmDEC = view(table, pix_ind, 4*cat_ind-3:4*cat_ind)
-        # Seconds since J2000 (TDB)
-        et_secs_i = dtutc2et(obs)
         # Seconds since J2000 (TT)
-        # Note: Should the line below be changed to:
-        # tt_secs_i = et_secs_i + ttmtdb(et_secs_i/daysec) ?
-        tt_secs_i = et_secs_i - ttmtdb(et_secs_i/daysec)
+        tt_secs_i = dtutc2tt(obs)
         # Years since J2000
         yrs_J2000_tt = tt_secs_i/(daysec*yr)
         # Total debiasing correction in right ascension [arcsec]

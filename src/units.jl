@@ -17,6 +17,26 @@ See also [`julian2etsecs`](@ref).
 etsecs2julian(et::Number) = JD_J2000 + et / daysec
 
 """
+    dtutc2tt(::DateTime)
+
+Convert a UTC date to TT seconds past the J2000 epoch.
+
+See also [`tt2dtutc`](@ref).
+"""
+function dtutc2tt(dtutc::DateTime)
+    # UTC seconds since J2000.0 epoch
+    utc_seconds = Millisecond(dtutc - DateTime(2000, 1, 1, 12)).value / 1000
+    # TAI - UTC
+    tai_utc = get_Δat(datetime2julian(dtutc))
+    # TT - TAI
+    tt_tai = 32.184
+    # TT - UTC = (TT - TAI) + (TAI - UTC)
+    tt_utc = tt_tai + tai_utc
+    # TT seconds  = UTC seconds + (TT-UTC)
+    return utc_seconds + tt_utc
+end
+
+"""
     dtutc2et(::DateTime)
 
 Convert a UTC date to TDB seconds past the J2000 epoch.
@@ -24,17 +44,9 @@ Convert a UTC date to TDB seconds past the J2000 epoch.
 See also [`et2dtutc`](@ref).
 """
 function dtutc2et(dtutc::DateTime)
-    # UTC seconds since J2000.0 epoch
-    utc_seconds = Millisecond(dtutc - DateTime(2000,1,1,12)).value / 1000
-    # TAI - UTC
-    tai_utc = get_Δat(datetime2julian(dtutc))
-    # TT - TAI
-    tt_tai = 32.184
-    # TT - UTC = (TT-TAI) + (TAI-UTC)
-    tt_utc = tt_tai +tai_utc
-    # TT seconds  = UTC seconds + (TT-UTC)
-    tt_seconds = utc_seconds + tt_utc
-    # TDB seconds = TT seconds + (TDB-TT)
+    # TT seconds
+    tt_seconds = dtutc2tt(dtutc)
+    # TDB seconds = TT seconds + (TDB - TT)
     return tt_seconds - ttmtdb_tt(tt_seconds)
 end
 
@@ -48,6 +60,30 @@ See also [`jdtdb2dtutc`](@ref).
 function dtutc2jdtdb(dtutc::DateTime)
     et = dtutc2et(dtutc) # TDB seconds since J2000.0
     return etsecs2julian(et) # JDTDB
+end
+
+"""
+    tt2dtutc(::Number)
+
+Convert TT seconds past the J2000 epoch to a UTC date.
+
+See also [`dtutc2tt`](@ref).
+"""
+function tt2dtutc(tt::Number)
+    # TT - TAI
+    tt_tai = 32.184
+    # TAI = TT - (TT - TAI)
+    tai_secs = tt - tt_tai
+    # Julian date corresponding to tai_secs
+    jd_tai = JD_J2000 + tai_secs/daysec
+    # TAI - UTC
+    tai_utc = get_Δat(jd_tai)
+    # TT - UTC = (TT - TAI) + (TAI - UTC)
+    tt_utc = tt_tai + tai_utc
+    # UTC = TT - (TT - UTC)
+    utc_seconds = tt - tt_utc
+    # DateTime corresponding to utc_seconds
+    return unix2datetime(utc_seconds + datetime2unix(DateTime(2000, 1, 1, 12)))
 end
 
 """
