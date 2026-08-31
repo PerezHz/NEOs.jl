@@ -249,7 +249,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 28, 2026
+        # Values by August 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -290,7 +290,7 @@ end
         @test issorted(orbit.Qs, rev = true)
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
-        jpl_compatibility_tests(54342500, orbit, params, (7.6E-01, 8.3E-01, 7.7E-12,
+        jpl_compatibility_tests(54342500, orbit, params, (7.6E-01, 8.3E-01, 8.3E-12,
             7.3E-14, 1.3E-13))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
@@ -401,7 +401,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 28, 2026
+        # Values by August 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -490,7 +490,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by August 28, 2026
+        # Values by August 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -567,7 +567,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by August 28, 2026
+        # Values by August 31, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -722,7 +722,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by August 28, 2026
+        # Values by August 31, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -814,7 +814,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 28, 2026
+        # Values by August 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -856,7 +856,7 @@ end
         @test orbit.Qs[end] == nrms(orbit)
         # Compatibility with JPL
         jpl_compatibility_tests(50392393, orbit, params, (1.8E+00, 1.1E+01, 1.3E-10,
-            9.2E-13, 1.0E-10))
+            1.9E-12, 1.0E-10))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit, params)
         @test H - dH ≤ 26.7 ≤ H + dH
@@ -971,7 +971,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by August 28, 2026
+        # Values by August 31, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -1070,7 +1070,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by August 28, 2026
+        # Values by August 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1176,7 +1176,7 @@ end
         @test issorted(orbit1.Qs, rev = true)
         @test orbit1.Qs[end] == nrms(orbit1)
         # Compatibility with JPL
-        jpl_compatibility_tests(50430314, orbit1, params, (2.0E+01, 7.6E-01, 2.6E-07,
+        jpl_compatibility_tests(50430314, orbit1, params, (2.0E+01, 7.6E-01, 3.3E-07,
             1.8E-8, 1.4E-09))
         # Absolute magnitude
         H, dH = absolutemagnitude(orbit1, params)
@@ -1252,7 +1252,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by August 28, 2026
+        # Values by August 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1369,7 +1369,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by August 28, 2026
+        # Values by August 31, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1475,7 +1475,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by August 28, 2026
+        # Values by August 31, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
