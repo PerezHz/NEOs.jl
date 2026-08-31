@@ -44,10 +44,12 @@ using Test
 
     @testset "Time conversions" begin
         d0 = now()
+        tt = dtutc2tt(d0)
 		et = dtutc2et(d0)
 		t0 = dtutc2days(d0)
 		jd = dtutc2jdtdb(d0)
 
+        @test tt2dtutc(tt) == d0
         @test et2dtutc(et) == d0
 		@test days2dtutc(t0) == d0
         @test jdtdb2dtutc(jd) == d0
