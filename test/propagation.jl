@@ -203,7 +203,6 @@ isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; r
             scalarra(_res_)  / cos(last(radecOBS)) + first(radecOBS),
             scalardec(_res_) + last(radecOBS)
         ))
-        @show maximum(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
         @test all(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
 
         # Propagate orbit with perturbed initial conditions
@@ -251,7 +250,6 @@ isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; r
             scalarra(_res1_)  / cos(last(radecOBS)) + first(radecOBS),
             scalardec(_res1_) + last(radecOBS)
         ))
-        @show maximum(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
         @test all(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
     end
 
@@ -337,7 +335,6 @@ isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; r
             scalarra(res_optical)  / cos(last(radecOBS)) + first(radecOBS),
             scalardec(res_optical) + last(radecOBS)
         ))
-        @show maximum(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
         @test all(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
 
         # Read radar astrometry file
@@ -544,7 +541,6 @@ isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; r
             scalarra(res_optical)  / cos(last(radecOBS)) + first(radecOBS),
             scalardec(res_optical) + last(radecOBS)
         ))
-        @show maximum(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
         @test all(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
 
         # Read radar astrometry file
