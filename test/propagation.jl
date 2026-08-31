@@ -9,6 +9,7 @@ using Test
 
 loadjpleph()
 
+const atol = 5E-10
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
 function warmuptests(dynamics, q00, jd0, nyears, params)
@@ -29,7 +30,7 @@ end
 scalarra(x) = -arcsec2rad(ra(x) / wra(x) + dra(x))
 scalardec(x) = -arcsec2rad(dec(x) / wdec(x) + ddec(x))
 scalarradar(x) = -(residual(x) / weight(x) + debias(x))
-isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; rtol)
+isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; atol)
 
 @testset "Propagation" begin
 
@@ -203,7 +204,7 @@ isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; r
             scalarra(_res_)  / cos(last(radecOBS)) + first(radecOBS),
             scalardec(_res_) + last(radecOBS)
         ))
-        @test all(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
+        @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
 
         # Propagate orbit with perturbed initial conditions
         q1 = q0 + vcat(1e-3randn(3), 1e-5randn(3))
@@ -250,7 +251,7 @@ isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; r
             scalarra(_res1_)  / cos(last(radecOBS)) + first(radecOBS),
             scalardec(_res1_) + last(radecOBS)
         ))
-        @test all(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
+        @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
     end
 
     @testset "Orbit propagation with nongravs: (99942) Apophis" begin
@@ -335,7 +336,7 @@ isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; r
             scalarra(res_optical)  / cos(last(radecOBS)) + first(radecOBS),
             scalardec(res_optical) + last(radecOBS)
         ))
-        @test all(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
+        @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
 
         # Read radar astrometry file
         radar_Apophis = read_radar_jpl(joinpath(TEST_DATA, "99942_RADAR_2005_2013.json"))
@@ -541,7 +542,7 @@ isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; r
             scalarra(res_optical)  / cos(last(radecOBS)) + first(radecOBS),
             scalardec(res_optical) + last(radecOBS)
         ))
-        @test all(isapproxtuple(x, y; rtol) for (x, y) in zip(radecJPL, radecNEOs))
+        @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
 
         # Read radar astrometry file
         radar_Apophis = NEOs.read_radar_jpl(joinpath(TEST_DATA, "99942_RADAR_2005_2013.json"))
