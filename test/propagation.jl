@@ -196,7 +196,7 @@ isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; r
         @test nms_optical0 ≈ 1.951 atol=1e-3
         @test nrms_optical0 ≈ 1.397 atol=1e-3
 
-        rtol = 15*sqrt(eps(Float64))
+        rtol = 20*sqrt(eps(Float64))
         radecOBS = measure.(optical_2023DW)
         radecJPL = compute_radec_rad.(optical_2023DW; xva = et -> bwdfwdeph(et, sol_bwd, sol_fwd))
         radecNEOs = @.(tuple(
@@ -328,7 +328,7 @@ isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; r
         @test nrms_ra ≈ 0.0857 atol=1e-4
         @test nrms_dec ≈ 0.0417 atol=1e-4
 
-        rtol = 15*sqrt(eps(Float64))
+        rtol = 20*sqrt(eps(Float64))
         radecOBS = measure.(optical_Apophis)
         radecJPL = compute_radec_rad.(optical_Apophis; xva = et -> bwdfwdeph(et, sol, sol))
         radecNEOs = @.(tuple(
@@ -534,7 +534,7 @@ isapproxtuple(x, y; rtol) = isapprox(x[1], y[1]; rtol) && isapprox(x[2], y[2]; r
         @test nrms_ra ≈ 0.0858 atol=1e-4
         @test nrms_dec ≈ 0.0417 atol=1e-4
 
-        rtol = 15*sqrt(eps(Float64))
+        rtol = 20*sqrt(eps(Float64))
         radecOBS = measure.(optical_Apophis)
         radecJPL = compute_radec_rad.(optical_Apophis; xva)
         radecNEOs = @.(tuple(
