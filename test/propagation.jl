@@ -7,6 +7,9 @@ using TaylorIntegration
 using JLD2
 using Test
 
+loadjpleph()
+
+const atol = 5E-10
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
 function warmuptests(dynamics, q00, jd0, nyears, params)
@@ -18,6 +21,16 @@ function warmuptests(dynamics, q00, jd0, nyears, params)
         @test size(fwd.p) == (1, NEOs.dof(Val(dynamics)))
     end
 end
+
+function compute_radec_rad(x; kwargs...)
+    α, δ = compute_radec(x; kwargs...)
+    return arcsec2rad(α), arcsec2rad(δ)
+end
+
+scalarra(x) = -arcsec2rad(ra(x) / wra(x) + dra(x))
+scalardec(x) = -arcsec2rad(dec(x) / wdec(x) + ddec(x))
+scalarradar(x) = -(residual(x) / weight(x) + debias(x))
+isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; atol)
 
 @testset "Propagation" begin
 
@@ -184,6 +197,15 @@ end
         @test nms_optical0 ≈ 1.951 atol=1e-3
         @test nrms_optical0 ≈ 1.397 atol=1e-3
 
+        rtol = 20*sqrt(eps(Float64))
+        radecOBS = measure.(optical_2023DW)
+        radecJPL = compute_radec_rad.(optical_2023DW; xva = et -> bwdfwdeph(et, sol_bwd, sol_fwd))
+        radecNEOs = @.(tuple(
+            scalarra(_res_)  / cos(last(radecOBS)) + first(radecOBS),
+            scalardec(_res_) + last(radecOBS)
+        ))
+        @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
+
         # Propagate orbit with perturbed initial conditions
         q1 = q0 + vcat(1e-3randn(3), 1e-5randn(3))
         sol1 = NEOs.propagate(dynamics, q1, jd0, nyears, params)
@@ -224,6 +246,12 @@ end
         @test nms_optical1 ≥ nms_optical0
         @test nrms_optical1 ≥ nrms_optical0
 
+        radecJPL = compute_radec_rad.(optical_2023DW; xva = et -> bwdfwdeph(et, sol1, sol1))
+        radecNEOs = @.(tuple(
+            scalarra(_res1_)  / cos(last(radecOBS)) + first(radecOBS),
+            scalardec(_res1_) + last(radecOBS)
+        ))
+        @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
     end
 
     @testset "Orbit propagation with nongravs: (99942) Apophis" begin
@@ -300,6 +328,15 @@ end
         @test nms_dec ≈ 0.0017 atol=1e-4
         @test nrms_ra ≈ 0.0857 atol=1e-4
         @test nrms_dec ≈ 0.0417 atol=1e-4
+
+        rtol = 20*sqrt(eps(Float64))
+        radecOBS = measure.(optical_Apophis)
+        radecJPL = compute_radec_rad.(optical_Apophis; xva = et -> bwdfwdeph(et, sol, sol))
+        radecNEOs = @.(tuple(
+            scalarra(res_optical)  / cos(last(radecOBS)) + first(radecOBS),
+            scalardec(res_optical) + last(radecOBS)
+        ))
+        @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
 
         # Read radar astrometry file
         radar_Apophis = read_radar_jpl(joinpath(TEST_DATA, "99942_RADAR_2005_2013.json"))
@@ -497,6 +534,15 @@ end
         @test nms_dec ≈ 0.0017 atol=1e-4
         @test nrms_ra ≈ 0.0858 atol=1e-4
         @test nrms_dec ≈ 0.0417 atol=1e-4
+
+        rtol = 20*sqrt(eps(Float64))
+        radecOBS = measure.(optical_Apophis)
+        radecJPL = compute_radec_rad.(optical_Apophis; xva)
+        radecNEOs = @.(tuple(
+            scalarra(res_optical)  / cos(last(radecOBS)) + first(radecOBS),
+            scalardec(res_optical) + last(radecOBS)
+        ))
+        @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
 
         # Read radar astrometry file
         radar_Apophis = NEOs.read_radar_jpl(joinpath(TEST_DATA, "99942_RADAR_2005_2013.json"))

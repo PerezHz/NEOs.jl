@@ -54,9 +54,10 @@ using TaylorSeries: NumberNotSeries
 # Common
 export Parameters
 export daymillisec, d_EM_km, d_EM_au, MJD2000
-export julian2etsecs, etsecs2julian, dtutc2tt, tt2dtutc, dtutc2et, et2dtutc, dtutc2jdtdb,
-       jdtdb2dtutc, et_to_200X, days_to_200X, dtutc_to_200X, dtutc2days, days2dtutc,
-       rad2arcsec, arcsec2rad, mas2rad, range2delay, rangerate2doppler, chi2, nms, nrms
+export julian2etsecs, etsecs2julian, dtutc2tt, tt2dtutc, dtutc2et, et2dtutc,
+       dtutc2jdtdb, jdtdb2dtutc, et_to_200X, days_to_200X, dtutc_to_200X,
+       dtutc2days, days2dtutc, rad2arcsec, arcsec2rad, mas2rad, rad2mas,
+       range2delay, rangerate2doppler, chi2, nms, nrms
 export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophisposvel199,
        tt_tdb, dtt_tdb
 # Minor bodies astrometry interface
@@ -102,7 +103,7 @@ export variables, designation, epoch, firsttime, lasttime, noptical, nradar, min
        print_mpec_residuals, print_mpec_elements, print_mpec_ephemeris, print_mpec
 export topo2bary, bary2topo, attr2bary, tsaiod, mmov
 export gaussmetric, gausstriplets, gaussmethod, gaussiod
-export jtls, issinglearc, initialorbitdetermination, orbitdetermination, linkage
+export jtls, initialorbitdetermination, orbitdetermination, linkage
 # Impact monitoring
 export ImpactTarget, IMProblem, BPlane, MTP, bopik, mtp, targetplane, crosssection,
        valsecchi_circle
