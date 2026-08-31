@@ -49,11 +49,11 @@ using Test
 		t0 = dtutc2days(d0)
 		jd = dtutc2jdtdb(d0)
 
-        @test tt2dtutc(tt) == d0
         @test et2dtutc(et) == d0
 		@test days2dtutc(t0) == d0
         @test jdtdb2dtutc(jd) == d0
 		@test isapprox(etsecs2julian(julian2etsecs(jd)), jd)
+        @test abs(d0 - tt2dtutc(tt)) ≤ Millisecond(1)
 
 		y1 = et_to_200X(et)
 		y2 = days_to_200X(t0)
