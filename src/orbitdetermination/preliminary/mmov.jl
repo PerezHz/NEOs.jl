@@ -63,7 +63,7 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
     # Least squares cache and methods
     lscache = LeastSquaresCache(x0, 1:4, 5)
     lsmethods = _lsmethods(res, x0, 1:4)
-    penalty = lspenalty ? zero(TaylorN{T}) : nothing
+    penalty = lspenalty > 0 ? zero(TaylorN{T}) : nothing
     # Gradient of objective function wrt (ρ, v_ρ)
     g_t = zeros(T, 2)
     # First and second momentum
@@ -93,10 +93,10 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
         bwd, fwd = propres!(res, od, q, jd0, params; buffer, idxs)
         isempty(res) && break
         # Least squares fit
-        if lspenalty
+        if lspenalty > 0
             _q0_ = equatorial2ecliptic(q - eph_su(jd0 - PE.J2000))
             e = eccentricity(_q0_..., μ_S, zero(T))
-            penalty = eccentricitypenalty(e)
+            penalty = (lspenalty / notout(res)) * eccentricitypenalty(e)
         end
         fit = tryls(res, x0, lscache, lsmethods; penalty, Qtol, Mtol)
         !issuccess(fit) && break

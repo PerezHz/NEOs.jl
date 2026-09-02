@@ -152,13 +152,18 @@ function addoptical!(
         trksin::TrackletVector{T}, trksout::TrackletVector{T},
         res::Vector{OpticalResidual{T, TaylorN{T}}},
         x0::Vector{T}, params::Parameters{T};
-        penalty::Union{Nothing, TaylorN{T}} = nothing
+        e::Union{Nothing, TaylorN{T}} = nothing
     ) where {T <: Real}
+    @unpack lspenalty = params
     Qtol, Mtol = params.lsQtol, params.lsMtol
+    penalty = lspenalty > 0 ? zero(TaylorN{T}) : nothing
     while !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods;
-                        penalty, Qtol, Mtol)
+        subres = view(res, oidxs ∪ extra)
+        if lspenalty > 0
+            penalty = (lspenalty / notout(subres)) * eccentricitypenalty(e)
+        end
+        fit_new = tryls(subres, x0, lscache, lsmethods; penalty, Qtol, Mtol)
         !issuccess(fit_new) && break
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -178,13 +183,18 @@ function addoptical!(
         trksin::TrackletVector{T}, trksout::TrackletVector{T},
         res::Vector{OpticalResidual{T, TaylorN{T}}},
         x0::Vector{T}, params::Parameters{T};
-        penalty::Union{Nothing, TaylorN{T}} = nothing
+        e::Union{Nothing, TaylorN{T}} = nothing
     ) where {T <: Real}
+    @unpack lspenalty = params
     Qtol, Mtol = params.lsQtol, params.lsMtol
+    penalty = lspenalty > 0 ? zero(TaylorN{T}) : nothing
     if critical_value(view(res, oidxs), fit) < params.significance && !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods;
-                        penalty, Qtol, Mtol)
+        subres = view(res, oidxs ∪ extra)
+        if lspenalty > 0
+            penalty = (lspenalty / notout(subres)) * eccentricitypenalty(e)
+        end
+        fit_new = tryls(subres, x0, lscache, lsmethods; penalty, Qtol, Mtol)
         !issuccess(fit_new) && return oidxs, fit
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -203,14 +213,19 @@ function addobservations!(
         trksin::TrackletVector{T}, trksout::TrackletVector{T},
         radarin::AbstractRadarVector{T}, radarout::AbstractRadarVector{T},
         res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T}, params::Parameters{T};
-        penalty::Union{Nothing, TaylorN{T}} = nothing
+        e::Union{Nothing, TaylorN{T}} = nothing
     ) where {T <: Real}
+    @unpack lspenalty = params
     Qtol, Mtol = params.lsQtol, params.lsMtol
+    penalty = lspenalty > 0 ? zero(TaylorN{T}) : nothing
     # Add optical astrometry
     while !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls((res[1][oidxs ∪ extra], res[2][ridxs]), x0, lscache, lsmethods;
-                         penalty, Qtol, Mtol)
+        subres = (view(res[1], oidxs ∪ extra), view(res[2], ridxs))
+        if lspenalty > 0
+            penalty = (lspenalty / notout(subres)) * eccentricitypenalty(e)
+        end
+        fit_new = tryls(subres, x0, lscache, lsmethods; penalty, Qtol, Mtol)
         !issuccess(fit_new) && break
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -223,8 +238,11 @@ function addobservations!(
     while !isempty(radarout)
         extra = findfirst(==(radarout[1]), od.radar)
         isnothing(extra) && break
-        fit_new = tryls((res[1][oidxs], res[2][ridxs ∪ extra]), x0, lscache, lsmethods;
-                        penalty, Qtol, Mtol)
+        subres = (view(res[1], oidxs), voew(res[2], ridxs ∪ extra))
+        if lspenalty > 0
+            penalty = (lspenalty / notout(subres)) * eccentricitypenalty(e)
+        end
+        fit_new = tryls(subres, x0, lscache, lsmethods; penalty, Qtol, Mtol)
         !issuccess(fit_new) && break
         fit = fit_new
         radar = popfirst!(radarout)
@@ -330,7 +348,7 @@ function jtls(
     # Least squares methods
     x0 = zeros(T, Npar)
     lsmethods = _lsmethods(res, x0, 1:Npar)
-    penalty = lspenalty ? zero(TaylorN{T}) : nothing
+    e, penalty = lspenalty > 0 ? (zero(TaylorN{T}), zero(TaylorN{T})) : (nothing, nothing)
     # Initial subset of astrometry for orbit fit
     trksin, trksout, oidxs = _initialtracklets(od.tracklets, orbit.tracklets)
     # Jet Transport Least Squares
@@ -346,16 +364,17 @@ function jtls(
         bwd, fwd = propres!(res, od, q0, jd0, params; buffer = prbuffer)
         isempty(res) && break
         # Orbit fit
-        if lspenalty
+        subres = view(res, oidxs)
+        if lspenalty > 0
             _q0_ = equatorial2ecliptic(q0 - eph_su(jd0 - PE.J2000))
             e = eccentricity(_q0_..., μ_S, zero(T))
-            penalty = eccentricitypenalty(e)
+            penalty = (lspenalty / notout(subres)) * eccentricitypenalty(e)
         end
-        fit = tryls(view(res, oidxs), x0, lscache, lsmethods; penalty, Qtol, Mtol)
+        fit = tryls(subres, x0, lscache, lsmethods; penalty, Qtol, Mtol)
         !issuccess(fit) && break
         # Incrementally add observations to fit
         oidxs, fit = addoptical!(Val(mode), oidxs, fit, lscache, lsmethods,
-                                 trksin, trksout, res, x0, params)
+                                 trksin, trksout, res, x0, params; e)
         fit.Γ .= project(q0[variables], fit)
         # Outlier rejection
         if outrej
@@ -410,7 +429,7 @@ function jtls(
     # Least squares methods
     x0 = zeros(T, Npar)
     lsmethods = _lsmethods(res, x0, 1:Npar)
-    penalty = lspenalty ? zero(TaylorN{T}) : nothing
+    e, penalty = lspenalty > 0 ? (zero(TaylorN{T}), zero(TaylorN{T})) : (nothing, nothing)
     # Initial subset of astrometry for orbit fit
     trksin, trksout, oidxs = _initialtracklets(od.tracklets, orbit.tracklets)
     radarin, radarout, ridxs = _initialradar(od, orbit)
@@ -427,16 +446,17 @@ function jtls(
         bwd, fwd = propres!(res, od, q0, jd0, params; buffer = prbuffer)
         any(isempty, res) && break
         # Orbit fit
-        if lspenalty
+        subres = (view(res[1], oidxs), view(res[2], ridxs))
+        if lspenalty > 0
             _q0_ = equatorial2ecliptic(q0 - eph_su(jd0 - PE.J2000))
             e = eccentricity(_q0_..., μ_S, zero(T))
-            penalty = eccentricitypenalty(e)
+            penalty = (lspenalty / notout(subres)) * eccentricitypenalty(e)
         end
-        fit = tryls((res[1][oidxs], res[2][ridxs]), x0, lscache, lsmethods; penalty, Qtol, Mtol)
+        fit = tryls(subres, x0, lscache, lsmethods; penalty, Qtol, Mtol)
         !issuccess(fit) && break
         # Incrementally add observations to fit
         oidxs, ridxs, fit = addobservations!(od, oidxs, ridxs, fit, lscache, lsmethods,
-            trksin, trksout, radarin, radarout, res, x0, params)
+            trksin, trksout, radarin, radarout, res, x0, params; e)
         fit.Γ .= project(q0[variables], fit)
         # Outlier rejection
         if outrej
