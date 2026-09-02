@@ -30,6 +30,15 @@ function iodinitcond(A::AdmissibleRegion)
     ]
 end
 
+"""
+    eccentricitypenalty(::Number)
+
+Penalty term corresponding to the natural logarithm of the
+Rayleigh distribution of the eccentricities of all asteroids
+recognized by the MPC by September 2, 2026.
+"""
+eccentricitypenalty(e::Number) = e^2 / (2ECCENTRICITY_RAYLEIGH_SIGMA^2) - log(e)
+
 #=
 """
     issinglearc(::AbstractOpticalVector, arc::Day)

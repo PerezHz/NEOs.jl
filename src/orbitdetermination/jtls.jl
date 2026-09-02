@@ -151,12 +151,14 @@ function addoptical!(
         lscache::LeastSquaresCache{T}, lsmethods::Tuple,
         trksin::TrackletVector{T}, trksout::TrackletVector{T},
         res::Vector{OpticalResidual{T, TaylorN{T}}},
-        x0::Vector{T}, params::Parameters{T}
+        x0::Vector{T}, params::Parameters{T};
+        penalty::Union{Nothing, TaylorN{T}} = nothing
     ) where {T <: Real}
     Qtol, Mtol = params.lsQtol, params.lsMtol
     while !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods; Qtol, Mtol)
+        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods;
+                        penalty, Qtol, Mtol)
         !issuccess(fit_new) && break
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -175,12 +177,14 @@ function addoptical!(
         lscache::LeastSquaresCache{T}, lsmethods::Tuple,
         trksin::TrackletVector{T}, trksout::TrackletVector{T},
         res::Vector{OpticalResidual{T, TaylorN{T}}},
-        x0::Vector{T}, params::Parameters{T}
+        x0::Vector{T}, params::Parameters{T};
+        penalty::Union{Nothing, TaylorN{T}} = nothing
     ) where {T <: Real}
     Qtol, Mtol = params.lsQtol, params.lsMtol
     if critical_value(view(res, oidxs), fit) < params.significance && !isempty(trksout)
         extra = indices(trksout[1])
-        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods; Qtol, Mtol)
+        fit_new = tryls(view(res, oidxs ∪ extra), x0, lscache, lsmethods;
+                        penalty, Qtol, Mtol)
         !issuccess(fit_new) && return oidxs, fit
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -198,14 +202,15 @@ function addobservations!(
         fit::LeastSquaresFit{T}, lscache::LeastSquaresCache{T}, lsmethods::Tuple,
         trksin::TrackletVector{T}, trksout::TrackletVector{T},
         radarin::AbstractRadarVector{T}, radarout::AbstractRadarVector{T},
-        res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T}, params::Parameters{T}
+        res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T}, params::Parameters{T};
+        penalty::Union{Nothing, TaylorN{T}} = nothing
     ) where {T <: Real}
     Qtol, Mtol = params.lsQtol, params.lsMtol
     # Add optical astrometry
     while !isempty(trksout)
         extra = indices(trksout[1])
         fit_new = tryls((res[1][oidxs ∪ extra], res[2][ridxs]), x0, lscache, lsmethods;
-                         Qtol, Mtol)
+                         penalty, Qtol, Mtol)
         !issuccess(fit_new) && break
         fit = fit_new
         tracklet = popfirst!(trksout)
@@ -219,7 +224,7 @@ function addobservations!(
         extra = findfirst(==(radarout[1]), od.radar)
         isnothing(extra) && break
         fit_new = tryls((res[1][oidxs], res[2][ridxs ∪ extra]), x0, lscache, lsmethods;
-                        Qtol, Mtol)
+                        penalty, Qtol, Mtol)
         !issuccess(fit_new) && break
         fit = fit_new
         radar = popfirst!(radarout)
@@ -314,8 +319,8 @@ function jtls(
     end
     # Unpack
     Qtol, Mtol = params.lsQtol, params.lsMtol
-    @unpack jtlsorder, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
-            fudge, max_per = params
+    @unpack jtlsorder, jtlsiter, outrej, jtlsmask, lspenalty, eph_su,
+            χ2_rec, χ2_rej, fudge, max_per = params
     @unpack orbits, res, Qs, q00s, outs, prbuffer, lscache, orcache = buffer
     # Reference epoch [Julian days TDB]
     jd0 = meanepoch(od) + PE.J2000
@@ -325,6 +330,7 @@ function jtls(
     # Least squares methods
     x0 = zeros(T, Npar)
     lsmethods = _lsmethods(res, x0, 1:Npar)
+    penalty = lspenalty ? zero(TaylorN{T}) : nothing
     # Initial subset of astrometry for orbit fit
     trksin, trksout, oidxs = _initialtracklets(od.tracklets, orbit.tracklets)
     # Jet Transport Least Squares
@@ -340,7 +346,12 @@ function jtls(
         bwd, fwd = propres!(res, od, q0, jd0, params; buffer = prbuffer)
         isempty(res) && break
         # Orbit fit
-        fit = tryls(view(res, oidxs), x0, lscache, lsmethods; Qtol, Mtol)
+        if lspenalty
+            _q0_ = equatorial2ecliptic(q0 - eph_su(jd0 - PE.J2000))
+            e = eccentricity(_q0_..., μ_S, zero(T))
+            penalty = eccentricitypenalty(e)
+        end
+        fit = tryls(view(res, oidxs), x0, lscache, lsmethods; penalty, Qtol, Mtol)
         !issuccess(fit) && break
         # Incrementally add observations to fit
         oidxs, fit = addoptical!(Val(mode), oidxs, fit, lscache, lsmethods,
@@ -388,8 +399,8 @@ function jtls(
     end
     # Unpack
     Qtol, Mtol = params.lsQtol, params.lsMtol
-    @unpack jtlsorder, jtlsiter, outrej, jtlsmask, χ2_rec, χ2_rej,
-            fudge, max_per = params
+    @unpack jtlsorder, jtlsiter, outrej, jtlsmask, lspenalty, eph_su,
+            χ2_rec, χ2_rej, fudge, max_per = params
     @unpack orbits, res, Qs, q00s, outs, prbuffer, lscache, orcache = buffer
     # Reference epoch [Julian days TDB]
     jd0 = meanepoch(od) + PE.J2000
@@ -399,6 +410,7 @@ function jtls(
     # Least squares methods
     x0 = zeros(T, Npar)
     lsmethods = _lsmethods(res, x0, 1:Npar)
+    penalty = lspenalty ? zero(TaylorN{T}) : nothing
     # Initial subset of astrometry for orbit fit
     trksin, trksout, oidxs = _initialtracklets(od.tracklets, orbit.tracklets)
     radarin, radarout, ridxs = _initialradar(od, orbit)
@@ -415,7 +427,12 @@ function jtls(
         bwd, fwd = propres!(res, od, q0, jd0, params; buffer = prbuffer)
         any(isempty, res) && break
         # Orbit fit
-        fit = tryls((res[1][oidxs], res[2][ridxs]), x0, lscache, lsmethods; Qtol, Mtol)
+        if lspenalty
+            _q0_ = equatorial2ecliptic(q0 - eph_su(jd0 - PE.J2000))
+            e = eccentricity(_q0_..., μ_S, zero(T))
+            penalty = eccentricitypenalty(e)
+        end
+        fit = tryls((res[1][oidxs], res[2][ridxs]), x0, lscache, lsmethods; penalty, Qtol, Mtol)
         !issuccess(fit) && break
         # Incrementally add observations to fit
         oidxs, ridxs, fit = addobservations!(od, oidxs, ridxs, fit, lscache, lsmethods,

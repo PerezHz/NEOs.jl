@@ -33,7 +33,7 @@ of the parameters.
 
 - `maxiter::Int`: maximum number of iterations (default: `25`)
 """
-function LeastSquaresCache(x0::Vector{T}, idxs::AbstractVector{Int} = eachindex(x0),
+function LeastSquaresCache(x0::AbstractVector{T}, idxs::AbstractVector{Int} = eachindex(x0),
     maxiter::Int = 25) where {T <: Real}
     xs = Matrix{T}(undef, length(x0), maxiter + 1)
     Qs = Vector{T}(undef, maxiter + 1)
@@ -118,20 +118,26 @@ set of O-C residuals `res`, starting from initial guess `x0`. If `idxs`
 (default: `eachindex(x0)`) is given, perform the minimization over a
 subset of the parameters.
 
-# Keyword argument
+# Keyword arguments
 
+- `penalty::Union{Nothing, TaylorN{<:Real}}`: penalty term for target
+    function (default: `nothing`).
 - `maxiter::Int`: maximum number of iterations (default: `25`).
 - `Qtol::Real`: target function absolute tolerance (default: `1E-3`).
 - `Mtol::Real`: Mahalanobis distance tolerance (default: `1E-3`).
 """
-function leastsquares(method::Type{<:AbstractLeastSquaresMethod{T}},
-                      res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
-                      idxs::AbstractVector{Int} = eachindex(x0); maxiter::Int = 25,
-                      Qtol::T = 1E-3, Mtol::T = 1E-3) where {T <: Real}
+function leastsquares(
+        method::Type{<:AbstractLeastSquaresMethod{T}},
+        res::AbstractResidualSet{T, TaylorN{T}},
+        x0::AbstractVector{T},
+        idxs::AbstractVector{Int} = eachindex(x0);
+        penalty::Union{Nothing, TaylorN{T}} = nothing,
+        maxiter::Int = 25, Qtol::T = 1E-3, Mtol::T = 1E-3
+    ) where {T <: Real}
     # Consistency checks
     @assert length(idxs) ≤ length(x0) == get_numvars()
     # Initialize least squares method and cache
-    ls = method(res, x0, idxs)
+    ls = method(res, x0, idxs; penalty)
     cache = LeastSquaresCache(x0, idxs, maxiter)
     # Main loop
     fit = leastsquares!(ls, cache; Qtol, Mtol)
@@ -139,13 +145,19 @@ function leastsquares(method::Type{<:AbstractLeastSquaresMethod{T}},
 end
 
 """
-    Newton(res, x0 [, idxs])
+    Newton(res, x0 [, idxs]; kwargs...)
 
-Newton method for minimizing the normalized mean square of a set of O-C residuals
-`res`, starting from initial guess `x0`. If `idxs` (default: `eachindex(x0)`) is
-given, perform the minimization over a subset of the parameters.
+Newton method for minimizing the normalized mean square of a set of
+O-C residuals `res`, starting from initial guess `x0`. If `idxs`
+(default: `eachindex(x0)`) is given, perform the minimization
+over a subset of the parameters.
 
 See also [`leastsquares`](@ref).
+
+# Keyword arguments
+
+- `penalty::Union{Nothing, TaylorN{<:Real}}`: penalty term for target
+    function (default: `nothing`).
 
 !!! reference
     See sections 5.2 and 5.3 of:
@@ -164,12 +176,19 @@ end
 getid(::Newton) = "Newton"
 targetfunction(x::Newton) = x.Q
 
-function Newton(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
-                idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
+function Newton(
+        res::AbstractResidualSet{T, TaylorN{T}},
+        x0::AbstractVector{T},
+        idxs::AbstractVector{Int} = eachindex(x0);
+        penalty::Union{Nothing, TaylorN{T}} = nothing
+    ) where {T <: Real}
     # Number of observations and degrees of freedom
     nobs, npar = notoutobs(res), length(idxs)
     # Mean square residual and its gradient
     Q = nms(res)
+    if !isnothing(penalty)
+        Q += penalty
+    end
     GQ = TaylorSeries.gradient(Q)[idxs]
     # Hessian of the target function
     HQ = [zero(Q) for _ in 1:npar, _ in 1:npar]
@@ -210,12 +229,18 @@ function normalmatrix(ls::Newton, x::AbstractVector)
     return (nobs / 2) * d2Q
 end
 
-function update!(ls::Newton{T}, res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
-                 idxs::AbstractVector{Int}) where {T <: Real}
+function update!(
+        ls::Newton{T}, res::AbstractResidualSet{T, TaylorN{T}},
+        x0::AbstractVector{T}, idxs::AbstractVector{Int};
+        penalty::Union{Nothing, TaylorN{T}} = nothing
+    ) where {T <: Real}
     # Number of observations and degrees of freedom
     ls.nobs, ls.npar = notoutobs(res), length(idxs)
     # Mean square residual and its gradient
     ls.Q = nms(res)
+    if !isnothing(penalty)
+        ls.Q += penalty
+    end
     TS.zero!.(ls.GQ)
     ls.GQ .= TaylorSeries.gradient(ls.Q)[idxs]
     # Hessian
@@ -233,13 +258,19 @@ function update!(ls::Newton{T}, res::AbstractResidualSet{T, TaylorN{T}}, x0::Vec
 end
 
 """
-    DifferentialCorrections(res, x0 [, idxs])
+    DifferentialCorrections(res, x0 [, idxs]; kwargs...)
 
-Differential corrections method for minimizing the normalized mean square of a
-set of O-C residuals `res`, starting from initial guess `x0`. If `idxs` (default:
-`eachindex(x0)`) is given, perform the minimization over a subset of the parameters.
+Differential corrections method for minimizing the normalized mean
+square of a set of O-C residuals `res`, starting from initial guess
+`x0`. If `idxs` (default: `eachindex(x0)`) is given, perform the
+minimization over a subset of the parameters.
 
 See also [`leastsquares`](@ref).
+
+# Keyword arguments
+
+- `penalty::Union{Nothing, TaylorN{<:Real}}`: penalty term for target
+    function (default: `nothing`).
 
 !!! reference
     See sections 5.2 and 5.3 of:
@@ -258,12 +289,19 @@ end
 getid(::DifferentialCorrections) = "Differential Corrections"
 targetfunction(x::DifferentialCorrections) = x.Q
 
-function DifferentialCorrections(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
-                                 idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
+function DifferentialCorrections(
+        res::AbstractResidualSet{T, TaylorN{T}},
+        x0::AbstractVector{T},
+        idxs::AbstractVector{Int} = eachindex(x0);
+        penalty::Union{Nothing, TaylorN{T}} = nothing
+    ) where {T <: Real}
     # Number of observations and degrees of freedom
     nobs, npar = notoutobs(res), length(idxs)
     # Mean square residual and its gradient
     Q = nms(res)
+    if !isnothing(penalty)
+        Q += penalty
+    end
     # D matrix and normal matrix C
     D, C, _, _ = DCVB(res, idxs)
     # Deprecated term
@@ -298,12 +336,18 @@ function normalmatrix(ls::DifferentialCorrections, x::AbstractVector)
     return Cx
 end
 
-function update!(ls::DifferentialCorrections{T}, res::AbstractResidualSet{T, TaylorN{T}},
-                 x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+function update!(
+        ls::DifferentialCorrections{T}, res::AbstractResidualSet{T, TaylorN{T}},
+        x0::AbstractVector{T}, idxs::AbstractVector{Int};
+        penalty::Union{Nothing, TaylorN{T}} = nothing
+    ) where {T <: Real}
     # Number of observations and degrees of freedom
     ls.nobs, ls.npar = notoutobs(res), length(idxs)
     # Mean square residual and its gradient
     ls.Q = nms(res)
+    if !isnothing(penalty)
+        ls.Q += penalty
+    end
     # D matrix and normal matrix C
     ls.D, ls.C, _, _ = DCVB(res, idxs)
     # Deprecated term
@@ -377,14 +421,19 @@ function ξTH(res::AbstractResidualSet{T, TaylorN{T}}, V::AbstractVector{TaylorN
 end
 
 """
-    LevenbergMarquardt(res, x0 [, idxs])
+    LevenbergMarquardt(res, x0 [, idxs]; kwargs...)
 
-Levenberg-Marquardt method for minimizing the normalized mean square of a
-set of O-C residuals `res`, starting from initial guess `x0`. If `idxs`
-(default: `eachindex(x0)`) is given, perform the minimization over a subset
-of the parameters.
+Levenberg-Marquardt method for minimizing the normalized mean square
+of a set of O-C residuals `res`, starting from initial guess `x0`. If
+`idxs` (default: `eachindex(x0)`) is given, perform the minimization
+over a subset of the parameters.
 
 See also [`leastsquares`](@ref).
+
+# Keyword arguments
+
+- `penalty::Union{Nothing, TaylorN{<:Real}}`: penalty term for target
+    function (default: `nothing`).
 
 !!! reference
     See section 15.5.2 of:
@@ -406,14 +455,21 @@ getid(::LevenbergMarquardt) = "Levenberg-Marquardt"
 targetfunction(x::LevenbergMarquardt) = x.Q
 isrejected(::LevenbergMarquardt, Δx) = iszero(Δx)
 
-function LevenbergMarquardt(res::AbstractResidualSet{T, TaylorN{T}}, x0::Vector{T},
-                            idxs::AbstractVector{Int} = eachindex(x0)) where {T <: Real}
+function LevenbergMarquardt(
+        res::AbstractResidualSet{T, TaylorN{T}},
+        x0::AbstractVector{T},
+        idxs::AbstractVector{Int} = eachindex(x0);
+        penalty::Union{Nothing, TaylorN{T}} = nothing
+    ) where {T <: Real}
     # Number of observations and degrees of freedom
     nobs, npar = notoutobs(res), length(idxs)
     # Damping factor
     λ = T(0.001)
     # Mean square residual and its gradient
     Q = nms(res)
+    if !isnothing(penalty)
+        Q += penalty
+    end
     GQ = TaylorSeries.gradient(Q)[idxs]
     # Hessian
     HQ = [zero(Q) for _ in 1:npar, _ in 1:npar]
@@ -463,14 +519,20 @@ function normalmatrix(ls::LevenbergMarquardt, x::AbstractVector)
     return (nobs / 2) * d2Q
 end
 
-function update!(ls::LevenbergMarquardt{T}, res::AbstractResidualSet{T, TaylorN{T}},
-                 x0::Vector{T}, idxs::AbstractVector{Int}) where {T <: Real}
+function update!(
+        ls::LevenbergMarquardt{T}, res::AbstractResidualSet{T, TaylorN{T}},
+        x0::AbstractVector{T}, idxs::AbstractVector{Int};
+        penalty::Union{Nothing, TaylorN{T}} = nothing
+    ) where {T <: Real}
     # Number of observations and degrees of freedom
     ls.nobs, ls.npar = notoutobs(res), length(idxs)
     # Damping factor
     ls.λ = T(0.001)
     # Mean square residual and its gradient
     ls.Q = nms(res)
+    if !isnothing(penalty)
+        ls.Q += penalty
+    end
     TS.zero!.(ls.GQ)
     ls.GQ .= TaylorSeries.gradient(ls.Q)[idxs]
     # Hessian
@@ -489,13 +551,15 @@ end
 
 # Default methods for tryls
 function _lsmethods(
-        res::AbstractResidualSet{T, TaylorN{T}}, x0::AbstractVector{T},
-        idxs::AbstractVector{Int} = eachindex(x0)
+        res::AbstractResidualSet{T, TaylorN{T}},
+        x0::AbstractVector{T},
+        idxs::AbstractVector{Int} = eachindex(x0);
+        penalty::Union{Nothing, TaylorN{T}} = nothing
     ) where {T <: Real}
     return (
-        Newton(res, x0, idxs),
-        DifferentialCorrections(res, x0, idxs),
-        LevenbergMarquardt(res, x0, idxs)
+        Newton(res, x0, idxs; penalty),
+        DifferentialCorrections(res, x0, idxs; penalty),
+        LevenbergMarquardt(res, x0, idxs; penalty)
     )
 end
 
@@ -503,14 +567,14 @@ end
 _tryls(fit, res, x0, cache, methods::Tuple{}; kwargs...) = fit
 
 # Recursive step
-function _tryls(fit, res, x0, cache, methods::Tuple; kwargs...)
+function _tryls(fit, res, x0, cache, methods::Tuple; penalty, kwargs...)
     method = first(methods)
-    update!(method, res, x0, cache.idxs)
+    update!(method, res, x0, cache.idxs; penalty)
     newfit = leastsquares!(method, cache; kwargs...)
     if issuccess(newfit) && 0 < targetfunction(method, newfit) < targetfunction(method, fit)
         fit = newfit
     end
-    return _tryls(fit, res, x0, cache, Base.tail(methods); kwargs...)
+    return _tryls(fit, res, x0, cache, Base.tail(methods); penalty, kwargs...)
 end
 
 # Main entry point
@@ -531,18 +595,22 @@ subset of the parameters.
 See also [`LeastSquaresCache`](@ref), [`AbstractLeastSquaresMethod`](@ref),
 [`_lsmethods`](@ref) and [`leastsquares!`](@ref).
 
-# Keyword Argument
+# Keyword arguments
 
+- `penalty::Union{Nothing, TaylorN{<:Real}}`: penalty term for target
+    function (default: `nothing`).
 - `maxiter::Int`: maximum number of iterations (default: `25`).
 - `Qtol::Real`: target function absolute tolerance (default: `1E-3`).
 - `Mtol::Real`: Mahalanobis distance tolerance (default: `1E-3`).
 """
 function tryls(
-        res::AbstractResidualSet{T, TaylorN{T}}, x0::AbstractVector{T},
-        idxs::AbstractVector{Int} = eachindex(x0); maxiter::Int = 25,
-        Qtol::T = 1E-3, Mtol::T = 1E-3
+        res::AbstractResidualSet{T, TaylorN{T}},
+        x0::AbstractVector{T},
+        idxs::AbstractVector{Int} = eachindex(x0);
+        penalty::Union{Nothing, TaylorN{T}} = nothing,
+        maxiter::Int = 25, Qtol::T = 1E-3, Mtol::T = 1E-3,
     ) where {T <: Real}
     cache = LeastSquaresCache(x0, idxs, maxiter)
-    methods = _lsmethods(res, x0, idxs)
-    return tryls(res, x0, cache, methods; Qtol, Mtol)
+    methods = _lsmethods(res, x0, idxs; penalty)
+    return tryls(res, x0, cache, methods; penalty, Qtol, Mtol)
 end

@@ -338,7 +338,7 @@ function gaussiod(od::OpticalODProblem{D, T, O}, params::Parameters{T}) where {D
     # Filter preliminary orbits
     filter!(!iszero, porbits)
     filter!(isphysical, porbits)
-    filter!(isclosed, porbits)
+    # filter!(isclosed, porbits)
     # Iterate over remaining preliminary orbits
     for i in eachindex(porbits)
         # Jet Transport Least Squares

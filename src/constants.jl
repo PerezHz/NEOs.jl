@@ -375,6 +375,11 @@ const μ_ES = PE.μ[ea] / PE.μ[su] # 1 / 328_900.5614
 # Coefficient of g1 (used in compute_radec)
 const g1coeff = 2μ_DE430[su] / c_au_per_day^2
 
+# Sigma parameter of the Rayleigh distribution of the
+# eccentricities of all asteroids recognized by the
+# MPC by September 2, 2026
+const ECCENTRICITY_RAYLEIGH_SIGMA = 0.1307950766727416
+
 # Impact monitoring
 
 # Equatorial radii of planets [au]
