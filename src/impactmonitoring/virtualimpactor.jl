@@ -203,12 +203,13 @@ function verifyvirtualimpactor(
             ip = min(one(T), impact_probability(iparams))
         end
         # Check impact condition
-        if hypot(cte(X), cte(Y)) ≤ cte(Z)
+        if hypot(cte(X), cte(Y)) ≤ cte(Z) || iszero(ip)
             # Multiply linearized probability by correction factor
             if iszero(width(domain))
                 χ2 = notoutobs(subres) * cte(Q)
                 if abs(_X_) > _Z_
-                    σimp, koff = (abs(_X_) - _Z_) / w, exp(-0.5 * (χ2 - σ^2 - σimp^2))
+                    σimp = (abs(_X_) - _Z_) / w
+                    koff = exp(-0.5 * (χ2 - σ^2 - σimp^2))
                 else
                     σimp, koff = zero(T), one(T)
                 end
