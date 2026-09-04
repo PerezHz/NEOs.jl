@@ -142,8 +142,7 @@ function verifyvirtualimpactor(
     # Unpack
     @unpack orbit = IM
     @unpack t, σ, ip, a, domain = VI
-    @unpack lsiter, jtlsiter = params
-    Qtol, Mtol = params.lsQtol, params.lsMtol
+    @unpack lsiter, jtlsiter, lsQtol, lsMtol = params
     # Set jet transport variables
     Npar = numvars(orbit)
     set_od_order(T, 2, Npar)
@@ -194,22 +193,25 @@ function verifyvirtualimpactor(
             # Semi-width and stretching
             w, Λ = sqrt.(E_tp.values)
             # Angle between the semimajor axis of the TP covariance ellipse and the Y-axis
-            α_Λ = angle(E_tp.vectors[:, 2], [zero(T), one(T)])
+            α_Λ = atan(-E_tp.vectors[1, 2], E_tp.vectors[2, 2])
             # Rotate TP coordinates by an angle of -α_Λ
-            _X_ = cte(X) * cos(-α_Λ) - cte(Y) * sin(-α_Λ)
-            _Y_ = cte(X) * sin(-α_Λ) + cte(Y) * cos(-α_Λ)
+            _X_ =  cte(X) * cos(α_Λ) + cte(Y) * sin(α_Λ)
+            _Y_ = -cte(X) * sin(α_Λ) + cte(Y) * cos(α_Λ)
             _Z_ = cte(Z)
             # 2D linearized probability integral
             iparams = (_X_, _Y_, _Z_, σ, w, Λ)
-            ip = impact_probability(iparams)
+            ip = min(one(T), impact_probability(iparams))
         end
         # Check impact condition
         if hypot(cte(X), cte(Y)) ≤ cte(Z)
             # Multiply linearized probability by correction factor
             if iszero(width(domain))
-                σimp = abs(_X_ - _Z_) / w
                 χ2 = notoutobs(subres) * cte(Q)
-                koff = exp(-0.5 * (χ2 - σ^2 - σimp^2))
+                if abs(_X_) > _Z_
+                    σimp, koff = (abs(_X_) - _Z_) / w, exp(-0.5 * (χ2 - σ^2 - σimp^2))
+                else
+                    σimp, koff = zero(T), one(T)
+                end
                 ip = koff * ip
             end
             return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
@@ -222,7 +224,7 @@ function verifyvirtualimpactor(
             zero(T), zero(T), zero(T), false)
         # Least squares fit
         update!(lsmethod, res, x0, lscache.idxs)
-        fit = leastsquares!(lsmethod, lscache; Qtol, Mtol)
+        fit = leastsquares!(lsmethod, lscache; Qtol = lsQtol, Mtol = lsMtol)
         !issuccess(fit) && break
         # Update orbit
         Qs[i] = nrms(res(x0))
@@ -356,18 +358,27 @@ Return the virtual impactors, under the impact monitoring problem
     `radialvelocity` in each return (default: `100`).
 - `dmax::Real`: maximum allowed value of [`distance`](@ref)
     (default: `0.0`).
+- `ε::Real`: numerical offset in Earth radii (default: `0.01`).
+- `α::Real`: impact pseudo-observation scale factor (default: `100`).
+- `Qmax::Real`: maximum allowed nrms (default: `100`).
+- `Qtol::Real`: target function absolute tolerance (default: `0.001`).
 """
-function virtualimpactors(IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
-                          RTs::ShowerT1{T}, params::Parameters; ctol::Real = T(Inf),
-                          no_pts::Int = 100, dmax::Real = zero(T)) where {D, T <: Real}
+function virtualimpactors(
+        IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
+        RTs::ShowerT1{T}, params::Parameters; ctol::Real = T(Inf),
+        no_pts::Int = 100, dmax::Real = zero(T), ε::Real = 0.01,
+        α::Real = 100, Qmax::Real = 100, Qtol::Real = 0.001
+    ) where {D, T <: Real}
     # Find all the virtual impactors in RTs
     σmax = ubound(lov)
     VIs = virtualimpactors(RTs; ctol, σmax, no_pts, dmax)
-    # Verify each virtual impactor
+    # Eliminate spurious virtual impactors
     newVIs = Vector{VirtualImpactor{T}}(undef, length(VIs))
     for (i, VI) in enumerate(VIs)
-        newVIs[i] = verifyvirtualimpactor(IM, lov, VI, params)
+        newVIs[i] = verifyvirtualimpactor(IM, lov, VI, params;
+            ε, α, Qmax, Qtol)
     end
+    filter!(!isspurious, newVIs)
     # Sort by time of impact
     sort!(newVIs, by = nominaltime)
 
