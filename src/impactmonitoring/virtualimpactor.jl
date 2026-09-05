@@ -159,7 +159,7 @@ function verifyvirtualimpactor(
     lsmethod = Newton(res, x0)
     lscache = LeastSquaresCache(x0, 1:Npar, lsiter)
     # Pre-allocate variables and arrays
-    _X_, _Z_, w = zero(T), zero(T), zero(T)
+    _X_, _Z_, w, σ_b, εx, εy = zero(T), zero(T), zero(T), zero(T), zero(T), zero(T)
     Qs = Vector{T}(undef, jtlsiter)
     # Jet Transport Least Squares (with impact pseudo-observation)
     for i in 1:jtlsiter
@@ -188,39 +188,45 @@ function verifyvirtualimpactor(
         # Eigenpairs of the target plane covariance matrix
         E_tp = eigen(Γ_tp)
         any(<(0), E_tp.values) && break
-        # Linearized impact probability (Milani et al. (2005), p. 379)
-        if i == 1 && iszero(width(domain))
-            # Semi-width and stretching
-            w, Λ = sqrt.(E_tp.values)
-            # Angle between the semimajor axis of the TP covariance ellipse and the Y-axis
-            α_Λ = atan(-E_tp.vectors[1, 2], E_tp.vectors[2, 2])
-            # Rotate TP coordinates by an angle of -α_Λ
-            _X_ =  cte(X) * cos(α_Λ) + cte(Y) * sin(α_Λ)
-            _Y_ = -cte(X) * sin(α_Λ) + cte(Y) * cos(α_Λ)
-            _Z_ = cte(Z)
-            # 2D linearized probability integral
-            iparams = (_X_, _Y_, _Z_, σ, w, Λ)
-            ip = min(one(T), impact_probability(iparams))
+        # Update the impact probability
+        if i == 1
+            # 1D LOV density impact probability (Fenucci et al. (2024), eq. 22)
+            if width(domain) > 0
+                ip = impact_probability(domain[1], domain[2])
+                return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
+            # 2D linearized impact probability (Milani et al. (2005), p. 379)
+            else
+                # Semi-width and stretching
+                w, Λ = sqrt.(E_tp.values)
+                # Angle between the semimajor axis of the TP covariance ellipse and the Y-axis
+                α_Λ = atan(-E_tp.vectors[1, 2], E_tp.vectors[2, 2])
+                # Rotate TP coordinates by an angle of -α_Λ
+                _X_ =  cte(X) * cos(α_Λ) + cte(Y) * sin(α_Λ)
+                _Y_ = -cte(X) * sin(α_Λ) + cte(Y) * cos(α_Λ)
+                _Z_ = cte(Z)
+                # 2D linearized probability integral
+                iparams = (_X_, _Y_, _Z_, σ, w, Λ)
+                ip = min(one(T), impact_probability(iparams))
+                iszero(ip) && break
+                # Weight for the impact pseudo-observation
+                σ_b = _Z_ / α
+                # Point on the impact boundary of minimum distance from the LOV minimum
+                εx = cte(X) * (cte(Z) - ε) / hypot(cte(X), cte(Y))
+                εy = cte(Y) * (cte(Z) - ε) / hypot(cte(X), cte(Y))
+            end
         end
         # Check impact condition
-        if hypot(cte(X), cte(Y)) ≤ cte(Z) || iszero(ip)
+        if hypot(cte(X), cte(Y)) ≤ _Z_
             # Multiply linearized probability by correction factor
-            if iszero(width(domain))
+            if abs(_X_) > _Z_
+                σimp = (abs(_X_) - _Z_) / w
                 χ2 = notoutobs(subres) * cte(Q)
-                if abs(_X_) > _Z_
-                    σimp = (abs(_X_) - _Z_) / w
-                    koff = exp(-0.5 * (χ2 - σ^2 - σimp^2))
-                else
-                    σimp, koff = zero(T), one(T)
-                end
+                koff = exp(-0.5 * (χ2 - σ^2 - σimp^2))
                 ip = koff * ip
             end
             return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
         end
         # Impact pseudo-observation
-        σ_b = cte(Z) / α
-        εx = cte(X) * (cte(Z) - ε) / hypot(cte(X), cte(Y))
-        εy = cte(Y) * (cte(Z) - ε) / hypot(cte(X), cte(Y))
         res[end] = OpticalResidual{T, TaylorN{T}}((εx - X)/σ_b, (εy - Y)/σ_b, 1/σ_b, 1/σ_b,
             zero(T), zero(T), zero(T), false)
         # Least squares fit

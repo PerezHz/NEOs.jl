@@ -10,14 +10,14 @@ using Test
 using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
       initialcondition, nominalstate, difft, domain_radius, convergence_radius,
       convergence_domain, isconvergent, timeofca, distance, radialvelocity,
-      concavity, width, isoutlov, vinf, closeapproaches, issamereturn
+      concavity, width, isoutlov, vinf, closeapproaches, issamereturn, escapevelocity
 
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
 @testset "Impact monitoring" begin
 
     @testset "Common" begin
-        using NEOs: PLANET_NAMES_TO_INDEX, PLANET_RADII, escapevelocity, sseph, numtype,
+        using NEOs: PLANET_NAMES_TO_INDEX, PLANET_RADII, sseph, numtype,
               μ_S, lovtransform
 
         # Impact monitoring scales
@@ -438,12 +438,12 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test impact_probability(VI1) > impact_probability(VI2) == 0.0
         @test width(VI1) == 2σmax
         @test width(VI2) == 0.0
-        @test isspurious(VI1) && isspurious(VI2)
+        @test !isspurious(VI1) && isspurious(VI2)
         @test !isoutlov(VI1) && isoutlov(VI2)
 
-        @test isnan(semiwidth(VI1)) && isnan(semiwidth(VI2))
-        @test isnan(stretching(VI1)) && isnan(stretching(VI2))
-        @test semimajoraxis(VI1) == semimajoraxis(VI2) > 0
+        @test semiwidth(VI1) > 0 && isnan(semiwidth(VI2))
+        @test stretching(VI1) > 0 && isnan(stretching(VI2))
+        @test semimajoraxis(VI1) ≈ semimajoraxis(VI2) > 0
         @test !ishyperbolic(VI1) && !ishyperbolic(VI2)
 
         @test vinf(IM, VI1) == vinf(IM, VI2) == 0.0
