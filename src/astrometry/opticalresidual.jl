@@ -272,7 +272,7 @@ function residuals(
     return res
 end
 
-function residuals!(res::Vector{OpticalResidual{T, U}},
+function residuals!(res::AbstractVector{OpticalResidual{T, U}},
                     optical::AbstractOpticalVector{T},
                     buffer::Vector{OpticalBuffer{U}};
                     kwargs...) where {T <: Real, U <: Number}

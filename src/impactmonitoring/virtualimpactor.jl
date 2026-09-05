@@ -53,15 +53,15 @@ width(x::VirtualImpactor) = width(x.domain)
 isoutlov(x::VirtualImpactor) = iszero(width(x))
 ishyperbolic(x::VirtualImpactor) = semimajoraxis(x) < 0
 
-# A marginal virtual impactor is one that was detected
+# A spurious virtual impactor is one that was detected
 # but could not be verified
-ismarginal(x::VirtualImpactor) = isempty(covariance(x))
+isspurious(x::VirtualImpactor) = isempty(covariance(x))
 
 semiwidth(x::VirtualImpactor{T}) where {T <: Real} =
-    ismarginal(x) ? T(NaN) : sqrt(first(eigvals(covariance(x))))
+    isspurious(x) ? T(NaN) : sqrt(first(eigvals(covariance(x))))
 
 stretching(x::VirtualImpactor{T}) where {T <: Real} =
-    ismarginal(x) ? T(NaN) : sqrt(last(eigvals(covariance(x))))
+    isspurious(x) ? T(NaN) : sqrt(last(eigvals(covariance(x))))
 
 # Impactor table
 function summary(VIs::AbstractVector{VirtualImpactor{T}}) where {T <: Real}
@@ -109,91 +109,146 @@ end
 function milani2005integrand(u::T, params::NTuple{6, T}) where {T <: Real}
     _X_, _Y_, _Z_, σ, w, Λ = params
     A = (u - _X_) / w
-    C = (_Y_ - Λ*σ) / (sqrt(2)*Λ)
-    Splus  = C + sqrt(_Z_^2 - u^2) / (sqrt(2)*Λ)
-    Sminus = C - sqrt(_Z_^2 - u^2) / (sqrt(2)*Λ)
-    return exp(-A^2/2) * erf(Sminus, Splus)
+    B = sqrt(_Z_^2 - u^2)
+    C = σ*Λ - _Y_
+    Zmax = (B + C) / (sqrt(2)*Λ)
+    Zmin = (-B + C) / (sqrt(2)*Λ)
+    return exp(-0.5*A^2) * erf(Zmin, Zmax)
 end
 
 # Virtual impactors search
-function VirtualImpactor(
+
+"""
+    verifyvirtualimpactor(IM, lov, VI, params; kwargs...)
+
+Check if a virtual impactor `VI` is spurious, with respect to the
+impact monitoring problem `IM` with line of variations `lov`, by
+looking for an explicit impact condition. If the virtual impactor
+is indeed spurious, return `VI`; otherwise, compute the target
+plane covariance matrix and update the impact probability.
+
+# Keyword arguments
+
+- `ε::Real`: numerical offset in Earth radii (default: `0.01`).
+- `α::Real`: impact pseudo-observation scale factor (default: `100`).
+- `Qmax::Real`: maximum allowed nrms (default: `100`).
+- `Qtol::Real`: target function absolute tolerance (default: `0.001`).
+"""
+function verifyvirtualimpactor(
         IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
-        VI::VirtualImpactor{T}, params::Parameters{T}
+        VI::VirtualImpactor{T}, params::Parameters; ε::Real = 0.01,
+        α::Real = 100, Qmax::Real = 100, Qtol::Real = 0.001
     ) where {D, T <: Real}
     # Unpack
-    @unpack orbit, target = IM
+    @unpack orbit = IM
     @unpack t, σ, ip, a, domain = VI
+    @unpack lsiter, jtlsiter, lsQtol, lsMtol = params
     # Set jet transport variables
     Npar = numvars(orbit)
     set_od_order(T, 2, Npar)
-    # Scalar initial condition
+    # Reference epoch [Julian days TDB]
     jd0 = epoch(lov) + PE.J2000
+    # Jet transport initial condition
     q00 = lov(σ)
-    # Second order jet transport initial condition
-    q0 = q00 + sigmas(orbit) .* TaylorSeries.variables(T, 2)
+    q0 = q00 + 1E-8 * sigmas(orbit) .* TaylorSeries.variables(T, 2)
     # O-C residuals
-    res = init_optical_residuals(TaylorN{T}, IM)
-    propres!(res, IM, q0, jd0, params)
-    # Covariance matrix at reference epoch
-    Q = nms(res)
-    C = notout(res) * TS.hessian(Q)
-    Γ = inv(C)
-    # Chi parameter
-    # χ = sqrt(notoutobs(orbit) * ( cte(Q) - nms(orbit) ))
-    # First order jet transport initial condition
-    q0 = q00 + sigmas(orbit) .* TaylorSeries.variables(T, 1)
-    # Virtual asteroid
-    VA = VirtualAsteroid(epoch(lov), σ, domain, q0)
-    # Number of years until impact
-    nyears = min(t + 2 + PE.J2000 - jd0, dtutc2days(DateTime(2099, 12, 31))) / yr
-    # Close approach
-    CAs = closeapproaches(IM, VA, nyears, params)
-    if isempty(CAs)
-        @warn string(
-            "The following virtual impactor was detected but could not be verified\n",
-            "Date (UTC)          Sigma      IP\n",
-            rpad(Dates.format(days2dtutc(t), "yyyy-mm-dd HH:MM"), 20),
-            rpad(@sprintf("%+.4f", σ), 11),
-            @sprintf("%.2E", ip),
-            width(domain) > 0 ? "" : " *"
-        )
-        return VI
+    res = init_optical_residuals(TaylorN{T}, IM; iobs = true)
+    subres = view(res, 1:length(res)-1)
+    # Least squares method
+    x0 = zeros(T, Npar)
+    lsmethod = Newton(res, x0)
+    lscache = LeastSquaresCache(x0, 1:Npar, lsiter)
+    # Pre-allocate variables and arrays
+    _X_, _Z_, w, σ_b, εx, εy = zero(T), zero(T), zero(T), zero(T), zero(T), zero(T)
+    Qs = Vector{T}(undef, jtlsiter)
+    # Jet Transport Least Squares (with impact pseudo-observation)
+    for i in 1:jtlsiter
+        # Initial conditions
+        TS.constant_term!.(q0, q00)
+        # Propagation & residuals
+        propres!(res, IM, q0, jd0, params)
+        isempty(res) && break
+        # Covariance matrix at reference epoch
+        Q = nms(subres)
+        C = notout(subres) * TS.hessian(Q)
+        Γ = inv(C)
+        sqrt(cte(Q)) > Qmax && break
+        # Virtual asteroid
+        VA = VirtualAsteroid(epoch(lov), σ, domain, q0)
+        # Number of years until impact
+        nyears = min(t + 2 + PE.J2000 - jd0, datetime2julian(DateTime(2100, 1, 1, 12))) / yr
+        # Close approach
+        CAs = closeapproaches(IM, VA, nyears, params)
+        isempty(CAs) && break
+        CA = CAs[end]
+        # Target plane coordinates
+        t, a, X, Y, Z = cte(CA.t), cte(CA.a), CA.x, CA.y, CA.z
+        # Target plane covariance matrix at close approach
+        Γ_tp = Symmetric(project([X, Y], x0, Γ))
+        # Eigenpairs of the target plane covariance matrix
+        E_tp = eigen(Γ_tp)
+        any(<(0), E_tp.values) && break
+        # Update the impact probability
+        if i == 1
+            # 1D LOV density impact probability (Fenucci et al. (2024), eq. 22)
+            if width(domain) > 0
+                ip = impact_probability(domain[1], domain[2])
+                return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
+            # 2D linearized impact probability (Milani et al. (2005), p. 379)
+            else
+                # Semi-width and stretching
+                w, Λ = sqrt.(E_tp.values)
+                # Angle between the semimajor axis of the TP covariance ellipse and the Y-axis
+                α_Λ = atan(-E_tp.vectors[1, 2], E_tp.vectors[2, 2])
+                # Rotate TP coordinates by an angle of -α_Λ
+                _X_ =  cte(X) * cos(α_Λ) + cte(Y) * sin(α_Λ)
+                _Y_ = -cte(X) * sin(α_Λ) + cte(Y) * cos(α_Λ)
+                _Z_ = cte(Z)
+                # 2D linearized probability integral
+                iparams = (_X_, _Y_, _Z_, σ, w, Λ)
+                ip = min(one(T), impact_probability(iparams))
+                iszero(ip) && break
+                # Weight for the impact pseudo-observation
+                σ_b = _Z_ / α
+                # Point on the impact boundary of minimum distance from the LOV minimum
+                εx = cte(X) * (cte(Z) - ε) / hypot(cte(X), cte(Y))
+                εy = cte(Y) * (cte(Z) - ε) / hypot(cte(X), cte(Y))
+            end
+        end
+        # Check impact condition
+        if hypot(cte(X), cte(Y)) ≤ _Z_
+            # Multiply linearized probability by correction factor
+            if abs(_X_) > _Z_
+                σimp = (abs(_X_) - _Z_) / w
+                χ2 = notoutobs(subres) * cte(Q)
+                koff = exp(-0.5 * (χ2 - σ^2 - σimp^2))
+                ip = koff * ip
+            end
+            return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
+        end
+        # Impact pseudo-observation
+        res[end] = OpticalResidual{T, TaylorN{T}}((εx - X)/σ_b, (εy - Y)/σ_b, 1/σ_b, 1/σ_b,
+            zero(T), zero(T), zero(T), false)
+        # Least squares fit
+        update!(lsmethod, res, x0, lscache.idxs)
+        fit = leastsquares!(lsmethod, lscache; Qtol = lsQtol, Mtol = lsMtol)
+        !issuccess(fit) && break
+        # Update orbit
+        Qs[i] = nrms(res(x0))
+        # Convergence condition
+        (i > 1 && abs(Qs[i-1] - Qs[i]) < Qtol) && break
+        # Update initial condition
+        TS.evaluate!(q0, fit.x, q00)
     end
-    CA = CAs[end]
-    # Target plane coordinates
-    X, Y, Z = CA.x, CA.y, CA.z
-    # Target plane covariance matrix at close approach
-    Γ_tp = Symmetric(project([X, Y], zeros(Npar), Γ))
-    # Eigenpairs of the target plane covariance matrix
-    E_tp = eigen(Γ_tp)
-    if any(<(0), E_tp.values)
-        @warn string(
-            "The following virtual impactor was detected but the target plane \
-            covariance matrix was not positive definite\n",
-            "Date (UTC)          Sigma      IP\n",
-            rpad(Dates.format(days2dtutc(t), "yyyy-mm-dd HH:MM"), 20),
-            rpad(@sprintf("%+.4f", σ), 11),
-            @sprintf("%.2E", ip),
-            width(domain) > 0 ? "" : " *"
-        )
-        return VI
-    end
-    # Approximate the impact probability using the formula from Milani et al (2005)
-    if iszero(width(domain))
-        # Semi-width and stretching
-        w, Λ = sqrt.(E_tp.values)
-        # Angle between the semimajor axis of the TP covariance ellipse and the Y-axis
-        α = angle(E_tp.vectors[:, 2], [zero(T), one(T)])
-        # Rotate TP coordinates by an angle of -α
-        _X_ = cte(X) * cos(-α) - cte(Y) * sin(-α)
-        _Y_ = cte(X) * sin(-α) + cte(Y) * cos(-α)
-        _Z_ = cte(Z)
-        # Compute the 2D integral
-        iparams = (_X_, _Y_, _Z_, σ, w, Λ)
-        ip = impact_probability(iparams)
-    end
-
-    return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
+    @warn string(
+        "The following virtual impactor was detected but could not be verified\n",
+        "Date (UTC)          Sigma      IP\n",
+        rpad(Dates.format(days2dtutc(VI.t), "yyyy-mm-dd HH:MM"), 20),
+        rpad(@sprintf("%+.4f", σ), 11),
+        @sprintf("%.2E", ip),
+        width(domain) > 0 ? "" : " *"
+    )
+    return VI
 end
 
 function virtualimpactors(RT::ReturnT1{T}; ctol::Real = T(Inf), σmax::Real = 5.0,
@@ -310,18 +365,27 @@ Return the virtual impactors, under the impact monitoring problem
     `radialvelocity` in each return (default: `100`).
 - `dmax::Real`: maximum allowed value of [`distance`](@ref)
     (default: `0.0`).
+- `ε::Real`: numerical offset in Earth radii (default: `0.01`).
+- `α::Real`: impact pseudo-observation scale factor (default: `100`).
+- `Qmax::Real`: maximum allowed nrms (default: `100`).
+- `Qtol::Real`: target function absolute tolerance (default: `0.001`).
 """
-function virtualimpactors(IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
-                          RTs::ShowerT1{T}, params::Parameters; ctol::Real = T(Inf),
-                          no_pts::Int = 100, dmax::Real = zero(T)) where {D, T <: Real}
+function virtualimpactors(
+        IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
+        RTs::ShowerT1{T}, params::Parameters; ctol::Real = T(Inf),
+        no_pts::Int = 100, dmax::Real = zero(T), ε::Real = 0.01,
+        α::Real = 100, Qmax::Real = 100, Qtol::Real = 0.001
+    ) where {D, T <: Real}
     # Find all the virtual impactors in RTs
     σmax = ubound(lov)
     VIs = virtualimpactors(RTs; ctol, σmax, no_pts, dmax)
-    # Verify each virtual impactor
+    # Eliminate spurious virtual impactors
     newVIs = Vector{VirtualImpactor{T}}(undef, length(VIs))
     for (i, VI) in enumerate(VIs)
-        newVIs[i] = VirtualImpactor(IM, lov, VI, params)
+        newVIs[i] = verifyvirtualimpactor(IM, lov, VI, params;
+            ε, α, Qmax, Qtol)
     end
+    filter!(!isspurious, newVIs)
     # Sort by time of impact
     sort!(newVIs, by = nominaltime)
 
