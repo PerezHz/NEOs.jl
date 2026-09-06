@@ -245,7 +245,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         σ = sigma(VI1)
         domain = (σ, σ)
-        subVI2 = VirtualImpactor(RT, σ, domain, ctol)
+        subVI2 = VirtualImpactor(RT, σ, 0.0, domain, ctol)
         VI2 = verifyvirtualimpactor(IM, lov, subVI2, params)
 
         @test round(date(VI1), Minute) == round(date(VI2), Minute) == DateTime(2018, 06, 02, 16, 48)
@@ -428,8 +428,8 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         σ = 0.0
         domain1, domain2 = (-σmax, σmax), (0.0, 0.0)
-        subVI1 = VirtualImpactor(RT, σ, domain1, ctol)
-        subVI2 = VirtualImpactor(RT, σ, domain2, ctol)
+        subVI1 = VirtualImpactor(RT, σ, 0.0, domain1, ctol)
+        subVI2 = VirtualImpactor(RT, σ, 0.0, domain2, ctol)
         VI1 = verifyvirtualimpactor(IM, lov, subVI1, params)
         VI2 = verifyvirtualimpactor(IM, lov, subVI2, params)
 
