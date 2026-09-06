@@ -56,7 +56,6 @@ function nongravs!(dq, q, params, t)
     local μ = params.μ
     # Allocations for Earth orientation model
     local orientAlloc = params.orientAlloc
-    # local M_ = params.Mmatrix
     # Marsden et al. (1973) radial function constants
     local marsden_α = params.marsden_radial[1]
     local marsden_r₀ = params.marsden_radial[2]
@@ -80,10 +79,8 @@ function nongravs!(dq, q, params, t)
     # Distance between the i-th body and the asteroid
     r_p2 = Array{S}(undef, N)      # r_{i,asteroid}^2
     r_p4 = Array{S}(undef, N)      # r_{i,asteroid}^4
-    r_p5 = Array{S}(undef, N)      # r_{i,asteroid}^5
     r_p1d2 = Array{S}(undef, N)    # sqrt(r_p2) <-> r_{i, asteroid}
     r_p3d2 = Array{S}(undef, N)    # r_p2^1.5 <-> r_{i, asteroid}^3
-    # r_p7d2 = Array{S}(undef, N)  # r_p2^3.5 <-> r_{i, asteroid}^7
 
     # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
     newtonianCoeff = Array{S}(undef, N)
@@ -99,9 +96,6 @@ function nongravs!(dq, q, params, t)
     U = Array{S}(undef, N)         # X-axis component
     V = Array{S}(undef, N)         # Y-axis component
     W = Array{S}(undef, N)         # Z-axis component
-
-    # 4 * Velocity of the asteroid
-    # _4dq = Array{S}(undef, 3)  # (X,Y,Z) components
 
     # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
     _4U_m_3X = Array{S}(undef, N)  # X-axis component
@@ -186,8 +180,6 @@ function nongravs!(dq, q, params, t)
     # ϕ = Array{S}(undef, N)        # Latitude ϕ
     sin_ϕ = Array{S}(undef, N)      # sin(latitude ϕ)
     sin2_ϕ = Array{S}(undef, N)     # sin(latitude ϕ)^2
-    # sin3_ϕ = Array{S}(undef, N)   # sin(latitude ϕ)^3
-    # sin4_ϕ = Array{S}(undef, N)   # sin(latitude ϕ)^4
     cos_ϕ = Array{S}(undef, N)      # cos(latitude ϕ)
 
     # Acceleration due to zonal harmonics in inertial frame
@@ -211,33 +203,20 @@ function nongravs!(dq, q, params, t)
     # See equations (176) and (177) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     P_2_sin_ϕ = Array{S}(undef, N)      # Second Legendre polynomial P_2(sin ϕ)
     ∂P_2_sin_ϕ = Array{S}(undef, N)     # dP_2(sin ϕ)/d(sin ϕ)
-    P_3_sin_ϕ = Array{S}(undef, N)      # Third Legendre polynomial P_3(sin ϕ)
-    ∂P_3_sin_ϕ = Array{S}(undef, N)     # dP_3(sin ϕ)/d(sin ϕ)
     # -cos ϕ P_n'
     m_c_ϕ_∂P_2 = Array{S}(undef, N)     # -cos ϕ P_2'
-    m_c_ϕ_∂P_3 = Array{S}(undef, N)     # -cos ϕ P_3'
 
     # -J_n * R^n / r^m
     # J_n: n-th zonal harmonic coefficient
     # R: radius of the body
     # r: distance between the body and the asteroid
     Λ2j_div_r4 = Array{S}(undef, N)   # J_2 * R^2 / r^4
-    Λ3j_div_r5 = Array{S}(undef, N)   # J_3 * R^3 / r^5
 
     # Accelerations due to zonal harmonics in body frame
 
-    # Acceleration due to zonal harmonics J_n, n = 2, 3
-    F_J_ξ = Array{S}(undef, N)         # ξ-axis component
-    # F_J_η = Array{S}(undef, N)       # η-axis component
-    F_J_ζ = Array{S}(undef, N)         # ζ-axis component
     # Acceleration due to second zonal harmonic J_2
     F_J2_ξ = Array{S}(undef, N)        # ξ-axis component
-    # F_J2_η = Array{S}(undef, N)      # η-axis component
     F_J2_ζ = Array{S}(undef, N)        # ζ-axis component
-    # Acceleration due to third zonal harmonic J_3
-    F_J3_ξ = Array{S}(undef, N)        # ξ-axis component
-    # F_J3_η = Array{S}(undef, N)      # η-axis component
-    F_J3_ζ = Array{S}(undef, N)        # ζ-axis component
 
     # Unit vectors (ξ, η, ζ) in inertial frame
 
@@ -245,28 +224,10 @@ function nongravs!(dq, q, params, t)
     ξx = Array{S}(undef, N)
     ξy = Array{S}(undef, N)
     ξz = Array{S}(undef, N)
-    # η vector
-    # ηx = Array{S}(undef, N)
-    # ηy = Array{S}(undef, N)
-    # ηz = Array{S}(undef, N)
-    # Auxiliaries to compute η vector
-    # ηx1 = Array{S}(undef, N)
-    # ηy1 = Array{S}(undef, N)
-    # ηz1 = Array{S}(undef, N)
-    # ηx2 = Array{S}(undef, N)
-    # ηy2 = Array{S}(undef, N)
-    # ηz2 = Array{S}(undef, N)
     # ζ vector
     ζx = Array{S}(undef, N)
     ζy = Array{S}(undef, N)
     ζz = Array{S}(undef, N)
-    # Auxiliaries to compute ζ vector
-    # ζx1 = Array{S}(undef, N)
-    # ζy1 = Array{S}(undef, N)
-    # ζz1 = Array{S}(undef, N)
-    # ζx2 = Array{S}(undef, N)
-    # ζy2 = Array{S}(undef, N)
-    # ζz2 = Array{S}(undef, N)
 
     # Full extended-body accelerations
     accX = zero_q_1
@@ -274,7 +235,6 @@ function nongravs!(dq, q, params, t)
     accZ = zero_q_1
 
     # Rotations to and from Earth, Sun and Moon pole-oriented frames
-    # local M_[:, :, ea] = t2c_jpl_de430!(dsj2k, zero_q_1, orientAlloc)
     local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
 
     # Fill first 3 elements of dq with velocities
@@ -289,6 +249,7 @@ function nongravs!(dq, q, params, t)
     Compute point-mass Newtonian accelerations, all bodies
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
+    # 4 * Velocity of the asteroid
     _4dq1 = 4dq[1]
     _4dq2 = 4dq[2]
     _4dq3 = 4dq[3]
@@ -330,7 +291,6 @@ function nongravs!(dq, q, params, t)
         r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,asteroid}^2
         r_p1d2[i] = sqrt(r_p2[i])                   # sqrt(r_p2) <-> r_{i,asteroid}
         r_p3d2[i] = r_p2[i] * r_p1d2[i]             # r_p2^1.5 <-> r_{i, asteroid}^3
-        # r_p7d2[i] = r_p2[i]^3.5                   # r_p2^3.5 <-> r_{i, asteroid}^7
 
         # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
         newtonianCoeff[i] =  μ[i]/r_p3d2[i]
@@ -371,19 +331,15 @@ function nongravs!(dq, q, params, t)
             # Trigonometric functions of latitude ϕ and longitude λ in the body-fixed coordinate system
             # See equations (165)-(168) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
 
-            # ϕ[i] = asin(sin_ϕ[i])               # Latitude ϕ
             sin_ϕ[i] = r_sin_ϕ[i]/r_p1d2[i]       # sin(latitude ϕ)
             sin2_ϕ[i] = sin_ϕ[i]^2                # sin(latitude ϕ)^2
-            # sin3_ϕ[i] = sin_ϕ[i]^3              # sin(latitude ϕ)^3
             cos_ϕ[i] = sqrt(1 - sin2_ϕ[i])        # cos(latitude ϕ)
 
             # Legendre polynomials
 
             # See equations (176) and (177) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
-            P_2_sin_ϕ[i] = 1.5sin2_ϕ[i] - 0.5               # Second Legendre polynomial P_2(sin ϕ)
-            ∂P_2_sin_ϕ[i] = 3sin_ϕ[i]                       # dP_2(sin ϕ)/d(sin ϕ)
-            P_3_sin_ϕ[i] = sin_ϕ[i] * (2.5sin2_ϕ[i] - 1.5)  # Third Legendre polynomial P_3(sin ϕ)
-            ∂P_3_sin_ϕ[i] = -1.5 + 7.5sin2_ϕ[i]             # dP_3(sin ϕ)/d(sin ϕ)
+            P_2_sin_ϕ[i] = 1.5sin2_ϕ[i] - 0.5                # Second Legendre polynomial P_2(sin ϕ)
+            ∂P_2_sin_ϕ[i] = 3sin_ϕ[i]                        # dP_2(sin ϕ)/d(sin ϕ)
 
             # Compute cartesian coordinates of acceleration due to body figure in body frame
 
@@ -392,28 +348,14 @@ function nongravs!(dq, q, params, t)
             # R: radius of the body
             # r: distance between the body and the asteroid
             r_p4[i] = r_p2[i] * r_p2[i]             # r_{i,asteroid}^4
-            r_p5[i] = r_p4[i] * r_p1d2[i]           # r_{i,asteroid}^5
             Λ2j_div_r4[i] = -(Λ2[i]/r_p4[i])        # J_2 * R^2 / r^4
-            Λ3j_div_r5[i] = -(Λ3[i]/r_p5[i])        # J_3 * R^3 / r^5
 
             # -cos ϕ P_n'
             m_c_ϕ_∂P_2[i] = (-cos_ϕ[i])*∂P_2_sin_ϕ[i]   # -cos ϕ P_2'
-            m_c_ϕ_∂P_3[i] = (-cos_ϕ[i])*∂P_3_sin_ϕ[i]   # -cos ϕ P_3'
 
             # Acceleration due to second zonal harmonic J_2 in body frame
             F_J2_ξ[i] = ( Λ2j_div_r4[i]*(3P_2_sin_ϕ[i]) )   # ξ-axis component
-            # F_J2_η[i] = zero_q_1                          # η-axis component
             F_J2_ζ[i] = Λ2j_div_r4[i]*m_c_ϕ_∂P_2[i]         # ζ-axis component
-
-            # Acceleration due to third zonal harmonic J_3 in body frame
-            F_J3_ξ[i] = ( Λ3j_div_r5[i]*(4P_3_sin_ϕ[i]) )   # ξ-axis component
-            #F_J3_η[i] = zero_q_1                           # η-axis component
-            F_J3_ζ[i] = Λ3j_div_r5[i]*m_c_ϕ_∂P_3[i]         # ζ-axis component
-
-            # Compute accelerations due to zonal harmonics J_n, n = 2, 3 in body frame
-            F_J_ξ[i] = F_J2_ξ[i] # + F_J3_ξ[i]              # ξ-axis component
-            # F_J_η[i] = zero_q_1                           # η-axis component
-            F_J_ζ[i] = F_J2_ζ[i] # + F_J3_ζ[i]              # ζ-axis component
 
             # Compute unit vectors (ξ, η, ζ) in inertial frame
 
@@ -422,26 +364,6 @@ function nongravs!(dq, q, params, t)
             ξy[i] = -Y[i]/r_p1d2[i]
             ξz[i] = -Z[i]/r_p1d2[i]
 
-            # Compute η = p x ξ
-            # Auxiliaries
-            # ηx1[i] = M_[2,3,i]*ξz[i]
-            # ηy1[i] = M_[3,3,i]*ξx[i]
-            # ηz1[i] = M_[1,3,i]*ξy[i]
-            # ηx2[i] = M_[3,3,i]*ξy[i]
-            # ηy2[i] = M_[1,3,i]*ξz[i]
-            # ηz2[i] = M_[2,3,i]*ξx[i]
-            # η components in inertial frame
-            # ηx[i] = ηx1[i] - ηx2[i]
-            # ηy[i] = ηy1[i] - ηy2[i]
-            # ηz[i] = ηz1[i] - ηz2[i]
-
-            # Compute ζ = ξ x η
-            # ζx1[i] = ξy[i]*ηz[i]
-            # ζy1[i] = ξz[i]*ηx[i]
-            # ζz1[i] = ξx[i]*ηy[i]
-            # ζx2[i] = ξz[i]*ηy[i]
-            # ζy2[i] = ξx[i]*ηz[i]
-            # ζz2[i] = ξy[i]*ηx[i]
             # ζ components in inertial frame
             ζx[i] = M_[1,3,i] - (sin_ϕ[i] * ξx[i])
             ζy[i] = M_[2,3,i] - (sin_ϕ[i] * ξy[i])
@@ -449,12 +371,12 @@ function nongravs!(dq, q, params, t)
 
             # Compute cartesian coordinates of acceleration due to body figure in inertial frame
             # Auxiliaries
-            F_J2_x1[i] = F_J_ξ[i]*ξx[i]
-            F_J2_y1[i] = F_J_ξ[i]*ξy[i]
-            F_J2_z1[i] = F_J_ξ[i]*ξz[i]
-            F_J2_x2[i] = F_J_ζ[i]*ζx[i]
-            F_J2_y2[i] = F_J_ζ[i]*ζy[i]
-            F_J2_z2[i] = F_J_ζ[i]*ζz[i]
+            F_J2_x1[i] = F_J2_ξ[i]*ξx[i]
+            F_J2_y1[i] = F_J2_ξ[i]*ξy[i]
+            F_J2_z1[i] = F_J2_ξ[i]*ξz[i]
+            F_J2_x2[i] = F_J2_ζ[i]*ζx[i]
+            F_J2_y2[i] = F_J2_ζ[i]*ζy[i]
+            F_J2_z2[i] = F_J2_ζ[i]*ζz[i]
             # Acceleration due to zonal harmonics in inertial frame
             F_J2_x[i] = F_J2_x1[i] + F_J2_x2[i]
             F_J2_y[i] = F_J2_y1[i] + F_J2_y2[i]
@@ -688,7 +610,6 @@ function gravityonly!(dq, q, params, t)
     local μ = params.μ
     # Allocations for Earth orientation model
     local orientAlloc = params.orientAlloc
-    # local M_ = params.Mmatrix
     # zero(q[1])
     local zero_q_1 = params.zeroq1
 
@@ -705,10 +626,8 @@ function gravityonly!(dq, q, params, t)
     # Distance between the i-th body and the asteroid
     r_p2 = Array{S}(undef, N)      # r_{i,asteroid}^2
     r_p4 = Array{S}(undef, N)      # r_{i,asteroid}^4
-    r_p5 = Array{S}(undef, N)      # r_{i,asteroid}^4
     r_p1d2 = Array{S}(undef, N)    # sqrt(r_p2) <-> r_{i, asteroid}
     r_p3d2 = Array{S}(undef, N)    # r_p2^1.5 <-> r_{i, asteroid}^3
-    # r_p7d2 = Array{S}(undef, N)  # r_p2^3.5 <-> r_{i, asteroid}^7
 
     # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
     newtonianCoeff = Array{S}(undef, N)
@@ -724,9 +643,6 @@ function gravityonly!(dq, q, params, t)
     U = Array{S}(undef, N)         # X-axis component
     V = Array{S}(undef, N)         # Y-axis component
     W = Array{S}(undef, N)         # Z-axis component
-
-    # 4 * Velocity of the asteroid
-    # _4dq = Array{S}(undef, 3)  # (X,Y,Z) components
 
     # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
     _4U_m_3X = Array{S}(undef, N)  # X-axis component
@@ -808,11 +724,8 @@ function gravityonly!(dq, q, params, t)
 
     # Trigonometric functions of latitude ϕ and longitude λ in the body-fixed coordinate system
     # See equations (165)-(168) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
-    # ϕ = Array{S}(undef, N)        # Latitude ϕ
     sin_ϕ = Array{S}(undef, N)      # sin(latitude ϕ)
     sin2_ϕ = Array{S}(undef, N)     # sin(latitude ϕ)^2
-    # sin3_ϕ = Array{S}(undef, N)   # sin(latitude ϕ)^3
-    # sin4_ϕ = Array{S}(undef, N)   # sin(latitude ϕ)^4
     cos_ϕ = Array{S}(undef, N)      # cos(latitude ϕ)
 
     # Acceleration due to zonal harmonics in inertial frame
@@ -836,33 +749,20 @@ function gravityonly!(dq, q, params, t)
     # See equations (176) and (177) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     P_2_sin_ϕ = Array{S}(undef, N)      # Second Legendre polynomial P_2(sin ϕ)
     ∂P_2_sin_ϕ = Array{S}(undef, N)     # dP_2(sin ϕ)/d(sin ϕ)
-    P_3_sin_ϕ = Array{S}(undef, N)      # Third Legendre polynomial P_3(sin ϕ)
-    ∂P_3_sin_ϕ = Array{S}(undef, N)     # dP_3(sin ϕ)/d(sin ϕ)
     # -cos ϕ P_n'
     m_c_ϕ_∂P_2 = Array{S}(undef, N)     # -cos ϕ P_2'
-    m_c_ϕ_∂P_3 = Array{S}(undef, N)     # -cos ϕ P_3'
 
     # -J_n * R^n / r^m
     # J_n: n-th zonal harmonic coefficient
     # R: radius of the body
     # r: distance between the body and the asteroid
     Λ2j_div_r4 = Array{S}(undef, N)   # J_2 * R^2 / r^4
-    Λ3j_div_r5 = Array{S}(undef, N)   # J_3 * R^3 / r^5
 
     # Accelerations due to zonal harmonics in body frame
 
-    # Acceleration due to zonal harmonics J_n, n = 2, 3
-    F_J_ξ = Array{S}(undef, N)         # ξ-axis component
-    # F_J_η = Array{S}(undef, N)       # η-axis component
-    F_J_ζ = Array{S}(undef, N)         # ζ-axis component
     # Acceleration due to second zonal harmonic J_2
     F_J2_ξ = Array{S}(undef, N)        # ξ-axis component
-    # F_J2_η = Array{S}(undef, N)      # η-axis component
     F_J2_ζ = Array{S}(undef, N)        # ζ-axis component
-    # Acceleration due to third zonal harmonic J_3
-    F_J3_ξ = Array{S}(undef, N)        # ξ-axis component
-    # F_J3_η = Array{S}(undef, N)      # η-axis component
-    F_J3_ζ = Array{S}(undef, N)        # ζ-axis component
 
     # Unit vectors (ξ, η, ζ) in inertial frame
 
@@ -870,28 +770,10 @@ function gravityonly!(dq, q, params, t)
     ξx = Array{S}(undef, N)
     ξy = Array{S}(undef, N)
     ξz = Array{S}(undef, N)
-    # η vector
-    # ηx = Array{S}(undef, N)
-    # ηy = Array{S}(undef, N)
-    # ηz = Array{S}(undef, N)
-    # Auxiliaries to compute η vector
-    # ηx1 = Array{S}(undef, N)
-    # ηy1 = Array{S}(undef, N)
-    # ηz1 = Array{S}(undef, N)
-    # ηx2 = Array{S}(undef, N)
-    # ηy2 = Array{S}(undef, N)
-    # ηz2 = Array{S}(undef, N)
     # ζ vector
     ζx = Array{S}(undef, N)
     ζy = Array{S}(undef, N)
     ζz = Array{S}(undef, N)
-    # Auxiliaries to compute ζ vector
-    # ζx1 = Array{S}(undef, N)
-    # ζy1 = Array{S}(undef, N)
-    # ζz1 = Array{S}(undef, N)
-    # ζx2 = Array{S}(undef, N)
-    # ζy2 = Array{S}(undef, N)
-    # ζz2 = Array{S}(undef, N)
 
     # Full extended-body accelerations
     accX = zero_q_1
@@ -899,7 +781,6 @@ function gravityonly!(dq, q, params, t)
     accZ = zero_q_1
 
     # Rotations to and from Earth, Sun and Moon pole-oriented frames
-    # local M_[:, :, ea] = t2c_jpl_de430!(dsj2k, zero_q_1, orientAlloc)
     local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
     # Fill first 3 elements of dq with velocities
     dq[1] = q[4]
@@ -913,6 +794,7 @@ function gravityonly!(dq, q, params, t)
     Compute point-mass Newtonian accelerations, all bodies
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
+    # 4 * Velocity of the asteroid
     _4dq1 = 4dq[1]
     _4dq2 = 4dq[2]
     _4dq3 = 4dq[3]
@@ -954,7 +836,6 @@ function gravityonly!(dq, q, params, t)
         r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,asteroid}^2
         r_p1d2[i] = sqrt(r_p2[i])                   # sqrt(r_p2) <-> r_{i,asteroid}
         r_p3d2[i] = r_p2[i] * r_p1d2[i]             # r_p2^1.5 <-> r_{i, asteroid}^3
-        # r_p7d2[i] = r_p2[i]^3.5                   # r_p2^3.5 <-> r_{i, asteroid}^7
 
         # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
         newtonianCoeff[i] =  μ[i]/r_p3d2[i]
@@ -995,19 +876,15 @@ function gravityonly!(dq, q, params, t)
             # Trigonometric functions of latitude ϕ and longitude λ in the body-fixed coordinate system
             # See equations (165)-(168) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
 
-            # ϕ[i] = asin(sin_ϕ[i])               # Latitude ϕ
             sin_ϕ[i] = r_sin_ϕ[i]/r_p1d2[i]       # sin(latitude ϕ)
             sin2_ϕ[i] = sin_ϕ[i]^2                # sin(latitude ϕ)^2
-            # sin3_ϕ[i] = sin_ϕ[i]^3              # sin(latitude ϕ)^3
             cos_ϕ[i] = sqrt(1 - sin2_ϕ[i])        # cos(latitude ϕ)
 
             # Legendre polynomials
 
             # See equations (176) and (177) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
-            P_2_sin_ϕ[i] = 1.5sin2_ϕ[i] - 0.5               # Second Legendre polynomial P_2(sin ϕ)
-            ∂P_2_sin_ϕ[i] = 3sin_ϕ[i]                       # dP_2(sin ϕ)/d(sin ϕ)
-            P_3_sin_ϕ[i] = sin_ϕ[i] * (2.5sin2_ϕ[i] - 1.5)  # Third Legendre polynomial P_3(sin ϕ)
-            ∂P_3_sin_ϕ[i] = -1.5 + 7.5sin2_ϕ[i]             # dP_3(sin ϕ)/d(sin ϕ)
+            P_2_sin_ϕ[i] = 1.5sin2_ϕ[i] - 0.5                # Second Legendre polynomial P_2(sin ϕ)
+            ∂P_2_sin_ϕ[i] = 3sin_ϕ[i]                        # dP_2(sin ϕ)/d(sin ϕ)
 
             # Compute cartesian coordinates of acceleration due to body figure in body frame
 
@@ -1016,28 +893,14 @@ function gravityonly!(dq, q, params, t)
             # R: radius of the body
             # r: distance between the body and the asteroid
             r_p4[i] = r_p2[i] * r_p2[i]             # r_{i,asteroid}^4
-            r_p5[i] = r_p4[i] * r_p1d2[i]           # r_{i,asteroid}^5
             Λ2j_div_r4[i] = -(Λ2[i]/r_p4[i])        # J_2 * R^2 / r^4
-            Λ3j_div_r5[i] = -(Λ3[i]/r_p5[i])        # J_3 * R^3 / r^5
 
             # -cos ϕ P_n'
             m_c_ϕ_∂P_2[i] = (-cos_ϕ[i])*∂P_2_sin_ϕ[i]   # -cos ϕ P_2'
-            m_c_ϕ_∂P_3[i] = (-cos_ϕ[i])*∂P_3_sin_ϕ[i]   # -cos ϕ P_3'
 
             # Acceleration due to second zonal harmonic J_2 in body frame
             F_J2_ξ[i] = ( Λ2j_div_r4[i]*(3P_2_sin_ϕ[i]) )   # ξ-axis component
-            # F_J2_η[i] = zero_q_1                          # η-axis component
             F_J2_ζ[i] = Λ2j_div_r4[i]*m_c_ϕ_∂P_2[i]         # ζ-axis component
-
-            # Acceleration due to third zonal harmonic J_3 in body frame
-            F_J3_ξ[i] = ( Λ3j_div_r5[i]*(4P_3_sin_ϕ[i]) )   # ξ-axis component
-            #F_J3_η[i] = zero_q_1                           # η-axis component
-            F_J3_ζ[i] = Λ3j_div_r5[i]*m_c_ϕ_∂P_3[i]         # ζ-axis component
-
-            # Compute accelerations due to zonal harmonics J_n, n = 2, 3 in body frame
-            F_J_ξ[i] = F_J2_ξ[i] # + F_J3_ξ[i]              # ξ-axis component
-            # F_J_η[i] = zero_q_1                           # η-axis component
-            F_J_ζ[i] = F_J2_ζ[i] # + F_J3_ζ[i]              # ζ-axis component
 
             # Compute unit vectors (ξ, η, ζ) in inertial frame
 
@@ -1046,26 +909,6 @@ function gravityonly!(dq, q, params, t)
             ξy[i] = -Y[i]/r_p1d2[i]
             ξz[i] = -Z[i]/r_p1d2[i]
 
-            # Compute η = p x ξ
-            # Auxiliaries
-            # ηx1[i] = M_[2,3,i]*ξz[i]
-            # ηy1[i] = M_[3,3,i]*ξx[i]
-            # ηz1[i] = M_[1,3,i]*ξy[i]
-            # ηx2[i] = M_[3,3,i]*ξy[i]
-            # ηy2[i] = M_[1,3,i]*ξz[i]
-            # ηz2[i] = M_[2,3,i]*ξx[i]
-            # η components in inertial frame
-            # ηx[i] = ηx1[i] - ηx2[i]
-            # ηy[i] = ηy1[i] - ηy2[i]
-            # ηz[i] = ηz1[i] - ηz2[i]
-
-            # Compute ζ = ξ x η
-            # ζx1[i] = ξy[i]*ηz[i]
-            # ζy1[i] = ξz[i]*ηx[i]
-            # ζz1[i] = ξx[i]*ηy[i]
-            # ζx2[i] = ξz[i]*ηy[i]
-            # ζy2[i] = ξx[i]*ηz[i]
-            # ζz2[i] = ξy[i]*ηx[i]
             # ζ components in inertial frame
             ζx[i] = M_[1,3,i] - (sin_ϕ[i] * ξx[i])
             ζy[i] = M_[2,3,i] - (sin_ϕ[i] * ξy[i])
@@ -1073,12 +916,12 @@ function gravityonly!(dq, q, params, t)
 
             # Compute cartesian coordinates of acceleration due to body figure in inertial frame
             # Auxiliaries
-            F_J2_x1[i] = F_J_ξ[i]*ξx[i]
-            F_J2_y1[i] = F_J_ξ[i]*ξy[i]
-            F_J2_z1[i] = F_J_ξ[i]*ξz[i]
-            F_J2_x2[i] = F_J_ζ[i]*ζx[i]
-            F_J2_y2[i] = F_J_ζ[i]*ζy[i]
-            F_J2_z2[i] = F_J_ζ[i]*ζz[i]
+            F_J2_x1[i] = F_J2_ξ[i]*ξx[i]
+            F_J2_y1[i] = F_J2_ξ[i]*ξy[i]
+            F_J2_z1[i] = F_J2_ξ[i]*ξz[i]
+            F_J2_x2[i] = F_J2_ζ[i]*ζx[i]
+            F_J2_y2[i] = F_J2_ζ[i]*ζy[i]
+            F_J2_z2[i] = F_J2_ζ[i]*ζz[i]
             # Acceleration due to zonal harmonics in inertial frame
             F_J2_x[i] = F_J2_x1[i] + F_J2_x2[i]
             F_J2_y[i] = F_J2_y1[i] + F_J2_y2[i]

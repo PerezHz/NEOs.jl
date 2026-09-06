@@ -50,28 +50,18 @@ end
 
 # Initialize vector of optical residuals
 function init_optical_residuals(
-        ::Type{U}, IM::AbstractIMProblem{D, T}
+        ::Type{U}, IM::AbstractIMProblem{D, T};
+        iobs::Bool = false
     ) where {D, T <: Real, U <: Number}
     @unpack orbit = IM
-    res = Vector{OpticalResidual{T, U}}(undef, length(orbit.ores))
-    for (i, r) in enumerate(orbit.ores)
+    @unpack ores = orbit
+    res = Vector{OpticalResidual{T, U}}(undef, length(ores) + iobs)
+    for (i, r) in enumerate(ores)
         res[i] = OpticalResidual{T, U}(zero(U), zero(U), wra(r), wdec(r), dra(r), ddec(r),
                                        corr(r), isoutlier(r))
     end
+    res[end] = iobs ? zero(OpticalResidual{T, U}) : res[end]
     return res
-end
-
-function PropresBuffer(
-        IM::AbstractIMProblem{D, T}, q0::Vector{U},
-        jd0::V, idxs::AbstractVector{Int}, params::Parameters{T}
-    ) where {D, T <: Real, U <: Number, V <: Number}
-    t0 = dtutc2days(date(IM.orbit.optical[idxs[1]]))
-    tf = dtutc2days(date(IM.orbit.optical[idxs[end]]))
-    tref = cte(cte(jd0)) - JD_J2000
-    tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
-    prop = PropagationBuffer(dynamicalmodel(IM), q0, jd0, tlim, params)
-    res = [OpticalBuffer(q0[1]) for _ in eachindex(idxs)]
-    return PropresBuffer{T, U, V}(prop, res)
 end
 
 function PropresBuffer(
@@ -89,18 +79,16 @@ end
 function propres!(
         res::Vector{OpticalResidual{T, U}}, IM::AbstractIMProblem{D, T},
         q0::Vector{U}, jd0::V, params::Parameters{T};
-        buffer::Union{Nothing, PropresBuffer{T, U, V}} = nothing,
-        idxs::AbstractVector{Int} = opticalindices(IM)
+        buffer::Union{Nothing, PropresBuffer{T, U, V}} = nothing
     )  where {D, T <: Real, U <: Number, V <: Number}
-    # Unpack parameters
+    # Unpack
+    @unpack optical = IM.orbit
     @unpack coeffstol, eph_su, eph_ea = params
-    # Subset of optical astrometry for propagation and residuals
-    optical = view(IM.orbit.optical, idxs)
     # Times of first/last observation, epoch and years in backward/forward propagation
     t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(optical, jd0, params)
     # Buffer
     if isnothing(buffer)
-        buffer = PropresBuffer(IM, q0, jd0, idxs, params)
+        buffer = PropresBuffer(IM, q0, jd0, params)
     end
     # Backward (forward) integration
     bwd = _propagate(dynamicalmodel(IM), q0, jd0, nyears_bwd, buffer.prop, params)
@@ -111,8 +99,10 @@ function propres!(
         return bwd, fwd
     end
     # O-C residuals
+    Nres = length(res)
+    subres = Nres == noptical(IM) ? view(res, 1:Nres) : view(res, 1:Nres-1)
     try
-        residuals!(res, optical, buffer.res; xvs = eph_su, xve = eph_ea,
+        residuals!(subres, optical, buffer.res; xvs = eph_su, xve = eph_ea,
                    xva = (bwd, fwd))
         return bwd, fwd
     catch

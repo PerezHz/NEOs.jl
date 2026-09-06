@@ -27,11 +27,12 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
               T <: Real, O <: AbstractOpticalVector{T}}
     # Unpack
     Qtol, Mtol = params.lsQtol, params.lsMtol
-    @unpack adamiter, adammode, adamQtol, mmovproject, significance = params
+    @unpack eph_su, adamiter, adammode, adamQtol, lspenalty, mmovproject,
+            significance = params
     @unpack dynamics = od
     variables = collect(1:6)
     # Initial time of integration [julian days TDB]
-    jd0 = dtutc2jdtdb(A.date)
+    _jd0_ = dtutc2jdtdb(A.date)
     # Pre-allocate memory
     aes = Matrix{T}(undef, 6, adamiter+1)
     Qs = fill(T(Inf), adamiter+1)
@@ -55,13 +56,14 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
     idxs = indices(tracklets)
     optical = od.optical[idxs]
     # Initialize buffer and set of residuals
-    buffer = PropresBuffer(od, AE, jd0, idxs, params)
+    buffer = PropresBuffer(od, AE, _jd0_, idxs, params)
     res = init_optical_residuals(TaylorN{T}, od, idxs)
     # Origin
     x0, x1 = zeros(T, 6), zeros(T, 6)
     # Least squares cache and methods
     lscache = LeastSquaresCache(x0, 1:4, 5)
     lsmethods = _lsmethods(res, x0, 1:4)
+    penalty = lspenalty > 0 ? zero(TaylorN{T}) : nothing
     # Gradient of objective function wrt (ρ, v_ρ)
     g_t = zeros(T, 2)
     # First and second momentum
@@ -87,10 +89,16 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
         # Propagation and residuals
         # TO DO: `ρ::TaylorN` is too slow for `mmov` due to evaluations
         # within the dynamical model
-        bwd, fwd = propres!(res, od, q, jd0 - ae[5]/c_au_per_day, params; buffer, idxs)
+        jd0 = _jd0_ - ae[5]/c_au_per_day
+        bwd, fwd = propres!(res, od, q, jd0, params; buffer, idxs)
         isempty(res) && break
         # Least squares fit
-        fit = tryls(res, x0, lscache, lsmethods; Qtol, Mtol)
+        if lspenalty > 0
+            _q0_ = equatorial2ecliptic(q - eph_su(jd0 - PE.J2000))
+            e = eccentricity(_q0_..., μ_S, zero(T))
+            penalty = (lspenalty / notout(res)) * eccentricitypenalty(e)
+        end
+        fit = tryls(res, x0, lscache, lsmethods; penalty, Qtol, Mtol)
         !issuccess(fit) && break
         x1 .= fit.x
         # Current Q

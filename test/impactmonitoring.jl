@@ -10,14 +10,14 @@ using Test
 using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
       initialcondition, nominalstate, difft, domain_radius, convergence_radius,
       convergence_domain, isconvergent, timeofca, distance, radialvelocity,
-      concavity, width, isoutlov, vinf, ismarginal, closeapproaches, issamereturn
+      concavity, width, isoutlov, vinf, closeapproaches, issamereturn, escapevelocity
 
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
 @testset "Impact monitoring" begin
 
     @testset "Common" begin
-        using NEOs: PLANET_NAMES_TO_INDEX, PLANET_RADII, escapevelocity, sseph, numtype,
+        using NEOs: PLANET_NAMES_TO_INDEX, PLANET_RADII, sseph, numtype,
               μ_S, lovtransform
 
         # Impact monitoring scales
@@ -107,7 +107,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 9, 2026
+        # Values by September 4, 2026
 
         # Impact target
         target = ImpactTarget(:earth)
@@ -245,14 +245,15 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         σ = sigma(VI1)
         domain = (σ, σ)
-        VI2 = VirtualImpactor(IM, lov, VirtualImpactor(RT, σ, domain, ctol), params)
+        subVI2 = VirtualImpactor(RT, σ, domain, ctol)
+        VI2 = verifyvirtualimpactor(IM, lov, subVI2, params)
 
-        @test date(VI1) == date(VI2) == date(CA) == date(RT)
+        @test round(date(VI1), Minute) == round(date(VI2), Minute) == DateTime(2018, 06, 02, 16, 48)
         @test sigma(VI1) == sigma(VI2) == 0.0
         @test impact_probability(VI1) ≈ impact_probability(VI2) atol = 0.01
         @test width(VI1) == 2σmax
         @test width(VI2) == 0.0
-        @test !ismarginal(VI1) && !ismarginal(VI2)
+        @test !isspurious(VI1) && !isspurious(VI2)
         @test !isoutlov(VI1) && isoutlov(VI2)
 
         @test semiwidth(VI1) == semiwidth(VI2) > 0
@@ -290,7 +291,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by August 9, 2026
+        # Values by September 4, 2026
 
         # Impact target
         target = ImpactTarget(:earth)
@@ -427,20 +428,22 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         σ = 0.0
         domain1, domain2 = (-σmax, σmax), (0.0, 0.0)
-        VI1 = VirtualImpactor(IM, lov, VirtualImpactor(RT, σ, domain1, ctol), params)
-        VI2 = VirtualImpactor(IM, lov, VirtualImpactor(RT, σ, domain2, ctol), params)
+        subVI1 = VirtualImpactor(RT, σ, domain1, ctol)
+        subVI2 = VirtualImpactor(RT, σ, domain2, ctol)
+        VI1 = verifyvirtualimpactor(IM, lov, subVI1, params)
+        VI2 = verifyvirtualimpactor(IM, lov, subVI2, params)
 
-        @test date(VI1) == date(VI2) == date(CA) == date(RT)
+        @test round(date(VI1), Minute) == round(date(VI2), Minute) == DateTime(2024, 10, 28, 23, 41)
         @test sigma(VI1) == sigma(VI2) == 0.0
         @test impact_probability(VI1) > impact_probability(VI2) == 0.0
         @test width(VI1) == 2σmax
         @test width(VI2) == 0.0
-        @test !ismarginal(VI1) && !ismarginal(VI2)
+        @test !isspurious(VI1) && isspurious(VI2)
         @test !isoutlov(VI1) && isoutlov(VI2)
 
-        @test semiwidth(VI1) == semiwidth(VI2) > 0
-        @test stretching(VI1) == stretching(VI2) > 0
-        @test semimajoraxis(VI1) == semimajoraxis(VI2) > 0
+        @test semiwidth(VI1) > 0 && isnan(semiwidth(VI2))
+        @test stretching(VI1) > 0 && isnan(stretching(VI2))
+        @test semimajoraxis(VI1) ≈ semimajoraxis(VI2) > 0
         @test !ishyperbolic(VI1) && !ishyperbolic(VI2)
 
         @test vinf(IM, VI1) == vinf(IM, VI2) == 0.0

@@ -31,12 +31,23 @@ function iodinitcond(A::AdmissibleRegion)
 end
 
 """
+    eccentricitypenalty(::Number)
+
+Penalty term corresponding to the natural logarithm of the
+Rayleigh distribution of the eccentricities of all asteroids
+recognized by the MPC by September 2, 2026.
+"""
+eccentricitypenalty(e::Number) = e^2 / (2ECCENTRICITY_RAYLEIGH_SIGMA^2) - log(e)
+
+#=
+"""
     issinglearc(::AbstractOpticalVector, arc::Day)
 
 Check whether a (sorted) vector of optical astrometry is a single observational
 arc, i.e. no two consecutive observations are more than `arc` days apart.
 """
 issinglearc(x::AbstractOpticalVector, arc::Day = Day(30)) = all(diff(date.(x)) .< arc)
+=#
 
 """
     initialorbitdetermination(od, params; kwargs...)

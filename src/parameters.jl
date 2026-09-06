@@ -57,6 +57,7 @@ nongravitational accelerations model:
 
 # Least Squares
 
+- `lspenalty::T`: scaling parameter for the eccentricity penalty (default: `0`).
 - `lsiter::Int`: maximum number of iterations for `leastsquares` (default: `10`).
 - `lsQtol::T`: target function absolute tolerance (default: `1E-3`).
 - `lsMtol::T`: Mahalanobis distance tolerance (default: `1E-3`).
@@ -119,6 +120,7 @@ nongravitational accelerations model:
     mmovproject::Bool = true
     tsaorder::Int = 6
     # Least Squares
+    lspenalty::T = 0.0
     lsiter::Int = 10
     lsQtol::T = 1E-3
     lsMtol::T = 1E-3

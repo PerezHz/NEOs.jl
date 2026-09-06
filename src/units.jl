@@ -234,7 +234,7 @@ end
 
 Convert radians to arcseconds.
 
-See also [`arcsec2rad`](@ref) and [`mas2rad`](@ref).
+See also [`arcsec2rad`](@ref) and [`rad2mas`](@ref).
 """
 rad2arcsec(x::Number) = 3600 * rad2deg(x)
 
@@ -252,9 +252,18 @@ arcsec2rad(x::Number) = deg2rad(x / 3600)
 
 Convert milli-arcseconds to radians.
 
-See also [`rad2arcsec`](@ref) and [`arcsec2rad`](@ref).
+See also [`rad2mas`](@ref) and [`arcsec2rad`](@ref).
 """
 mas2rad(x::Number) = arcsec2rad(x / 1000)
+
+"""
+    rad2mas(::Number)
+
+Convert radians to milli-arcseconds.
+
+See also [`mas2rad`](@ref) and [`rad2arcsec`](@ref).
+"""
+rad2mas(x::Number) = rad2arcsec(x) * 1000
 
 """
     range2delay(::Number)

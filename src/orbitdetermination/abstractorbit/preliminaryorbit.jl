@@ -144,6 +144,7 @@ iszero(x::GaussOrbit) = x == zero(typeof(x))
 isphysical(x::GaussOrbit) = iszero(x) ? false : all(x.ρ .> 0)
 
 # Check heliocentric energy is negative
+#=
 function isclosed(x::GaussOrbit)
     iszero(x) && return false
     # Heliocentric state vector [au, au/day]
@@ -155,6 +156,7 @@ function isclosed(x::GaussOrbit)
 
     return E <= 0
 end
+=#
 
 # Evaluate TaylorN's in deltas
 function evaldeltas(orbit::GaussOrbit{D, T, TaylorN{T}, O},

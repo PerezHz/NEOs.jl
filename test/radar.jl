@@ -35,6 +35,7 @@ using Test
         @test apophis.bp == "C"
         @test debias(apophis) == 0.0
 
+        @test NEOs.numtype(apophis) == Float64
         @test !isdelay(apophis)
         @test isdoppler(apophis)
         @test ismonostatic(apophis)
@@ -139,6 +140,7 @@ using Test
         @test rms(apophis) == abs(rangerate2doppler(1.3604, 2380.0))
         @test debias(apophis) == 0.0
 
+        @test NEOs.numtype(apophis) == Float64
         @test !isdelay(apophis)
         @test isdoppler(apophis)
         @test ismonostatic(apophis)

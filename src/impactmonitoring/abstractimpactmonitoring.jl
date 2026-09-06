@@ -77,10 +77,13 @@ abstract type AbstractVirtualImpactor{T <: Real} <: AbstractImpactMonitoring end
 overlap(a::NTuple{2, T}, b::NTuple{2, T}) where {T <: Real} =
     (a[1] ≤ b[2]) && (b[1] ≤ a[2])
 
+isspurious(::AbstractVirtualImpactor) = false
+
 function show(io::IO, x::AbstractVirtualImpactor)
+    f = isspurious(x) ? "Spurious " : ""
     d = round(date(x), Minute)
     t = Dates.format(d, "yyyy-mm-dd HH:MM")
     ip = @sprintf("%.2E", impact_probability(x))
     asterisk = isoutlov(x) ? " *" : ""
-    print(io, "VI at ", t, " with probability ", ip, asterisk)
+    print(io, f, "VI at ", t, " with probability ", ip, asterisk)
 end
