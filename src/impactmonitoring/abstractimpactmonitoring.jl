@@ -79,11 +79,27 @@ overlap(a::NTuple{2, T}, b::NTuple{2, T}) where {T <: Real} =
 
 isspurious(::AbstractVirtualImpactor) = false
 
-function show(io::IO, x::AbstractVirtualImpactor)
-    f = isspurious(x) ? "Spurious " : ""
-    d = round(date(x), Minute)
-    t = Dates.format(d, "yyyy-mm-dd HH:MM")
+# Print methods for AbstractVirtualImpactor
+function show(io::IO, ::MIME"text/plain", x::AbstractVirtualImpactor)
+    t = repeat(' ', 4)
+    f = isspurious(x) ? "true " : "false"
+    d = Dates.format(round(date(x), Minute), "yyyy-mm-dd HH:MM")
+    σ = @sprintf("%+.4f", sigma(x))
     ip = @sprintf("%.2E", impact_probability(x))
-    asterisk = isoutlov(x) ? " *" : ""
-    print(io, f, "VI at ", t, " with probability ", ip, asterisk)
+    print(io,
+        typeof(x), "\n",
+        t, rpad("Spurious:", 21), f, "\n",
+        t, rpad("Date:", 21), d, "\n",
+        t, rpad("Sigma:", 21), σ, "\n",
+        t, rpad("Impact probability:", 21), ip,
+    )
+    return nothing
+end
+
+function show(io::IO, x::AbstractVirtualImpactor)
+    f = isspurious(x) ? "[Spurious] " : ""
+    d = Dates.format(round(date(x), Minute), "yyyy-mm-dd HH:MM")
+    σ = @sprintf("%+.4f", sigma(x))
+    ip = @sprintf("%.2E", impact_probability(x))
+    print(io, f, "VI t: ", d, " σ: ", σ, " ip: ", ip)
 end

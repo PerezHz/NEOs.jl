@@ -73,7 +73,7 @@ function summary(VIs::AbstractVector{VirtualImpactor{T}}) where {T <: Real}
     s1 = string(
         "Impactor table{$T}\n",
         repeat('-', 90), "\n",
-        "Date (UTC)          Sigma      Sigimp     Semi-width [RE]    Stretching [RE]    IP\n",
+        "Date (UTC)          Sigma      Sigimp     Semi-width [RE]    Stretching [RE]    IP       S\n",
     )
     s2 = Vector{String}(undef, length(VIs))
     for (i, VI) in enumerate(VIs)
@@ -82,11 +82,11 @@ function summary(VIs::AbstractVector{VirtualImpactor{T}}) where {T <: Real}
         σimp = rpad(@sprintf("%+.4f", sigmaimp(VI)), 11)
         w = rpad(@sprintf("%.3f", semiwidth(VI)), 19)
         Λ = rpad(@sprintf("%.2E", stretching(VI)), 19)
-        asterisk = isoutlov(VI) ? " *" : "  "
-        ip = rpad(@sprintf("%.2E", VI.ip) * asterisk, 11)
-        s2[i] = string(t, σ, σimp, w, Λ, ip, "\n")
+        ip = rpad(@sprintf("%.2E", VI.ip), 9)
+        f = isspurious(VI) ? "T" : "F"
+        s2[i] = string(t, σ, σimp, w, Λ, ip, f)
     end
-    return string(s1, join(s2))
+    return string(s1, join(s2, '\n'))
 end
 
 impactor_table(x::AbstractVector{VirtualImpactor{T}}) where {T} = println(summary(x))
