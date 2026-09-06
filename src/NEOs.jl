@@ -109,7 +109,7 @@ export ImpactTarget, IMProblem, BPlane, MTP, bopik, mtp, targetplane, crosssecti
        valsecchi_circle
 export LineOfVariations, VirtualAsteroid, CloseApproach, Return, lineofvariations,
        virtualasteroids, closeapproaches, showersnreturns, sigma, lbound, ubound
-export VirtualImpactor, isspurious, semiwidth, stretching, virtualimpactors,
+export VirtualImpactor, isspurious, sigmaimp, semiwidth, stretching, virtualimpactors,
        verifyvirtualimpactor, impact_probability, impactor_table, vinf,
        impactenergy, palermoscale, torinoscale
 

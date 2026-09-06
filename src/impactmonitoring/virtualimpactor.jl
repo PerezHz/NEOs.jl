@@ -7,6 +7,7 @@ A segment of the line of variations that impacts the Earth.
 
 - `t::T`: time of impact [days since J2000 TDB].
 - `σ::T`: LOV index.
+- `σimp::T`: off-LOV index.
 - `ip::T`: impact probability.
 - `a::T`: planetocentric semimajor axis [au].
 - `domain::NTuple{2, T}`: segment of the line of variations.
@@ -15,6 +16,7 @@ A segment of the line of variations that impacts the Earth.
 @auto_hash_equals struct VirtualImpactor{T} <: AbstractVirtualImpactor{T}
     t::T
     σ::T
+    σimp::T
     ip::T
     a::T
     domain::NTuple{2, T}
@@ -22,17 +24,19 @@ A segment of the line of variations that impacts the Earth.
 end
 
 # Outer constructorss
-function VirtualImpactor(t::T, σ::T, ip::T, a::T, domain::NTuple{2, T},
-                         Γ_tp::Matrix{T} = Matrix{T}(undef, 0, 0)) where {T <: Real}
-    return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
-end
+VirtualImpactor(
+    t::T, σ::T, σimp::T, ip::T, a::T, domain::NTuple{2, T},
+    Γ_tp::Matrix{T} = Matrix{T}(undef, 0, 0)
+) where {T <: Real} = VirtualImpactor{T}(t, σ, σimp, ip, a, domain, Γ_tp)
 
-function VirtualImpactor(RT::ReturnT1{T}, σ::T, domain::NTuple{2, T},
-                         ctol::T) where {T <: Real}
+function VirtualImpactor(
+        RT::ReturnT1{T}, σ::T, σimp::T,
+        domain::NTuple{2, T}, ctol::T
+    ) where {T <: Real}
     t = timeofca(RT, σ, ctol)
     ip = impact_probability(domain[1], domain[2])
     a = semimajoraxis(RT, σ, ctol)
-    return VirtualImpactor(t, σ, ip, a, domain)
+    return VirtualImpactor(t, σ, σimp, ip, a, domain)
 end
 
 # Abbreviations
@@ -41,6 +45,7 @@ const ShowerT1{T} = Shower{T, Taylor1{T}}
 
 # AbstractVirtualImpactor interface
 sigma(x::VirtualImpactor) = x.σ
+sigmaimp(x::VirtualImpactor) = x.σimp
 nominaltime(x::VirtualImpactor) = x.t
 semimajoraxis(x::VirtualImpactor) = x.a
 covariance(x::VirtualImpactor) = x.covariance
@@ -67,18 +72,19 @@ stretching(x::VirtualImpactor{T}) where {T <: Real} =
 function summary(VIs::AbstractVector{VirtualImpactor{T}}) where {T <: Real}
     s1 = string(
         "Impactor table{$T}\n",
-        repeat('-', 80), "\n",
-        "Date (UTC)          Sigma      Semi-width [RE]    Stretching [RE]    IP\n",
+        repeat('-', 90), "\n",
+        "Date (UTC)          Sigma      Sigimp     Semi-width [RE]    Stretching [RE]    IP\n",
     )
     s2 = Vector{String}(undef, length(VIs))
     for (i, VI) in enumerate(VIs)
         t = rpad(Dates.format(date(VI), "yyyy-mm-dd HH:MM"), 20)
         σ = rpad(@sprintf("%+.4f", sigma(VI)), 11)
+        σimp = rpad(@sprintf("%+.4f", sigmaimp(VI)), 11)
         w = rpad(@sprintf("%.3f", semiwidth(VI)), 19)
         Λ = rpad(@sprintf("%.2E", stretching(VI)), 19)
         asterisk = isoutlov(VI) ? " *" : "  "
         ip = rpad(@sprintf("%.2E", VI.ip) * asterisk, 11)
-        s2[i] = string(t, σ, w, Λ, ip, "\n")
+        s2[i] = string(t, σ, σimp, w, Λ, ip, "\n")
     end
     return string(s1, join(s2))
 end
@@ -141,7 +147,7 @@ function verifyvirtualimpactor(
     ) where {D, T <: Real}
     # Unpack
     @unpack orbit = IM
-    @unpack t, σ, ip, a, domain = VI
+    @unpack t, σ, σimp, ip, a, domain = VI
     @unpack lsiter, jtlsiter, lsQtol, lsMtol = params
     # Set jet transport variables
     Npar = numvars(orbit)
@@ -193,7 +199,7 @@ function verifyvirtualimpactor(
             # 1D LOV density impact probability (Fenucci et al. (2024), eq. 22)
             if width(domain) > 0
                 ip = impact_probability(domain[1], domain[2])
-                return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
+                return VirtualImpactor{T}(t, σ, σimp, ip, a, domain, Γ_tp)
             # 2D linearized impact probability (Milani et al. (2005), p. 379)
             else
                 # Semi-width and stretching
@@ -224,7 +230,7 @@ function verifyvirtualimpactor(
                 koff = exp(-0.5 * (χ2 - σ^2 - σimp^2))
                 ip = koff * ip
             end
-            return VirtualImpactor{T}(t, σ, ip, a, domain, Γ_tp)
+            return VirtualImpactor{T}(t, σ, σimp, ip, a, domain, Γ_tp)
         end
         # Impact pseudo-observation
         res[end] = OpticalResidual{T, TaylorN{T}}((εx - X)/σ_b, (εy - Y)/σ_b, 1/σ_b, 1/σ_b,
@@ -266,7 +272,7 @@ function virtualimpactors(RT::ReturnT1{T}; ctol::Real = T(Inf), σmax::Real = 5.
     # Check if any of the roots of the radial velocity is a local minimum
     # with positive distance
     for σ in rs
-        VI = VirtualImpactor(RT, σ, (σ, σ), ctol)
+        VI = VirtualImpactor(RT, σ, zero(T), (σ, σ), ctol)
         if 0 ≤ nominaltime(VI) ≤ 36525.0 && 0 < distance(RT, σ, ctol) < dmax &&
             0 < concavity(RT, σ, ctol)
             push!(VIs, VI)
@@ -284,7 +290,7 @@ function virtualimpactors(RT::ReturnT1{T}; ctol::Real = T(Inf), σmax::Real = 5.
             domain = (da < 0 && db > 0) ? (domain[1], σ) : (σ, domain[2])
         end
         σ = midpoint(domain)
-        VI = VirtualImpactor(RT, σ, domain, ctol)
+        VI = VirtualImpactor(RT, σ, zero(T), domain, ctol)
         if 0 ≤ nominaltime(VI) ≤ 36525.0 && distance(RT, σ, ctol) < dmax
             push!(VIs, VI)
         end
@@ -300,7 +306,7 @@ function virtualimpactors(RT::ReturnT1{T}; ctol::Real = T(Inf), σmax::Real = 5.
         if overlap(domaina, domainb)
             domain = (min(domaina[1], domainb[1]), max(domaina[2], domainb[2]))
             σ = midpoint(domain)
-            newVIs[end] = VirtualImpactor(RT, σ, domain, ctol)
+            newVIs[end] = VirtualImpactor(RT, σ, zero(T), domain, ctol)
         # The intersection of domaina and domainb is empty
         else
             push!(newVIs, VI)
@@ -337,7 +343,7 @@ function virtualimpactors(RTs::ShowerT1{T}; ctol::Real = T(Inf), σmax::Real = 5
             else
                 k = flaga ? ka : kb
             end
-            newVIs[end] = VirtualImpactor(RTs[k], σ, domain, ctol)
+            newVIs[end] = VirtualImpactor(RTs[k], σ, zero(T), domain, ctol)
         # The intersection of domaina and domainb is empty
         else
             push!(newks, k)
