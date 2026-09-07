@@ -139,11 +139,14 @@ plane covariance matrix and update the impact probability.
 - `α::Real`: impact pseudo-observation scale factor (default: `100`).
 - `Qmax::Real`: maximum allowed nrms (default: `100`).
 - `Qtol::Real`: target function absolute tolerance (default: `0.001`).
+- `buffer::Union{Nothing, VirtualImpactorsBuffer}`: pre-allocated
+    memory (default: `nothing`).
 """
 function verifyvirtualimpactor(
         IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
         VI::VirtualImpactor{T}, params::Parameters; ε::Real = 0.01,
-        α::Real = 100, Qmax::Real = 100, Qtol::Real = 0.001
+        α::Real = 100, Qmax::Real = 100, Qtol::Real = 0.001,
+        buffer::Union{Nothing, VirtualImpactorsBuffer{T}} = nothing
     ) where {D, T <: Real}
     # Unpack
     @unpack orbit = IM
@@ -152,14 +155,18 @@ function verifyvirtualimpactor(
     # Set jet transport variables
     Npar = numvars(orbit)
     set_od_order(T, 2, Npar)
+    # Virtual impactors buffer
+    if isnothing(buffer)
+        buffer = VirtualImpactorsBuffer(IM, params)
+    end
+    CAsbuffer = buffer.CAs
+    @unpack res, prop = buffer
+    subres = view(res, 1:length(res)-1)
     # Reference epoch [Julian days TDB]
     jd0 = epoch(lov) + PE.J2000
     # Jet transport initial condition
     q00 = lov(σ)
     q0 = q00 + 1E-8 * sigmas(orbit) .* TaylorSeries.variables(T, 2)
-    # O-C residuals
-    res = init_optical_residuals(TaylorN{T}, IM; iobs = true)
-    subres = view(res, 1:length(res)-1)
     # Least squares method
     x0 = zeros(T, Npar)
     lsmethod = Newton(res, x0)
@@ -172,7 +179,7 @@ function verifyvirtualimpactor(
         # Initial conditions
         TS.constant_term!.(q0, q00)
         # Propagation & residuals
-        propres!(res, IM, q0, jd0, params)
+        propres!(res, IM, q0, jd0, params; buffer = prop)
         isempty(res) && break
         # Covariance matrix at reference epoch
         Q = nms(subres)
@@ -182,9 +189,9 @@ function verifyvirtualimpactor(
         # Virtual asteroid
         VA = VirtualAsteroid(epoch(lov), σ, domain, q0)
         # Number of years until impact
-        nyears = min(t + 2 + PE.J2000 - jd0, datetime2julian(DateTime(2100, 1, 1, 12))) / yr
+        nyears = (min(t + 2 + PE.J2000, datetime2julian(DateTime(2100, 1, 1, 12))) - jd0) / yr
         # Close approach
-        CAs = closeapproaches(IM, VA, nyears, params)
+        CAs = closeapproaches(IM, VA, nyears, params; buffer = CAsbuffer)
         isempty(CAs) && break
         CA = CAs[end]
         # Target plane coordinates

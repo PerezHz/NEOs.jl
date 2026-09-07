@@ -1,4 +1,69 @@
 """
+    LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
+
+Pre-allocated memory for [`lineofvariations`](@ref).
+
+# Fields
+
+- `t0::T`: reference epoch [TDB days since J2000].
+- `sun::Vector{T}`: Sun barycentric cartesian state vector at `t0` [au, au/day].
+- `scalings::Vector{T}`: covariance matrix scaling factors.
+- `resTN::Vector{OpticalResidual{T, TaylorN{T}}}`: buffer for `TaylorN{T}` residuals.
+- `bufferTN::PropresBuffer{T, TaylorN{T}, T}`: buffer for `TaylorN{T}` propagations.
+"""
+struct LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
+    t0::T
+    sun::Vector{T}
+    scalings::Vector{T}
+    resTN::Vector{OpticalResidual{T, TaylorN{T}}}
+    bufferTN::PropresBuffer{T, TaylorN{T}, T}
+end
+
+TaylorSeries.order(x::LineOfVariationsBuffer) =
+    TaylorSeries.order(x.bufferTN.prop.cache.x[1][0])
+
+"""
+    LineOfVariationsBuffer(IM, lovorder, params)
+
+Return a `LineOfVariationsBuffer` object with pre-allocated
+memory for [`lineofvariations`](@ref).
+
+# Arguments
+
+- `IM::IMProblem`: impact monitoring problem.
+- `lovorder::Int`: order of Taylor expansions wrt LOV index.
+- `params::Parameters`: see the `Propagation` section of [`Parameters`](@ref).
+"""
+function LineOfVariationsBuffer(IM::AbstractIMProblem{D, T}, lovorder::Int,
+                                params::Parameters{T}) where {D, T <: Real}
+    # Unpack
+    @unpack orbit = IM
+    @unpack eph_su = params
+    # Set jet transport order
+    Ndof = dof(IM)
+    set_od_order(T, lovorder, Ndof)
+    # Refence epoch [julian date TDB]
+    t0 = epoch(orbit)
+    jd0 = t0 + PE.J2000
+    # Sun's state vector at jd0
+    sun = eph_su(t0)
+    # Covariance matrix scaling factors
+    scalings = fill(1E-8, 6)
+    if Ndof == 9
+        scalings = vcat(scalings, params.marsden_scalings...)
+    end
+    # Initial condition
+    q00 = orbit()
+    q0TN = q00 + sigmas(orbit) .* TaylorSeries.variables(T, lovorder)
+    # Vectors of residuals
+    resTN = init_optical_residuals(TaylorN{T}, IM)
+    # Propagation and residuals buffers
+    bufferTN = PropresBuffer(IM, q0TN, jd0, params)
+
+    return LineOfVariationsBuffer{T}(t0, sun, scalings, resTN, bufferTN)
+end
+
+"""
     RootFindingEvent{U <: Number}
 
 An evaluation of an event function, e.g. [`closeapproach!`](@ref).
@@ -58,7 +123,7 @@ mutable struct RootFindingBuffer{T <: Real, U <: Number} <: AbstractBuffer
 end
 
 """
-    ImpactMonitoringBuffer{T <: Real, U <: Number} <: AbstractBuffer
+    CloseApproachesBuffer{T <: Real, U <: Number} <: AbstractBuffer
 
 Pre-allocated memory for [`closeapproaches`](@ref).
 
@@ -67,13 +132,13 @@ Pre-allocated memory for [`closeapproaches`](@ref).
 - `prop::PropagationBuffer{T, U, T}`: propagation buffer.
 - `root::RootFindingBuffer{T, U}`: root-finding buffer.
 """
-struct ImpactMonitoringBuffer{T <: Real, U <: Number} <: AbstractBuffer
+struct CloseApproachesBuffer{T <: Real, U <: Number} <: AbstractBuffer
     prop::PropagationBuffer{T, U, T}
     root::RootFindingBuffer{T, U}
 end
 
 """
-    ImpactMonitoringBuffer(IM, q0, nyears, params)
+    CloseApproachesBuffer(IM, q0, nyears, params)
 
 Return an `ImpactMonitoringBuffer` object with pre-allocated
 memory for [`closeapproaches`](@ref).
@@ -85,8 +150,10 @@ memory for [`closeapproaches`](@ref).
 - `nyears::Real`: number of years.
 - `params::Parameters`: see the `Propagation` section of [`Parameters`](@ref).
 """
-function ImpactMonitoringBuffer(IM::AbstractIMProblem{D, T}, q0::Vector{U}, nyears::T,
-                                params::Parameters{T}) where {D, T <: Real, U <: Number}
+function CloseApproachesBuffer(
+        IM::AbstractIMProblem{D, T}, q0::Vector{U},
+        nyears::T, params::Parameters{T}
+    ) where {D, T <: Real, U <: Number}
     # Unpack
     @unpack orbit, target = IM
     @unpack order, maxsteps = params
@@ -114,6 +181,55 @@ function ImpactMonitoringBuffer(IM::AbstractIMProblem{D, T}, q0::Vector{U}, nyea
     g_tupl_old = RootFindingEvent{U}(false, zero(y))
     root = RootFindingBuffer{T, U}(jd0, rv, teph,  g_dg_val, g_dg, g_constant,
         f_tupl, g_tupl, f_tupl_old, g_tupl_old)
-    # Impact monitoring buffer
-    return ImpactMonitoringBuffer{T, U}(prop, root)
+    # Close approaches buffer
+    return CloseApproachesBuffer{T, U}(prop, root)
+end
+
+"""
+    VirtualImpactorsBuffer{T <: Real} <: AbstractBuffer
+
+Pre-allocated memory for [`verifyvirtualimpactor`](@ref).
+
+# Fields
+
+- `res::Vector{OpticalResidual{T, TaylorN{T}}}`: buffer for `TaylorN{T}`
+    residuals.
+- `prop::PropresBuffer{T, TaylorN{T}, T}`: buffer for `TaylorN{T}`
+    propagations.
+- `CAs::CloseApproachesBuffer{T, TaylorN{T}}`: buffer for `TaylorN{T}`
+    close approaches search.
+"""
+struct VirtualImpactorsBuffer{T <: Real} <: AbstractBuffer
+    res::Vector{OpticalResidual{T, TaylorN{T}}}
+    prop::PropresBuffer{T, TaylorN{T}, T}
+    CAs::CloseApproachesBuffer{T, TaylorN{T}}
+end
+
+"""
+    VirtualImpactorsBuffer(IM, params)
+
+Return a `VirtualImpactorsBuffer` object with pre-allocated
+memory for [`verifyvirtualimpactor`](@ref).
+
+# Arguments
+
+- `IM::IMProblem`: impact monitoring problem.
+- `params::Parameters`: see the `Propagation` section of [`Parameters`](@ref).
+"""
+function VirtualImpactorsBuffer(
+        IM::AbstractIMProblem{D, T}, params::Parameters{T}
+    ) where {D, T <: Real}
+    # Unpack
+    @unpack orbit = IM
+    # Vector of residuals
+    res = init_optical_residuals(TaylorN{T}, IM; iobs = true)
+    # Propagation buffer
+    jd0 = epoch(orbit) + PE.J2000
+    q0 = orbit() + 1E-8 * sigmas(orbit) .* TaylorSeries.variables(T, 2)
+    prop = PropresBuffer(IM, q0, jd0, params)
+    # Close approaches buffer
+    nyears = ( datetime2julian(DateTime(2100, 1, 1, 12)) - jd0 ) / yr
+    CAs = CloseApproachesBuffer(IM, q0, nyears, params)
+    # Virtual impactors buffer
+    return VirtualImpactorsBuffer{T}(res, prop, CAs)
 end

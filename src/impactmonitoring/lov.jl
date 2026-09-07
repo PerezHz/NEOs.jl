@@ -1,69 +1,4 @@
 """
-    LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
-
-Pre-allocated memory for [`lineofvariations`](@ref).
-
-# Fields
-
-- `t0::T`: reference epoch [TDB days since J2000].
-- `sun::Vector{T}`: Sun barycentric cartesian state vector at `t0` [au, au/day].
-- `scalings::Vector{T}`: covariance matrix scaling factors.
-- `resTN::Vector{OpticalResidual{T, TaylorN{T}}}`: buffer for `TaylorN{T}` residuals.
-- `bufferTN::PropresBuffer{T, TaylorN{T}, T}`: buffer for `TaylorN{T}` propagations.
-"""
-struct LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
-    t0::T
-    sun::Vector{T}
-    scalings::Vector{T}
-    resTN::Vector{OpticalResidual{T, TaylorN{T}}}
-    bufferTN::PropresBuffer{T, TaylorN{T}, T}
-end
-
-TaylorSeries.order(x::LineOfVariationsBuffer) =
-    TaylorSeries.order(x.bufferTN.prop.cache.x[1][0])
-
-"""
-    LineOfVariationsBuffer(IM, lovorder, params)
-
-Return a `LineOfVariationsBuffer` object with pre-allocated
-memory for [`lineofvariations`](@ref).
-
-# Arguments
-
-- `IM::IMProblem`: impact monitoring problem.
-- `lovorder::Int`: order of Taylor expansions wrt LOV index.
-- `params::Parameters`: see the `Propagation` section of [`Parameters`](@ref).
-"""
-function LineOfVariationsBuffer(IM::AbstractIMProblem{D, T}, lovorder::Int,
-                                params::Parameters{T}) where {D, T <: Real}
-    # Unpack
-    @unpack orbit = IM
-    @unpack eph_su = params
-    # Set jet transport order
-    Ndof = dof(IM)
-    set_od_order(T, lovorder, Ndof)
-    # Refence epoch [julian date TDB]
-    t0 = epoch(orbit)
-    jd0 = t0 + PE.J2000
-    # Sun's state vector at jd0
-    sun = eph_su(t0)
-    # Covariance matrix scaling factors
-    scalings = fill(1E-8, 6)
-    if Ndof == 9
-        scalings = vcat(scalings, params.marsden_scalings...)
-    end
-    # Initial condition
-    q00 = orbit()
-    q0TN = q00 + sigmas(orbit) .* TaylorSeries.variables(T, lovorder)
-    # Vectors of residuals
-    resTN = init_optical_residuals(TaylorN{T}, IM)
-    # Propagation and residuals buffers
-    bufferTN = PropresBuffer(IM, q0TN, jd0, params)
-
-    return LineOfVariationsBuffer{T}(t0, sun, scalings, resTN, bufferTN)
-end
-
-"""
     LineOfVariations{D, T} <: AbstractLineOfVariations{T}
 
 A parametrization of the line of variations (LOV).
@@ -253,9 +188,9 @@ end
 """
     lineofvariations(IM, params; kwargs...)
 
-Return a parametrization of the line of variations associated to an
-impact monitoring problem `IM`. For a list of parameters, see the
-`Propagation` section of [`Parameters`](@ref).
+Return a parametrization of the line of variations associated to
+an impact monitoring problem `IM`. For a list of parameters, see
+the `Propagation` section of [`Parameters`](@ref).
 
 # Keyword arguments
 
@@ -265,13 +200,18 @@ impact monitoring problem `IM`. For a list of parameters, see the
 - `lovorder::Int`: order of Taylor expansions wrt LOV index (default: `4`).
 - `lovtol::Real`: absolute tolerance used to integrate the LOV (default: `1E-8`).
 - `lovsteps::Int`: maximum number of steps for the integration (default: `100`).
+- `buffer::Union{Nothing, LineOfVariationsBuffer}`: pre-allocated memory
+    (default: `nothing`).
 """
-function lineofvariations(IM::AbstractIMProblem{D, T}, params::Parameters{T};
-                          coord::Symbol = :cartesian, σmax::Real = 5.0,
-                          lovorder::Int = 4, lovtol::Real = 1E-8,
-                          lovsteps::Int = 100) where {D, T <: Real}
+function lineofvariations(
+        IM::AbstractIMProblem{D, T}, params::Parameters{T}; coord::Symbol = :cartesian,
+        σmax::Real = 5.0, lovorder::Int = 4, lovtol::Real = 1E-8, lovsteps::Int = 100,
+        buffer::Union{Nothing, LineOfVariationsBuffer{T}} = nothing
+    ) where {D, T <: Real}
     # Line of variations buffer
-    buffer = LineOfVariationsBuffer(IM, lovorder, params)
+    if isnothing(buffer)
+        buffer = LineOfVariationsBuffer(IM, lovorder, params)
+    end
     # Unpack
     @unpack orbit = IM
     @unpack t0, sun = buffer
