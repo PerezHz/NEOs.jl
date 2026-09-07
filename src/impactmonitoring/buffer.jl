@@ -8,19 +8,19 @@ Pre-allocated memory for [`lineofvariations`](@ref).
 - `t0::T`: reference epoch [TDB days since J2000].
 - `sun::Vector{T}`: Sun barycentric cartesian state vector at `t0` [au, au/day].
 - `scalings::Vector{T}`: covariance matrix scaling factors.
-- `resTN::Vector{OpticalResidual{T, TaylorN{T}}}`: buffer for `TaylorN{T}` residuals.
-- `bufferTN::PropresBuffer{T, TaylorN{T}, T}`: buffer for `TaylorN{T}` propagations.
+- `res::Vector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
+- `propres::PropresBuffer{T, TaylorN{T}, T}`: buffer for [`propres`](@ref).
 """
 struct LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
     t0::T
     sun::Vector{T}
     scalings::Vector{T}
-    resTN::Vector{OpticalResidual{T, TaylorN{T}}}
-    bufferTN::PropresBuffer{T, TaylorN{T}, T}
+    res::Vector{OpticalResidual{T, TaylorN{T}}}
+    propres::PropresBuffer{T, TaylorN{T}, T}
 end
 
 TaylorSeries.order(x::LineOfVariationsBuffer) =
-    TaylorSeries.order(x.bufferTN.prop.cache.x[1][0])
+    TaylorSeries.order(x.propres.prop.cache.x[1][0])
 
 """
     LineOfVariationsBuffer(IM, lovorder, params)
@@ -31,11 +31,13 @@ memory for [`lineofvariations`](@ref).
 # Arguments
 
 - `IM::IMProblem`: impact monitoring problem.
-- `lovorder::Int`: order of Taylor expansions wrt LOV index.
+- `lovorder::Int`: order of Taylor expansions with respect to LOV index.
 - `params::Parameters`: see the `Propagation` section of [`Parameters`](@ref).
 """
-function LineOfVariationsBuffer(IM::AbstractIMProblem{D, T}, lovorder::Int,
-                                params::Parameters{T}) where {D, T <: Real}
+function LineOfVariationsBuffer(
+        IM::AbstractIMProblem{D, T}, lovorder::Int,
+        params::Parameters{T}
+    ) where {D, T <: Real}
     # Unpack
     @unpack orbit = IM
     @unpack eph_su = params
@@ -55,12 +57,12 @@ function LineOfVariationsBuffer(IM::AbstractIMProblem{D, T}, lovorder::Int,
     # Initial condition
     q00 = orbit()
     q0TN = q00 + sigmas(orbit) .* TaylorSeries.variables(T, lovorder)
-    # Vectors of residuals
-    resTN = init_optical_residuals(TaylorN{T}, IM)
-    # Propagation and residuals buffers
-    bufferTN = PropresBuffer(IM, q0TN, jd0, params)
+    # Vector of residuals
+    res = init_optical_residuals(TaylorN{T}, IM)
+    # Propagation and residuals buffer
+    propres = PropresBuffer(IM, q0TN, jd0, params)
 
-    return LineOfVariationsBuffer{T}(t0, sun, scalings, resTN, bufferTN)
+    return LineOfVariationsBuffer{T}(t0, sun, scalings, res, propres)
 end
 
 """
@@ -192,16 +194,13 @@ Pre-allocated memory for [`verifyvirtualimpactor`](@ref).
 
 # Fields
 
-- `res::Vector{OpticalResidual{T, TaylorN{T}}}`: buffer for `TaylorN{T}`
-    residuals.
-- `prop::PropresBuffer{T, TaylorN{T}, T}`: buffer for `TaylorN{T}`
-    propagations.
-- `CAs::CloseApproachesBuffer{T, TaylorN{T}}`: buffer for `TaylorN{T}`
-    close approaches search.
+- `res::Vector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
+- `propres::PropresBuffer{T, TaylorN{T}, T}`: buffer for [`propres`](@ref).
+- `CAs::CloseApproachesBuffer{T, TaylorN{T}}`: buffer for [`closeapproaches`](@ref).
 """
 struct VirtualImpactorsBuffer{T <: Real} <: AbstractBuffer
     res::Vector{OpticalResidual{T, TaylorN{T}}}
-    prop::PropresBuffer{T, TaylorN{T}, T}
+    propres::PropresBuffer{T, TaylorN{T}, T}
     CAs::CloseApproachesBuffer{T, TaylorN{T}}
 end
 
@@ -223,13 +222,13 @@ function VirtualImpactorsBuffer(
     @unpack orbit = IM
     # Vector of residuals
     res = init_optical_residuals(TaylorN{T}, IM; iobs = true)
-    # Propagation buffer
+    # Propagation and residuals buffer
     jd0 = epoch(orbit) + PE.J2000
     q0 = orbit() + 1E-8 * sigmas(orbit) .* TaylorSeries.variables(T, 2)
-    prop = PropresBuffer(IM, q0, jd0, params)
+    propres = PropresBuffer(IM, q0, jd0, params)
     # Close approaches buffer
     nyears = ( datetime2julian(MAXDTTDB) - jd0 ) / yr
     CAs = CloseApproachesBuffer(IM, q0, nyears, params)
     # Virtual impactors buffer
-    return VirtualImpactorsBuffer{T}(res, prop, CAs)
+    return VirtualImpactorsBuffer{T}(res, propres, CAs)
 end

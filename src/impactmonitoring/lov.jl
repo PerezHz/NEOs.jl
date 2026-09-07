@@ -83,7 +83,7 @@ function covariance(
         buffer::LineOfVariationsBuffer{T}, params::Parameters{T}
     ) where {D, T <: Real}
     # Unpack
-    @unpack t0, sun, scalings, resTN, bufferTN = buffer
+    @unpack t0, sun, scalings, res, propres = buffer
     # Refence epoch [MJDTDB, JDTDB]
     mjd0 = t0 + MJD2000
     jd0 = t0 + PE.J2000
@@ -91,17 +91,17 @@ function covariance(
     order = TaylorSeries.order(buffer)
     # Jet transpot initial condition
     car00 = lovtransform(mjd0, coord00, sun, Val(coord), Val(:cartesian))
-    carTN = car00 + scalings .* TaylorSeries.variables(T, order)
+    car = car00 + scalings .* TaylorSeries.variables(T, order)
     # TaylorN propagation and residuals
-    propres!(resTN, IM, carTN, jd0, params; buffer = bufferTN)
+    propres!(res, IM, car, jd0, params; buffer = propres)
     # Covariance matrix in residuals space
-    QTN = nms(resTN)
-    CTN_res = notout(resTN) * TS.hessianmatrix(QTN)
-    ΓTN_res = inv(Symmetric(CTN_res))
+    Q = nms(res)
+    C_res = notout(res) * TS.hessianmatrix(Q)
+    Γ_res = inv(Symmetric(C_res))
     # Covariance matrix in coordinate space
-    coordTN = lovtransform(mjd0, carTN, sun, Val(:cartesian), Val(coord))
-    ΓTN_coord = Symmetric(project(coordTN, ΓTN_res))
-    return ΓTN_coord
+    coord = lovtransform(mjd0, car, sun, Val(:cartesian), Val(coord))
+    Γ_coord = Symmetric(project(coord, Γ_res))
+    return Γ_coord
 end
 
 # Return the Taylor expansion of the vector field associated to the

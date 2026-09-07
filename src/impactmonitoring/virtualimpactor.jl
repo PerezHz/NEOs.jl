@@ -160,7 +160,7 @@ function verifyvirtualimpactor(
         buffer = VirtualImpactorsBuffer(IM, params)
     end
     CAsbuffer = buffer.CAs
-    @unpack res, prop = buffer
+    @unpack res, propres = buffer
     subres = view(res, 1:length(res)-1)
     # Reference epoch [Julian days TDB]
     jd0 = epoch(lov) + PE.J2000
@@ -179,7 +179,7 @@ function verifyvirtualimpactor(
         # Initial conditions
         TS.constant_term!.(q0, q00)
         # Propagation & residuals
-        propres!(res, IM, q0, jd0, params; buffer = prop)
+        propres!(res, IM, q0, jd0, params; buffer = propres)
         isempty(res) && break
         # Covariance matrix at reference epoch
         Q = nms(subres)
