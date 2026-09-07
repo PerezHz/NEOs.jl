@@ -382,13 +382,20 @@ Return the virtual impactors, under the impact monitoring problem
 - `α::Real`: impact pseudo-observation scale factor (default: `100`).
 - `Qmax::Real`: maximum allowed nrms (default: `100`).
 - `Qtol::Real`: target function absolute tolerance (default: `0.001`).
+- `buffer::Union{Nothing, VirtualImpactorsBuffer{T}}`: pre-allocated
+    memory (default: `nothing`).
 """
 function virtualimpactors(
         IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
         RTs::ShowerT1{T}, params::Parameters; ctol::Real = T(Inf),
         no_pts::Int = 100, dmax::Real = zero(T), ε::Real = 0.01,
-        α::Real = 100, Qmax::Real = 100, Qtol::Real = 0.001
+        α::Real = 100, Qmax::Real = 100, Qtol::Real = 0.001,
+        buffer::Union{Nothing, VirtualImpactorsBuffer{T}} = nothing
     ) where {D, T <: Real}
+    # Virtual impactors buffer
+    if isnothing(buffer)
+        buffer = VirtualImpactorsBuffer(IM, params)
+    end
     # Find all the virtual impactors in RTs
     σmax = ubound(lov)
     VIs = virtualimpactors(RTs; ctol, σmax, no_pts, dmax)
@@ -396,7 +403,7 @@ function virtualimpactors(
     newVIs = Vector{VirtualImpactor{T}}(undef, length(VIs))
     for (i, VI) in enumerate(VIs)
         newVIs[i] = verifyvirtualimpactor(IM, lov, VI, params;
-            ε, α, Qmax, Qtol)
+            ε, α, Qmax, Qtol, buffer)
     end
     filter!(!isspurious, newVIs)
     # Sort by time of impact
