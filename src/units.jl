@@ -25,7 +25,7 @@ See also [`tt2dtutc`](@ref).
 """
 function dtutc2tt(dtutc::DateTime)
     # UTC seconds since J2000.0 epoch
-    utc_seconds = Millisecond(dtutc - DateTime(2000, 1, 1, 12)).value / 1000
+    utc_seconds = Millisecond(dtutc - DTJ2000).value / 1000
     # TAI - UTC
     tai_utc = get_Δat(datetime2julian(dtutc))
     # TT - TAI
@@ -83,7 +83,7 @@ function tt2dtutc(tt::Number)
     # UTC = TT - (TT - UTC)
     utc_seconds = tt - tt_utc
     # DateTime corresponding to utc_seconds
-    return unix2datetime(utc_seconds + datetime2unix(DateTime(2000, 1, 1, 12)))
+    return unix2datetime(utc_seconds + datetime2unix(DTJ2000))
 end
 
 """

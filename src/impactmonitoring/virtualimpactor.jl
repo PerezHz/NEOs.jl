@@ -189,7 +189,7 @@ function verifyvirtualimpactor(
         # Virtual asteroid
         VA = VirtualAsteroid(epoch(lov), σ, domain, q0)
         # Number of years until impact
-        nyears = (min(t + 2 + PE.J2000, datetime2julian(DateTime(2100, 1, 1, 12))) - jd0) / yr
+        nyears = (min(t + 2 + PE.J2000, datetime2julian(MAXDTTDB)) - jd0) / yr
         # Close approach
         CAs = closeapproaches(IM, VA, nyears, params; buffer = CAsbuffer)
         isempty(CAs) && break

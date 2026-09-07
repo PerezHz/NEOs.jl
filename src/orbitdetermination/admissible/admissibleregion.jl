@@ -50,7 +50,7 @@ end
 
 # Definition of zero AdmissibleRegion{T}
 zero(::Type{AdmissibleRegion{T}}) where {T <: Real} = AdmissibleRegion{T}(
-    DateTime(2000), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
+    MINDTTDB, zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
     Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
     Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
     Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs(T)

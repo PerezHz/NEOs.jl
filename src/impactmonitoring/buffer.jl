@@ -228,7 +228,7 @@ function VirtualImpactorsBuffer(
     q0 = orbit() + 1E-8 * sigmas(orbit) .* TaylorSeries.variables(T, 2)
     prop = PropresBuffer(IM, q0, jd0, params)
     # Close approaches buffer
-    nyears = ( datetime2julian(DateTime(2100, 1, 1, 12)) - jd0 ) / yr
+    nyears = ( datetime2julian(MAXDTTDB) - jd0 ) / yr
     CAs = CloseApproachesBuffer(IM, q0, nyears, params)
     # Virtual impactors buffer
     return VirtualImpactorsBuffer{T}(res, prop, CAs)
