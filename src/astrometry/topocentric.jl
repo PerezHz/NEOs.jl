@@ -25,7 +25,7 @@ issatellite(x::TimeOfDay) = x.light == :satellite
 isgeocentric(x::TimeOfDay) = x.light == :geocentric
 
 isunknown(x::TimeOfDay) = x.light == :unknown
-unknowntod() = TimeOfDay(:unknown, DateTime(2000, 1, 1, 12), DateTime(2000, 1, 1, 12), 0)
+unknowntod() = TimeOfDay(:unknown, MINDTTDB, MINDTTDB, 0)
 
 # Print method for TimeOfDay
 function show(io::IO, m::TimeOfDay)
@@ -35,7 +35,7 @@ end
 
 # Constructor
 function TimeOfDay(observatory::ObservatoryMPC, date::DateTime; eop::EOPIAU = EOP_IAU2000A)
-    if !(DateTime(2000, 1, 1, 12) ≤ date ≤ DateTime(2100, 1, 1, 12))
+    if !(MINDTTDB ≤ date ≤ MAXDTTDB)
         return unknowntod()
     elseif  isgeocentric(observatory)
         return TimeOfDay(:geocentric, Date(date), Date(date), 0)

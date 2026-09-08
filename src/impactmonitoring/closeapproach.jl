@@ -240,14 +240,14 @@ list of parameters see the `Propagation` section of  [`Parameters`](@ref).
     (default: `25`).
 - `nrabstol::Real`: allowed tolerance for the Newton-Raphson process
     (default: `eps()`).
-- `buffer::Union{Nothing, ImpactMonitoringBuffer}`: pre-allocated memory
+- `buffer::Union{Nothing, CloseApproachesBuffer}`: pre-allocated memory
     (default: `nothing`).
 """
 function closeapproaches(
         IM::AbstractIMProblem{D, T}, VA::VirtualAsteroid{T, U},
         nyears::T, params::Parameters{T}; R_TP::T = 0.2,
         ctol::T = T(Inf), newtoniter::Int = 25, nrabstol::T = eps(T),
-        buffer::Union{Nothing, ImpactMonitoringBuffer{T, U}} = nothing
+        buffer::Union{Nothing, CloseApproachesBuffer{T, U}} = nothing
     ) where {D, T <: Real, U <: Number}
     # Unpack problem and parameters
     @unpack target = IM
@@ -258,9 +258,9 @@ function closeapproaches(
     # Initial conditions
     t0, tmax = zero(T), nyears * yr
     q0 = initialcondition(VA)
-    # Impact monitoring buffer
+    # Close approaches buffer
     if isnothing(buffer)
-        buffer = ImpactMonitoringBuffer(IM, q0, nyears, params)
+        buffer = CloseApproachesBuffer(IM, q0, nyears, params)
     end
     @unpack prop, root = buffer
     # Unpack propagation buffer

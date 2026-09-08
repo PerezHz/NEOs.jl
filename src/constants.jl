@@ -277,6 +277,8 @@ const poteph::DensePropagation2{Float64, Float64} =
 const ttmtdb::DensePropagation1{Float64, Float64} = TaylorSolution(sseph.t, sseph.p[:, end])
 const SSEPHORDER::Int = TaylorSeries.order(sseph.p[1])
 const SSEPHNBODIES::Int = numberofbodies(sseph)
+const MINDTTDB::DateTime = julian2datetime(firsttime(sseph) + JD_J2000)
+const MAXDTTDB::DateTime = julian2datetime(lasttime(sseph) + JD_J2000)
 
 """
     print_sseph_summary()
@@ -289,18 +291,19 @@ function print_sseph_summary()
         "Solar system ephemeris summary\n",
         t, rpad("Expansion order:", 21), SSEPHORDER, "\n",
         t, rpad("Number of bodies:", 21), SSEPHNBODIES, "\n",
-        t, rpad("Initial time:", 21), julian2datetime(firsttime(sseph) + JD_J2000),
-            " TDB", "\n",
-        t, rpad("Final time:", 21), julian2datetime(lasttime(sseph) + JD_J2000),
-            " TDB", "\n",
+        t, rpad("Initial time:", 21), MINDTTDB, " TDB", "\n",
+        t, rpad("Final time:", 21), MAXDTTDB, " TDB", "\n",
     )
 end
+
+# J2000 epoch DateTime
+const DTJ2000 = julian2datetime(JD_J2000)
 
 # Modified julian date offset
 const MJD2000 = JD_J2000 - 2400000.5
 
 # Milliseconds between rounding epoch and J2000
-const EPOCHMSJ2000::Int = (DateTime(2000, 1, 1, 12) - DateTime(0)).value
+const EPOCHMSJ2000::Int = (DTJ2000 - DateTime(0)).value
 
 # Abbreviations
 const cte = constant_term
