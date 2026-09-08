@@ -579,9 +579,9 @@ end
 
 # Main entry point
 function tryls(res::AbstractResidualSet, x0::AbstractVector,
-               cache::LeastSquaresCache, methods::Tuple; kwargs...)
+               cache::LeastSquaresCache, methods::Tuple; penalty = nothing, kwargs...)
     fit = zero(LeastSquaresFit{eltype(x0)})
-    return _tryls(fit, res, x0, cache, methods; kwargs...)
+    return _tryls(fit, res, x0, cache, methods; penalty, kwargs...)
 end
 
 """
