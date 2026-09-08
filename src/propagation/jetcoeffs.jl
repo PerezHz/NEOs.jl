@@ -954,7 +954,7 @@ function TaylorIntegration.jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}, q::Abstr
     local marsden_k = -(params.marsden_radial[5])
     local zero_q_1 = params.zeroq1
     local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
-    for ord = 0:order - 1
+    @cyclicbarrier for ord = 0:order - 1
         ordnext = ord + 1
         TaylorSeries.identity!(pntempX, zero_q_1, ord)
         TaylorSeries.identity!(pntempY, zero_q_1, ord)
@@ -2003,7 +2003,7 @@ function TaylorIntegration.jetcoeffs!(::Val{gravityonly!}, t::Taylor1{_T}, q::Ab
     local orientAlloc = params.orientAlloc
     local zero_q_1 = params.zeroq1
     local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
-    for ord = 0:order - 1
+    @cyclicbarrier for ord = 0:order - 1
         ordnext = ord + 1
         TaylorSeries.identity!(pntempX, zero_q_1, ord)
         TaylorSeries.identity!(pntempY, zero_q_1, ord)
