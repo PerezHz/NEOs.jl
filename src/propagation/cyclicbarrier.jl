@@ -65,6 +65,9 @@ function is_threads_macro(ex::Expr)
            macro_name == :(Base.Threads.@threads)
 end
 
+# Filter out LineNumberNodes
+clean_blocks(x::Expr) = map(identity, filter(!Base.Fix2(isa, LineNumberNode), x.args))
+
 # Assemble the lines of code into blocks
 function assemble_blocks(x::AbstractVector{Expr})
     mask = is_threads_macro.(x)
@@ -125,7 +128,7 @@ macro cyclicbarrier(ex)
     # Verify the provided expression is actually a block
     @assert ex.head === :block "Expression must be a block"
     # Filter out LineNumberNodes to find the actual code blocks
-    lines = map(identity, filter(!Base.Fix2(isa, LineNumberNode), ex.args))
+    lines = clean_blocks(ex)
     # Assemble the lines of code into blocks
     kbody = 0
     loop_def = :()
@@ -134,7 +137,7 @@ macro cyclicbarrier(ex)
     for line in lines
         if line.head === :for
             loop_def, loop_body = line.args
-            sublines = map(identity, filter(!Base.Fix2(isa, LineNumberNode), loop_body.args))
+            sublines = clean_blocks(loop_body)
             subiters, subblocks = assemble_blocks(sublines)
             kbody = length(blocks) + 1
             append!(iters, subiters)
@@ -144,13 +147,15 @@ macro cyclicbarrier(ex)
             append!(iters, subiters)
             append!(blocks, subblocks)
         else
-            throw(ArgumentError("Each block must be either a serial or multi-threaded for loop"))
+            throw(ArgumentError("Each block must be either a serial or \
+                multi-threaded for loop"))
         end
     end
     mblocks = modify_block.(blocks, eachindex(blocks))
     # Preamble and body
-    preamble = mapreduce(Base.Fix2(getfield, :args), vcat, view(mblocks, 1:k-1); init = [])
-    body = mapreduce(Base.Fix2(getfield, :args), vcat, view(mblocks, k:length(mblocks)))
+    subpreamble, subbody = view(mblocks, 1:kbody-1), view(mblocks, kbody:length(mblocks))
+    preamble = mapreduce(Base.Fix2(getfield, :args), vcat, subpreamble; init = [])
+    body = mapreduce(Base.Fix2(getfield, :args), vcat, subbody; init = [])
     # Variable declarations
     names = Symbol.(:cyclic_barrier_, eachindex(mblocks))
     cyclic_barriers = [:($name = CyclicBarrier(Ntasks)) for name in names]
