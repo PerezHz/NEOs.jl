@@ -66,6 +66,10 @@ for U in (:(T), :(TaylorN{T}), :(Taylor1{T}))
     end
 end
 
+_identity!(a::Taylor1{T}, b::Taylor1{T}, k::Int) where {T <: Real} = TS.identity!(a, b, k)
+_identity!(a::Taylor1{TaylorN{T}}, b::Taylor1{T}, k::Int) where {T <: Real} = a[k][0][1] = b[k]
+_identity!(a::Taylor1{Taylor1{T}}, b::Taylor1{T}, k::Int) where {T <: Real} = a[k][0] = b[k]
+
 # Parameters used within dynamical model functions
 mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
     N::Int
