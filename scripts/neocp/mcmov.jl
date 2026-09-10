@@ -4,7 +4,7 @@ using HTTP, JSON, DataFrames, CSV, Printf, Statistics
 @everywhere using NEOs: PropresBuffer, PropagationBuffer, OpticalBuffer, OpticalADES,
                   AbstractOrbit, KeplerianElements, ObservatoryMPC, parse_optical_rwo,
                   argoldensearch, evaldeltas, init_optical_residuals, indices,
-                  _lsmethods, μ_S, equatorial2ecliptic, _propagate
+                  _lsmethods, μ_S, equatorial2ecliptic, _propagate, designation
 @everywhere import NEOs: initialcondition, keplerian
 
 const NEOCP_ORBITS_HEADER = "Object   H     G    Epoch    M         Peri.      \
@@ -36,7 +36,7 @@ function parse_commandline(dict::AbstractDict = Dict())
     @add_arg_table! s begin
         # General parameters
         "--input", "-i"
-            help = "NEOCP designation (trksub)"
+            help = "Input (ADES) file / (NEOCP) designation"
             arg_type = String
         "--output", "-o"
             help = "Output file"
@@ -155,12 +155,12 @@ function generate_grid(A::AdmissibleRegion{T}, B::AbstractVector{T},
     return points
 end
 
-function fetch_scout_orbits(input::AbstractString, write_output::Bool)
+function fetch_scout_orbits(desig::AbstractString, write_output::Bool)
     uri = HTTP.URI(
         scheme = "https",
         host   = "ssd-api.jpl.nasa.gov",
         path   = "/scout.api",
-        query  = "tdes=$input&orbits=1"
+        query  = "tdes=$desig&orbits=1"
     )
     response_scout = HTTP.get(string(uri), require_ssl_verification = false)
     text_scout = String(response_scout.body)
@@ -172,8 +172,8 @@ function fetch_scout_orbits(input::AbstractString, write_output::Bool)
     df = DataFrame(mat, orbits_fields)
     println("• Fetched Scout data")
     if write_output
-        CSV.write("$input.csv", df)
-        println("• Scout data saved to: $input.csv")
+        CSV.write("$desig.csv", df)
+        println("• Scout data saved to: $desig.csv")
         return ""
     else
         io = IOBuffer()
@@ -182,34 +182,34 @@ function fetch_scout_orbits(input::AbstractString, write_output::Bool)
     end
 end
 
-function fetch_neoscan_orbits(input::AbstractString, write_output::Bool)
+function fetch_neoscan_orbits(desig::AbstractString, write_output::Bool)
     uri = HTTP.URI(
         scheme = "https",
         host   = "newton.spacedys.com",
-        path   = "/neodys/NEOScan/scan_neocp/$input/$input.mov_sample"
+        path   = "/neodys/NEOScan/scan_neocp/$desig/$desig.mov_sample"
     )
     response_neoscan = HTTP.get(string(uri) #=, require_ssl_verification = false=#)
     println("• Fetched NEOScan data")
     if write_output
-        write("$input.mov_sample", response_neoscan.body)
-        println("• NEOScan data saved to: $(input).mov_sample")
+        write("$desig.mov_sample", response_neoscan.body)
+        println("• NEOScan data saved to: $(desig).mov_sample")
         return ""
     else
         return String(response_neoscan.body)
     end
 end
 
-function fetch_neocp_orbits(input::AbstractString, write_output::Bool)
+function fetch_neocp_orbits(desig::AbstractString, write_output::Bool)
     url_neocp = "https://cgi.minorplanetcenter.net/cgi-bin/showobsorbs.cgi"
-    data = Dict("Obj" => input, "orb" => "y")
+    data = Dict("Obj" => desig, "orb" => "y")
     response_neocp = HTTP.post(url_neocp, [], data #=, require_ssl_verification = false=#)
     text = String(response_neocp.body)
     lines = split(text, '\n')[2:end-2]
     text = join(lines, '\n')
     println("• Fetched NEOCP data")
     if write_output
-        write("$input.orb", text)
-        println("• NEOCP data saved to: $(input).orb")
+        write("$desig.orb", text)
+        println("• NEOCP data saved to: $(desig).orb")
         return ""
     else
         return text
@@ -261,7 +261,7 @@ function keplerian(orbit::AbstractOrbit{D, T, T}, t::T,
     return kep
 end
 
-function neocp_orbits_format(input::AbstractString,
+function neocp_orbits_format(desig::AbstractString,
                              reference_epoch::Real,
                              ids::AbstractVector{String},
                              orbits::AbstractVector{<:VariantOrbit},
@@ -290,7 +290,7 @@ function neocp_orbits_format(input::AbstractString,
         Q = nrms(orbit)
         # Assemble line
         orbits_lines[j + 1] = string(
-            rpad(input, 8),
+            rpad(desig, 8),
             rpad(@sprintf("%.1f", H), 6),
             # ' ' ^ 6,
             rpad(@sprintf("%.2f", G), 6),
@@ -406,11 +406,23 @@ function main(dict::AbstractDict = Dict(); write_output::Bool = true)
     Nworkers, Nthreads = nworkers(), Threads.nthreads()
     println("• Detected $Nworkers worker(s) with $Nthreads thread(s) each")
 
+    # Load optical astrometry
     input::String = parsed_args["input"]
-    println("• Input NEOCP designation (trksub): ", input)
+    optical_all = if isfile(input)
+        read_optical_ades(input)
+    else
+        fetch_optical_ades(input, NEOCP)
+    end
+    desig = designation(last(optical_all))
+    println("• Input (NEOCP) designation: ", desig)
+
+    # If `trkids` is empty use all the astrometry; else, use only trkids contained in `trkids`
+    trkids::Vector{String} = parsed_args["trkids"]
+    optical = isempty(trkids) ? optical_all : filter(x -> x.trkid in trkids, optical_all)
+    println("• `trkids` included in run: ", unique(map(x -> x.trkid, optical_all)))
 
     if write_output
-        orbits_output = something(parsed_args["output"], input) * ".neos"
+        orbits_output = something(parsed_args["output"], desig) * ".neos"
         println("• Orbits output file: ", orbits_output)
     else
         orbits_output = ""
@@ -470,15 +482,9 @@ function main(dict::AbstractDict = Dict(); write_output::Bool = true)
     printitle("Computation", "-")
     println("• Run started at ", initial_time)
 
-    # Fetch optical astrometry
-    optical_all = fetch_optical_ades(input, NEOCP)
-    trkids::Vector{String} = parsed_args["trkids"]
-    # If `trkids` is empty use all the astrometry; else, use only trkids contained in `trkids`
-    optical = isempty(trkids) ? optical_all : filter(x->x.trkid in trkids, optical_all)
-    println("• `trkids` included in run: ", unique(map(x->x.trkid, optical_all)))
     # Orbit determination problem
     od = ODProblem(newtonian!, optical)
-    od.weights.weights .= fetch_neodys_weights(input)
+    od.weights.weights .= fetch_neodys_weights(desig)
     # Parameters
     params = Parameters(
         maxsteps = 1_000, order = 15, abstol = 1E-12, parse_eqs = true,
@@ -582,9 +588,9 @@ function main(dict::AbstractDict = Dict(); write_output::Bool = true)
     Third-party results
     ==================#
 
-    scout_string = fetch_scout ? fetch_scout_orbits(input, write_output) : ""
-    neoscan_string = fetch_neoscan ? fetch_neoscan_orbits(input, write_output) : ""
-    neocp_string = fetch_neocp ? fetch_neocp_orbits(input, write_output) : ""
+    scout_string = fetch_scout ? fetch_scout_orbits(desig, write_output) : ""
+    neoscan_string = fetch_neoscan ? fetch_neoscan_orbits(desig, write_output) : ""
+    neocp_string = fetch_neocp ? fetch_neocp_orbits(desig, write_output) : ""
 
     #===========
     Save results
@@ -599,7 +605,7 @@ function main(dict::AbstractDict = Dict(); write_output::Bool = true)
     prepend!(ids, nominal_ids)
     # Print orbits in NEOCP format
     reference_epoch = dtutc2days(tracklet)
-    orbits_string = neocp_orbits_format(input, reference_epoch, ids, orbits, params)
+    orbits_string = neocp_orbits_format(desig, reference_epoch, ids, orbits, params)
     if write_output
         write(orbits_output, orbits_string)
         println("• Orbits saved to: ", orbits_output)
