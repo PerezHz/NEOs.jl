@@ -14,9 +14,9 @@ import Tables: Schema, istable, rowaccess, rows, schema
 import TaylorIntegration: surfacecrossing, firsttime, lasttime
 import TaylorSeries: evaluate, constant_term, identity!
 
-using AngleBetweenVectors, AutoHashEquals, Dates, Downloads, HTTP, InteractiveUtils, JLD2,
-      JSON, LazyArtifacts, LinearAlgebra, Printf, SatelliteToolboxTransformations, Scratch,
-      SPICE, TaylorIntegration, TaylorSeries, XML
+using AutoHashEquals, Dates, Downloads, HTTP, InteractiveUtils, JLD2, JSON,
+      LazyArtifacts, LinearAlgebra, Printf, SatelliteToolboxTransformations,
+      Scratch, SPICE, TaylorIntegration, TaylorSeries, XML
 
 using AstroAngles: hms2rad, rad2hms, dms2rad, rad2dms
 using AstroMOID: wisric_moid
@@ -95,12 +95,13 @@ export gm, frame, elements, iscircular, iselliptic, isparabolic, ishyperbolic, c
        keplerian2cartesian, equinoctial2cartesian, attributable2cartesian,
        keplerian2equinoctial, equinoctial2keplerian, pericenter
 export curvature
+export apparentmagnitude, absolutemagnitude
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
 export variables, designation, epoch, firsttime, lasttime, noptical, nradar, minmaxdates,
        optical, sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
-       absolutemagnitude, diameter, mass, shiftepoch, meandate, meanepoch, earthmoid,
-       print_mpec_residuals, print_mpec_elements, print_mpec_ephemeris, print_mpec
+       diameter, mass, shiftepoch, meandate, meanepoch, earthmoid, print_mpec_residuals,
+       print_mpec_elements, print_mpec_ephemeris, print_mpec
 export topo2bary, bary2topo, attr2bary, tsaiod, mmov
 export gaussmetric, gausstriplets, gaussmethod, gaussiod
 export jtls, initialorbitdetermination, orbitdetermination, linkage

@@ -4,7 +4,6 @@ version = "0.31.0"
 authors = ["Jorge A. Pérez Hernández", "Luis Benet", "Luis Eduardo Ramírez Montoya"]
 
 [deps]
-AngleBetweenVectors = "ec570357-d46e-52ed-9726-18773498274d"
 Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 AstroAngles = "5c4adb95-c1fc-4c53-b4ea-2a94080c53d2"
 AstroMOID = "534c009d-3f74-45e2-88f7-ae4fc4afe031"
@@ -49,7 +48,6 @@ RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 NEOsRecipesBaseExt = "RecipesBase"
 
 [compat]
-AngleBetweenVectors = "0.3"
 Artifacts = "1"
 AstroAngles = "0.3"
 AstroMOID = "0.1.0"

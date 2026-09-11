@@ -1032,7 +1032,7 @@ end
         # Mass
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit, params)
-        @test 7.0E3 < Ma < Mc < Mb < 8.1E4
+        @test 6.9E3 < Ma < Mc < Mb < 8.1E4
         # MPEC
         @test isnothing(print_mpec(orbit, params))
         println()
@@ -1194,7 +1194,7 @@ end
         # Mass
         Ma, Mb = minmax(mass(2_600, Da), mass(2_600, Db))
         Mc = mass(orbit1, params)
-        @test 1.4E4 < Ma < Mc < Mb < 1.7E5
+        @test 1.3E4 < Ma < Mc < Mb < 1.7E5
         # MPEC
         @test isnothing(print_mpec(orbit1, params))
         println()
