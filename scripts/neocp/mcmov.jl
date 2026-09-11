@@ -4,7 +4,7 @@ using HTTP, JSON, DataFrames, CSV, Printf, Statistics
 @everywhere using NEOs: PropresBuffer, PropagationBuffer, OpticalBuffer, OpticalADES,
                   AbstractOrbit, KeplerianElements, ObservatoryMPC, parse_optical_rwo,
                   argoldensearch, evaldeltas, init_optical_residuals, indices,
-                  _lsmethods, μ_S, equatorial2ecliptic, _propagate
+                  _lsmethods, μ_S, equatorial2ecliptic, _propagate, designation
 @everywhere import NEOs: initialcondition, keplerian
 
 const NEOCP_ORBITS_HEADER = "Object   H     G    Epoch    M         Peri.      \
@@ -23,7 +23,7 @@ function parse_commandline(dict::AbstractDict = Dict())
     s.prog = "mcmov.jl"
     # Desciption (for help screen)
     s.description = "Sample the manifold of variations (MOV) of a NEOCP \
-    object using jet transport-assisted monte carlo."
+    object using jet transport-assisted Monte Carlo."
 
     s.epilog = """
         Example:\n
@@ -34,8 +34,9 @@ function parse_commandline(dict::AbstractDict = Dict())
     """
 
     @add_arg_table! s begin
+        # General parameters
         "--input", "-i"
-            help = "NEOCP designation (trksub)"
+            help = "Input (ADES) file / (NEOCP) designation"
             arg_type = String
         "--output", "-o"
             help = "Output file"
@@ -43,6 +44,7 @@ function parse_commandline(dict::AbstractDict = Dict())
         "--trkids", "-t"
             help = "Trkids to include in OD"
             nargs = '+'
+        # Manifold of variations parameters
         "--scale", "-s"
             help = "Horizontal scale (log / linear)"
             arg_type = String
@@ -59,13 +61,20 @@ function parse_commandline(dict::AbstractDict = Dict())
             help = "χ value threshold"
             arg_type = Float64
             default = 5.0
-        "--nominal"
-            help = "Compute a nominal orbit"
-            arg_type = Bool
-            default = true
         "--refine"
             help = "Refine the first grid"
             action = :store_true
+        # Nominal orbits parameters
+        "--minimum"
+            help = "Find the orbit that minimizes the target function"
+            action = :store_true
+        "--penalty"
+            help = "Find the orbit that minimizes the penalized target function"
+            action = :store_true
+        "--median"
+            help = "Find the orbit closest to the median in RA and DEC"
+            action = :store_true
+        # Third-party results parameters
         "--scout"
             help = "Fetch JPL Scout data and save it into a .csv file"
             action = :store_true
@@ -146,12 +155,12 @@ function generate_grid(A::AdmissibleRegion{T}, B::AbstractVector{T},
     return points
 end
 
-function fetch_scout_orbits(input::AbstractString, write_output::Bool)
+function fetch_scout_orbits(desig::AbstractString, write_output::Bool)
     uri = HTTP.URI(
         scheme = "https",
         host   = "ssd-api.jpl.nasa.gov",
         path   = "/scout.api",
-        query  = "tdes=$input&orbits=1"
+        query  = "tdes=$desig&orbits=1"
     )
     response_scout = HTTP.get(string(uri), require_ssl_verification = false)
     text_scout = String(response_scout.body)
@@ -163,8 +172,8 @@ function fetch_scout_orbits(input::AbstractString, write_output::Bool)
     df = DataFrame(mat, orbits_fields)
     println("• Fetched Scout data")
     if write_output
-        CSV.write("$input.csv", df)
-        println("• Scout data saved to: $input.csv")
+        CSV.write("$desig.csv", df)
+        println("• Scout data saved to: $desig.csv")
         return ""
     else
         io = IOBuffer()
@@ -173,34 +182,34 @@ function fetch_scout_orbits(input::AbstractString, write_output::Bool)
     end
 end
 
-function fetch_neoscan_orbits(input::AbstractString, write_output::Bool)
+function fetch_neoscan_orbits(desig::AbstractString, write_output::Bool)
     uri = HTTP.URI(
         scheme = "https",
         host   = "newton.spacedys.com",
-        path   = "/neodys/NEOScan/scan_neocp/$input/$input.mov_sample"
+        path   = "/neodys/NEOScan/scan_neocp/$desig/$desig.mov_sample"
     )
     response_neoscan = HTTP.get(string(uri) #=, require_ssl_verification = false=#)
     println("• Fetched NEOScan data")
     if write_output
-        write("$input.mov_sample", response_neoscan.body)
-        println("• NEOScan data saved to: $(input).mov_sample")
+        write("$desig.mov_sample", response_neoscan.body)
+        println("• NEOScan data saved to: $(desig).mov_sample")
         return ""
     else
         return String(response_neoscan.body)
     end
 end
 
-function fetch_neocp_orbits(input::AbstractString, write_output::Bool)
+function fetch_neocp_orbits(desig::AbstractString, write_output::Bool)
     url_neocp = "https://cgi.minorplanetcenter.net/cgi-bin/showobsorbs.cgi"
-    data = Dict("Obj" => input, "orb" => "y")
+    data = Dict("Obj" => desig, "orb" => "y")
     response_neocp = HTTP.post(url_neocp, [], data #=, require_ssl_verification = false=#)
     text = String(response_neocp.body)
     lines = split(text, '\n')[2:end-2]
     text = join(lines, '\n')
     println("• Fetched NEOCP data")
     if write_output
-        write("$input.orb", text)
-        println("• NEOCP data saved to: $(input).orb")
+        write("$desig.orb", text)
+        println("• NEOCP data saved to: $(desig).orb")
         return ""
     else
         return text
@@ -239,7 +248,7 @@ end
 end
 
 function keplerian(orbit::AbstractOrbit{D, T, T}, t::T,
-                       params::Parameters{T}) where {D, T <: Real}
+                   params::Parameters{T}) where {D, T <: Real}
     # Reference epoch [MJD TDB]
     mjd0 = t + MJD2000
     # Scalar initial condition
@@ -252,14 +261,14 @@ function keplerian(orbit::AbstractOrbit{D, T, T}, t::T,
     return kep
 end
 
-function neocp_orbits_format(input::AbstractString,
+function neocp_orbits_format(desig::AbstractString,
                              reference_epoch::Real,
-                             norbits::AbstractVector{<:AbstractOrbit},
-                             vorbits::AbstractVector{<:AbstractOrbit},
+                             ids::AbstractVector{String},
+                             orbits::AbstractVector{<:VariantOrbit},
                              params::Parameters)
-    orbits_lines = Vector{String}(undef, length(norbits) + length(vorbits) + 1)
+    orbits_lines = Vector{String}(undef, length(orbits) + 1)
     orbits_lines[1] = NEOCP_ORBITS_HEADER
-    for (j, orbit) in enumerate(Iterators.flatten((norbits, vorbits)))
+    for (j, orbit) in enumerate(orbits)
         # Absolute magnitude
         H, _ = absolutemagnitude(orbit, params)
         # Slope parameter
@@ -279,11 +288,9 @@ function neocp_orbits_format(input::AbstractString,
         arc = floor(Int, numberofdays(orbit.optical))
         # RMS
         Q = nrms(orbit)
-        # Orbit ID
-        id = isone(j) ? "NEOCPNomin" : "NEOCPV" * lpad(j-1, 4, '0')
         # Assemble line
         orbits_lines[j + 1] = string(
-            rpad(input, 8),
+            rpad(desig, 8),
             rpad(@sprintf("%.1f", H), 6),
             # ' ' ^ 6,
             rpad(@sprintf("%.2f", G), 6),
@@ -299,15 +306,17 @@ function neocp_orbits_format(input::AbstractString,
             "   1 ", # Number of oppsitions
             lpad(string(arc, " days "), 10),
             rpad(@sprintf("%.2f", Q), 13),
-            id
+            ids[j]
         )
     end
     return join(orbits_lines, '\n')
 end
 
-@everywhere function mcmov(od::OD{typeof(newtonian!), T}, A::AdmissibleRegion{T},
-                           points::AbstractVector{NTuple{2, T}}, bounds::AbstractVector{T},
-                           scale::Symbol, params::Parameters{T}) where {T <: Real}
+@everywhere function mcmov(
+        od::OD{typeof(newtonian!), T}, A::AdmissibleRegion{T},
+        points::AbstractVector{NTuple{2, T}}, bounds::AbstractVector{T},
+        scale::Symbol, params::Parameters{T}
+    ) where {T <: Real}
     # Attributable elements (plain)
     ae = Vector{T}(undef, 6)
     ae[1:4] .= A.ra, A.dec, A.vra, A.vdec
@@ -329,19 +338,18 @@ end
         AE[5] = 10^(log10(ae[5]) + dae[5])
     end
     AE[6] = ae[6] + dae[6]
-    # TDB epoch of admissible region
-    jd0 = dtutc2jdtdb(A.date)
+    # Admissible region epoch [julian days TDB]
+    _jd0_ = dtutc2jdtdb(A.date)
     # Initialize buffer and set of residuals
+    nobs = 2 * noptical(od)
     idxs = indices(od.tracklets)
-    buffer = PropresBuffer(od, AE, jd0, idxs, params)
+    buffer = PropresBuffer(od, AE, _jd0_, idxs, params)
     res = init_optical_residuals(TaylorN{T}, od, idxs)
-    # Number of observations
-    nobs = notoutobs(res)
-    # Origin
-    x0 = zeros(T, 6)
     # Least squares cache and methods
-    lscache = LeastSquaresCache(x0, 1:4, 20)
+    x0 = zeros(T, 6)
+    lscache = LeastSquaresCache(x0, 1:4, 25)
     lsmethods = _lsmethods(res, x0, 1:4)
+    Qtol, Mtol, penalty = params.lsQtol, params.lsMtol, nothing
     # Manifold of variations
     orbits = [zero(VariantOrbit{T}) for _ in eachindex(points)]
     # Iterate mov points
@@ -359,111 +367,124 @@ end
         # Barycentric initial conditions (JT)
         q = attr2bary(A, AE, params)
         # Propagation and residuals
-        bwd, fwd = propres!(res, od, q, jd0 - ae[5] / c_au_per_day, params; buffer, idxs)
+        jd0 = _jd0_ - ae[5] / c_au_per_day
+        bwd, fwd = propres!(res, od, q, jd0, params; buffer, idxs)
         if isempty(res)
             res = init_optical_residuals(TaylorN{T}, od, idxs)
             continue
         end
         # Least squares fit
-        fit = tryls(res, x0, lscache, lsmethods)
+        fit = tryls(res, x0, lscache, lsmethods; penalty, Qtol, Mtol)
         !fit.success && continue
         # Current Q
         Q = nms(res)
         Q(fit.x) < 0 && continue
         # Covariance matrix
         C = (nobs/2) * TS.hessian(Q, fit.x)
-        covariance = inv(C)
-        # Residuals space to barycentric coordinates jacobian
-        jacobian = Matrix(TS.jacobian(q - constant_term(q), fit.x))
+        Γ = project(q, fit.x, inv(C))
         # Update orbit
         orbits[i] = evaldeltas(MMOVOrbit(
             newtonian!, variables, od.optical, od.tracklets, bwd, fwd,
-            res, covariance, jacobian, [AE(fit.x);;], [Q(fit.x)]
+            res, Γ, [AE(fit.x);;], [Q(fit.x)]
         ), fit.x)
     end
 
     return orbits
 end
 
-function mcmov(dict::AbstractDict = Dict(); write_output::Bool = true)
-    # Parse arguments from commandline
+function main(dict::AbstractDict = Dict(); write_output::Bool = true)
+
+    #=================
+    General parameters
+    =================#
+
     parsed_args = parse_commandline(dict)
 
-    # Print header
     printitle("Manifold of variations sampling for NEOCP objects", "=")
     printitle("Parameters", "-")
 
-    # Number of workers and threads
     Nworkers, Nthreads = nworkers(), Threads.nthreads()
     println("• Detected $Nworkers worker(s) with $Nthreads thread(s) each")
 
-    # Input asteroid desgination
+    # Load optical astrometry
     input::String = parsed_args["input"]
-    println("• Input NEOCP designation (trksub): ", input)
-
-    # Output file
-    if write_output
-        output::String = isnothing(parsed_args["output"]) ? input * ".neosjl" :
-            parsed_args["output"]
-        println("• Output file: ", output)
+    optical_all = if isfile(input)
+        read_optical_ades(input)
     else
-        output = ""
+        fetch_optical_ades(input, NEOCP)
+    end
+    desig = designation(last(optical_all))
+    println("• Input (NEOCP) designation: ", desig)
+
+    # If `trkids` is empty use all the astrometry; else, use only trkids contained in `trkids`
+    trkids::Vector{String} = parsed_args["trkids"]
+    optical = isempty(trkids) ? optical_all : filter(x -> x.trkid in trkids, optical_all)
+    println("• `trkids` included in run: ", unique(map(x -> x.trkid, optical_all)))
+
+    if write_output
+        orbits_output = something(parsed_args["output"], desig) * ".neos"
+        println("• Orbits output file: ", orbits_output)
+    else
+        orbits_output = ""
     end
 
-    # Horizontal scale
+    #================================
+    Manifold of variations parameters
+    ================================#
+
     scale_str::String = parsed_args["scale"]
     scale::Symbol = Symbol(scale_str)
+    @assert scale in (:linear, :log) "Possible values for argument `scale` are: \
+        `linear` or `log`"
     println("• Horizontal scale: ", scale)
 
-    # Number of points in x (y)
     Nx::Int, Ny::Int = parsed_args["Nx"], parsed_args["Ny"]
     println("• Number of points in x (y): $Nx ($Ny)")
 
-    # χ value threshold
     χ_max::Float64 = parsed_args["maxchi"]
     println("• χ threshold: ", χ_max)
 
-    # Compute a nominal orbit?
-    compute_nominal = parsed_args["nominal"]
-    println("• Compute nominal orbit?: ", compute_nominal)
-
-    # Refine the first grid?
     refine_grid = parsed_args["refine"]
     println("• Refine the first grid?: ", refine_grid)
 
-    # Fetching JPl Scout data?
+    #=======================
+    Nominal orbits parameters
+    =======================#
+
+    compute_minimum = parsed_args["minimum"]
+    println("• Find the orbit that minimizes the target function?: ", compute_minimum)
+
+    compute_penalty = parsed_args["penalty"]
+    println("• Find the orbit that minimizes the penalized target function?: ", compute_penalty)
+
+    compute_median = parsed_args["median"]
+    println("• Find the orbit closest to the median in RA and DEC?: ", compute_median)
+
+    #=============================
+    Third-party results parameters
+    =============================#
+
     fetch_scout = parsed_args["scout"]
     println("• Fetch Scout data?: ", fetch_scout)
 
-    # Fetch NEODyS NEOScan data?
     fetch_neoscan = parsed_args["neoscan"]
     println("• Fetch NEOScan data?: ", fetch_neoscan)
 
-    # Fetch MPC NEOCP data?
     fetch_neocp = parsed_args["neocp"]
     println("• Fetch NEOCP data?: ", fetch_neocp)
+
+    #=====================
+    Manifold of variations
+    =====================#
 
     # Initial time
     initial_time = now()
     printitle("Computation", "-")
     println("• Run started at ", initial_time)
 
-    # Get JPL Scout data for same object, if requested by user
-    scout_string = fetch_scout ? fetch_scout_orbits(input, write_output) : ""
-    # Get NEODyS NEOScan data for same object, if requested by user
-    neoscan_string = fetch_neoscan ? fetch_neoscan_orbits(input, write_output) : ""
-    # Get MPC NEOCP data for same object, if requested by user
-    neocp_string = fetch_neocp ? fetch_neocp_orbits(input, write_output) : ""
-
-    # Fetch optical astrometry
-    optical_all = fetch_optical_ades(input, NEOCP)
-    trkids::Vector{String} = parsed_args["trkids"]
-    # If `trkids` is empty use all the astrometry; else, use only trkids contained in `trkids`
-    optical = isempty(trkids) ? optical_all : filter(x->x.trkid in trkids, optical_all)
-    println("• `trkids` included in run: ", unique(map(x->x.trkid, optical_all)))
     # Orbit determination problem
     od = ODProblem(newtonian!, optical)
-    od.weights.weights .= fetch_neodys_weights(input)
+    od.weights.weights .= fetch_neodys_weights(desig)
     # Parameters
     params = Parameters(
         maxsteps = 1_000, order = 15, abstol = 1E-12, parse_eqs = true,
@@ -517,36 +538,77 @@ function mcmov(dict::AbstractDict = Dict(); write_output::Bool = true)
         println("• $Norbits / $Npoints points with χ ≤ χ_max = $χ_max")
     end
 
-    if compute_nominal
-        # Right ascension and declination one day after the reference_epoch
+    #=============
+    Nominal orbits
+    =============#
+
+    nominal_ids = Vector{String}(undef, 0)
+    nominal_orbits = Vector{VariantOrbit{Float64}}(undef, 0)
+
+    if compute_minimum
+        minimum_orbit = argmin(nms, orbits)
+        push!(nominal_ids, "NEOCPMinim")
+        push!(nominal_orbits, minimum_orbit)
+        printitle("Orbit that minimizes the target function", "-")
+        println(summary(minimum_orbit))
+    end
+
+    if compute_penalty
+        params = Parameters(params; lspenalty = 0.05)
+        ρ = if scale === :linear
+            (A.ρ_domain[1] + A.ρ_domain[2]) / 2
+        else
+            10^(log10(A.ρ_domain[1] * A.ρ_domain[2]) / 2)
+        end
+        v_ρ = (A.v_ρ_domain[1] + A.v_ρ_domain[2]) / 2
+        penalty_orbit = mmov(od, A, ρ, v_ρ, params; scale)
+        params = Parameters(params; lspenalty = 0.00)
+        push!(nominal_ids, "NEOCPPenal")
+        push!(nominal_orbits, penalty_orbit)
+        printitle("Orbit that minimizes the penalized target function", "-")
+        println(summary(penalty_orbit))
+    end
+
+    if compute_median
         day_after_epoch = date(tracklet) + Day(1)
         observer = observatory(tracklet)
         radec = reduce(vcat, pmap(x -> radec_next_day(day_after_epoch, observer, x, params),
             chunks(orbits, n = Nworkers)))
         αs, δs = @. first(radec), last(radec)
-        # Find closest orbit to the median
         αmedian, δmedian = median(αs), median(δs)
         i = argmin(@. hypot(αs - αmedian, δs - δmedian))
-        # Sort orbits by nms
-        orbits[1], orbits[i] = orbits[i], orbits[1]
-        sort!(view(orbits, 2:Norbits), by = nms)
-        # Nominal orbit
-        norbit = jtls(od, orbits[1], params)
-        norbits = iszero(norbit) ? view(orbits, 1:1) : [norbit]
-    else
-        # Sort orbits by nms
-        sort!(orbits, by = nms)
-        # Nominal orbit
-        norbits = view(orbits, 1:1)
+        median_orbit = orbits[i]
+        push!(nominal_ids, "NEOCPMedia")
+        push!(nominal_orbits, penalty_orbit)
+        printitle("Orbit closest to the median in RA and DEC", "-")
+        println(summary(median_orbit))
     end
 
-    # Save results
+    #==================
+    Third-party results
+    ==================#
+
+    scout_string = fetch_scout ? fetch_scout_orbits(desig, write_output) : ""
+    neoscan_string = fetch_neoscan ? fetch_neoscan_orbits(desig, write_output) : ""
+    neocp_string = fetch_neocp ? fetch_neocp_orbits(desig, write_output) : ""
+
+    #===========
+    Save results
+    ===========#
+
+    # Sort by nms, then put the nominal orbits first
+    sort!(orbits, by = nms)
+    prepend!(orbits, nominal_orbits)
+    unique!(orbits)
+    N_nominal, N_orbits = length(nominal_orbits), length(orbits)
+    ids = ["NEOCPV" * lpad(i-N_nominal, 4, '0') for i in N_nominal+1:N_orbits]
+    prepend!(ids, nominal_ids)
+    # Print orbits in NEOCP format
     reference_epoch = dtutc2days(tracklet)
-    orbits_string = neocp_orbits_format(input, reference_epoch, norbits,
-        view(orbits, 2:Norbits), params)
+    orbits_string = neocp_orbits_format(desig, reference_epoch, ids, orbits, params)
     if write_output
-        write(output, orbits_string)
-        println("• Output saved to: ", output)
+        write(orbits_output, orbits_string)
+        println("• Orbits saved to: ", orbits_output)
     end
 
     # Final time
@@ -559,5 +621,5 @@ function mcmov(dict::AbstractDict = Dict(); write_output::Bool = true)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    mcmov()
+    main()
 end
