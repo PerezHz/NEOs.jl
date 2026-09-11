@@ -18,7 +18,8 @@ Subset of topocentric range × range-rate space defined by the following constra
 - `slope::T`: slope parameter.
 - `a_max::T`: maximum semimajor axis [au].
 - `ρ_unit/ρ_α/ρ_δ::Vector{T}`: topocentric unit vector and its partials.
-- `q::Vector{T}`: heliocentric position of observer.
+- `sun::Vector{T}`: barycentric cartesian state vector of the Sun.
+- `observer::Vector{T}`: heliocentric cartesian state vector of observer.
 - `coeffs::Vector{T}`: polynomial coefficients.
 - `ρ_domain::Vector{T}`: range domain.
 - `v_ρ_domain::Vector{T}`: range-rate domain.
@@ -44,7 +45,8 @@ Subset of topocentric range × range-rate space defined by the following constra
     ρ_unit::Vector{T}
     ρ_α::Vector{T}
     ρ_δ::Vector{T}
-    q::Vector{T}
+    sun::Vector{T}
+    observer::Vector{T}
     coeffs::Vector{T}
     ρ_domain::Vector{T}
     v_ρ_domain::Vector{T}
@@ -57,7 +59,7 @@ zero(::Type{AdmissibleRegion{T}}) where {T <: Real} = AdmissibleRegion{T}(
     MINDTTDB, zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
     Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
     Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
-    Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs(T)
+    Vector{T}(undef, 0), Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs(T)
 )
 
 iszero(x::AdmissibleRegion{T}) where {T <: Real} = x == zero(AdmissibleRegion{T})
