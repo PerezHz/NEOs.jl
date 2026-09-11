@@ -1,6 +1,5 @@
 module NEOs
 
-# __precompile__(false)
 import Base: RefValue, isless, show, string, getindex, in, zero,
        iszero, isnan, summary, firstindex, lastindex, first, last, wait, isdeprecated
 import Dates: datetime2julian

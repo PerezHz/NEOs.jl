@@ -38,10 +38,10 @@ AdmissibleRegion(x::OpticalTracklet, params::Parameters) = AdmissibleRegion(
     date(x), ra(x), dec(x), vra(x), vdec(x), mag(x), observatory(x), params)
 
 function AdmissibleRegion(date::DateTime, α::T, δ::T, v_α::T, v_δ::T,
-                          mag::T, observatory::ObservatoryMPC{T},
+                          h::T, observatory::ObservatoryMPC{T},
                           params::Parameters{T}) where {T <: Real}
     # Unpack parameters
-    @unpack eph_ea, eph_su, H_max, a_max = params
+    @unpack eph_ea, eph_su, H_max, slope, a_max = params
     # Topocentric unit vector and partials
     ρ, ρ_α, ρ_δ = topounitpdv(α, δ)
     # Time of observation [days since J2000 TDB, Julian days UTC]
@@ -54,12 +54,12 @@ function AdmissibleRegion(date::DateTime, α::T, δ::T, v_α::T, v_δ::T,
     ρ_max = _helmaxrange(coeffs, a_max)
     iszero(ρ_max) && return zero(AdmissibleRegion{T})
     # Minimum range
-    if isnan(mag)
+    if isnan(h)
         # Earth's sphere of influence radius / Earth's physical radius
         ρ_min = R_SI < ρ_max ? R_SI : R_EA
     else
         # Tiny object boundary
-        ρ_min = 10^((mag - H_max)/5)
+        ρ_min = body2observer(coeffs, h, H_max; slope)
     end
     ρ_min > ρ_max && return zero(AdmissibleRegion{T})
     # Range domain
@@ -75,6 +75,6 @@ function AdmissibleRegion(date::DateTime, α::T, δ::T, v_α::T, v_δ::T,
     Fs[2, :] .= [ρ_min, v_ρ_max]
     Fs[3, :] .= [ρ_max, v_ρ_mid]
 
-    return AdmissibleRegion{T}(date, α, δ, v_α, v_δ, H_max, a_max,
+    return AdmissibleRegion{T}(date, α, δ, v_α, v_δ, h, H_max, slope, a_max,
         ρ, ρ_α, ρ_δ, q, coeffs, ρ_domain, v_ρ_domain, Fs, observatory)
 end

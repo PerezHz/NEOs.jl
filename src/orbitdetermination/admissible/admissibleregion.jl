@@ -13,7 +13,9 @@ Subset of topocentric range × range-rate space defined by the following constra
 - `dec::T`: declination [rad].
 - `vra::T`: right ascension velocity [rad/day].
 - `vdec::T`: declination velocity [rad/day].
+- `mag::T`: apparent magnitude.
 - `H_max::T`: maximum absolute magnitude.
+- `slope::T`: slope parameter.
 - `a_max::T`: maximum semimajor axis [au].
 - `ρ_unit/ρ_α/ρ_δ::Vector{T}`: topocentric unit vector and its partials.
 - `q::Vector{T}`: heliocentric position of observer.
@@ -35,7 +37,9 @@ Subset of topocentric range × range-rate space defined by the following constra
     dec::T
     vra::T
     vdec::T
+    mag::T
     H_max::T
+    slope::T
     a_max::T
     ρ_unit::Vector{T}
     ρ_α::Vector{T}
@@ -50,7 +54,7 @@ end
 
 # Definition of zero AdmissibleRegion{T}
 zero(::Type{AdmissibleRegion{T}}) where {T <: Real} = AdmissibleRegion{T}(
-    MINDTTDB, zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
+    MINDTTDB, zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
     Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
     Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
     Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs(T)
@@ -63,6 +67,8 @@ ra(x::AdmissibleRegion) = x.ra
 dec(x::AdmissibleRegion) = x.dec
 vra(x::AdmissibleRegion) = x.vra
 vdec(x::AdmissibleRegion) = x.vdec
+mag(x::AdmissibleRegion) = x.mag
+slopeparameter(x::AdmissibleRegion) = x.slope
 observatory(x::AdmissibleRegion) = x.observatory
 
 # Print method for AdmissibleRegion

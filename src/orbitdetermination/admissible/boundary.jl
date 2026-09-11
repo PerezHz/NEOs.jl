@@ -369,3 +369,20 @@ function argoldensearch(A::AdmissibleRegion{T}, ρmin::T, ρmax::T, m::Symbol,
 
     return ρ, rangerate(A, ρ, m, boundary)
 end
+
+# Angle between the line of sight and the opposition direction
+# See paragraph below equation (8.16) of https://doi.org/10.1017/CBO9781139175371
+opposition_angle(coeffs::AbstractVector) = acos(coeffs[6] / (2 * sqrt(coeffs[1])))
+opposition_angle(A::AdmissibleRegion) = opposition_angle(A.coeffs)
+
+# Approximation for the distance between the body and the observer
+# See paragraph below equation (8.16) of https://doi.org/10.1017/CBO9781139175371
+function body2observer(coeffs::AbstractVector, h::Number, H::Number;
+                       slope::Number = 0.15)
+    β = opposition_angle(coeffs)
+    Φ = phase_integral(β; slope)
+    return 10^((h - H + 2.5*log10(Φ))/5)
+end
+
+body2observer(x::AdmissibleRegion, H::Number) = body2observer(x.coeffs, mag(x), H;
+    slope = slopeparameter(x))
