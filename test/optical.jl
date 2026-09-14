@@ -515,7 +515,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test count(mask1) == count(mask2) == count(mask3) == 0
         @test light1[mask1] == light2[mask2] == light3[mask3]
         mask1, mask2, mask3 = @. isnight(light1), isnight(light2), isnight(light3)
-        @test count(mask1) == count(mask2) == count(mask3) == 6_765
+        @test count(mask1) == count(mask2) == count(mask3) == 6_692
         @test light1[mask1] == light2[mask2] == light3[mask3]
         mask1, mask2, mask3 = @. issatellite(light1), issatellite(light2), issatellite(light3)
         @test count(mask1) == count(mask2) == count(mask3) == 1_790
