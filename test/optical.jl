@@ -496,9 +496,10 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test_throws ArgumentError load_optical_astrometry("433"; format = :unknown)
     end
 
-    filter!(x -> Date(2000) < date(x) < Date(2025), optical1)
-    filter!(x -> Date(2000) < date(x) < Date(2025), optical2)
-    filter!(x -> Date(2000) < date(x) < Date(2025), optical3)
+    # Delete observations before J200 and from observatory K73
+    filter!(x -> Date(2000) < date(x) < Date(2025) && observatorycode(x) != "K73", optical1)
+    filter!(x -> Date(2000) < date(x) < Date(2025) && observatorycode(x) != "K73", optical2)
+    filter!(x -> Date(2000) < date(x) < Date(2025) && observatorycode(x) != "K73", optical3)
 
     @testset "Topocentric" begin
 
