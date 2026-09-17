@@ -13,10 +13,13 @@ Subset of topocentric range × range-rate space defined by the following constra
 - `dec::T`: declination [rad].
 - `vra::T`: right ascension velocity [rad/day].
 - `vdec::T`: declination velocity [rad/day].
+- `mag::T`: apparent magnitude.
 - `H_max::T`: maximum absolute magnitude.
+- `slope::T`: slope parameter.
 - `a_max::T`: maximum semimajor axis [au].
 - `ρ_unit/ρ_α/ρ_δ::Vector{T}`: topocentric unit vector and its partials.
-- `q::Vector{T}`: heliocentric position of observer.
+- `sun::Vector{T}`: barycentric cartesian state vector of the Sun.
+- `observer::Vector{T}`: heliocentric cartesian state vector of observer.
 - `coeffs::Vector{T}`: polynomial coefficients.
 - `ρ_domain::Vector{T}`: range domain.
 - `v_ρ_domain::Vector{T}`: range-rate domain.
@@ -35,12 +38,15 @@ Subset of topocentric range × range-rate space defined by the following constra
     dec::T
     vra::T
     vdec::T
+    mag::T
     H_max::T
+    slope::T
     a_max::T
     ρ_unit::Vector{T}
     ρ_α::Vector{T}
     ρ_δ::Vector{T}
-    q::Vector{T}
+    sun::Vector{T}
+    observer::Vector{T}
     coeffs::Vector{T}
     ρ_domain::Vector{T}
     v_ρ_domain::Vector{T}
@@ -50,10 +56,10 @@ end
 
 # Definition of zero AdmissibleRegion{T}
 zero(::Type{AdmissibleRegion{T}}) where {T <: Real} = AdmissibleRegion{T}(
-    MINDTTDB, zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
+    MINDTTDB, zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
     Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
     Vector{T}(undef, 0), Vector{T}(undef, 0), Vector{T}(undef, 0),
-    Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs(T)
+    Vector{T}(undef, 0), Vector{T}(undef, 0), Matrix{T}(undef, 0, 0), unknownobs(T)
 )
 
 iszero(x::AdmissibleRegion{T}) where {T <: Real} = x == zero(AdmissibleRegion{T})
@@ -63,17 +69,30 @@ ra(x::AdmissibleRegion) = x.ra
 dec(x::AdmissibleRegion) = x.dec
 vra(x::AdmissibleRegion) = x.vra
 vdec(x::AdmissibleRegion) = x.vdec
+mag(x::AdmissibleRegion) = x.mag
+slopeparameter(x::AdmissibleRegion) = x.slope
 observatory(x::AdmissibleRegion) = x.observatory
+attributable(x::AdmissibleRegion) = [ra(x), dec(x), vra(x), vdec(x), mag(x)]
 
-# Print method for AdmissibleRegion
-function show(io::IO, x::AdmissibleRegion)
-    v = string(
-        @sprintf("%.5f", rad2deg(ra(x))), ", ",
-        @sprintf("%.5f", rad2deg(dec(x))), ", ",
-        @sprintf("%.5f", rad2deg(vra(x))), ", ",
-        @sprintf("%.5f", rad2deg(vdec(x))), "",
+# Print methods for AdmissibleRegion
+show(io::IO, x::AdmissibleRegion) = print(io, "Admissible region around ",
+    date(x), " at ", observatory(x).name)
+
+function show(io::IO, ::MIME"text/plain", x::AdmissibleRegion)
+    t = repeat(' ', 4)
+    print(io,
+        typeof(x), '\n',
+        t, rpad("Observatory: ", 21),  observatory(x).name, '\n',
+        t, rpad("Date: ", 21),         date(x), '\n',
+        t, rpad("Attributable: ", 21), "[",
+            @sprintf("%.5f", rad2deg(ra(x))),   ", ",
+            @sprintf("%.5f", rad2deg(dec(x))),  ", ",
+            @sprintf("%.5f", rad2deg(vra(x))),  ", ",
+            @sprintf("%.5f", rad2deg(vdec(x))), ", ",
+            @sprintf("%.2f", mag(x)),
+        "]",
     )
-    print(io, "AE: [", v, "]", " t: ", date(x), " obs: ", observatory(x).name)
+    return nothing
 end
 
 # Check whether P is inside A's boundary

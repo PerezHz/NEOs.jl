@@ -1,4 +1,5 @@
 include("curvature.jl")
+include("magnitude.jl")
 include("odproblem.jl")
 include("propres.jl")
 include("osculating/abstractosculatingelements.jl")

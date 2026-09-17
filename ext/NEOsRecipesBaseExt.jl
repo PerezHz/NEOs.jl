@@ -2,21 +2,63 @@ module NEOsRecipesBaseExt
 
 using RecipesBase
 using TaylorIntegration: TaylorSolution
-using NEOs: OpticalResidual, AdmissibleRegion, AbstractOrbit, cte, ra, dec, arboundary
+using NEOs: OpticalResidual, AdmissibleRegion, AbstractOrbit, cte, ra, dec, arboundary,
+      mag, body2observer
 
 @recipe function f(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
     seriestype --> :scatter
     return cte.(ra.(res)), cte.(dec.(res))
 end
 
-@recipe function f(A::AdmissibleRegion{T}; boundary::Symbol = :outer,
-                   N::Int = 100, ρscale::Symbol = :linear) where {T <: Real}
-    seriestype --> :path
-    tmax = boundary == :outer ? 3 : 2
-    ps = map(t -> arboundary(A, t, boundary, ρscale), LinRange(0, tmax, N))
-    xs, ys = first.(ps), last.(ps)
-
-    return xs, ys
+@recipe function f(A::AdmissibleRegion;
+                   N = 100, ρscale = :linear,
+                   Hs = [], Hcolor = :magenta, Hlinewidth = 1,
+                   outer = true, outercolor = :red, outerlinewidth = 2,
+                   inner = true, innercolor = :lime, innerlinewidth = 2)
+    @assert isa(N, Int) && N > 0 "Number of points must be an integer greater than zero"
+    @assert isa(ρscale, Symbol) && ρscale in (:linear, :log) "Possible values for \
+        `ρscale` are: `:linear` and `:log`"
+    # Outer boundary
+    if outer
+        @series begin
+            label := ""
+            color := outercolor
+            seriestype := :path
+            linewidth := outerlinewidth
+            ts = LinRange(0, 3, N)
+            ps = arboundary.(Ref(A), ts, Ref(:outer), Ref(ρscale))
+            return first.(ps), last.(ps)
+        end
+    end
+    # Inner boundary
+    if inner
+        @series begin
+            label := ""
+            z_order := 1
+            color := innercolor
+            seriestype := :path
+            linewidth := innerlinewidth
+            ts = LinRange(0, 2, N)
+            ps = arboundary.(Ref(A), ts, Ref(:inner), Ref(ρscale))
+            return first.(ps), last.(ps)
+        end
+    end
+    # Shooting star limit
+    if !isempty(Hs)
+        @series begin
+            label := ""
+            z_order := 1
+            color := Hcolor
+            seriestype := :vline
+            linewidth := Hlinewidth
+            ρs = body2observer.(Ref(A), Hs)
+            if ρscale === :linear
+                return ρs
+            else
+                return log10.(ρs)
+            end
+        end
+    end
 end
 
 @recipe function f(sol::U, t0::T, tf::T; N::Int = 100,

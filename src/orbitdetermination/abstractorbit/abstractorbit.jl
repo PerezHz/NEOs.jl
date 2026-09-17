@@ -560,25 +560,11 @@ function uncertaintyparameter(orbit::AbstractOrbit{D, T, T},
     return clamp(U, 0, 9)
 end
 
-# Bowell et al (1989) phase integral
-# See https://ui.adsabs.harvard.edu/abs/1989aste.conf..524B/abstract
-function phase_integral(α::Number, slope::Real = 0.15)
-    sin_α, tan_α = sin(α), tan(α/2)
-    Φ1L = exp(-PHASE_INTEGRAL_A1 * tan_α^PHASE_INTEGRAL_B1)
-    Φ2L = exp(-PHASE_INTEGRAL_A2 * tan_α^PHASE_INTEGRAL_B2)
-    Φ1S = 1 - (PHASE_INTEGRAL_C1 * sin_α) / (0.119 + 1.341 * sin_α - 0.754 * sin_α^2)
-    Φ2S = 1 - (PHASE_INTEGRAL_C2 * sin_α) / (0.119 + 1.341 * sin_α - 0.754 * sin_α^2)
-    W = exp(-90.56 * tan_α^2)
-    Φ1 = W * Φ1S + (1 - W) * Φ1L
-    Φ2 = W * Φ2S + (1 - W) * Φ2L
-    return (1 - slope) * Φ1 + slope * Φ2
-end
-
 """
     absolutemagnitude(orbit, params)
 
 Return the absolute magnitude of an orbit, as well as its standard error,
-following the Bowell et al (1989) H-G photometric model for asteroids.
+following the Bowell et al. (1989) H-G photometric model for asteroids.
 For a list of parameters, see the `Physical properties` section of
 [`Parameters`](@ref).
 
@@ -589,36 +575,33 @@ For a list of parameters, see the `Physical properties` section of
 function absolutemagnitude(orbit::AbstractOrbit, params::Parameters)
     # Unpack
     @unpack optical = orbit
-    @unpack eph_ea, eph_su, slope = params
-    # Observation times [TDB days since J2000]
-    ts = @. dtutc2days(date(optical))
-    # Asteroid, Earth and Sun positions [au]
-    xa = [orbit(t)[1:3] for t in ts]
-    xe = [eph_ea(t)[1:3] for t in ts]
-    xs = [eph_su(t)[1:3] for t in ts]
-    # Distances [au]
-    d_BS = @. norm(xa - xs)     # Asteroid-Sun
-    d_OS = @. norm(xe - xs)     # Earth-Sun
-    d_BO = @. norm(xa - xe)     # Asteroid-Earth
-    # Phase angles [rad]
-    αs = @. acos((d_BO^2 + d_BS^2 - d_OS^2) / (2 * d_BO * d_BS))
+    @unpack eph_su, eph_ea, slope = params
     # Convert observed magnitudes to V band
     Vs = @. mag(optical) + vconversion(optical)
-    # Reduced magnitudes
-    @. Vs -= 5 * log10(d_BS * d_BO)
-    # Phase integrals
-    Φs = @. phase_integral(αs, slope)
+    # Observation times [DateTime UTC, days since J2000 TDB, Julian days UTC]
+    ds = date.(optical)
+    ts = dtutc2days.(ds)
+    jds = datetime2julian.(ds)
+    # Observing stations
+    obs = observatory.(optical)
+    # (B)ody, (S)un and (O)bserver positions [au]
+    p_B = [orbit(t)[1:3] for t in ts]
+    p_S = [eph_su(t)[1:3] for t in ts]
+    p_O = [eph_ea(t)[1:3] + kmsec2auday(obsposvelECI(o, j))[1:3]
+           for (t, o, j) in zip(ts, obs, jds)]
+    # Distances between (B)ody, (S)un and (O)bserver [au]
+    d_BS = @. norm(p_B - p_S)
+    d_BO = @. norm(p_B - p_O)
+    d_OS = @. norm(p_O - p_S)
     # Absolute magnitudes
-    Hs = @. Vs + 2.5 * log10(Φs)
+    Hs = @. absolutemagnitude(Vs, d_BS, d_BO, d_OS; slope)
     # Eliminate NaNs
     mask = @. isnan(Hs)
     deleteat!(Vs, mask)
-    deleteat!(Φs, mask)
     deleteat!(Hs, mask)
     # Mean and standard error
     H = mean(Hs)
-    dH = nrms(@. Vs + 2.5 * log10(Φs) - H)
-
+    dH = nrms(Hs .- H)
     return H, dH
 end
 
@@ -779,24 +762,25 @@ function print_mpec_ephemeris(io::IO, orbit::AbstractOrbit, params::Parameters,
     for i in eachindex(lines)
         d = d0 + ts[i]
         t = dtutc2days(d)
-        qs = eph_su(t)[1:3]
-        qe = eph_ea(t)[1:3]
-        qa = ecliptic2equatorial(kep(t + MJD2000))[1:3] + qs
-        qas = qa - qs
-        qae = qa - qe
-        qes = qe - qs
-        das = norm(qas)
-        dae = norm(qae)
-        hms = rad2hms(mod2pi(atan(qae[2], qae[1])))
-        dms = rad2dms(asin(qae[3] / dae))
-        elong = angle(qae, qes)
-        phase = angle(-qae, -qas)
-        V = H + 5 * log10(das * dae) - 2.5 * phase_integral(phase, slope)
+        p_S = eph_su(t)[1:3]
+        p_O = eph_ea(t)[1:3]
+        p_B = ecliptic2equatorial(kep(t + MJD2000))[1:3] + p_S
+        p_BS = p_B - p_S
+        p_BO = p_B - p_O
+        p_OS = p_O - p_S
+        d_BS = norm(p_BS)
+        d_BO = norm(p_BO)
+        d_OS = norm(p_OS)
+        hms = rad2hms(mod2pi(atan(p_BO[2], p_BO[1])))
+        dms = rad2dms(asin(p_BO[3] / d_BO))
+        elong = elongation_angle(d_BS, d_BO, d_OS)
+        phase = phase_angle(d_BS, d_BO, d_OS)
+        V = apparentmagnitude(H, d_BS, d_BO, d_OS; slope)
         lines[i] = @sprintf(
             "%-14s%02d %02d %04.1f %s%02d %02d %02d%3s%6.4f%8.4f%8.1f%8.1f%8.1f\n",
             Dates.format(d, "yyyy mm dd"), hms[1], hms[2], hms[3],
             dms[1] ≥ 0 ? "+" : "-", abs(dms[1]), dms[2], dms[3], "",
-            dae, das, rad2deg(elong), rad2deg(phase), V
+            d_BO, d_BS, rad2deg(elong), rad2deg(phase), V
         )
     end
     write(

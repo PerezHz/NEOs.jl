@@ -85,7 +85,7 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
         end
         AE[6] = ae[6] + dae[6]
         # Barycentric state vector
-        q = attr2bary(A, AE, params)
+        q = attr2bary(A, AE)
         # Propagation and residuals
         # TO DO: `ρ::TaylorN` is too slow for `mmov` due to evaluations
         # within the dynamical model

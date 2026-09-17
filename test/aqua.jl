@@ -25,8 +25,12 @@ end
 
 @testset "Aqua tests (additional)" begin
     Aqua.test_ambiguities(NEOs, broken = true)
+    # As of September 17, 2026 the test below fails because of an
+    # external issue with the ChainRulesCore extension of LogExpFunctions
+    Aqua.test_persistent_tasks(NEOs, broken = true)
     Aqua.test_all(
         NEOs;
-        ambiguities = false
+        ambiguities = false,
+        persistent_tasks = false,
     )
 end
