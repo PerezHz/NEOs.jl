@@ -6,7 +6,12 @@ using DataFrames
 using Query
 using Test
 
+using NEOs: AbstractOpticalAstrometry
+
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
+
+isvalidEros(x::AbstractOpticalAstrometry) =
+    Date(2000) < date(x) < Date(2025) && observatorycode(x) != "K73"
 
 @testset "AbstractOpticalAstrometry" begin
 
@@ -60,7 +65,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         # Fetch OpticalMPC80
         optical1 = fetch_optical_mpc80("433", MPC)
-        filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical1)
+        filter!(isvalidEros, optical1)
         @test isa(optical1, Vector{OpticalMPC80{Float64}})
         @test issorted(optical1)
         @test allunique(optical1)
@@ -68,7 +73,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # Read/write OpticalMPC80 file
         filename = joinpath(TEST_DATA, "433.txt")
         optical2 = read_optical_mpc80(filename)
-        filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical2)
+        filter!(isvalidEros, optical2)
         @test isa(optical2, Vector{OpticalMPC80{Float64}})
         @test issorted(optical2)
         @test allunique(optical2)
@@ -250,13 +255,13 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         # Fetch OpticalRWO
         optical1 = fetch_optical_rwo("433", NEOCC)
-        filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical1)
+        filter!(isvalidEros, optical1)
         @test isa(optical1, Vector{OpticalRWO{Float64}})
         @test issorted(optical1)
         @test allunique(optical1)
 
         optical2 = fetch_optical_rwo("433", NEODyS2)
-        filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical2)
+        filter!(isvalidEros, optical2)
         @test isa(optical2, Vector{OpticalRWO{Float64}})
         @test issorted(optical2)
         @test allunique(optical2)
@@ -264,7 +269,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # Read/write OpticalRWO file
         filename = joinpath(TEST_DATA, "433.rwo")
         optical3 = read_optical_rwo(filename)
-        filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical3)
+        filter!(isvalidEros, optical3)
         @test isa(optical3, Vector{OpticalRWO{Float64}})
         @test issorted(optical3)
         @test allunique(optical3)
@@ -414,7 +419,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         # Fetch OpticalADES
         optical1 = fetch_optical_ades("433", MPC)
-        filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical1)
+        filter!(isvalidEros, optical1)
         @test isa(optical1, Vector{OpticalADES{Float64}})
         @test issorted(optical1)
         @test allunique(optical1)
@@ -422,7 +427,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # Read/write OpticalRWO file
         filename = joinpath(TEST_DATA, "433.xml")
         optical2 = read_optical_ades(filename)
-        filter!(x -> Date(2000, 1) < date(x) < Date(2025, 6), optical2)
+        filter!(isvalidEros, optical2)
         @test isa(optical2, Vector{OpticalADES{Float64}})
         @test issorted(optical2)
         @test allunique(optical2)
@@ -497,9 +502,9 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
     end
 
     # Delete observations before J200 and from observatory K73
-    filter!(x -> Date(2000) < date(x) < Date(2025) && observatorycode(x) != "K73", optical1)
-    filter!(x -> Date(2000) < date(x) < Date(2025) && observatorycode(x) != "K73", optical2)
-    filter!(x -> Date(2000) < date(x) < Date(2025) && observatorycode(x) != "K73", optical3)
+    filter!(isvalidEros, optical1)
+    filter!(isvalidEros, optical2)
+    filter!(isvalidEros, optical3)
 
     @testset "Topocentric" begin
 
