@@ -166,7 +166,7 @@ Equivalent to [`propres`](@ref), but computes the O-C residuals in-place over
 a pre-allocated set `res`.
 """
 function propres!(
-        res::Vector{OpticalResidual{T, U}}, od::OpticalODProblem{D, T, O},
+        res::AbstractVector{OpticalResidual{T, U}}, od::OpticalODProblem{D, T, O},
         q0::Vector{U}, jd0::V, params::Parameters{T};
         buffer::Union{Nothing, PropresBuffer{T, U, V}} = nothing,
         idxs::AbstractVector{Int} = opticalindices(od)
