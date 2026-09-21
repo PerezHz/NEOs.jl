@@ -8,9 +8,9 @@ using Plots
 using Test
 
 # Load optical astrometry
-optical = read_optical_mpc80(joinpath(pkgdir(NEOs), "data",
+astrometry = read_optical_mpc80(joinpath(pkgdir(NEOs), "data",
     "99942_2004_2020.dat"))
-filter!(x -> Date(2005, 1, 27) < date(x) < Date(2005, 1, 31), optical)
+filter!(x -> Date(2005, 1, 27) < date(x) < Date(2005, 1, 31), astrometry)
 # Parameters
 params = Parameters(
     coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
@@ -21,7 +21,7 @@ params = Parameters(
     fudge = 100.0, max_per = 34.0,
 )
 # Orbit determination problem (only optical astrometry)
-od = ODProblem(newtonian!, optical)
+od = ODProblem(newtonian!, astrometry)
 # Admissible region
 A = AdmissibleRegion(od.tracklets[1], params)
 # Preliminary orbit
