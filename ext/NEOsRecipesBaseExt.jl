@@ -2,12 +2,15 @@ module NEOsRecipesBaseExt
 
 using RecipesBase
 using TaylorIntegration: TaylorSolution
-using NEOs: OpticalResidual, AdmissibleRegion, AbstractOrbit, cte, ra, dec, arboundary,
-      mag, body2observer
+using NEOs: OpticalResidual, AdmissibleRegion, AbstractOrbit, cte, ra, dec,
+      arboundary, body2observer
 
-@recipe function f(res::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
-    seriestype --> :scatter
-    return cte.(ra.(res)), cte.(dec.(res))
+@recipe function f(res::AbstractVector{<:OpticalResidual})
+    @series begin
+        seriestype := :scatter
+        α, δ = @. cte(ra(res)), cte(dec(res))
+        return α, δ
+    end
 end
 
 @recipe function f(A::AdmissibleRegion;
@@ -61,31 +64,35 @@ end
     end
 end
 
-@recipe function f(sol::U, t0::T, tf::T; N::Int = 100,
-        projection::Symbol = :xyz) where {T <: Real,
-        U <: Union{TaylorSolution, AbstractOrbit}}
-    seriestype --> :path
-    ts = LinRange(t0, tf, N)
-    rvs = Matrix{T}(undef, 6, N)
-    for i in eachindex(ts)
-        rvs[:, i] .= cte.(sol(ts[i])[1:6])
-    end
-    xs, ys, zs = rvs[1, :], rvs[2, :], rvs[3, :]
-
-    if projection == :x
-        return xs
-    elseif projection == :y
-        return ys
-    elseif projection == :z
-        return zs
-    elseif projection == :xy
-        return xs, ys
-    elseif projection == :xz
-        return xs, zs
-    elseif projection == :yz
-        return ys, zs
-    elseif projection == :xyz
-        return xs, ys, zs
+@recipe function f(sol::Union{TaylorSolution, AbstractOrbit},
+                   t0::Real, tf::Real; N = 100, projection = :xyz)
+    @assert isa(N, Int) && N > 0 "Number of points must be an integer greater than zero"
+    @assert isa(projection, Symbol) && projection in (:x, :y, :z, :xy, :xz,
+        :yz, :xyz) "Possible values for `projection` are: `:x`, `:y`, `:z`, `:xy`, \
+        `:xz`, `:yz` and `:xyz`"
+    @series begin
+        seriestype := :path
+        ts = LinRange(t0, tf, N)
+        rvs = Matrix{typeof(t0)}(undef, 6, N)
+        for i in eachindex(ts)
+            rvs[:, i] .= cte.(sol(ts[i])[1:6])
+        end
+        xs, ys, zs = rvs[1, :], rvs[2, :], rvs[3, :]
+        if projection === :x
+            return xs
+        elseif projection === :y
+            return ys
+        elseif projection === :z
+            return zs
+        elseif projection === :xy
+            return xs, ys
+        elseif projection === :xz
+            return xs, zs
+        elseif projection === :yz
+            return ys, zs
+        elseif projection === :xyz
+            return xs, ys, zs
+        end
     end
 end
 

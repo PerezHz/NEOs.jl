@@ -8,6 +8,7 @@ testfiles = (
     "propagation.jl",
     "orbitdetermination.jl",
     "impactmonitoring.jl",
+    "recipes.jl",
     "aqua.jl",
 )
 
