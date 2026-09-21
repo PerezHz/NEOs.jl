@@ -1,6 +1,7 @@
 using ArgParse, Distributed, ChunkSplitters, StaticArraysCore
 using HTTP, JSON, DataFrames, CSV, Printf, Statistics
 @everywhere using NEOs, Dates, PlanetaryEphemeris, TaylorSeries
+@everywhere using LinearAlgebra: inv!
 @everywhere using NEOs: AbstractOpticalAstrometry, OpticalADES, ObservatoryMPC,
                   PropagationBuffer, OpticalBuffer, PropresBuffer,  AbstractODProblem,
                   AbstractOrbit, KeplerianElements, parse_optical_rwo, argoldensearch,
