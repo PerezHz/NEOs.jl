@@ -38,7 +38,7 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
     Qs = fill(T(Inf), adamiter+1)
     orbits = [zero(MMOVOrbit{D, T, T, O}) for _ in 1:adamiter]
     # Initial attributable elements
-    aes[:, 1] .= A.ra, A.dec, A.vra, A.vdec, ρ, v_ρ
+    aes[:, 1] .= ra(A), dec(A), vra(A), vdec(A), ρ, v_ρ
     # Scaling factors
     scalings = Vector{T}(undef, 6)
     @. scalings[1:4] = abs(aes[1:4, 1]) / 1e6
