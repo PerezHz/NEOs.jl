@@ -1,20 +1,21 @@
 using ArgParse, Distributed, ChunkSplitters, StaticArraysCore
 using HTTP, JSON, DataFrames, CSV, Printf, Statistics
 @everywhere using NEOs, Dates, PlanetaryEphemeris, TaylorSeries
-@everywhere using NEOs: PropresBuffer, PropagationBuffer, OpticalBuffer, OpticalADES,
-                  AbstractOrbit, KeplerianElements, ObservatoryMPC, parse_optical_rwo,
-                  argoldensearch, evaldeltas, init_optical_residuals, indices,
-                  _lsmethods, μ_S, equatorial2ecliptic, _propagate, designation
+@everywhere using NEOs: AbstractOpticalAstrometry, OpticalADES, ObservatoryMPC,
+                  PropagationBuffer, OpticalBuffer, PropresBuffer,  AbstractODProblem,
+                  AbstractOrbit, KeplerianElements, parse_optical_rwo, argoldensearch,
+                  evaldeltas, init_optical_residuals, indices, _lsmethods, μ_S,
+                  equatorial2ecliptic, _propagate, designation
 @everywhere import NEOs: initialcondition, keplerian
 
 const NEOCP_ORBITS_HEADER = "Object   H     G    Epoch    M         Peri.      \
       Node       Incl.        e           n         a                     NObs \
       NOpp   Arc    r.m.s.       Orbit ID"
 
-@everywhere const OD{D, T} = ODProblem{D, T, Vector{OpticalADES{T}},
-    Nothing, Veres17{T}, Eggl20{T}}
-@everywhere const VariantOrbit{T} = MMOVOrbit{typeof(newtonian!),
-    T, T, Vector{OpticalADES{T}}}
+@everywhere const OD{D, T, O} = ODProblem{D, T, Vector{O}, Nothing, Veres17{T}, Eggl20{T}}
+@everywhere const VariantOrbit{T, O} = MMOVOrbit{typeof(newtonian!), T, T, Vector{O}}
+@everywhere const AbstractVariantOrbitVector{T} = AbstractVector{VariantOrbit{T, O}} where
+    {O <: AbstractOpticalAstrometry{T}}
 
 function parse_commandline(dict::AbstractDict = Dict())
     s = ArgParseSettings(add_version = true, version = "0.3")
@@ -102,7 +103,7 @@ printitle(s::AbstractString, d::AbstractString) = println(d ^ length(s), '\n', s
 
 @everywhere initialcondition(x::AbstractOrbit) = x(), epoch(x) + PE.J2000
 
-function chi(x::AbstractVector{VariantOrbit{T}}) where {T <: Real}
+function chi(x::AbstractVariantOrbitVector)
     Qmin, i = findmin(nms, x)
     nobs = 2 * noptical(x[i])
     χs = @. sqrt(nobs * ( nms(x) - Qmin ))
@@ -227,7 +228,7 @@ end
 
 @everywhere function radec_next_day(day_after_epoch::DateTime,
                                     observer::ObservatoryMPC{T},
-                                    orbits::AbstractVector{VariantOrbit{T}},
+                                    orbits::AbstractVariantOrbitVector{T},
                                     params::Parameters{T}) where {T <: Real}
     radec = Vector{NTuple{2, T}}(undef, length(orbits))
     q0, jd0 = initialcondition(orbits[1])
@@ -264,7 +265,7 @@ end
 function neocp_orbits_format(desig::AbstractString,
                              reference_epoch::Real,
                              ids::AbstractVector{String},
-                             orbits::AbstractVector{<:VariantOrbit},
+                             orbits::AbstractVariantOrbitVector,
                              params::Parameters)
     orbits_lines = Vector{String}(undef, length(orbits) + 1)
     orbits_lines[1] = NEOCP_ORBITS_HEADER
@@ -313,10 +314,10 @@ function neocp_orbits_format(desig::AbstractString,
 end
 
 @everywhere function mcmov(
-        od::OD{typeof(newtonian!), T}, A::AdmissibleRegion{T},
+        od::OD{typeof(newtonian!), T, O}, A::AdmissibleRegion{T},
         points::AbstractVector{NTuple{2, T}}, bounds::AbstractVector{T},
         scale::Symbol, params::Parameters{T}
-    ) where {T <: Real}
+    ) where {T <: Real, O <: AbstractOpticalAstrometry{T}}
     # Attributable elements (plain)
     ae = Vector{T}(undef, 6)
     ae[1:4] .= A.ra, A.dec, A.vra, A.vdec
@@ -351,7 +352,7 @@ end
     lsmethods = _lsmethods(res, x0, 1:4)
     Qtol, Mtol, penalty = params.lsQtol, params.lsMtol, nothing
     # Manifold of variations
-    orbits = [zero(VariantOrbit{T}) for _ in eachindex(points)]
+    orbits = [zero(VariantOrbit{T, O}) for _ in eachindex(points)]
     # Iterate mov points
     for (i, point) in enumerate(points)
         # Attributable elements (plain)
@@ -365,7 +366,7 @@ end
         end
         AE[6] = ae[6] + dae[6]
         # Barycentric initial conditions (JT)
-        q = attr2bary(A, AE, params)
+        q = attr2bary(A, AE)
         # Propagation and residuals
         jd0 = _jd0_ - ae[5] / c_au_per_day
         bwd, fwd = propres!(res, od, q, jd0, params; buffer, idxs)
@@ -381,12 +382,16 @@ end
         Q(fit.x) < 0 && continue
         # Covariance matrix
         C = (nobs/2) * TS.hessian(Q, fit.x)
-        Γ = project(q, fit.x, inv(C))
+        luC = lu!(C; check = false)
         # Update orbit
-        orbits[i] = evaldeltas(MMOVOrbit(
-            newtonian!, variables, od.optical, od.tracklets, bwd, fwd,
-            res, Γ, [AE(fit.x);;], [Q(fit.x)]
-        ), fit.x)
+        if issuccess(luC)
+            invC = inv!(luC)
+            Γ = project(q, fit.x, invC)
+            orbits[i] = evaldeltas(MMOVOrbit(
+                newtonian!, variables, od.optical, od.tracklets, bwd, fwd,
+                res, Γ, [AE(fit.x);;], [Q(fit.x)]
+            ), fit.x)
+        end
     end
 
     return orbits
@@ -543,7 +548,7 @@ function main(dict::AbstractDict = Dict(); write_output::Bool = true)
     =============#
 
     nominal_ids = Vector{String}(undef, 0)
-    nominal_orbits = Vector{VariantOrbit{Float64}}(undef, 0)
+    nominal_orbits = Vector{VariantOrbit{Float64, OpticalADES{T}}}(undef, 0)
 
     if compute_minimum
         minimum_orbit = argmin(nms, orbits)
