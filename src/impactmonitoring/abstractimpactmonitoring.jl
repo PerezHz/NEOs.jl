@@ -82,7 +82,7 @@ isspurious(::AbstractVirtualImpactor) = false
 # Print methods for AbstractVirtualImpactor
 function show(io::IO, ::MIME"text/plain", x::AbstractVirtualImpactor)
     t = repeat(' ', 4)
-    f = isspurious(x) ? "true " : "false"
+    f = isspurious(x) ? "true" : "false"
     d = Dates.format(round(date(x), Minute), "yyyy-mm-dd HH:MM")
     σ = @sprintf("%+.4f", sigma(x))
     ip = @sprintf("%.2E", impact_probability(x))
