@@ -269,7 +269,16 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         VIs = [VI1, VI2]
         impactor_table(VIs)
         @test isa(summary(VIs), String)
-        @test isa(string(VI1), String) && isa(string(VI2), String)
+        @test sprint(show, VI1) == sprint(show, VI2) ==
+            "VI t: 2018-06-02 16:48 σ: +0.0000 ip: 1.00E+00"
+        @test sprint(show, MIME("text/plain"), VI1) ==
+              sprint(show, MIME("text/plain"), VI2) == """
+        VirtualImpactor{Float64}
+            Spurious:            false
+            Date:                2018-06-02 16:48
+            Sigma:               +0.0000
+            Impact probability:  1.00E+00\
+        """
     end
 
     @testset "Modified target plane" begin
@@ -454,7 +463,22 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         VIs = [VI1, VI2]
         impactor_table(VIs)
         @test isa(summary(VIs), String)
-        @test isa(string(VI1), String) && isa(string(VI2), String)
+        @test sprint(show, VI1) == "VI t: 2024-10-28 23:41 σ: +0.0000 ip: 1.00E+00"
+        @test sprint(show, VI2) == "[Spurious] VI t: 2024-10-28 23:41 σ: +0.0000 ip: 0.00E+00"
+        @test sprint(show, MIME("text/plain"), VI1) == """
+        VirtualImpactor{Float64}
+            Spurious:            false
+            Date:                2024-10-28 23:41
+            Sigma:               +0.0000
+            Impact probability:  1.00E+00\
+        """
+        @test sprint(show, MIME("text/plain"), VI2) == """
+        VirtualImpactor{Float64}
+            Spurious:            true
+            Date:                2024-10-28 23:41
+            Sigma:               +0.0000
+            Impact probability:  0.00E+00\
+        """
     end
 
 end

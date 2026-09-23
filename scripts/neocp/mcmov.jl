@@ -1,6 +1,7 @@
 using ArgParse, Distributed, ChunkSplitters, StaticArraysCore
 using HTTP, JSON, DataFrames, CSV, Printf, Statistics
 @everywhere using NEOs, Dates, PlanetaryEphemeris, TaylorSeries
+@everywhere using LinearAlgebra: lu!, inv!, issuccess
 @everywhere using NEOs: AbstractOpticalAstrometry, OpticalADES, ObservatoryMPC,
                   PropagationBuffer, OpticalBuffer, PropresBuffer,  AbstractODProblem,
                   AbstractOrbit, KeplerianElements, parse_optical_rwo, argoldensearch,
@@ -427,7 +428,7 @@ function main(dict::AbstractDict = Dict(); write_output::Bool = true)
     println("• `trkids` included in run: ", unique(map(x -> x.trkid, optical_all)))
 
     if write_output
-        orbits_output = something(parsed_args["output"], desig) * ".neos"
+        orbits_output = something(parsed_args["output"], desig * ".neos")
         println("• Orbits output file: ", orbits_output)
     else
         orbits_output = ""
@@ -548,7 +549,7 @@ function main(dict::AbstractDict = Dict(); write_output::Bool = true)
     =============#
 
     nominal_ids = Vector{String}(undef, 0)
-    nominal_orbits = Vector{VariantOrbit{Float64, OpticalADES{T}}}(undef, 0)
+    nominal_orbits = Vector{VariantOrbit{Float64, OpticalADES{Float64}}}(undef, 0)
 
     if compute_minimum
         minimum_orbit = argmin(nms, orbits)

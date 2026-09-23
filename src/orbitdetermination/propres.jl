@@ -86,6 +86,9 @@ See also [`propagate`](@ref) and [`residuals`](@ref).
 - `buffer::Union{Nothing, PropresBuffer}`: pre-allocated memory (default: `nothing`).
 - `idxs::AbstractVector{Int}`: indices of the observations in `od.optical` to be included
     in the computation.
+In addition, if `od` contains radar astrometry:
+- `tord::Int`: order of Taylor expansions (default: `10`).
+- `niter::Int`: number of light-time solution iterations (default: `10`).
 """
 function propres(
         od::OpticalODProblem{D, T, O}, q0::Vector{U}, jd0::V, params::Parameters{T};
@@ -122,8 +125,9 @@ function propres(
 end
 
 function propres(
-        od::MixedODProblem{D, T, O, R}, q0::Vector{U}, jd0::V, params::Parameters{T};
-        buffer::Union{Nothing, PropresBuffer{T, U, V}} = nothing,
+        od::MixedODProblem{D, T, O, R}, q0::Vector{U},
+        jd0::V, params::Parameters{T}; tord::Int = 10,
+        niter::Int = 10, buffer::Union{Nothing, PropresBuffer{T, U, V}} = nothing,
     ) where {D, T <: Real, U <: Number, V <: Number, O <: AbstractOpticalVector{T},
              R <: AbstractRadarVector{T}}
     # Unpack
@@ -148,6 +152,7 @@ function propres(
         residuals!(res[1], optical, buffer.res; xvs = eph_su, xve = eph_ea,
                    xva = (bwd, fwd))
         residuals!(res[2], radar;
+            tord, niter,
             xvs = et -> auday2kmsec(eph_su(et/daysec)),
             xve = et -> auday2kmsec(eph_ea(et/daysec)),
             xva = et -> bwdfwdeph(et, bwd, fwd))
@@ -202,7 +207,8 @@ end
 
 function propres!(
         res::Tuple{Vector{OpticalResidual{T, U}}, Vector{RadarResidual{T, U}}},
-        od::MixedODProblem{D, T, O, R}, q0::Vector{U}, jd0::V, params::Parameters{T};
+        od::MixedODProblem{D, T, O, R}, q0::Vector{U}, jd0::V,
+        params::Parameters{T}; tord::Int = 10, niter::Int = 10,
         buffer::Union{Nothing, PropresBuffer{T, U, V}} = nothing,
     )  where {D, T <: Real, U <: Number, V <: Number, O <: AbstractOpticalVector{T},
               R <: AbstractRadarVector{T}}
@@ -229,6 +235,7 @@ function propres!(
         residuals!(res[1], optical, buffer.res; xvs = eph_su, xve = eph_ea,
                    xva = (bwd, fwd))
         residuals!(res[2], radar;
+            tord, niter,
             xvs = et -> auday2kmsec(eph_su(et/daysec)),
             xve = et -> auday2kmsec(eph_ea(et/daysec)),
             xva = et -> bwdfwdeph(et, bwd, fwd))

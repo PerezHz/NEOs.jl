@@ -7,6 +7,8 @@ using TaylorIntegration
 using JLD2
 using Test
 
+using NEOs: isdelay, isdoppler
+
 loadjpleph()
 
 const atol = 5E-10
@@ -120,26 +122,31 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
 
         # Dynamical function
         dynamics = gravityonly!
-        # Initial time [Julian date TDB]
+        # Initial time [Julian date TDB, days since J2000 TDB]
         jd0 = datetime2julian(DateTime(2023, 2, 25, 0, 0, 0))
+        t0 = jd0 - PE.J2000
         # Time of integration [years]
         nyears = 0.2
         # Unperturbed initial condition
         q0 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01,
               -9.071450085084557E-03, -9.353197026254517E-03, -5.610023032269034E-03]
+        # Read optical astrometry file
+        optical_2023DW = read_optical_mpc80(joinpath(TEST_DATA, "2023DW.txt"))
+        # Time of first and last observation
+        ti, tf = dtutc2days(first(optical_2023DW)), dtutc2days(last(optical_2023DW))
+        # Orbit determination problem
+        OD = ODProblem(dynamics, optical_2023DW, weights = Veres17, debias = Eggl20)
+        # Weigths and debiasing corrections
+        w8s, bias = weights(OD), debias(OD)
         # Propagation parameters
-        params = Parameters(maxsteps = 1_000, order = 25, abstol = 1e-20, parse_eqs = true)
+        params = Parameters(
+            bwdoffset = (ti - t0) + nyears * yr,
+            fwdoffset = (t0 - tf) + nyears * yr,
+            maxsteps = 1_000, order = 25, abstol = 1e-20, parse_eqs = true
+        )
 
-        # Initial time [days since J2000]
-        t0 = jd0 - PE.J2000
-        # Sun's ephemeris
-        eph_su = selecteph(NEOs.sseph, su, t0 - nyears*yr, t0 + nyears*yr)
-        # Earth's ephemeris
-        eph_ea = selecteph(NEOs.sseph, ea, t0 - nyears*yr, t0 + nyears*yr)
-
-        # Propagate orbit
-        sol_bwd = NEOs.propagate(dynamics, q0, jd0, -nyears, params)
-        sol_fwd = NEOs.propagate(dynamics, q0, jd0, nyears, params)
+        # Propagate orbit and compute optical residuals
+        sol_bwd, sol_fwd, _res_ = propres(OD, q0, jd0, params)
 
         # Check that solution saves correctly
         jldsave("test.jld2"; sol_bwd, sol_fwd)
@@ -161,26 +168,11 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
                      -0.018875911266050937, 0.0167349306087375, 0.007789382070881366]
         @test norm(sol_bwd(lasttime(sol_bwd)) - q_bwd_end, Inf) < 1e-12
 
-        # Read optical astrometry file
-        optical_2023DW = read_optical_mpc80(joinpath(TEST_DATA, "2023DW.txt"))
-        # Make weigths and debiasing corrections
-        w8s = Veres17(optical_2023DW)
-        bias = Eggl20(optical_2023DW)
-
-        # Compute normalized residuals
-        _res_ = NEOs.residuals(
-            optical_2023DW,
-            w8s, bias;
-            xvs = eph_su,
-            xve = eph_ea,
-            xva = (sol_bwd, sol_fwd)
-        )
-
         @test iszero(zero(eltype(_res_)))
         @test all(@. isa(string(_res_), String))
         @test all(@. residual(_res_) == tuple(ra(_res_), dec(_res_)))
-        @test all(@. weight(_res_) == $weights(w8s))
-        @test all(@. debias(_res_) == $debias(bias))
+        @test all(@. weight(_res_) == w8s)
+        @test all(@. debias(_res_) == bias)
         @test sqrt(chi2(_res_)) ≤ sum(chi, _res_)
         @test all(@. logchi(_res_) < log10chi(_res_) || chi(_res_) > 1)
 
@@ -206,30 +198,23 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         ))
         @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
 
-        # Propagate orbit with perturbed initial conditions
+        # Propagate orbit with perturbed initial conditions and compute optical residuals
         q1 = q0 + vcat(1e-3randn(3), 1e-5randn(3))
-        sol1 = NEOs.propagate(dynamics, q1, jd0, nyears, params)
+        sol1_bwd, sol1_fwd, _res1_ = propres(OD, q1, jd0, params)
 
         # Check that solution saves correctly
-        jldsave("test.jld2"; sol1)
-        recovered_sol1 = JLD2.load("test.jld2", "sol1")
-        @test sol1 == recovered_sol1
+        jldsave("test.jld2"; sol1_bwd, sol1_fwd)
+        recovered_sol1_fwd = JLD2.load("test.jld2", "sol1_fwd")
+        recovered_sol1_bwd = JLD2.load("test.jld2", "sol1_bwd")
+        @test sol1_fwd == recovered_sol1_fwd
+        @test sol1_bwd == recovered_sol1_bwd
         rm("test.jld2")
-
-        # Compute residuals for orbit with perturbed initial conditions
-        _res1_ = NEOs.residuals(
-            optical_2023DW,
-            w8s, bias,
-            xvs = eph_su,
-            xve = eph_ea,
-            xva = (sol1, sol1)
-        )
 
         @test iszero(zero(eltype(_res1_)))
         @test all(@. isa(string(_res1_), String))
         @test all(@. residual(_res1_) == tuple(ra(_res1_), dec(_res1_)))
-        @test all(@. weight(_res1_) == $weights(w8s))
-        @test all(@. debias(_res1_) == $debias(bias))
+        @test all(@. weight(_res1_) == w8s)
+        @test all(@. debias(_res1_) == bias)
         @test sqrt(chi2(_res1_)) ≤ sum(chi, _res1_)
         @test all(@. logchi(_res1_) < log10chi(_res1_) || chi(_res1_) > 1)
 
@@ -246,7 +231,7 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         @test nms_optical1 ≥ nms_optical0
         @test nrms_optical1 ≥ nrms_optical0
 
-        radecJPL = compute_radec_rad.(optical_2023DW; xva = et -> bwdfwdeph(et, sol1, sol1))
+        radecJPL = compute_radec_rad.(optical_2023DW; xva = et -> bwdfwdeph(et, sol1_bwd, sol1_fwd))
         radecNEOs = @.(tuple(
             scalarra(_res1_)  / cos(last(radecOBS)) + first(radecOBS),
             scalardec(_res1_) + last(radecOBS)
@@ -256,57 +241,51 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
 
     @testset "Orbit propagation with nongravs: (99942) Apophis" begin
 
-        using NEOs: isdelay, isdoppler
-
         # Dynamical function
         dynamics = nongravs!
-        # Initial time [Julian date TDB]
+        # Initial time [Julian date TDB, days since J2000 TDB]
         jd0 = datetime2julian(DateTime(2004, 6, 1))
+        t0 = jd0 - PE.J2000
         # Time of integration [years]
         nyears = 9.0
         # JPL #199 solution for Apophis at June 1st, 2004
         q0 = [-1.0506628055913627, -0.06064314196134998, -0.04997102228887035,
               0.0029591421121582077, -0.01423233538611057, -0.005218412537773594,
               -5.592839897872e-14, 0.0, 0.0]
-        # Propagation parameters
-        params = Parameters(maxsteps = 5_000, order = 25, abstol = 1e-20, parse_eqs = true)
-
-        # Initial time [days since J2000]
-        t0 = jd0 - PE.J2000
-        # Sun's ephemeris
-        eph_su = selecteph(NEOs.sseph, su, t0, t0 + nyears*yr)
-        # Earth's ephemeris
-        eph_ea = selecteph(NEOs.sseph, ea, t0, t0 + nyears*yr)
-
-        # Propagate orbit
-        sol = NEOs.propagate(dynamics, q0, jd0, nyears, params)
-
-        # Check that solution saves correctly
-        jldsave("test.jld2"; sol)
-        recovered_sol = JLD2.load("test.jld2", "sol")
-        @test sol == recovered_sol
-        rm("test.jld2")
-
         # Read optical astrometry file
         optical_Apophis = read_optical_mpc80(joinpath(TEST_DATA, "99942_Tholen_etal_2013.dat"))
-        # Make weights and debiasing corrections
-        w8s = Veres17(optical_Apophis)
-        bias = Eggl20(optical_Apophis)
-
-        # Compute optical astrometry residuals
-        res_optical = NEOs.residuals(
-            optical_Apophis,
-            w8s, bias,
-            xvs = eph_su,
-            xve = eph_ea,
-            xva = (sol, sol)
+        # Read radar astrometry file
+        radar_Apophis = read_radar_jpl(joinpath(TEST_DATA, "99942_RADAR_2005_2013.json"))
+        # Time of first and last observation
+        ti, tf = dtutc2days(first(optical_Apophis)), dtutc2days(last(optical_Apophis))
+        # Orbit determination problem
+        OD = ODProblem(dynamics, optical_Apophis, radar_Apophis, weights = Veres17, debias = Eggl20)
+        # Weigths and debiasing corrections
+        w8s, bias = weights(OD), debias(OD)
+        # Propagation parameters
+        params = Parameters(
+            bwdoffset = (ti - t0) + 1,
+            fwdoffset = (t0 - tf) + nyears * yr,
+            maxsteps = 5_000, order = 25, abstol = 1e-20, parse_eqs = true
         )
+
+        # Propagate orbit and compute astrometric residuals
+        sol_bwd, sol_fwd, _res_ = propres(OD, q0, jd0, params; niter = 4, tord = 5)
+        res_optical, res_radar = _res_
+
+        # Check that solution saves correctly
+        jldsave("test.jld2"; sol_bwd, sol_fwd)
+        recovered_sol_fwd = JLD2.load("test.jld2", "sol_fwd")
+        recovered_sol_bwd = JLD2.load("test.jld2", "sol_bwd")
+        @test sol_fwd == recovered_sol_fwd
+        @test sol_bwd == recovered_sol_bwd
+        rm("test.jld2")
 
         @test iszero(zero(eltype(res_optical)))
         @test all(@. isa(string(res_optical), String))
         @test all(@. residual(res_optical) == tuple(ra(res_optical), dec(res_optical)))
-        @test all(@. weight(res_optical) == $weights(w8s))
-        @test all(@. debias(res_optical) == $debias(bias))
+        @test all(@. weight(res_optical) == w8s)
+        @test all(@. debias(res_optical) == bias)
         @test sqrt(chi2(res_optical)) ≤ sum(chi, res_optical)
         @test all(@. logchi(res_optical) < log10chi(res_optical) || chi(res_optical) > 1)
 
@@ -331,25 +310,13 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
 
         rtol = 20*sqrt(eps(Float64))
         radecOBS = measure.(optical_Apophis)
-        radecJPL = compute_radec_rad.(optical_Apophis; xva = et -> bwdfwdeph(et, sol, sol))
+        radecJPL = compute_radec_rad.(optical_Apophis; xva = et -> bwdfwdeph(et, sol_bwd, sol_fwd))
         radecNEOs = @.(tuple(
             scalarra(res_optical)  / cos(last(radecOBS)) + first(radecOBS),
             scalardec(res_optical) + last(radecOBS)
         ))
         @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
 
-        # Read radar astrometry file
-        radar_Apophis = read_radar_jpl(joinpath(TEST_DATA, "99942_RADAR_2005_2013.json"))
-
-        # Compute mean radar (time-delay and Doppler-shift) residuals
-        res_radar = residuals(
-            radar_Apophis,
-            xve = t -> auday2kmsec(eph_ea(t/daysec)),
-            xvs = t -> auday2kmsec(eph_su(t/daysec)),
-            xva = t -> auday2kmsec(sol(t/daysec)),
-            niter = 4,
-            tord = 5
-        )
         res_del = residual.(res_radar[isdelay.(radar_Apophis)])
         res_dop = residual.(res_radar[isdoppler.(radar_Apophis)])
 
@@ -440,16 +407,15 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
 
     @testset "Jet transport orbit propagation and astrometric observables: (99942) Apophis" begin
 
-        using NEOs: isdelay, isdoppler
-
         # Dynamical functions
         dynamicsg  = gravityonly!
         dynamicsng = nongravs!
         # Integration parameters
         nyears = 10.0
         varorder = 1
-        # Julian date (TDB) of integration initial time
+        # Initial time [Julian date TDB, days since J2000 TDB]
         jd0 = datetime2julian(DateTime(2004, 6, 1))
+        t0 = jd0 - PE.J2000
         # 7-DOF nominal solution from pha/apophis.jl script at epoch 2004-06-01T00:00:00.000 (TDB)
         q00 = [-1.0506627988664696, -0.060643124245514164, -0.0499709975200415,
                0.0029591416313078838, -0.014232335581939919, -0.0052184125285361415,
@@ -457,6 +423,19 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         scalings = vcat(fill(1e-8, 6), 1e-14)
         dq = scaled_variables("δx", scalings, order = varorder)
         q0 = q00 + vcat(dq, zero(dq[1]), zero(dq[1]))
+        # Read optical astrometry file
+        optical_Apophis = read_optical_mpc80(joinpath(TEST_DATA, "99942_Tholen_etal_2013.dat"))
+        # Read radar astrometry file
+        radar_Apophis = read_radar_jpl(joinpath(TEST_DATA, "99942_RADAR_2005_2013.json"))
+        filter!(x -> year(date(x)) == 2005, radar_Apophis)
+        mask_del, mask_dop = @. isdelay(radar_Apophis), isdoppler(radar_Apophis)
+        del, dop = radar_Apophis[mask_del], radar_Apophis[mask_dop]
+        # Time of first and last observation
+        ti, tf = dtutc2days(first(optical_Apophis)), dtutc2days(last(optical_Apophis))
+        # Orbit determination problem
+        OD = ODProblem(dynamicsng, optical_Apophis, radar_Apophis, weights = Veres17, debias = Eggl20)
+        # Weigths and debiasing corrections
+        w8s, bias = weights(OD), debias(OD)
 
         # Test parsed vs non-parsed propagation: gravity-only model
         params = Parameters(maxsteps = 10, order = 25, abstol = 1e-20, parse_eqs = true)
@@ -476,43 +455,20 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         @test norm(sol.p - solnp.p, Inf) < 1e-16
         @test sol == solnp
 
-        # Propagate orbit (nongrav model)
-        params = Parameters(params, maxsteps = 2_000, parse_eqs = true)
-        sol = NEOs.propagate(dynamicsng, q0, jd0, nyears, params)
-
-        # Sun's ephemeris
-        eph_su = selecteph(NEOs.sseph, su, firsttime(sol), lasttime(sol))
-        # Earth's ephemeris
-        eph_ea = selecteph(NEOs.sseph, ea, firsttime(sol), lasttime(sol))
-
-        # Apophis
-        # Change t, x, v units, resp., from days, au, au/day to sec, km, km/sec
-        xva(et) = auday2kmsec(sol(et/daysec))
-        # Earth
-        # Change x, v units, resp., from au, au/day to km, km/sec
-        xve(et) = auday2kmsec(eph_ea(et/daysec))
-        # Sun
-        # Change x, v units, resp., from au, au/day to km, km/sec
-        xvs(et) = auday2kmsec(eph_su(et/daysec))
-
-        # Read optical astrometry file
-        optical_Apophis = read_optical_mpc80(joinpath(TEST_DATA, "99942_Tholen_etal_2013.dat"))
-        # Make weights and debiasing corrections
-        w8s = Veres17(optical_Apophis)
-        bias = Eggl20(optical_Apophis)
-
-        # Compute optical astrometry residuals
-        res_optical = NEOs.residuals(optical_Apophis, w8s, bias;
-            xvs = eph_su,
-            xve = eph_ea,
-            xva = (sol, sol)
+        # Propagate orbit (nongrav model) and compute astrometric residuals
+        params = Parameters(params;
+            bwdoffset = (ti - t0) + 1,
+            fwdoffset = (t0 - tf) + nyears * yr,
+            maxsteps = 2_000, parse_eqs = true
         )
+        sol_bwd, sol_fwd, _res_ = propres(OD, q0, jd0, params; niter = 10, tord = 10)
+        res_optical, res_radar = _res_
 
         @test iszero(zero(eltype(res_optical)))
         @test all(@. isa(string(res_optical), String))
         @test all(@. residual(res_optical) == tuple(ra(res_optical), dec(res_optical)))
-        @test all(@. weight(res_optical) == $weights(w8s))
-        @test all(@. debias(res_optical) == $debias(bias))
+        @test all(@. weight(res_optical) == w8s)
+        @test all(@. debias(res_optical) == bias)
         @test sqrt(chi2(res_optical)) ≤ sum(chi, res_optical)
         # @test all(@. logchi(res_optical) < log10chi(res_optical) || chi(res_optical) > 1)
 
@@ -537,21 +493,14 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
 
         rtol = 20*sqrt(eps(Float64))
         radecOBS = measure.(optical_Apophis)
-        radecJPL = compute_radec_rad.(optical_Apophis; xva)
+        radecJPL = compute_radec_rad.(optical_Apophis; xva = et -> bwdfwdeph(et, sol_bwd, sol_fwd))
         radecNEOs = @.(tuple(
             scalarra(res_optical)  / cos(last(radecOBS)) + first(radecOBS),
             scalardec(res_optical) + last(radecOBS)
         ))
         @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
 
-        # Read radar astrometry file
-        radar_Apophis = NEOs.read_radar_jpl(joinpath(TEST_DATA, "99942_RADAR_2005_2013.json"))
-        filter!(x -> year(date(x)) == 2005, radar_Apophis)
-        mask_del, mask_dop = @. isdelay(radar_Apophis), isdoppler(radar_Apophis)
-        del, dop = radar_Apophis[mask_del], radar_Apophis[mask_dop]
-
         # Compute mean radar (time-delay and Doppler-shift) residuals
-        res_radar = residuals(radar_Apophis; xvs, xve, xva, niter = 10, tord = 10)
         res_del, w_del = @. residual(res_radar[mask_del]), weight(res_radar[mask_del])
         res_dop, w_dop = @. residual(res_radar[mask_dop]), weight(res_radar[mask_dop])
 
