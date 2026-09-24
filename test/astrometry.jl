@@ -381,8 +381,8 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
         apps = apparitions(optical1, radar1, Day(238))
 
-        @test all(Base.Fix2(isa, String), string.(apps))
-        @test isa(string(apps), String)
+        @test all(Base.Fix2(isa, String), sprint.(show, apps))
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), apps))
 
         @test all(==(RadarJPL{Float64}), radartype.(apps))
         @test all(==(OpticalMPC80{Float64}), opticaltype.(apps))

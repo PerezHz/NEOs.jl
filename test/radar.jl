@@ -223,11 +223,11 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         apps1 = apparitions(radar1)
         apps2 = apparitions(radar2)
 
-        @test all(Base.Fix2(isa, String), string.(apps1))
-        @test all(Base.Fix2(isa, String), string.(apps2))
+        @test all(Base.Fix2(isa, String), sprint.(show, apps1))
+        @test all(Base.Fix2(isa, String), sprint.(show, apps2))
 
-        @test isa(string(apps1), String)
-        @test isa(string(apps2), String)
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), apps1))
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), apps2))
 
         @test all(==(RadarJPL{Float64}), radartype.(apps1))
         @test all(==(RadarRWO{Float64}), radartype.(apps2))

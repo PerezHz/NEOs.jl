@@ -669,13 +669,13 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         @test isa(trks3, Vector{OpticalTracklet{Float64}})
         @test length(trks1) == length(trks2) > length(trks3)
 
-        @test all(Base.Fix2(isa, String), string.(trks1))
-        @test all(Base.Fix2(isa, String), string.(trks2))
-        @test all(Base.Fix2(isa, String), string.(trks3))
+        @test all(Base.Fix2(isa, String), sprint.(show, trks1))
+        @test all(Base.Fix2(isa, String), sprint.(show, trks2))
+        @test all(Base.Fix2(isa, String), sprint.(show, trks3))
 
-        @test isa(string(trks1), String)
-        @test isa(string(trks2), String)
-        @test isa(string(trks3), String)
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), trks1))
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), trks2))
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), trks3))
 
         @test nobs(trks1) == length(optical1)
         @test nobs(trks2) == length(optical2)
@@ -773,13 +773,13 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         apps2 = apparitions(optical2)
         apps3 = apparitions(optical3)
 
-        @test all(Base.Fix2(isa, String), string.(apps1))
-        @test all(Base.Fix2(isa, String), string.(apps2))
-        @test all(Base.Fix2(isa, String), string.(apps3))
+        @test all(Base.Fix2(isa, String), sprint.(show, apps1))
+        @test all(Base.Fix2(isa, String), sprint.(show, apps2))
+        @test all(Base.Fix2(isa, String), sprint.(show, apps3))
 
-        @test isa(string(apps1), String)
-        @test isa(string(apps2), String)
-        @test isa(string(apps3), String)
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), apps1))
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), apps2))
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), apps3))
 
         @test all(==(RadarJPL{Float64}), radartype.(apps1))
         @test all(==(RadarJPL{Float64}), radartype.(apps2))
