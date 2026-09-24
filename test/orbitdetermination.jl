@@ -8,7 +8,7 @@ using StaticArraysCore
 using Test
 
 using NEOs: OpticalMPC80, RadarJPL, AbstractOpticalVector, RadarResidual, KeplerianElements,
-      EquinoctialElements, AttributableElements, μ_S, indices, equatorial2ecliptic,
+      EquinoctialElements, AttributableElements, μ_S, opticalindices, equatorial2ecliptic,
       ecliptic2equatorial, numtypes, sseph, covariance, scalartype, opticaltype, radartype,
       dof, hasradar
 using SPICE: furnsh, spkgeo
@@ -24,7 +24,7 @@ furnsh(joinpath(TEST_DATA, "test.bsp"))
 
 function iodsuboptical(optical::AbstractOpticalVector, N::Int = 3)
     tracklets = reduce_tracklets(optical)
-    idxs = indices(tracklets[1:N])
+    idxs = opticalindices(tracklets[1:N])
     suboptical = optical[idxs]
     return suboptical
 end
@@ -1226,7 +1226,7 @@ end
             for i in 1:length(tracklets)-2
                 numberofdays(tracklets[i:i+2]) > 15.0 && continue
                 tracklets = tracklets[i:i+2]
-                optical = optical[indices(tracklets)]
+                optical = optical[opticalindices(tracklets)]
                 sort!(optical)
                 break
             end

@@ -1304,13 +1304,13 @@ numberofbodies(::Val{gravityonly!}) = SSEPHNBODIES + 1
 numberofbodies(::Val{nongravs!}) = SSEPHNBODIES + 1
 
 # Indices of the bodies used by each dynamical model
-indices(::Val{sunearthmoon!}) = [su, ea, mo]
-indices(::Val{newtonian!}) = 1:9
-indices(::Val{gravityonly!}) = 1:SSEPHNBODIES
-indices(::Val{nongravs!}) = 1:SSEPHNBODIES
+bodyindices(::Val{sunearthmoon!}) = [su, ea, mo]
+bodyindices(::Val{newtonian!}) = 1:9
+bodyindices(::Val{gravityonly!}) = 1:SSEPHNBODIES
+bodyindices(::Val{nongravs!}) = 1:SSEPHNBODIES
 
 # Gravitational parameters used by each dynamical model
-gm(::Val{sunearthmoon!}) = μ_DE430[indices(Val(sunearthmoon!))]
-gm(::Val{newtonian!}) = μ_DE430[indices(Val(newtonian!))]
-gm(::Val{gravityonly!}) = μ_DE430[indices(Val(gravityonly!))]
-gm(::Val{nongravs!}) = μ_DE430[indices(Val(nongravs!))]
+gm(::Val{sunearthmoon!}) = μ_DE430[bodyindices(Val(sunearthmoon!))]
+gm(::Val{newtonian!}) = μ_DE430[bodyindices(Val(newtonian!))]
+gm(::Val{gravityonly!}) = μ_DE430[bodyindices(Val(gravityonly!))]
+gm(::Val{nongravs!}) = μ_DE430[bodyindices(Val(nongravs!))]

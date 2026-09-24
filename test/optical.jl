@@ -650,7 +650,7 @@ isvalidEros(x::AbstractOpticalAstrometry) =
     end
 
     using NEOs: OpticalTracklet, OpticalMPC80, OpticalRWO, OpticalADES,
-                indices, reduce_tracklets, isunknown, closest_tracklet,
+                opticalindices, reduce_tracklets, isunknown, closest_tracklet,
                 daysbetween
 
     @testset "Tracklet" begin
@@ -681,13 +681,13 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         @test nobs(trks2) == length(optical2)
         @test nobs(trks3) == length(optical3)
 
-        @test indices(trks1) == collect(eachindex(optical1))
-        @test indices(trks2) == collect(eachindex(optical2))
-        @test indices(trks3) == collect(eachindex(optical3))
+        @test opticalindices(trks1) == collect(eachindex(optical1))
+        @test opticalindices(trks2) == collect(eachindex(optical2))
+        @test opticalindices(trks3) == collect(eachindex(optical3))
 
-        @test indices(trks1, 1:10) == indices(trks1[1:10])
-        @test indices(trks2, 1:10) == indices(trks2[1:10])
-        @test indices(trks3, 1:10) == indices(trks3[1:10])
+        @test opticalindices(trks1, 1:10) == opticalindices(trks1[1:10])
+        @test opticalindices(trks2, 1:10) == opticalindices(trks2[1:10])
+        @test opticalindices(trks3, 1:10) == opticalindices(trks3[1:10])
 
         @test all(isempty, trackletid.(trks1))
         @test all(isempty, trackletid.(trks2))
@@ -767,8 +767,7 @@ isvalidEros(x::AbstractOpticalAstrometry) =
 
     @testset "Apparition" begin
 
-        using NEOs: RadarJPL, radartype, opticaltype, scalartype, radarindices,
-              opticalindices
+        using NEOs: RadarJPL, radartype, opticaltype, scalartype, radarindices
 
         apps1 = apparitions(optical1)
         apps2 = apparitions(optical2)

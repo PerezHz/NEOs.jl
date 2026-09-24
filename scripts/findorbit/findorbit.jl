@@ -1,7 +1,7 @@
 using ArgParse
 using NEOs, PlanetaryEphemeris, JLD2, Dates, Statistics, Printf
 using NEOs: AbstractOpticalAstrometry, AbstractOpticalVector, AbstractApparitionVector,
-            OpticalADES, OpticalMPC80, AbstractOrbit, log10chi, indices
+            OpticalADES, OpticalMPC80, AbstractOrbit, log10chi, opticalindices
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -93,7 +93,7 @@ function bridge(apps::AbstractApparitionVector, orbitSA::SingleApparitionOrbit,
         if issubset(NEOs.optical(app), orbitSA.optical)
             mags[i] = zero(Float64)
         else
-            mags[i] = maximum(log10chi, view(res, indices(app)))
+            mags[i] = maximum(log10chi, view(res, opticalindices(app)))
         end
     end
     perm = sortperm(mags)
@@ -127,7 +127,7 @@ function multipleapparition(apps::AbstractApparitionVector, orbitMA::MultipleApp
         if issubset(NEOs.optical(app), orbitMA.optical)
             mags[i] = zero(Float64)
         else
-            mags[i] = maximum(log10chi, view(res, indices(app)))
+            mags[i] = maximum(log10chi, view(res, opticalindices(app)))
         end
     end
     perm = sortperm(mags)

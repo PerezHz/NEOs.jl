@@ -5,7 +5,7 @@ using HTTP, JSON, DataFrames, CSV, Printf, Statistics
 @everywhere using NEOs: AbstractOpticalAstrometry, OpticalADES, ObservatoryMPC,
                   PropagationBuffer, OpticalBuffer, PropresBuffer,  AbstractODProblem,
                   AbstractOrbit, KeplerianElements, parse_optical_rwo, argoldensearch,
-                  evaldeltas, init_optical_residuals, indices, _lsmethods, μ_S,
+                  evaldeltas, init_optical_residuals, opticalindices, _lsmethods, μ_S,
                   equatorial2ecliptic, _propagate, designation
 @everywhere import NEOs: initialcondition, keplerian
 
@@ -344,7 +344,7 @@ end
     _jd0_ = dtutc2jdtdb(A.date)
     # Initialize buffer and set of residuals
     nobs = 2 * noptical(od)
-    idxs = indices(od.tracklets)
+    idxs = opticalindices(od.tracklets)
     buffer = PropresBuffer(od, AE, _jd0_, idxs, params)
     res = init_optical_residuals(TaylorN{T}, od, idxs)
     # Least squares cache and methods
