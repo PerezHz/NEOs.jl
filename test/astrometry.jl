@@ -366,4 +366,41 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
     end
 
+    # Load optical astrometry
+    mpc80_file = joinpath(TEST_DATA, "433.txt")
+    optical1 = read_optical_mpc80(mpc80_file)
+    filter!(x -> Date(2000) < date(x) < Date(2025) && observatorycode(x) != "K73", optical1)
+    # Load radar astrometry
+    json_file = joinpath(TEST_DATA, "433.json")
+    radar1 = read_radar_jpl(json_file)
+
+    @testset "Apparition" begin
+
+        using NEOs: OpticalMPC80, RadarJPL, radartype, opticaltype, scalartype,
+              radarindices, opticalindices
+
+        apps = apparitions(optical1, radar1, Day(238))
+
+        @test all(Base.Fix2(isa, String), string.(apps))
+        @test isa(string(apps), String)
+
+        @test all(==(RadarJPL{Float64}), radartype.(apps))
+        @test all(==(OpticalMPC80{Float64}), opticaltype.(apps))
+        @test all(==(Float64), scalartype.(apps))
+
+        @test length(apps) == 13
+        @test nradar(apps) == length(radar1)
+        @test noptical(apps) == length(optical1)
+        @test nobs(apps) == length(radar1) + length(optical1)
+
+        @test radar(apps) == radar1
+        @test optical(apps) == optical1
+
+        @test numberofdays(apps) < numberofdays(optical1, radar1)
+
+        @test radarindices(apps) == collect(eachindex(radar1))
+        @test opticalindices(apps) == collect(eachindex(optical1))
+
+    end
+
 end

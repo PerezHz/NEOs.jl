@@ -767,6 +767,9 @@ isvalidEros(x::AbstractOpticalAstrometry) =
 
     @testset "Apparition" begin
 
+        using NEOs: RadarJPL, radartype, opticaltype, scalartype, radarindices,
+              opticalindices
+
         apps1 = apparitions(optical1)
         apps2 = apparitions(optical2)
         apps3 = apparitions(optical3)
@@ -779,11 +782,24 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         @test isa(string(apps2), String)
         @test isa(string(apps3), String)
 
-        @test length(apps1) == length(apps2) == length(apps3)
-        @test indices(apps1) == eachindex(optical1)
-        @test indices(apps2) == eachindex(optical2)
-        @test indices(apps3) == eachindex(optical3)
+        @test all(==(RadarJPL{Float64}), radartype.(apps1))
+        @test all(==(RadarJPL{Float64}), radartype.(apps2))
+        @test all(==(RadarJPL{Float64}), radartype.(apps3))
 
+        @test all(==(OpticalMPC80{Float64}), opticaltype.(apps1))
+        @test all(==(OpticalRWO{Float64}), opticaltype.(apps2))
+        @test all(==(OpticalADES{Float64}), opticaltype.(apps3))
+
+        @test all(==(Float64), scalartype.(apps1))
+        @test all(==(Float64), scalartype.(apps2))
+        @test all(==(Float64), scalartype.(apps3))
+
+        @test length(apps1) == length(apps2) == length(apps3)
+        @test nradar(apps1) == nradar(apps2) == nradar(apps3) == 0
+        @test noptical(apps1) == noptical(apps2) == noptical(apps3)
+        @test nobs(apps1) == nobs(apps2) == nobs(apps3)
+
+        @test radar(apps1) == radar(apps2) == radar(apps3) == RadarJPL[]
         @test optical(apps1) == optical1
         @test optical(apps2) == optical2
         @test optical(apps3) == optical3
@@ -792,9 +808,8 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         @test numberofdays(apps2) < numberofdays(optical2)
         @test numberofdays(apps3) < numberofdays(optical3)
 
-        @test noptical(apps1) == length(optical1)
-        @test noptical(apps2) == length(optical2)
-        @test noptical(apps3) == length(optical3)
+        @test radarindices(apps1) == radarindices(apps2) == radarindices(apps3) == Int[]
+        @test opticalindices(apps1) == opticalindices(apps2) == opticalindices(apps3)
 
     end
 
