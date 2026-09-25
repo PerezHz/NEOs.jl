@@ -53,7 +53,7 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
     AE = aes[:, 1] .+ dae
     # Subset of optical astrometry to be included in the calculation
     tracklets = adammode ? od.tracklets : od.tracklets[i:i]
-    idxs = indices(tracklets)
+    idxs = opticalindices(tracklets)
     optical = od.optical[idxs]
     # Initialize buffer and set of residuals
     buffer = PropresBuffer(od, AE, _jd0_, idxs, params)

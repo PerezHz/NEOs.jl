@@ -131,7 +131,7 @@ function PropagationBuffer(
     # Gravitational parameters
     μ = T.(gm(Val(dynamics)))
     # Indices of perturbers
-    idxs = indices(Val(dynamics))
+    idxs = bodyindices(Val(dynamics))
     cols = nbodyind(SSEPHNBODIES, idxs)
     # Solar system ephemeris [au, au/day]
     _sseph_ = EphemerisEvaluationBuffer(sseph, tlim, order, q0; cols)

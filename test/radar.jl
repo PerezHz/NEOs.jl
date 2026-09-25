@@ -4,6 +4,8 @@ using DataFrames
 using Query
 using Test
 
+const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
+
 @testset "AbstractRadarAstrometry" begin
 
     @testset "RadarJPL" begin
@@ -203,6 +205,53 @@ using Test
         @test nrow(radar5) == 3
         @test all(@. radar5.K == 'R')
         @test all(@. year(radar5.date) < 2019)
+
+    end
+
+    # Load radar astrometry
+    json_file = joinpath(TEST_DATA, "433.json")
+    rwo_file = joinpath(TEST_DATA, "433.rwo")
+
+    radar1 = read_radar_jpl(json_file)
+    radar2 = read_radar_rwo(rwo_file)
+
+    @testset "Apparition" begin
+
+        using NEOs: OpticalMPC80, RadarJPL, RadarRWO, radartype, opticaltype, scalartype,
+              radarindices, opticalindices
+
+        apps1 = apparitions(radar1)
+        apps2 = apparitions(radar2)
+
+        @test all(Base.Fix2(isa, String), sprint.(show, apps1))
+        @test all(Base.Fix2(isa, String), sprint.(show, apps2))
+
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), apps1))
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), apps2))
+
+        @test all(==(RadarJPL{Float64}), radartype.(apps1))
+        @test all(==(RadarRWO{Float64}), radartype.(apps2))
+
+        @test all(==(OpticalMPC80{Float64}), opticaltype.(apps1))
+        @test all(==(OpticalMPC80{Float64}), opticaltype.(apps2))
+
+        @test all(==(Float64), scalartype.(apps1))
+        @test all(==(Float64), scalartype.(apps2))
+
+        @test length(apps1) == length(apps2)
+        @test nradar(apps1) == nradar(apps2)
+        @test noptical(apps1) == noptical(apps2) == 0
+        @test nobs(apps1) == nobs(apps2)
+
+        @test radar(apps1) == radar1
+        @test radar(apps2) == radar2
+        @test optical(apps1) == optical(apps2) == OpticalMPC80[]
+
+        @test numberofdays(apps1) < numberofdays(radar1)
+        @test numberofdays(apps2) < numberofdays(radar2)
+
+        @test radarindices(apps1) == radarindices(apps2)
+        @test opticalindices(apps1) == opticalindices(apps2) == Int[]
 
     end
 

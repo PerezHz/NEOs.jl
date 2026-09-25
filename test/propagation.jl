@@ -40,7 +40,7 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
 
         using InteractiveUtils: methodswith
         using TaylorIntegration: jetcoeffs!, _allocate_jetcoeffs!
-        using NEOs: SSEPHNBODIES, numvars, indices, gm
+        using NEOs: SSEPHNBODIES, numvars, bodyindices, gm
 
         @test !isempty(methodswith(Val{nongravs!}, jetcoeffs!))
         @test !isempty(methodswith(Val{nongravs!}, _allocate_jetcoeffs!))
@@ -72,20 +72,20 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         @test numberofbodies(Val(newtonian!)) == 10
         @test numberofbodies(Val(sunearthmoon!)) == 4
 
-        @test length(indices((Val(nongravs!)))) == numberofbodies(Val(nongravs!)) - 1
-        @test length(indices((Val(gravityonly!)))) == numberofbodies(Val(gravityonly!)) - 1
-        @test length(indices((Val(newtonian!)))) == numberofbodies(Val(newtonian!)) - 1
-        @test length(indices((Val(sunearthmoon!)))) == numberofbodies(Val(sunearthmoon!)) - 1
+        @test length(bodyindices((Val(nongravs!)))) == numberofbodies(Val(nongravs!)) - 1
+        @test length(bodyindices((Val(gravityonly!)))) == numberofbodies(Val(gravityonly!)) - 1
+        @test length(bodyindices((Val(newtonian!)))) == numberofbodies(Val(newtonian!)) - 1
+        @test length(bodyindices((Val(sunearthmoon!)))) == numberofbodies(Val(sunearthmoon!)) - 1
 
         @test length(gm((Val(nongravs!)))) == numberofbodies(Val(nongravs!)) - 1
         @test length(gm((Val(gravityonly!)))) == numberofbodies(Val(gravityonly!)) - 1
         @test length(gm((Val(newtonian!)))) == numberofbodies(Val(newtonian!)) - 1
         @test length(gm((Val(sunearthmoon!)))) == numberofbodies(Val(sunearthmoon!)) - 1
 
-        @test iszero(length(nbodyind(SSEPHNBODIES, indices((Val(nongravs!))))) % 6)
-        @test iszero(length(nbodyind(SSEPHNBODIES, indices((Val(gravityonly!))))) % 6)
-        @test iszero(length(nbodyind(SSEPHNBODIES, indices((Val(newtonian!))))) % 6)
-        @test iszero(length(nbodyind(SSEPHNBODIES, indices((Val(sunearthmoon!))))) % 6)
+        @test iszero(length(nbodyind(SSEPHNBODIES, bodyindices((Val(nongravs!))))) % 6)
+        @test iszero(length(nbodyind(SSEPHNBODIES, bodyindices((Val(gravityonly!))))) % 6)
+        @test iszero(length(nbodyind(SSEPHNBODIES, bodyindices((Val(newtonian!))))) % 6)
+        @test iszero(length(nbodyind(SSEPHNBODIES, bodyindices((Val(sunearthmoon!))))) % 6)
     end
 
     @testset "Warmup (2023 DW)" begin

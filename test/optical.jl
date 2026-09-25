@@ -650,7 +650,7 @@ isvalidEros(x::AbstractOpticalAstrometry) =
     end
 
     using NEOs: OpticalTracklet, OpticalMPC80, OpticalRWO, OpticalADES,
-                indices, reduce_tracklets, isunknown, closest_tracklet,
+                opticalindices, reduce_tracklets, isunknown, closest_tracklet,
                 daysbetween
 
     @testset "Tracklet" begin
@@ -669,25 +669,25 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         @test isa(trks3, Vector{OpticalTracklet{Float64}})
         @test length(trks1) == length(trks2) > length(trks3)
 
-        @test all(Base.Fix2(isa, String), string.(trks1))
-        @test all(Base.Fix2(isa, String), string.(trks2))
-        @test all(Base.Fix2(isa, String), string.(trks3))
+        @test all(Base.Fix2(isa, String), sprint.(show, trks1))
+        @test all(Base.Fix2(isa, String), sprint.(show, trks2))
+        @test all(Base.Fix2(isa, String), sprint.(show, trks3))
 
-        @test isa(string(trks1), String)
-        @test isa(string(trks2), String)
-        @test isa(string(trks3), String)
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), trks1))
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), trks2))
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), trks3))
 
         @test nobs(trks1) == length(optical1)
         @test nobs(trks2) == length(optical2)
         @test nobs(trks3) == length(optical3)
 
-        @test indices(trks1) == collect(eachindex(optical1))
-        @test indices(trks2) == collect(eachindex(optical2))
-        @test indices(trks3) == collect(eachindex(optical3))
+        @test opticalindices(trks1) == collect(eachindex(optical1))
+        @test opticalindices(trks2) == collect(eachindex(optical2))
+        @test opticalindices(trks3) == collect(eachindex(optical3))
 
-        @test indices(trks1, 1:10) == indices(trks1[1:10])
-        @test indices(trks2, 1:10) == indices(trks2[1:10])
-        @test indices(trks3, 1:10) == indices(trks3[1:10])
+        @test opticalindices(trks1, 1:10) == opticalindices(trks1[1:10])
+        @test opticalindices(trks2, 1:10) == opticalindices(trks2[1:10])
+        @test opticalindices(trks3, 1:10) == opticalindices(trks3[1:10])
 
         @test all(isempty, trackletid.(trks1))
         @test all(isempty, trackletid.(trks2))
@@ -767,23 +767,38 @@ isvalidEros(x::AbstractOpticalAstrometry) =
 
     @testset "Apparition" begin
 
+        using NEOs: RadarJPL, radartype, opticaltype, scalartype, radarindices
+
         apps1 = apparitions(optical1)
         apps2 = apparitions(optical2)
         apps3 = apparitions(optical3)
 
-        @test all(Base.Fix2(isa, String), string.(apps1))
-        @test all(Base.Fix2(isa, String), string.(apps2))
-        @test all(Base.Fix2(isa, String), string.(apps3))
+        @test all(Base.Fix2(isa, String), sprint.(show, apps1))
+        @test all(Base.Fix2(isa, String), sprint.(show, apps2))
+        @test all(Base.Fix2(isa, String), sprint.(show, apps3))
 
-        @test isa(string(apps1), String)
-        @test isa(string(apps2), String)
-        @test isa(string(apps3), String)
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), apps1))
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), apps2))
+        @test all(Base.Fix2(isa, String), sprint.(Ref(show), Ref(MIME("text/plain")), apps3))
+
+        @test all(==(RadarJPL{Float64}), radartype.(apps1))
+        @test all(==(RadarJPL{Float64}), radartype.(apps2))
+        @test all(==(RadarJPL{Float64}), radartype.(apps3))
+
+        @test all(==(OpticalMPC80{Float64}), opticaltype.(apps1))
+        @test all(==(OpticalRWO{Float64}), opticaltype.(apps2))
+        @test all(==(OpticalADES{Float64}), opticaltype.(apps3))
+
+        @test all(==(Float64), scalartype.(apps1))
+        @test all(==(Float64), scalartype.(apps2))
+        @test all(==(Float64), scalartype.(apps3))
 
         @test length(apps1) == length(apps2) == length(apps3)
-        @test indices(apps1) == eachindex(optical1)
-        @test indices(apps2) == eachindex(optical2)
-        @test indices(apps3) == eachindex(optical3)
+        @test nradar(apps1) == nradar(apps2) == nradar(apps3) == 0
+        @test noptical(apps1) == noptical(apps2) == noptical(apps3)
+        @test nobs(apps1) == nobs(apps2) == nobs(apps3)
 
+        @test radar(apps1) == radar(apps2) == radar(apps3) == RadarJPL[]
         @test optical(apps1) == optical1
         @test optical(apps2) == optical2
         @test optical(apps3) == optical3
@@ -792,9 +807,8 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         @test numberofdays(apps2) < numberofdays(optical2)
         @test numberofdays(apps3) < numberofdays(optical3)
 
-        @test noptical(apps1) == length(optical1)
-        @test noptical(apps2) == length(optical2)
-        @test noptical(apps3) == length(optical3)
+        @test radarindices(apps1) == radarindices(apps2) == radarindices(apps3) == Int[]
+        @test opticalindices(apps1) == opticalindices(apps2) == opticalindices(apps3)
 
     end
 

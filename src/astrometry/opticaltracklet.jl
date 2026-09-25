@@ -41,19 +41,19 @@ vra(x::OpticalTracklet) = x.vra
 vdec(x::OpticalTracklet) = x.vdec
 observatory(x::OpticalTracklet) = x.observatory
 catalogue(::OpticalTracklet) = unknowncat()
-band(x::OpticalTracklet) = ' '
+band(::OpticalTracklet) = ' '
 rms(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
 debias(::OpticalTracklet{T}) where {T <: Real} = (T(NaN), T(NaN))
 corr(::OpticalTracklet{T}) where {T <: Real} = T(NaN)
 
-trackletid(x::OpticalTracklet) = ""
+trackletid(::OpticalTracklet) = ""
 
 nobs(x::OpticalTracklet) = x.nobs
 nobs(x::AbstractTrackletVector) = sum(nobs, x; init = 0)
 
-indices(x::OpticalTracklet) = x.indices
-indices(x::AbstractTrackletVector) = sort!(reduce(vcat, indices.(x)))
-indices(x::AbstractTrackletVector, i::AbstractVector{Int}) = indices(view(x, i))
+opticalindices(x::OpticalTracklet) = x.indices
+opticalindices(x::AbstractTrackletVector) = sort!(mapreduce(opticalindices, vcat, x))
+opticalindices(x::AbstractTrackletVector, i::AbstractVector{Int}) = opticalindices(view(x, i))
 
 #=
 # TO DO: rename this function (e.g. as `timerange`), as the

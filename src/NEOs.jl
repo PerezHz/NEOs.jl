@@ -98,7 +98,7 @@ export apparentmagnitude, absolutemagnitude
 export bwdfwdeph, propres, propres!
 export leastsquares, leastsquares!, tryls, outlier_rejection!, project, critical_value
 export variables, designation, epoch, firsttime, lasttime, noptical, nradar, minmaxdates,
-       optical, sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
+       optical, radar, sigmas, snr, keplerian, equinoctial, attributable, uncertaintyparameter,
        diameter, mass, shiftepoch, meandate, meanepoch, earthmoid, print_mpec_residuals,
        print_mpec_elements, print_mpec_ephemeris, print_mpec
 export topo2bary, bary2topo, attr2bary, tsaiod, mmov

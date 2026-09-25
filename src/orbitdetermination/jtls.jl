@@ -80,7 +80,7 @@ function _initialtracklets(trksa::AbstractTrackletVector{T},
         sort!(trksin)
     end
     # Starting indices
-    oidxs = indices(trksin)
+    oidxs = opticalindices(trksin)
     # Sort trksout by absolute time to trksin
     et = mean(@. dtutc2et(date(trksin)))
     dts = @. abs(dtutc2et(date(trksout)) - et)
@@ -158,7 +158,7 @@ function addoptical!(
     Qtol, Mtol = params.lsQtol, params.lsMtol
     penalty = lspenalty > 0 ? zero(TaylorN{T}) : nothing
     while !isempty(trksout)
-        extra = indices(trksout[1])
+        extra = opticalindices(trksout[1])
         subres = view(res, oidxs ∪ extra)
         if lspenalty > 0
             penalty = (lspenalty / notout(subres)) * eccentricitypenalty(e)
@@ -189,7 +189,7 @@ function addoptical!(
     Qtol, Mtol = params.lsQtol, params.lsMtol
     penalty = lspenalty > 0 ? zero(TaylorN{T}) : nothing
     if critical_value(view(res, oidxs), fit) < params.significance && !isempty(trksout)
-        extra = indices(trksout[1])
+        extra = opticalindices(trksout[1])
         subres = view(res, oidxs ∪ extra)
         if lspenalty > 0
             penalty = (lspenalty / notout(subres)) * eccentricitypenalty(e)
@@ -220,7 +220,7 @@ function addobservations!(
     penalty = lspenalty > 0 ? zero(TaylorN{T}) : nothing
     # Add optical astrometry
     while !isempty(trksout)
-        extra = indices(trksout[1])
+        extra = opticalindices(trksout[1])
         subres = (view(res[1], oidxs ∪ extra), view(res[2], ridxs))
         if lspenalty > 0
             penalty = (lspenalty / notout(subres)) * eccentricitypenalty(e)
@@ -507,7 +507,7 @@ function linkage(
     jd0 = epoch(porbit) + PE.J2000
     # Find observations in od that are not in porbit
     trks = setdiff(od.tracklets, porbit.tracklets)
-    idxs = indices(trks)
+    idxs = opticalindices(trks)
     # Original weights
     w8s = deepcopy(od.weights.weights)
     # Initialize buffer and set of residuals
@@ -524,7 +524,7 @@ function linkage(
         return orbit
     end
     for i in eachindex(mags)
-        x = maximum(log10chi, view(res, indices(trks[i])))
+        x = maximum(log10chi, view(res, opticalindices(trks[i])))
         mags[i] = ceil(Int, x)
     end
     k = max(0, minimum(mags) - 1)
@@ -564,7 +564,7 @@ function linkage(
             break
         end
         for i in eachindex(mags)
-            x = maximum(log10chi, view(res, indices(trks[i])))
+            x = maximum(log10chi, view(res, opticalindices(trks[i])))
             mags[i] = ceil(Int, x)
         end
         k += min(-1, minimum(mags))

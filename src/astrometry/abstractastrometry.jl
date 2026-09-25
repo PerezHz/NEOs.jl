@@ -66,15 +66,38 @@ dtutc2et(x::AbstractAstrometryObservation) = dtutc2et(date(x))
 dtutc2days(x::AbstractAstrometryObservation) = dtutc2days(date(x))
 datetime2julian(x::AbstractAstrometryObservation) = datetime2julian(date(x))
 
+"""
+    daysbetween(::DateTime, ::DateTime)
+
+Return the time between two timestamps in days.
+"""
 daysbetween(x::DateTime, y::DateTime) = (y - x).value / daymillisec
 daysbetween(x::DateTime, y::AbstractAstrometryObservation) = daysbetween(x, date(y))
 daysbetween(x::AbstractAstrometryObservation, y::DateTime) = daysbetween(date(x), y)
 daysbetween(x::AbstractAstrometryObservation, y::AbstractAstrometryObservation) =
     daysbetween(date(x), date(y))
 
+"""
+    numberofdays(::AbstractVector)
+
+Return the timespan of a vector of dates in days.
+"""
+function numberofdays(dates::AbstractVector{DateTime})
+    t0, tf = extrema(dates)
+    return daysbetween(t0, tf)
+end
+
 function numberofdays(x::AbstractObservationVector)
     t0, tf = extrema(date, x)
-    return (tf - t0).value / daymillisec
+    return daysbetween(t0, tf)
+end
+
+function numberofdays(x::AbstractObservationVector, y::AbstractObservationVector)
+    init = (typemax(DateTime), typemin(DateTime))
+    t0x, tfx = extrema(date, x; init)
+    t0y, tfy = extrema(date, y; init)
+    t0, tf = min(t0x, t0y), max(tfx, tfy)
+    return daysbetween(t0, tf)
 end
 
 minmaxdates(x::AbstractObservationVector) = extrema(date, x)
