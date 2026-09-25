@@ -48,7 +48,7 @@ nradar(x::AbstractApparitionVector) = sum(nradar, x)
 noptical(x::Apparition) = length(x.optical)
 noptical(x::AbstractApparitionVector) = sum(noptical, x)
 nobs(x::Apparition) = noptical(x) + nradar(x)
-nobs(x::AbstractApparitionVector) = noptical(x) + nradar(x)
+nobs(x::AbstractApparitionVector) = sum(nobs, x)
 
 radar(x::Apparition) = collect(x.radar)
 radar(x::AbstractApparitionVector) = sort!(mapreduce(radar, vcat, x))
