@@ -245,7 +245,7 @@ function smallestfloat(f, a::Real, b::Real)
             a = c
         end
     end
-    return c
+    return b
 end
 
 function largestfloat(f, a::Real, b::Real)
@@ -258,7 +258,7 @@ function largestfloat(f, a::Real, b::Real)
             b = c
         end
     end
-    return c
+    return a
 end
 
 # Check whether a given range `ρ` is inside either of the connected
@@ -324,7 +324,7 @@ end
 # `t ∈ [0, 1]`. The evaluation can be made from left to
 # right (`right = true`) or the other way around (`right = false`).
 numberbetween(a::Real, b::Real, right::Bool, t::Real) =
-    right ? a + t * (b - a) : b - t * (a - b)
+    right ? a + t * (b - a) : b - t * (b - a)
 
 # Return the domain of the parameter that parametrizes the
 # `:outer` or `:inner` boundary of an admissible region.
@@ -357,27 +357,32 @@ function _arhelboundary(A::AdmissibleRegion, t::Number, ρscale::Symbol = :linea
     @assert tmin <= t <= tmax
     # Lower (upper) bounds
     if ρscale == :linear
-        ρ_domain = rangedomain(A)
+        x_domain = rangedomain(A)
     elseif ρscale == :log
-        ρ_domain = log10.(rangedomain(A))
+        x_domain = log10.(rangedomain(A))
     else
         throw(ArgumentError("Argument `ρscale` must be either `:linear` or `:log`"))
     end
-    v_ρ_domain = rangeratedomain(A)
+    ydomain = rangeratedomain(A)
     # Tiny object boundary
     if 0.0 ≤ t < 1.0
-        x, y = ρ_domain[1], numberbetween(v_ρ_domain[1], v_ρ_domain[2], true, t)
+        x, y = x_domain[1], numberbetween(ydomain[1], ydomain[2], true, t)
     # First component
     elseif 1.0 ≤ t < 3.0
-        x = numberbetween(ρ_domain[1], ρ_domain[2], 1.0 ≤ t < 2.0, t - floor(t))
-        _x_ = ρscale == :linear ? x : clamp(10^x, ρ_domain[1], ρ_domain[2])
+        flag = 1.0 ≤ t < 2.0
+        _t_ = flag ? t - 1 : t - 2
+        x = numberbetween(x_domain[1], x_domain[2], flag, _t_)
+        _x_ = ρscale == :linear ? x : clamp(10^x, A.ρ_domain[1], A.ρ_domain[2])
         ys = rangerates(A, _x_, :outer)
-        y = 1.0 ≤ t < 2.0 ? last(ys) : first(ys)
+        y = flag ? last(ys) : first(ys)
     # Second component
-        x = numberbetween(ρ_domain[3], ρ_domain[4], 3.0 ≤ t < 4.0, t - floor(t))
-        _x_ = ρscale == :linear ? x : clamp(10^x, ρ_domain[3], ρ_domain[4])
+    elseif 3.0 ≤ t ≤ 5.0
+        flag = 3.0 ≤ t < 4.0
+        _t_ = flag ? t - 3 : t - 4
+        x = numberbetween(x_domain[3], x_domain[4], flag, _t_)
+        _x_ = ρscale == :linear ? x : clamp(10^x, A.ρ_domain[3], A.ρ_domain[4])
         ys = rangerates(A, _x_, :outer)
-        y = 3.0 ≤ t < 4.0 ? last(ys) : first(ys)
+        y = flag ? last(ys) : first(ys)
     end
     return [x, y]
 end
@@ -387,19 +392,20 @@ function _argeoboundary(A::AdmissibleRegion, t::Number, ρscale::Symbol = :linea
     tmin, tmax = boundarydomain(A, Val(:inner))
     @assert tmin <= t <= tmax
     # Lower (upper) bounds
-    ρ_domain = rangedomain(A)
     ρmax = _geomaxrange(A.coeffs)
     if ρscale == :linear
-        xmin, xmax = ρ_domain[1], ρmax
+        xmin, xmax = A.ρ_domain[1], ρmax
     elseif ρscale == :log
-        xmin, xmax = log10(ρ_domain[1]), log10(ρmax)
+        xmin, xmax = log10(A.ρ_domain[1]), log10(ρmax)
     else
         throw(ArgumentError("Argument `ρscale` must be either `:linear` or `:log`"))
     end
-    x = numberbetween(xmin, xmax, 0.0 ≤ t < 1.0, t - floor(t))
-    _x_ = ρscale == :linear ? x : clamp(10^x, ρ_domain[1], ρmax)
+    flag = 0.0 ≤ t < 1.0
+    _t_ = flag ? t : t - 1
+    x = numberbetween(xmin, xmax, flag, _t_)
+    _x_ = ρscale == :linear ? x : clamp(10^x, A.ρ_domain[1], ρmax)
     ys = rangerates(A, _x_, :inner)
-    y = 0.0 ≤ t < 1.0 ? last(ys) : first(ys)
+    y = flag ? last(ys) : first(ys)
     return [x, y]
 end
 

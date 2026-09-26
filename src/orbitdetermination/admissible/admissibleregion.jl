@@ -75,7 +75,7 @@ observatory(x::AdmissibleRegion) = x.observatory
 attributable(x::AdmissibleRegion) = [ra(x), dec(x), vra(x), vdec(x), mag(x)]
 rangedomain(x::AdmissibleRegion) = x.ρ_domain
 rangeratedomain(x::AdmissibleRegion) = x.v_ρ_domain
-numberofcomponents(x::AdmissibleRegion) = 1 + length(rangedomain(x)) > 2
+numberofcomponents(x::AdmissibleRegion) = 1 + (length(rangedomain(x)) > 2)
 
 # Print methods for AdmissibleRegion
 show(io::IO, x::AdmissibleRegion) = print(io, "Admissible region around ",
