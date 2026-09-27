@@ -1,21 +1,23 @@
 # Project `[ρ, v_ρ]` into `A`'s outer boundary.
-function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <: Real}
+function boundary_projection(A::AdmissibleRegion, ρ::Number, v_ρ::Number)
+    # Number of components
+    Nc = numberofcomponents(A)
     # Outer boundary limits
-    xmin, xmax = A.ρ_domain
+    xmin, xleft = A.ρ_domain[1], A.ρ_domain[2]
+    xright, xmax = Nc == 1 ? (Inf * x1, Inf * x2) : A.ρ_domain[3], A.ρ_domain[4]
     ymin, ymax = A.v_ρ_domain
     ymid = (ymin + ymax) / 2
-    # Projection onto the outer boundary
+    # ρ is left of the tiny object boundary
     if ρ ≤ xmin
         return xmin, clamp(v_ρ, ymin, ymax)
-    elseif ρ ≥ xmax
-        return xmax, ymid
-    else # xmin < ρ < xmax
+    # ρ is inside one of the components
+    elseif xmin < ρ < xleft || (Nc > 1 && xright < ρ < xmax)
         ys = _helrangerates(A.coeffs, A.a_max, ρ)
-        length(ys) < 2 && return xmax, ymid
-        ymin, ymax = ys
-        ymin, ymax = minmax(ymin, ymax)
+        length(ys) < 2 && return ρ, ymid
+        ymin, ymax = minmax(ys[1], ys[2])
         ymin ≤ v_ρ ≤ ymax && return ρ, v_ρ
         m = v_ρ > ymid ? :max : :min
+        xmin, xmax = xmin < ρ < xleft ? (xmin, xleft) : (xright, xmax)
         x = clamp(ρ, xmin, xmax)
         y, dy, d2y = _helrangerate_derivatives(A.coeffs, A.a_max, x, m)
         for _ in 1:25
@@ -25,6 +27,16 @@ function boundary_projection(A::AdmissibleRegion{T}, ρ::T, v_ρ::T) where {T <:
             abs(dx) < eps(T) && break
         end
         return x, y
+    # ρ is right of the first component
+    elseif Nc == 1
+        return xleft, ymid
+    # ρ is right of the second component
+    elseif ρ ≥ xmax
+        return xmax, ymid
+    # ρ is between the two components
+    else
+        x = abs(ρ - xleft) < abs(ρ - xright) ? xleft : xright
+        return x, ymid
     end
 end
 
