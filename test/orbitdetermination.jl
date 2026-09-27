@@ -220,6 +220,303 @@ end
 
 end
 
+@testset "Admissible region" begin
+    using NEOs: AdmissibleRegion, arenergydis, rangerate, rangerates,
+          argoldensearch, arboundary, R_SI, k_gauss, μ_ES, boundary_projection,
+          topo2bary, bary2topo, arW, ardW, ard2W, arS, ardS, ard2S, arG
+
+    function distance(A, x, ρ, v_ρ)
+        m = v_ρ > ymid ? :max : :min
+        y = rangerate(A, x, m)
+        return hypot(x - ρ, y - v_ρ)
+    end
+
+    @testset "One component" begin
+
+        # Read optical astrometry
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "2024BX1.txt"))
+        # Parameters
+        params = Parameters()
+        # First tracklet
+        optical = optical[1:3]
+        tracklet = reduce_tracklets(optical)[1]
+        # Admissible region
+        A = AdmissibleRegion(tracklet, params)
+
+        # Values by September 27, 2026
+
+        # Zero AdmissibleRegion
+        @test iszero(zero(AdmissibleRegion{Float64}))
+        # Custom print
+        @test sprint(show, A) ==
+            "Admissible region around 2024-01-20T21:50:15.360 at GINOP-KHK, Piszkesteto"
+        @test sprint(show, MIME("text/plain"), A) == """
+        AdmissibleRegion{Float64}
+            Observatory:         GINOP-KHK, Piszkesteto
+            Date:                2024-01-20T21:50:15.360
+            Attributable:        [116.61547, 45.39840, -3.21667, 5.76667, 18.03]\
+        """
+        # Coefficients
+        α, δ, v_α, v_δ, h = attributable(A)
+        @test length(A.coeffs) == 6
+        @test A.coeffs[3] == v_α^2 * cos(δ)^2 + v_δ^2  # proper motion squared
+        # Boundary functions
+        xmin, xmax = A.ρ_domain
+        @test arW(A, xmin) * arW(A, xmax) > 0
+        @test ardW(A, xmin) * ardW(A, xmax) < 0
+        @test ard2W(A, xmin) * ard2W(A, xmax) > 0
+        @test arS(A, xmin) * arS(A, xmax) > 0
+        @test ardS(A, xmin) * ardS(A, xmax) > 0
+        @test ard2S(A, xmin) * ard2S(A, xmax) > 0
+        @test ard2S(A, xmin) * ard2S(A, xmax) > 0
+        @test arG(A, xmin) * arG(A, xmax) < 0
+        # Energy discriminant
+        @test arenergydis(A, A.ρ_domain[1], :outer) > 0
+        @test arenergydis(A, A.ρ_domain[1], :inner) > 0
+        @test arenergydis(A, A.ρ_domain[2], :outer) ≈ 0 atol = 1e-18
+        ρ0 = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / A.coeffs[3]))
+        @test arenergydis(A, ρ0, :inner) ≈ 0 atol = 1e-18
+        @test arenergydis(A, A.ρ_domain[2] + 1.0, :outer) < 0
+        @test arenergydis(A, ρ0 + 1.0, :inner) < 0
+        # Range-rate
+        @test rangerates(A, A.ρ_domain[1], :outer) == A.v_ρ_domain
+        a, b = rangerates(A, A.ρ_domain[1], :inner)
+        @test a ≈ -b atol = 1e-18
+        @test minimum(rangerates(A, A.ρ_domain[2], :outer)) ≈ sum(A.v_ρ_domain)/2 atol = 3E-10
+        @test !isempty(rangerates(A, ρ0, :inner))
+        @test rangerates(A, ρ0, :inner) == [zero(ρ0)]
+        @test isempty(rangerates(A, A.ρ_domain[2] + 1.0, :outer))
+        @test isempty(rangerates(A, ρ0 + 1.0, :inner))
+        @test rangerate(A, A.ρ_domain[1], :min, :outer) == A.v_ρ_domain[1]
+        @test rangerate(A, A.ρ_domain[1], :max, :outer) == A.v_ρ_domain[2]
+        @test rangerate(A, A.ρ_domain[1], :min, :inner) ≈
+            -rangerate(A, A.ρ_domain[1], :max, :inner) atol = 1e-18
+        # Golden section search
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :min, :outer, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test v_ρ ≤ A.v_ρ_domain[1]
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :max, :outer, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test v_ρ ≥ A.v_ρ_domain[2]
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain[1], ρ0, :min, :inner, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test A.v_ρ_domain[1] ≤ v_ρ ≤ A.v_ρ_domain[2]
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain[1], ρ0, :max, :inner, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test A.v_ρ_domain[1] ≤ v_ρ ≤ A.v_ρ_domain[2]
+        # Outer boundary
+        O0 = arboundary(A, 0.0, :outer, :linear)
+        O1 = arboundary(A, 1.0, :outer, :linear)
+        O2 = arboundary(A, 2.0, :outer, :linear)
+        O3 = arboundary(A, 3.0, :outer, :linear)
+        @test O0[1] == O1[1] == A.ρ_domain[1]
+        @test [O0[2], O1[2]] == A.v_ρ_domain
+        @test O2[1] == A.ρ_domain[2]
+        @test norm(O0 - O3) < 9E-18
+        L0 = arboundary(A, 0.0, :outer, :log)
+        L1 = arboundary(A, 1.0, :outer, :log)
+        L2 = arboundary(A, 2.0, :outer, :log)
+        L3 = arboundary(A, 3.0, :outer, :log)
+        @test L0[1] == log10(O0[1])
+        @test L1[1] == log10(O1[1])
+        @test L2[1] == log10(O2[1])
+        @test L3[1] ≈ log10(O3[1]) atol = 8E-15
+        # Inner boundary
+        I0 = arboundary(A, 0.0, :inner, :linear)
+        I1 = arboundary(A, 1.0, :inner, :linear)
+        I2 = arboundary(A, 2.0, :inner, :linear)
+        @test I0[1] ≈ I2[1] atol = 1e-18
+        @test I0[2] ≈ -I2[2] atol = 1e-18
+        @test I1[1] ≈ ρ0 atol = 1e-18
+        @test I1[2] ≈ 0.0 atol = 1e-10
+        P0 = arboundary(A, 0.0, :inner, :log)
+        P1 = arboundary(A, 1.0, :inner, :log)
+        P2 = arboundary(A, 2.0, :inner, :log)
+        @test P0[1] == P2[1] == log10(I0[1]) == log10(I2[1])
+        @test P1[1] == log10(I1[1])
+        # In
+        @test O0 in A
+        @test O1 in A
+        @test O2 in A
+        @test O3 in A
+        @test [sum(A.ρ_domain), sum(A.v_ρ_domain)] / 2 in A
+        # Topocentric to barycentric conversion
+        @test norm(bary2topo(A, topo2bary(A, O0...)) .- O0) < 8e-6
+        @test norm(bary2topo(A, topo2bary(A, O1...)) .- O1) < 8e-6
+        @test norm(bary2topo(A, topo2bary(A, O2...)) .- O2) < 8e-6
+        @test norm(bary2topo(A, topo2bary(A, O3...)) .- O3) < 8e-6
+        # Curvature
+        w8s = Veres17(optical)
+        C, Γ_C = curvature(optical, w8s)
+        σ_C = sqrt.(diag(Γ_C))
+        @test all( abs.(C) ./ σ_C .> 0.02)
+        χ2 = C' * inv(Γ_C) * C
+        @test χ2 > 2.7
+        # Boundary projection
+        xmin, xmax = A.ρ_domain
+        ymin, ymax = A.v_ρ_domain
+        xmid, ymid = (xmin + xmax) / 2, (ymin + ymax) / 2
+        ρs = [10^(-3.5), xmid, 1.0]
+        v_ρs = [-0.02, ymid, 0.03]
+        for (ρ, v_ρ) in Iterators.product(ρs, v_ρs)
+            x, y = boundary_projection(A, ρ, v_ρ)
+            if (ρ, v_ρ) in A
+                @test x == ρ && y == v_ρ
+            elseif ρ ≤ xmin
+                @test x == xmin && ymin ≤ y ≤ ymax
+            elseif ρ ≥ xmax
+                @test x == xmax && y == ymid
+            else
+                @test distance(A, x, ρ, v_ρ) < distance(A, x - 1E-4, ρ, v_ρ)
+                @test distance(A, x, ρ, v_ρ) < distance(A, x + 1E-4, ρ, v_ρ)
+            end
+        end
+    end
+
+    @testset "Two components" begin
+
+        # Read optical astrometry
+        optical = read_optical_mpc80(joinpath(TEST_DATA, "895907.txt"))
+        # Parameters
+        params = Parameters()
+        # First tracklet
+        optical = optical[1:3]
+        tracklet = reduce_tracklets(optical)[1]
+        # Admissible region
+        A = AdmissibleRegion(tracklet, params)
+
+        # Values by September 27, 2026
+
+        # Zero AdmissibleRegion
+        @test iszero(zero(AdmissibleRegion{Float64}))
+        # Custom print
+        @test sprint(show, A) ==
+            "Admissible region around 2016-01-09T10:42:51.523 at Pan-STARRS 1, Haleakala"
+        @test sprint(show, MIME("text/plain"), A) == """
+        AdmissibleRegion{Float64}
+            Observatory:         Pan-STARRS 1, Haleakala
+            Date:                2016-01-09T10:42:51.523
+            Attributable:        [132.58380, 6.56995, -0.02594, 0.00865, 23.32]\
+        """
+        # Coefficients
+        α, δ, v_α, v_δ, h = attributable(A)
+        @test length(A.coeffs) == 6
+        @test A.coeffs[3] == v_α^2 * cos(δ)^2 + v_δ^2  # proper motion squared
+        # Boundary functions
+        xmin, xmax = A.ρ_domain
+        @test arW(A, xmin) * arW(A, xmax) > 0
+        @test ardW(A, xmin) * ardW(A, xmax) > 0
+        @test ard2W(A, xmin) * ard2W(A, xmax) > 0
+        @test arS(A, xmin) * arS(A, xmax) > 0
+        @test ardS(A, xmin) * ardS(A, xmax) > 0
+        @test ard2S(A, xmin) * ard2S(A, xmax) > 0
+        @test ard2S(A, xmin) * ard2S(A, xmax) > 0
+        @test arG(A, xmin) * arG(A, xmax) < 0
+        # Energy discriminant
+        @test arenergydis(A, A.ρ_domain[1], :outer) > 0
+        @test arenergydis(A, A.ρ_domain[1], :inner) > 0
+        @test arenergydis(A, A.ρ_domain[2], :outer) ≈ 0 atol = 1e-18
+        ρ0 = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / A.coeffs[3]))
+        @test arenergydis(A, ρ0, :inner) ≈ 0 atol = 8e-7
+        @test arenergydis(A, A.ρ_domain[2] + 1.0, :outer) < 0
+        @test arenergydis(A, ρ0 + 1.0, :inner) < 0
+        # Range-rate
+        @test rangerates(A, A.ρ_domain[1], :outer) == A.v_ρ_domain
+        a, b = rangerates(A, A.ρ_domain[1], :inner)
+        @test a ≈ -b atol = 1e-18
+        @test minimum(rangerates(A, A.ρ_domain[2], :outer)) ≈ sum(A.v_ρ_domain)/2 atol = 3E-10
+        @test !isempty(rangerates(A, ρ0, :inner))
+        @test sum(rangerates(A, ρ0, :inner)) / 2 == zero(ρ0)
+        @test isempty(rangerates(A, A.ρ_domain[2] + 1.0, :outer))
+        @test isempty(rangerates(A, ρ0 + 1.0, :inner))
+        @test rangerate(A, A.ρ_domain[1], :min, :outer) == A.v_ρ_domain[1]
+        @test rangerate(A, A.ρ_domain[1], :max, :outer) == A.v_ρ_domain[2]
+        @test rangerate(A, A.ρ_domain[1], :min, :inner) ≈
+            -rangerate(A, A.ρ_domain[1], :max, :inner) atol = 1e-18
+        # Golden section search
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain[1], A.ρ_domain[2], :min, :outer, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test v_ρ ≥ A.v_ρ_domain[1]
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain[1], A.ρ_domain[2], :max, :outer, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test v_ρ ≤ A.v_ρ_domain[2]
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain[1], ρ0, :min, :inner, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test A.v_ρ_domain[1] ≤ v_ρ ≤ A.v_ρ_domain[2]
+        ρ, v_ρ = argoldensearch(A, A.ρ_domain[1], ρ0, :max, :inner, 1e-20)
+        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
+        @test A.v_ρ_domain[1] ≤ v_ρ ≤ A.v_ρ_domain[2]
+        # Outer boundary
+        O0 = arboundary(A, 0.0, :outer, :linear)
+        O1 = arboundary(A, 1.0, :outer, :linear)
+        O2 = arboundary(A, 2.0, :outer, :linear)
+        O3 = arboundary(A, prevfloat(3.0), :outer, :linear)
+        @test O0[1] == O1[1] == A.ρ_domain[1]
+        @test [O0[2], O1[2]] == A.v_ρ_domain
+        @test O2[1] == A.ρ_domain[2]
+        @test norm(O0 - O3) < 7E-16
+        L0 = arboundary(A, 0.0, :outer, :log)
+        L1 = arboundary(A, 1.0, :outer, :log)
+        L2 = arboundary(A, 2.0, :outer, :log)
+        L3 = arboundary(A, prevfloat(3.0), :outer, :log)
+        @test L0[1] == log10(O0[1])
+        @test L1[1] == log10(O1[1])
+        @test L2[1] == log10(O2[1])
+        @test L3[1] ≈ log10(O3[1]) atol = 9E-14
+        # Inner boundary
+        I0 = arboundary(A, 0.0, :inner, :linear)
+        I1 = arboundary(A, 1.0, :inner, :linear)
+        I2 = arboundary(A, 2.0, :inner, :linear)
+        @test I0[1] ≈ I2[1] atol = 1e-18
+        @test I0[2] ≈ -I2[2] atol = 1e-18
+        @test I1[1] ≈ ρ0 atol = 1e-18
+        # @test I1[2] ≈ 0.0 atol = 1e-10
+        P0 = arboundary(A, 0.0, :inner, :log)
+        P1 = arboundary(A, 1.0, :inner, :log)
+        P2 = arboundary(A, 2.0, :inner, :log)
+        @test P0[1] == P2[1] == log10(I0[1]) == log10(I2[1])
+        @test P1[1] == log10(I1[1])
+        # In
+        @test O0 in A
+        @test O1 in A
+        @test O2 in A
+        @test O3 in A
+        @test [sum(A.ρ_domain), sum(A.v_ρ_domain)] / 2 in A
+        # Topocentric to barycentric conversion
+        @test norm(bary2topo(A, topo2bary(A, O0...)) .- O0) < 8e-6
+        @test norm(bary2topo(A, topo2bary(A, O1...)) .- O1) < 8e-6
+        @test norm(bary2topo(A, topo2bary(A, O2...)) .- O2) < 8e-6
+        @test norm(bary2topo(A, topo2bary(A, O3...)) .- O3) < 8e-6
+        # Curvature
+        w8s = Veres17(optical)
+        C, Γ_C = curvature(optical, w8s)
+        σ_C = sqrt.(diag(Γ_C))
+        @test all( abs.(C) ./ σ_C .> 0.02)
+        χ2 = C' * inv(Γ_C) * C
+        @test χ2 > 13.0
+        # Boundary projection
+        xmin, xmax = A.ρ_domain
+        ymin, ymax = A.v_ρ_domain
+        xmid, ymid = (xmin + xmax) / 2, (ymin + ymax) / 2
+        ρs = [10^(-3.5), xmid, 1.0]
+        v_ρs = [-0.02, ymid, 0.03]
+        for (ρ, v_ρ) in Iterators.product(ρs, v_ρs)
+            x, y = boundary_projection(A, ρ, v_ρ)
+            if (ρ, v_ρ) in A
+                @test x == ρ && y == v_ρ
+            elseif ρ ≤ xmin
+                @test x == xmin && ymin ≤ y ≤ ymax
+            elseif ρ ≥ xmax
+                @test x == xmax && y == ymid
+            else
+                @test distance(A, x, ρ, v_ρ) < distance(A, x - 1E-4, ρ, v_ρ)
+                @test distance(A, x, ρ, v_ρ) < distance(A, x + 1E-4, ρ, v_ρ)
+            end
+        end
+    end
+
+end
+
 @testset "Orbit Determination" begin
 
     @testset "Straight Gauss Method" begin
@@ -549,156 +846,6 @@ end
         # MPEC
         @test isnothing(print_mpec(orbit, params))
         println()
-    end
-
-    @testset "Admissible region" begin
-        using NEOs: AdmissibleRegion, arenergydis, rangerate, rangerates,
-            argoldensearch, arboundary, R_SI, k_gauss, μ_ES, boundary_projection,
-            topo2bary, bary2topo, arW, ardW, ard2W, arS, ardS, ard2S, arG
-
-        # Read optical astrometry
-        optical = read_optical_mpc80(joinpath(TEST_DATA, "2024BX1.txt"))
-        # Parameters
-        params = Parameters()
-        # First tracklet
-        optical = optical[1:3]
-        tracklet = reduce_tracklets(optical)[1]
-        # Admissible region
-        A = AdmissibleRegion(tracklet, params)
-
-        # Values by September 27, 2026
-
-        # Zero AdmissibleRegion
-        @test iszero(zero(AdmissibleRegion{Float64}))
-        # Custom print
-        @test sprint(show, A) ==
-            "Admissible region around 2024-01-20T21:50:15.360 at GINOP-KHK, Piszkesteto"
-        @test sprint(show, MIME("text/plain"), A) == """
-        AdmissibleRegion{Float64}
-            Observatory:         GINOP-KHK, Piszkesteto
-            Date:                2024-01-20T21:50:15.360
-            Attributable:        [116.61547, 45.39840, -3.21667, 5.76667, 18.03]\
-        """
-        # Coefficients
-        α, δ, v_α, v_δ, h = attributable(A)
-        @test length(A.coeffs) == 6
-        @test A.coeffs[3] == v_α^2 * cos(δ)^2 + v_δ^2  # proper motion squared
-        # Boundary functions
-        xmin, xmax = A.ρ_domain
-        @test arW(A, xmin) * arW(A, xmax) > 0
-        @test ardW(A, xmin) * ardW(A, xmax) < 0
-        @test ard2W(A, xmin) * ard2W(A, xmax) > 0
-        @test arS(A, xmin) * arS(A, xmax) > 0
-        @test ardS(A, xmin) * ardS(A, xmax) > 0
-        @test ard2S(A, xmin) * ard2S(A, xmax) > 0
-        @test ard2S(A, xmin) * ard2S(A, xmax) > 0
-        @test arG(A, xmin) * arG(A, xmax) < 0
-        # Energy discriminant
-        @test arenergydis(A, A.ρ_domain[1], :outer) > 0
-        @test arenergydis(A, A.ρ_domain[1], :inner) > 0
-        @test arenergydis(A, A.ρ_domain[2], :outer) ≈ 0 atol = 1e-18
-        ρ0 = min(R_SI, cbrt(2 * k_gauss^2 * μ_ES / A.coeffs[3]))
-        @test arenergydis(A, ρ0, :inner) ≈ 0 atol = 1e-18
-        @test arenergydis(A, A.ρ_domain[2] + 1.0, :outer) < 0
-        @test arenergydis(A, ρ0 + 1.0, :inner) < 0
-        # Range-rate
-        @test rangerates(A, A.ρ_domain[1], :outer) == A.v_ρ_domain
-        a, b = rangerates(A, A.ρ_domain[1], :inner)
-        @test a ≈ -b atol = 1e-18
-        @test minimum(rangerates(A, A.ρ_domain[2], :outer)) ≈ sum(A.v_ρ_domain)/2 atol = 3E-10
-        @test !isempty(rangerates(A, ρ0, :inner))
-        @test rangerates(A, ρ0, :inner) == [zero(ρ0)]
-        @test isempty(rangerates(A, A.ρ_domain[2] + 1.0, :outer))
-        @test isempty(rangerates(A, ρ0 + 1.0, :inner))
-        @test rangerate(A, A.ρ_domain[1], :min, :outer) == A.v_ρ_domain[1]
-        @test rangerate(A, A.ρ_domain[1], :max, :outer) == A.v_ρ_domain[2]
-        @test rangerate(A, A.ρ_domain[1], :min, :inner) ≈
-            -rangerate(A, A.ρ_domain[1], :max, :inner) atol = 1e-18
-        # Golden section search
-        ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :min, :outer, 1e-20)
-        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
-        @test v_ρ ≤ A.v_ρ_domain[1]
-        ρ, v_ρ = argoldensearch(A, A.ρ_domain..., :max, :outer, 1e-20)
-        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
-        @test v_ρ ≥ A.v_ρ_domain[2]
-        ρ, v_ρ = argoldensearch(A, A.ρ_domain[1], ρ0, :min, :inner, 1e-20)
-        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
-        @test A.v_ρ_domain[1] ≤ v_ρ ≤ A.v_ρ_domain[2]
-        ρ, v_ρ = argoldensearch(A, A.ρ_domain[1], ρ0, :max, :inner, 1e-20)
-        @test A.ρ_domain[1] ≤ ρ ≤ A.ρ_domain[2]
-        @test A.v_ρ_domain[1] ≤ v_ρ ≤ A.v_ρ_domain[2]
-        # Outer boundary
-        O0 = arboundary(A, 0.0, :outer, :linear)
-        O1 = arboundary(A, 1.0, :outer, :linear)
-        O2 = arboundary(A, 2.0, :outer, :linear)
-        O3 = arboundary(A, 3.0, :outer, :linear)
-        @test O0[1] == O1[1] == A.ρ_domain[1]
-        @test [O0[2], O1[2]] == A.v_ρ_domain
-        @test O2[1] == A.ρ_domain[2]
-        @test norm(O0 - O3) < 9E-18
-        L0 = arboundary(A, 0.0, :outer, :log)
-        L1 = arboundary(A, 1.0, :outer, :log)
-        L2 = arboundary(A, 2.0, :outer, :log)
-        L3 = arboundary(A, 3.0, :outer, :log)
-        @test L0[1] == log10(O0[1])
-        @test L1[1] == log10(O1[1])
-        @test L2[1] == log10(O2[1])
-        @test L3[1] ≈ log10(O3[1]) atol = 8E-15
-        # Inner boundary
-        I0 = arboundary(A, 0.0, :inner, :linear)
-        I1 = arboundary(A, 1.0, :inner, :linear)
-        I2 = arboundary(A, 2.0, :inner, :linear)
-        @test I0[1] ≈ I2[1] atol = 1e-18
-        @test I0[2] ≈ -I2[2] atol = 1e-18
-        @test I1[1] ≈ ρ0 atol = 1e-18
-        @test I1[2] ≈ 0.0 atol = 1e-10
-        P0 = arboundary(A, 0.0, :inner, :log)
-        P1 = arboundary(A, 1.0, :inner, :log)
-        P2 = arboundary(A, 2.0, :inner, :log)
-        @test P0[1] == P2[1] == log10(I0[1]) == log10(I2[1])
-        @test P1[1] == log10(I1[1])
-        # In
-        @test O0 in A
-        @test O1 in A
-        @test O2 in A
-        @test O3 in A
-        @test [sum(A.ρ_domain), sum(A.v_ρ_domain)] / 2 in A
-        # Topocentric to barycentric conversion
-        @test norm(bary2topo(A, topo2bary(A, O0...)) .- O0) < 8e-6
-        @test norm(bary2topo(A, topo2bary(A, O1...)) .- O1) < 8e-6
-        @test norm(bary2topo(A, topo2bary(A, O2...)) .- O2) < 8e-6
-        @test norm(bary2topo(A, topo2bary(A, O3...)) .- O3) < 8e-6
-        # Curvature
-        w8s = Veres17(optical)
-        C, Γ_C = curvature(optical, w8s)
-        σ_C = sqrt.(diag(Γ_C))
-        @test all( abs.(C) ./ σ_C .> 0.02)
-        χ2 = C' * inv(Γ_C) * C
-        @test χ2 > 2.7
-        # Boundary projection
-        xmin, xmax = A.ρ_domain
-        ymin, ymax = A.v_ρ_domain
-        xmid, ymid = (xmin + xmax) / 2, (ymin + ymax) / 2
-        function distance(A, x, ρ, v_ρ)
-            m = v_ρ > ymid ? :max : :min
-            y = rangerate(A, x, m)
-            return hypot(x - ρ, y - v_ρ)
-        end
-        ρs = [10^(-3.5), xmid, 1.0]
-        v_ρs = [-0.02, ymid, 0.03]
-        for (ρ, v_ρ) in Iterators.product(ρs, v_ρs)
-            x, y = boundary_projection(A, ρ, v_ρ)
-            if (ρ, v_ρ) in A
-                @test x == ρ && y == v_ρ
-            elseif ρ ≤ xmin
-                @test x == xmin && ymin ≤ y ≤ ymax
-            elseif ρ ≥ xmax
-                @test x == xmax && y == ymid
-            else
-                @test distance(A, x, ρ, v_ρ) < distance(A, x - 1E-4, ρ, v_ρ)
-                @test distance(A, x, ρ, v_ρ) < distance(A, x + 1E-4, ρ, v_ρ)
-            end
-        end
     end
 
     @testset "Too Short Arc" begin
