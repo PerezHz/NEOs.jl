@@ -225,8 +225,7 @@ end
           argoldensearch, arboundary, R_SI, k_gauss, μ_ES, boundary_projection,
           topo2bary, bary2topo, arW, ardW, ard2W, arS, ardS, ard2S, arG
 
-    function distance(A, x, ρ, v_ρ)
-        m = v_ρ > ymid ? :max : :min
+    function distance(A, x, m, ρ, v_ρ)
         y = rangerate(A, x, m)
         return hypot(x - ρ, y - v_ρ)
     end
@@ -367,8 +366,9 @@ end
             elseif ρ ≥ xmax
                 @test x == xmax && y == ymid
             else
-                @test distance(A, x, ρ, v_ρ) < distance(A, x - 1E-4, ρ, v_ρ)
-                @test distance(A, x, ρ, v_ρ) < distance(A, x + 1E-4, ρ, v_ρ)
+                m = v_ρ > ymid ? :max : :min
+                @test distance(A, x, m, ρ, v_ρ) < distance(A, x - 1E-4, m, ρ, v_ρ)
+                @test distance(A, x, m, ρ, v_ρ) < distance(A, x + 1E-4, m, ρ, v_ρ)
             end
         end
     end
@@ -509,8 +509,9 @@ end
             elseif ρ ≥ xmax
                 @test x == xmax && y == ymid
             else
-                @test distance(A, x, ρ, v_ρ) < distance(A, x - 1E-4, ρ, v_ρ)
-                @test distance(A, x, ρ, v_ρ) < distance(A, x + 1E-4, ρ, v_ρ)
+                m = v_ρ > ymid ? :max : :min
+                @test distance(A, x, m, ρ, v_ρ) < distance(A, x - 1E-4, m, ρ, v_ρ)
+                @test distance(A, x, m, ρ, v_ρ) < distance(A, x + 1E-4, m, ρ, v_ρ)
             end
         end
     end
