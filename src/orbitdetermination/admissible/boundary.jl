@@ -355,6 +355,8 @@ function _arhelboundary(A::AdmissibleRegion, t::Number, ρscale::Symbol = :linea
     # Parametrization domain
     tmin, tmax = boundarydomain(A, Val(:outer))
     @assert tmin <= t <= tmax
+    # Number of components
+    Nc = numberofcomponents(A)
     # Lower (upper) bounds
     if ρscale == :linear
         x_domain = rangedomain(A)
@@ -368,7 +370,7 @@ function _arhelboundary(A::AdmissibleRegion, t::Number, ρscale::Symbol = :linea
     if 0.0 ≤ t < 1.0
         x, y = x_domain[1], numberbetween(ydomain[1], ydomain[2], true, t)
     # First component
-    elseif 1.0 ≤ t < 3.0
+    elseif 1.0 ≤ t && ifelse(Nc == 1, t ≤ 3.0, t < 3.0)
         flag = 1.0 ≤ t < 2.0
         _t_ = flag ? t - 1 : t - 2
         x = numberbetween(x_domain[1], x_domain[2], flag, _t_)

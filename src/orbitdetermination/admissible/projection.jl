@@ -4,7 +4,7 @@ function boundary_projection(A::AdmissibleRegion, ρ::Number, v_ρ::Number)
     Nc = numberofcomponents(A)
     # Outer boundary limits
     xmin, xleft = A.ρ_domain[1], A.ρ_domain[2]
-    xright, xmax = Nc == 1 ? (Inf * x1, Inf * x2) : A.ρ_domain[3], A.ρ_domain[4]
+    xright, xmax = Nc == 1 ? (Inf * xmin, Inf * xmin) : (A.ρ_domain[3], A.ρ_domain[4])
     ymin, ymax = A.v_ρ_domain
     ymid = (ymin + ymax) / 2
     # ρ is left of the tiny object boundary
@@ -24,7 +24,7 @@ function boundary_projection(A::AdmissibleRegion, ρ::Number, v_ρ::Number)
             dx = (x - ρ + (y - v_ρ) * dy) / (1 + (y - v_ρ) * d2y + dy^2)
             x = clamp(x - dx, xmin, xmax)
             y, dy, d2y = _helrangerate_derivatives(A.coeffs, A.a_max, x, m)
-            abs(dx) < eps(T) && break
+            abs(dx) < eps(typeof(x)) && break
         end
         return x, y
     # ρ is right of the first component

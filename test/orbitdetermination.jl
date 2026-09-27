@@ -249,7 +249,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by September 22, 2026
+        # Values by September 27, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -401,7 +401,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by September 22, 2026
+        # Values by September 27, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -490,7 +490,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by September 22, 2026
+        # Values by September 27, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -553,9 +553,8 @@ end
 
     @testset "Admissible region" begin
         using NEOs: AdmissibleRegion, arenergydis, rangerate, rangerates,
-            argoldensearch, arboundary, _helmaxrange, R_SI, k_gauss, μ_ES,
-            boundary_projection, topo2bary, bary2topo, arW, ardW, ard2W,
-            arS, ardS, ard2S, arG
+            argoldensearch, arboundary, R_SI, k_gauss, μ_ES, boundary_projection,
+            topo2bary, bary2topo, arW, ardW, ard2W, arS, ardS, ard2S, arG
 
         # Read optical astrometry
         optical = read_optical_mpc80(joinpath(TEST_DATA, "2024BX1.txt"))
@@ -567,7 +566,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by September 22, 2026
+        # Values by September 27, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -606,7 +605,7 @@ end
         @test rangerates(A, A.ρ_domain[1], :outer) == A.v_ρ_domain
         a, b = rangerates(A, A.ρ_domain[1], :inner)
         @test a ≈ -b atol = 1e-18
-        @test minimum(rangerates(A, A.ρ_domain[2], :outer)) == A.Fs[3, 2]
+        @test minimum(rangerates(A, A.ρ_domain[2], :outer)) ≈ sum(A.v_ρ_domain)/2 atol = 3E-10
         @test !isempty(rangerates(A, ρ0, :inner))
         @test rangerates(A, ρ0, :inner) == [zero(ρ0)]
         @test isempty(rangerates(A, A.ρ_domain[2] + 1.0, :outer))
@@ -635,12 +634,8 @@ end
         O3 = arboundary(A, 3.0, :outer, :linear)
         @test O0[1] == O1[1] == A.ρ_domain[1]
         @test [O0[2], O1[2]] == A.v_ρ_domain
-        @test O2[1] == _helmaxrange(A.coeffs, A.a_max) == A.ρ_domain[2]
+        @test O2[1] == A.ρ_domain[2]
         @test norm(O0 - O3) < 9E-18
-        @test O0 == A.Fs[1, :]
-        @test O1 == A.Fs[2, :]
-        @test O2 == A.Fs[3, :]
-        @test norm(O3 - A.Fs[1, :]) < 9E-18
         L0 = arboundary(A, 0.0, :outer, :log)
         L1 = arboundary(A, 1.0, :outer, :log)
         L2 = arboundary(A, 2.0, :outer, :log)
@@ -663,12 +658,16 @@ end
         @test P0[1] == P2[1] == log10(I0[1]) == log10(I2[1])
         @test P1[1] == log10(I1[1])
         # In
-        @test A.Fs[1, :] in A
-        @test A.Fs[2, :] in A
-        @test A.Fs[3, :] in A
+        @test O0 in A
+        @test O1 in A
+        @test O2 in A
+        @test O3 in A
         @test [sum(A.ρ_domain), sum(A.v_ρ_domain)] / 2 in A
         # Topocentric to barycentric conversion
-        @test norm(bary2topo(A, topo2bary(A, A.Fs[3, :]...)) .- A.Fs[3, :]) < 8e-6
+        @test norm(bary2topo(A, topo2bary(A, O0...)) .- O0) < 8e-6
+        @test norm(bary2topo(A, topo2bary(A, O1...)) .- O1) < 8e-6
+        @test norm(bary2topo(A, topo2bary(A, O2...)) .- O2) < 8e-6
+        @test norm(bary2topo(A, topo2bary(A, O3...)) .- O3) < 8e-6
         # Curvature
         w8s = Veres17(optical)
         C, Γ_C = curvature(optical, w8s)
@@ -729,7 +728,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by September 22, 2026
+        # Values by September 27, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -821,7 +820,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by September 22, 2026
+        # Values by September 27, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -978,7 +977,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by September 22, 2026
+        # Values by September 27, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -1077,7 +1076,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by September 22, 2026
+        # Values by September 27, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1259,7 +1258,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by September 22, 2026
+        # Values by September 27, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1376,7 +1375,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by September 22, 2026
+        # Values by September 27, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1482,7 +1481,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by September 22, 2026
+        # Values by September 27, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
