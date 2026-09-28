@@ -313,7 +313,8 @@ end
 # is a small numerical offset used to obtain an enclosing
 # interval for `largestfloat`
 function _geomaxrange(coeffs::AbstractVector; ϵ::Real = 1E-4)
-    ρmax = min(R_SI, G⁻¹0(coeffs))
+    ρmax = G⁻¹0(coeffs)
+    ρmax ≥ R_SI && return R_SI
     flag = _argeoenergydis(coeffs, ρmax) ≥ 0
     ρa, ρb = (ρmax - !flag*ϵ, ρmax + flag*ϵ)
     ρmax = largestfloat(Base.Fix1(_argeoin, coeffs), ρa, ρb)
