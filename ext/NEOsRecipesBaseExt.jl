@@ -3,7 +3,7 @@ module NEOsRecipesBaseExt
 using RecipesBase
 using TaylorIntegration: TaylorSolution
 using NEOs: OpticalResidual, AdmissibleRegion, AbstractOrbit, cte, ra, dec,
-      arboundary, body2observer
+      arboundary, body2observer, boundarydomain, numberofcomponents
 
 @recipe function f(res::AbstractVector{<:OpticalResidual})
     @series begin
@@ -28,9 +28,20 @@ end
             color := outercolor
             seriestype := :path
             linewidth := outerlinewidth
-            ts = LinRange(0, 3, N)
+            ts = LinRange(0.0, prevfloat(3.0), N)
             ps = arboundary.(Ref(A), ts, Ref(:outer), Ref(ρscale))
             return first.(ps), last.(ps)
+        end
+        if numberofcomponents(A) > 1
+            @series begin
+                label := ""
+                color := outercolor
+                seriestype := :path
+                linewidth := outerlinewidth
+                ts = LinRange(3.0, 5.0, N)
+                ps = arboundary.(Ref(A), ts, Ref(:outer), Ref(ρscale))
+                return first.(ps), last.(ps)
+            end
         end
     end
     # Inner boundary

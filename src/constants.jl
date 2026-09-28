@@ -371,9 +371,11 @@ const k_gauss = 0.017_202_098_95
 # Earth's sphere of influence radius [AU]
 const R_SI = 0.010044
 # Earth's physical radius [AU]
-const R_EA = 4.24e-5
+const R_EA = 4.24E-5
 # Ratio between the mass of the Earth and the mass of the Sun
 const μ_ES = PE.μ[ea] / PE.μ[su] # 1 / 328_900.5614
+# Heliopause radius [au]
+const HELIOPAUSE_RADIUS = 120.0
 
 # Coefficient of g1 (used in compute_radec)
 const g1coeff = 2μ_DE430[su] / c_au_per_day^2
