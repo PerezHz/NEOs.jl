@@ -53,6 +53,7 @@ function static_loop_split(r::AbstractVector{Int}, N::Int, tid::Int)
 end
 
 # Check if an expression is a call to Threads.@threads
+is_threads_macro(x) = false
 function is_threads_macro(ex::Expr)
     # Check if the expression is a macro call
     ex.head === :macrocall || return false
@@ -75,11 +76,40 @@ end
 # Filter out LineNumberNodes
 clean_blocks(x::Expr) = map(identity, filter(!Base.Fix2(isa, LineNumberNode), x.args))
 
+# Check if an expression is the main loop, i.e. a for loop with at least
+# one Threads.@threads loop at the top level of its body
+is_main_loop(x) = x isa Expr && x.head === :for && any(is_threads_macro, clean_blocks(x.args[2]))
+
+# Collect the symbols (re)bound by assignments within an expression
+assigned_symbols!(s::Set{Symbol}, x) = s
+function assigned_symbols!(s::Set{Symbol}, ex::Expr)
+    # Do not descend into nested functions (they have their own scope)
+    ex.head in (:function, :->) && return s
+    # Skip the iteration specification of for loops
+    ex.head === :for && return assigned_symbols!(s, ex.args[2])
+    if ex.head in (:(=), :+=, :-=, :*=, :/=, :^=)
+        lhs = ex.args[1]
+        # Short-form function definitions
+        lhs isa Expr && lhs.head in (:call, :where) && return s
+        lhs_symbols!(s, lhs)
+        return assigned_symbols!(s, ex.args[2])
+    end
+    foreach(Base.Fix1(assigned_symbols!, s), ex.args)
+    return s
+end
+
+lhs_symbols!(s::Set{Symbol}, x) = s
+lhs_symbols!(s::Set{Symbol}, x::Symbol) = push!(s, x)
+function lhs_symbols!(s::Set{Symbol}, x::Expr)
+    x.head === :tuple && foreach(Base.Fix1(lhs_symbols!, s), x.args)
+    return s
+end
+
 # Assemble the lines of code into blocks
-function assemble_blocks(x::AbstractVector{Expr})
+function assemble_blocks(x::AbstractVector)
     mask = is_threads_macro.(x)
-    iters = Vector{Expr}(undef, 0)
-    blocks = Vector{Vector{Expr}}(undef, 0)
+    iters = Vector{Any}(undef, 0)
+    blocks = Vector{Vector{Any}}(undef, 0)
     for i in eachindex(x)
         if mask[i]
             push!(blocks, [x[i]])
@@ -87,7 +117,7 @@ function assemble_blocks(x::AbstractVector{Expr})
         else
             if isempty(blocks) || mask[i-1]
                 push!(blocks, [x[i]])
-                push!(iters, :())
+                push!(iters, nothing)
             else
                 push!(blocks[end], x[i])
             end
@@ -96,7 +126,7 @@ function assemble_blocks(x::AbstractVector{Expr})
     return iters, blocks
 end
 
-function modify_block(x::AbstractVector{Expr}, i::Int)
+function modify_block(x::AbstractVector, i::Int)
     cyclic_barrier = Symbol(:cyclic_barrier_, i)
     if is_threads_macro(x[1])
         loop = x[1].args[end]
@@ -120,43 +150,59 @@ function modify_block(x::AbstractVector{Expr}, i::Int)
     return q
 end
 
-# Build the multi-threaded (cyclic barrier) version of a block (unescaped)
+# Build the multi-threaded (cyclic barrier) version of a block (unescaped). Also
+# return the symbols assigned in the serial code outside the main loop
 function cyclicbarrier_threaded(ex::Expr)
-    # Filter out LineNumberNodes to find the actual code blocks
+    # Filter out LineNumberNodes to find the actual lines of code
     lines = clean_blocks(ex)
+    # Split the lines into the code before, within and after the main loop
+    kmain = findall(is_main_loop, lines)
+    length(kmain) <= 1 || throw(ArgumentError("At most one top-level for loop \
+        can contain multi-threaded loops"))
+    if isempty(kmain)
+        prelines, mainloop, postlines = lines, nothing, lines[1:0]
+    else
+        k = kmain[1]
+        prelines, mainloop, postlines = lines[1:k-1], lines[k], lines[k+1:end]
+    end
     # Assemble the lines of code into blocks
-    kbody = 0
-    loop_def = :()
-    iters = Vector{Expr}(undef, 0)
-    blocks = Vector{Vector{Expr}}(undef, 0)
-    for line in lines
-        if line.head === :for
-            loop_def, loop_body = line.args
-            sublines = clean_blocks(loop_body)
-            subiters, subblocks = assemble_blocks(sublines)
-            kbody = length(blocks) + 1
-            append!(iters, subiters)
-            append!(blocks, subblocks)
-        elseif is_threads_macro(line)
-            subiters, subblocks = assemble_blocks([line])
-            append!(iters, subiters)
-            append!(blocks, subblocks)
-        else
-            throw(ArgumentError("Each block must be either a serial or \
-                multi-threaded for loop"))
+    preiters, preblocks = assemble_blocks(prelines)
+    if isnothing(mainloop)
+        loop_def = nothing
+        bodyiters, bodyblocks = assemble_blocks(lines[1:0])
+    else
+        loop_def, loop_body = mainloop.args
+        bodyiters, bodyblocks = assemble_blocks(clean_blocks(loop_body))
+    end
+    postiters, postblocks = assemble_blocks(postlines)
+    iters = vcat(preiters, bodyiters, postiters)
+    blocks = vcat(preblocks, bodyblocks, postblocks)
+    mblocks = modify_block.(blocks, eachindex(blocks))
+    # Preamble, body and postamble
+    npre, nbody = length(preblocks), length(bodyblocks)
+    getargs(x) = mapreduce(Base.Fix2(getfield, :args), vcat, x; init = [])
+    preamble = getargs(view(mblocks, 1:npre))
+    body = getargs(view(mblocks, npre+1:npre+nbody))
+    postamble = getargs(view(mblocks, npre+nbody+1:length(mblocks)))
+    # Reconstruct the original main loop
+    main = isnothing(loop_def) ? nothing : quote
+        for $(loop_def.args[1]) in $(loop_def.args[2])
+            $(body...)
         end
     end
-    mblocks = modify_block.(blocks, eachindex(blocks))
-    # Preamble and body
-    subpreamble, subbody = view(mblocks, 1:kbody-1), view(mblocks, kbody:length(mblocks))
-    preamble = mapreduce(Base.Fix2(getfield, :args), vcat, subpreamble; init = [])
-    body = mapreduce(Base.Fix2(getfield, :args), vcat, subbody; init = [])
+    # Variables assigned in the serial code outside the main loop must be
+    # shared by all tasks and visible after the block
+    shared = Set{Symbol}()
+    for b in vcat(preblocks, postblocks)
+        is_threads_macro(b[1]) && continue
+        foreach(Base.Fix1(assigned_symbols!, shared), b)
+    end
     # Variable declarations
     names = Symbol.(:cyclic_barrier_, eachindex(mblocks))
     cyclic_barriers = [:($name = CyclicBarrier(Ntasks)) for name in names]
     names = Symbol.(:chunked_indices_, eachindex(iters))
     chunked_indices = [:($name = [static_loop_split($iter, Ntasks, tid) for tid in 1:Ntasks])
-        for (name, iter) in zip(names, iters) if iter != :()]
+        for (name, iter) in zip(names, iters) if !isnothing(iter)]
     # Generate the multithreaded code
     q = quote
         # Variable declarations
@@ -166,47 +212,34 @@ function cyclicbarrier_threaded(ex::Expr)
         function threadsfor_fun(task_id::Int)
             # Preamble
             $(preamble...)
-            # Reconstruct the original loop
-            for $(loop_def.args[1]) in $(loop_def.args[2])
-                $(body...)
-            end
+            # Main loop
+            $main
+            # Postamble
+            $(postamble...)
         end
         # Spawn tasks
         tasks = Vector{Task}(undef, Ntasks)
         for task_id in 1:Ntasks
             tasks[task_id] = Threads.@spawn threadsfor_fun(task_id)
         end
-        # Wait for all tasks to complete the entire range of the original loop
+        # Wait for all tasks to complete
         for t in tasks
             fetch(t)
         end
     end
     Base.remove_linenums!(q)
-    return q
+    return sort!(collect(shared)), q
 end
 
-"""
-    @cyclicbarrier [threads] ex
-
-This macro modifies a block containing (i) the Solar System ephemeris
-evaluation loops and (ii) the main loop in the `jetcoeffs!` functions
-generated by `@taylorize` in order to implement a cyclic barrier that
-avoids spawning new tasks at every iteration.
-
-If `threads` (a `Bool` expression evaluated at runtime, e.g. `params.threads`)
-is `false`, every `Threads.@threads` loop inside `ex` is run as a plain
-serial `for` loop instead. If omitted, `threads` defaults to `true`.
-
-!!! warning
-    This macro is on an experimental stage; check the integration results carefully.
-"""
-macro cyclicbarrier(threads, ex)
+function cyclicbarrier_expr(threads, ex)
     # Verify the provided expression is actually a block
     @assert ex isa Expr && ex.head === :block "Expression must be a block"
-    threaded = cyclicbarrier_threaded(ex)
+    shared, threaded = cyclicbarrier_threaded(ex)
     serial = remove_threads(ex)
+    decls = [Expr(:local, s) for s in shared]
     # We use esc() to ensure variables resolve in the caller's scope (macro hygiene)
     q = esc(quote
+        $(decls...)
         if $threads
             let
                 $threaded
@@ -219,8 +252,38 @@ macro cyclicbarrier(threads, ex)
     return q
 end
 
-# Backwards compatibility: multi-threading always on
+"""
+    @cyclicbarrier [threads] ex
+
+This macro modifies a block of code in the `jetcoeffs!` and `_allocate_jetcoeffs!`
+functions generated by `@taylorize` in order to implement a cyclic barrier that
+avoids spawning new tasks at every `Threads.@threads` loop. Tasks are spawned
+only once per evaluation of the block, and each `Threads.@threads` loop is
+replaced by a statically-scheduled chunk of iterations followed by a barrier.
+
+The block may contain:
+- `Threads.@threads` loops (e.g. the Solar System ephemeris evaluation loops),
+- serial code, which is run by the first task only, and
+- at most one top-level `for` loop (the main loop, e.g. the loop over the orders
+    of the Taylor expansions in `jetcoeffs!`) whose body contains `Threads.@threads`
+    loops at its top level.
+
+Variables assigned in the serial code outside the main loop are declared `local`
+in the enclosing scope, so they are shared by all tasks and remain visible after
+the block. The iteration ranges of the `Threads.@threads` loops must be computable
+before the block is entered.
+
+If `threads` (a `Bool` expression evaluated at runtime, e.g. `params.threads`)
+is `false`, every `Threads.@threads` loop inside `ex` is run as a plain
+serial `for` loop instead. If omitted, `threads` defaults to `true`.
+
+!!! warning
+    This macro is on an experimental stage; check the integration results carefully.
+"""
+macro cyclicbarrier(threads, ex)
+    return cyclicbarrier_expr(threads, ex)
+end
+
 macro cyclicbarrier(ex)
-    @assert ex isa Expr && ex.head === :block "Expression must be a block"
-    return esc(cyclicbarrier_threaded(ex))
+    return cyclicbarrier_expr(true, ex)
 end
