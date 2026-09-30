@@ -114,6 +114,38 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         warmuptests(sunearthmoon!, q00, jd0, nyears, params2)
     end
 
+    @testset "Serial vs multithreaded consistency (2023 DW)" begin
+        # Initial time [Julian date TDB]
+        jd0 = datetime2julian(DateTime(2023, 2, 25, 0, 0, 0))
+        # Initial condition
+        q00 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01,
+               -9.071450085084557E-03, -9.353197026254517E-03, -5.610023032269034E-03]
+        q00NG = vcat(q00, 0.0, 0.0, 0.0)
+        # Time of integration [years]
+        nyears = 0.1
+        # Propagation parameters
+        params1 = Parameters(maxsteps = 10, order = 15, abstol = 1E-12,
+                             parse_eqs = true, threads = false)
+        params2 = Parameters(params1; threads = true)
+        @test !params1.threads
+        @test params2.threads
+
+        Threads.nthreads() == 1 && @warn "Running with a single thread; " *
+            "the multithreaded branch of @cyclicbarrier uses only one task"
+
+        for (dynamics, q0) in ((nongravs!, q00NG), (gravityonly!, q00),
+                               (newtonian!, q00), (sunearthmoon!, q00))
+            @testset "$dynamics" begin
+                sol1 = NEOs.propagate(dynamics, q0, jd0, nyears, params1)
+                sol2 = NEOs.propagate(dynamics, q0, jd0, nyears, params2)
+                # More than one step was taken
+                @test length(sol1.t) > 2
+                # Serial and multithreaded integrations must agree exactly
+                @test sol1 == sol2
+            end
+        end
+    end
+
     using NEOs: chi, logchi, log10chi
     using PlanetaryEphemeris: ea, su, daysec, auday2kmsec
     using Statistics
