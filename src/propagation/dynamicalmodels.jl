@@ -37,11 +37,17 @@ than one thread, both in the parsed (`parse_eqs = true`) and non-parsed
 For other dynamical models, see [`gravityonly!`](@ref), [`newtonian!`](@ref) and
 [`sunearthmoon!`](@ref).
 """
-function nongravs!(dq, q, params, t)
+@cyclicbarrier function nongravs!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
+    # Solar system ephemeris at dsj2k
+    local sseph_ephU = params.sseph(dsj2k)
+    # Accelerations at dsj2k
+    local acceph_ephU = params.acceph(dsj2k)
+    # Newtonian potentials at dsj2k
+    local poteph_ephU = params.poteph(dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
@@ -63,60 +69,6 @@ function nongravs!(dq, q, params, t)
 
     # zero(q[1])
     local zero_q_1 = params.zeroq1
-
-    # Use multi-threading only if requested and more than one thread is available
-    local threads = params.threads && Threads.threadpoolsize() > 1
-    # Evaluation of params.sseph
-    local sseph_t = params.sseph.t
-    local sseph_eph = params.sseph.eph
-    local sseph_aux = params.sseph.aux
-    local sseph_ephT = params.sseph.ephT
-    local sseph_ephU = params.sseph.ephU
-    TaylorSeries.identity!(sseph_t, dsj2k, 0)
-    local sseph_ind, sseph_δt = timeindex(sseph_eph, sseph_t)
-    # Evaluation of params.acceph
-    local acceph_t = params.acceph.t
-    local acceph_eph = params.acceph.eph
-    local acceph_aux = params.acceph.aux
-    local acceph_ephT = params.acceph.ephT
-    local acceph_ephU = params.acceph.ephU
-    TaylorSeries.identity!(acceph_t, dsj2k, 0)
-    local acceph_ind, acceph_δt = timeindex(acceph_eph, acceph_t)
-    # Evaluation of params.poteph
-    local poteph_t = params.poteph.t
-    local poteph_eph = params.poteph.eph
-    local poteph_aux = params.poteph.aux
-    local poteph_ephT = params.poteph.ephT
-    local poteph_ephU = params.poteph.ephU
-    TaylorSeries.identity!(poteph_t, dsj2k, 0)
-    local poteph_ind, poteph_δt = timeindex(poteph_eph, poteph_t)
-    @optionalthreads threads for i in eachindex(sseph_ephU)
-        TaylorSeries.zero!(sseph_ephT[i])
-        TaylorSeries.zero!(sseph_aux[i])
-        TaylorSeries._horner!(sseph_ephT[i], sseph_eph.p[sseph_ind, i], sseph_δt, sseph_aux[i])
-        TaylorSeries.zero!(sseph_ephU[i])
-        for k in eachindex(sseph_ephU[i])
-            _identity!(sseph_ephU[i], sseph_ephT[i], k)
-        end
-    end
-    @optionalthreads threads for i in eachindex(acceph_ephU)
-        TaylorSeries.zero!(acceph_ephT[i])
-        TaylorSeries.zero!(acceph_aux[i])
-        TaylorSeries._horner!(acceph_ephT[i], acceph_eph.p[acceph_ind, i], acceph_δt, acceph_aux[i])
-        TaylorSeries.zero!(acceph_ephU[i])
-        for k in eachindex(acceph_ephU[i])
-            _identity!(acceph_ephU[i], acceph_ephT[i], k)
-        end
-    end
-    @optionalthreads threads for i in eachindex(poteph_ephU)
-        TaylorSeries.zero!(poteph_ephT[i])
-        TaylorSeries.zero!(poteph_aux[i])
-        TaylorSeries._horner!(poteph_ephT[i], poteph_eph.p[poteph_ind, i], poteph_δt, poteph_aux[i])
-        TaylorSeries.zero!(poteph_ephU[i])
-        for k in eachindex(poteph_ephU[i])
-            _identity!(poteph_ephU[i], poteph_ephT[i], k)
-        end
-    end
 
     #=
     Point-mass accelerations
@@ -305,7 +257,7 @@ function nongravs!(dq, q, params, t)
     _4dq1 = 4dq[1]
     _4dq2 = 4dq[2]
     _4dq3 = 4dq[3]
-    @optionalthreads threads for i in 1:Nm1
+    Threads.@threads for i in 1:Nm1
         # Velocity of the i-th body
         ui[i] = sseph_ephU[3(N-1+i)-2]    # X-axis component
         vi[i] = sseph_ephU[3(N-1+i)-1]    # Y-axis component
@@ -470,7 +422,7 @@ function nongravs!(dq, q, params, t)
 
     # 4*\sum term inside {}
     _4ϕj[N] = 4newtonianNb_Potential[N]
-    @optionalthreads threads for i in 1:10
+    Threads.@threads for i in 1:10
         # 4*\sum + \sum terms inside {}
         ϕi_plus_4ϕj[i] = poteph_ephU[i] + _4ϕj[N]
         # \dot{s}_j^2 + 2\dot{s}_i^2 - 4 <, > terms inside {}
@@ -523,7 +475,7 @@ function nongravs!(dq, q, params, t)
         pntempZ = sumpnz
     end
     # Compute Newtonian accelerations due to Pluto and 16 asteroid perturbers
-    @optionalthreads threads for i in 11:Nm1
+    Threads.@threads for i in 11:Nm1
         # Full first term
         X_t_pn1[i] = c_p2*newton_acc_X[i]
         Y_t_pn1[i] = c_p2*newton_acc_Y[i]
@@ -643,11 +595,17 @@ than one thread, both in the parsed (`parse_eqs = true`) and non-parsed
 For other dynamical models, see [`nongravs!`](@ref), [`newtonian!`](@ref) and
 [`sunearthmoon!`](@ref).
 """
-function gravityonly!(dq, q, params, t)
+@cyclicbarrier function gravityonly!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
+    # Solar system ephemeris at dsj2k
+    local sseph_ephU = params.sseph(dsj2k)
+    # Accelerations at dsj2k
+    local acceph_ephU = params.acceph(dsj2k)
+    # Newtonian potentials at dsj2k
+    local poteph_ephU = params.poteph(dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
@@ -662,60 +620,6 @@ function gravityonly!(dq, q, params, t)
     local orientAlloc = params.orientAlloc
     # zero(q[1])
     local zero_q_1 = params.zeroq1
-
-    # Use multi-threading only if requested and more than one thread is available
-    local threads = params.threads && Threads.threadpoolsize() > 1
-    # Evaluation of params.sseph
-    local sseph_t = params.sseph.t
-    local sseph_eph = params.sseph.eph
-    local sseph_aux = params.sseph.aux
-    local sseph_ephT = params.sseph.ephT
-    local sseph_ephU = params.sseph.ephU
-    TaylorSeries.identity!(sseph_t, dsj2k, 0)
-    local sseph_ind, sseph_δt = timeindex(sseph_eph, sseph_t)
-    # Evaluation of params.acceph
-    local acceph_t = params.acceph.t
-    local acceph_eph = params.acceph.eph
-    local acceph_aux = params.acceph.aux
-    local acceph_ephT = params.acceph.ephT
-    local acceph_ephU = params.acceph.ephU
-    TaylorSeries.identity!(acceph_t, dsj2k, 0)
-    local acceph_ind, acceph_δt = timeindex(acceph_eph, acceph_t)
-    # Evaluation of params.poteph
-    local poteph_t = params.poteph.t
-    local poteph_eph = params.poteph.eph
-    local poteph_aux = params.poteph.aux
-    local poteph_ephT = params.poteph.ephT
-    local poteph_ephU = params.poteph.ephU
-    TaylorSeries.identity!(poteph_t, dsj2k, 0)
-    local poteph_ind, poteph_δt = timeindex(poteph_eph, poteph_t)
-    @optionalthreads threads for i in eachindex(sseph_ephU)
-        TaylorSeries.zero!(sseph_ephT[i])
-        TaylorSeries.zero!(sseph_aux[i])
-        TaylorSeries._horner!(sseph_ephT[i], sseph_eph.p[sseph_ind, i], sseph_δt, sseph_aux[i])
-        TaylorSeries.zero!(sseph_ephU[i])
-        for k in eachindex(sseph_ephU[i])
-            _identity!(sseph_ephU[i], sseph_ephT[i], k)
-        end
-    end
-    @optionalthreads threads for i in eachindex(acceph_ephU)
-        TaylorSeries.zero!(acceph_ephT[i])
-        TaylorSeries.zero!(acceph_aux[i])
-        TaylorSeries._horner!(acceph_ephT[i], acceph_eph.p[acceph_ind, i], acceph_δt, acceph_aux[i])
-        TaylorSeries.zero!(acceph_ephU[i])
-        for k in eachindex(acceph_ephU[i])
-            _identity!(acceph_ephU[i], acceph_ephT[i], k)
-        end
-    end
-    @optionalthreads threads for i in eachindex(poteph_ephU)
-        TaylorSeries.zero!(poteph_ephT[i])
-        TaylorSeries.zero!(poteph_aux[i])
-        TaylorSeries._horner!(poteph_ephT[i], poteph_eph.p[poteph_ind, i], poteph_δt, poteph_aux[i])
-        TaylorSeries.zero!(poteph_ephU[i])
-        for k in eachindex(poteph_ephU[i])
-            _identity!(poteph_ephU[i], poteph_ephT[i], k)
-        end
-    end
 
     #=
     Point-mass accelerations
@@ -902,7 +806,7 @@ function gravityonly!(dq, q, params, t)
     _4dq1 = 4dq[1]
     _4dq2 = 4dq[2]
     _4dq3 = 4dq[3]
-    @optionalthreads threads for i in 1:Nm1
+    Threads.@threads for i in 1:Nm1
         # Velocity of the i-th body
         ui[i] = sseph_ephU[3(N-1+i)-2]    # X-axis component
         vi[i] = sseph_ephU[3(N-1+i)-1]    # Y-axis component
@@ -1067,7 +971,7 @@ function gravityonly!(dq, q, params, t)
 
     # 4*\sum term inside {}
     _4ϕj[N] = 4newtonianNb_Potential[N]
-    @optionalthreads threads for i in 1:10
+    Threads.@threads for i in 1:10
         # 4*\sum + \sum terms inside {}
         ϕi_plus_4ϕj[i] = poteph_ephU[i] + _4ϕj[N]
         # \dot{s}_j^2 + 2\dot{s}_i^2 - 4 <, > terms inside {}
@@ -1120,7 +1024,7 @@ function gravityonly!(dq, q, params, t)
         pntempZ = sumpnz
     end
     # Compute Newtonian accelerations due to Pluto and 16 asteroid perturbers
-    @optionalthreads threads for i in 11:Nm1
+    Threads.@threads for i in 11:Nm1
         # Full first term
         X_t_pn1[i] = c_p2*newton_acc_X[i]
         Y_t_pn1[i] = c_p2*newton_acc_Y[i]
@@ -1176,11 +1080,13 @@ than one thread, both in the parsed (`parse_eqs = true`) and non-parsed
 For other dynamical models, see [`nongravs!`](@ref), [`gravityonly!`](@ref) and
 [`sunearthmoon!`](@ref).
 """
-function newtonian!(dq, q, params, t)
+@cyclicbarrier function newtonian!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
+    # Solar system ephemeris at dsj2k
+    local sseph_ephU = params.sseph(dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
     # Number of bodies (perturbers + asteroid)
@@ -1192,26 +1098,6 @@ function newtonian!(dq, q, params, t)
 
     # zero(q[1])
     local zero_q_1 = params.zeroq1
-
-    # Use multi-threading only if requested and more than one thread is available
-    local threads = params.threads && Threads.threadpoolsize() > 1
-    # Evaluation of params.sseph
-    local sseph_t = params.sseph.t
-    local sseph_eph = params.sseph.eph
-    local sseph_aux = params.sseph.aux
-    local sseph_ephT = params.sseph.ephT
-    local sseph_ephU = params.sseph.ephU
-    TaylorSeries.identity!(sseph_t, dsj2k, 0)
-    local sseph_ind, sseph_δt = timeindex(sseph_eph, sseph_t)
-    @optionalthreads threads for i in eachindex(sseph_ephU)
-        TaylorSeries.zero!(sseph_ephT[i])
-        TaylorSeries.zero!(sseph_aux[i])
-        TaylorSeries._horner!(sseph_ephT[i], sseph_eph.p[sseph_ind, i], sseph_δt, sseph_aux[i])
-        TaylorSeries.zero!(sseph_ephU[i])
-        for k in eachindex(sseph_ephU[i])
-            _identity!(sseph_ephU[i], sseph_ephT[i], k)
-        end
-    end
 
     #=
     Point-mass accelerations
@@ -1255,7 +1141,7 @@ function newtonian!(dq, q, params, t)
     Compute point-mass Newtonian accelerations, all bodies
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
-    @optionalthreads threads for i in 1:Nm1
+    Threads.@threads for i in 1:Nm1
         # Position of the i-th body - position of the asteroid
         X[i] = sseph_ephU[3i-2]-q[1]      # X-axis component
         Y[i] = sseph_ephU[3i-1]-q[2]      # Y-axis component
@@ -1323,11 +1209,13 @@ For other dynamical models, see [`nongravs!`](@ref), [`gravityonly!`](@ref) and
     (the Sun, the Earth and the Moon); the overhead of synchronizing the tasks may
     even make the integration slower. Consider setting `threads = false`.
 """
-function sunearthmoon!(dq, q, params, t)
+@cyclicbarrier function sunearthmoon!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
+    # Solar system ephemeris at dsj2k
+    local sseph_ephU = params.sseph(dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
     # Number of bodies (perturbers + asteroid)
@@ -1339,26 +1227,6 @@ function sunearthmoon!(dq, q, params, t)
 
     # zero(q[1])
     local zero_q_1 = params.zeroq1
-
-    # Use multi-threading only if requested and more than one thread is available
-    local threads = params.threads && Threads.threadpoolsize() > 1
-    # Evaluation of params.sseph
-    local sseph_t = params.sseph.t
-    local sseph_eph = params.sseph.eph
-    local sseph_aux = params.sseph.aux
-    local sseph_ephT = params.sseph.ephT
-    local sseph_ephU = params.sseph.ephU
-    TaylorSeries.identity!(sseph_t, dsj2k, 0)
-    local sseph_ind, sseph_δt = timeindex(sseph_eph, sseph_t)
-    @optionalthreads threads for i in eachindex(sseph_ephU)
-        TaylorSeries.zero!(sseph_ephT[i])
-        TaylorSeries.zero!(sseph_aux[i])
-        TaylorSeries._horner!(sseph_ephT[i], sseph_eph.p[sseph_ind, i], sseph_δt, sseph_aux[i])
-        TaylorSeries.zero!(sseph_ephU[i])
-        for k in eachindex(sseph_ephU[i])
-            _identity!(sseph_ephU[i], sseph_ephT[i], k)
-        end
-    end
 
     #=
     Point-mass accelerations
@@ -1402,7 +1270,7 @@ function sunearthmoon!(dq, q, params, t)
     Compute point-mass Newtonian accelerations, all bodies
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
-    @optionalthreads threads for i in 1:Nm1
+    Threads.@threads for i in 1:Nm1
         # Position of the i-th body - position of the asteroid
         X[i] = sseph_ephU[3i-2]-q[1]      # X-axis component
         Y[i] = sseph_ephU[3i-1]-q[2]      # Y-axis component

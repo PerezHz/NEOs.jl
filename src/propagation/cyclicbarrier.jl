@@ -231,27 +231,6 @@ function cyclicbarrier_threaded(ex::Expr)
     return sort!(collect(shared)), q
 end
 
-function cyclicbarrier_expr(threads, ex)
-    # Verify the provided expression is actually a block
-    @assert ex isa Expr && ex.head === :block "Expression must be a block"
-    shared, threaded = cyclicbarrier_threaded(ex)
-    serial = remove_threads(ex)
-    decls = [Expr(:local, s) for s in shared]
-    # We use esc() to ensure variables resolve in the caller's scope (macro hygiene)
-    q = esc(quote
-        $(decls...)
-        if $threads
-            let
-                $threaded
-            end
-        else
-            $serial
-        end
-    end)
-    Base.remove_linenums!(q)
-    return q
-end
-
 # Fields of `DynamicalParameters` holding an `EphemerisEvaluationBuffer`
 const EPHEMERIS_BUFFERS = (:sseph, :acceph, :poteph)
 
@@ -447,54 +426,10 @@ loop is placed at the beginning of the code.
 !!! warning
     This macro is on an experimental stage; check the integration results carefully.
 
----
-
-    @cyclicbarrier [threads] ex
-
-Old form: modify a block containing `Threads.@threads` loops (see
-`cyclicbarrier_threaded`), choosing at runtime between the serial and
-multi-threaded code depending on `threads` (default: `true`).
 """
-macro cyclicbarrier(threads, ex)
-    return cyclicbarrier_expr(threads, ex)
-end
-
-macro cyclicbarrier(ex)
-    if ex isa Expr && ex.head === :function
-        return esc(cyclicbarrier_function(ex))
-    else
-        return cyclicbarrier_expr(true, ex)
-    end
-end
-
-"""
-    @optionalthreads threads [schedule] for ... end
-
-Run a `for` loop multi-threaded via `Threads.@threads` (with the optional
-`schedule` argument, e.g. `:static`) if `threads` is `true`, and as a plain
-serial `for` loop otherwise. `threads` is a `Bool` expression evaluated at
-runtime, e.g. `params.threads && Threads.threadpoolsize() > 1`.
-
-This macro is used in the non-parsed dynamical models of
-`src/propagation/dynamicalmodels.jl`. Since `@taylorize` only accepts
-`Threads.@threads`, every `@optionalthreads threads` must be replaced by
-`Threads.@threads` before generating the parsed methods of `jetcoeffs!`
-(see the header of `src/propagation/jetcoeffs.jl`).
-"""
-macro optionalthreads(threads, args...)
-    isempty(args) && throw(ArgumentError("@optionalthreads must be followed \
-        by a `for` loop"))
-    loop = args[end]
-    (loop isa Expr && loop.head === :for) || throw(ArgumentError("@optionalthreads \
-        must be followed by a `for` loop"))
-    threaded = Expr(:macrocall, Expr(:., :Threads, QuoteNode(Symbol("@threads"))),
-        __source__, args...)
+macro cyclicbarrier(fdef)
+    (fdef isa Expr && fdef.head === :function) || throw(ArgumentError("@cyclicbarrier \
+        must decorate a function definition"))
     # We use esc() to ensure variables resolve in the caller's scope (macro hygiene)
-    return esc(quote
-        if $threads
-            $threaded
-        else
-            $loop
-        end
-    end)
+    return esc(cyclicbarrier_function(fdef))
 end
