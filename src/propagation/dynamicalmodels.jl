@@ -28,7 +28,10 @@ Dynamical effects considered are:
 - Non-gravitational accelerations model (Marsden et al., 1973). See equations (1)-(5) in
     pages (211)-(212) of https://articles.adsabs.harvard.edu/pdf/1973AJ.....78..211M.
 
-To improve performance, some internal loops are multi-threaded via `@threads`.
+To improve performance, some internal loops can be multi-threaded via `@threads`.
+Multi-threading is optional and controlled by the `threads` keyword of
+[`Parameters`](@ref) (default: `true`). It only takes effect in the specialized
+methods of `jetcoeffs!` (`parse_eqs = true`).
 
 For other dynamical models, see [`gravityonly!`](@ref), [`newtonian!`](@ref) and
 [`sunearthmoon!`](@ref).
@@ -582,7 +585,10 @@ Dynamical effects considered are:
     (14)-(15) in page 9 and equations (34)-(35) in page 16 of
     https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract.
 
-To improve performance, some internal loops are multi-threaded via `@threads`.
+To improve performance, some internal loops can be multi-threaded via `@threads`.
+Multi-threading is optional and controlled by the `threads` keyword of
+[`Parameters`](@ref) (default: `true`). It only takes effect in the specialized
+methods of `jetcoeffs!` (`parse_eqs = true`).
 
 For other dynamical models, see [`nongravs!`](@ref), [`newtonian!`](@ref) and
 [`sunearthmoon!`](@ref).
@@ -1063,7 +1069,10 @@ Dynamical effects considered are:
 
 - Newtonian point-mass accelerations between all bodies.
 
-To improve performance, some internal loops are multi-threaded via `@threads`.
+To improve performance, some internal loops can be multi-threaded via `@threads`.
+Multi-threading is optional and controlled by the `threads` keyword of
+[`Parameters`](@ref) (default: `true`). It only takes effect in the specialized
+methods of `jetcoeffs!` (`parse_eqs = true`).
 
 For other dynamical models, see [`nongravs!`](@ref), [`gravityonly!`](@ref) and
 [`sunearthmoon!`](@ref).
@@ -1182,8 +1191,19 @@ Dynamical effects considered are:
 
 - Newtonian point-mass accelerations between all bodies.
 
+To improve performance, some internal loops can be multi-threaded via `@threads`.
+Multi-threading is optional and controlled by the `threads` keyword of
+[`Parameters`](@ref) (default: `true`). It only takes effect in the specialized
+methods of `jetcoeffs!` (`parse_eqs = true`).
+
 For other dynamical models, see [`nongravs!`](@ref), [`gravityonly!`](@ref) and
 [`newtonian!`](@ref).
+
+!!! warning
+    Although supported, multi-threading is not expected to speed up `sunearthmoon!`
+    significantly, since its only multi-threaded loop iterates over three bodies
+    (the Sun, the Earth and the Moon); the overhead of synchronizing the tasks may
+    even make the integration slower. Consider setting `threads = false`.
 """
 function sunearthmoon!(dq, q, params, t)
     # Julian date (TDB) of start time
@@ -1246,7 +1266,7 @@ function sunearthmoon!(dq, q, params, t)
     Compute point-mass Newtonian accelerations, all bodies
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
-    for i in 1:Nm1
+    Threads.@threads for i in 1:Nm1
         # Position of the i-th body - position of the asteroid
         X[i] = ss16asteph_t[3i-2]-q[1]      # X-axis component
         Y[i] = ss16asteph_t[3i-1]-q[2]      # Y-axis component
