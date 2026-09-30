@@ -114,7 +114,7 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         warmuptests(sunearthmoon!, q00, jd0, nyears, params2)
     end
 
-    @testset "Serial vs multithreaded consistency (2023 DW)" begin
+    @testset "Parsed/non-parsed and serial/multithreaded consistency (2023 DW)" begin
         # Initial time [Julian date TDB]
         jd0 = datetime2julian(DateTime(2023, 2, 25, 0, 0, 0))
         # Initial condition
@@ -123,25 +123,29 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         q00NG = vcat(q00, 0.0, 0.0, 0.0)
         # Time of integration [years]
         nyears = 0.1
-        # Propagation parameters
-        params1 = Parameters(maxsteps = 10, order = 15, abstol = 1E-12,
-                             parse_eqs = true, threads = false)
-        params2 = Parameters(params1; threads = true)
-        @test !params1.threads
-        @test params2.threads
+        # Propagation parameters: all combinations of parsed / non-parsed
+        # and serial / multithreaded integrations
+        params0 = Parameters(maxsteps = 10, order = 15, abstol = 1E-12)
+        paramsv = [Parameters(params0; parse_eqs, threads)
+                   for parse_eqs in (true, false) for threads in (false, true)]
+        @test [(p.parse_eqs, p.threads) for p in paramsv] ==
+            [(true, false), (true, true), (false, false), (false, true)]
 
         Threads.threadpoolsize() == 1 && @warn "Running with a single thread; " *
-            "both integrations use the serial branch of @cyclicbarrier"
+            "all integrations use serial code"
 
         for (dynamics, q0) in ((nongravs!, q00NG), (gravityonly!, q00),
                                (newtonian!, q00), (sunearthmoon!, q00))
             @testset "$dynamics" begin
-                sol1 = NEOs.propagate(dynamics, q0, jd0, nyears, params1)
-                sol2 = NEOs.propagate(dynamics, q0, jd0, nyears, params2)
+                sols = [NEOs.propagate(dynamics, q0, jd0, nyears, p) for p in paramsv]
                 # More than one step was taken
-                @test length(sol1.t) > 2
-                # Serial and multithreaded integrations must agree exactly
-                @test sol1 == sol2
+                @test length(first(sols).t) > 2
+                # All integrations must agree exactly with the parsed serial one
+                for (p, sol) in zip(paramsv[2:end], sols[2:end])
+                    @testset "parse_eqs = $(p.parse_eqs), threads = $(p.threads)" begin
+                        @test sol == first(sols)
+                    end
+                end
             end
         end
     end
