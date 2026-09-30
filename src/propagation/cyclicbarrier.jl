@@ -423,13 +423,21 @@ Every `local x = params.eph(t)` declaration, where `eph` is one of `:sseph`,
 corresponding `EphemerisEvaluationBuffer`, whose (multi-threaded) evaluation
 loop is placed at the beginning of the code.
 
+To keep the generated code readable, its nested macros are expanded and its
+`LineNumberNode`s are removed; hence, stack traces of errors inside the generated
+functions do not point to specific lines of their bodies.
+
 !!! warning
     This macro is on an experimental stage; check the integration results carefully.
-
 """
 macro cyclicbarrier(fdef)
     (fdef isa Expr && fdef.head === :function) || throw(ArgumentError("@cyclicbarrier \
         must decorate a function definition"))
+    q = cyclicbarrier_function(fdef)
+    # Expand the nested macros (e.g. Threads.@threads and Threads.@spawn) and remove
+    # the LineNumberNodes, so the generated code is easier to read
+    q = macroexpand(__module__, q; recursive = true)
+    Base.remove_linenums!(q)
     # We use esc() to ensure variables resolve in the caller's scope (macro hygiene)
-    return esc(cyclicbarrier_function(fdef))
+    return esc(q)
 end
