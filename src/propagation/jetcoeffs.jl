@@ -12,11 +12,13 @@
 # 3.- Paste `x` and `y` in this file
 # In addition, to avoid the spawning of tasks at every Threads.@threads loop and to
 # allow multi-threading to be turned off via params.threads:
+# - Define `local threads = params.threads && Threads.threadpoolsize() > 1`, so the
+#   serial code is also used when Julia runs with a single thread
 # - In jetcoeffs!, place the internal loop in a begin ... end block and decorate it
-#   with @cyclicbarrier params.threads
+#   with @cyclicbarrier threads
 # - In _allocate_jetcoeffs!, place the function's body (except the `order = ...` line,
 #   the `local` declarations and the `return` statement) in a begin ... end block and
-#   decorate it with @cyclicbarrier params.threads
+#   decorate it with @cyclicbarrier threads
 # - In both functions, explicitly include the Solar System ephemeris evaluation
 #   blocks, i.e. replace `local ss16asteph_t = params.sseph(dsj2k)` (and analogously
 #   for params.acceph and params.poteph) by the `local` declarations before the
@@ -42,6 +44,8 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}
     local marsden_k = -(params.marsden_radial[5])
     local zero_q_1 = params.zeroq1
     local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
+    # Use multi-threading only if requested and more than one thread is available
+    local threads = params.threads && Threads.threadpoolsize() > 1
     # Evaluation of params.sseph
     local sseph_t = params.sseph.t
     local sseph_eph = params.sseph.eph
@@ -66,7 +70,7 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}
     local poteph_ephU = params.poteph.ephU
     TaylorSeries.identity!(poteph_t, dsj2k, 0)
     local poteph_ind, poteph_δt = timeindex(poteph_eph, poteph_t)
-    @cyclicbarrier params.threads begin
+    @cyclicbarrier threads begin
         Threads.@threads for i in eachindex(sseph_ephU)
             TaylorSeries.zero!(sseph_ephT[i])
             TaylorSeries.zero!(sseph_aux[i])
@@ -1014,6 +1018,8 @@ function TaylorIntegration.jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}, q::Abstr
     local marsden_k = -(params.marsden_radial[5])
     local zero_q_1 = params.zeroq1
     local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
+    # Use multi-threading only if requested and more than one thread is available
+    local threads = params.threads && Threads.threadpoolsize() > 1
     # Evaluation of params.sseph
     local sseph_t = params.sseph.t
     local sseph_eph = params.sseph.eph
@@ -1038,7 +1044,7 @@ function TaylorIntegration.jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}, q::Abstr
     local poteph_ephU = params.poteph.ephU
     TaylorSeries.identity!(poteph_t, dsj2k, 0)
     local poteph_ind, poteph_δt = timeindex(poteph_eph, poteph_t)
-    @cyclicbarrier params.threads begin
+    @cyclicbarrier threads begin
         Threads.@threads for i in eachindex(sseph_ephU)
             TaylorSeries.zero!(sseph_ephT[i])
             TaylorSeries.zero!(sseph_aux[i])
@@ -1361,6 +1367,8 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{gravityonly!}, t::Taylor1{
     local orientAlloc = params.orientAlloc
     local zero_q_1 = params.zeroq1
     local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
+    # Use multi-threading only if requested and more than one thread is available
+    local threads = params.threads && Threads.threadpoolsize() > 1
     # Evaluation of params.sseph
     local sseph_t = params.sseph.t
     local sseph_eph = params.sseph.eph
@@ -1385,7 +1393,7 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{gravityonly!}, t::Taylor1{
     local poteph_ephU = params.poteph.ephU
     TaylorSeries.identity!(poteph_t, dsj2k, 0)
     local poteph_ind, poteph_δt = timeindex(poteph_eph, poteph_t)
-    @cyclicbarrier params.threads begin
+    @cyclicbarrier threads begin
         Threads.@threads for i in eachindex(sseph_ephU)
             TaylorSeries.zero!(sseph_ephT[i])
             TaylorSeries.zero!(sseph_aux[i])
@@ -2163,6 +2171,8 @@ function TaylorIntegration.jetcoeffs!(::Val{gravityonly!}, t::Taylor1{_T}, q::Ab
     local orientAlloc = params.orientAlloc
     local zero_q_1 = params.zeroq1
     local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
+    # Use multi-threading only if requested and more than one thread is available
+    local threads = params.threads && Threads.threadpoolsize() > 1
     # Evaluation of params.sseph
     local sseph_t = params.sseph.t
     local sseph_eph = params.sseph.eph
@@ -2187,7 +2197,7 @@ function TaylorIntegration.jetcoeffs!(::Val{gravityonly!}, t::Taylor1{_T}, q::Ab
     local poteph_ephU = params.poteph.ephU
     TaylorSeries.identity!(poteph_t, dsj2k, 0)
     local poteph_ind, poteph_δt = timeindex(poteph_eph, poteph_t)
-    @cyclicbarrier params.threads begin
+    @cyclicbarrier threads begin
         Threads.@threads for i in eachindex(sseph_ephU)
             TaylorSeries.zero!(sseph_ephT[i])
             TaylorSeries.zero!(sseph_aux[i])
@@ -2434,6 +2444,8 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T
     local Nm1 = N - 1
     local μ = params.μ
     local zero_q_1 = params.zeroq1
+    # Use multi-threading only if requested and more than one thread is available
+    local threads = params.threads && Threads.threadpoolsize() > 1
     # Evaluation of params.sseph
     local sseph_t = params.sseph.t
     local sseph_eph = params.sseph.eph
@@ -2442,7 +2454,7 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T
     local sseph_ephU = params.sseph.ephU
     TaylorSeries.identity!(sseph_t, dsj2k, 0)
     local sseph_ind, sseph_δt = timeindex(sseph_eph, sseph_t)
-    @cyclicbarrier params.threads begin
+    @cyclicbarrier threads begin
         Threads.@threads for i in eachindex(sseph_ephU)
             TaylorSeries.zero!(sseph_ephT[i])
             TaylorSeries.zero!(sseph_aux[i])
@@ -2568,6 +2580,8 @@ function TaylorIntegration.jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T}, q::Abst
     local Nm1 = N - 1
     local μ = params.μ
     local zero_q_1 = params.zeroq1
+    # Use multi-threading only if requested and more than one thread is available
+    local threads = params.threads && Threads.threadpoolsize() > 1
     # Evaluation of params.sseph
     local sseph_t = params.sseph.t
     local sseph_eph = params.sseph.eph
@@ -2576,7 +2590,7 @@ function TaylorIntegration.jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T}, q::Abst
     local sseph_ephU = params.sseph.ephU
     TaylorSeries.identity!(sseph_t, dsj2k, 0)
     local sseph_ind, sseph_δt = timeindex(sseph_eph, sseph_t)
-    @cyclicbarrier params.threads begin
+    @cyclicbarrier threads begin
         Threads.@threads for i in eachindex(sseph_ephU)
             TaylorSeries.zero!(sseph_ephT[i])
             TaylorSeries.zero!(sseph_aux[i])
@@ -2641,6 +2655,8 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{sunearthmoon!}, t::Taylor1
     local Nm1 = N - 1
     local μ = params.μ
     local zero_q_1 = params.zeroq1
+    # Use multi-threading only if requested and more than one thread is available
+    local threads = params.threads && Threads.threadpoolsize() > 1
     # Evaluation of params.sseph
     local sseph_t = params.sseph.t
     local sseph_eph = params.sseph.eph
@@ -2649,7 +2665,7 @@ function TaylorIntegration._allocate_jetcoeffs!(::Val{sunearthmoon!}, t::Taylor1
     local sseph_ephU = params.sseph.ephU
     TaylorSeries.identity!(sseph_t, dsj2k, 0)
     local sseph_ind, sseph_δt = timeindex(sseph_eph, sseph_t)
-    @cyclicbarrier params.threads begin
+    @cyclicbarrier threads begin
         Threads.@threads for i in eachindex(sseph_ephU)
             TaylorSeries.zero!(sseph_ephT[i])
             TaylorSeries.zero!(sseph_aux[i])
@@ -2775,6 +2791,8 @@ function TaylorIntegration.jetcoeffs!(::Val{sunearthmoon!}, t::Taylor1{_T}, q::A
     local Nm1 = N - 1
     local μ = params.μ
     local zero_q_1 = params.zeroq1
+    # Use multi-threading only if requested and more than one thread is available
+    local threads = params.threads && Threads.threadpoolsize() > 1
     # Evaluation of params.sseph
     local sseph_t = params.sseph.t
     local sseph_eph = params.sseph.eph
@@ -2783,7 +2801,7 @@ function TaylorIntegration.jetcoeffs!(::Val{sunearthmoon!}, t::Taylor1{_T}, q::A
     local sseph_ephU = params.sseph.ephU
     TaylorSeries.identity!(sseph_t, dsj2k, 0)
     local sseph_ind, sseph_δt = timeindex(sseph_eph, sseph_t)
-    @cyclicbarrier params.threads begin
+    @cyclicbarrier threads begin
         Threads.@threads for i in eachindex(sseph_ephU)
             TaylorSeries.zero!(sseph_ephT[i])
             TaylorSeries.zero!(sseph_aux[i])

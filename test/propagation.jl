@@ -130,8 +130,8 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         @test !params1.threads
         @test params2.threads
 
-        Threads.nthreads() == 1 && @warn "Running with a single thread; " *
-            "the multithreaded branch of @cyclicbarrier uses only one task"
+        Threads.threadpoolsize() == 1 && @warn "Running with a single thread; " *
+            "both integrations use the serial branch of @cyclicbarrier"
 
         for (dynamics, q0) in ((nongravs!, q00NG), (gravityonly!, q00),
                                (newtonian!, q00), (sunearthmoon!, q00))
