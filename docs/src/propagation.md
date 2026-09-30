@@ -18,7 +18,7 @@ In the following table we summarize the dynamical effects included in each model
 | IAU 1976/1980 Earth orientation model [Folkner2014](@cite) |   ❌   |   ❌   |   ✅   |   ✅   |
 | Moon's orientation model [Folkner2014](@cite)              |   ❌   |   ❌   |   ✅   |   ✅   |
 | Non-gravitational accelerations [Marsden1973](@cite)       |   ❌   |   ❌   |   ❌   |   ✅   |
-| Multi-threaded internal loops                              |   ❌   |   ✅   |   ✅   |   ✅   |
+| Multi-threaded internal loops (optional, see [Multi-threading](@ref MultiThreading)) |   ✅   |   ✅   |   ✅   |   ✅   |
 
 For now, let's use `newtonian!` as the dynamical model.
 ```@example Apophis
@@ -57,6 +57,9 @@ fwd = propagate(dynamics, q00, jd0, nyears_fwd, params)
     - `order`: the degree of the Taylor expansions with respect to time,
     - `abstol`: the absolute tolerance, used to compute the step size.
 
+    Also, the `threads` parameter controls whether the dynamical model uses
+    multiple threads; see [Multi-threading](@ref MultiThreading).
+
 !!! note
     With NEOs plotting recipes we can visualize Apophis' orbit and compare it
     with Earth's.
@@ -74,6 +77,37 @@ fwd = propagate(dynamics, q00, jd0, nyears_fwd, params)
     plot!(fwd, t0, tf, label = "Apophis", color = :deepskyblue, linewidth = 2,
         N = 1_000, projection = :xy)
     ````
+
+## [Multi-threading](@id MultiThreading)
+
+All dynamical models can evaluate their most expensive internal loops (e.g. the
+interactions between the object of interest and the perturbing bodies) using multiple
+threads. This behaviour is controlled by the `threads` parameter (default: `true`):
+```julia
+params = Parameters(maxsteps = 1_000, order = 15, abstol = 1E-12, threads = true)
+```
+Multi-threading is used only if `threads = true` and Julia was started with more than one
+thread (e.g. `julia --threads=4`, or setting the `JULIA_NUM_THREADS` environment variable);
+otherwise, the serial version of the dynamical model is used. This applies to both the
+parsed (`parse_eqs = true`, default) and non-parsed (`parse_eqs = false`) versions of the
+model, and the serial and multi-threaded integrations give exactly the same results.
+
+Using multiple threads within the dynamical model speeds up a single propagation, which is
+useful, for instance, when determining the orbit of an object. However, when many
+independent propagations are needed (e.g. to propagate many samples of an uncertainty
+region), it is usually more efficient to set `threads = false` and use the threads to run
+several propagations at once:
+```julia
+params = Parameters(params; threads = false)
+tasks = [Threads.@spawn propagate(dynamics, q, jd0, nyears_fwd, params) for q in q0s]
+sols = fetch.(tasks)
+```
+where `q0s` is a vector of initial conditions.
+
+!!! warning
+    `sunearthmoon!` supports multi-threading, but its multi-threaded loop only iterates
+    over three bodies (the Sun, the Earth and the Moon), so using multiple threads is not
+    expected to offer any significant speed-up.
 
 ## Jet transport
 

@@ -28,22 +28,26 @@ Dynamical effects considered are:
 - Non-gravitational accelerations model (Marsden et al., 1973). See equations (1)-(5) in
     pages (211)-(212) of https://articles.adsabs.harvard.edu/pdf/1973AJ.....78..211M.
 
-To improve performance, some internal loops are multi-threaded via `@threads`.
+To improve performance, some internal loops can be multi-threaded via `@threads`.
+Multi-threading is optional and controlled by the `threads` keyword of
+[`Parameters`](@ref) (default: `true`); it is used only if Julia runs with more
+than one thread, both in the parsed (`parse_eqs = true`) and non-parsed
+(`parse_eqs = false`) versions of the model.
 
 For other dynamical models, see [`gravityonly!`](@ref), [`newtonian!`](@ref) and
 [`sunearthmoon!`](@ref).
 """
-function nongravs!(dq, q, params, t)
+@cyclicbarrier function nongravs!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = params.sseph(dsj2k)
+    local sseph_ephU = params.sseph(dsj2k)
     # Accelerations at dsj2k
-    local acceph_t = params.acceph(dsj2k)
+    local acceph_ephU = params.acceph(dsj2k)
     # Newtonian potentials at dsj2k
-    local newtonianNb_Potential_t = params.poteph(dsj2k)
+    local poteph_ephU = params.poteph(dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
@@ -255,14 +259,14 @@ function nongravs!(dq, q, params, t)
     _4dq3 = 4dq[3]
     Threads.@threads for i in 1:Nm1
         # Velocity of the i-th body
-        ui[i] = ss16asteph_t[3(N-1+i)-2]    # X-axis component
-        vi[i] = ss16asteph_t[3(N-1+i)-1]    # Y-axis component
-        wi[i] = ss16asteph_t[3(N-1+i)  ]    # Z-axis component
+        ui[i] = sseph_ephU[3(N-1+i)-2]    # X-axis component
+        vi[i] = sseph_ephU[3(N-1+i)-1]    # Y-axis component
+        wi[i] = sseph_ephU[3(N-1+i)  ]    # Z-axis component
 
         # Position of the i-th body - position of the asteroid
-        X[i] = ss16asteph_t[3i-2]-q[1]      # X-axis component
-        Y[i] = ss16asteph_t[3i-1]-q[2]      # Y-axis component
-        Z[i] = ss16asteph_t[3i  ]-q[3]      # Z-axis component
+        X[i] = sseph_ephU[3i-2]-q[1]      # X-axis component
+        Y[i] = sseph_ephU[3i-1]-q[2]      # Y-axis component
+        Z[i] = sseph_ephU[3i  ]-q[3]      # Z-axis component
 
         # Velocity of the i-th body - velocity of the asteroid
         U[i] = ui[i]-dq[1]                  # X-axis component
@@ -420,7 +424,7 @@ function nongravs!(dq, q, params, t)
     _4ϕj[N] = 4newtonianNb_Potential[N]
     Threads.@threads for i in 1:10
         # 4*\sum + \sum terms inside {}
-        ϕi_plus_4ϕj[i] = newtonianNb_Potential_t[i] + _4ϕj[N]
+        ϕi_plus_4ϕj[i] = poteph_ephU[i] + _4ϕj[N]
         # \dot{s}_j^2 + 2\dot{s}_i^2 - 4 <, > terms inside {}
         sj2_plus_2si2_minus_4vivj[i] = ( (2v2[i]) - (4vi_dot_vj[i]) ) + v2[N]
         # -4\sum - \sum + \dot{s}_j^2 + 2\dot{s}_i^2  - 4<, > terms inside {}
@@ -441,9 +445,9 @@ function nongravs!(dq, q, params, t)
         pn1t1_7[i] = c_p2 + pn1t2_7
 
         # Last term inside the {}
-        pNX_t_X[i] = acceph_t[3i-2]*X[i]   # X-axis component
-        pNY_t_Y[i] = acceph_t[3i-1]*Y[i]   # Y-axis component
-        pNZ_t_Z[i] = acceph_t[3i  ]*Z[i]   # Z-axis component
+        pNX_t_X[i] = acceph_ephU[3i-2]*X[i]   # X-axis component
+        pNY_t_Y[i] = acceph_ephU[3i-1]*Y[i]   # Y-axis component
+        pNZ_t_Z[i] = acceph_ephU[3i  ]*Z[i]   # Z-axis component
 
         # Everything inside the {} in the first term
         pn1[i] = (  pn1t1_7[i]  +  (0.5*( (pNX_t_X[i]+pNY_t_Y[i]) + pNZ_t_Z[i] ))  )
@@ -454,9 +458,9 @@ function nongravs!(dq, q, params, t)
         Z_t_pn1[i] = newton_acc_Z[i]*pn1[i]   # Z-axis component
 
         # Full third term
-        pNX_t_pn3[i] = acceph_t[3i-2]*pn3[i]   # X-axis component
-        pNY_t_pn3[i] = acceph_t[3i-1]*pn3[i]   # Y-axis component
-        pNZ_t_pn3[i] = acceph_t[3i  ]*pn3[i]   # Z-axis component
+        pNX_t_pn3[i] = acceph_ephU[3i-2]*pn3[i]   # X-axis component
+        pNY_t_pn3[i] = acceph_ephU[3i-1]*pn3[i]   # Y-axis component
+        pNZ_t_pn3[i] = acceph_ephU[3i  ]*pn3[i]   # Z-axis component
     end
     # Temporary post-Newtonian accelerations (planets)
     for i in 1:10
@@ -582,22 +586,26 @@ Dynamical effects considered are:
     (14)-(15) in page 9 and equations (34)-(35) in page 16 of
     https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract.
 
-To improve performance, some internal loops are multi-threaded via `@threads`.
+To improve performance, some internal loops can be multi-threaded via `@threads`.
+Multi-threading is optional and controlled by the `threads` keyword of
+[`Parameters`](@ref) (default: `true`); it is used only if Julia runs with more
+than one thread, both in the parsed (`parse_eqs = true`) and non-parsed
+(`parse_eqs = false`) versions of the model.
 
 For other dynamical models, see [`nongravs!`](@ref), [`newtonian!`](@ref) and
 [`sunearthmoon!`](@ref).
 """
-function gravityonly!(dq, q, params, t)
+@cyclicbarrier function gravityonly!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = params.sseph(dsj2k)
+    local sseph_ephU = params.sseph(dsj2k)
     # Accelerations at dsj2k
-    local acceph_t = params.acceph(dsj2k)
+    local acceph_ephU = params.acceph(dsj2k)
     # Newtonian potentials at dsj2k
-    local newtonianNb_Potential_t = params.poteph(dsj2k)
+    local poteph_ephU = params.poteph(dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
     # Interaction matrix with flattened bodies
@@ -800,14 +808,14 @@ function gravityonly!(dq, q, params, t)
     _4dq3 = 4dq[3]
     Threads.@threads for i in 1:Nm1
         # Velocity of the i-th body
-        ui[i] = ss16asteph_t[3(N-1+i)-2]    # X-axis component
-        vi[i] = ss16asteph_t[3(N-1+i)-1]    # Y-axis component
-        wi[i] = ss16asteph_t[3(N-1+i)  ]    # Z-axis component
+        ui[i] = sseph_ephU[3(N-1+i)-2]    # X-axis component
+        vi[i] = sseph_ephU[3(N-1+i)-1]    # Y-axis component
+        wi[i] = sseph_ephU[3(N-1+i)  ]    # Z-axis component
 
         # Position of the i-th body - position of the asteroid
-        X[i] = ss16asteph_t[3i-2]-q[1]      # X-axis component
-        Y[i] = ss16asteph_t[3i-1]-q[2]      # Y-axis component
-        Z[i] = ss16asteph_t[3i  ]-q[3]      # Z-axis component
+        X[i] = sseph_ephU[3i-2]-q[1]      # X-axis component
+        Y[i] = sseph_ephU[3i-1]-q[2]      # Y-axis component
+        Z[i] = sseph_ephU[3i  ]-q[3]      # Z-axis component
 
         # Velocity of the i-th body - velocity of the asteroid
         U[i] = ui[i]-dq[1]                  # X-axis component
@@ -965,7 +973,7 @@ function gravityonly!(dq, q, params, t)
     _4ϕj[N] = 4newtonianNb_Potential[N]
     Threads.@threads for i in 1:10
         # 4*\sum + \sum terms inside {}
-        ϕi_plus_4ϕj[i] = newtonianNb_Potential_t[i] + _4ϕj[N]
+        ϕi_plus_4ϕj[i] = poteph_ephU[i] + _4ϕj[N]
         # \dot{s}_j^2 + 2\dot{s}_i^2 - 4 <, > terms inside {}
         sj2_plus_2si2_minus_4vivj[i] = ( (2v2[i]) - (4vi_dot_vj[i]) ) + v2[N]
         # -4\sum - \sum + \dot{s}_j^2 + 2\dot{s}_i^2  - 4<, > terms inside {}
@@ -986,9 +994,9 @@ function gravityonly!(dq, q, params, t)
         pn1t1_7[i] = c_p2 + pn1t2_7
 
         # Last term inside the {}
-        pNX_t_X[i] = acceph_t[3i-2]*X[i]   # X-axis component
-        pNY_t_Y[i] = acceph_t[3i-1]*Y[i]   # Y-axis component
-        pNZ_t_Z[i] = acceph_t[3i  ]*Z[i]   # Z-axis component
+        pNX_t_X[i] = acceph_ephU[3i-2]*X[i]   # X-axis component
+        pNY_t_Y[i] = acceph_ephU[3i-1]*Y[i]   # Y-axis component
+        pNZ_t_Z[i] = acceph_ephU[3i  ]*Z[i]   # Z-axis component
 
         # Everything inside the {} in the first term
         pn1[i] = (  pn1t1_7[i]  +  (0.5*( (pNX_t_X[i]+pNY_t_Y[i]) + pNZ_t_Z[i] ))  )
@@ -999,9 +1007,9 @@ function gravityonly!(dq, q, params, t)
         Z_t_pn1[i] = newton_acc_Z[i]*pn1[i]   # Z-axis component
 
         # Full third term
-        pNX_t_pn3[i] = acceph_t[3i-2]*pn3[i]   # X-axis component
-        pNY_t_pn3[i] = acceph_t[3i-1]*pn3[i]   # Y-axis component
-        pNZ_t_pn3[i] = acceph_t[3i  ]*pn3[i]   # Z-axis component
+        pNX_t_pn3[i] = acceph_ephU[3i-2]*pn3[i]   # X-axis component
+        pNY_t_pn3[i] = acceph_ephU[3i-1]*pn3[i]   # Y-axis component
+        pNZ_t_pn3[i] = acceph_ephU[3i  ]*pn3[i]   # Z-axis component
     end
     # Temporary post-Newtonian accelerations (planets)
     for i in 1:10
@@ -1063,18 +1071,22 @@ Dynamical effects considered are:
 
 - Newtonian point-mass accelerations between all bodies.
 
-To improve performance, some internal loops are multi-threaded via `@threads`.
+To improve performance, some internal loops can be multi-threaded via `@threads`.
+Multi-threading is optional and controlled by the `threads` keyword of
+[`Parameters`](@ref) (default: `true`); it is used only if Julia runs with more
+than one thread, both in the parsed (`parse_eqs = true`) and non-parsed
+(`parse_eqs = false`) versions of the model.
 
 For other dynamical models, see [`nongravs!`](@ref), [`gravityonly!`](@ref) and
 [`sunearthmoon!`](@ref).
 """
-function newtonian!(dq, q, params, t)
+@cyclicbarrier function newtonian!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = params.sseph(dsj2k)
+    local sseph_ephU = params.sseph(dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
     # Number of bodies (perturbers + asteroid)
@@ -1131,9 +1143,9 @@ function newtonian!(dq, q, params, t)
     =#
     Threads.@threads for i in 1:Nm1
         # Position of the i-th body - position of the asteroid
-        X[i] = ss16asteph_t[3i-2]-q[1]      # X-axis component
-        Y[i] = ss16asteph_t[3i-1]-q[2]      # Y-axis component
-        Z[i] = ss16asteph_t[3i  ]-q[3]      # Z-axis component
+        X[i] = sseph_ephU[3i-2]-q[1]      # X-axis component
+        Y[i] = sseph_ephU[3i-1]-q[2]      # Y-axis component
+        Z[i] = sseph_ephU[3i  ]-q[3]      # Z-axis component
 
         # Distance between the i-th body and the asteroid
         r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,asteroid}^2
@@ -1182,16 +1194,28 @@ Dynamical effects considered are:
 
 - Newtonian point-mass accelerations between all bodies.
 
+To improve performance, some internal loops can be multi-threaded via `@threads`.
+Multi-threading is optional and controlled by the `threads` keyword of
+[`Parameters`](@ref) (default: `true`); it is used only if Julia runs with more
+than one thread, both in the parsed (`parse_eqs = true`) and non-parsed
+(`parse_eqs = false`) versions of the model.
+
 For other dynamical models, see [`nongravs!`](@ref), [`gravityonly!`](@ref) and
 [`newtonian!`](@ref).
+
+!!! warning
+    Although supported, multi-threading is not expected to speed up `sunearthmoon!`
+    significantly, since its only multi-threaded loop iterates over three bodies
+    (the Sun, the Earth and the Moon); the overhead of synchronizing the tasks may
+    even make the integration slower. Consider setting `threads = false`.
 """
-function sunearthmoon!(dq, q, params, t)
+@cyclicbarrier function sunearthmoon!(dq, q, params, t)
     # Julian date (TDB) of start time
     local jd0 = params.jd0
     # Days since J2000.0 = 2.451545e6
     local dsj2k = t + (jd0 - JD_J2000)
     # Solar system ephemeris at dsj2k
-    local ss16asteph_t = params.sseph(dsj2k)
+    local sseph_ephU = params.sseph(dsj2k)
     # Type of position / velocity components
     local S = eltype(q)
     # Number of bodies (perturbers + asteroid)
@@ -1246,11 +1270,11 @@ function sunearthmoon!(dq, q, params, t)
     Compute point-mass Newtonian accelerations, all bodies
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
-    for i in 1:Nm1
+    Threads.@threads for i in 1:Nm1
         # Position of the i-th body - position of the asteroid
-        X[i] = ss16asteph_t[3i-2]-q[1]      # X-axis component
-        Y[i] = ss16asteph_t[3i-1]-q[2]      # Y-axis component
-        Z[i] = ss16asteph_t[3i  ]-q[3]      # Z-axis component
+        X[i] = sseph_ephU[3i-2]-q[1]      # X-axis component
+        Y[i] = sseph_ephU[3i-1]-q[2]      # Y-axis component
+        Z[i] = sseph_ephU[3i  ]-q[3]      # Z-axis component
 
         # Distance between the i-th body and the asteroid
         r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,asteroid}^2
