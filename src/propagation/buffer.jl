@@ -84,6 +84,7 @@ mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
     orientAlloc::Union{Nothing, RetAlloc{Taylor1{T}}}
     Mmatrix::Array{Taylor1{U},3}
     zeroq1::Taylor1{U}
+    threads::Bool
 end
 
 """
@@ -125,7 +126,7 @@ function PropagationBuffer(
         params::Parameters{T}; R_TP::T = 0.2
     ) where {D, T <: Real, U <: Number, V <: Number}
     # Unpack parameters
-    @unpack order, maxsteps, marsden_radial, parse_eqs = params
+    @unpack order, maxsteps, marsden_radial, parse_eqs, threads = params
     # Number of bodies (perturbers + asteroid)
     N = numberofbodies(Val(dynamics))
     # Gravitational parameters
@@ -158,7 +159,7 @@ function PropagationBuffer(
     end
     # Dynamical parameters for `propagate`
     dparams = DynamicalParameters{T, U, V}(N, jd0, R_TP, μ, marsden_radial, _sseph_,
-        UJ_interaction, _acceph_, _poteph_, _orientation_, M_, zero_q_1)
+        UJ_interaction, _acceph_, _poteph_, _orientation_, M_, zero_q_1, threads)
     # TaylorIntegration cache
     cache = init_cache(Val(true), zero(T), q0, maxsteps, order, dynamics, dparams;
                        parse_eqs)

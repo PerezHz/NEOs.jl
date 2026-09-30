@@ -15,6 +15,8 @@ A collection of the most important parameters in `NEOs.jl` functions.
     (default: `1e-20`).
 - `parse_eqs::Bool`: whether to use the specialized method of `jetcoeffs` or not
     (default: `true`).
+- `threads::Bool`: whether to use multi-threading inside the specialized methods of
+    `jetcoeffs` or not (default: `true`).
 - `bwdoffset/fwdoffset::T`: days to propagate beyond first (bwd) / last (fwd) observation
     (default: `0.5`).
 - `coeffstol::T`: maximum size of the coefficients (default: `10.0`).
@@ -95,6 +97,7 @@ nongravitational accelerations model:
     order::Int = 25
     abstol::T = 1e-20
     parse_eqs::Bool = true
+    threads::Bool = true
     bwdoffset::T = 0.5
     fwdoffset::T = 0.5
     coeffstol::T = 10.0

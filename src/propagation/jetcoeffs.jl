@@ -12,7 +12,8 @@
 # 3.- Paste `x` and `y` in this file
 # In addition, to avoid the spawning of tasks at every iteration of the jetcoeffs!
 # internal loop:
-# - Place the internal loop in a begin ... end block and decorate it with @cyclicbarrier
+# - Place the internal loop in a begin ... end block and decorate it with
+#   @cyclicbarrier params.threads (so multi-threading can be turned off via params)
 # - Explicitly include the Solar System ephemeris evaluation blocks
 
 # nongravs!
@@ -979,7 +980,7 @@ function TaylorIntegration.jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}, q::Abstr
     local poteph_ephU = params.poteph.ephU
     TaylorSeries.identity!(poteph_t, dsj2k, 0)
     local poteph_ind, poteph_δt = timeindex(poteph_eph, poteph_t)
-    @cyclicbarrier begin
+    @cyclicbarrier params.threads begin
         Threads.@threads for i in eachindex(sseph_ephU)
             TaylorSeries.zero!(sseph_ephT[i])
             TaylorSeries.zero!(sseph_aux[i])
@@ -2078,7 +2079,7 @@ function TaylorIntegration.jetcoeffs!(::Val{gravityonly!}, t::Taylor1{_T}, q::Ab
     local poteph_ephU = params.poteph.ephU
     TaylorSeries.identity!(poteph_t, dsj2k, 0)
     local poteph_ind, poteph_δt = timeindex(poteph_eph, poteph_t)
-    @cyclicbarrier begin
+    @cyclicbarrier params.threads begin
         Threads.@threads for i in eachindex(sseph_ephU)
             TaylorSeries.zero!(sseph_ephT[i])
             TaylorSeries.zero!(sseph_aux[i])
@@ -2449,7 +2450,7 @@ function TaylorIntegration.jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T}, q::Abst
     local sseph_ephU = params.sseph.ephU
     TaylorSeries.identity!(sseph_t, dsj2k, 0)
     local sseph_ind, sseph_δt = timeindex(sseph_eph, sseph_t)
-    @cyclicbarrier begin
+    @cyclicbarrier params.threads begin
         Threads.@threads for i in eachindex(sseph_ephU)
             TaylorSeries.zero!(sseph_ephT[i])
             TaylorSeries.zero!(sseph_aux[i])
