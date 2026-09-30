@@ -5,26 +5,34 @@
 
 # To update the functions below do the following:
 # 1.- Update the corresponding function in src/propagation/dynamicalmodels.jl
-# 2.- Run:
+# 2.- Copy the function and revert it to the format accepted by @taylorize:
+#     - Replace every `@optionalthreads threads for` by `Threads.@threads for`
+#     - Replace the explicit evaluation of each Solar System ephemeris, i.e. the
+#       `# Evaluation of params.sseph` block of `local` declarations (plus the
+#       `TaylorSeries.identity!(sseph_t, dsj2k, 0)` call) and the corresponding
+#       `Threads.@threads for i in eachindex(sseph_ephU)` loop, by
+#       `local sseph_ephU = params.sseph(dsj2k)`; analogously for params.acceph
+#       and params.poteph
+#     The `local threads = ...` line can be kept, since @taylorize copies `local`
+#     declarations as they are
+# 3.- Run:
 # julia> using TaylorIntegration
-# julia> ex = :(paste here the modified function)
+# julia> ex = :(paste here the reverted function)
 # julia> x, y = TaylorIntegration._make_parsed_jetcoeffs(ex)
-# 3.- Paste `x` and `y` in this file
-# In addition, to avoid the spawning of tasks at every Threads.@threads loop and to
-# allow multi-threading to be turned off via params.threads:
-# - Define `local threads = params.threads && Threads.threadpoolsize() > 1`, so the
-#   serial code is also used when Julia runs with a single thread
-# - In jetcoeffs!, place the internal loop in a begin ... end block and decorate it
-#   with @cyclicbarrier threads
-# - In _allocate_jetcoeffs!, place the function's body (except the `order = ...` line,
-#   the `local` declarations and the `return` statement) in a begin ... end block and
-#   decorate it with @cyclicbarrier threads
-# - In both functions, explicitly include the Solar System ephemeris evaluation
-#   blocks, i.e. replace `local ss16asteph_t = params.sseph(dsj2k)` (and analogously
-#   for params.acceph and params.poteph) by the `local` declarations before the
-#   block and the Threads.@threads loop at the beginning of the block, and rename
-#   ss16asteph_t, acceph_t and newtonianNb_Potential_t to sseph_ephU, acceph_ephU
-#   and poteph_ephU
+# 4.- Paste `x` and `y` in this file and, in both methods:
+#     - Unfold the Solar System ephemerides evaluation again, i.e. replace
+#       `local sseph_ephU = params.sseph(dsj2k)` by the `local` declarations
+#       (plus the `TaylorSeries.identity!` call) before the @cyclicbarrier block
+#       and the `Threads.@threads for i in eachindex(sseph_ephU)` loop at the
+#       beginning of the block; analogously for params.acceph and params.poteph
+#     - In jetcoeffs!, place the internal loop in a begin ... end block and
+#       decorate it with @cyclicbarrier threads, to avoid spawning tasks at every
+#       Threads.@threads loop
+#     - In _allocate_jetcoeffs!, place the function's body (except the
+#       `order = ...` line, the `local` declarations and the `return` statement)
+#       in a begin ... end block and decorate it with @cyclicbarrier threads
+# 5.- Check that the integrations with `parse_eqs = true` and `parse_eqs = false`
+#     agree, both with `threads = true` and `threads = false`
 
 # nongravs!
 function TaylorIntegration._allocate_jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params) where {_T <: Real, _S <: Number, _N}

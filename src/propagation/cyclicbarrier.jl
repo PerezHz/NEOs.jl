@@ -287,3 +287,35 @@ end
 macro cyclicbarrier(ex)
     return cyclicbarrier_expr(true, ex)
 end
+
+"""
+    @optionalthreads threads [schedule] for ... end
+
+Run a `for` loop multi-threaded via `Threads.@threads` (with the optional
+`schedule` argument, e.g. `:static`) if `threads` is `true`, and as a plain
+serial `for` loop otherwise. `threads` is a `Bool` expression evaluated at
+runtime, e.g. `params.threads && Threads.threadpoolsize() > 1`.
+
+This macro is used in the non-parsed dynamical models of
+`src/propagation/dynamicalmodels.jl`. Since `@taylorize` only accepts
+`Threads.@threads`, every `@optionalthreads threads` must be replaced by
+`Threads.@threads` before generating the parsed methods of `jetcoeffs!`
+(see the header of `src/propagation/jetcoeffs.jl`).
+"""
+macro optionalthreads(threads, args...)
+    isempty(args) && throw(ArgumentError("@optionalthreads must be followed \
+        by a `for` loop"))
+    loop = args[end]
+    (loop isa Expr && loop.head === :for) || throw(ArgumentError("@optionalthreads \
+        must be followed by a `for` loop"))
+    threaded = Expr(:macrocall, Expr(:., :Threads, QuoteNode(Symbol("@threads"))),
+        __source__, args...)
+    # We use esc() to ensure variables resolve in the caller's scope (macro hygiene)
+    return esc(quote
+        if $threads
+            $threaded
+        else
+            $loop
+        end
+    end)
+end
