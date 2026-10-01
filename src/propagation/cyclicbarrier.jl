@@ -76,6 +76,37 @@ end
 # Filter out LineNumberNodes
 clean_blocks(x::Expr) = map(identity, filter(!Base.Fix2(isa, LineNumberNode), x.args))
 
+# Split a block into its statements, each paired with the LineNumberNode that
+# precedes it (or `nothing`), so the generated code keeps the source lines
+function lines_of(ex::Expr)
+    lines = Tuple{Any, Any}[]
+    lnn = nothing
+    for x in ex.args
+        if x isa LineNumberNode
+            lnn = x
+        else
+            push!(lines, (lnn, x))
+            lnn = nothing
+        end
+    end
+    return lines
+end
+
+# Flatten a vector of (LineNumberNode, statement) pairs
+linenums(lnn) = isnothing(lnn) ? Any[] : Any[lnn]
+unlines(lines) = mapreduce(l -> Any[linenums(l[1])..., l[2]], vcat, lines; init = Any[])
+
+# Remove the LineNumberNodes that do not point to `file`, e.g. those coming
+# from the quotes in this file or from the expansion of Threads.@threads
+filter_linenums!(x, file) = x
+function filter_linenums!(ex::Expr, file)
+    if ex.head === :block || ex.head === :quote
+        filter!(x -> !(x isa LineNumberNode && x.file !== file), ex.args)
+    end
+    foreach(x -> filter_linenums!(x, file), ex.args)
+    return ex
+end
+
 # Check if an expression is the main loop, i.e. a for loop with at least
 # one Threads.@threads loop at the top level of its body
 is_main_loop(x) = x isa Expr && x.head === :for && any(is_threads_macro, clean_blocks(x.args[2]))
@@ -105,15 +136,15 @@ function lhs_symbols!(s::Set{Symbol}, x::Expr)
     return s
 end
 
-# Assemble the lines of code into blocks
+# Assemble the (LineNumberNode, statement) pairs into blocks
 function assemble_blocks(x::AbstractVector)
-    mask = is_threads_macro.(x)
+    mask = [is_threads_macro(l[2]) for l in x]
     iters = Vector{Any}(undef, 0)
-    blocks = Vector{Vector{Any}}(undef, 0)
+    blocks = Vector{Vector{Tuple{Any, Any}}}(undef, 0)
     for i in eachindex(x)
         if mask[i]
             push!(blocks, [x[i]])
-            push!(iters, x[i].args[end].args[1].args[2])
+            push!(iters, x[i][2].args[end].args[1].args[2])
         else
             if isempty(blocks) || mask[i-1]
                 push!(blocks, [x[i]])
@@ -128,51 +159,43 @@ end
 
 function modify_block(x::AbstractVector, i::Int)
     cyclic_barrier = Symbol(:cyclic_barrier_, i)
-    if is_threads_macro(x[1])
-        loop = x[1].args[end]
+    if is_threads_macro(x[1][2])
+        lnn, ex = x[1]
+        loop = ex.args[end]
         loop_def, loop_body = loop.args
         itr = Symbol(:chunked_indices_, i)
-        q = quote
-            for $(loop_def.args[1]) in $(itr)[task_id]
-                $(loop_body.args...)
-            end
-            wait($cyclic_barrier)
-        end
+        chunk = Expr(:for, :($(loop_def.args[1]) = $(itr)[task_id]), loop_body)
+        q = Expr(:block, linenums(lnn)..., chunk, :(wait($cyclic_barrier)))
     else
-        q = quote
-           if task_id == 1
-               $(x...)
-           end
-           wait($cyclic_barrier)
-        end
+        serial = Expr(:if, :(task_id == 1), Expr(:block, unlines(x)...))
+        q = Expr(:block, serial, :(wait($cyclic_barrier)))
     end
-    Base.remove_linenums!(q)
     return q
 end
 
-# Build the multi-threaded (cyclic barrier) version of a block (unescaped). Also
-# return the symbols assigned in the serial code outside the main loop
-function cyclicbarrier_threaded(ex::Expr)
-    # Filter out LineNumberNodes to find the actual lines of code
-    lines = clean_blocks(ex)
+# Build the multi-threaded (cyclic barrier) version of a vector of
+# (LineNumberNode, statement) pairs (unescaped). Also return the symbols
+# assigned in the serial code outside the main loop
+function cyclicbarrier_threaded(lines::AbstractVector)
     # Split the lines into the code before, within and after the main loop
-    kmain = findall(is_main_loop, lines)
+    kmain = findall(l -> is_main_loop(l[2]), lines)
     length(kmain) <= 1 || throw(ArgumentError("At most one top-level for loop \
         can contain multi-threaded loops"))
     if isempty(kmain)
-        prelines, mainloop, postlines = lines, nothing, lines[1:0]
+        prelines, mainline, postlines = lines, nothing, lines[1:0]
     else
         k = kmain[1]
-        prelines, mainloop, postlines = lines[1:k-1], lines[k], lines[k+1:end]
+        prelines, mainline, postlines = lines[1:k-1], lines[k], lines[k+1:end]
     end
     # Assemble the lines of code into blocks
     preiters, preblocks = assemble_blocks(prelines)
-    if isnothing(mainloop)
-        loop_def = nothing
+    if isnothing(mainline)
+        main_lnn, loop_def = nothing, nothing
         bodyiters, bodyblocks = assemble_blocks(lines[1:0])
     else
+        main_lnn, mainloop = mainline
         loop_def, loop_body = mainloop.args
-        bodyiters, bodyblocks = assemble_blocks(clean_blocks(loop_body))
+        bodyiters, bodyblocks = assemble_blocks(lines_of(loop_body))
     end
     postiters, postblocks = assemble_blocks(postlines)
     iters = vcat(preiters, bodyiters, postiters)
@@ -185,17 +208,14 @@ function cyclicbarrier_threaded(ex::Expr)
     body = getargs(view(mblocks, npre+1:npre+nbody))
     postamble = getargs(view(mblocks, npre+nbody+1:length(mblocks)))
     # Reconstruct the original main loop
-    main = isnothing(loop_def) ? nothing : quote
-        for $(loop_def.args[1]) in $(loop_def.args[2])
-            $(body...)
-        end
-    end
+    main = isnothing(loop_def) ? nothing :
+        Expr(:block, linenums(main_lnn)..., Expr(:for, loop_def, Expr(:block, body...)))
     # Variables assigned in the serial code outside the main loop must be
     # shared by all tasks and visible after the block
     shared = Set{Symbol}()
     for b in vcat(preblocks, postblocks)
-        is_threads_macro(b[1]) && continue
-        foreach(Base.Fix1(assigned_symbols!, shared), b)
+        is_threads_macro(b[1][2]) && continue
+        foreach(l -> assigned_symbols!(shared, l[2]), b)
     end
     # Variable declarations
     names = Symbol.(:cyclic_barrier_, eachindex(mblocks))
@@ -227,7 +247,6 @@ function cyclicbarrier_threaded(ex::Expr)
             fetch(t)
         end
     end
-    Base.remove_linenums!(q)
     return sort!(collect(shared)), q
 end
 
@@ -320,7 +339,7 @@ end
 is_local(x) = x isa Expr && x.head === :local
 
 # Generate the wrapper, serial and multi-threaded methods of a function (unescaped)
-function cyclicbarrier_function(fdef::Expr)
+function cyclicbarrier_function(fdef::Expr, source::LineNumberNode)
     # Split the function definition
     sig, body = fdef.args
     wparams = Any[]
@@ -338,37 +357,40 @@ function cyclicbarrier_function(fdef::Expr)
     # Split the function's body into: (i) the header, i.e. the lines before the
     # first `local` declaration, (ii) the `local` declarations, (iii) the rest
     # of the code and (iv) the final `return` statement (if any)
-    lines = Any[clean_blocks(body)...]
-    tail = !isempty(lines) && lines[end] isa Expr && lines[end].head === :return ?
-        Any[pop!(lines)] : Any[]
-    k = findfirst(is_local, lines)
+    lines = lines_of(body)
+    tail = !isempty(lines) && lines[end][2] isa Expr && lines[end][2].head === :return ?
+        [pop!(lines)] : lines[1:0]
+    k = findfirst(l -> is_local(l[2]), lines)
     k = isnothing(k) ? length(lines) + 1 : k
     header, rest = lines[1:k-1], lines[k:end]
-    locals, code = filter(is_local, rest), filter(!is_local, rest)
+    locals = filter(l -> is_local(l[2]), rest)
+    code = filter(l -> !is_local(l[2]), rest)
     # Unfold the evaluation of the Solar System ephemerides
-    decls, ephloops = Any[], Any[]
-    for line in locals
+    decls, ephloops = lines[1:0], lines[1:0]
+    for (lnn, line) in locals
         if is_ephemeris_evaluation(line)
             d, loop = unfold_ephemeris(line)
-            append!(decls, d)
-            push!(ephloops, loop)
+            append!(decls, [(lnn, x) for x in d])
+            push!(ephloops, (lnn, loop))
         else
-            push!(decls, line)
+            push!(decls, (lnn, line))
         end
     end
     # Serial version
-    serial = Expr(:block, header..., decls..., remove_threads.(ephloops)...,
-        remove_threads.(code)..., tail...)
+    unthreaded(l) = (l[1], remove_threads(l[2]))
+    serial = Expr(:block, unlines(header)..., unlines(decls)...,
+        unlines(unthreaded.(ephloops))..., unlines(unthreaded.(code))..., unlines(tail)...)
     # Multi-threaded version
     if kind === :model
         # Non-parsed dynamical models keep their Threads.@threads loops
-        threaded = Expr(:block, header..., decls..., ephloops..., code..., tail...)
+        threaded = Expr(:block, unlines(header)..., unlines(decls)...,
+            unlines(ephloops)..., unlines(code)..., unlines(tail)...)
     else
         # Parsed methods use a cyclic barrier
-        shared, q = cyclicbarrier_threaded(Expr(:block, ephloops..., code...))
+        shared, q = cyclicbarrier_threaded(vcat(ephloops, code))
         shared_decls = [Expr(:local, s) for s in shared]
-        threaded = Expr(:block, header..., decls..., shared_decls...,
-            Expr(:let, Expr(:block), q), tail...)
+        threaded = Expr(:block, unlines(header)..., unlines(decls)..., shared_decls...,
+            Expr(:let, Expr(:block), q), unlines(tail)...)
     end
     # Wrapper with the original signature
     wsig = build_signature(fname, newargs, wparams)
@@ -379,6 +401,7 @@ function cyclicbarrier_function(fdef::Expr)
             return $inner(Val(false), $(names...))
         end
     end
+    pushfirst!(wbody.args, source)
     ssig = build_signature(inner, Any[:(::Val{false}), newargs...], wparams)
     tsig = build_signature(inner, Any[:(::Val{true}), newargs...], wparams)
     q = quote
@@ -423,9 +446,9 @@ Every `local x = params.eph(t)` declaration, where `eph` is one of `:sseph`,
 corresponding `EphemerisEvaluationBuffer`, whose (multi-threaded) evaluation
 loop is placed at the beginning of the code.
 
-To keep the generated code readable, its nested macros are expanded and its
-`LineNumberNode`s are removed; hence, stack traces of errors inside the generated
-functions do not point to specific lines of their bodies.
+To keep the generated code readable, its nested macros are expanded and only the
+`LineNumberNode`s pointing to the decorated function's file are kept; these are
+needed by code coverage tools and stack traces.
 
 !!! warning
     This macro is on an experimental stage; check the integration results carefully.
@@ -433,11 +456,12 @@ functions do not point to specific lines of their bodies.
 macro cyclicbarrier(fdef)
     (fdef isa Expr && fdef.head === :function) || throw(ArgumentError("@cyclicbarrier \
         must decorate a function definition"))
-    q = cyclicbarrier_function(fdef)
-    # Expand the nested macros (e.g. Threads.@threads and Threads.@spawn) and remove
-    # the LineNumberNodes, so the generated code is easier to read
+    q = cyclicbarrier_function(fdef, __source__)
+    # Expand the nested macros (e.g. Threads.@threads and Threads.@spawn) and keep
+    # only the LineNumberNodes of the decorated function's file, so the generated
+    # code is easier to read while code coverage and stack traces still work
     q = macroexpand(__module__, q; recursive = true)
-    Base.remove_linenums!(q)
+    filter_linenums!(q, __source__.file)
     # We use esc() to ensure variables resolve in the caller's scope (macro hygiene)
     return esc(q)
 end
