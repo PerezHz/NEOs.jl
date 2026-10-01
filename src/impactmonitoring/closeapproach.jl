@@ -252,7 +252,9 @@ function closeapproaches(
     ) where {D, T <: Real, U <: Number}
     # Unpack problem and parameters
     @unpack target = IM
-    @unpack abstol, maxsteps, eph_su, threads = params
+    @unpack abstol, maxsteps, eph_su = params
+    # Use multi-threading only if requested and more than one thread is available
+    threads = params.threads && Threads.threadpoolsize() > 1
     R_P = radius(target)
     # Dynamical model
     dynamics = dynamicalmodel(IM)

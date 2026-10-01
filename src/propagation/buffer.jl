@@ -41,7 +41,11 @@ function (y::EphemerisEvaluationBuffer{T, U})(tt::Taylor1{T},
     TS.identity!(t, tt, 0)
     ind::Int, δt::Taylor1{T} = timeindex(eph, t)
     # Evaluate eph at t and convert the output to U
-    _evaluate_ephemeris!(Val(threads), ephU, ephT, aux, eph, ind, δt)
+    if threads
+        _evaluate_ephemeris!(Val(true), ephU, ephT, aux, eph, ind, δt)
+    else
+        _evaluate_ephemeris!(Val(false), ephU, ephT, aux, eph, ind, δt)
+    end
     return ephU
 end
 
