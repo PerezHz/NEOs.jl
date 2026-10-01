@@ -149,7 +149,8 @@ function concavity(x::CloseApproachT1, σ::Real)
 end
 
 # Root-finding function for `closeapproaches`
-function closeapproach!(A::RootFindingEvent, B::RootFindingEvent, x, params, t; R_TP, R_P)
+function closeapproach!(A::RootFindingEvent, B::RootFindingEvent, x, params, t;
+                        R_TP, R_P, threads)
     # Unpack
     @unpack jd0, rv, teph = params
     @unpack v0, v1 = rv
@@ -157,7 +158,7 @@ function closeapproach!(A::RootFindingEvent, B::RootFindingEvent, x, params, t; 
     # Days since J2000.0 = 2.451545e6
     dsj2k = t + (jd0 - JD_J2000)
     # Planet ephemeris at dsj2k
-    xp = teph(dsj2k)
+    xp = teph(dsj2k, threads)
     # Update events A and B
     for ord in eachindex(t)
         # Asteroid's planetocentric state vector
@@ -251,7 +252,7 @@ function closeapproaches(
     ) where {D, T <: Real, U <: Number}
     # Unpack problem and parameters
     @unpack target = IM
-    @unpack abstol, maxsteps, eph_su = params
+    @unpack abstol, maxsteps, eph_su, threads = params
     R_P = radius(target)
     # Dynamical model
     dynamics = dynamicalmodel(IM)
@@ -274,7 +275,7 @@ function closeapproaches(
     # Unpack root-finding buffer
     root.jd0 = epoch(VA) + JD_J2000
     @unpack f_tupl, g_tupl, f_tupl_old, g_tupl_old = root
-    closeapproach!(f_tupl, g_tupl, x, root, t; R_TP, R_P)
+    closeapproach!(f_tupl, g_tupl, x, root, t; R_TP, R_P, threads)
     f_tupl.flag, g_tupl.flag = false, false
     identity!(f_tupl_old, f_tupl)
     identity!(g_tupl_old, g_tupl)
@@ -298,7 +299,7 @@ function closeapproaches(
         # New initial condition
         TS.evaluate!(x, δt, x0)
         # Root-finding
-        closeapproach!(f_tupl, g_tupl, x, root, t; R_TP, R_P)
+        closeapproach!(f_tupl, g_tupl, x, root, t; R_TP, R_P, threads)
         flag, dt_nr = findroot(f_tupl_old, f_tupl, δt_old, root; nrabstol, newtoniter)
         if flag
             # Time at surface crossing

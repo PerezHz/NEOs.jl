@@ -34,22 +34,42 @@ function EphemerisEvaluationBuffer(
 end
 
 # Evaluation method for EphemerisEvaluationBuffer
-function (y::EphemerisEvaluationBuffer{T, U})(tt::Taylor1{T}) where {T <: Real, U <: Number}
+function (y::EphemerisEvaluationBuffer{T, U})(tt::Taylor1{T},
+                                              threads::Bool = true) where {T <: Real, U <: Number}
     @unpack t, eph, aux, ephT, ephU = y
     # Get index of eph.p that interpolates at time t
     TS.identity!(t, tt, 0)
     ind::Int, δt::Taylor1{T} = timeindex(eph, t)
     # Evaluate eph at t and convert the output to U
-    Threads.@threads for i in eachindex(ephU)
-        TS.zero!(ephT[i])
-        TS.zero!(aux[i])
-        TS._horner!(ephT[i], eph.p[ind, i], δt, aux[i])
-        TS.zero!(ephU[i])
-        for k in eachindex(ephU[i])
-            _identity!(ephU[i], ephT[i], k)
-        end
-    end
+    _evaluate_ephemeris!(Val(threads), ephU, ephT, aux, eph, ind, δt)
     return ephU
+end
+
+# Serial and multi-threaded evaluation loops of an EphemerisEvaluationBuffer
+function _evaluate_ephemeris!(::Val{false}, ephU, ephT, aux, eph, ind, δt)
+    for i in eachindex(ephU)
+        _evaluate_ephemeris_component!(ephU, ephT, aux, eph, ind, δt, i)
+    end
+    return nothing
+end
+
+function _evaluate_ephemeris!(::Val{true}, ephU, ephT, aux, eph, ind, δt)
+    Threads.@threads for i in eachindex(ephU)
+        _evaluate_ephemeris_component!(ephU, ephT, aux, eph, ind, δt, i)
+    end
+    return nothing
+end
+
+# Evaluate the i-th component of an EphemerisEvaluationBuffer
+function _evaluate_ephemeris_component!(ephU, ephT, aux, eph, ind, δt, i)
+    TS.zero!(ephT[i])
+    TS.zero!(aux[i])
+    TS._horner!(ephT[i], eph.p[ind, i], δt, aux[i])
+    TS.zero!(ephU[i])
+    for k in eachindex(ephU[i])
+        _identity!(ephU[i], ephT[i], k)
+    end
+    return nothing
 end
 
 _identity!(a::Taylor1{T}, b::Taylor1{T}, k::Int) where {T <: Real} = TS.identity!(a, b, k)
