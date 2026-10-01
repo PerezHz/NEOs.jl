@@ -47,13 +47,59 @@ jobs:
       - uses: julia-actions/julia-runtest@v1
         env:
           JULIA_NUM_THREADS: 2
+      # Process and store the coverage of each job, even if the tests failed;
+      # the coverage reports are uploaded by the coverage job below
       - uses: julia-actions/julia-processcoverage@v1
+        if: ${{ !cancelled() }}
+      # On Windows, lcov.info contains paths like src\propagation\buffer.jl; use
+      # forward slashes so the reports of all jobs can be merged file by file
+      - name: Normalize coverage paths
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: bash
+        run: sed -i '/^SF:/ s|\\|/|g' lcov.info
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: lcov-${{ matrix.version }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: lcov.info
+          if-no-files-found: warn
+  coverage:
+    name: Coverage
+    needs: test
+    # Upload the combined coverage report, even if some tests failed
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: lcov-*
+          path: coverage
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - name: Merge coverage reports
+        shell: julia --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.activate(; temp = true)
+          Pkg.add("CoverageTools")
+          using CoverageTools
+          files = [joinpath(root, file) for (root, _, names) in walkdir("coverage")
+                   for file in names if endswith(file, ".info")]
+          @info "Merging $(length(files)) coverage reports" files
+          LCOV.writefile("lcov.info", merge_coverage_counts(LCOV.readfile.(files)...))
       - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          disable_search: true
           fail_ci_if_error: false
       - uses: coverallsapp/github-action@v2
         with:
+          file: lcov.info
           fail-on-error: false
-          path-to-lcov: lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # In pull requests, use the head commit (which, unlike the temporary
+          # merge commit, remains available for Coveralls to fetch the sources)
+          git-commit: ${{ github.event.pull_request.head.sha || github.sha }}
