@@ -188,6 +188,11 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         nyears = 0.4 / yr
         ctol = 0.01
         CAs = closeapproaches(IM, VA, nyears, params; ctol)
+        # Serial and multi-threaded close approaches must agree exactly
+        @test params.threads
+        Threads.threadpoolsize() == 1 && @warn "Running with a single thread; " *
+            "both close approaches computations use serial code"
+        @test closeapproaches(IM, VA, nyears, Parameters(params; threads = false); ctol) == CAs
         @test length(CAs) == 1
         CA = CAs[1]
 
@@ -381,6 +386,11 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         nyears = 26 / yr
         ctol = 0.01
         CAs = closeapproaches(IM, VA, nyears, params; ctol)
+        # Serial and multi-threaded close approaches must agree exactly
+        @test params.threads
+        Threads.threadpoolsize() == 1 && @warn "Running with a single thread; " *
+            "both close approaches computations use serial code"
+        @test closeapproaches(IM, VA, nyears, Parameters(params; threads = false); ctol) == CAs
         @test length(CAs) == 1
         CA = CAs[1]
 
