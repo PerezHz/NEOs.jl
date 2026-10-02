@@ -12,6 +12,8 @@ using NEOs: isdelay, isdoppler
 loadjpleph()
 
 const atol = 5E-10
+# Relative tolerance of the taylorized vs non-taylorized astrometry tests
+const TAYLORIZED_RTOL = 1E-10
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
 function warmuptests(dynamics, q00, jd0, nyears, params)
@@ -32,7 +34,47 @@ end
 scalarra(x) = -arcsec2rad(ra(x) / wra(x) + dra(x))
 scalardec(x) = -arcsec2rad(dec(x) / wdec(x) + ddec(x))
 scalarradar(x) = -(residual(x) / weight(x) + debias(x))
-isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; atol)
+isapproxtuple(x, y; kwargs...) = isapprox(x[1], y[1]; kwargs...) &&
+    isapprox(x[2], y[2]; kwargs...)
+
+# Ephemerides for the non-taylorized methods of compute_radec and compute_delay,
+# equivalent to those used by the taylorized methods
+nontaylorizedephs(bwd, fwd, params) = (
+    xvs = et -> PE.auday2kmsec(params.eph_su(et/PE.daysec)),
+    xve = et -> PE.auday2kmsec(params.eph_ea(et/PE.daysec)),
+    xva = et -> bwdfwdeph(et, bwd, fwd)
+)
+
+# Check that the taylorized and non-taylorized methods of compute_radec agree
+# at the given observatories and dates
+function taylorizedradectests(observatories, dates, q0, bwd, fwd, params)
+    buffer = NEOs.OpticalBuffer(q0[1])
+    ephs = nontaylorizedephs(bwd, fwd, params)
+    for (obs, dt) in zip(observatories, dates)
+        radec1 = compute_radec(obs, dt; ephs...)
+        radec2 = compute_radec(obs, dt, buffer; xvs = params.eph_su,
+            xve = params.eph_ea, xva = (bwd, fwd))
+        # Right ascension and declination [arcsec]
+        @test isapproxtuple(radec1, radec2; rtol = TAYLORIZED_RTOL)
+    end
+    return nothing
+end
+
+# Check that the taylorized and non-taylorized methods of compute_delay agree
+# at the given observatories and dates
+function taylorizeddelaytests(observatories, dates, q0, bwd, fwd, params;
+                              tord::Int = 10, niter::Int = 10)
+    buffer = NEOs.RadarBuffer(q0[1], tord)
+    ephs = nontaylorizedephs(bwd, fwd, params)
+    for (obs, dt) in zip(observatories, dates)
+        τ1 = compute_delay(obs, dt; tord, niter, ephs...)
+        τ2 = compute_delay(obs, dt, buffer; niter, xvs = params.eph_su,
+            xve = params.eph_ea, xva = (bwd, fwd))
+        # Time-delay [us] and its time derivative (used for Doppler shifts)
+        @test isapprox(τ1, τ2; rtol = TAYLORIZED_RTOL)
+    end
+    return nothing
+end
 
 @testset "Propagation" begin
 
@@ -242,6 +284,14 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         ))
         @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
 
+        # Taylorized vs non-taylorized optical and radar astrometry; since there is
+        # no radar astrometry of 2023 DW, compute the time-delays as seen by Arecibo
+        # at the dates of the optical observations
+        dates = date.(optical_2023DW)
+        taylorizedradectests(observatory.(optical_2023DW), dates, q0, sol_bwd, sol_fwd, params)
+        arecibo = fill(search_observatory_code("251"), length(dates))
+        taylorizeddelaytests(arecibo, dates, q0, sol_bwd, sol_fwd, params)
+
         # Propagate orbit with perturbed initial conditions and compute optical residuals
         q1 = q0 + vcat(1e-3randn(3), 1e-5randn(3))
         sol1_bwd, sol1_fwd, _res1_ = propres(OD, q1, jd0, params)
@@ -361,6 +411,12 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         ))
         @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
 
+        # Taylorized vs non-taylorized optical and radar astrometry
+        taylorizedradectests(observatory.(optical_Apophis), date.(optical_Apophis),
+            q0, sol_bwd, sol_fwd, params)
+        taylorizeddelaytests(observatory.(radar_Apophis), date.(radar_Apophis),
+            q0, sol_bwd, sol_fwd, params)
+
         res_del = residual.(res_radar[isdelay.(radar_Apophis)])
         res_dop = residual.(res_radar[isdoppler.(radar_Apophis)])
 
@@ -422,6 +478,14 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol
         rm("test.jld2")
+
+        # Taylorized vs non-taylorized optical and radar astrometry; since there are
+        # no observations, compute the astrometry as seen by Arecibo at the midpoints
+        # of the integration steps (with a single forward integration)
+        dates = julian2datetime.(PE.J2000 .+ (sol.t[1:end-1] .+ sol.t[2:end]) ./ 2)
+        arecibo = fill(search_observatory_code("251"), length(dates))
+        taylorizedradectests(arecibo, dates, q0, sol, sol, params)
+        taylorizeddelaytests(arecibo, dates, q0, sol, sol, params)
 
         params = Parameters(params; maxsteps = 1)
         sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, q0, jd0, nyears, params)
@@ -543,6 +607,12 @@ isapproxtuple(x, y; atol) = isapprox(x[1], y[1]; atol) && isapprox(x[2], y[2]; a
             scalardec(res_optical) + last(radecOBS)
         ))
         @test all(isapproxtuple(x, y; atol) for (x, y) in zip(radecJPL, radecNEOs))
+
+        # Taylorized vs non-taylorized optical and radar astrometry
+        taylorizedradectests(observatory.(optical_Apophis), date.(optical_Apophis),
+            q0, sol_bwd, sol_fwd, params)
+        taylorizeddelaytests(observatory.(radar_Apophis), date.(radar_Apophis),
+            q0, sol_bwd, sol_fwd, params)
 
         # Compute mean radar (time-delay and Doppler-shift) residuals
         res_del, w_del = @. residual(res_radar[mask_del]), weight(res_radar[mask_del])
