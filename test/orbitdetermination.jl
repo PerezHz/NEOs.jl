@@ -243,7 +243,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -308,19 +308,19 @@ end
         ρ, v_ρ = argoldensearch(A, xmin, xmax, :min, :outer, 1E-20)
         @test xmin ≤ ρ ≤ xmax
         @test v_ρ ≤ ymin
-        @test (ρ, v_ρ) == argoldensearch(A, xmin, xmax, :min, :outer, 1E-20)
+        @test (ρ, v_ρ) == argoldensearch(A, ρ, ρ, :min, :outer, 1E-20)
         ρ, v_ρ = argoldensearch(A, xmin, xmax, :max, :outer, 1E-20)
         @test xmin ≤ ρ ≤ xmax
         @test v_ρ ≥ ymax
-        @test (ρ, v_ρ) == argoldensearch(A, xmin, xmax, :max, :outer, 1E-20)
+        @test (ρ, v_ρ) == argoldensearch(A, ρ, ρ, :max, :outer, 1E-20)
         ρ, v_ρ = argoldensearch(A, xmin, ρ0, :min, :inner, 1E-20)
         @test xmin ≤ ρ ≤ ρ0
         @test ymin ≤ v_ρ ≤ ymax
-        @test (ρ, v_ρ) == argoldensearch(A, xmin, ρ0, :min, :inner, 1E-20)
+        @test (ρ, v_ρ) == argoldensearch(A, ρ, ρ, :min, :inner, 1E-20)
         ρ, v_ρ = argoldensearch(A, xmin, ρ0, :max, :inner, 1E-20)
         @test xmin ≤ ρ ≤ ρ0
         @test ymin ≤ v_ρ ≤ ymax
-        @test (ρ, v_ρ) == argoldensearch(A, xmin, ρ0, :max, :inner, 1E-20)
+        @test (ρ, v_ρ) == argoldensearch(A, ρ, ρ, :max, :inner, 1E-20)
         # Boundary parametrization
         O0 = arboundary(A, 0.0, :outer, :linear)
         O1 = arboundary(A, 1.0, :outer, :linear)
@@ -414,7 +414,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -495,27 +495,27 @@ end
         ρ, v_ρ = argoldensearch(A, xmin, xleft, :min, :outer, 1e-20)
         @test xmin ≤ ρ ≤ xleft
         @test v_ρ ≥ ymin
-        @test (ρ, v_ρ) == argoldensearch(A, xmin, xleft, :min, :outer, 1e-20)
+        @test (ρ, v_ρ) == argoldensearch(A, ρ, ρ, :min, :outer, 1e-20)
         ρ, v_ρ = argoldensearch(A, xright, xmax, :min, :outer, 1e-20)
         @test xright ≤ ρ ≤ xmax
         @test v_ρ ≤ ymid
-        @test (ρ, v_ρ) == argoldensearch(A, xright, xmax, :min, :outer, 1e-20)
+        @test (ρ, v_ρ) == argoldensearch(A, ρ, ρ, :min, :outer, 1e-20)
         ρ, v_ρ = argoldensearch(A, xmin, xleft, :max, :outer, 1E-20)
         @test xmin ≤ ρ ≤ xleft
         @test v_ρ ≤ ymax
-        @test (ρ, v_ρ) == argoldensearch(A, xmin, xleft, :max, :outer, 1E-20)
+        @test (ρ, v_ρ) == argoldensearch(A, ρ, ρ, :max, :outer, 1E-20)
         ρ, v_ρ = argoldensearch(A, xright, xmax, :max, :outer, 1E-20)
         @test xright ≤ ρ ≤ xmax
         @test v_ρ ≥ ymid
-        @test (ρ, v_ρ) == argoldensearch(A, xright, xmax, :max, :outer, 1E-20)
+        @test (ρ, v_ρ) == argoldensearch(A, ρ, ρ, :max, :outer, 1E-20)
         ρ, v_ρ = argoldensearch(A, xmin, ρ0, :min, :inner, 1E-20)
         @test xmin ≤ ρ ≤ ρ0
         @test ymin ≤ v_ρ ≤ ymax
-        @test (ρ, v_ρ) == argoldensearch(A, xmin, ρ0, :min, :inner, 1E-20)
+        @test (ρ, v_ρ) == argoldensearch(A, ρ, ρ, :min, :inner, 1E-20)
         ρ, v_ρ = argoldensearch(A, xmin, ρ0, :max, :inner, 1E-20)
         @test xmin ≤ ρ ≤ ρ0
         @test ymin ≤ v_ρ ≤ ymax
-        @test (ρ, v_ρ) == argoldensearch(A, xmin, ρ0, :max, :inner, 1E-20)
+        @test (ρ, v_ρ) == argoldensearch(A, ρ, ρ, :max, :inner, 1E-20)
         # Boundary parametrization
         O0 = arboundary(A, 0.0, :outer, :linear)
         O1 = arboundary(A, 1.0, :outer, :linear)
@@ -650,7 +650,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -802,7 +802,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -891,7 +891,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -979,7 +979,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -1071,7 +1071,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1228,7 +1228,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -1327,7 +1327,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1509,7 +1509,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1626,7 +1626,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1732,7 +1732,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by September 28, 2026
+        # Values by October 2, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
