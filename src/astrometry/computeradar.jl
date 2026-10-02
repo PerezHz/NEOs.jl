@@ -1,3 +1,37 @@
+"""
+    RadarBuffer{U <: Number} <: AbstractBuffer
+
+Pre-allocated memory for [`compute_delay`](@ref).
+
+# Fields
+
+- `v0::Vector{Taylor1{U}}`: array of scalar variables.
+- `v1::Vector{Vector{Taylor1{U}}}`: array of vector variables.
+
+!!! note
+    All variables are `Taylor1` expansions in time (around the echo reception
+    time) with coefficients of type `U`. The first element of `v0` is the
+    independent time variable.
+"""
+struct RadarBuffer{U <: Number} <: AbstractBuffer
+    v0::Vector{Taylor1{U}}
+    v1::Vector{Vector{Taylor1{U}}}
+end
+
+function RadarBuffer(x::U, tord::Int) where {U <: Number}
+    @assert tord ≥ 1 "Order of Taylor expansions must be at least one"
+    # Every coefficient must be a different object, since the buffer
+    # is modified in place
+    zeroT1() = Taylor1([zero(x) for _ in 0:tord], tord)
+    # Independent time variable
+    tvar = Taylor1([zero(x), one(x), (zero(x) for _ in 2:tord)...], tord)
+    v0 = [tvar, (zeroT1() for _ in 1:24)...]
+    # Number of components of each vector variable
+    nv1 = (3, 3, 3, 3, 3, 3, 6, 3, 3, 3, 3, 6, 3, 3, 3, 3, 3, 3)
+    v1 = [[zeroT1() for _ in 1:n] for n in nv1]
+    return RadarBuffer{U}(v0, v1)
+end
+
 raw"""
     shapiro_delay(e, p, q)
 
@@ -287,21 +321,27 @@ function tropo_delay(r_antenna::Vector{T},
 end
 
 """
-    compute_delay(::ObservatoryMPC, ::DateTime; xva, kwargs...)
+    compute_delay(::ObservatoryMPC, ::DateTime [, ::RadarBuffer]; xva, kwargs...)
 
 Compute the Taylor series expansion of the time-delay [us] observable as seen
-by an observatory around an UTC echo reception time.
+by an observatory around an UTC echo reception time. An optional buffer can be
+passed to recycle memory.
 
 # Keyword arguments
 
-- `tord::Int`: order of Taylor expansions (default: `10`).
+- `tord::Int`: order of Taylor expansions (default: `10`, or the order of the
+    buffer).
 - `niter::Int`: number of light-time solution iterations (default: `10`).
 - `xve::EarthEph`: Earth ephemeris (default: `earthposvel`).
 - `xvs::SunEph`: Sun ephemeris (default: `sunposvel`).
 - `xva::AstEph`: asteroid ephemeris.
 
-All ephemeris must take  [et seconds since J2000] and return [barycentric
-position in km and velocity in km/sec].
+Without a buffer, all ephemeris must take [et seconds since J2000] and return
+[barycentric position in km and velocity in km/sec]. With a buffer, `xvs` and
+`xve` must be `DensePropagation2` ephemerides [au, au/day] taking TDB days
+since J2000, `xva` must be a tuple with the backward and forward propagations
+of the asteroid, and the returned time-delay is stored in the buffer, so it is
+overwritten by subsequent calls with the same buffer.
 
 !!! reference
     See https://doi.org/10.1086/116062.
@@ -521,6 +561,186 @@ function compute_delay(observatory::ObservatoryMPC{T}, t_r_utc::DateTime; tord::
 
     # Total signal delay [us]
     return 1e6τ
+end
+
+# Taylorized version of the function above
+function compute_delay(
+        observatory::ObservatoryMPC{T}, t_r_utc::DateTime, buffer::RadarBuffer{U};
+        tord::Int = TS.order(buffer.v0[1]), niter::Int = 10,
+        xvs::DensePropagation2{T, T}, xve::DensePropagation2{T, T},
+        xva::NTuple{2, DensePropagation2{T, U}}
+    ) where {T <: Real, U <: Number}
+    # Unfold
+    tvar, et_r_secs, aux1, aux2, auxh, ρ_r, τ_D, et_b_secs, e_D, p_D, _p_dot_, p_dot,
+    τ_ρ, τ_p, one_τ_p, _Δt_, Δt, τ_U, et_t_secs, dt_t, ρ_t, e_U, p_U, τ, τ_us = buffer.v0
+    rv_e_t_r, rv_s_t_r, rv_a_t_r, r_r_t_r, ρ_vec_r, e_D_vec, rv_a_t_b, rv_s_t_b,
+    p_D_vec, R_t, V_t, rv_e_t_t, rv_s_t_t, r_t_t_t, v_t_t_t, ρ_vec_t, e_U_vec,
+    p_U_vec = buffer.v1
+    order = TS.order(tvar)
+    @assert tord == order "Order of Taylor expansions ($tord) does not match \
+        the order of the buffer ($order)"
+    # Asteroid barycentric velocity at bounce time
+    v_a_t_b = view(rv_a_t_b, 4:6)
+    # Transform receiving time from UTC to TDB seconds since J2000
+    et_r_secs_0 = dtutc2et(t_r_utc)
+    for ord in 0:order
+        TS.add!(et_r_secs, tvar, et_r_secs_0, ord)
+    end
+    # TDB-UTC at receive time
+    tdb_utc_r = tdb_utc(et_r_secs)
+    # Compute geocentric position/velocity of receiving antenna in
+    # inertial frame [km, km/sec]
+    utc_r_days = JD_J2000 + (et_r_secs - tdb_utc_r) / daysec
+    RV_r = obsposvelECI(observatory, utc_r_days)
+    R_r = RV_r[1:3]
+    # Earth, Sun and asteroid barycentric positions at receive time
+    evaleph!(rv_e_t_r, et_r_secs, xve, auxh)
+    evaleph!(rv_s_t_r, et_r_secs, xvs, auxh)
+    evaleph!(rv_a_t_r, et_r_secs, xva[1], xva[2], auxh)
+
+    # Down-leg iteration
+    for ord in 0:order
+        for i in 1:3
+            # Receiver barycentric position at receive time
+            TS.add!(r_r_t_r[i], rv_e_t_r[i], R_r[i], ord)
+            # See equation (1) of https://doi.org/10.1086/116062
+            TS.subst!(ρ_vec_r[i], rv_a_t_r[i], r_r_t_r[i], ord)
+            # Heliocentric position of Earth at receive time
+            TS.subst!(e_D_vec[i], r_r_t_r[i], rv_s_t_r[i], ord)
+        end
+        euclid3D!(ρ_r, ρ_vec_r, aux1, aux2, ord)
+        euclid3D!(e_D, e_D_vec, aux1, aux2, ord)
+        # τ_D first approximation [seconds]
+        TS.mul!(τ_D, c_kms_m1, ρ_r, ord)
+        # Bounce time, first estimate
+        # See equation (2) of https://doi.org/10.1086/116062
+        TS.subst!(et_b_secs, et_r_secs, τ_D, ord)
+    end
+    # Allocate memory for time delays
+    Δτ_tropo_D = zero(τ_D)      # Delay due to Earth's troposphere
+    for _ in 1:niter
+        # Asteroid barycentric position and velocity, and Sun barycentric
+        # position [km, km/sec] at bounce time
+        evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2], auxh)
+        evaleph!(rv_s_t_b, et_b_secs, xvs, auxh)
+        for ord in 0:order
+            for i in 1:3
+                # See equation (3) of https://doi.org/10.1086/116062
+                TS.subst!(ρ_vec_r[i], rv_a_t_b[i], r_r_t_r[i], ord)
+                # Heliocentric position of asteroid at bounce time
+                TS.subst!(p_D_vec[i], rv_a_t_b[i], rv_s_t_b[i], ord)
+            end
+            # See equation (4) of https://doi.org/10.1086/116062
+            euclid3D!(ρ_r, ρ_vec_r, aux1, aux2, ord)
+            euclid3D!(p_D, p_D_vec, aux1, aux2, ord)
+        end
+        # Shapiro and troposphere corrections to time delay [seconds]
+        Δτ_rel_D = shapiro_delay(e_D, p_D, ρ_r)
+        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)
+        for ord in 0:order
+            # New estimate
+            dot3D!(_p_dot_, ρ_vec_r, v_a_t_b, aux1, ord)
+            TS.div!(p_dot, _p_dot_, ρ_r, ord)
+            # Time delay correction
+            TS.mul!(τ_ρ, c_kms_m1, ρ_r, ord)
+            TS.mul!(τ_p, c_kms_m1, p_dot, ord)
+            TS.subst!(one_τ_p, 1, τ_p, ord)
+            TS.subst!(_Δt_, τ_D, τ_ρ, ord)
+            TS.subst!(_Δt_, _Δt_, Δτ_rel_D, ord)
+            TS.div!(Δt, _Δt_, one_τ_p, ord)
+            # Time delay new estimate
+            TS.subst!(τ_D, τ_D, Δt, ord)
+            # Bounce time, new estimate
+            # See equation (2) of https://doi.org/10.1086/116062
+            TS.subst!(et_b_secs, et_r_secs, τ_D, ord)
+        end
+    end
+
+    # Asteroid barycentric position and velocity, and Sun barycentric
+    # position [km, km/sec] at bounce time
+    evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2], auxh)
+    evaleph!(rv_s_t_b, et_b_secs, xvs, auxh)
+
+    # Up-leg iteration
+    for ord in 0:order
+        # τ_U first estimate
+        # See equation (5) of https://doi.org/10.1086/116062
+        TS.identity!(τ_U, τ_D, ord)
+        # Transmit time, first estimate
+        # See equation (6) of https://doi.org/10.1086/116062
+        TS.subst!(et_t_secs, et_b_secs, τ_U, ord)
+        TS.subst!(dt_t, et_t_secs, et_r_secs_0, ord)
+        # Heliocentric position of asteroid at bounce time
+        for i in 1:3
+            TS.subst!(p_U_vec[i], rv_a_t_b[i], rv_s_t_b[i], ord)
+        end
+        euclid3D!(p_U, p_U_vec, aux1, aux2, ord)
+    end
+    # Allocate memory for time delays
+    Δτ_tropo_U = zero(τ_U)      # Delay due to Earth's troposphere
+    for _ in 1:niter
+        # Geocentric position and velocity of transmitting antenna in
+        # inertial frame [km, km/sec]
+        for i in 1:3
+            taylorcompose!(R_t[i], RV_r[i], dt_t, auxh)
+            taylorcompose!(V_t[i], RV_r[i+3], dt_t, auxh)
+        end
+        # Earth's barycentric position and velocity, and Sun barycentric
+        # position [km, km/sec] at transmit time
+        evaleph!(rv_e_t_t, et_t_secs, xve, auxh)
+        evaleph!(rv_s_t_t, et_t_secs, xvs, auxh)
+        for ord in 0:order
+            for i in 1:3
+                # Barycentric position and velocity of the transmitter at transmit time
+                TS.add!(r_t_t_t[i], rv_e_t_t[i], R_t[i], ord)
+                TS.add!(v_t_t_t[i], rv_e_t_t[i+3], V_t[i], ord)
+                # Up-leg vector at transmit time
+                # See equation (7) of https://doi.org/10.1086/116062
+                TS.subst!(ρ_vec_t[i], rv_a_t_b[i], r_t_t_t[i], ord)
+                # Heliocentric position of Earth at transmit time
+                TS.subst!(e_U_vec[i], r_t_t_t[i], rv_s_t_t[i], ord)
+            end
+            euclid3D!(ρ_t, ρ_vec_t, aux1, aux2, ord)
+            euclid3D!(e_U, e_U_vec, aux1, aux2, ord)
+        end
+        # Shapiro and troposphere corrections to time delay [seconds]
+        Δτ_rel_U = shapiro_delay(e_U, p_U, ρ_t)
+        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t)
+        for ord in 0:order
+            # New estimate (p_dot_12 = -p_dot)
+            dot3D!(_p_dot_, ρ_vec_t, v_t_t_t, aux1, ord)
+            TS.div!(p_dot, _p_dot_, ρ_t, ord)
+            # Time delay correction
+            TS.mul!(τ_ρ, c_kms_m1, ρ_t, ord)
+            TS.mul!(τ_p, c_kms_m1, p_dot, ord)
+            TS.add!(one_τ_p, 1, τ_p, ord)
+            TS.subst!(_Δt_, τ_U, τ_ρ, ord)
+            TS.subst!(_Δt_, _Δt_, Δτ_rel_U, ord)
+            TS.div!(Δt, _Δt_, one_τ_p, ord)
+            # Time delay new estimate
+            TS.subst!(τ_U, τ_U, Δt, ord)
+            # Transmit time, new estimate
+            # See equation (6) of https://doi.org/10.1086/116062
+            TS.subst!(et_t_secs, et_b_secs, τ_U, ord)
+            TS.subst!(dt_t, et_t_secs, et_r_secs_0, ord)
+        end
+    end
+
+    # TDB-UTC at transmit time
+    tdb_utc_t = tdb_utc(et_t_secs)
+    for ord in 0:order
+        # Total time delay [UTC seconds]; relativistic delay is already included
+        # in τ_D, τ_U. See equation (9) of https://doi.org/10.1086/116062
+        TS.add!(aux1, τ_D, τ_U, ord)
+        TS.add!(aux2, Δτ_tropo_D, Δτ_tropo_U, ord)
+        TS.add!(τ, aux1, aux2, ord)
+        TS.subst!(auxh, tdb_utc_t, tdb_utc_r, ord)
+        TS.add!(τ, τ, auxh, ord)
+        # Total signal delay [us]
+        TS.mul!(τ_us, 1e6, τ, ord)
+    end
+
+    return τ_us
 end
 
 """

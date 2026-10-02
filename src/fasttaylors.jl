@@ -17,26 +17,36 @@ auxzero(a::AbstractSeries) = zero(a)
 scalingfactor(x::TaylorN{T}) where {T <: Real} = x[1][findfirst(x[1])]
 
 # In-place methods of auday2kmsec
-function auday2kmsec!(y::Vector{T}) where {T <: Real}
+function auday2kmsec!(y::AbstractVector{T}) where {T <: Real}
     y[1:3] .*= au
     y[4:6] .*= au/daysec
     return nothing
 end
 
-function auday2kmsec!(y::Vector{TaylorN{T}}) where {T <: Real}
+function auday2kmsec!(y::AbstractVector{S}) where {S <: AbstractSeries}
     for i in eachindex(y)
-        k = i <= 3 ? au : au/daysec
-        for j in eachindex(y[i])
-            y[i].coeffs[j+1].coeffs .*= k
+        C = i <= 3 ? au : au/daysec
+        for k in eachindex(y[i])
+            multscalar!(y[i], C, k)
         end
     end
     return nothing
 end
 
-function auday2kmsec!(y::Vector{Taylor1{T}}) where {T <: Real}
-    for i in eachindex(y)
-        k = i <= 3 ? au : au/daysec
-        y[i].coeffs .*= k
+# In-place multiplication of the k-th order coefficient of `a` by the scalar `C`
+function multscalar!(a::TaylorN{T}, C::Real, k::Int) where {T <: Real}
+    a.coeffs[k+1].coeffs .*= C
+    return nothing
+end
+
+function multscalar!(a::Taylor1{T}, C::Real, k::Int) where {T <: Real}
+    a.coeffs[k+1] *= C
+    return nothing
+end
+
+function multscalar!(a::Taylor1{TaylorN{T}}, C::Real, k::Int) where {T <: Real}
+    for l in eachindex(a.coeffs[k+1])
+        multscalar!(a.coeffs[k+1], C, l)
     end
     return nothing
 end
@@ -121,66 +131,98 @@ evaleph(eph::NTuple{2, DensePropagation2{T, U}}, et::Number) where {T, U} =
 
 evaleph(eph::AstEph, et::Number) where {AstEph} = eph(et)
 
-# In-place methods of evaleph
-function evaleph!(c::TaylorN{T}, a::Taylor1{TaylorN{T}}, dx::Number) where {T <: Real}
+# In-place composition `c = a(x)` of a `Taylor1` polynomial `a` with an argument `x`,
+# i.e. the evaluation of `a` at `x`; `aux` is an auxiliary variable, which must be
+# different from `c` and `x`. All methods return `c`, except for real (immutable)
+# `c`, in which case the result is returned instead; thus, the output must always be
+# assigned, e.g. `y[i] = taylorcompose!(y[i], a, x, aux)`
+taylorcompose!(::T, a::Taylor1{T}, x::T, ::T) where {T <: Real} = evaluate(a, x)
+
+function taylorcompose!(c::TaylorN{T}, a::Taylor1{T}, x::TaylorN{T},
+                        aux::TaylorN{T}) where {T <: Real}
     TS.zero!(c)
-    d = zero(c)
-    @inbounds for k in reverse(eachindex(a))
-        TS.zero!(d)
-        for ord in eachindex(c)
-            TS.mul!(d, c, dx, ord)
-        end
-        for ord in eachindex(c)
-            TS.add!(c, d, a[k], ord)
-        end
-    end
-    return nothing
+    TS._horner!(c, a, x, aux)
+    return c
 end
 
-function evaleph!(c::Taylor1{T}, a::Taylor1{Taylor1{T}}, dx::Number) where {T <: Real}
+function taylorcompose!(c::TaylorN{T}, a::Taylor1{TaylorN{T}}, x::Number,
+                        aux::TaylorN{T}) where {T <: Real}
     TS.zero!(c)
-    d = zero(c)
     @inbounds for k in reverse(eachindex(a))
-        TS.zero!(d)
+        TS.zero!(aux)
         for ord in eachindex(c)
-            TS.mul!(d, c, dx, ord)
+            TS.mul!(aux, c, x, ord)
         end
         for ord in eachindex(c)
-            TS.add!(c, d, a[k], ord)
+            TS.add!(c, aux, a[k], ord)
         end
     end
-    return nothing
+    return c
 end
 
-function evaleph!(y::Vector{U}, et::U,
-                  eph::DensePropagation2{T, T}) where {T <: Real, U <: Number}
-    # Convert time from seconds to days (TDB) since J2000
+function taylorcompose!(c::Taylor1{T}, a::Taylor1{Taylor1{T}}, x::Number,
+                        aux::Taylor1{T}) where {T <: Real}
+    TS.zero!(c)
+    @inbounds for k in reverse(eachindex(a))
+        TS.zero!(aux)
+        for ord in eachindex(c)
+            TS.mul!(aux, c, x, ord)
+        end
+        for ord in eachindex(c)
+            TS.add!(c, aux, a[k], ord)
+        end
+    end
+    return c
+end
+
+function taylorcompose!(c::Taylor1{U}, a::Taylor1{U}, x::Taylor1{U},
+                        aux::Taylor1{U}) where {U <: Number}
+    TS.zero!(c)
+    TS._horner!(c, a, x, aux)
+    return c
+end
+
+function taylorcompose!(c::Taylor1{U}, a::Taylor1{T}, x::Taylor1{U},
+                        aux::Taylor1{U}) where {T <: Real, U <: AbstractSeries}
+    TS.zero!(c)
+    TS._horner!(c, a, x, aux)
+    return c
+end
+
+# Specialized method that avoids the allocations of the generic Horner kernel
+# when the coefficients of `a` are `TaylorN`s
+function taylorcompose!(c::Taylor1{TaylorN{T}}, a::Taylor1{TaylorN{T}},
+                        x::Taylor1{TaylorN{T}}, aux::Taylor1{TaylorN{T}}) where {T <: Real}
+    TS.zero!(c)
+    @inbounds for k in reverse(eachindex(a))
+        # c <- c * x
+        for ord in eachindex(c)
+            TS.mul!(aux, c, x, ord)
+        end
+        for ord in eachindex(c)
+            TS.identity!(c, aux, ord)
+        end
+        # c <- c + a[k]
+        for ordQ in eachindex(c[0])
+            TS.add!(c[0], c[0], a[k], ordQ)
+        end
+    end
+    return c
+end
+
+# In-place evaluation of an ephemeris at time `et` [TDB seconds since J2000]. Only the
+# first `length(y)` components are evaluated, and the state vector is converted from
+# [au, au/day] to [km, km/sec]. `aux` is an auxiliary variable of the same type as the
+# elements of `y`. For the asteroid ephemeris, pass the backward and forward integrations
+function evaleph!(y::AbstractVector{U}, et::Number, eph::DensePropagation2,
+                  aux::Number = zero(first(y))) where {U <: Number}
+    # Convert time to TDB days since J2000
     t = et / daysec
     # Get index of eph.p that interpolates at time t
-    ind::Int, δt::U = timeindex(eph, t)
+    ind::Int, δt = timeindex(eph, t)
     # Evaluate eph.p[ind] at δt
-    y .= evaluate(view(eph.p, ind, eachindex(y)), δt)
-    # Convert state vector from [au, au/day] to [km, km/sec]
-    auday2kmsec!(y)
-
-    return nothing
-end
-
-function evaleph!(y::Vector{U}, et::U, bwd::DensePropagation2{T, U},
-                 fwd::DensePropagation2{T, U}) where {T <: Real, U <: Number}
-    # Convert time to TDB days since J2000
-    t = et / daysec
-    # Get index of bwd/fwd that interpolates at time t
-    ind::Int, δt::U = t <= firsttime(bwd) ? timeindex(bwd, t) : timeindex(fwd, t)
-    # Evaluate bwd/fwd.p[ind] at δt
-    if t <= firsttime(bwd)
-        for i in eachindex(y)
-            evaleph!(y[i], bwd.p[ind, i], δt)
-        end
-    else
-        for i in eachindex(y)
-            evaleph!(y[i], fwd.p[ind, i], δt)
-        end
+    for i in eachindex(y)
+        y[i] = taylorcompose!(y[i], eph.p[ind, i], δt, aux)
     end
     # Convert state vector from [au, au/day] to [km, km/sec]
     auday2kmsec!(y)
@@ -188,39 +230,18 @@ function evaleph!(y::Vector{U}, et::U, bwd::DensePropagation2{T, U},
     return nothing
 end
 
-function evaleph!(y::Vector{U}, et::T, bwd::DensePropagation2{T, U},
-                 fwd::DensePropagation2{T, U}) where {T <: Real, U <: Number}
+function evaleph!(y::AbstractVector{U}, et::Number, bwd::DensePropagation2,
+                  fwd::DensePropagation2, aux::Number = zero(first(y))) where
+                  {U <: Number}
     # Convert time to TDB days since J2000
     t = et / daysec
-    # Get index of bwd/fwd that interpolates at time t
-    ind::Int, δt::T = t <= firsttime(bwd) ? timeindex(bwd, t) : timeindex(fwd, t)
-    # Evaluate bwd/fwd.p[ind] at δt
-    if t <= firsttime(bwd)
-        for i in eachindex(y)
-            evaleph!(y[i], bwd.p[ind, i], δt)
-        end
-    else
-        for i in eachindex(y)
-            evaleph!(y[i], fwd.p[ind, i], δt)
-        end
-    end
-    # Convert state vector from [au, au/day] to [km, km/sec]
-    auday2kmsec!(y)
-
-    return nothing
-end
-
-function evaleph!(y::Vector{T}, et::T, bwd::DensePropagation2{T, T},
-                 fwd::DensePropagation2{T, T}) where {T <: Real}
-    # Convert time to TDB days since J2000
-    t = et / daysec
-    # Get index of bwd/fwd that interpolates at time t
-    ind::Int, δt::T = t <= firsttime(bwd) ? timeindex(bwd, t) : timeindex(fwd, t)
-    # Evaluate bwd/fwd.p[ind] at δt
-    if t <= firsttime(bwd)
-        y .= evaluate(view(bwd.p, ind, eachindex(y)), δt)
-    else
-        y .= evaluate(view(fwd.p, ind, eachindex(y)), δt)
+    # Backward or forward integration
+    eph = t <= firsttime(bwd) ? bwd : fwd
+    # Get index of eph.p that interpolates at time t
+    ind::Int, δt = timeindex(eph, t)
+    # Evaluate eph.p[ind] at δt
+    for i in eachindex(y)
+        y[i] = taylorcompose!(y[i], eph.p[ind, i], δt, aux)
     end
     # Convert state vector from [au, au/day] to [km, km/sec]
     auday2kmsec!(y)
