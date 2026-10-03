@@ -343,6 +343,17 @@ since J2000, `xva` must be a tuple with the backward and forward propagations
 of the asteroid, and the returned time-delay is stored in the buffer, so it is
 overwritten by subsequent calls with the same buffer.
 
+!!! warning
+    Without a buffer, the ephemerides are evaluated at `Taylor1` times of order
+    `tord`; for `TaylorSolution` ephemerides, this truncates their interpolating
+    polynomials to degree `tord`, which introduces an approximation error that
+    can be significant for low values of `tord` (e.g., for `tord = 5`, of the order
+    of a few microseconds for (99942) Apophis). The method with a buffer evaluates
+    the full interpolating polynomials, so both methods only agree (to roundoff)
+    when `tord` is at least the order of the ephemerides. Hence, the method with
+    a buffer, which is used by [`radar_astrometry`](@ref) and [`residuals`](@ref),
+    is preferred.
+
 !!! reference
     See https://doi.org/10.1086/116062.
 
