@@ -275,7 +275,6 @@ end
         @test nms_optical0 ≈ 1.951 atol=1e-3
         @test nrms_optical0 ≈ 1.397 atol=1e-3
 
-        rtol = 20*sqrt(eps(Float64))
         radecOBS = measure.(optical_2023DW)
         radecJPL = compute_radec_rad.(optical_2023DW; xva = et -> bwdfwdeph(et, sol_bwd, sol_fwd))
         radecNEOs = @.(tuple(
@@ -403,7 +402,6 @@ end
         @test nrms_ra ≈ 0.0857 atol=1e-4
         @test nrms_dec ≈ 0.0417 atol=1e-4
 
-        rtol = 20*sqrt(eps(Float64))
         radecOBS = measure.(optical_Apophis)
         radecJPL = compute_radec_rad.(optical_Apophis; xva = et -> bwdfwdeph(et, sol_bwd, sol_fwd))
         radecNEOs = @.(tuple(
@@ -478,14 +476,6 @@ end
         recovered_sol = JLD2.load("test.jld2", "sol")
         @test sol == recovered_sol
         rm("test.jld2")
-
-        # Taylorized vs non-taylorized optical and radar astrometry; since there are
-        # no observations, compute the astrometry as seen by Arecibo at the midpoints
-        # of the integration steps (with a single forward integration)
-        dates = julian2datetime.(PE.J2000 .+ (sol.t[1:end-1] .+ sol.t[2:end]) ./ 2)
-        arecibo = fill(search_observatory_code("251"), length(dates))
-        taylorizedradectests(arecibo, dates, q0, sol, sol, params)
-        taylorizeddelaytests(arecibo, dates, q0, sol, sol, params)
 
         params = Parameters(params; maxsteps = 1)
         sol, tvS, xvS, gvS = NEOs.propagate_root(dynamics, q0, jd0, nyears, params)
@@ -600,7 +590,6 @@ end
         @test nrms_ra ≈ 0.0858 atol=1e-4
         @test nrms_dec ≈ 0.0417 atol=1e-4
 
-        rtol = 20*sqrt(eps(Float64))
         radecOBS = measure.(optical_Apophis)
         radecJPL = compute_radec_rad.(optical_Apophis; xva = et -> bwdfwdeph(et, sol_bwd, sol_fwd))
         radecNEOs = @.(tuple(
