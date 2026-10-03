@@ -84,7 +84,7 @@ function propres!(
     )  where {D, T <: Real, U <: Number, V <: Number}
     # Unpack
     @unpack optical = IM.orbit
-    @unpack coeffstol, eph_su, eph_ea = params
+    @unpack coeffstol, eph_su, eph_ea, opticaliter = params
     # Times of first/last observation, epoch and years in backward/forward propagation
     t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(optical, jd0, params)
     # Buffer
@@ -103,8 +103,8 @@ function propres!(
     Nres = length(res)
     subres = Nres == noptical(IM) ? view(res, 1:Nres) : view(res, 1:Nres-1)
     try
-        residuals!(subres, optical, buffer.optical; xvs = eph_su, xve = eph_ea,
-                   xva = (bwd, fwd))
+        residuals!(subres, optical, buffer.optical; niter = opticaliter,
+                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         return bwd, fwd
     catch
         empty!(res)

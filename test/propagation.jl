@@ -360,11 +360,12 @@ end
         params = Parameters(
             bwdoffset = (ti - t0) + 1,
             fwdoffset = (t0 - tf) + nyears * yr,
-            maxsteps = 5_000, order = 25, abstol = 1e-20, parse_eqs = true
+            maxsteps = 5_000, order = 25, abstol = 1e-20, parse_eqs = true,
+            radariter = 4, radarord = 5
         )
 
         # Propagate orbit and compute astrometric residuals
-        sol_bwd, sol_fwd, _res_ = propres(OD, q0, jd0, params; niter = 4, tord = 5)
+        sol_bwd, sol_fwd, _res_ = propres(OD, q0, jd0, params)
         res_optical, res_radar = _res_
 
         # Check that solution saves correctly
@@ -545,7 +546,8 @@ end
         w8s, bias = weights(OD), debias(OD)
 
         # Test parsed vs non-parsed propagation: gravity-only model
-        params = Parameters(maxsteps = 10, order = 25, abstol = 1e-20, parse_eqs = true)
+        params = Parameters(maxsteps = 10, order = 25, abstol = 1e-20, parse_eqs = true,
+                            radariter = 10, radarord = 10)
         sol   = NEOs.propagate(dynamicsg, q0[1:6], jd0, nyears, params)
         params = Parameters(params, parse_eqs = false)
         solnp = NEOs.propagate(dynamicsg, q0[1:6], jd0, nyears, params)
@@ -568,7 +570,7 @@ end
             fwdoffset = (t0 - tf) + nyears * yr,
             maxsteps = 2_000, parse_eqs = true
         )
-        sol_bwd, sol_fwd, _res_ = propres(OD, q0, jd0, params; niter = 10, tord = 10)
+        sol_bwd, sol_fwd, _res_ = propres(OD, q0, jd0, params)
         res_optical, res_radar = _res_
 
         @test iszero(zero(eltype(res_optical)))

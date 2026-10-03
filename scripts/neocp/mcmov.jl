@@ -242,7 +242,7 @@ end
         fwd = _propagate(newtonian!, q0, jd0, tmax, pbuffer, params)
         obuffer = OpticalBuffer(zero(T))
         radec[i] = compute_radec(observer, day_after_epoch, obuffer;
-            xvs = params.eph_su, xve = params.eph_ea,
+            niter = params.opticaliter, xvs = params.eph_su, xve = params.eph_ea,
             xva = (orbit.bwd, fwd)
         )
     end

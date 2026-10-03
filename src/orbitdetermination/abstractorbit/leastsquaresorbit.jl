@@ -295,7 +295,7 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
     t0, tf = dtutc2days(d0) - params.bwdoffset, dtutc2days(df) + params.fwdoffset
     @assert t0 ≤ tnew ≤ tf "New epoch must be within the observational arc"
     # Unpack
-    @unpack coeffstol, eph_su, eph_ea = params
+    @unpack coeffstol, eph_su, eph_ea, opticaliter, radariter, radarord = params
     @unpack dynamics, variables, optical, tracklets, radar = orbit
     # Number of degrees of freedom
     Ndof = dof(orbit)
@@ -313,13 +313,13 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
     # O-C residuals
     ores = init_optical_residuals(T, orbit)
     obuffer = [OpticalBuffer(q00[1]) for _ in eachindex(ores)]
-    residuals!(ores, optical, obuffer; xvs = eph_su, xve = eph_ea,
-               xva = (bwd, fwd))
+    residuals!(ores, optical, obuffer; niter = opticaliter, xvs = eph_su,
+               xve = eph_ea, xva = (bwd, fwd))
     if hasradar(orbit)
         rres = init_radar_residuals(T, orbit)
-        rbuffer = [RadarBuffer(q00[1], 10) for _ in eachindex(rres)]
-        residuals!(rres, radar, rbuffer; xvs = eph_su, xve = eph_ea,
-                   xva = (bwd, fwd))
+        rbuffer = [RadarBuffer(q00[1], radarord) for _ in eachindex(rres)]
+        residuals!(rres, radar, rbuffer; niter = radariter, xvs = eph_su,
+                   xve = eph_ea, xva = (bwd, fwd))
         Q = nrms((ores, rres))
     else
         rres = nothing
