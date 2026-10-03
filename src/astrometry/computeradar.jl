@@ -753,9 +753,11 @@ function compute_delay(
 end
 
 """
-    radar_astrometry(::AbstractRadarAstrometry; xva, kwargs...)
+    radar_astrometry(::AbstractRadarAstrometry [, ::RadarBuffer]; xva, kwargs...)
 
-Return time-delay [us] and Doppler shift [Hz].
+Return time-delay [us] and Doppler shift [Hz], computed with the taylorized method
+of [`compute_delay`](@ref). An optional buffer can be passed to recycle memory;
+otherwise, a new one is allocated.
 
 # Keyword arguments
 
@@ -764,34 +766,56 @@ Return time-delay [us] and Doppler shift [Hz].
     the nearest millisecond (default: `1.0`).
 - `autodiff::Bool`: whether to compute Doppler shift via automatic diff
     of [`compute_delay`](@ref) or not (default: `true`).
-- `tord::Int`: order of Taylor expansions (default: `10`).
+- `tord::Int`: order of Taylor expansions (default: `10`, or the order of the
+    buffer).
 - `niter::Int`: number of light-time solution iterations (default: `10`).
-- `xve::EarthEph`: Earth ephemeris (default: `earthposvel`).
-- `xvs::SunEph`: Sun ephemeris (default: `sunposvel`).
-- `xva::AstEph`: asteroid ephemeris.
+- `xve`: Earth ephemeris.
+- `xvs`: Sun ephemeris.
+- `xva`: asteroid ephemeris.
 
-All ephemeris must take  [et seconds since J2000] and return [barycentric
-position in km and velocity in km/sec].
+`xvs` and `xve` must be `DensePropagation2` ephemerides [au, au/day] taking TDB days
+since J2000, while `xva` must be a tuple with the backward and forward propagations
+of the asteroid.
+
+!!! warning
+    If `autodiff = true`, the returned time-delay is stored in the buffer, so it is
+    overwritten by subsequent calls with the same buffer.
 """
 radar_astrometry(radar::AbstractRadarAstrometry{T}; kwargs...) where {T <: Real} =
     radar_astrometry(observatory(radar), date(radar), frequency(radar); kwargs...)
 
+radar_astrometry(radar::AbstractRadarAstrometry{T}, buffer::RadarBuffer;
+                 kwargs...) where {T <: Real} =
+    radar_astrometry(observatory(radar), date(radar), frequency(radar), buffer; kwargs...)
+
 function radar_astrometry(observatory::ObservatoryMPC, t_r_utc::DateTime, F_tx::Real;
-                          tc::Real = 1.0, autodiff::Bool = true, kwargs...)
+                          xva, tord::Int = 10, kwargs...)
+    # Asteroid ephemeris at receive time
+    a1_et_r = evaleph(xva, dtutc2et(t_r_utc))[1]
+    # Buffer
+    buffer = RadarBuffer(a1_et_r, tord)
+    return radar_astrometry(observatory, t_r_utc, F_tx, buffer; xva, kwargs...)
+end
+
+function radar_astrometry(observatory::ObservatoryMPC, t_r_utc::DateTime, F_tx::Real,
+                          buffer::RadarBuffer; tc::Real = 1.0, autodiff::Bool = true,
+                          kwargs...)
     # Compute Doppler shift via automatic differentiation of time-delay
     if autodiff
         # Time delay
-        τ = compute_delay(observatory, t_r_utc; kwargs...)
+        τ = compute_delay(observatory, t_r_utc, buffer; kwargs...)
         # Time delay [us] and Doppler shift [Hz]
         return τ[0], -F_tx * τ[1]
     # Compute Doppler shift via numerical differentiation of time-delay
     else
         offset = Dates.Millisecond(1000round(tc/2, digits = 3))
-        τe = compute_delay(observatory, t_r_utc + offset; kwargs...)
-        τn = compute_delay(observatory, t_r_utc       ; kwargs...)
-        τs = compute_delay(observatory, t_r_utc - offset; kwargs...)
+        # Since the buffer owns the time-delay it returns, each result must be
+        # copied before the next call to compute_delay
+        τe = deepcopy(compute_delay(observatory, t_r_utc + offset, buffer; kwargs...)[0])
+        τn = deepcopy(compute_delay(observatory, t_r_utc         , buffer; kwargs...)[0])
+        τs = deepcopy(compute_delay(observatory, t_r_utc - offset, buffer; kwargs...)[0])
         # Time delay [us] and Doppler shift [Hz]
-        return τn[0], -F_tx * ((τe[0]-τs[0]) / tc)
+        return τn, -F_tx * ((τe - τs) / tc)
     end
 
 end

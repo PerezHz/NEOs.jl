@@ -146,40 +146,45 @@ See also [`RadarResidual`](@ref) and [`radar_astrometry`](@ref).
     of [`compute_delay`](@ref) or not (default: `true`).
 - `tord::Int`: order of Taylor expansions (default: `10`).
 - `niter::Int`: number of light-time solution iterations (default: `10`).
-- `xve::EarthEph`: Earth ephemeris (default: `earthposvel`).
-- `xvs::SunEph`: Sun ephemeris (default: `sunposvel`).
-- `xva::AstEph`: asteroid ephemeris.
+- `xve`: Earth ephemeris.
+- `xvs`: Sun ephemeris.
+- `xva`: asteroid ephemeris.
 
-All ephemeris must take [et seconds since J2000] and return [barycentric
-position in km and velocity in km/sec].
+`xvs` and `xve` must be `DensePropagation2` ephemerides [au, au/day] taking TDB days
+since J2000, while `xva` must be a tuple with the backward and forward propagations
+of the asteroid (see the taylorized method of [`compute_delay`](@ref)).
 """
 function residuals(radar::AbstractRadarVector{T},
                    outliers::AbstractVector{Bool} = falses(length(radar));
-                   xva::AstEph, kwargs...) where {AstEph, T <: Real}
+                   xva::AstEph, tord::Int = 10, kwargs...) where {AstEph, T <: Real}
     # UTC time of first radar observation
     utc1 = date(radar[1])
     # TDB seconds since J2000.0 for first radar observation
     et1 = dtutc2et(utc1)
     # Asteroid ephemeris at et1
-    a1_et1 = xva(et1)[1]
+    a1_et1 = evaleph(xva, et1)[1]
     # Type of asteroid ephemeris
     U = typeof(a1_et1)
+    # Buffer
+    buffer = [RadarBuffer(a1_et1, tord) for _ in eachindex(radar)]
     # Vector of residuals
     res = init_radar_residuals(U, radar, outliers)
-    residuals!(res, radar; xva, kwargs...)
+    residuals!(res, radar, buffer; xva, kwargs...)
 
     return res
 end
 
-function residuals!(res::Vector{RadarResidual{T, U}}, radar::AbstractRadarVector{T};
-                    xva::AstEph, kwargs...) where {AstEph, T <: Real, U <: Number}
+function residuals!(res::AbstractVector{RadarResidual{T, U}},
+                    radar::AbstractRadarVector{T},
+                    buffer::Vector{RadarBuffer{U}};
+                    kwargs...) where {T <: Real, U <: Number}
 
-    @allow_boxed_captures tmap!(res, radar, weight.(res), debias.(res),
-                                isoutlier.(res)) do x, w8, bias, outlier
+    @allow_boxed_captures tmap!(res, radar, buffer, weight.(res), debias.(res),
+                                isoutlier.(res)) do x, buff, w8, bias, outlier
         # Observed time-delay or Doppler shift
         observed = measure(x)
         # Computed time-delay and Doppler shift
-        delay, doppler = radar_astrometry(x; xva, kwargs...)
+        delay, doppler = radar_astrometry(x, buff; kwargs...)
         computed = isdelay(x) ? delay : doppler
         # Observed minus computed residual
         return RadarResidual{T, U}(

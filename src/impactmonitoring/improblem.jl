@@ -72,8 +72,9 @@ function PropresBuffer(
     tref = cte(cte(jd0)) - JD_J2000
     tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(dynamicalmodel(IM), q0, jd0, tlim, params)
-    res = [OpticalBuffer(q0[1]) for _ in 1:noptical(IM)]
-    return PropresBuffer{T, U, V}(prop, res)
+    optical = [OpticalBuffer(q0[1]) for _ in 1:noptical(IM)]
+    radar = RadarBuffer{U}[]
+    return PropresBuffer{T, U, V}(prop, optical, radar)
 end
 
 function propres!(
@@ -102,7 +103,7 @@ function propres!(
     Nres = length(res)
     subres = Nres == noptical(IM) ? view(res, 1:Nres) : view(res, 1:Nres-1)
     try
-        residuals!(subres, optical, buffer.res; xvs = eph_su, xve = eph_ea,
+        residuals!(subres, optical, buffer.optical; xvs = eph_su, xve = eph_ea,
                    xva = (bwd, fwd))
         return bwd, fwd
     catch

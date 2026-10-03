@@ -317,11 +317,9 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
                xva = (bwd, fwd))
     if hasradar(orbit)
         rres = init_radar_residuals(T, orbit)
-        residuals!(rres, radar;
-            xvs = et -> auday2kmsec(eph_su(et/daysec)),
-            xve = et -> auday2kmsec(eph_ea(et/daysec)),
-            xva = et -> bwdfwdeph(et, bwd, fwd)
-        )
+        rbuffer = [RadarBuffer(q00[1], 10) for _ in eachindex(rres)]
+        residuals!(rres, radar, rbuffer; xvs = eph_su, xve = eph_ea,
+                   xva = (bwd, fwd))
         Q = nrms((ores, rres))
     else
         rres = nothing

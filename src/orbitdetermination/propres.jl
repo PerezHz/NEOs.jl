@@ -6,11 +6,13 @@ Pre-allocated memory for [`propres`](@ref).
 # Fields
 
 - `prop::PropagationBuffer{T, U, V}`: buffer for [`propagate`](@ref).
-- `res::Vector{OpticalBuffer{U}}`: buffer for [`compute_radec`](@ref).
+- `optical::Vector{OpticalBuffer{U}}`: buffer for [`compute_radec`](@ref).
+- `radar::Vector{RadarBuffer{U}}`: buffer for [`compute_delay`](@ref).
 """
 struct PropresBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
     prop::PropagationBuffer{T, U, V}
-    res::Vector{OpticalBuffer{U}}
+    optical::Vector{OpticalBuffer{U}}
+    radar::Vector{RadarBuffer{U}}
 end
 
 # Special PropresBuffer constructors
@@ -23,20 +25,22 @@ function PropresBuffer(
     tref = cte(cte(jd0)) - JD_J2000
     tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
-    res = [OpticalBuffer(q0[1]) for _ in eachindex(idxs)]
-    return PropresBuffer{T, U, V}(prop, res)
+    optical = [OpticalBuffer(q0[1]) for _ in eachindex(idxs)]
+    radar = RadarBuffer{U}[]
+    return PropresBuffer{T, U, V}(prop, optical, radar)
 end
 
 function PropresBuffer(
         od::AbstractODProblem{D, T}, q0::Vector{U},
-        jd0::V, params::Parameters
+        jd0::V, params::Parameters; tord::Int = 10
     ) where {D, T <: Real, U <: Number, V <: Number}
     t0, tf = dtutc2days.(minmaxdates(od))
     tref = cte(cte(jd0)) - JD_J2000
     tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
-    res = [OpticalBuffer(q0[1]) for _ in 1:noptical(od)]
-    return PropresBuffer{T, U, V}(prop, res)
+    optical = [OpticalBuffer(q0[1]) for _ in 1:noptical(od)]
+    radar = [RadarBuffer(q0[1], tord) for _ in 1:nradar(od)]
+    return PropresBuffer{T, U, V}(prop, optical, radar)
 end
 
 """
@@ -87,7 +91,8 @@ See also [`propagate`](@ref) and [`residuals`](@ref).
 - `idxs::AbstractVector{Int}`: indices of the observations in `od.optical` to be included
     in the computation.
 In addition, if `od` contains radar astrometry:
-- `tord::Int`: order of Taylor expansions (default: `10`).
+- `tord::Int`: order of Taylor expansions (default: `10`). Only used when `buffer`
+    is `nothing`; otherwise, the order is that of `buffer.radar`.
 - `niter::Int`: number of light-time solution iterations (default: `10`).
 """
 function propres(
@@ -115,7 +120,7 @@ function propres(
     # O-C residuals
     res = init_optical_residuals(U, od, idxs)
     try
-        residuals!(res, optical, buffer.res; xvs = eph_su, xve = eph_ea,
+        residuals!(res, optical, buffer.optical; xvs = eph_su, xve = eph_ea,
                    xva = (bwd, fwd))
         return bwd, fwd, res
     catch
@@ -137,7 +142,7 @@ function propres(
     t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(od, jd0, params)
     # Buffer
     if isnothing(buffer)
-        buffer = PropresBuffer(od, q0, jd0, params)
+        buffer = PropresBuffer(od, q0, jd0, params; tord)
     end
     # Backward (forward) integration
     bwd = _propagate(dynamics, q0, jd0, nyears_bwd, buffer.prop, params)
@@ -149,13 +154,10 @@ function propres(
     # O-C residuals
     res = (init_optical_residuals(U, od), init_radar_residuals(U, od))
     try
-        residuals!(res[1], optical, buffer.res; xvs = eph_su, xve = eph_ea,
+        residuals!(res[1], optical, buffer.optical; xvs = eph_su, xve = eph_ea,
                    xva = (bwd, fwd))
-        residuals!(res[2], radar;
-            tord, niter,
-            xvs = et -> auday2kmsec(eph_su(et/daysec)),
-            xve = et -> auday2kmsec(eph_ea(et/daysec)),
-            xva = et -> bwdfwdeph(et, bwd, fwd))
+        residuals!(res[2], radar, buffer.radar; niter, xvs = eph_su, xve = eph_ea,
+                   xva = (bwd, fwd))
         return bwd, fwd, res
     catch
         empty!(res[1])
@@ -196,7 +198,7 @@ function propres!(
     end
     # O-C residuals
     try
-        residuals!(res, optical, buffer.res; xvs = eph_su, xve = eph_ea,
+        residuals!(res, optical, buffer.optical; xvs = eph_su, xve = eph_ea,
                    xva = (bwd, fwd))
         return bwd, fwd
     catch
@@ -219,7 +221,7 @@ function propres!(
     t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(od, jd0, params)
     # Buffer
     if isnothing(buffer)
-        buffer = PropresBuffer(od, q0, jd0, params)
+        buffer = PropresBuffer(od, q0, jd0, params; tord)
     end
     # Backward (forward) integration
     bwd = _propagate(dynamics, q0, jd0, nyears_bwd, buffer.prop, params)
@@ -232,13 +234,10 @@ function propres!(
     end
     # O-C residuals
     try
-        residuals!(res[1], optical, buffer.res; xvs = eph_su, xve = eph_ea,
+        residuals!(res[1], optical, buffer.optical; xvs = eph_su, xve = eph_ea,
                    xva = (bwd, fwd))
-        residuals!(res[2], radar;
-            tord, niter,
-            xvs = et -> auday2kmsec(eph_su(et/daysec)),
-            xve = et -> auday2kmsec(eph_ea(et/daysec)),
-            xva = et -> bwdfwdeph(et, bwd, fwd))
+        residuals!(res[2], radar, buffer.radar; niter, xvs = eph_su, xve = eph_ea,
+                   xva = (bwd, fwd))
         return bwd, fwd
     catch
         empty!(res[1])
