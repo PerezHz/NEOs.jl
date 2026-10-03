@@ -287,9 +287,8 @@ function unfold_ephemeris(ex::Expr)
             TaylorSeries.zero!($T_[i])
             TaylorSeries.zero!($a_[i])
             TaylorSeries._horner!($T_[i], $e_.p[$i_, i], $δ_, $a_[i])
-            TaylorSeries.zero!($x[i])
             for k in eachindex($x[i])
-                _identity!($x[i], $T_[i], k)
+                taylorembed!($x[i], $T_[i], k)
             end
         end
     end

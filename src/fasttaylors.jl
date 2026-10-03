@@ -52,7 +52,8 @@ function multscalar!(a::Taylor1{TaylorN{T}}, C::Real, k::Int) where {T <: Real}
 end
 
 # In-place copy of the k-th order coefficient of a `Taylor1{T}` into a `Taylor1{U}`;
-# if `U` is a `TaylorN{T}`, the copied coefficient is a constant `TaylorN`
+# if `U` is a `TaylorN{T}` (`Taylor1{T}`), the copied coefficient is a constant
+# `TaylorN` (`Taylor1`)
 function taylorembed!(c::Taylor1{T}, a::Taylor1{T}, k::Int) where {T <: Real}
     c.coeffs[k+1] = a.coeffs[k+1]
     return nothing
@@ -61,6 +62,12 @@ end
 function taylorembed!(c::Taylor1{TaylorN{T}}, a::Taylor1{T}, k::Int) where {T <: Real}
     TS.zero!(c.coeffs[k+1])
     c.coeffs[k+1].coeffs[1].coeffs[1] = a.coeffs[k+1]
+    return nothing
+end
+
+function taylorembed!(c::Taylor1{Taylor1{T}}, a::Taylor1{T}, k::Int) where {T <: Real}
+    TS.zero!(c.coeffs[k+1])
+    c.coeffs[k+1].coeffs[1] = a.coeffs[k+1]
     return nothing
 end
 
