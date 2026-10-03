@@ -25,9 +25,9 @@ function RadarBuffer(x::U, tord::Int) where {U <: Number}
     zeroT1() = Taylor1([zero(x) for _ in 0:tord], tord)
     # Independent time variable
     tvar = Taylor1([zero(x), one(x), (zero(x) for _ in 2:tord)...], tord)
-    v0 = [tvar, (zeroT1() for _ in 1:24)...]
+    v0 = [tvar, (zeroT1() for _ in 1:25)...]
     # Number of components of each vector variable
-    nv1 = (3, 3, 3, 3, 3, 3, 6, 3, 3, 3, 3, 6, 3, 3, 3, 3, 3, 3)
+    nv1 = (3, 3, 3, 3, 3, 3, 3, 6, 3, 3, 3, 3, 6, 3, 3, 3, 3, 3, 3)
     v1 = [[zeroT1() for _ in 1:n] for n in nv1]
     return RadarBuffer{U}(v0, v1)
 end
@@ -571,9 +571,10 @@ function compute_delay(
         xva::NTuple{2, DensePropagation2{T, U}}
     ) where {T <: Real, U <: Number}
     # Unfold
-    tvar, et_r_secs, aux1, aux2, auxh, ρ_r, τ_D, et_b_secs, e_D, p_D, _p_dot_, p_dot,
-    τ_ρ, τ_p, one_τ_p, _Δt_, Δt, τ_U, et_t_secs, dt_t, ρ_t, e_U, p_U, τ, τ_us = buffer.v0
-    rv_e_t_r, rv_s_t_r, rv_a_t_r, r_r_t_r, ρ_vec_r, e_D_vec, rv_a_t_b, rv_s_t_b,
+    tvar, et_r_secs, tdb_utc_r, aux1, aux2, auxh, ρ_r, τ_D, et_b_secs, e_D, p_D,
+    _p_dot_, p_dot, τ_ρ, τ_p, one_τ_p, _Δt_, Δt, τ_U, et_t_secs, dt_t, ρ_t, e_U, p_U,
+    τ, τ_us = buffer.v0
+    R_r, rv_e_t_r, rv_s_t_r, rv_a_t_r, r_r_t_r, ρ_vec_r, e_D_vec, rv_a_t_b, rv_s_t_b,
     p_D_vec, R_t, V_t, rv_e_t_t, rv_s_t_t, r_t_t_t, v_t_t_t, ρ_vec_t, e_U_vec,
     p_U_vec = buffer.v1
     order = TS.order(tvar)
@@ -586,13 +587,21 @@ function compute_delay(
     for ord in 0:order
         TS.add!(et_r_secs, tvar, et_r_secs_0, ord)
     end
-    # TDB-UTC at receive time
-    tdb_utc_r = tdb_utc(et_r_secs)
-    # Compute geocentric position/velocity of receiving antenna in
-    # inertial frame [km, km/sec]
-    utc_r_days = JD_J2000 + (et_r_secs - tdb_utc_r) / daysec
+    # TDB-UTC and geocentric position/velocity of receiving antenna in inertial
+    # frame [km, km/sec] at receive time. Since these quantities do not depend on
+    # the asteroid, they are evaluated on plain Taylor1{T} expansions, which is much
+    # cheaper than evaluating them on Taylor1{U} when U is a TaylorN
+    et_r_secs_T = et_r_secs_0 + Taylor1(T, order)
+    tdb_utc_r_T = tdb_utc(et_r_secs_T)
+    utc_r_days = JD_J2000 + (et_r_secs_T - tdb_utc_r_T) / daysec
     RV_r = obsposvelECI(observatory, utc_r_days)
-    R_r = RV_r[1:3]
+    # Copy TDB-UTC and the antenna position at receive time into the buffer
+    for ord in 0:order
+        taylorembed!(tdb_utc_r, tdb_utc_r_T, ord)
+        for i in 1:3
+            taylorembed!(R_r[i], RV_r[i], ord)
+        end
+    end
     # Earth, Sun and asteroid barycentric positions at receive time
     evaleph!(rv_e_t_r, et_r_secs, xve, auxh)
     evaleph!(rv_s_t_r, et_r_secs, xvs, auxh)
