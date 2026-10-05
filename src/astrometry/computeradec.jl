@@ -1,5 +1,5 @@
 """
-    OpticalBuffer{U <: Number} <: AbstractBuffer
+    OpticalBuffer{T <: Real, U <: Number} <: AbstractBuffer
 
 Pre-allocated memory for [`compute_radec`](@ref).
 
@@ -7,16 +7,38 @@ Pre-allocated memory for [`compute_radec`](@ref).
 
 - `v0::Vector{U}`: array of scalar variables.
 - `v1::Vector{Vector{U}}`: array of vector variables.
+- `observer::Vector{T}`: geocentric state vector [km, km/sec] of the observer in
+    inertial frame at the reception time.
+
+# Constructors
+
+    OpticalBuffer(x::U, optical::AbstractOpticalAstrometry)
+    OpticalBuffer(x::U, observatory::ObservatoryMPC, date::DateTime)
+
+where `x` fixes the type of the stored variables.
+
+!!! note
+    The observer's state vector depends only on the observatory and the date, so it
+    is computed once, when the buffer is constructed, and reused by every call to
+    [`compute_radec`](@ref) with the buffer. Hence, a buffer must only be used with
+    the observation (or observatory and date) it was constructed with.
 """
-struct OpticalBuffer{U <: Number} <: AbstractBuffer
+struct OpticalBuffer{T <: Real, U <: Number} <: AbstractBuffer
     v0::Vector{U}
     v1::Vector{Vector{U}}
+    observer::Vector{T}
 end
 
-function OpticalBuffer(x::U) where {U <: Number}
+OpticalBuffer(x::Number, optical::AbstractOpticalAstrometry) =
+    OpticalBuffer(x, observatory(optical), date(optical))
+
+function OpticalBuffer(x::U, observatory::ObservatoryMPC{T},
+                       date::DateTime) where {T <: Real, U <: Number}
     v0 = [zero(x) for _ in 1:32]
     v1 = [[zero(x) for _ in 1:6] for _ in 1:19]
-    return OpticalBuffer{U}(v0, v1)
+    # Geocentric state vector of the observer in inertial frame [km, km/sec]
+    observer = Vector{T}(obsposvelECI(observatory, datetime2julian(date)))
+    return OpticalBuffer{T, U}(v0, v1, observer)
 end
 
 """
@@ -24,7 +46,10 @@ end
 
 Compute the astrometric right ascension and declination [arcsec] at the observatory
 and date given by an optical observation. An optional buffer can be passed to recycle
-memory. Corrections due to Earth orientation, LOD and polar motion are considered.
+memory; in that case, the observer's state vector cached in the buffer is used, so
+the buffer must have been constructed with the same observation (see
+[`OpticalBuffer`](@ref)). Corrections due to Earth orientation, LOD and polar motion
+are considered.
 
 # Keyword arguments
 
@@ -177,7 +202,7 @@ function compute_radec(
 end
 
 function compute_radec(
-        observatory::ObservatoryMPC{T}, t_r_utc::DateTime, buffer::OpticalBuffer{U};
+        observatory::ObservatoryMPC{T}, t_r_utc::DateTime, buffer::OpticalBuffer{T, U};
         niter::Int = 5, xvs::DensePropagation2{T, T}, xve::DensePropagation2{T, T},
         xva::NTuple{2, DensePropagation2{T, U}}
     ) where {T <: Real, U <: NumberNotSeries}
@@ -197,8 +222,9 @@ function compute_radec(
     # Asteroid barycentric position and velocity at receive time
     evaleph!(rv_a_t_r, et_r_secs, xva[1], xva[2])
     r_a_t_r = rv_a_t_r[1:3]
-    # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
-    RV_r = obsposvelECI(observatory, datetime2julian(t_r_utc))
+    # Geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
+    # (cached in the buffer)
+    RV_r = buffer.observer
     R_r = RV_r[1:3]
     # Receiver barycentric position and velocity at receive time
     r_r_t_r = r_e_t_r + R_r
@@ -318,7 +344,7 @@ end
 
 # Taylorized version of the function above
 function compute_radec(
-        observatory::ObservatoryMPC{T}, t_r_utc::DateTime, buffer::OpticalBuffer{U};
+        observatory::ObservatoryMPC{T}, t_r_utc::DateTime, buffer::OpticalBuffer{T, U};
         niter::Int = 5, xvs::DensePropagation2{T, T}, xve::DensePropagation2{T, T},
         xva::NTuple{2, DensePropagation2{T, U}}
     ) where {T <: Real, U <: AbstractSeries}
@@ -337,7 +363,7 @@ function compute_radec(
     evaleph!(rv_a_t_r, et_r_secs, xva[1], xva[2])
     r_a_t_r = rv_a_t_r[1:3]
     order = TaylorSeries.order(r_a_t_r[1])
-    RV_r = obsposvelECI(observatory, datetime2julian(t_r_utc))
+    RV_r = buffer.observer
     R_r = RV_r[1:3]
     r_r_t_r = r_e_t_r + R_r
     E_H_vec = e_D_vec  = r_r_t_r - r_s_t_r

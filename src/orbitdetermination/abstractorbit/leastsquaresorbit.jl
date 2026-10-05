@@ -312,12 +312,12 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
     fwd = _propagate(dynamics, q00, jdnew, nyears_fwd, pbuffer, params)
     # O-C residuals
     ores = init_optical_residuals(T, orbit)
-    obuffer = [OpticalBuffer(q00[1]) for _ in eachindex(ores)]
+    obuffer = [OpticalBuffer(q00[1], x) for x in optical]
     residuals!(ores, optical, obuffer; niter = opticaliter, xvs = eph_su,
                xve = eph_ea, xva = (bwd, fwd))
     if hasradar(orbit)
         rres = init_radar_residuals(T, orbit)
-        rbuffer = [RadarBuffer(q00[1], radarord) for _ in eachindex(rres)]
+        rbuffer = [RadarBuffer(q00[1], x, radarord) for x in radar]
         residuals!(rres, radar, rbuffer; niter = radariter, xvs = eph_su,
                    xve = eph_ea, xva = (bwd, fwd))
         Q = nrms((ores, rres))

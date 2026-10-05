@@ -166,7 +166,7 @@ function residuals(radar::AbstractRadarVector{T},
     # Type of asteroid ephemeris
     U = typeof(a1_et1)
     # Buffer
-    buffer = [RadarBuffer(a1_et1, tord) for _ in eachindex(radar)]
+    buffer = [RadarBuffer(a1_et1, x, tord) for x in radar]
     # Vector of residuals
     res = init_radar_residuals(U, radar, outliers)
     residuals!(res, radar, buffer; xva, kwargs...)
@@ -176,7 +176,7 @@ end
 
 function residuals!(res::AbstractVector{RadarResidual{T, U}},
                     radar::AbstractRadarVector{T},
-                    buffer::Vector{RadarBuffer{U}};
+                    buffer::Vector{RadarBuffer{T, U}};
                     kwargs...) where {T <: Real, U <: Number}
 
     @allow_boxed_captures tmap!(res, radar, buffer, weight.(res), debias.(res),

@@ -72,8 +72,8 @@ function PropresBuffer(
     tref = cte(cte(jd0)) - JD_J2000
     tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(dynamicalmodel(IM), q0, jd0, tlim, params)
-    optical = [OpticalBuffer(q0[1]) for _ in 1:noptical(IM)]
-    radar = RadarBuffer{U}[]
+    optical = [OpticalBuffer(q0[1], x) for x in IM.orbit.optical]
+    radar = RadarBuffer{T, U}[]
     return PropresBuffer{T, U, V}(prop, optical, radar)
 end
 

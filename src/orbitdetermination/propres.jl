@@ -6,13 +6,13 @@ Pre-allocated memory for [`propres`](@ref).
 # Fields
 
 - `prop::PropagationBuffer{T, U, V}`: buffer for [`propagate`](@ref).
-- `optical::Vector{OpticalBuffer{U}}`: buffer for [`compute_radec`](@ref).
-- `radar::Vector{RadarBuffer{U}}`: buffer for [`compute_delay`](@ref).
+- `optical::Vector{OpticalBuffer{T, U}}`: buffer for [`compute_radec`](@ref).
+- `radar::Vector{RadarBuffer{T, U}}`: buffer for [`compute_delay`](@ref).
 """
 struct PropresBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
     prop::PropagationBuffer{T, U, V}
-    optical::Vector{OpticalBuffer{U}}
-    radar::Vector{RadarBuffer{U}}
+    optical::Vector{OpticalBuffer{T, U}}
+    radar::Vector{RadarBuffer{T, U}}
 end
 
 # Special PropresBuffer constructors
@@ -25,8 +25,8 @@ function PropresBuffer(
     tref = cte(cte(jd0)) - JD_J2000
     tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
-    optical = [OpticalBuffer(q0[1]) for _ in eachindex(idxs)]
-    radar = RadarBuffer{U}[]
+    optical = [OpticalBuffer(q0[1], od.optical[i]) for i in idxs]
+    radar = RadarBuffer{T, U}[]
     return PropresBuffer{T, U, V}(prop, optical, radar)
 end
 
@@ -38,8 +38,9 @@ function PropresBuffer(
     tref = cte(cte(jd0)) - JD_J2000
     tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
-    optical = [OpticalBuffer(q0[1]) for _ in 1:noptical(od)]
-    radar = [RadarBuffer(q0[1], params.radarord) for _ in 1:nradar(od)]
+    optical = [OpticalBuffer(q0[1], x) for x in od.optical]
+    radar = hasradar(od) ? [RadarBuffer(q0[1], x, params.radarord) for x in od.radar] :
+        RadarBuffer{T, U}[]
     return PropresBuffer{T, U, V}(prop, optical, radar)
 end
 

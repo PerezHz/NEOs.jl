@@ -88,10 +88,11 @@ using Test
         using NEOs: AbstractBuffer, OpticalBuffer, auxzero, scalingfactor, auday2kmsec!,
               dot3D, euclid3D, evaleph, taylorcompose!, cte, sseph
 
-        buffer = OpticalBuffer(0.0)
+        buffer = OpticalBuffer(0.0, search_observatory_code("G96"), DateTime(2020, 1, 1))
         @test isa(string(buffer), String)
         @test isa(buffer, AbstractBuffer)
-        @test isa(buffer, OpticalBuffer{Float64})
+        @test isa(buffer, OpticalBuffer{Float64, Float64})
+        @test length(buffer.observer) == 6
 
         q00 = rand(6)
         scalings = fill(1E-8, 6)

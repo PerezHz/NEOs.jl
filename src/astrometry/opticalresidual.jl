@@ -264,7 +264,7 @@ function residuals(
     # Type of asteroid ephemeris
     U = typeof(a1_et1)
     # Buffer
-    buffer = [OpticalBuffer(a1_et1) for _ in eachindex(optical)]
+    buffer = [OpticalBuffer(a1_et1, x) for x in optical]
     # Vector of residuals
     res = init_optical_residuals(U, wsm, dsm)
     residuals!(res, optical, buffer; xva, kwargs...)
@@ -274,7 +274,7 @@ end
 
 function residuals!(res::AbstractVector{OpticalResidual{T, U}},
                     optical::AbstractOpticalVector{T},
-                    buffer::Vector{OpticalBuffer{U}};
+                    buffer::Vector{OpticalBuffer{T, U}};
                     kwargs...) where {T <: Real, U <: Number}
 
     @allow_boxed_captures tmap!(res, optical, buffer, weight.(res), debias.(res), corr.(res),
