@@ -18,8 +18,9 @@ scalingfactor(x::TaylorN{T}) where {T <: Real} = x[1][findfirst(x[1])]
 
 # In-place methods of auday2kmsec
 function auday2kmsec!(y::AbstractVector{T}) where {T <: Real}
-    y[1:3] .*= au
-    y[4:6] .*= au/daysec
+    for i in eachindex(y)
+        y[i] *= i <= 3 ? au : au/daysec
+    end
     return nothing
 end
 
