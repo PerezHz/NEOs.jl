@@ -37,7 +37,7 @@ function OpticalBuffer(x::U, observatory::ObservatoryMPC{T},
     v0 = [zero(x) for _ in 1:32]
     # Number of components of each vector variable; only the asteroid's state
     # vector at bounce time (third vector) needs the velocity
-    nv1 = (3, 3, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3)
+    nv1 = (3, 3, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3)
     v1 = [[zero(x) for _ in 1:n] for n in nv1]
     # Geocentric state vector of the observer in inertial frame [km, km/sec]
     observer = Vector{T}(obsposvelECI(observatory, datetime2julian(date)))
@@ -212,8 +212,8 @@ function compute_radec(
     # Unfold
     ρ_r, τ_D, et_b_secs, Δτ_D, Δτ_rel_D, p_D, q_D, p_dot_23, Δt_2, U_norm,
         g2, u1_norm, α_rad_, α_rad, δ_rad, δ_as, α_as = buffer.v0
-    r_a_t_r, ρ_vec_r, rv_a_t_b, r_a_t_b, v_a_t_b, r_s_t_b, p_D_vec, U_vec,
-        u_vec, Q_vec, q_vec, u1_vec = buffer.v1
+    r_a_t_r, ρ_vec_r, rv_a_t_b, r_s_t_b, p_D_vec, U_vec, u_vec, Q_vec, q_vec,
+        u1_vec = buffer.v1
     # Transform receiving time from UTC to TDB seconds since J2000
     et_r_secs = dtutc2et(t_r_utc)
     # Sun barycentric position and velocity at receive time
@@ -352,21 +352,20 @@ function compute_radec(
     p_dot_23, τ_D_r, τ_D_23, one_minus_τ_D_23, _Δt_2_, Δt_2, U_norm, Q_norm,
     q_dot_e, g2, u_dot_q, e_dot_u, g1_div_g2, u1_norm, u12_div_u11, α_aux,
     u13_div_u1_norm, δ_aux, α_rad,  δ_rad, δ_as, α_as = buffer.v0
-    r_a_t_r, ρ_vec_r, rv_a_t_b, r_a_t_b, v_a_t_b, r_s_t_b, p_D_vec, U_vec,
-    u_vec, Q_vec, q_vec, u_dot_q_e_vec, e_dot_u_q_vec, uqe_minus_euq, g12_uqe_vec,
-    _u1_vec_, u1_vec = buffer.v1
+    r_a_t_r, ρ_vec_r, rv_a_t_b, r_s_t_b, p_D_vec, U_vec, u_vec, Q_vec, q_vec,
+    u_dot_q_e_vec, e_dot_u_q_vec, uqe_minus_euq, g12_uqe_vec, _u1_vec_,
+    u1_vec = buffer.v1
+    # Asteroid barycentric velocity at bounce time
+    v_a_t_b = view(rv_a_t_b, 4:6)
     et_r_secs = dtutc2et(t_r_utc)
     rv_s_t_r = auday2kmsec(xvs(et_r_secs/daysec))
-    r_s_t_r = rv_s_t_r[1:3]
     rv_e_t_r = auday2kmsec(xve(et_r_secs/daysec))
-    r_e_t_r = rv_e_t_r[1:3]
-    evaleph!(r_a_t_r, et_r_secs, xva[1], xva[2])
+    evaleph!(r_a_t_r, et_r_secs, xva[1], xva[2], aux1)
     order = TaylorSeries.order(r_a_t_r[1])
     RV_r = buffer.observer
-    R_r = RV_r[1:3]
-    r_r_t_r = r_e_t_r + R_r
-    E_H_vec = e_D_vec  = r_r_t_r - r_s_t_r
-    E_H = e_D = euclid3D(e_D_vec)
+    r_r_t_r = [rv_e_t_r[i] + RV_r[i] for i in 1:3]
+    E_H_vec = [r_r_t_r[i] - rv_s_t_r[i] for i in 1:3]
+    E_H = e_D = euclid3D(E_H_vec)
     e_vec = E_H_vec / E_H
     g1 = g1coeff / (E_H / au)
     for ord = 0:order
@@ -378,14 +377,12 @@ function compute_radec(
         TS.subst!(et_b_secs, et_r_secs, τ_D, ord)
     end
     for _ in 1:niter
-        evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2])
-        evaleph!(r_s_t_b, et_b_secs, xvs)
+        evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2], aux1)
+        evaleph!(r_s_t_b, et_b_secs, xvs, aux1)
         for ord in 0:order
             for i in 1:3
-                TS.identity!(r_a_t_b[i], rv_a_t_b[i], ord)
-                TS.identity!(v_a_t_b[i], rv_a_t_b[i+3], ord)
-                TS.subst!(ρ_vec_r[i], r_a_t_b[i], r_r_t_r[i], ord)
-                TS.subst!(p_D_vec[i], r_a_t_b[i], r_s_t_b[i], ord)
+                TS.subst!(ρ_vec_r[i], rv_a_t_b[i], r_r_t_r[i], ord)
+                TS.subst!(p_D_vec[i], rv_a_t_b[i], r_s_t_b[i], ord)
             end
             euclid3D!(ρ_r, ρ_vec_r, aux1, aux2, ord)
             euclid3D!(p_D, p_D_vec, aux1, aux2, ord)
@@ -406,15 +403,13 @@ function compute_radec(
             TS.subst!(et_b_secs, et_r_secs, τ_D, ord)
         end
     end
-    evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2])
-    evaleph!(r_s_t_b, et_b_secs, xvs)
+    evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2], aux1)
+    evaleph!(r_s_t_b, et_b_secs, xvs, aux1)
     for ord in 0:order
         for i in 1:3
-            TS.identity!(r_a_t_b[i], rv_a_t_b[i], ord)
-            TS.identity!(v_a_t_b[i], rv_a_t_b[i+3], ord)
-            TS.subst!(ρ_vec_r[i], r_a_t_b[i], r_r_t_r[i], ord)
+            TS.subst!(ρ_vec_r[i], rv_a_t_b[i], r_r_t_r[i], ord)
             TS.identity!(U_vec[i], ρ_vec_r[i], ord)
-            TS.subst!(Q_vec[i], r_a_t_b[i], r_s_t_b[i], ord)
+            TS.subst!(Q_vec[i], rv_a_t_b[i], r_s_t_b[i], ord)
         end
         euclid3D!(ρ_r, ρ_vec_r, aux1, aux2, ord)
         TS.identity!(U_norm, ρ_r, ord)
