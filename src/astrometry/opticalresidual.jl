@@ -277,32 +277,40 @@ function residuals!(res::AbstractVector{OpticalResidual{T, U}},
                     buffer::Vector{OpticalBuffer{T, U}};
                     kwargs...) where {T <: Real, U <: Number}
 
-    @allow_boxed_captures tforeach(eachindex(res, optical, buffer)) do i
-        x, r = optical[i], res[i]
-        # Observed ra/dec [arcsec]
-        obsra, obsdec = rad2arcsec.(measure(x))
-        # Computed ra/dec [arcsec]
-        compra, compdec = compute_radec(x, buffer[i]; kwargs...)
-        # Statistical weights [arcsec⁻²]
-        wra, wdec = weight(r)
-        # Debiasing factors [arcsec]
-        dra, ddec = debias(r)
-        # Correlation between ra and dec, and outlier flag
-        rho, outlier = corr(r), isoutlier(r)
-        # Observed minus computed residual ra/dec
-        # Note: ra is multiplied by a metric factor cos(dec) to match the format of
-        # debiasing corrections
-        res[i] = OpticalResidual{T, U}(
-            wra * ( anglediff(obsra, compra) * cos(dec(x)) - dra ),
-            wdec * ( obsdec - compdec - ddec ),
-            wra,
-            wdec,
-            dra,
-            ddec,
-            rho,
-            -1 < rho < 1 ? outlier : true
-        )
+    # Function barrier: the closure only captures the (never reassigned) arguments,
+    # so none of its captured variables is boxed
+    tforeach(eachindex(res, optical, buffer)) do i
+        res[i] = optical_residual(res[i], optical[i], buffer[i]; kwargs...)
     end
 
     return nothing
+end
+
+# Observed minus computed residual of optical observation `x`; the weights, debiasing
+# factors, correlation and outlier flag are taken from the previous residual `r`
+function optical_residual(r::OpticalResidual{T, U}, x::AbstractOpticalAstrometry{T},
+                          buffer::OpticalBuffer{T, U}; kwargs...) where {T <: Real, U <: Number}
+    # Observed ra/dec [arcsec]
+    obsra, obsdec = rad2arcsec.(measure(x))
+    # Computed ra/dec [arcsec]
+    compra, compdec = compute_radec(x, buffer; kwargs...)
+    # Statistical weights [arcsec⁻²]
+    wra, wdec = weight(r)
+    # Debiasing factors [arcsec]
+    dra, ddec = debias(r)
+    # Correlation between ra and dec, and outlier flag
+    rho, outlier = corr(r), isoutlier(r)
+    # Observed minus computed residual ra/dec
+    # Note: ra is multiplied by a metric factor cos(dec) to match the format of
+    # debiasing corrections
+    return OpticalResidual{T, U}(
+        wra * ( anglediff(obsra, compra) * cos(dec(x)) - dra ),
+        wdec * ( obsdec - compdec - ddec ),
+        wra,
+        wdec,
+        dra,
+        ddec,
+        rho,
+        -1 < rho < 1 ? outlier : true
+    )
 end

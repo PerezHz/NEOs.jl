@@ -27,7 +27,7 @@ using Healpix: Resolution, ang2pixRing
 using HORIZONS: smb_spk
 using LinearAlgebra: inv!
 using LsqFit: PrecisionWeights, curve_fit, vcov
-using OhMyThreads: tmap, tmap!, tforeach, @allow_boxed_captures
+using OhMyThreads: tmap, tmap!, tforeach
 using Parameters: @with_kw, @unpack
 using PlanetaryEphemeris: au, su, ea, mo, yr, RE, Rx, Ry, Rz, R_sun, α_p_sun,
       δ_p_sun, daysec, auday2kmsec, kmsec2auday,
