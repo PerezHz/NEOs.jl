@@ -277,20 +277,22 @@ function residuals!(res::AbstractVector{OpticalResidual{T, U}},
                     buffer::Vector{OpticalBuffer{T, U}};
                     kwargs...) where {T <: Real, U <: Number}
 
-    @allow_boxed_captures tmap!(res, optical, buffer, weight.(res), debias.(res), corr.(res),
-                                isoutlier.(res)) do x, buff, w8s, bias, rho, outlier
+    @allow_boxed_captures tforeach(eachindex(res, optical, buffer)) do i
+        x, r = optical[i], res[i]
         # Observed ra/dec [arcsec]
         obsra, obsdec = rad2arcsec.(measure(x))
         # Computed ra/dec [arcsec]
-        compra, compdec = compute_radec(x, buff; kwargs...)
+        compra, compdec = compute_radec(x, buffer[i]; kwargs...)
         # Statistical weights [arcsec⁻²]
-        wra, wdec = w8s
+        wra, wdec = weight(r)
         # Debiasing factors [arcsec]
-        dra, ddec = bias
+        dra, ddec = debias(r)
+        # Correlation between ra and dec, and outlier flag
+        rho, outlier = corr(r), isoutlier(r)
         # Observed minus computed residual ra/dec
         # Note: ra is multiplied by a metric factor cos(dec) to match the format of
         # debiasing corrections
-        return OpticalResidual{T, U}(
+        res[i] = OpticalResidual{T, U}(
             wra * ( anglediff(obsra, compra) * cos(dec(x)) - dra ),
             wdec * ( obsdec - compdec - ddec ),
             wra,

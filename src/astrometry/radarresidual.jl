@@ -179,15 +179,17 @@ function residuals!(res::AbstractVector{RadarResidual{T, U}},
                     buffer::Vector{RadarBuffer{T, U}};
                     kwargs...) where {T <: Real, U <: Number}
 
-    @allow_boxed_captures tmap!(res, radar, buffer, weight.(res), debias.(res),
-                                isoutlier.(res)) do x, buff, w8, bias, outlier
+    @allow_boxed_captures tforeach(eachindex(res, radar, buffer)) do i
+        x, r = radar[i], res[i]
+        # Statistical weight, debiasing factor and outlier flag
+        w8, bias, outlier = weight(r), debias(r), isoutlier(r)
         # Observed time-delay or Doppler shift
         observed = measure(x)
         # Computed time-delay and Doppler shift
-        delay, doppler = radar_astrometry(x, buff; kwargs...)
+        delay, doppler = radar_astrometry(x, buffer[i]; kwargs...)
         computed = isdelay(x) ? delay : doppler
         # Observed minus computed residual
-        return RadarResidual{T, U}(
+        res[i] = RadarResidual{T, U}(
             w8 * ( observed - computed - bias ),
             w8,
             bias,
