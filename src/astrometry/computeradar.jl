@@ -9,6 +9,7 @@ Pre-allocated memory for [`compute_delay`](@ref).
 - `v1::Vector{Vector{Taylor1{U}}}`: array of vector variables.
 - `observer::Vector{Taylor1{T}}`: geocentric state vector [km, km/sec] of the
     observer in inertial frame around the echo reception time.
+- `tdb_utc::Taylor1{T}`: TDB-UTC difference [sec] around the echo reception time.
 
 # Constructors
 
@@ -21,16 +22,17 @@ the Taylor expansions.
 !!! note
     All variables are `Taylor1` expansions in time (around the echo reception
     time) of order `tord`. The first element of `v0` is the independent time
-    variable. The observer's state vector depends only on the observatory and
-    the date, so it is computed once, when the buffer is constructed, and reused
-    by every call to [`compute_delay`](@ref) with the buffer. Hence, a buffer must
-    only be used with the observation (or observatory and date) it was constructed
-    with.
+    variable. The observer's state vector and the TDB-UTC difference at receive
+    time depend only on the observatory and the date, so they are computed once,
+    when the buffer is constructed, and reused by every call to
+    [`compute_delay`](@ref) with the buffer. Hence, a buffer must only be used with
+    the observation (or observatory and date) it was constructed with.
 """
 struct RadarBuffer{T <: Real, U <: Number} <: AbstractBuffer
     v0::Vector{Taylor1{U}}
     v1::Vector{Vector{Taylor1{U}}}
     observer::Vector{Taylor1{T}}
+    tdb_utc::Taylor1{T}
 end
 
 RadarBuffer(x::Number, radar::AbstractRadarAstrometry, tord::Int) =
@@ -48,27 +50,37 @@ function RadarBuffer(x::U, observatory::ObservatoryMPC{T}, date::DateTime,
     # Number of components of each vector variable
     nv1 = (3, 3, 3, 3, 3, 3, 3, 6, 3, 3, 3, 3, 6, 3, 3, 3, 3, 3, 3)
     v1 = [[zeroT1() for _ in 1:n] for n in nv1]
-    # Geocentric state vector of the observer in inertial frame [km, km/sec]
-    observer = obsposvelECI_taylor1(observatory, date, tord)
-    return RadarBuffer{T, U}(v0, v1, observer)
+    # Geocentric state vector of the observer in inertial frame [km, km/sec] and
+    # TDB-UTC difference [sec] at receive time
+    observer, tdb_utc_r = receivetaylor1(observatory, date, tord)
+    return RadarBuffer{T, U}(v0, v1, observer, tdb_utc_r)
 end
 
-# Geocentric state vector [km, km/sec] in inertial frame of `observatory`, as a
-# `Taylor1{T}` expansion of order `tord` in TDB seconds around the UTC time `date`.
-# Since the observer does not depend on the asteroid, the expansion is evaluated on
-# plain Taylor1{T}, which is much cheaper than evaluating it on Taylor1{TaylorN{T}}
-function obsposvelECI_taylor1(observatory::ObservatoryMPC{T}, date::DateTime,
-                              tord::Int) where {T <: Real}
+# Geocentric state vector [km, km/sec] in inertial frame of `observatory` and TDB-UTC
+# difference [sec], as `Taylor1{T}` expansions of order `tord` in TDB seconds around
+# the UTC time `date`. Since these quantities do not depend on the asteroid, they are
+# evaluated on plain Taylor1{T}, which is much cheaper than evaluating them on
+# Taylor1{TaylorN{T}}
+function receivetaylor1(observatory::ObservatoryMPC{T}, date::DateTime,
+                        tord::Int) where {T <: Real}
     et_r_secs = dtutc2et(date) + Taylor1(T, tord)
-    utc_r_days = JD_J2000 + (et_r_secs - tdb_utc(et_r_secs)) / daysec
-    return Vector{Taylor1{T}}(obsposvelECI(observatory, utc_r_days))
+    tdb_utc_r = tdb_utc(et_r_secs)
+    utc_r_days = JD_J2000 + (et_r_secs - tdb_utc_r) / daysec
+    observer = Vector{Taylor1{T}}(obsposvelECI(observatory, utc_r_days))
+    return observer, tdb_utc_r
 end
 
-# Update, in place, the observer's state vector cached in `buffer` to `observatory`
-# and `date`
-function observer!(buffer::RadarBuffer, observatory::ObservatoryMPC, date::DateTime)
+# Update, in place, the observer's state vector and TDB-UTC difference cached in
+# `buffer` to `observatory` and `date`
+function updatecache!(buffer::RadarBuffer, observatory::ObservatoryMPC, date::DateTime)
     tord = TS.order(buffer.v0[1])
-    copyto!(buffer.observer, obsposvelECI_taylor1(observatory, date, tord))
+    observer, tdb_utc_r = receivetaylor1(observatory, date, tord)
+    for ord in 0:tord
+        for i in eachindex(observer)
+            TS.identity!(buffer.observer[i], observer[i], ord)
+        end
+        TS.identity!(buffer.tdb_utc, tdb_utc_r, ord)
+    end
     return nothing
 end
 
@@ -365,9 +377,9 @@ end
 
 Compute the Taylor series expansion of the time-delay [us] observable as seen
 by an observatory around an UTC echo reception time. An optional buffer can be
-passed to recycle memory; in that case, the observer's state vector cached in the
-buffer is used, so the buffer must have been constructed with the same observatory
-and date (see [`RadarBuffer`](@ref)).
+passed to recycle memory; in that case, the observer's state vector and the TDB-UTC
+difference at receive time cached in the buffer are used, so the buffer must have been
+constructed with the same observatory and date (see [`RadarBuffer`](@ref)).
 
 # Keyword arguments
 
@@ -640,14 +652,10 @@ function compute_delay(
     for ord in 0:order
         TS.add!(et_r_secs, tvar, et_r_secs_0, ord)
     end
-    # TDB-UTC at receive time. Since it does not depend on the asteroid, it is
-    # evaluated on a plain Taylor1{T} expansion, which is much cheaper than
-    # evaluating it on Taylor1{U} when U is a TaylorN
-    et_r_secs_T = et_r_secs_0 + Taylor1(T, order)
-    tdb_utc_r_T = tdb_utc(et_r_secs_T)
     # Geocentric position/velocity of receiving antenna in inertial frame
-    # [km, km/sec] at receive time (cached in the buffer)
+    # [km, km/sec] and TDB-UTC [sec] at receive time (cached in the buffer)
     RV_r = buffer.observer
+    tdb_utc_r_T = buffer.tdb_utc
     # Copy TDB-UTC and the antenna position at receive time into the buffer
     for ord in 0:order
         taylorembed!(tdb_utc_r, tdb_utc_r_T, ord)
@@ -864,13 +872,13 @@ function radar_astrometry(observatory::ObservatoryMPC, t_r_utc::DateTime, F_tx::
         offset = Dates.Millisecond(1000round(tc/2, digits = 3))
         # Since the buffer owns the time-delay it returns, each result must be
         # copied before the next call to compute_delay. Moreover, the buffer caches
-        # the observer's state vector around the reception time, so it is updated
-        # in place for the shifted times, and restored afterwards
-        observer!(buffer, observatory, t_r_utc + offset)
+        # the observer's state vector and TDB-UTC around the reception time, so they
+        # are updated in place for the shifted times, and restored afterwards
+        updatecache!(buffer, observatory, t_r_utc + offset)
         τe = deepcopy(compute_delay(observatory, t_r_utc + offset, buffer; kwargs...)[0])
-        observer!(buffer, observatory, t_r_utc - offset)
+        updatecache!(buffer, observatory, t_r_utc - offset)
         τs = deepcopy(compute_delay(observatory, t_r_utc - offset, buffer; kwargs...)[0])
-        observer!(buffer, observatory, t_r_utc)
+        updatecache!(buffer, observatory, t_r_utc)
         τn = deepcopy(compute_delay(observatory, t_r_utc         , buffer; kwargs...)[0])
         # Time delay [us] and Doppler shift [Hz]
         return τn, -F_tx * ((τe - τs) / tc)
