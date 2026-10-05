@@ -32,6 +32,15 @@ nongravitational accelerations model:
     `α`, normalizing distance `r₀` [au], and exponents `m`, `n` and `k` (default:
     `(1.0, 1.0, 2.0, 0.0, 0.0)`)
 
+# Astrometry
+
+- `opticaliter::Int`: number of light-time solution iterations in `compute_radec`
+    (default: `5`).
+- `radariter::Int`: number of light-time solution iterations in `compute_delay`
+    (default: `10`).
+- `radarord::Int`: order of Taylor expansions wrt time in `compute_delay`
+    (default: `10`).
+
 # Gauss Method
 
 - `gaussorder::Int`: order of the jet transport perturbation (default: `2`).
@@ -107,6 +116,10 @@ nongravitational accelerations model:
     # Sun (earth) ephemeris
     eph_su::DensePropagation2{T, T} = selecteph(sseph, su)
     eph_ea::DensePropagation2{T, T} = selecteph(sseph, ea)
+    # Astrometry
+    opticaliter::Int = 5
+    radariter::Int = 10
+    radarord::Int = 10
     # Gauss' Method
     gaussorder::Int = 2
     safegauss::Bool = true

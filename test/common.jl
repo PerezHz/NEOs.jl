@@ -86,7 +86,7 @@ using Test
 
     @testset "fasttaylors" begin
         using NEOs: AbstractBuffer, OpticalBuffer, auxzero, scalingfactor, auday2kmsec!,
-              dot3D, euclid3D, evaleph, evaleph!, cte, sseph
+              dot3D, euclid3D, evaleph, taylorcompose!, cte, sseph
 
         buffer = OpticalBuffer(0.0)
         @test isa(string(buffer), String)
@@ -121,8 +121,8 @@ using Test
 
         @test evaleph(sseph, Taylor1(2), Taylor1(2)) ≈ evaleph(sseph, Taylor1(2))
 
-        evaleph!.(q0T1, q0T11, 0.0)
-        evaleph!.(q0TN, q0T1N, 0.0)
+        taylorcompose!.(q0T1, q0T11, 0.0, zero.(q0T1))
+        taylorcompose!.(q0TN, q0T1N, 0.0, zero.(q0TN))
 
         @test q0T1 == cte(q0T11)
         @test q0TN == cte(q0T1N)

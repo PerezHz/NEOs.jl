@@ -6,11 +6,13 @@ Pre-allocated memory for [`propres`](@ref).
 # Fields
 
 - `prop::PropagationBuffer{T, U, V}`: buffer for [`propagate`](@ref).
-- `res::Vector{OpticalBuffer{U}}`: buffer for [`compute_radec`](@ref).
+- `optical::Vector{OpticalBuffer{U}}`: buffer for [`compute_radec`](@ref).
+- `radar::Vector{RadarBuffer{U}}`: buffer for [`compute_delay`](@ref).
 """
 struct PropresBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
     prop::PropagationBuffer{T, U, V}
-    res::Vector{OpticalBuffer{U}}
+    optical::Vector{OpticalBuffer{U}}
+    radar::Vector{RadarBuffer{U}}
 end
 
 # Special PropresBuffer constructors
@@ -23,8 +25,9 @@ function PropresBuffer(
     tref = cte(cte(jd0)) - JD_J2000
     tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
-    res = [OpticalBuffer(q0[1]) for _ in eachindex(idxs)]
-    return PropresBuffer{T, U, V}(prop, res)
+    optical = [OpticalBuffer(q0[1]) for _ in eachindex(idxs)]
+    radar = RadarBuffer{U}[]
+    return PropresBuffer{T, U, V}(prop, optical, radar)
 end
 
 function PropresBuffer(
@@ -35,8 +38,9 @@ function PropresBuffer(
     tref = cte(cte(jd0)) - JD_J2000
     tlim = (min(t0 - params.bwdoffset, tref), max(tf + params.fwdoffset, tref))
     prop = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
-    res = [OpticalBuffer(q0[1]) for _ in 1:noptical(od)]
-    return PropresBuffer{T, U, V}(prop, res)
+    optical = [OpticalBuffer(q0[1]) for _ in 1:noptical(od)]
+    radar = [RadarBuffer(q0[1], params.radarord) for _ in 1:nradar(od)]
+    return PropresBuffer{T, U, V}(prop, optical, radar)
 end
 
 """
@@ -86,9 +90,11 @@ See also [`propagate`](@ref) and [`residuals`](@ref).
 - `buffer::Union{Nothing, PropresBuffer}`: pre-allocated memory (default: `nothing`).
 - `idxs::AbstractVector{Int}`: indices of the observations in `od.optical` to be included
     in the computation.
-In addition, if `od` contains radar astrometry:
-- `tord::Int`: order of Taylor expansions (default: `10`).
-- `niter::Int`: number of light-time solution iterations (default: `10`).
+
+The number of light-time iterations of [`compute_radec`](@ref) (`compute_delay`) is
+given by `params.opticaliter` (`params.radariter`). The order of the Taylor expansions
+in [`compute_delay`](@ref) is that of `buffer.radar`, or `params.radarord` if `buffer`
+is `nothing`.
 """
 function propres(
         od::OpticalODProblem{D, T, O}, q0::Vector{U}, jd0::V, params::Parameters{T};
@@ -96,7 +102,7 @@ function propres(
         idxs::AbstractVector{Int} = opticalindices(od)
     ) where {D, T <: Real, U <: Number, V <: Number, O <: AbstractOpticalVector{T}}
     # Unpack parameters
-    @unpack coeffstol, eph_su, eph_ea = params
+    @unpack coeffstol, eph_su, eph_ea, opticaliter, radariter = params
     # Subset of optical astrometry for propagation and residuals
     optical = view(od.optical, idxs)
     # Times of first/last observation, epoch and years in backward/forward propagation
@@ -115,8 +121,8 @@ function propres(
     # O-C residuals
     res = init_optical_residuals(U, od, idxs)
     try
-        residuals!(res, optical, buffer.res; xvs = eph_su, xve = eph_ea,
-                   xva = (bwd, fwd))
+        residuals!(res, optical, buffer.optical; niter = opticaliter,
+                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         return bwd, fwd, res
     catch
         empty!(res)
@@ -126,12 +132,12 @@ end
 
 function propres(
         od::MixedODProblem{D, T, O, R}, q0::Vector{U},
-        jd0::V, params::Parameters{T}; tord::Int = 10,
-        niter::Int = 10, buffer::Union{Nothing, PropresBuffer{T, U, V}} = nothing,
+        jd0::V, params::Parameters{T};
+        buffer::Union{Nothing, PropresBuffer{T, U, V}} = nothing,
     ) where {D, T <: Real, U <: Number, V <: Number, O <: AbstractOpticalVector{T},
              R <: AbstractRadarVector{T}}
     # Unpack
-    @unpack coeffstol, eph_su, eph_ea = params
+    @unpack coeffstol, eph_su, eph_ea, opticaliter, radariter = params
     @unpack dynamics, optical, radar = od
     # Times of first/last observation, epoch and years in backward/forward propagation
     t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(od, jd0, params)
@@ -149,13 +155,10 @@ function propres(
     # O-C residuals
     res = (init_optical_residuals(U, od), init_radar_residuals(U, od))
     try
-        residuals!(res[1], optical, buffer.res; xvs = eph_su, xve = eph_ea,
-                   xva = (bwd, fwd))
-        residuals!(res[2], radar;
-            tord, niter,
-            xvs = et -> auday2kmsec(eph_su(et/daysec)),
-            xve = et -> auday2kmsec(eph_ea(et/daysec)),
-            xva = et -> bwdfwdeph(et, bwd, fwd))
+        residuals!(res[1], optical, buffer.optical; niter = opticaliter,
+                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
+        residuals!(res[2], radar, buffer.radar; niter = radariter,
+                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         return bwd, fwd, res
     catch
         empty!(res[1])
@@ -177,7 +180,7 @@ function propres!(
         idxs::AbstractVector{Int} = opticalindices(od)
     )  where {D, T <: Real, U <: Number, V <: Number, O <: AbstractOpticalVector{T}}
     # Unpack parameters
-    @unpack coeffstol, eph_su, eph_ea = params
+    @unpack coeffstol, eph_su, eph_ea, opticaliter, radariter = params
     # Subset of optical astrometry for propagation and residuals
     optical = view(od.optical, idxs)
     # Times of first/last observation, epoch and years in backward/forward propagation
@@ -196,8 +199,8 @@ function propres!(
     end
     # O-C residuals
     try
-        residuals!(res, optical, buffer.res; xvs = eph_su, xve = eph_ea,
-                   xva = (bwd, fwd))
+        residuals!(res, optical, buffer.optical; niter = opticaliter,
+                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         return bwd, fwd
     catch
         empty!(res)
@@ -208,12 +211,12 @@ end
 function propres!(
         res::Tuple{Vector{OpticalResidual{T, U}}, Vector{RadarResidual{T, U}}},
         od::MixedODProblem{D, T, O, R}, q0::Vector{U}, jd0::V,
-        params::Parameters{T}; tord::Int = 10, niter::Int = 10,
+        params::Parameters{T};
         buffer::Union{Nothing, PropresBuffer{T, U, V}} = nothing,
     )  where {D, T <: Real, U <: Number, V <: Number, O <: AbstractOpticalVector{T},
               R <: AbstractRadarVector{T}}
     # Unpack
-    @unpack coeffstol, eph_su, eph_ea = params
+    @unpack coeffstol, eph_su, eph_ea, opticaliter, radariter = params
     @unpack dynamics, optical, radar = od
     # Times of first/last observation, epoch and years in backward/forward propagation
     t0, tf, _jd0_, nyears_bwd, nyears_fwd = _proprestimes(od, jd0, params)
@@ -232,13 +235,10 @@ function propres!(
     end
     # O-C residuals
     try
-        residuals!(res[1], optical, buffer.res; xvs = eph_su, xve = eph_ea,
-                   xva = (bwd, fwd))
-        residuals!(res[2], radar;
-            tord, niter,
-            xvs = et -> auday2kmsec(eph_su(et/daysec)),
-            xve = et -> auday2kmsec(eph_ea(et/daysec)),
-            xva = et -> bwdfwdeph(et, bwd, fwd))
+        residuals!(res[1], optical, buffer.optical; niter = opticaliter,
+                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
+        residuals!(res[2], radar, buffer.radar; niter = radariter,
+                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         return bwd, fwd
     catch
         empty!(res[1])

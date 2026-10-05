@@ -100,4 +100,5 @@ end
 # Radar astrometry
 include("radarjpl.jl")
 include("radarrwo.jl")
+include("computeradar.jl")
 include("radarresidual.jl")

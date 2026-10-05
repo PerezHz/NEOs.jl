@@ -290,71 +290,11 @@ function obsposvelECI(::Val{:WGS84}, coords::SVector{3}, jd_utc::Number;
     return vcat(posvelECI.r, posvelECI.v)
 end
 
-# TODO: avoid sv_ecef_to_ecef and sv_ecef_to_eci overloads by defining proper product
-# between DCMs and Taylor1/TaylorN. The method below has been adapted from
-# SatelliteToolboxTransformations.jl, MIT-licensed
-# https://github.com/JuliaSpace/SatelliteToolboxTransformations.jl
-# NOTE: By SatelliteToolboxTransformations v1.2 the methods below are ambiguous with
-# respect to the original methods. Thus, I have commented them out but not deleted
-# them, as the operations between Taylor objects can still be optimized (09/07/26)
-#=
-for EOP in (:Nothing, :EopIau1980, :EopIau2000A)
-    @eval begin
-
-        function sv_ecef_to_ecef(
-            sv::OrbitStateVector,
-            T_ECEF1::Val{:ITRF},
-            T_ECEF2::Val{:TIRS},
-            jd_utc::Taylor1{TaylorN{Float64}},
-            eop_data::$EOP
-        )
-            D = r_ecef_to_ecef(DCM, T_ECEF1, T_ECEF2, jd_utc, eop_data)
-
-            # Since both frames does not have a significant angular velocity between
-            # them, then we just need to convert the representations.
-            r_ecef::Vector{Taylor1{TaylorN{Float64}}} = D * sv.r
-            v_ecef::Vector{Taylor1{TaylorN{Float64}}} = D * sv.v
-            a_ecef::Vector{Taylor1{TaylorN{Float64}}} = D * sv.a
-            return OrbitStateVector(sv.t, r_ecef, v_ecef, a_ecef)
-        end
-
-        function sv_ecef_to_eci(
-            sv::OrbitStateVector,
-            T_ECEF::Union{Val{:PEF}, Val{:TIRS}},
-            T_ECI::Union{T_ECIs, T_ECIs_IAU_2006},
-            jd_utc::Taylor1{TaylorN{Float64}},
-            eop_data::$EOP
-        )
-            # Get the matrix that converts the ECEF to the ECI.
-            if eop_data === nothing
-                D = r_ecef_to_eci(DCM, T_ECEF, T_ECI, jd_utc)
-            else
-                D = r_ecef_to_eci(DCM, T_ECEF, T_ECI, jd_utc, eop_data)
-            end
-
-            # Since the ECI and ECEF frames have a relative velocity between them, then
-            # we must account from it when converting the velocity and acceleration. The
-            # angular velocity between those frames is computed using `we` and corrected
-            # by the length of day (LOD) parameter of the EOP data, if available.
-            ω  = EARTH_ANGULAR_SPEED * (1 - (eop_data !== nothing ? eop_data.lod(jd_utc) / 86400000 : 0))
-            vω = [0, 0, ω]
-
-            # Compute the position in the ECI frame.
-            r_eci::Vector{Taylor1{TaylorN{Float64}}} = D * sv.r
-
-            # Compute the velocity in the ECI frame.
-            vω_x_r = vω × sv.r
-            v_eci::Vector{Taylor1{TaylorN{Float64}}} = D * (sv.v + vω_x_r )
-
-            # Compute the acceleration in the ECI frame.
-            a_eci::Vector{Taylor1{TaylorN{Float64}}} = D * (sv.a + vω × vω_x_r + 2vω × sv.v)
-
-            return OrbitStateVector(sv.t, r_eci, v_eci, a_eci)
-        end
-
-    end
-end
-=#
+# NOTE: The Taylor1{TaylorN} overloads of sv_ecef_to_ecef and sv_ecef_to_eci, adapted
+# from SatelliteToolboxTransformations.jl, have been deleted. They were ambiguous with
+# the original methods since SatelliteToolboxTransformations v1.2 and, since the
+# observer's state vector does not depend on the jet transport variables, compute_delay
+# now evaluates obsposvelECI on plain Taylor1{T} expansions, which is much cheaper.
 
 # Convert from the fixed-width USNO format to the IERS csv format
 # read by SatelliteToolboxTransformations
