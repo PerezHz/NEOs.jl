@@ -686,8 +686,6 @@ function compute_delay(
         # See equation (2) of https://doi.org/10.1086/116062
         TS.subst!(et_b_secs, et_r_secs, τ_D, ord)
     end
-    # Allocate memory for time delays
-    Δτ_tropo_D = zero(τ_D)      # Delay due to Earth's troposphere
     for _ in 1:niter
         # Asteroid barycentric position and velocity, and Sun barycentric
         # position [km, km/sec] at bounce time
@@ -704,9 +702,8 @@ function compute_delay(
             euclid3D!(ρ_r, ρ_vec_r, aux1, aux2, ord)
             euclid3D!(p_D, p_D_vec, aux1, aux2, ord)
         end
-        # Shapiro and troposphere corrections to time delay [seconds]
+        # Shapiro correction to time delay [seconds]
         Δτ_rel_D = shapiro_delay(e_D, p_D, ρ_r)
-        Δτ_tropo_D = tropo_delay(R_r, ρ_vec_r)
         for ord in 0:order
             # New estimate
             dot3D!(_p_dot_, ρ_vec_r, v_a_t_b, aux1, ord)
@@ -725,6 +722,9 @@ function compute_delay(
             TS.subst!(et_b_secs, et_r_secs, τ_D, ord)
         end
     end
+    # Troposphere correction to time delay [seconds]; since it does not enter the
+    # light-time iteration, it is computed once with the last down-leg vector
+    Δτ_tropo_D = iszero(niter) ? zero(τ_D) : tropo_delay(R_r, ρ_vec_r)
 
     # Asteroid barycentric position and velocity, and Sun barycentric
     # position [km, km/sec] at bounce time
@@ -746,8 +746,6 @@ function compute_delay(
         end
         euclid3D!(p_U, p_U_vec, aux1, aux2, ord)
     end
-    # Allocate memory for time delays
-    Δτ_tropo_U = zero(τ_U)      # Delay due to Earth's troposphere
     for _ in 1:niter
         # Geocentric position and velocity of transmitting antenna in
         # inertial frame [km, km/sec]
@@ -773,9 +771,8 @@ function compute_delay(
             euclid3D!(ρ_t, ρ_vec_t, aux1, aux2, ord)
             euclid3D!(e_U, e_U_vec, aux1, aux2, ord)
         end
-        # Shapiro and troposphere corrections to time delay [seconds]
+        # Shapiro correction to time delay [seconds]
         Δτ_rel_U = shapiro_delay(e_U, p_U, ρ_t)
-        Δτ_tropo_U = tropo_delay(R_t, ρ_vec_t)
         for ord in 0:order
             # New estimate (p_dot_12 = -p_dot)
             dot3D!(_p_dot_, ρ_vec_t, v_t_t_t, aux1, ord)
@@ -795,6 +792,9 @@ function compute_delay(
             TS.subst!(dt_t, et_t_secs, et_r_secs_0, ord)
         end
     end
+    # Troposphere correction to time delay [seconds]; since it does not enter the
+    # light-time iteration, it is computed once with the last up-leg vector
+    Δτ_tropo_U = iszero(niter) ? zero(τ_U) : tropo_delay(R_t, ρ_vec_t)
 
     # TDB-UTC at transmit time
     tdb_utc_t = tdb_utc(et_t_secs)
