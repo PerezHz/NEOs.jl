@@ -166,7 +166,7 @@ function residuals(radar::AbstractRadarVector{T},
     # Type of asteroid ephemeris
     U = typeof(a1_et1)
     # Buffer
-    buffer = [RadarBuffer(a1_et1, tord) for _ in eachindex(radar)]
+    buffer = [RadarBuffer(a1_et1, x, tord) for x in radar]
     # Vector of residuals
     res = init_radar_residuals(U, radar, outliers)
     residuals!(res, radar, buffer; xva, kwargs...)
@@ -176,24 +176,34 @@ end
 
 function residuals!(res::AbstractVector{RadarResidual{T, U}},
                     radar::AbstractRadarVector{T},
-                    buffer::Vector{RadarBuffer{U}};
+                    buffer::Vector{RadarBuffer{T, U}};
                     kwargs...) where {T <: Real, U <: Number}
 
-    @allow_boxed_captures tmap!(res, radar, buffer, weight.(res), debias.(res),
-                                isoutlier.(res)) do x, buff, w8, bias, outlier
-        # Observed time-delay or Doppler shift
-        observed = measure(x)
-        # Computed time-delay and Doppler shift
-        delay, doppler = radar_astrometry(x, buff; kwargs...)
-        computed = isdelay(x) ? delay : doppler
-        # Observed minus computed residual
-        return RadarResidual{T, U}(
-            w8 * ( observed - computed - bias ),
-            w8,
-            bias,
-            outlier
-        )
+    # Function barrier: the closure only captures the (never reassigned) arguments,
+    # so none of its captured variables is boxed
+    tforeach(eachindex(res, radar, buffer)) do i
+        res[i] = radar_residual(res[i], radar[i], buffer[i]; kwargs...)
     end
 
     return nothing
+end
+
+# Observed minus computed residual of radar observation `x`; the weight, debiasing
+# factor and outlier flag are taken from the previous residual `r`
+function radar_residual(r::RadarResidual{T, U}, x::AbstractRadarAstrometry{T},
+                        buffer::RadarBuffer{T, U}; kwargs...) where {T <: Real, U <: Number}
+    # Statistical weight, debiasing factor and outlier flag
+    w8, bias, outlier = weight(r), debias(r), isoutlier(r)
+    # Observed time-delay or Doppler shift
+    observed = measure(x)
+    # Computed time-delay and Doppler shift
+    delay, doppler = radar_astrometry(x, buffer; kwargs...)
+    computed = isdelay(x) ? delay : doppler
+    # Observed minus computed residual
+    return RadarResidual{T, U}(
+        w8 * ( observed - computed - bias ),
+        w8,
+        bias,
+        outlier
+    )
 end

@@ -240,7 +240,7 @@ end
         q0, jd0 = initialcondition(orbit)
         tmax = ( tf + PE.J2000 - jd0 ) / yr
         fwd = _propagate(newtonian!, q0, jd0, tmax, pbuffer, params)
-        obuffer = OpticalBuffer(zero(T))
+        obuffer = OpticalBuffer(zero(T), observer, day_after_epoch)
         radec[i] = compute_radec(observer, day_after_epoch, obuffer;
             niter = params.opticaliter, xvs = params.eph_su, xve = params.eph_ea,
             xva = (orbit.bwd, fwd)

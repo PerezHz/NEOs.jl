@@ -1,5 +1,5 @@
 """
-    OpticalBuffer{U <: Number} <: AbstractBuffer
+    OpticalBuffer{T <: Real, U <: Number} <: AbstractBuffer
 
 Pre-allocated memory for [`compute_radec`](@ref).
 
@@ -7,16 +7,41 @@ Pre-allocated memory for [`compute_radec`](@ref).
 
 - `v0::Vector{U}`: array of scalar variables.
 - `v1::Vector{Vector{U}}`: array of vector variables.
+- `observer::Vector{T}`: geocentric state vector [km, km/sec] of the observer in
+    inertial frame at the reception time.
+
+# Constructors
+
+    OpticalBuffer(x::U, optical::AbstractOpticalAstrometry)
+    OpticalBuffer(x::U, observatory::ObservatoryMPC, date::DateTime)
+
+where `x` fixes the type of the stored variables.
+
+!!! note
+    The observer's state vector depends only on the observatory and the date, so it
+    is computed once, when the buffer is constructed, and reused by every call to
+    [`compute_radec`](@ref) with the buffer. Hence, a buffer must only be used with
+    the observation (or observatory and date) it was constructed with.
 """
-struct OpticalBuffer{U <: Number} <: AbstractBuffer
+struct OpticalBuffer{T <: Real, U <: Number} <: AbstractBuffer
     v0::Vector{U}
     v1::Vector{Vector{U}}
+    observer::Vector{T}
 end
 
-function OpticalBuffer(x::U) where {U <: Number}
+OpticalBuffer(x::Number, optical::AbstractOpticalAstrometry) =
+    OpticalBuffer(x, observatory(optical), date(optical))
+
+function OpticalBuffer(x::U, observatory::ObservatoryMPC{T},
+                       date::DateTime) where {T <: Real, U <: Number}
     v0 = [zero(x) for _ in 1:32]
-    v1 = [[zero(x) for _ in 1:6] for _ in 1:19]
-    return OpticalBuffer{U}(v0, v1)
+    # Number of components of each vector variable; only the asteroid's state
+    # vector at bounce time (third vector) needs the velocity
+    nv1 = (3, 3, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3)
+    v1 = [[zero(x) for _ in 1:n] for n in nv1]
+    # Geocentric state vector of the observer in inertial frame [km, km/sec]
+    observer = Vector{T}(obsposvelECI(observatory, datetime2julian(date)))
+    return OpticalBuffer{T, U}(v0, v1, observer)
 end
 
 """
@@ -24,7 +49,10 @@ end
 
 Compute the astrometric right ascension and declination [arcsec] at the observatory
 and date given by an optical observation. An optional buffer can be passed to recycle
-memory. Corrections due to Earth orientation, LOD and polar motion are considered.
+memory; in that case, the observer's state vector cached in the buffer is used, so
+the buffer must have been constructed with the same observation (see
+[`OpticalBuffer`](@ref)). Corrections due to Earth orientation, LOD and polar motion
+are considered.
 
 # Keyword arguments
 
@@ -177,15 +205,15 @@ function compute_radec(
 end
 
 function compute_radec(
-        observatory::ObservatoryMPC{T}, t_r_utc::DateTime, buffer::OpticalBuffer{U};
+        observatory::ObservatoryMPC{T}, t_r_utc::DateTime, buffer::OpticalBuffer{T, U};
         niter::Int = 5, xvs::DensePropagation2{T, T}, xve::DensePropagation2{T, T},
         xva::NTuple{2, DensePropagation2{T, U}}
     ) where {T <: Real, U <: NumberNotSeries}
     # Unfold
     ρ_r, τ_D, et_b_secs, Δτ_D, Δτ_rel_D, p_D, q_D, p_dot_23, Δt_2, U_norm,
         g2, u1_norm, α_rad_, α_rad, δ_rad, δ_as, α_as = buffer.v0
-    rv_a_t_r, r_a_t_r, ρ_vec_r, rv_a_t_b, r_a_t_b, v_a_t_b, rv_s_t_b,
-        r_s_t_b, p_D_vec, U_vec, u_vec, Q_vec, q_vec, u1_vec = buffer.v1
+    r_a_t_r, ρ_vec_r, rv_a_t_b, r_s_t_b, p_D_vec, U_vec, u_vec, Q_vec, q_vec,
+        u1_vec = buffer.v1
     # Transform receiving time from UTC to TDB seconds since J2000
     et_r_secs = dtutc2et(t_r_utc)
     # Sun barycentric position and velocity at receive time
@@ -195,10 +223,10 @@ function compute_radec(
     rv_e_t_r = auday2kmsec(xve(et_r_secs/daysec))
     r_e_t_r = rv_e_t_r[1:3]
     # Asteroid barycentric position and velocity at receive time
-    evaleph!(rv_a_t_r, et_r_secs, xva[1], xva[2])
-    r_a_t_r = rv_a_t_r[1:3]
-    # Compute geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
-    RV_r = obsposvelECI(observatory, datetime2julian(t_r_utc))
+    evaleph!(r_a_t_r, et_r_secs, xva[1], xva[2])
+    # Geocentric position/velocity of receiving antenna in inertial frame [km, km/s]
+    # (cached in the buffer)
+    RV_r = buffer.observer
     R_r = RV_r[1:3]
     # Receiver barycentric position and velocity at receive time
     r_r_t_r = r_e_t_r + R_r
@@ -241,8 +269,7 @@ function compute_radec(
         # Heliocentric distance of Earth at t_r
         e_D = euclid3D(e_D_vec)
         # Barycentric position of Sun at estimated bounce time
-        evaleph!(rv_s_t_b, et_b_secs, xvs)
-        r_s_t_b = rv_s_t_b[1:3]
+        evaleph!(r_s_t_b, et_b_secs, xvs)
         # Heliocentric position of asteroid at t_b
         p_D_vec  = r_a_t_b - r_s_t_b
         # Heliocentric distance of asteroid at t_b
@@ -291,8 +318,7 @@ function compute_radec(
     U_norm = ρ_r                  # sqrt(U_vec[1]^2 + U_vec[2]^2 + U_vec[3]^2)
     u_vec = U_vec/U_norm
     # Barycentric position and velocity of Sun at converged bounce time
-    evaleph!(rv_s_t_b, et_b_secs, xvs)
-    r_s_t_b = rv_s_t_b[1:3]
+    evaleph!(r_s_t_b, et_b_secs, xvs)
     Q_vec = r_a_t_b - r_s_t_b     # ESAA 2014, equation (7.113)
     q_vec = Q_vec/ euclid3D(Q_vec)
     E_H = euclid3D(E_H_vec)
@@ -318,7 +344,7 @@ end
 
 # Taylorized version of the function above
 function compute_radec(
-        observatory::ObservatoryMPC{T}, t_r_utc::DateTime, buffer::OpticalBuffer{U};
+        observatory::ObservatoryMPC{T}, t_r_utc::DateTime, buffer::OpticalBuffer{T, U};
         niter::Int = 5, xvs::DensePropagation2{T, T}, xve::DensePropagation2{T, T},
         xva::NTuple{2, DensePropagation2{T, U}}
     ) where {T <: Real, U <: AbstractSeries}
@@ -326,22 +352,20 @@ function compute_radec(
     p_dot_23, τ_D_r, τ_D_23, one_minus_τ_D_23, _Δt_2_, Δt_2, U_norm, Q_norm,
     q_dot_e, g2, u_dot_q, e_dot_u, g1_div_g2, u1_norm, u12_div_u11, α_aux,
     u13_div_u1_norm, δ_aux, α_rad,  δ_rad, δ_as, α_as = buffer.v0
-    rv_a_t_r, r_a_t_r, ρ_vec_r, rv_a_t_b, r_a_t_b, v_a_t_b, rv_s_t_b,
-    r_s_t_b, p_D_vec, U_vec, u_vec, Q_vec, q_vec, u_dot_q_e_vec,
-    e_dot_u_q_vec, uqe_minus_euq, g12_uqe_vec, _u1_vec_, u1_vec = buffer.v1
+    r_a_t_r, ρ_vec_r, rv_a_t_b, r_s_t_b, p_D_vec, U_vec, u_vec, Q_vec, q_vec,
+    u_dot_q_e_vec, e_dot_u_q_vec, uqe_minus_euq, g12_uqe_vec, _u1_vec_,
+    u1_vec = buffer.v1
+    # Asteroid barycentric velocity at bounce time
+    v_a_t_b = view(rv_a_t_b, 4:6)
     et_r_secs = dtutc2et(t_r_utc)
     rv_s_t_r = auday2kmsec(xvs(et_r_secs/daysec))
-    r_s_t_r = rv_s_t_r[1:3]
     rv_e_t_r = auday2kmsec(xve(et_r_secs/daysec))
-    r_e_t_r = rv_e_t_r[1:3]
-    evaleph!(rv_a_t_r, et_r_secs, xva[1], xva[2])
-    r_a_t_r = rv_a_t_r[1:3]
+    evaleph!(r_a_t_r, et_r_secs, xva[1], xva[2], aux1)
     order = TaylorSeries.order(r_a_t_r[1])
-    RV_r = obsposvelECI(observatory, datetime2julian(t_r_utc))
-    R_r = RV_r[1:3]
-    r_r_t_r = r_e_t_r + R_r
-    E_H_vec = e_D_vec  = r_r_t_r - r_s_t_r
-    E_H = e_D = euclid3D(e_D_vec)
+    RV_r = buffer.observer
+    r_r_t_r = [rv_e_t_r[i] + RV_r[i] for i in 1:3]
+    E_H_vec = [r_r_t_r[i] - rv_s_t_r[i] for i in 1:3]
+    E_H = e_D = euclid3D(E_H_vec)
     e_vec = E_H_vec / E_H
     g1 = g1coeff / (E_H / au)
     for ord = 0:order
@@ -353,15 +377,12 @@ function compute_radec(
         TS.subst!(et_b_secs, et_r_secs, τ_D, ord)
     end
     for _ in 1:niter
-        evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2])
-        evaleph!(rv_s_t_b, et_b_secs, xvs)
+        evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2], aux1)
+        evaleph!(r_s_t_b, et_b_secs, xvs, aux1)
         for ord in 0:order
             for i in 1:3
-                TS.identity!(r_a_t_b[i], rv_a_t_b[i], ord)
-                TS.identity!(v_a_t_b[i], rv_a_t_b[i+3], ord)
-                TS.identity!(r_s_t_b[i], rv_s_t_b[i], ord)
-                TS.subst!(ρ_vec_r[i], r_a_t_b[i], r_r_t_r[i], ord)
-                TS.subst!(p_D_vec[i], r_a_t_b[i], r_s_t_b[i], ord)
+                TS.subst!(ρ_vec_r[i], rv_a_t_b[i], r_r_t_r[i], ord)
+                TS.subst!(p_D_vec[i], rv_a_t_b[i], r_s_t_b[i], ord)
             end
             euclid3D!(ρ_r, ρ_vec_r, aux1, aux2, ord)
             euclid3D!(p_D, p_D_vec, aux1, aux2, ord)
@@ -382,16 +403,13 @@ function compute_radec(
             TS.subst!(et_b_secs, et_r_secs, τ_D, ord)
         end
     end
-    evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2])
-    evaleph!(rv_s_t_b, et_b_secs, xvs)
+    evaleph!(rv_a_t_b, et_b_secs, xva[1], xva[2], aux1)
+    evaleph!(r_s_t_b, et_b_secs, xvs, aux1)
     for ord in 0:order
         for i in 1:3
-            TS.identity!(r_a_t_b[i], rv_a_t_b[i], ord)
-            TS.identity!(v_a_t_b[i], rv_a_t_b[i+3], ord)
-            TS.identity!(r_s_t_b[i], rv_s_t_b[i], ord)
-            TS.subst!(ρ_vec_r[i], r_a_t_b[i], r_r_t_r[i], ord)
+            TS.subst!(ρ_vec_r[i], rv_a_t_b[i], r_r_t_r[i], ord)
             TS.identity!(U_vec[i], ρ_vec_r[i], ord)
-            TS.subst!(Q_vec[i], r_a_t_b[i], r_s_t_b[i], ord)
+            TS.subst!(Q_vec[i], rv_a_t_b[i], r_s_t_b[i], ord)
         end
         euclid3D!(ρ_r, ρ_vec_r, aux1, aux2, ord)
         TS.identity!(U_norm, ρ_r, ord)

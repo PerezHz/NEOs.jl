@@ -48,9 +48,9 @@ nontaylorizedephs(bwd, fwd, params) = (
 # Check that the taylorized and non-taylorized methods of compute_radec agree
 # at the given observatories and dates
 function taylorizedradectests(observatories, dates, q0, bwd, fwd, params)
-    buffer = NEOs.OpticalBuffer(q0[1])
     ephs = nontaylorizedephs(bwd, fwd, params)
     for (obs, dt) in zip(observatories, dates)
+        buffer = NEOs.OpticalBuffer(q0[1], obs, dt)
         radec1 = compute_radec(obs, dt; ephs...)
         radec2 = compute_radec(obs, dt, buffer; xvs = params.eph_su,
             xve = params.eph_ea, xva = (bwd, fwd))
@@ -64,9 +64,9 @@ end
 # at the given observatories and dates
 function taylorizeddelaytests(observatories, dates, q0, bwd, fwd, params;
                               tord::Int = 10, niter::Int = 10)
-    buffer = NEOs.RadarBuffer(q0[1], tord)
     ephs = nontaylorizedephs(bwd, fwd, params)
     for (obs, dt) in zip(observatories, dates)
+        buffer = NEOs.RadarBuffer(q0[1], obs, dt, tord)
         τ1 = compute_delay(obs, dt; tord, niter, ephs...)
         τ2 = compute_delay(obs, dt, buffer; niter, xvs = params.eph_su,
             xve = params.eph_ea, xva = (bwd, fwd))
