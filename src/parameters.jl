@@ -76,7 +76,7 @@ nongravitational accelerations model:
 # Jet Transport Least Squares
 
 - `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
-- `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `6`).
+- `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `2`).
 - `significance::T`: chi-square significance level (default: `0.99`).
 - `jtlsmask::Bool`: whether to use `isjtlsfit` to skip bad-conditioned
     preliminary orbits in `jtls` (default: `true`).
@@ -142,7 +142,7 @@ nongravitational accelerations model:
     lsMtol::T = 1E-3
     # Jet Transport Least Squares
     jtlsiter::Int = 5
-    jtlsorder::Int = 6
+    jtlsorder::Int = 2
     significance::T = 0.99
     jtlsmask::Bool = true
     jtlsproject::Bool = false
