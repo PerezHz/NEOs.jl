@@ -40,7 +40,7 @@ Next, to compute a preliminary orbit of 2024 XA1, we use the `initialorbitdeterm
 params = Parameters(
     maxsteps = 100, order = 15, abstol = 1E-12,
     coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042,
-    tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
+    mmovorder = 2, mmoviter = 500, mmovQtol = 1e-5,
     jtlsorder = 2, jtlsmask = false, jtlsiter = 20,
     lsiter = 10, significance = 0.99, outrej = false,
 )
@@ -50,7 +50,7 @@ nothing # hide
 !!! tip "Parameters"
     Some of the most important parameters used in `initialorbitdetermination` are:
     - `bwdoffset/fwdoffset`: how much time [in days] to integrate beyond the first/last observation.
-    - `tsaorder/gaussorder/jtlsorder`: the degree of the jet transport expansions used in different sections of the orbit determination routine.
+    - `mmovorder/gaussorder/jtlsorder`: the degree of the jet transport expansions used in different sections of the orbit determination routine.
     - `lsiter/jtlsiter`: the maximum number of iterations for normal and jet transport least squares.
     - `significance`: chi-square significance level, used to decide whether an orbit is acceptable.
 

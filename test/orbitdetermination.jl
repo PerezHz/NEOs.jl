@@ -243,7 +243,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -414,7 +414,7 @@ end
         # Admissible region
         A = AdmissibleRegion(tracklet, params)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Zero AdmissibleRegion
         @test iszero(zero(AdmissibleRegion{Float64}))
@@ -650,7 +650,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -802,7 +802,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -873,7 +873,7 @@ end
         params = Parameters(
             coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
             gaussorder = 2, safegauss = true,
-            tsaorder = 2, adamiter = 500, adamQtol = 1e-5, jtlsorder = 4,
+            mmovorder = 2, mmoviter = 500, mmovQtol = 1e-5, jtlsorder = 4,
             jtlsmask = false, jtlsiter = 20, lsiter = 10, significance = 0.99,
             outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10),
             fudge = 100.0, max_per = 34.0,
@@ -891,7 +891,7 @@ end
         # Initial Orbit Determination
         orbit = gaussiod(od, params)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -962,7 +962,7 @@ end
         # Parameters
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-           tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
+           mmovorder = 2, mmoviter = 500, mmovQtol = 1e-5,
            jtlsorder = 2, jtlsiter = 20, lsiter = 10,
            significance = 0.99, outrej = false
         )
@@ -979,7 +979,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -1071,7 +1071,7 @@ end
         # Initial Orbit Determination (with outlier rejection)
         orbit = initialorbitdetermination(od, params)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1211,7 +1211,7 @@ end
         # Parameters
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-           tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
+           mmovorder = 2, mmoviter = 500, mmovQtol = 1e-5,
            jtlsorder = 2, jtlsiter = 20, lsiter = 10,
            significance = 0.99, outrej = false
         )
@@ -1228,7 +1228,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Curvature
         C, Γ_C = curvature(optical, od.weights)
@@ -1327,7 +1327,7 @@ end
         # Initial Orbit Determination
         orbit = tsaiod(od, params)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1491,7 +1491,7 @@ end
         params = Parameters(
             coeffstol = Inf, bwdoffset = 0.042, fwdoffset = 0.042,          # Propagation
             gaussorder = 2, safegauss = true, refscale = :log,              # Gauss method
-            tsaorder = 2, adamiter = 500, adamQtol = 1e-5,                  # ADAM
+            mmovorder = 2, mmoviter = 500, mmovQtol = 1e-5,                  # ADAM
             jtlsorder = 2, jtlsiter = 20, lsiter = 20, significance = 0.99, # Least squares
             outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,                      # Outlier rejection
             fudge = 100.0, max_per = 20.0
@@ -1509,7 +1509,7 @@ end
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params; initcond = iodinitcond)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})
@@ -1585,7 +1585,7 @@ end
         params = Parameters(
            coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
            gaussorder = 2, safegauss = false,
-           tsaorder = 2, adamiter = 500, adamQtol = 1e-5, jtlsorder = 2,
+           mmovorder = 2, mmoviter = 500, mmovQtol = 1e-5, jtlsorder = 2,
            jtlsmask = false, jtlsiter = 20, lsiter = 10, significance = 0.99,
            outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,
            fudge = 100.0, max_per = 34.0,
@@ -1626,7 +1626,7 @@ end
         # Refine orbit (both optical and radar astrometry)
         orbit1 = orbitdetermination(od1, orbit0, params)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Check type
         @test isa(orbit1, RadarOrbit{Float64})
@@ -1706,7 +1706,7 @@ end
             maxsteps = 20_000, order = 15, abstol = 1E-12, parse_eqs = true,
             coeffstol = Inf, bwdoffset = 0.05, fwdoffset = 0.05,
             gaussorder = 2, safegauss = false, refscale = :log,
-            tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
+            mmovorder = 2, mmoviter = 500, mmovQtol = 1E-5,
             jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 10,
             jtlsproject = true, significance = 0.99, verbose = true,
             outrej = true, χ2_rec = sqrt(9.21), χ2_rej = sqrt(10), fudge = 100.0,
@@ -1732,7 +1732,7 @@ end
         # Linkage
         orbit = linkage(od, orbit, params)
 
-        # Values by October 2, 2026
+        # Values by October 8, 2026
 
         # Check type
         @test isa(orbit, OpticalOrbit{Float64})

@@ -97,7 +97,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         params = Parameters(
             maxsteps = 100, order = 15, abstol = 1E-12, parse_eqs = true,
             coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
-            gaussorder = 2, tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
+            gaussorder = 2, mmovorder = 2, mmoviter = 500, mmovQtol = 1e-5,
             jtlsorder = 2, jtlsiter = 20, lsiter = 10,
             significance = 0.99, outrej = false
         )
@@ -107,7 +107,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by September 4, 2026
+        # Values by October 8, 2026
 
         # Impact target
         target = ImpactTarget(:earth)
@@ -295,7 +295,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
             maxsteps = 100, order = 15, abstol = 1E-12, parse_eqs = true,
             coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
             gaussorder = 2, safegauss = false, gaussntrip = 1,
-            tsaorder = 2, adamiter = 500, adamQtol = 1e-5,
+            mmovorder = 2, mmoviter = 500, mmovQtol = 1e-5,
             jtlsorder = 2, jtlsiter = 20, lsiter = 10,
             significance = 0.99, outrej = false
         )
@@ -305,7 +305,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # Initial Orbit Determination
         orbit = initialorbitdetermination(od, params)
 
-        # Values by September 4, 2026
+        # Values by October 8, 2026
 
         # Impact target
         target = ImpactTarget(:earth)

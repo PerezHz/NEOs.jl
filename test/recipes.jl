@@ -22,7 +22,7 @@ trks895907 = reduce_tracklets(obs895907)
 params = Parameters(
     coeffstol = Inf, bwdoffset = 0.007, fwdoffset = 0.007,
     gaussorder = 2, safegauss = false,
-    tsaorder = 2, adamiter = 500, adamQtol = 1e-5, jtlsorder = 2,
+    mmovorder = 2, mmoviter = 500, mmovQtol = 1e-5, jtlsorder = 2,
     jtlsmask = false, jtlsiter = 20, lsiter = 10, significance = 0.99,
     outrej = true, χ2_rec = 7.0, χ2_rej = 8.0,
     fudge = 100.0, max_per = 34.0,

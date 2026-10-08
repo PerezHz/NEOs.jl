@@ -74,7 +74,7 @@ function initialorbitdetermination(od::OpticalODProblem{D, T, O}, params::Parame
     # Allocate memory for orbit
     orbit = zero(LeastSquaresOrbit{D, T, T, O, Nothing, Nothing})
     # Unpack
-    @unpack tsaorder, gaussorder, jtlsorder, significance = params
+    @unpack significance = params
     @unpack optical = od
     # Cannot handle observatories without coordinates
     all(x -> hascoord(observatory(x)), optical) || return orbit
