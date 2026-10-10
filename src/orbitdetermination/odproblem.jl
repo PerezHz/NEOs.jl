@@ -169,8 +169,8 @@ function set_od_order(::Type{T}, varorder::Int, numvars::Int = 6) where {T <: Re
 end
 
 function set_od_order(params::Parameters{T}, numvars::Int = 6) where {T <: Real}
-    @unpack tsaorder, gaussorder, jtlsorder = params
-    varorder = max(tsaorder, gaussorder, jtlsorder)
+    @unpack mmovorder, gaussorder, jtlsorder = params
+    varorder = max(mmovorder, gaussorder, jtlsorder)
     set_od_order(T, varorder, numvars)
     return nothing
 end

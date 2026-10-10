@@ -8,35 +8,35 @@ over the MOV` section of [`Parameters`](@ref).
 
 # Keyword arguments
 
-- `i::Int`: if `params.adammode` is `false`, perform the minimization over the
+- `i::Int`: if `params.mmovmode` is `false`, perform the minimization over the
     `i`-th tracklet in `od` (default: `1`).
 - `scale::Symbol`: horizontal scale, either `:log` (default) or `:linear`.
 - `η::Real`: learning rate (default: `25.0`).
 - `μ::Real`: first moment (default: `0.75`).
 - `ν::Real`: second moment (default: `0.9`).
 - `ϵ::Real`: numerical stability constant (default: `1e-8`).
-- `adamorder::Int`: jet transport order (default: `2`).
 
 !!! reference
     See Section 4 of:
     - https://doi.org/10.1007/s10569-025-10246-2
 """
-function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
-              params::Parameters{T}; i::Int = 1, scale::Symbol = :log, η::T = 25.0,
-              μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8, adamorder::Int = 2) where {D,
-              T <: Real, O <: AbstractOpticalVector{T}}
+function mmov(
+        od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ::T,
+        params::Parameters{T}; i::Int = 1, scale::Symbol = :log, η::T = 25.0,
+        μ::T = 0.75, ν::T = 0.9, ϵ::T = 1e-8
+    ) where {D, T <: Real, O <: AbstractOpticalVector{T}}
     # Unpack
     Qtol, Mtol = params.lsQtol, params.lsMtol
-    @unpack eph_su, adamiter, adammode, adamQtol, lspenalty, mmovproject,
+    @unpack eph_su, mmoviter, mmovorder, mmovmode, mmovQtol, lspenalty, mmovproject,
             significance = params
     @unpack dynamics = od
     variables = collect(1:6)
     # Initial time of integration [julian days TDB]
     _jd0_ = dtutc2jdtdb(A.date)
     # Pre-allocate memory
-    aes = Matrix{T}(undef, 6, adamiter+1)
-    Qs = fill(T(Inf), adamiter+1)
-    orbits = [zero(MMOVOrbit{D, T, T, O}) for _ in 1:adamiter]
+    aes = Matrix{T}(undef, 6, mmoviter+1)
+    Qs = fill(T(Inf), mmoviter+1)
+    orbits = [zero(MMOVOrbit{D, T, T, O}) for _ in 1:mmoviter]
     # Initial attributable elements
     aes[:, 1] .= ra(A), dec(A), vra(A), vdec(A), ρ, v_ρ
     # Scaling factors
@@ -49,10 +49,10 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
     end
     scalings[6] = (A.v_ρ_domain[2] - A.v_ρ_domain[1]) / 1_000
     # Jet transport variables and initial condition
-    dae = [scalings[i] * TaylorN(i, order = adamorder) for i in 1:6]
+    dae = [scalings[i] * TaylorN(i, order = mmovorder) for i in 1:6]
     AE = aes[:, 1] .+ dae
     # Subset of optical astrometry to be included in the calculation
-    tracklets = adammode ? od.tracklets : od.tracklets[i:i]
+    tracklets = mmovmode ? od.tracklets : od.tracklets[i:i]
     idxs = opticalindices(tracklets)
     optical = od.optical[idxs]
     # Initialize buffer and set of residuals
@@ -73,7 +73,7 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
     Qthreshold = nms_threshold(2*length(res), significance)
     Nsawtooth = 0
     # Gradient descent
-    for t in 1:adamiter
+    for t in 1:mmoviter
         # Current attributable elements (plain)
         ae = view(aes, :, t)
         # Attributable elements (JT)
@@ -118,7 +118,7 @@ function mmov(od::OpticalODProblem{D, T, O}, A::AdmissibleRegion{T}, ρ::T, v_ρ
         if t > 1
             (Qs[t-1] < Qthreshold < Qs[t]) && (Nsawtooth += 1)
             Nsawtooth == 2 && break
-            abs(Qs[t] - Qs[t-1]) / Qs[t] < adamQtol && break
+            abs(Qs[t] - Qs[t-1]) / Qs[t] < mmovQtol && break
         end
         # Gradient of objective function wrt (ρ, v_ρ)
         g_t[1] = differentiate(Q, 5)(x1)
@@ -203,7 +203,7 @@ function tsaiod(od::OpticalODProblem{D, T, O}, params::Parameters{T};
                 initcond::I = iodinitcond) where {D, I, T <: Real,
                 O <: AbstractOpticalVector{T}}
     # Unpack
-    @unpack tsaorder, adammode, significance, verbose = params
+    @unpack mmovmode, significance, verbose = params
     @unpack optical, tracklets = od
     # Set jet transport variables
     Npar = numvars(Val(od.dynamics), params)
@@ -228,7 +228,7 @@ function tsaiod(od::OpticalODProblem{D, T, O}, params::Parameters{T};
             # Failed to converge
             iszero(porbit) && continue
             # Jet Transport Least Squares
-            _orbit_ = jtls(od, porbit, params, adammode)
+            _orbit_ = jtls(od, porbit, params, mmovmode)
             # Update orbit
             orbit = updateorbit(orbit, _orbit_, optical)
             # Termination condition
@@ -244,7 +244,7 @@ function tsaiod(od::OpticalODProblem{D, T, O}, params::Parameters{T};
             end
         end
         # Global MMOV should be independent of starting tracklet
-        adammode && break
+        mmovmode && break
     end
     # Unsuccessful orbit determination
     verbose && @warn("Orbit determination did not converge within \

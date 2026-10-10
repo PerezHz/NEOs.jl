@@ -58,13 +58,13 @@ nongravitational accelerations model:
 
 - `H_max::T`: maximum absolute magnitude (default: `34.5`).
 - `a_max::T`: maximum semimajor axis (default: `100.0`).
-- `adamiter::Int`: maximum number of iterations for `ADAM` optimizer (default: `200`).
-- `adammode::Bool`: whether to perform ADAM iterations with all the observations
+- `mmoviter::Int`: maximum number of iterations for MMOV (default: `200`).
+- `mmovorder::Int`: order of the jet transport perturbation (default: `2`).
+- `mmovQtol::T`: target function relative tolerance (default: `0.001`).
+- `mmovmode::Bool`: whether to use all observations in MMOV iterations
     (default: `true`).
-- `adamQtol::T`: target function relative tolerance (default: `0.001`).
 - `mmovproject::Bool`: whether to project the orbits onto the admissible region
     (default: `true`).
-- `tsaorder::Int`: order of the jet transport perturbation (default: `6`).
 
 # Least Squares
 
@@ -76,7 +76,7 @@ nongravitational accelerations model:
 # Jet Transport Least Squares
 
 - `jtlsiter::Int`: maximum number of iterations for `jtls` (default: `5`).
-- `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `6`).
+- `jtlsorder::Int`: order of the jet transport perturbation in `jtls` (default: `2`).
 - `significance::T`: chi-square significance level (default: `0.99`).
 - `jtlsmask::Bool`: whether to use `isjtlsfit` to skip bad-conditioned
     preliminary orbits in `jtls` (default: `true`).
@@ -130,11 +130,11 @@ nongravitational accelerations model:
     # Minimization over the MOV
     H_max::T = 34.5
     a_max::T = 100.0
-    adamiter::Int = 200
-    adammode::Bool = true
-    adamQtol::T = 0.001
+    mmoviter::Int = 200
+    mmovorder::Int = 2
+    mmovQtol::T = 0.001
+    mmovmode::Bool = true
     mmovproject::Bool = true
-    tsaorder::Int = 6
     # Least Squares
     lspenalty::T = 0.0
     lsiter::Int = 10
@@ -142,7 +142,7 @@ nongravitational accelerations model:
     lsMtol::T = 1E-3
     # Jet Transport Least Squares
     jtlsiter::Int = 5
-    jtlsorder::Int = 6
+    jtlsorder::Int = 2
     significance::T = 0.99
     jtlsmask::Bool = true
     jtlsproject::Bool = false
