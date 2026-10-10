@@ -59,12 +59,17 @@ const AbstractObservationVector{T} = AbstractVector{<:AbstractAstrometryObservat
 numtype(::AbstractAstrometryObservation{T}) where {T} = T
 
 # Order in AbstractAstrometryObservation is given by date
-isless(a::AbstractAstrometryObservation, b::AbstractAstrometryObservation) = date(a) < date(b)
+function isless(a::AbstractAstrometryObservation, b::AbstractAstrometryObservation)
+    da, db = date(a), date(b)
+    oa, ob = observatorycode(a), observatorycode(b)
+    return da != db ? da < db : oa < ob
+end
 
 dtutc2tt(x::AbstractAstrometryObservation) = dtutc2tt(date(x))
 dtutc2et(x::AbstractAstrometryObservation) = dtutc2et(date(x))
 dtutc2days(x::AbstractAstrometryObservation) = dtutc2days(date(x))
 datetime2julian(x::AbstractAstrometryObservation) = datetime2julian(date(x))
+observatorycode(x::AbstractAstrometryObservation) = observatory(x).code
 
 """
     daysbetween(::DateTime, ::DateTime)
@@ -136,7 +141,6 @@ dec(x::AbstractOpticalAstrometry) = x.dec
 mag(x::AbstractOpticalAstrometry) = x.mag
 cataloguecode(x::AbstractOpticalAstrometry) = catalogue(x).code
 vconversion(x::AbstractOpticalAstrometry) = band(x).v_conversion
-observatorycode(x::AbstractOpticalAstrometry) = observatory(x).code
 timeofday(x::AbstractOpticalAstrometry) = x.timeofday
 
 """
