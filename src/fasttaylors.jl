@@ -72,6 +72,14 @@ function taylorembed!(c::Taylor1{Taylor1{T}}, a::Taylor1{T}, k::Int) where {T <:
     return nothing
 end
 
+# In-place copy of all the coefficients of a `Taylor1{T}` into a `Taylor1{U}`
+function taylorembed!(c::Taylor1{U}, a::Taylor1{T}) where {T <: Real, U <: Number}
+    for k in eachindex(c)
+        taylorembed!(c, a, k)
+    end
+    return nothing
+end
+
 # Write into `y` the Taylor expansion of `p(a + τ)` with respect to `τ`,
 # truncated at the order of `y`.
 function taylorshift!(y::Taylor1{T}, p::Taylor1{T}, a::T) where {T <: Real}

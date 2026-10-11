@@ -201,29 +201,28 @@ end
     end
 
     @testset "Solar system ephemeris evaluation" begin
-        using NEOs: taylorshift!
+        using NEOs: EphemerisEvaluationBuffer, SSEPHORDER, sseph, acceph, poteph
 
-        @testset "taylorshift!" begin
-            using NEOs: sseph, acceph, poteph, SSEPHORDER
-
-            nbad = zeros(Int, 3)
-            for eph in (sseph, acceph, poteph)
-                for j in rand(axes(eph.p, 1), 20)
-                    a = rand() * (eph.t[j+1] - eph.t[j])
-                    δt = Taylor1([a, 1.0], SSEPHORDER)
+        @testset "EphemerisEvaluationBuffer" begin
+            # New (buffer) vs previous (TaylorSeries._horner! with a Taylor1 argument)
+            # evaluation at random times, including segment boundaries
+            for eph in (sseph, acceph, poteph), order in (SSEPHORDER, 2),
+                    q0 in ([0.0], [TaylorN(1)])
+                ts = eph.t
+                y = EphemerisEvaluationBuffer(eph, (ts[1], ts[end]), order, q0)
+                ok = true
+                for t in vcat(ts[1:3], ts[1] .+ (ts[end] - ts[1]) .* rand(50), ts[end])
+                    tt = Taylor1([t, 1.0], SSEPHORDER)
+                    ephU = y(tt, false)
+                    ind, δt = TaylorIntegration.timeindex(eph, tt)
                     for i in axes(eph.p, 2)
-                        p = eph.p[j, i]
-                        y0, aux = zero(δt), zero(δt)
-                        TS._horner!(y0, p, δt, aux)
-                        for (n, order) in enumerate((SSEPHORDER, 15, 2))
-                            y = Taylor1(ones(order + 1))
-                            taylorshift!(y, p, a)
-                            nbad[n] += y.coeffs != y0.coeffs[1:order+1]
-                        end
+                        s, aux = zero(tt), zero(tt)
+                        TS._horner!(s, eph.p[ind, i], δt, aux)
+                        ok &= constant_term.(ephU[i].coeffs) == s.coeffs[1:order+1]
                     end
                 end
+                @test ok
             end
-            @test all(iszero, nbad)
         end
     end
 

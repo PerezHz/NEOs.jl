@@ -1,9 +1,26 @@
-# Pre-allocated memory for the evaluation of solar system
-# ephemerides within propagation functions
+"""
+    EphemerisEvaluationBuffer{T <: Real, U <: Number} <: AbstractBuffer
+
+Pre-allocated memory for the evaluation of solar system ephemerides within
+the dynamical models.
+
+# Fields
+
+- `eph::DensePropagation2{T, T}`: ephemeris restricted to the propagation timespan
+    and to the columns (bodies' coordinates) used by the dynamical model.
+- `forward::Bool`: whether `eph.t` is sorted in increasing order.
+- `ind::RefValue{Int}`: index of the segment of `eph` used in the last evaluation.
+- `active::Vector{Int}`: columns of `eph` evaluated at each call; the others are
+    left untouched.
+- `ephT::Vector{Taylor1{T}}`: evaluation of each column of `eph` as a `Taylor1{T}`.
+- `ephU::Vector{Taylor1{U}}`: evaluation of each column of `eph` embedded into a
+    `Taylor1{U}`.
+"""
 struct EphemerisEvaluationBuffer{T <: Real, U <: Number} <: AbstractBuffer
-    t::Taylor1{T}
     eph::DensePropagation2{T, T}
-    aux::Vector{Taylor1{T}}
+    forward::Bool
+    ind::RefValue{Int}
+    active::Vector{Int}
     ephT::Vector{Taylor1{T}}
     ephU::Vector{Taylor1{U}}
 end
@@ -11,67 +28,101 @@ end
 # Outer constructor
 function EphemerisEvaluationBuffer(
         eph::DensePropagation2{T, T}, tlim::NTuple{2, T}, order::Int,
-        q0::Vector{U}; cols::AbstractVector{Int} = axes(eph.p, 2)
+        q0::Vector{U}; cols::AbstractVector{Int} = axes(eph.p, 2),
+        active::AbstractVector{Int} = eachindex(cols)
     ) where {T <: Real, U <: Number}
     # Check order
     @assert order <= SSEPHORDER "order ($order) must be less or equal than solar system \
         ephemerides order ($SSEPHORDER)"
-    # Evaluation time
-    t = Taylor1(SSEPHORDER)
+    # Check active columns
+    @assert issubset(active, eachindex(cols)) "active columns must be indices of cols"
     # Load ephemeris
     t0, tf = minmax(tlim[1], tlim[2])
     j0 = searchsortedlast(eph.t, t0)
     jf = searchsortedfirst(eph.t, tf)
     _eph_ = TaylorSolution(eph.t[j0:jf], eph.p[j0:jf-1, cols])
+    # Direction of the time grid
+    forward = issorted(_eph_.t)
+    @assert forward || issorted(_eph_.t, rev = true) "ephemeris times must be sorted \
+        in increasing or decreasing order"
     # Evaluation vectors
-    zeroT = Taylor1(zeros(order+1), SSEPHORDER)
-    aux = [zero(zeroT) for _ in cols]
-    ephT = [zero(zeroT) for _ in cols]
+    ephT = [Taylor1(zeros(T, order + 1)) for _ in cols]
     zeroU = Taylor1(zero(q0[1]), order)
     ephU = [zero(zeroU) for _ in cols]
 
-    return EphemerisEvaluationBuffer{T, U}(t, _eph_, aux, ephT, ephU)
+    return EphemerisEvaluationBuffer{T, U}(_eph_, forward, Ref(firstindex(_eph_.t)),
+        collect(active), ephT, ephU)
 end
 
-# Evaluation method for EphemerisEvaluationBuffer
-function (y::EphemerisEvaluationBuffer{T, U})(tt::Taylor1{T},
-                                              threads::Bool = true) where {T <: Real, U <: Number}
-    @unpack t, eph, aux, ephT, ephU = y
-    # Get index of eph.p that interpolates at time t
-    TS.identity!(t, tt, 0)
-    ind::Int, δt::Taylor1{T} = timeindex(eph, t)
-    # Evaluate eph at t and convert the output to U
-    if threads
-        _evaluate_ephemeris!(Val(true), ephU, ephT, aux, eph, ind, δt)
+# Return the index of the segment of `y.eph` that contains (the constant term of) `t`
+# and the time elapsed since the start of that segment.
+function ephemeristime(y::EphemerisEvaluationBuffer{T}, t::Taylor1{T}) where {T <: Real}
+    ts = y.eph.t
+    x = constant_term(t)
+    tmin, tmax = minmax(ts[end], ts[1])
+    @assert tmin ≤ x ≤ tmax "Evaluation time outside range of interpolation"
+    if length(ts) == 1
+        ind = firstindex(ts)
+    # Final time: evaluate the expansion of the last segment
+    elseif x == ts[end]
+        ind = lastindex(ts) - 1
     else
-        _evaluate_ephemeris!(Val(false), ephU, ephT, aux, eph, ind, δt)
+        ind = y.ind[]
+        if !insegment(ts, ind, x, y.forward)
+            if insegment(ts, ind + 1, x, y.forward)
+                ind += 1
+            elseif insegment(ts, ind - 1, x, y.forward)
+                ind -= 1
+            else
+                ind = y.forward ? searchsortedlast(ts, x) :
+                    searchsortedlast(ts, x, rev = true)
+            end
+        end
+        y.ind[] = ind
     end
-    return ephU
+    return ind, x - ts[ind]
+end
+
+# Whether time `x` lies within the `i`-th segment of a time grid `ts` sorted in
+# increasing (`forward = true`) or decreasing (`forward = false`) order
+insegment(ts::AbstractVector, i::Int, x, forward::Bool) =
+    firstindex(ts) ≤ i < lastindex(ts) &&
+    (forward ? ts[i] ≤ x < ts[i+1] : ts[i] ≥ x > ts[i+1])
+
+# Evaluation method for EphemerisEvaluationBuffer
+function (y::EphemerisEvaluationBuffer{T, U})(t::Taylor1{T},
+                                              threads::Bool = true) where {T <: Real, U <: Number}
+    # Index of the segment of y.eph that contains t and time since its start
+    ind, δt = ephemeristime(y, t)
+    # Evaluate the active columns of y.eph at t and embed them into Taylor1{U}
+    if threads
+        _evaluate_ephemeris!(Val(true), y, ind, δt)
+    else
+        _evaluate_ephemeris!(Val(false), y, ind, δt)
+    end
+    return y.ephU
 end
 
 # Serial and multi-threaded evaluation loops of an EphemerisEvaluationBuffer
-function _evaluate_ephemeris!(::Val{false}, ephU, ephT, aux, eph, ind, δt)
-    for i in eachindex(ephU)
-        _evaluate_ephemeris_component!(ephU, ephT, aux, eph, ind, δt, i)
+function _evaluate_ephemeris!(::Val{false}, y::EphemerisEvaluationBuffer, ind::Int, δt)
+    for i in y.active
+        _evaluate_ephemeris_component!(y, ind, δt, i)
     end
     return nothing
 end
 
-function _evaluate_ephemeris!(::Val{true}, ephU, ephT, aux, eph, ind, δt)
-    Threads.@threads for i in eachindex(ephU)
-        _evaluate_ephemeris_component!(ephU, ephT, aux, eph, ind, δt, i)
+function _evaluate_ephemeris!(::Val{true}, y::EphemerisEvaluationBuffer, ind::Int, δt)
+    Threads.@threads for i in y.active
+        _evaluate_ephemeris_component!(y, ind, δt, i)
     end
     return nothing
 end
 
-# Evaluate the i-th component of an EphemerisEvaluationBuffer
-function _evaluate_ephemeris_component!(ephU, ephT, aux, eph, ind, δt, i)
-    TS.zero!(ephT[i])
-    TS.zero!(aux[i])
-    TS._horner!(ephT[i], eph.p[ind, i], δt, aux[i])
-    for k in eachindex(ephU[i])
-        taylorembed!(ephU[i], ephT[i], k)
-    end
+# Evaluate the i-th column of an EphemerisEvaluationBuffer at time `δt` since the
+# start of the `ind`-th segment.
+function _evaluate_ephemeris_component!(y::EphemerisEvaluationBuffer, ind::Int, δt, i::Int)
+    @inbounds taylorshift!(y.ephT[i], y.eph.p[ind, i], δt)
+    @inbounds taylorembed!(y.ephU[i], y.ephT[i])
     return nothing
 end
 
