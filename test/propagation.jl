@@ -200,6 +200,33 @@ end
         end
     end
 
+    @testset "Solar system ephemeris evaluation" begin
+        using NEOs: taylorshift!
+
+        @testset "taylorshift!" begin
+            using NEOs: sseph, acceph, poteph, SSEPHORDER
+
+            nbad = zeros(Int, 3)
+            for eph in (sseph, acceph, poteph)
+                for j in rand(axes(eph.p, 1), 20)
+                    a = rand() * (eph.t[j+1] - eph.t[j])
+                    δt = Taylor1([a, 1.0], SSEPHORDER)
+                    for i in axes(eph.p, 2)
+                        p = eph.p[j, i]
+                        y0, aux = zero(δt), zero(δt)
+                        TS._horner!(y0, p, δt, aux)
+                        for (n, order) in enumerate((SSEPHORDER, 15, 2))
+                            y = Taylor1(ones(order + 1))
+                            taylorshift!(y, p, a)
+                            nbad[n] += y.coeffs != y0.coeffs[1:order+1]
+                        end
+                    end
+                end
+            end
+            @test all(iszero, nbad)
+        end
+    end
+
     using NEOs: chi, logchi, log10chi
     using PlanetaryEphemeris: ea, su, daysec, auday2kmsec
     using Statistics
