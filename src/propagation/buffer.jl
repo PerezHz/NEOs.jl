@@ -197,10 +197,12 @@ function PropagationBuffer(
         _acceph_, _poteph_, UJ_interaction = nothing, nothing, nothing
         _orientation_ = nothing
     else
+        # Only the accelerations and potentials of POST_NEWTONIAN_BODIES are read
         _acceph_ = EphemerisEvaluationBuffer(acceph, tlim, order, q0;
-            cols = view(cols, 1:3(N-1)))
+            cols = view(cols, 1:3(N-1)),
+            active = [3i-k for i in POST_NEWTONIAN_BODIES for k in 2:-1:0])
         _poteph_ = EphemerisEvaluationBuffer(poteph, tlim, order, q0;
-            cols = idxs)
+            cols = idxs, active = POST_NEWTONIAN_BODIES)
         UJ_interaction = falses(N)
         # Turn on Earth interaction
         UJ_interaction[ea] = true

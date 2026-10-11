@@ -279,6 +279,9 @@ const SSEPHORDER::Int = TaylorSeries.order(sseph.p[1])
 const SSEPHNBODIES::Int = numberofbodies(sseph)
 const MINDTTDB::DateTime = julian2datetime(firsttime(sseph) + JD_J2000)
 const MAXDTTDB::DateTime = julian2datetime(lasttime(sseph) + JD_J2000)
+# Bodies whose post-Newtonian interaction with the asteroid is computed by `nongravs!`
+# and `gravityonly!` (the Sun, the Moon and the planets Mercury to Neptune)
+const POST_NEWTONIAN_BODIES = 1:10
 
 """
     print_sseph_summary()
