@@ -267,29 +267,22 @@ function is_ephemeris_evaluation(ex)
 end
 
 # Unfold `local x = params.eph(t)` into (i) the `local` declarations needed to
-# evaluate the ephemeris and (ii) the `Threads.@threads` evaluation loop
+# evaluate the ephemeris and (ii) the `Threads.@threads` evaluation loop over its
+# active columns
 function unfold_ephemeris(ex::Expr)
     x, call = ex.args[1].args
     p, eph = call.args[1].args[1], call.args[1].args[2].value
     tt = call.args[2]
-    t_, e_, a_, T_, i_, δ_ = Symbol.(eph, (:_t, :_eph, :_aux, :_ephT, :_ind, :_δt))
+    b_, c_, i_, δ_ = Symbol.(eph, (:_buffer, :_active, :_ind, :_δt))
     decls = Any[
-        :(local $t_ = $p.$eph.t),
-        :(local $e_ = $p.$eph.eph),
-        :(local $a_ = $p.$eph.aux),
-        :(local $T_ = $p.$eph.ephT),
-        :(local $x = $p.$eph.ephU),
-        :(TaylorSeries.identity!($t_, $tt, 0)),
-        Expr(:local, Expr(:(=), Expr(:tuple, i_, δ_), :(timeindex($e_, $t_)))),
+        :(local $b_ = $p.$eph),
+        :(local $x = $b_.ephU),
+        :(local $c_ = $b_.active),
+        Expr(:local, Expr(:(=), Expr(:tuple, i_, δ_), :(ephemeristime($b_, $tt)))),
     ]
     loop = quote
-        Threads.@threads for i in eachindex($x)
-            TaylorSeries.zero!($T_[i])
-            TaylorSeries.zero!($a_[i])
-            TaylorSeries._horner!($T_[i], $e_.p[$i_, i], $δ_, $a_[i])
-            for k in eachindex($x[i])
-                taylorembed!($x[i], $T_[i], k)
-            end
+        Threads.@threads for i in eachindex($c_)
+            _evaluate_ephemeris_component!($b_, $i_, $δ_, $c_[i])
         end
     end
     Base.remove_linenums!(loop)

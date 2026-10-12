@@ -17,6 +17,8 @@ A collection of the most important parameters in `NEOs.jl` functions.
     (default: `true`).
 - `threads::Bool`: whether to use multi-threading inside the dynamical models or not;
     it only takes effect if Julia runs with more than one thread (default: `true`).
+    `threads = false` is recommended for plain floating point integrations, and
+    `threads = true` for heavy (jet transport) single-use integrations.
 - `bwdoffset/fwdoffset::T`: days to propagate beyond first (bwd) / last (fwd) observation
     (default: `0.5`).
 - `coeffstol::T`: maximum size of the coefficients (default: `10.0`).

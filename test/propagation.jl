@@ -200,6 +200,55 @@ end
         end
     end
 
+    @testset "Solar system ephemeris evaluation" begin
+        using NEOs: EphemerisEvaluationBuffer, SSEPHORDER, POST_NEWTONIAN_BODIES,
+            sseph, acceph, poteph
+
+        # New vs previous (TaylorSeries._horner! with a Taylor1 argument) evaluation of
+        # the active columns at random times, including segment boundaries; inactive
+        # columns stay zero
+        actives = (axes(sseph.p, 2), 1:3length(POST_NEWTONIAN_BODIES), POST_NEWTONIAN_BODIES)
+        for (eph, active) in zip((sseph, acceph, poteph), actives),
+                order in (SSEPHORDER, 2), q0 in ([0.0], [TaylorN(1)], [Taylor1(2)])
+            ts = eph.t
+            y = EphemerisEvaluationBuffer(eph, (ts[1], ts[end]), order, q0; active)
+            ok = true
+            for t in vcat(ts[1:3], ts[1] .+ (ts[end] - ts[1]) .* rand(50), ts[end])
+                tt = Taylor1([t, 1.0], SSEPHORDER)
+                ephU = y(tt, false)
+                ind, δt = TaylorIntegration.timeindex(eph, tt)
+                for i in axes(eph.p, 2)
+                    s, aux = zero(tt), zero(tt)
+                    TS._horner!(s, eph.p[ind, i], δt, aux)
+                    ok &= i in active ?
+                        constant_term.(ephU[i].coeffs) == s.coeffs[1:order+1] :
+                        iszero(ephU[i])
+                end
+            end
+            @test ok
+        end
+    end
+
+    @testset "Unread ephemeris columns" begin
+        # Filling the inactive columns of acceph and poteph with NaNs leaves the
+        # integration unchanged
+        jd0 = datetime2julian(DateTime(2023, 2, 25, 0, 0, 0))
+        q00 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01,
+               -9.071450085084557E-03, -9.353197026254517E-03, -5.610023032269034E-03]
+        tlim = (jd0, jd0 + 0.1 * PE.yr) .- PE.J2000
+        for (dynamics, q0) in ((nongravs!, vcat(q00, 0.0, 0.0, 0.0)), (gravityonly!, q00)),
+                parse_eqs in (true, false)
+            params = Parameters(; maxsteps = 10, order = 15, abstol = 1E-12, parse_eqs)
+            buffer = NEOs.PropagationBuffer(dynamics, q0, jd0, tlim, params)
+            sol = NEOs._propagate(dynamics, q0, jd0, 0.1, buffer, params)
+            for y in (buffer.dparams.acceph, buffer.dparams.poteph),
+                    i in setdiff(eachindex(y.ephU), y.active)
+                fill!(y.ephU[i].coeffs, NaN)
+            end
+            @test NEOs._propagate(dynamics, q0, jd0, 0.1, buffer, params) == sol
+        end
+    end
+
     using NEOs: chi, logchi, log10chi
     using PlanetaryEphemeris: ea, su, daysec, auday2kmsec
     using Statistics
