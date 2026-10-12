@@ -230,18 +230,18 @@ end
     end
 
     @testset "Unread ephemeris columns" begin
-        # Filling the inactive columns of acceph and poteph with NaNs leaves the
-        # integration unchanged
+        # Filling the inactive ephemeris columns with NaNs leaves the integration unchanged
         jd0 = datetime2julian(DateTime(2023, 2, 25, 0, 0, 0))
         q00 = [-9.759018085743707E-01, 3.896554445697074E-01, 1.478066121706831E-01,
                -9.071450085084557E-03, -9.353197026254517E-03, -5.610023032269034E-03]
         tlim = (jd0, jd0 + 0.1 * PE.yr) .- PE.J2000
-        for (dynamics, q0) in ((nongravs!, vcat(q00, 0.0, 0.0, 0.0)), (gravityonly!, q00)),
-                parse_eqs in (true, false)
+        for (dynamics, q0) in ((nongravs!, vcat(q00, 0.0, 0.0, 0.0)), (gravityonly!, q00),
+                (newtonian!, q00), (sunearthmoon!, q00)), parse_eqs in (true, false)
             params = Parameters(; maxsteps = 10, order = 15, abstol = 1E-12, parse_eqs)
             buffer = NEOs.PropagationBuffer(dynamics, q0, jd0, tlim, params)
             sol = NEOs._propagate(dynamics, q0, jd0, 0.1, buffer, params)
-            for y in (buffer.dparams.acceph, buffer.dparams.poteph),
+            ys = (buffer.dparams.sseph, buffer.dparams.acceph, buffer.dparams.poteph)
+            for y in Iterators.filter(!isnothing, ys),
                     i in setdiff(eachindex(y.ephU), y.active)
                 fill!(y.ephU[i].coeffs, NaN)
             end
