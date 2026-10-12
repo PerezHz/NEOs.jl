@@ -190,8 +190,11 @@ function PropagationBuffer(
     # Indices of perturbers
     idxs = bodyindices(Val(dynamics))
     cols = nbodyind(SSEPHNBODIES, idxs)
-    # Solar system ephemeris [au, au/day]
-    _sseph_ = EphemerisEvaluationBuffer(sseph, tlim, order, q0; cols)
+    # Solar system ephemeris [au, au/day]; only the positions of all perturbers and
+    # the velocities of velocitybodies are read
+    vidxs = findall(in(velocitybodies(Val(dynamics))), idxs)
+    _sseph_ = EphemerisEvaluationBuffer(sseph, tlim, order, q0; cols,
+        active = vcat(1:3(N-1), [3(N-1+i)-k for i in vidxs for k in 2:-1:0]))
     # Accelerations, Newtonian potentials and interaction matrix with flattened bodies
     if dynamics in (sunearthmoon!, newtonian!)
         _acceph_, _poteph_, UJ_interaction = nothing, nothing, nothing

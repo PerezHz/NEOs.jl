@@ -1341,6 +1341,12 @@ bodyindices(::Val{newtonian!}) = 1:9
 bodyindices(::Val{gravityonly!}) = 1:SSEPHNBODIES
 bodyindices(::Val{nongravs!}) = 1:SSEPHNBODIES
 
+# Indices of the bodies whose velocities are read by each dynamical model (or by `rvelea`)
+velocitybodies(::Val{sunearthmoon!}) = [ea]
+velocitybodies(::Val{newtonian!}) = [ea]
+velocitybodies(::Val{gravityonly!}) = POST_NEWTONIAN_BODIES
+velocitybodies(::Val{nongravs!}) = POST_NEWTONIAN_BODIES
+
 # Gravitational parameters used by each dynamical model
 gm(::Val{sunearthmoon!}) = μ_DE430[bodyindices(Val(sunearthmoon!))]
 gm(::Val{newtonian!}) = μ_DE430[bodyindices(Val(newtonian!))]
