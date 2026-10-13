@@ -5,17 +5,16 @@
 
 # To update the functions below do the following:
 # 1.- Update the corresponding function in src/propagation/dynamicalmodels.jl
-# 2.- Run:
-# julia> using TaylorIntegration
-# julia> ex = :(paste here the modified function, without the @cyclicbarrier macro)
-# julia> x, y = TaylorIntegration._make_parsed_jetcoeffs(ex)
-# 3.- Paste `x` and `y` in this file and decorate both functions with @cyclicbarrier
-# The @cyclicbarrier macro generates the serial and multi-threaded versions of each
-# function (see its docstring); in particular, it unfolds the evaluation of the Solar
-# System ephemerides (`local sseph_ephU = params.sseph(dsj2k)` and analogously for
-# params.acceph and params.poteph) and runs the Threads.@threads loops via a cyclic
-# barrier, so tasks are spawned only once per call.
-# 4.- Check that the integrations with `parse_eqs = true` and `parse_eqs = false`
+# 2.- Run, from NEOs.jl root directory:
+#     julia --project dev/generate_jetcoeffs.jl
+# The script runs `TaylorIntegration._make_parsed_jetcoeffs` on every function decorated
+# with @cyclicbarrier in src/propagation/dynamicalmodels.jl, and decorates the resulting
+# methods with @cyclicbarrier as well. This macro generates the serial and multi-threaded
+# versions of each function (see its docstring); in particular, it unfolds the evaluation
+# of the Solar System ephemerides (`local sseph_ephU = params.sseph(dsj2k)` and
+# analogously for params.acceph and params.poteph) and runs the Threads.@threads loops
+# via a cyclic barrier, so tasks are spawned only once per call.
+# 3.- Check that the integrations with `parse_eqs = true` and `parse_eqs = false`
 #     agree, both with `threads = true` and `threads = false`
 
 # nongravs!
@@ -23,6 +22,9 @@
     order = TS.order(t)
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
+    local sseph_ephU = params.sseph(dsj2k)
+    local acceph_ephU = params.acceph(dsj2k)
+    local poteph_ephU = params.poteph(dsj2k)
     local S = eltype(q)
     local UJ_interaction = params.UJ_interaction
     local N = params.N
@@ -35,10 +37,6 @@
     local marsden_n = params.marsden_radial[4]
     local marsden_k = -(params.marsden_radial[5])
     local zero_q_1 = params.zeroq1
-    local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
-    local sseph_ephU = params.sseph(dsj2k)
-    local acceph_ephU = params.acceph(dsj2k)
-    local poteph_ephU = params.poteph(dsj2k)
     X = Array{S}(undef, N)
     Y = Array{S}(undef, N)
     Z = Array{S}(undef, N)
@@ -123,24 +121,235 @@
     accX = Taylor1(identity(constant_term(zero_q_1)), order)
     accY = Taylor1(identity(constant_term(zero_q_1)), order)
     accZ = Taylor1(identity(constant_term(zero_q_1)), order)
+    local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
     dq[1] = Taylor1(identity(constant_term(q[4])), order)
     dq[2] = Taylor1(identity(constant_term(q[5])), order)
     dq[3] = Taylor1(identity(constant_term(q[6])), order)
     newtonianNb_Potential[N] = Taylor1(identity(constant_term(zero_q_1)), order)
+    tmp1 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp1)
+        tmp1[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp2 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp2)
+        tmp2[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp3 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp3)
+        tmp3[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp4 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp4)
+        tmp4[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp5 = Array{Taylor1{_S}}(undef, size(tmp1))
+    for i = eachindex(tmp5)
+        tmp5[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp6 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp6)
+        tmp6[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp7 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp7)
+        tmp7[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp8 = Array{Taylor1{_S}}(undef, size(r_p2))
+    for i = eachindex(tmp8)
+        tmp8[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp9 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp9)
+        tmp9[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp10 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp10)
+        tmp10[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp11 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp11)
+        tmp11[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp12 = Array{Taylor1{_S}}(undef, size(t31))
+    for i = eachindex(tmp12)
+        tmp12[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp13 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
+    for i = eachindex(tmp13)
+        tmp13[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp14 = Array{Taylor1{_S}}(undef, size(sin2_ϕ))
+    for i = eachindex(tmp14)
+        tmp14[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp15 = Array{Taylor1{_S}}(undef, size(tmp14))
+    for i = eachindex(tmp15)
+        tmp15[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp16 = Array{Taylor1{_S}}(undef, size(sin2_ϕ))
+    for i = eachindex(tmp16)
+        tmp16[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp17 = Array{Taylor1{_S}}(undef, size(Λ2))
+    for i = eachindex(tmp17)
+        tmp17[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp18 = Array{Taylor1{_S}}(undef, size(cos_ϕ))
+    for i = eachindex(tmp18)
+        tmp18[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp19 = Array{Taylor1{_S}}(undef, size(Λ2j_div_r4))
+    for i = eachindex(tmp19)
+        tmp19[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp20 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp20)
+        tmp20[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp21 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp21)
+        tmp21[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp22 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp22)
+        tmp22[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp23 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
+    for i = eachindex(tmp23)
+        tmp23[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp24 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
+    for i = eachindex(tmp24)
+        tmp24[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp25 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
+    for i = eachindex(tmp25)
+        tmp25[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    Threads.@threads for i = 1:Nm1
+            X[i] = Taylor1(constant_term(sseph_ephU[3i - 2]) - constant_term(q[1]), order)
+            Y[i] = Taylor1(constant_term(sseph_ephU[3i - 1]) - constant_term(q[2]), order)
+            Z[i] = Taylor1(constant_term(sseph_ephU[3i]) - constant_term(q[3]), order)
+            tmp1[i] = Taylor1(constant_term(X[i]) ^ float(constant_term(2)), order)
+            tmp2[i] = Taylor1(zero(constant_term(X[i])), order)
+            tmp3[i] = Taylor1(constant_term(Y[i]) ^ float(constant_term(2)), order)
+            tmp4[i] = Taylor1(zero(constant_term(Y[i])), order)
+            tmp5[i] = Taylor1(constant_term(tmp1[i]) + constant_term(tmp3[i]), order)
+            tmp6[i] = Taylor1(constant_term(Z[i]) ^ float(constant_term(2)), order)
+            tmp7[i] = Taylor1(zero(constant_term(Z[i])), order)
+            r_p2[i] = Taylor1(constant_term(tmp5[i]) + constant_term(tmp6[i]), order)
+            r_p1d2[i] = Taylor1(sqrt(constant_term(r_p2[i])), order)
+            tmp8[i] = Taylor1(zero(constant_term(r_p2[i])), order)
+            r_p3d2[i] = Taylor1(constant_term(r_p2[i]) * constant_term(r_p1d2[i]), order)
+            newtonianCoeff[i] = Taylor1(constant_term(μ[i]) / constant_term(r_p3d2[i]), order)
+            newton_acc_X[i] = Taylor1(constant_term(X[i]) * constant_term(newtonianCoeff[i]), order)
+            newton_acc_Y[i] = Taylor1(constant_term(Y[i]) * constant_term(newtonianCoeff[i]), order)
+            newton_acc_Z[i] = Taylor1(constant_term(Z[i]) * constant_term(newtonianCoeff[i]), order)
+            newtonian1b_Potential[i] = Taylor1(constant_term(μ[i]) / constant_term(r_p1d2[i]), order)
+            pn3[i] = Taylor1(constant_term(3.5) * constant_term(newtonian1b_Potential[i]), order)
+            if UJ_interaction[i]
+                tmp9[i] = Taylor1(-(constant_term(X[i])), order)
+                t31[i] = Taylor1(constant_term(tmp9[i]) * constant_term(M_[1, 3, i]), order)
+                tmp10[i] = Taylor1(-(constant_term(Y[i])), order)
+                t32[i] = Taylor1(constant_term(tmp10[i]) * constant_term(M_[2, 3, i]), order)
+                tmp11[i] = Taylor1(-(constant_term(Z[i])), order)
+                t33[i] = Taylor1(constant_term(tmp11[i]) * constant_term(M_[3, 3, i]), order)
+                tmp12[i] = Taylor1(constant_term(t31[i]) + constant_term(t32[i]), order)
+                r_sin_ϕ[i] = Taylor1(constant_term(tmp12[i]) + constant_term(t33[i]), order)
+                sin_ϕ[i] = Taylor1(constant_term(r_sin_ϕ[i]) / constant_term(r_p1d2[i]), order)
+                sin2_ϕ[i] = Taylor1(constant_term(sin_ϕ[i]) ^ float(constant_term(2)), order)
+                tmp13[i] = Taylor1(zero(constant_term(sin_ϕ[i])), order)
+                tmp14[i] = Taylor1(constant_term(1) - constant_term(sin2_ϕ[i]), order)
+                cos_ϕ[i] = Taylor1(sqrt(constant_term(tmp14[i])), order)
+                tmp15[i] = Taylor1(zero(constant_term(tmp14[i])), order)
+                tmp16[i] = Taylor1(constant_term(1.5) * constant_term(sin2_ϕ[i]), order)
+                P_2_sin_ϕ[i] = Taylor1(constant_term(tmp16[i]) - constant_term(0.5), order)
+                ∂P_2_sin_ϕ[i] = Taylor1(constant_term(3) * constant_term(sin_ϕ[i]), order)
+                r_p4[i] = Taylor1(constant_term(r_p2[i]) * constant_term(r_p2[i]), order)
+                tmp17[i] = Taylor1(constant_term(Λ2[i]) / constant_term(r_p4[i]), order)
+                Λ2j_div_r4[i] = Taylor1(-(constant_term(tmp17[i])), order)
+                tmp18[i] = Taylor1(-(constant_term(cos_ϕ[i])), order)
+                m_c_ϕ_∂P_2[i] = Taylor1(constant_term(tmp18[i]) * constant_term(∂P_2_sin_ϕ[i]), order)
+                tmp19[i] = Taylor1(constant_term(Λ2j_div_r4[i]) * constant_term(3), order)
+                F_J2_ξ[i] = Taylor1(constant_term(tmp19[i]) * constant_term(P_2_sin_ϕ[i]), order)
+                F_J2_ζ[i] = Taylor1(constant_term(Λ2j_div_r4[i]) * constant_term(m_c_ϕ_∂P_2[i]), order)
+                tmp20[i] = Taylor1(-(constant_term(X[i])), order)
+                ξx[i] = Taylor1(constant_term(tmp20[i]) / constant_term(r_p1d2[i]), order)
+                tmp21[i] = Taylor1(-(constant_term(Y[i])), order)
+                ξy[i] = Taylor1(constant_term(tmp21[i]) / constant_term(r_p1d2[i]), order)
+                tmp22[i] = Taylor1(-(constant_term(Z[i])), order)
+                ξz[i] = Taylor1(constant_term(tmp22[i]) / constant_term(r_p1d2[i]), order)
+                tmp23[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξx[i]), order)
+                ζx[i] = Taylor1(constant_term(M_[1, 3, i]) - constant_term(tmp23[i]), order)
+                tmp24[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξy[i]), order)
+                ζy[i] = Taylor1(constant_term(M_[2, 3, i]) - constant_term(tmp24[i]), order)
+                tmp25[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξz[i]), order)
+                ζz[i] = Taylor1(constant_term(M_[3, 3, i]) - constant_term(tmp25[i]), order)
+                F_J2_x1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξx[i]), order)
+                F_J2_y1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξy[i]), order)
+                F_J2_z1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξz[i]), order)
+                F_J2_x2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζx[i]), order)
+                F_J2_y2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζy[i]), order)
+                F_J2_z2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζz[i]), order)
+                F_J2_x[i] = Taylor1(constant_term(F_J2_x1[i]) + constant_term(F_J2_x2[i]), order)
+                F_J2_y[i] = Taylor1(constant_term(F_J2_y1[i]) + constant_term(F_J2_y2[i]), order)
+                F_J2_z[i] = Taylor1(constant_term(F_J2_z1[i]) + constant_term(F_J2_z2[i]), order)
+            end
+        end
+    tmp26 = Taylor1(constant_term(q[4]) ^ float(constant_term(2)), order)
+    tmp27 = Taylor1(zero(constant_term(q[4])), order)
+    tmp28 = Taylor1(constant_term(q[5]) ^ float(constant_term(2)), order)
+    tmp29 = Taylor1(zero(constant_term(q[5])), order)
+    tmp30 = Taylor1(constant_term(tmp26) + constant_term(tmp28), order)
+    tmp31 = Taylor1(constant_term(q[6]) ^ float(constant_term(2)), order)
+    tmp32 = Taylor1(zero(constant_term(q[6])), order)
+    v2[N] = Taylor1(constant_term(tmp30) + constant_term(tmp31), order)
+    temp_004 = Array{Taylor1{_S}}(undef, size(newtonian1b_Potential))
+    for i = eachindex(temp_004)
+        temp_004[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp33 = Array{Taylor1{_S}}(undef, size(μ))
+    for i = eachindex(tmp33)
+        tmp33[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp34 = Array{Taylor1{_S}}(undef, size(μ))
+    for i = eachindex(tmp34)
+        tmp34[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp35 = Array{Taylor1{_S}}(undef, size(μ))
+    for i = eachindex(tmp35)
+        tmp35[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    for i = 1:Nm1
+        temp_004[i] = Taylor1(constant_term(newtonian1b_Potential[i]) + constant_term(newtonianNb_Potential[N]), order)
+        newtonianNb_Potential[N] = Taylor1(identity(constant_term(temp_004[i])), order)
+        if UJ_interaction[i]
+            tmp33[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_x[i]), order)
+            temp_accX = Taylor1(constant_term(accX) - constant_term(tmp33[i]), order)
+            accX = Taylor1(identity(constant_term(temp_accX)), order)
+            tmp34[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_y[i]), order)
+            temp_accY = Taylor1(constant_term(accY) - constant_term(tmp34[i]), order)
+            accY = Taylor1(identity(constant_term(temp_accY)), order)
+            tmp35[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_z[i]), order)
+            temp_accZ = Taylor1(constant_term(accZ) - constant_term(tmp35[i]), order)
+            accZ = Taylor1(identity(constant_term(temp_accZ)), order)
+        end
+    end
+    _4ϕj[N] = Taylor1(constant_term(4) * constant_term(newtonianNb_Potential[N]), order)
     _4dq1 = Taylor1(constant_term(4) * constant_term(dq[1]), order)
     _4dq2 = Taylor1(constant_term(4) * constant_term(dq[2]), order)
     _4dq3 = Taylor1(constant_term(4) * constant_term(dq[3]), order)
-    tmp602 = Array{Taylor1{_S}}(undef, size(ui))
-    for i = eachindex(tmp602)
-        tmp602[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp36 = Array{Taylor1{_S}}(undef, size(ui))
+    for i = eachindex(tmp36)
+        tmp36[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp605 = Array{Taylor1{_S}}(undef, size(vi))
-    for i = eachindex(tmp605)
-        tmp605[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp37 = Array{Taylor1{_S}}(undef, size(vi))
+    for i = eachindex(tmp37)
+        tmp37[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp608 = Array{Taylor1{_S}}(undef, size(wi))
-    for i = eachindex(tmp608)
-        tmp608[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp38 = Array{Taylor1{_S}}(undef, size(wi))
+    for i = eachindex(tmp38)
+        tmp38[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     pn2x = Array{Taylor1{_S}}(undef, size(X))
     for i = eachindex(pn2x)
@@ -154,301 +363,57 @@
     for i = eachindex(pn2z)
         pn2z[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp616 = Array{Taylor1{_S}}(undef, size(UU))
-    for i = eachindex(tmp616)
-        tmp616[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp39 = Array{Taylor1{_S}}(undef, size(UU))
+    for i = eachindex(tmp39)
+        tmp39[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp619 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp619)
-        tmp619[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp40 = Array{Taylor1{_S}}(undef, size(pn2x))
+    for i = eachindex(tmp40)
+        tmp40[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp848 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp848)
-        tmp848[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp41 = Array{Taylor1{_S}}(undef, size(tmp40))
+    for i = eachindex(tmp41)
+        tmp41[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp621 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp621)
-        tmp621[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp42 = Array{Taylor1{_S}}(undef, size(ui))
+    for i = eachindex(tmp42)
+        tmp42[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp849 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp849)
-        tmp849[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp43 = Array{Taylor1{_S}}(undef, size(ui))
+    for i = eachindex(tmp43)
+        tmp43[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp622 = Array{Taylor1{_S}}(undef, size(tmp619))
-    for i = eachindex(tmp622)
-        tmp622[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp44 = Array{Taylor1{_S}}(undef, size(vi))
+    for i = eachindex(tmp44)
+        tmp44[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp624 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp624)
-        tmp624[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp45 = Array{Taylor1{_S}}(undef, size(vi))
+    for i = eachindex(tmp45)
+        tmp45[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp850 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp850)
-        tmp850[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp46 = Array{Taylor1{_S}}(undef, size(tmp42))
+    for i = eachindex(tmp46)
+        tmp46[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp851 = Array{Taylor1{_S}}(undef, size(r_p2))
-    for i = eachindex(tmp851)
-        tmp851[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp47 = Array{Taylor1{_S}}(undef, size(wi))
+    for i = eachindex(tmp47)
+        tmp47[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp629 = Array{Taylor1{_S}}(undef, size(pn2x))
-    for i = eachindex(tmp629)
-        tmp629[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp48 = Array{Taylor1{_S}}(undef, size(wi))
+    for i = eachindex(tmp48)
+        tmp48[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp630 = Array{Taylor1{_S}}(undef, size(tmp629))
-    for i = eachindex(tmp630)
-        tmp630[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp49 = Array{Taylor1{_S}}(undef, size(v2))
+    for i = eachindex(tmp49)
+        tmp49[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp692 = Array{Taylor1{_S}}(undef, size(ui))
-    for i = eachindex(tmp692)
-        tmp692[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp50 = Array{Taylor1{_S}}(undef, size(vi_dot_vj))
+    for i = eachindex(tmp50)
+        tmp50[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp854 = Array{Taylor1{_S}}(undef, size(ui))
-    for i = eachindex(tmp854)
-        tmp854[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp694 = Array{Taylor1{_S}}(undef, size(vi))
-    for i = eachindex(tmp694)
-        tmp694[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp855 = Array{Taylor1{_S}}(undef, size(vi))
-    for i = eachindex(tmp855)
-        tmp855[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp695 = Array{Taylor1{_S}}(undef, size(tmp692))
-    for i = eachindex(tmp695)
-        tmp695[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp697 = Array{Taylor1{_S}}(undef, size(wi))
-    for i = eachindex(tmp697)
-        tmp697[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp856 = Array{Taylor1{_S}}(undef, size(wi))
-    for i = eachindex(tmp856)
-        tmp856[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp641 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp641)
-        tmp641[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp643 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp643)
-        tmp643[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp645 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp645)
-        tmp645[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp647 = Array{Taylor1{_S}}(undef, size(t31))
-    for i = eachindex(tmp647)
-        tmp647[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp852 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
-    for i = eachindex(tmp852)
-        tmp852[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp653 = Array{Taylor1{_S}}(undef, size(sin2_ϕ))
-    for i = eachindex(tmp653)
-        tmp653[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp853 = Array{Taylor1{_S}}(undef, size(tmp653))
-    for i = eachindex(tmp853)
-        tmp853[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp656 = Array{Taylor1{_S}}(undef, size(sin2_ϕ))
-    for i = eachindex(tmp656)
-        tmp656[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp662 = Array{Taylor1{_S}}(undef, size(Λ2))
-    for i = eachindex(tmp662)
-        tmp662[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp664 = Array{Taylor1{_S}}(undef, size(cos_ϕ))
-    for i = eachindex(tmp664)
-        tmp664[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp667 = Array{Taylor1{_S}}(undef, size(Λ2j_div_r4))
-    for i = eachindex(tmp667)
-        tmp667[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp670 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp670)
-        tmp670[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp672 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp672)
-        tmp672[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp674 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp674)
-        tmp674[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp676 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
-    for i = eachindex(tmp676)
-        tmp676[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp678 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
-    for i = eachindex(tmp678)
-        tmp678[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp680 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
-    for i = eachindex(tmp680)
-        tmp680[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    #= /Users/lerm/.julia/dev/NEOs.jl/ex.jl:222 =# Threads.@threads for i = 1:Nm1
-            ui[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i) - 2])), order)
-            vi[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i) - 1])), order)
-            wi[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i)])), order)
-            X[i] = Taylor1(constant_term(sseph_ephU[3i - 2]) - constant_term(q[1]), order)
-            Y[i] = Taylor1(constant_term(sseph_ephU[3i - 1]) - constant_term(q[2]), order)
-            Z[i] = Taylor1(constant_term(sseph_ephU[3i]) - constant_term(q[3]), order)
-            U[i] = Taylor1(constant_term(ui[i]) - constant_term(dq[1]), order)
-            V[i] = Taylor1(constant_term(vi[i]) - constant_term(dq[2]), order)
-            W[i] = Taylor1(constant_term(wi[i]) - constant_term(dq[3]), order)
-            tmp602[i] = Taylor1(constant_term(-3) * constant_term(ui[i]), order)
-            _4U_m_3X[i] = Taylor1(constant_term(tmp602[i]) + constant_term(_4dq1), order)
-            tmp605[i] = Taylor1(constant_term(-3) * constant_term(vi[i]), order)
-            _4V_m_3Y[i] = Taylor1(constant_term(tmp605[i]) + constant_term(_4dq2), order)
-            tmp608[i] = Taylor1(constant_term(-3) * constant_term(wi[i]), order)
-            _4W_m_3Z[i] = Taylor1(constant_term(tmp608[i]) + constant_term(_4dq3), order)
-            pn2x[i] = Taylor1(constant_term(X[i]) * constant_term(_4U_m_3X[i]), order)
-            pn2y[i] = Taylor1(constant_term(Y[i]) * constant_term(_4V_m_3Y[i]), order)
-            pn2z[i] = Taylor1(constant_term(Z[i]) * constant_term(_4W_m_3Z[i]), order)
-            UU[i] = Taylor1(constant_term(ui[i]) * constant_term(dq[1]), order)
-            VV[i] = Taylor1(constant_term(vi[i]) * constant_term(dq[2]), order)
-            WW[i] = Taylor1(constant_term(wi[i]) * constant_term(dq[3]), order)
-            tmp616[i] = Taylor1(constant_term(UU[i]) + constant_term(VV[i]), order)
-            vi_dot_vj[i] = Taylor1(constant_term(tmp616[i]) + constant_term(WW[i]), order)
-            tmp619[i] = Taylor1(constant_term(X[i]) ^ float(constant_term(2)), order)
-            tmp848[i] = Taylor1(zero(constant_term(X[i])), order)
-            tmp621[i] = Taylor1(constant_term(Y[i]) ^ float(constant_term(2)), order)
-            tmp849[i] = Taylor1(zero(constant_term(Y[i])), order)
-            tmp622[i] = Taylor1(constant_term(tmp619[i]) + constant_term(tmp621[i]), order)
-            tmp624[i] = Taylor1(constant_term(Z[i]) ^ float(constant_term(2)), order)
-            tmp850[i] = Taylor1(zero(constant_term(Z[i])), order)
-            r_p2[i] = Taylor1(constant_term(tmp622[i]) + constant_term(tmp624[i]), order)
-            r_p1d2[i] = Taylor1(sqrt(constant_term(r_p2[i])), order)
-            tmp851[i] = Taylor1(zero(constant_term(r_p2[i])), order)
-            r_p3d2[i] = Taylor1(constant_term(r_p2[i]) * constant_term(r_p1d2[i]), order)
-            newtonianCoeff[i] = Taylor1(constant_term(μ[i]) / constant_term(r_p3d2[i]), order)
-            tmp629[i] = Taylor1(constant_term(pn2x[i]) + constant_term(pn2y[i]), order)
-            tmp630[i] = Taylor1(constant_term(tmp629[i]) + constant_term(pn2z[i]), order)
-            pn2[i] = Taylor1(constant_term(newtonianCoeff[i]) * constant_term(tmp630[i]), order)
-            newton_acc_X[i] = Taylor1(constant_term(X[i]) * constant_term(newtonianCoeff[i]), order)
-            newton_acc_Y[i] = Taylor1(constant_term(Y[i]) * constant_term(newtonianCoeff[i]), order)
-            newton_acc_Z[i] = Taylor1(constant_term(Z[i]) * constant_term(newtonianCoeff[i]), order)
-            newtonian1b_Potential[i] = Taylor1(constant_term(μ[i]) / constant_term(r_p1d2[i]), order)
-            pn3[i] = Taylor1(constant_term(3.5) * constant_term(newtonian1b_Potential[i]), order)
-            U_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(U[i]), order)
-            V_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(V[i]), order)
-            W_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(W[i]), order)
-            if UJ_interaction[i]
-                tmp641[i] = Taylor1(-(constant_term(X[i])), order)
-                t31[i] = Taylor1(constant_term(tmp641[i]) * constant_term(M_[1, 3, i]), order)
-                tmp643[i] = Taylor1(-(constant_term(Y[i])), order)
-                t32[i] = Taylor1(constant_term(tmp643[i]) * constant_term(M_[2, 3, i]), order)
-                tmp645[i] = Taylor1(-(constant_term(Z[i])), order)
-                t33[i] = Taylor1(constant_term(tmp645[i]) * constant_term(M_[3, 3, i]), order)
-                tmp647[i] = Taylor1(constant_term(t31[i]) + constant_term(t32[i]), order)
-                r_sin_ϕ[i] = Taylor1(constant_term(tmp647[i]) + constant_term(t33[i]), order)
-                sin_ϕ[i] = Taylor1(constant_term(r_sin_ϕ[i]) / constant_term(r_p1d2[i]), order)
-                sin2_ϕ[i] = Taylor1(constant_term(sin_ϕ[i]) ^ float(constant_term(2)), order)
-                tmp852[i] = Taylor1(zero(constant_term(sin_ϕ[i])), order)
-                tmp653[i] = Taylor1(constant_term(1) - constant_term(sin2_ϕ[i]), order)
-                cos_ϕ[i] = Taylor1(sqrt(constant_term(tmp653[i])), order)
-                tmp853[i] = Taylor1(zero(constant_term(tmp653[i])), order)
-                tmp656[i] = Taylor1(constant_term(1.5) * constant_term(sin2_ϕ[i]), order)
-                P_2_sin_ϕ[i] = Taylor1(constant_term(tmp656[i]) - constant_term(0.5), order)
-                ∂P_2_sin_ϕ[i] = Taylor1(constant_term(3) * constant_term(sin_ϕ[i]), order)
-                r_p4[i] = Taylor1(constant_term(r_p2[i]) * constant_term(r_p2[i]), order)
-                tmp662[i] = Taylor1(constant_term(Λ2[i]) / constant_term(r_p4[i]), order)
-                Λ2j_div_r4[i] = Taylor1(-(constant_term(tmp662[i])), order)
-                tmp664[i] = Taylor1(-(constant_term(cos_ϕ[i])), order)
-                m_c_ϕ_∂P_2[i] = Taylor1(constant_term(tmp664[i]) * constant_term(∂P_2_sin_ϕ[i]), order)
-                tmp667[i] = Taylor1(constant_term(Λ2j_div_r4[i]) * constant_term(3), order)
-                F_J2_ξ[i] = Taylor1(constant_term(tmp667[i]) * constant_term(P_2_sin_ϕ[i]), order)
-                F_J2_ζ[i] = Taylor1(constant_term(Λ2j_div_r4[i]) * constant_term(m_c_ϕ_∂P_2[i]), order)
-                tmp670[i] = Taylor1(-(constant_term(X[i])), order)
-                ξx[i] = Taylor1(constant_term(tmp670[i]) / constant_term(r_p1d2[i]), order)
-                tmp672[i] = Taylor1(-(constant_term(Y[i])), order)
-                ξy[i] = Taylor1(constant_term(tmp672[i]) / constant_term(r_p1d2[i]), order)
-                tmp674[i] = Taylor1(-(constant_term(Z[i])), order)
-                ξz[i] = Taylor1(constant_term(tmp674[i]) / constant_term(r_p1d2[i]), order)
-                tmp676[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξx[i]), order)
-                ζx[i] = Taylor1(constant_term(M_[1, 3, i]) - constant_term(tmp676[i]), order)
-                tmp678[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξy[i]), order)
-                ζy[i] = Taylor1(constant_term(M_[2, 3, i]) - constant_term(tmp678[i]), order)
-                tmp680[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξz[i]), order)
-                ζz[i] = Taylor1(constant_term(M_[3, 3, i]) - constant_term(tmp680[i]), order)
-                F_J2_x1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξx[i]), order)
-                F_J2_y1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξy[i]), order)
-                F_J2_z1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξz[i]), order)
-                F_J2_x2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζx[i]), order)
-                F_J2_y2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζy[i]), order)
-                F_J2_z2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζz[i]), order)
-                F_J2_x[i] = Taylor1(constant_term(F_J2_x1[i]) + constant_term(F_J2_x2[i]), order)
-                F_J2_y[i] = Taylor1(constant_term(F_J2_y1[i]) + constant_term(F_J2_y2[i]), order)
-                F_J2_z[i] = Taylor1(constant_term(F_J2_z1[i]) + constant_term(F_J2_z2[i]), order)
-            end
-            tmp692[i] = Taylor1(constant_term(ui[i]) ^ float(constant_term(2)), order)
-            tmp854[i] = Taylor1(zero(constant_term(ui[i])), order)
-            tmp694[i] = Taylor1(constant_term(vi[i]) ^ float(constant_term(2)), order)
-            tmp855[i] = Taylor1(zero(constant_term(vi[i])), order)
-            tmp695[i] = Taylor1(constant_term(tmp692[i]) + constant_term(tmp694[i]), order)
-            tmp697[i] = Taylor1(constant_term(wi[i]) ^ float(constant_term(2)), order)
-            tmp856[i] = Taylor1(zero(constant_term(wi[i])), order)
-            v2[i] = Taylor1(constant_term(tmp695[i]) + constant_term(tmp697[i]), order)
-        end
-    tmp700 = Taylor1(constant_term(q[4]) ^ float(constant_term(2)), order)
-    tmp857 = Taylor1(zero(constant_term(q[4])), order)
-    tmp702 = Taylor1(constant_term(q[5]) ^ float(constant_term(2)), order)
-    tmp858 = Taylor1(zero(constant_term(q[5])), order)
-    tmp703 = Taylor1(constant_term(tmp700) + constant_term(tmp702), order)
-    tmp705 = Taylor1(constant_term(q[6]) ^ float(constant_term(2)), order)
-    tmp859 = Taylor1(zero(constant_term(q[6])), order)
-    v2[N] = Taylor1(constant_term(tmp703) + constant_term(tmp705), order)
-    temp_004 = Array{Taylor1{_S}}(undef, size(newtonian1b_Potential))
-    for i = eachindex(temp_004)
-        temp_004[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp708 = Array{Taylor1{_S}}(undef, size(μ))
-    for i = eachindex(tmp708)
-        tmp708[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp710 = Array{Taylor1{_S}}(undef, size(μ))
-    for i = eachindex(tmp710)
-        tmp710[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp712 = Array{Taylor1{_S}}(undef, size(μ))
-    for i = eachindex(tmp712)
-        tmp712[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    for i = 1:Nm1
-        temp_004[i] = Taylor1(constant_term(newtonian1b_Potential[i]) + constant_term(newtonianNb_Potential[N]), order)
-        newtonianNb_Potential[N] = Taylor1(identity(constant_term(temp_004[i])), order)
-        if UJ_interaction[i]
-            tmp708[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_x[i]), order)
-            temp_accX = Taylor1(constant_term(accX) - constant_term(tmp708[i]), order)
-            accX = Taylor1(identity(constant_term(temp_accX)), order)
-            tmp710[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_y[i]), order)
-            temp_accY = Taylor1(constant_term(accY) - constant_term(tmp710[i]), order)
-            accY = Taylor1(identity(constant_term(temp_accY)), order)
-            tmp712[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_z[i]), order)
-            temp_accZ = Taylor1(constant_term(accZ) - constant_term(tmp712[i]), order)
-            accZ = Taylor1(identity(constant_term(temp_accZ)), order)
-        end
-    end
-    _4ϕj[N] = Taylor1(constant_term(4) * constant_term(newtonianNb_Potential[N]), order)
-    tmp718 = Array{Taylor1{_S}}(undef, size(v2))
-    for i = eachindex(tmp718)
-        tmp718[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp720 = Array{Taylor1{_S}}(undef, size(vi_dot_vj))
-    for i = eachindex(tmp720)
-        tmp720[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp721 = Array{Taylor1{_S}}(undef, size(tmp718))
-    for i = eachindex(tmp721)
-        tmp721[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp51 = Array{Taylor1{_S}}(undef, size(tmp49))
+    for i = eachindex(tmp51)
+        tmp51[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     Xij_t_Ui = Array{Taylor1{_S}}(undef, size(X))
     for i = eachindex(Xij_t_Ui)
@@ -462,71 +427,105 @@
     for i = eachindex(Zij_t_Wi)
         Zij_t_Wi[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp727 = Array{Taylor1{_S}}(undef, size(Xij_t_Ui))
-    for i = eachindex(tmp727)
-        tmp727[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp52 = Array{Taylor1{_S}}(undef, size(Xij_t_Ui))
+    for i = eachindex(tmp52)
+        tmp52[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    Rij_dot_Vi = Array{Taylor1{_S}}(undef, size(tmp727))
+    Rij_dot_Vi = Array{Taylor1{_S}}(undef, size(tmp52))
     for i = eachindex(Rij_dot_Vi)
         Rij_dot_Vi[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp730 = Array{Taylor1{_S}}(undef, size(Rij_dot_Vi))
-    for i = eachindex(tmp730)
-        tmp730[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp53 = Array{Taylor1{_S}}(undef, size(Rij_dot_Vi))
+    for i = eachindex(tmp53)
+        tmp53[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp860 = Array{Taylor1{_S}}(undef, size(Rij_dot_Vi))
-    for i = eachindex(tmp860)
-        tmp860[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp54 = Array{Taylor1{_S}}(undef, size(Rij_dot_Vi))
+    for i = eachindex(tmp54)
+        tmp54[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    pn1t7 = Array{Taylor1{_S}}(undef, size(tmp730))
+    pn1t7 = Array{Taylor1{_S}}(undef, size(tmp53))
     for i = eachindex(pn1t7)
         pn1t7[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp733 = Array{Taylor1{_S}}(undef, size(pn1t7))
-    for i = eachindex(tmp733)
-        tmp733[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp55 = Array{Taylor1{_S}}(undef, size(pn1t7))
+    for i = eachindex(tmp55)
+        tmp55[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     pn1t2_7 = Array{Taylor1{_S}}(undef, size(ϕs_and_vs))
     for i = eachindex(pn1t2_7)
         pn1t2_7[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp740 = Array{Taylor1{_S}}(undef, size(pNX_t_X))
-    for i = eachindex(tmp740)
-        tmp740[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp56 = Array{Taylor1{_S}}(undef, size(pNX_t_X))
+    for i = eachindex(tmp56)
+        tmp56[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp741 = Array{Taylor1{_S}}(undef, size(tmp740))
-    for i = eachindex(tmp741)
-        tmp741[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp57 = Array{Taylor1{_S}}(undef, size(tmp56))
+    for i = eachindex(tmp57)
+        tmp57[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp742 = Array{Taylor1{_S}}(undef, size(tmp741))
-    for i = eachindex(tmp742)
-        tmp742[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp58 = Array{Taylor1{_S}}(undef, size(tmp57))
+    for i = eachindex(tmp58)
+        tmp58[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    #= /Users/lerm/.julia/dev/NEOs.jl/ex.jl:387 =# Threads.@threads for i = 1:10
+    Threads.@threads for i = 1:10
+            ui[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i) - 2])), order)
+            vi[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i) - 1])), order)
+            wi[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i)])), order)
+            U[i] = Taylor1(constant_term(ui[i]) - constant_term(dq[1]), order)
+            V[i] = Taylor1(constant_term(vi[i]) - constant_term(dq[2]), order)
+            W[i] = Taylor1(constant_term(wi[i]) - constant_term(dq[3]), order)
+            tmp36[i] = Taylor1(constant_term(-3) * constant_term(ui[i]), order)
+            _4U_m_3X[i] = Taylor1(constant_term(tmp36[i]) + constant_term(_4dq1), order)
+            tmp37[i] = Taylor1(constant_term(-3) * constant_term(vi[i]), order)
+            _4V_m_3Y[i] = Taylor1(constant_term(tmp37[i]) + constant_term(_4dq2), order)
+            tmp38[i] = Taylor1(constant_term(-3) * constant_term(wi[i]), order)
+            _4W_m_3Z[i] = Taylor1(constant_term(tmp38[i]) + constant_term(_4dq3), order)
+            pn2x[i] = Taylor1(constant_term(X[i]) * constant_term(_4U_m_3X[i]), order)
+            pn2y[i] = Taylor1(constant_term(Y[i]) * constant_term(_4V_m_3Y[i]), order)
+            pn2z[i] = Taylor1(constant_term(Z[i]) * constant_term(_4W_m_3Z[i]), order)
+            UU[i] = Taylor1(constant_term(ui[i]) * constant_term(dq[1]), order)
+            VV[i] = Taylor1(constant_term(vi[i]) * constant_term(dq[2]), order)
+            WW[i] = Taylor1(constant_term(wi[i]) * constant_term(dq[3]), order)
+            tmp39[i] = Taylor1(constant_term(UU[i]) + constant_term(VV[i]), order)
+            vi_dot_vj[i] = Taylor1(constant_term(tmp39[i]) + constant_term(WW[i]), order)
+            tmp40[i] = Taylor1(constant_term(pn2x[i]) + constant_term(pn2y[i]), order)
+            tmp41[i] = Taylor1(constant_term(tmp40[i]) + constant_term(pn2z[i]), order)
+            pn2[i] = Taylor1(constant_term(newtonianCoeff[i]) * constant_term(tmp41[i]), order)
+            U_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(U[i]), order)
+            V_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(V[i]), order)
+            W_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(W[i]), order)
+            tmp42[i] = Taylor1(constant_term(ui[i]) ^ float(constant_term(2)), order)
+            tmp43[i] = Taylor1(zero(constant_term(ui[i])), order)
+            tmp44[i] = Taylor1(constant_term(vi[i]) ^ float(constant_term(2)), order)
+            tmp45[i] = Taylor1(zero(constant_term(vi[i])), order)
+            tmp46[i] = Taylor1(constant_term(tmp42[i]) + constant_term(tmp44[i]), order)
+            tmp47[i] = Taylor1(constant_term(wi[i]) ^ float(constant_term(2)), order)
+            tmp48[i] = Taylor1(zero(constant_term(wi[i])), order)
+            v2[i] = Taylor1(constant_term(tmp46[i]) + constant_term(tmp47[i]), order)
             ϕi_plus_4ϕj[i] = Taylor1(constant_term(poteph_ephU[i]) + constant_term(_4ϕj[N]), order)
-            tmp718[i] = Taylor1(constant_term(2) * constant_term(v2[i]), order)
-            tmp720[i] = Taylor1(constant_term(4) * constant_term(vi_dot_vj[i]), order)
-            tmp721[i] = Taylor1(constant_term(tmp718[i]) - constant_term(tmp720[i]), order)
-            sj2_plus_2si2_minus_4vivj[i] = Taylor1(constant_term(tmp721[i]) + constant_term(v2[N]), order)
+            tmp49[i] = Taylor1(constant_term(2) * constant_term(v2[i]), order)
+            tmp50[i] = Taylor1(constant_term(4) * constant_term(vi_dot_vj[i]), order)
+            tmp51[i] = Taylor1(constant_term(tmp49[i]) - constant_term(tmp50[i]), order)
+            sj2_plus_2si2_minus_4vivj[i] = Taylor1(constant_term(tmp51[i]) + constant_term(v2[N]), order)
             ϕs_and_vs[i] = Taylor1(constant_term(sj2_plus_2si2_minus_4vivj[i]) - constant_term(ϕi_plus_4ϕj[i]), order)
             Xij_t_Ui[i] = Taylor1(constant_term(X[i]) * constant_term(ui[i]), order)
             Yij_t_Vi[i] = Taylor1(constant_term(Y[i]) * constant_term(vi[i]), order)
             Zij_t_Wi[i] = Taylor1(constant_term(Z[i]) * constant_term(wi[i]), order)
-            tmp727[i] = Taylor1(constant_term(Xij_t_Ui[i]) + constant_term(Yij_t_Vi[i]), order)
-            Rij_dot_Vi[i] = Taylor1(constant_term(tmp727[i]) + constant_term(Zij_t_Wi[i]), order)
-            tmp730[i] = Taylor1(constant_term(Rij_dot_Vi[i]) ^ float(constant_term(2)), order)
-            tmp860[i] = Taylor1(zero(constant_term(Rij_dot_Vi[i])), order)
-            pn1t7[i] = Taylor1(constant_term(tmp730[i]) / constant_term(r_p2[i]), order)
-            tmp733[i] = Taylor1(constant_term(1.5) * constant_term(pn1t7[i]), order)
-            pn1t2_7[i] = Taylor1(constant_term(ϕs_and_vs[i]) - constant_term(tmp733[i]), order)
+            tmp52[i] = Taylor1(constant_term(Xij_t_Ui[i]) + constant_term(Yij_t_Vi[i]), order)
+            Rij_dot_Vi[i] = Taylor1(constant_term(tmp52[i]) + constant_term(Zij_t_Wi[i]), order)
+            tmp53[i] = Taylor1(constant_term(Rij_dot_Vi[i]) ^ float(constant_term(2)), order)
+            tmp54[i] = Taylor1(zero(constant_term(Rij_dot_Vi[i])), order)
+            pn1t7[i] = Taylor1(constant_term(tmp53[i]) / constant_term(r_p2[i]), order)
+            tmp55[i] = Taylor1(constant_term(1.5) * constant_term(pn1t7[i]), order)
+            pn1t2_7[i] = Taylor1(constant_term(ϕs_and_vs[i]) - constant_term(tmp55[i]), order)
             pn1t1_7[i] = Taylor1(constant_term(c_p2) + constant_term(pn1t2_7[i]), order)
             pNX_t_X[i] = Taylor1(constant_term(acceph_ephU[3i - 2]) * constant_term(X[i]), order)
             pNY_t_Y[i] = Taylor1(constant_term(acceph_ephU[3i - 1]) * constant_term(Y[i]), order)
             pNZ_t_Z[i] = Taylor1(constant_term(acceph_ephU[3i]) * constant_term(Z[i]), order)
-            tmp740[i] = Taylor1(constant_term(pNX_t_X[i]) + constant_term(pNY_t_Y[i]), order)
-            tmp741[i] = Taylor1(constant_term(tmp740[i]) + constant_term(pNZ_t_Z[i]), order)
-            tmp742[i] = Taylor1(constant_term(0.5) * constant_term(tmp741[i]), order)
-            pn1[i] = Taylor1(constant_term(pn1t1_7[i]) + constant_term(tmp742[i]), order)
+            tmp56[i] = Taylor1(constant_term(pNX_t_X[i]) + constant_term(pNY_t_Y[i]), order)
+            tmp57[i] = Taylor1(constant_term(tmp56[i]) + constant_term(pNZ_t_Z[i]), order)
+            tmp58[i] = Taylor1(constant_term(0.5) * constant_term(tmp57[i]), order)
+            pn1[i] = Taylor1(constant_term(pn1t1_7[i]) + constant_term(tmp58[i]), order)
             X_t_pn1[i] = Taylor1(constant_term(newton_acc_X[i]) * constant_term(pn1[i]), order)
             Y_t_pn1[i] = Taylor1(constant_term(newton_acc_Y[i]) * constant_term(pn1[i]), order)
             Z_t_pn1[i] = Taylor1(constant_term(newton_acc_Z[i]) * constant_term(pn1[i]), order)
@@ -534,9 +533,9 @@
             pNY_t_pn3[i] = Taylor1(constant_term(acceph_ephU[3i - 1]) * constant_term(pn3[i]), order)
             pNZ_t_pn3[i] = Taylor1(constant_term(acceph_ephU[3i]) * constant_term(pn3[i]), order)
         end
-    tmp750 = Array{Taylor1{_S}}(undef, size(U_t_pn2))
-    for i = eachindex(tmp750)
-        tmp750[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp59 = Array{Taylor1{_S}}(undef, size(U_t_pn2))
+    for i = eachindex(tmp59)
+        tmp59[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     termpnx = Array{Taylor1{_S}}(undef, size(X_t_pn1))
     for i = eachindex(termpnx)
@@ -546,9 +545,9 @@
     for i = eachindex(sumpnx)
         sumpnx[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp753 = Array{Taylor1{_S}}(undef, size(V_t_pn2))
-    for i = eachindex(tmp753)
-        tmp753[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp60 = Array{Taylor1{_S}}(undef, size(V_t_pn2))
+    for i = eachindex(tmp60)
+        tmp60[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     termpny = Array{Taylor1{_S}}(undef, size(Y_t_pn1))
     for i = eachindex(termpny)
@@ -558,9 +557,9 @@
     for i = eachindex(sumpny)
         sumpny[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp756 = Array{Taylor1{_S}}(undef, size(W_t_pn2))
-    for i = eachindex(tmp756)
-        tmp756[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp61 = Array{Taylor1{_S}}(undef, size(W_t_pn2))
+    for i = eachindex(tmp61)
+        tmp61[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     termpnz = Array{Taylor1{_S}}(undef, size(Z_t_pn1))
     for i = eachindex(termpnz)
@@ -571,20 +570,20 @@
         sumpnz[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     for i = 1:10
-        tmp750[i] = Taylor1(constant_term(U_t_pn2[i]) + constant_term(pNX_t_pn3[i]), order)
-        termpnx[i] = Taylor1(constant_term(X_t_pn1[i]) + constant_term(tmp750[i]), order)
+        tmp59[i] = Taylor1(constant_term(U_t_pn2[i]) + constant_term(pNX_t_pn3[i]), order)
+        termpnx[i] = Taylor1(constant_term(X_t_pn1[i]) + constant_term(tmp59[i]), order)
         sumpnx[i] = Taylor1(constant_term(pntempX) + constant_term(termpnx[i]), order)
         pntempX = Taylor1(identity(constant_term(sumpnx[i])), order)
-        tmp753[i] = Taylor1(constant_term(V_t_pn2[i]) + constant_term(pNY_t_pn3[i]), order)
-        termpny[i] = Taylor1(constant_term(Y_t_pn1[i]) + constant_term(tmp753[i]), order)
+        tmp60[i] = Taylor1(constant_term(V_t_pn2[i]) + constant_term(pNY_t_pn3[i]), order)
+        termpny[i] = Taylor1(constant_term(Y_t_pn1[i]) + constant_term(tmp60[i]), order)
         sumpny[i] = Taylor1(constant_term(pntempY) + constant_term(termpny[i]), order)
         pntempY = Taylor1(identity(constant_term(sumpny[i])), order)
-        tmp756[i] = Taylor1(constant_term(W_t_pn2[i]) + constant_term(pNZ_t_pn3[i]), order)
-        termpnz[i] = Taylor1(constant_term(Z_t_pn1[i]) + constant_term(tmp756[i]), order)
+        tmp61[i] = Taylor1(constant_term(W_t_pn2[i]) + constant_term(pNZ_t_pn3[i]), order)
+        termpnz[i] = Taylor1(constant_term(Z_t_pn1[i]) + constant_term(tmp61[i]), order)
         sumpnz[i] = Taylor1(constant_term(pntempZ) + constant_term(termpnz[i]), order)
         pntempZ = Taylor1(identity(constant_term(sumpnz[i])), order)
     end
-    #= /Users/lerm/.julia/dev/NEOs.jl/ex.jl:440 =# Threads.@threads for i = 11:Nm1
+    Threads.@threads for i = 11:Nm1
             X_t_pn1[i] = Taylor1(constant_term(c_p2) * constant_term(newton_acc_X[i]), order)
             Y_t_pn1[i] = Taylor1(constant_term(c_p2) * constant_term(newton_acc_Y[i]), order)
             Z_t_pn1[i] = Taylor1(constant_term(c_p2) * constant_term(newton_acc_Z[i]), order)
@@ -603,145 +602,145 @@
     postNewtonX = Taylor1(constant_term(pntempX) * constant_term(c_m2), order)
     postNewtonY = Taylor1(constant_term(pntempY) * constant_term(c_m2), order)
     postNewtonZ = Taylor1(constant_term(pntempZ) * constant_term(c_m2), order)
-    tmp768 = Taylor1(constant_term(Y[1]) * constant_term(W[1]), order)
-    tmp769 = Taylor1(constant_term(Z[1]) * constant_term(V[1]), order)
-    h_x = Taylor1(constant_term(tmp768) - constant_term(tmp769), order)
-    tmp771 = Taylor1(constant_term(Z[1]) * constant_term(U[1]), order)
-    tmp772 = Taylor1(constant_term(X[1]) * constant_term(W[1]), order)
-    h_y = Taylor1(constant_term(tmp771) - constant_term(tmp772), order)
-    tmp774 = Taylor1(constant_term(X[1]) * constant_term(V[1]), order)
-    tmp775 = Taylor1(constant_term(Y[1]) * constant_term(U[1]), order)
-    h_z = Taylor1(constant_term(tmp774) - constant_term(tmp775), order)
-    tmp778 = Taylor1(constant_term(h_x) ^ float(constant_term(2)), order)
-    tmp861 = Taylor1(zero(constant_term(h_x)), order)
-    tmp780 = Taylor1(constant_term(h_y) ^ float(constant_term(2)), order)
-    tmp862 = Taylor1(zero(constant_term(h_y)), order)
-    tmp781 = Taylor1(constant_term(tmp778) + constant_term(tmp780), order)
-    tmp783 = Taylor1(constant_term(h_z) ^ float(constant_term(2)), order)
-    tmp863 = Taylor1(zero(constant_term(h_z)), order)
-    tmp784 = Taylor1(constant_term(tmp781) + constant_term(tmp783), order)
-    h_norm = Taylor1(sqrt(constant_term(tmp784)), order)
-    tmp864 = Taylor1(zero(constant_term(tmp784)), order)
+    tmp62 = Taylor1(constant_term(Y[1]) * constant_term(W[1]), order)
+    tmp63 = Taylor1(constant_term(Z[1]) * constant_term(V[1]), order)
+    h_x = Taylor1(constant_term(tmp62) - constant_term(tmp63), order)
+    tmp64 = Taylor1(constant_term(Z[1]) * constant_term(U[1]), order)
+    tmp65 = Taylor1(constant_term(X[1]) * constant_term(W[1]), order)
+    h_y = Taylor1(constant_term(tmp64) - constant_term(tmp65), order)
+    tmp66 = Taylor1(constant_term(X[1]) * constant_term(V[1]), order)
+    tmp67 = Taylor1(constant_term(Y[1]) * constant_term(U[1]), order)
+    h_z = Taylor1(constant_term(tmp66) - constant_term(tmp67), order)
+    tmp68 = Taylor1(constant_term(h_x) ^ float(constant_term(2)), order)
+    tmp69 = Taylor1(zero(constant_term(h_x)), order)
+    tmp70 = Taylor1(constant_term(h_y) ^ float(constant_term(2)), order)
+    tmp71 = Taylor1(zero(constant_term(h_y)), order)
+    tmp72 = Taylor1(constant_term(tmp68) + constant_term(tmp70), order)
+    tmp73 = Taylor1(constant_term(h_z) ^ float(constant_term(2)), order)
+    tmp74 = Taylor1(zero(constant_term(h_z)), order)
+    tmp75 = Taylor1(constant_term(tmp72) + constant_term(tmp73), order)
+    h_norm = Taylor1(sqrt(constant_term(tmp75)), order)
+    tmp76 = Taylor1(zero(constant_term(tmp75)), order)
     h_x_unit = Taylor1(constant_term(h_x) / constant_term(h_norm), order)
     h_y_unit = Taylor1(constant_term(h_y) / constant_term(h_norm), order)
     h_z_unit = Taylor1(constant_term(h_z) / constant_term(h_norm), order)
-    tmp789 = Taylor1(constant_term(h_z) * constant_term(Y[1]), order)
-    tmp790 = Taylor1(constant_term(h_y) * constant_term(Z[1]), order)
-    t_x = Taylor1(constant_term(tmp789) - constant_term(tmp790), order)
-    tmp792 = Taylor1(constant_term(h_x) * constant_term(Z[1]), order)
-    tmp793 = Taylor1(constant_term(h_z) * constant_term(X[1]), order)
-    t_y = Taylor1(constant_term(tmp792) - constant_term(tmp793), order)
-    tmp795 = Taylor1(constant_term(h_y) * constant_term(X[1]), order)
-    tmp796 = Taylor1(constant_term(h_x) * constant_term(Y[1]), order)
-    t_z = Taylor1(constant_term(tmp795) - constant_term(tmp796), order)
-    tmp799 = Taylor1(constant_term(t_x) ^ float(constant_term(2)), order)
-    tmp865 = Taylor1(zero(constant_term(t_x)), order)
-    tmp801 = Taylor1(constant_term(t_y) ^ float(constant_term(2)), order)
-    tmp866 = Taylor1(zero(constant_term(t_y)), order)
-    tmp802 = Taylor1(constant_term(tmp799) + constant_term(tmp801), order)
-    tmp804 = Taylor1(constant_term(t_z) ^ float(constant_term(2)), order)
-    tmp867 = Taylor1(zero(constant_term(t_z)), order)
-    tmp805 = Taylor1(constant_term(tmp802) + constant_term(tmp804), order)
-    t_norm = Taylor1(sqrt(constant_term(tmp805)), order)
-    tmp868 = Taylor1(zero(constant_term(tmp805)), order)
+    tmp77 = Taylor1(constant_term(h_z) * constant_term(Y[1]), order)
+    tmp78 = Taylor1(constant_term(h_y) * constant_term(Z[1]), order)
+    t_x = Taylor1(constant_term(tmp77) - constant_term(tmp78), order)
+    tmp79 = Taylor1(constant_term(h_x) * constant_term(Z[1]), order)
+    tmp80 = Taylor1(constant_term(h_z) * constant_term(X[1]), order)
+    t_y = Taylor1(constant_term(tmp79) - constant_term(tmp80), order)
+    tmp81 = Taylor1(constant_term(h_y) * constant_term(X[1]), order)
+    tmp82 = Taylor1(constant_term(h_x) * constant_term(Y[1]), order)
+    t_z = Taylor1(constant_term(tmp81) - constant_term(tmp82), order)
+    tmp83 = Taylor1(constant_term(t_x) ^ float(constant_term(2)), order)
+    tmp84 = Taylor1(zero(constant_term(t_x)), order)
+    tmp85 = Taylor1(constant_term(t_y) ^ float(constant_term(2)), order)
+    tmp86 = Taylor1(zero(constant_term(t_y)), order)
+    tmp87 = Taylor1(constant_term(tmp83) + constant_term(tmp85), order)
+    tmp88 = Taylor1(constant_term(t_z) ^ float(constant_term(2)), order)
+    tmp89 = Taylor1(zero(constant_term(t_z)), order)
+    tmp90 = Taylor1(constant_term(tmp87) + constant_term(tmp88), order)
+    t_norm = Taylor1(sqrt(constant_term(tmp90)), order)
+    tmp91 = Taylor1(zero(constant_term(tmp90)), order)
     t_x_unit = Taylor1(constant_term(t_x) / constant_term(t_norm), order)
     t_y_unit = Taylor1(constant_term(t_y) / constant_term(t_norm), order)
     t_z_unit = Taylor1(constant_term(t_z) / constant_term(t_norm), order)
-    tmp810 = Taylor1(constant_term(X[1]) / constant_term(r_p1d2[1]), order)
-    r_x_unit = Taylor1(-(constant_term(tmp810)), order)
-    tmp812 = Taylor1(constant_term(Y[1]) / constant_term(r_p1d2[1]), order)
-    r_y_unit = Taylor1(-(constant_term(tmp812)), order)
-    tmp814 = Taylor1(constant_term(Z[1]) / constant_term(r_p1d2[1]), order)
-    r_z_unit = Taylor1(-(constant_term(tmp814)), order)
+    tmp92 = Taylor1(constant_term(X[1]) / constant_term(r_p1d2[1]), order)
+    r_x_unit = Taylor1(-(constant_term(tmp92)), order)
+    tmp93 = Taylor1(constant_term(Y[1]) / constant_term(r_p1d2[1]), order)
+    r_y_unit = Taylor1(-(constant_term(tmp93)), order)
+    tmp94 = Taylor1(constant_term(Z[1]) / constant_term(r_p1d2[1]), order)
+    r_z_unit = Taylor1(-(constant_term(tmp94)), order)
     g_r_quotient = Taylor1(constant_term(r_p1d2[1]) / constant_term(marsden_r₀), order)
-    tmp817 = Taylor1(constant_term(g_r_quotient) ^ float(constant_term(marsden_m)), order)
-    tmp869 = Taylor1(zero(constant_term(g_r_quotient)), order)
-    g_r_A = Taylor1(constant_term(marsden_α) * constant_term(tmp817), order)
-    tmp820 = Taylor1(constant_term(g_r_quotient) ^ float(constant_term(marsden_n)), order)
-    tmp870 = Taylor1(zero(constant_term(g_r_quotient)), order)
-    tmp821 = Taylor1(constant_term(1) + constant_term(tmp820), order)
-    g_r_B = Taylor1(constant_term(tmp821) ^ float(constant_term(marsden_k)), order)
-    tmp871 = Taylor1(zero(constant_term(tmp821)), order)
+    tmp95 = Taylor1(constant_term(g_r_quotient) ^ float(constant_term(marsden_m)), order)
+    tmp96 = Taylor1(zero(constant_term(g_r_quotient)), order)
+    g_r_A = Taylor1(constant_term(marsden_α) * constant_term(tmp95), order)
+    tmp97 = Taylor1(constant_term(g_r_quotient) ^ float(constant_term(marsden_n)), order)
+    tmp98 = Taylor1(zero(constant_term(g_r_quotient)), order)
+    tmp99 = Taylor1(constant_term(1) + constant_term(tmp97), order)
+    g_r_B = Taylor1(constant_term(tmp99) ^ float(constant_term(marsden_k)), order)
+    tmp100 = Taylor1(zero(constant_term(tmp99)), order)
     g_r = Taylor1(constant_term(g_r_A) * constant_term(g_r_B), order)
     A2_t_g_r = Taylor1(constant_term(g_r) * constant_term(q[7]), order)
     A1_t_g_r = Taylor1(constant_term(g_r) * constant_term(q[8]), order)
     A3_t_g_r = Taylor1(constant_term(g_r) * constant_term(q[9]), order)
-    tmp827 = Taylor1(constant_term(A2_t_g_r) * constant_term(t_x_unit), order)
-    tmp828 = Taylor1(constant_term(A1_t_g_r) * constant_term(r_x_unit), order)
-    tmp829 = Taylor1(constant_term(tmp827) + constant_term(tmp828), order)
-    tmp830 = Taylor1(constant_term(A3_t_g_r) * constant_term(h_x_unit), order)
-    NGAx = Taylor1(constant_term(tmp829) + constant_term(tmp830), order)
-    tmp832 = Taylor1(constant_term(A2_t_g_r) * constant_term(t_y_unit), order)
-    tmp833 = Taylor1(constant_term(A1_t_g_r) * constant_term(r_y_unit), order)
-    tmp834 = Taylor1(constant_term(tmp832) + constant_term(tmp833), order)
-    tmp835 = Taylor1(constant_term(A3_t_g_r) * constant_term(h_y_unit), order)
-    NGAy = Taylor1(constant_term(tmp834) + constant_term(tmp835), order)
-    tmp837 = Taylor1(constant_term(A2_t_g_r) * constant_term(t_z_unit), order)
-    tmp838 = Taylor1(constant_term(A1_t_g_r) * constant_term(r_z_unit), order)
-    tmp839 = Taylor1(constant_term(tmp837) + constant_term(tmp838), order)
-    tmp840 = Taylor1(constant_term(A3_t_g_r) * constant_term(h_z_unit), order)
-    NGAz = Taylor1(constant_term(tmp839) + constant_term(tmp840), order)
-    tmp842 = Taylor1(constant_term(postNewtonX) + constant_term(accX), order)
-    dq[4] = Taylor1(constant_term(tmp842) + constant_term(NGAx), order)
-    tmp844 = Taylor1(constant_term(postNewtonY) + constant_term(accY), order)
-    dq[5] = Taylor1(constant_term(tmp844) + constant_term(NGAy), order)
-    tmp846 = Taylor1(constant_term(postNewtonZ) + constant_term(accZ), order)
-    dq[6] = Taylor1(constant_term(tmp846) + constant_term(NGAz), order)
+    tmp101 = Taylor1(constant_term(A2_t_g_r) * constant_term(t_x_unit), order)
+    tmp102 = Taylor1(constant_term(A1_t_g_r) * constant_term(r_x_unit), order)
+    tmp103 = Taylor1(constant_term(tmp101) + constant_term(tmp102), order)
+    tmp104 = Taylor1(constant_term(A3_t_g_r) * constant_term(h_x_unit), order)
+    NGAx = Taylor1(constant_term(tmp103) + constant_term(tmp104), order)
+    tmp105 = Taylor1(constant_term(A2_t_g_r) * constant_term(t_y_unit), order)
+    tmp106 = Taylor1(constant_term(A1_t_g_r) * constant_term(r_y_unit), order)
+    tmp107 = Taylor1(constant_term(tmp105) + constant_term(tmp106), order)
+    tmp108 = Taylor1(constant_term(A3_t_g_r) * constant_term(h_y_unit), order)
+    NGAy = Taylor1(constant_term(tmp107) + constant_term(tmp108), order)
+    tmp109 = Taylor1(constant_term(A2_t_g_r) * constant_term(t_z_unit), order)
+    tmp110 = Taylor1(constant_term(A1_t_g_r) * constant_term(r_z_unit), order)
+    tmp111 = Taylor1(constant_term(tmp109) + constant_term(tmp110), order)
+    tmp112 = Taylor1(constant_term(A3_t_g_r) * constant_term(h_z_unit), order)
+    NGAz = Taylor1(constant_term(tmp111) + constant_term(tmp112), order)
+    tmp113 = Taylor1(constant_term(postNewtonX) + constant_term(accX), order)
+    dq[4] = Taylor1(constant_term(tmp113) + constant_term(NGAx), order)
+    tmp114 = Taylor1(constant_term(postNewtonY) + constant_term(accY), order)
+    dq[5] = Taylor1(constant_term(tmp114) + constant_term(NGAy), order)
+    tmp115 = Taylor1(constant_term(postNewtonZ) + constant_term(accZ), order)
+    dq[6] = Taylor1(constant_term(tmp115) + constant_term(NGAz), order)
     dq[7] = Taylor1(identity(constant_term(zero_q_1)), order)
     dq[8] = Taylor1(identity(constant_term(zero_q_1)), order)
     dq[9] = Taylor1(identity(constant_term(zero_q_1)), order)
-    return TaylorIntegration.RetAlloc{Taylor1{_S}}([tmp700, tmp702, tmp703, tmp705, tmp768, tmp769, tmp771, tmp772, tmp774, tmp775, tmp778, tmp780, tmp781, tmp783, tmp784, tmp789, tmp790, tmp792, tmp793, tmp795, tmp796, tmp799, tmp801, tmp802, tmp804, tmp805, tmp810, tmp812, tmp814, tmp817, tmp820, tmp821, tmp827, tmp828, tmp829, tmp830, tmp832, tmp833, tmp834, tmp835, tmp837, tmp838, tmp839, tmp840, tmp842, tmp844, tmp846, pntempX, pntempY, pntempZ, temp_accX, temp_accY, temp_accZ, accX, accY, accZ, _4dq1, _4dq2, _4dq3, tmp857, tmp858, tmp859, postNewtonX, postNewtonY, postNewtonZ, h_x, h_y, h_z, tmp861, tmp862, tmp863, h_norm, tmp864, h_x_unit, h_y_unit, h_z_unit, t_x, t_y, t_z, tmp865, tmp866, tmp867, t_norm, tmp868, t_x_unit, t_y_unit, t_z_unit, r_x_unit, r_y_unit, r_z_unit, g_r_quotient, tmp869, g_r_A, tmp870, g_r_B, tmp871, g_r, A2_t_g_r, A1_t_g_r, A3_t_g_r, NGAx, NGAy, NGAz], [X, Y, Z, r_p2, r_p4, r_p1d2, r_p3d2, newtonianCoeff, ui, vi, wi, U, V, W, _4U_m_3X, _4V_m_3Y, _4W_m_3Z, UU, VV, WW, newtonian1b_Potential, newtonianNb_Potential, newton_acc_X, newton_acc_Y, newton_acc_Z, v2, vi_dot_vj, pn2, U_t_pn2, V_t_pn2, W_t_pn2, pn3, pNX_t_pn3, pNY_t_pn3, pNZ_t_pn3, _4ϕj, ϕi_plus_4ϕj, sj2_plus_2si2_minus_4vivj, ϕs_and_vs, pn1t1_7, pNX_t_X, pNY_t_Y, pNZ_t_Z, pn1, X_t_pn1, Y_t_pn1, Z_t_pn1, t31, t32, t33, r_sin_ϕ, sin_ϕ, sin2_ϕ, cos_ϕ, F_J2_x, F_J2_y, F_J2_z, F_J2_x1, F_J2_y1, F_J2_z1, F_J2_x2, F_J2_y2, F_J2_z2, P_2_sin_ϕ, ∂P_2_sin_ϕ, m_c_ϕ_∂P_2, Λ2j_div_r4, F_J2_ξ, F_J2_ζ, ξx, ξy, ξz, ζx, ζy, ζz, tmp602, tmp605, tmp608, pn2x, pn2y, pn2z, tmp616, tmp619, tmp848, tmp621, tmp849, tmp622, tmp624, tmp850, tmp851, tmp629, tmp630, tmp641, tmp643, tmp645, tmp647, tmp852, tmp653, tmp853, tmp656, tmp662, tmp664, tmp667, tmp670, tmp672, tmp674, tmp676, tmp678, tmp680, tmp692, tmp854, tmp694, tmp855, tmp695, tmp697, tmp856, temp_004, tmp708, tmp710, tmp712, tmp718, tmp720, tmp721, Xij_t_Ui, Yij_t_Vi, Zij_t_Wi, tmp727, Rij_dot_Vi, tmp730, tmp860, pn1t7, tmp733, pn1t2_7, tmp740, tmp741, tmp742, tmp750, termpnx, sumpnx, tmp753, termpny, sumpny, tmp756, termpnz, sumpnz], [Array{Taylor1{_S}, 2}(undef, 0, 0)], [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)])
+    return TaylorIntegration.RetAlloc{Taylor1{_S}}([tmp26, tmp28, tmp30, tmp31, tmp62, tmp63, tmp64, tmp65, tmp66, tmp67, tmp68, tmp70, tmp72, tmp73, tmp75, tmp77, tmp78, tmp79, tmp80, tmp81, tmp82, tmp83, tmp85, tmp87, tmp88, tmp90, tmp92, tmp93, tmp94, tmp95, tmp97, tmp99, tmp101, tmp102, tmp103, tmp104, tmp105, tmp106, tmp107, tmp108, tmp109, tmp110, tmp111, tmp112, tmp113, tmp114, tmp115, pntempX, pntempY, pntempZ, temp_accX, temp_accY, temp_accZ, accX, accY, accZ, tmp27, tmp29, tmp32, _4dq1, _4dq2, _4dq3, postNewtonX, postNewtonY, postNewtonZ, h_x, h_y, h_z, tmp69, tmp71, tmp74, h_norm, tmp76, h_x_unit, h_y_unit, h_z_unit, t_x, t_y, t_z, tmp84, tmp86, tmp89, t_norm, tmp91, t_x_unit, t_y_unit, t_z_unit, r_x_unit, r_y_unit, r_z_unit, g_r_quotient, tmp96, g_r_A, tmp98, g_r_B, tmp100, g_r, A2_t_g_r, A1_t_g_r, A3_t_g_r, NGAx, NGAy, NGAz], [X, Y, Z, r_p2, r_p4, r_p1d2, r_p3d2, newtonianCoeff, ui, vi, wi, U, V, W, _4U_m_3X, _4V_m_3Y, _4W_m_3Z, UU, VV, WW, newtonian1b_Potential, newtonianNb_Potential, newton_acc_X, newton_acc_Y, newton_acc_Z, v2, vi_dot_vj, pn2, U_t_pn2, V_t_pn2, W_t_pn2, pn3, pNX_t_pn3, pNY_t_pn3, pNZ_t_pn3, _4ϕj, ϕi_plus_4ϕj, sj2_plus_2si2_minus_4vivj, ϕs_and_vs, pn1t1_7, pNX_t_X, pNY_t_Y, pNZ_t_Z, pn1, X_t_pn1, Y_t_pn1, Z_t_pn1, t31, t32, t33, r_sin_ϕ, sin_ϕ, sin2_ϕ, cos_ϕ, F_J2_x, F_J2_y, F_J2_z, F_J2_x1, F_J2_y1, F_J2_z1, F_J2_x2, F_J2_y2, F_J2_z2, P_2_sin_ϕ, ∂P_2_sin_ϕ, m_c_ϕ_∂P_2, Λ2j_div_r4, F_J2_ξ, F_J2_ζ, ξx, ξy, ξz, ζx, ζy, ζz, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8, tmp9, tmp10, tmp11, tmp12, tmp13, tmp14, tmp15, tmp16, tmp17, tmp18, tmp19, tmp20, tmp21, tmp22, tmp23, tmp24, tmp25, temp_004, tmp33, tmp34, tmp35, tmp36, tmp37, tmp38, pn2x, pn2y, pn2z, tmp39, tmp40, tmp41, tmp42, tmp43, tmp44, tmp45, tmp46, tmp47, tmp48, tmp49, tmp50, tmp51, Xij_t_Ui, Yij_t_Vi, Zij_t_Wi, tmp52, Rij_dot_Vi, tmp53, tmp54, pn1t7, tmp55, pn1t2_7, tmp56, tmp57, tmp58, tmp59, termpnx, sumpnx, tmp60, termpny, sumpny, tmp61, termpnz, sumpnz], [Array{Taylor1{_S}, 2}(undef, 0, 0)], [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)])
 end
 
 @cyclicbarrier function TaylorIntegration.jetcoeffs!(::Val{nongravs!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
     order = TS.order(t)
-    tmp700 = __ralloc.v0[1]
-    tmp702 = __ralloc.v0[2]
-    tmp703 = __ralloc.v0[3]
-    tmp705 = __ralloc.v0[4]
-    tmp768 = __ralloc.v0[5]
-    tmp769 = __ralloc.v0[6]
-    tmp771 = __ralloc.v0[7]
-    tmp772 = __ralloc.v0[8]
-    tmp774 = __ralloc.v0[9]
-    tmp775 = __ralloc.v0[10]
-    tmp778 = __ralloc.v0[11]
-    tmp780 = __ralloc.v0[12]
-    tmp781 = __ralloc.v0[13]
-    tmp783 = __ralloc.v0[14]
-    tmp784 = __ralloc.v0[15]
-    tmp789 = __ralloc.v0[16]
-    tmp790 = __ralloc.v0[17]
-    tmp792 = __ralloc.v0[18]
-    tmp793 = __ralloc.v0[19]
-    tmp795 = __ralloc.v0[20]
-    tmp796 = __ralloc.v0[21]
-    tmp799 = __ralloc.v0[22]
-    tmp801 = __ralloc.v0[23]
-    tmp802 = __ralloc.v0[24]
-    tmp804 = __ralloc.v0[25]
-    tmp805 = __ralloc.v0[26]
-    tmp810 = __ralloc.v0[27]
-    tmp812 = __ralloc.v0[28]
-    tmp814 = __ralloc.v0[29]
-    tmp817 = __ralloc.v0[30]
-    tmp820 = __ralloc.v0[31]
-    tmp821 = __ralloc.v0[32]
-    tmp827 = __ralloc.v0[33]
-    tmp828 = __ralloc.v0[34]
-    tmp829 = __ralloc.v0[35]
-    tmp830 = __ralloc.v0[36]
-    tmp832 = __ralloc.v0[37]
-    tmp833 = __ralloc.v0[38]
-    tmp834 = __ralloc.v0[39]
-    tmp835 = __ralloc.v0[40]
-    tmp837 = __ralloc.v0[41]
-    tmp838 = __ralloc.v0[42]
-    tmp839 = __ralloc.v0[43]
-    tmp840 = __ralloc.v0[44]
-    tmp842 = __ralloc.v0[45]
-    tmp844 = __ralloc.v0[46]
-    tmp846 = __ralloc.v0[47]
+    tmp26 = __ralloc.v0[1]
+    tmp28 = __ralloc.v0[2]
+    tmp30 = __ralloc.v0[3]
+    tmp31 = __ralloc.v0[4]
+    tmp62 = __ralloc.v0[5]
+    tmp63 = __ralloc.v0[6]
+    tmp64 = __ralloc.v0[7]
+    tmp65 = __ralloc.v0[8]
+    tmp66 = __ralloc.v0[9]
+    tmp67 = __ralloc.v0[10]
+    tmp68 = __ralloc.v0[11]
+    tmp70 = __ralloc.v0[12]
+    tmp72 = __ralloc.v0[13]
+    tmp73 = __ralloc.v0[14]
+    tmp75 = __ralloc.v0[15]
+    tmp77 = __ralloc.v0[16]
+    tmp78 = __ralloc.v0[17]
+    tmp79 = __ralloc.v0[18]
+    tmp80 = __ralloc.v0[19]
+    tmp81 = __ralloc.v0[20]
+    tmp82 = __ralloc.v0[21]
+    tmp83 = __ralloc.v0[22]
+    tmp85 = __ralloc.v0[23]
+    tmp87 = __ralloc.v0[24]
+    tmp88 = __ralloc.v0[25]
+    tmp90 = __ralloc.v0[26]
+    tmp92 = __ralloc.v0[27]
+    tmp93 = __ralloc.v0[28]
+    tmp94 = __ralloc.v0[29]
+    tmp95 = __ralloc.v0[30]
+    tmp97 = __ralloc.v0[31]
+    tmp99 = __ralloc.v0[32]
+    tmp101 = __ralloc.v0[33]
+    tmp102 = __ralloc.v0[34]
+    tmp103 = __ralloc.v0[35]
+    tmp104 = __ralloc.v0[36]
+    tmp105 = __ralloc.v0[37]
+    tmp106 = __ralloc.v0[38]
+    tmp107 = __ralloc.v0[39]
+    tmp108 = __ralloc.v0[40]
+    tmp109 = __ralloc.v0[41]
+    tmp110 = __ralloc.v0[42]
+    tmp111 = __ralloc.v0[43]
+    tmp112 = __ralloc.v0[44]
+    tmp113 = __ralloc.v0[45]
+    tmp114 = __ralloc.v0[46]
+    tmp115 = __ralloc.v0[47]
     pntempX = __ralloc.v0[48]
     pntempY = __ralloc.v0[49]
     pntempZ = __ralloc.v0[50]
@@ -751,34 +750,34 @@ end
     accX = __ralloc.v0[54]
     accY = __ralloc.v0[55]
     accZ = __ralloc.v0[56]
-    _4dq1 = __ralloc.v0[57]
-    _4dq2 = __ralloc.v0[58]
-    _4dq3 = __ralloc.v0[59]
-    tmp857 = __ralloc.v0[60]
-    tmp858 = __ralloc.v0[61]
-    tmp859 = __ralloc.v0[62]
+    tmp27 = __ralloc.v0[57]
+    tmp29 = __ralloc.v0[58]
+    tmp32 = __ralloc.v0[59]
+    _4dq1 = __ralloc.v0[60]
+    _4dq2 = __ralloc.v0[61]
+    _4dq3 = __ralloc.v0[62]
     postNewtonX = __ralloc.v0[63]
     postNewtonY = __ralloc.v0[64]
     postNewtonZ = __ralloc.v0[65]
     h_x = __ralloc.v0[66]
     h_y = __ralloc.v0[67]
     h_z = __ralloc.v0[68]
-    tmp861 = __ralloc.v0[69]
-    tmp862 = __ralloc.v0[70]
-    tmp863 = __ralloc.v0[71]
+    tmp69 = __ralloc.v0[69]
+    tmp71 = __ralloc.v0[70]
+    tmp74 = __ralloc.v0[71]
     h_norm = __ralloc.v0[72]
-    tmp864 = __ralloc.v0[73]
+    tmp76 = __ralloc.v0[73]
     h_x_unit = __ralloc.v0[74]
     h_y_unit = __ralloc.v0[75]
     h_z_unit = __ralloc.v0[76]
     t_x = __ralloc.v0[77]
     t_y = __ralloc.v0[78]
     t_z = __ralloc.v0[79]
-    tmp865 = __ralloc.v0[80]
-    tmp866 = __ralloc.v0[81]
-    tmp867 = __ralloc.v0[82]
+    tmp84 = __ralloc.v0[80]
+    tmp86 = __ralloc.v0[81]
+    tmp89 = __ralloc.v0[82]
     t_norm = __ralloc.v0[83]
-    tmp868 = __ralloc.v0[84]
+    tmp91 = __ralloc.v0[84]
     t_x_unit = __ralloc.v0[85]
     t_y_unit = __ralloc.v0[86]
     t_z_unit = __ralloc.v0[87]
@@ -786,11 +785,11 @@ end
     r_y_unit = __ralloc.v0[89]
     r_z_unit = __ralloc.v0[90]
     g_r_quotient = __ralloc.v0[91]
-    tmp869 = __ralloc.v0[92]
+    tmp96 = __ralloc.v0[92]
     g_r_A = __ralloc.v0[93]
-    tmp870 = __ralloc.v0[94]
+    tmp98 = __ralloc.v0[94]
     g_r_B = __ralloc.v0[95]
-    tmp871 = __ralloc.v0[96]
+    tmp100 = __ralloc.v0[96]
     g_r = __ralloc.v0[97]
     A2_t_g_r = __ralloc.v0[98]
     A1_t_g_r = __ralloc.v0[99]
@@ -873,78 +872,81 @@ end
     ζx = __ralloc.v1[73]
     ζy = __ralloc.v1[74]
     ζz = __ralloc.v1[75]
-    tmp602 = __ralloc.v1[76]
-    tmp605 = __ralloc.v1[77]
-    tmp608 = __ralloc.v1[78]
-    pn2x = __ralloc.v1[79]
-    pn2y = __ralloc.v1[80]
-    pn2z = __ralloc.v1[81]
-    tmp616 = __ralloc.v1[82]
-    tmp619 = __ralloc.v1[83]
-    tmp848 = __ralloc.v1[84]
-    tmp621 = __ralloc.v1[85]
-    tmp849 = __ralloc.v1[86]
-    tmp622 = __ralloc.v1[87]
-    tmp624 = __ralloc.v1[88]
-    tmp850 = __ralloc.v1[89]
-    tmp851 = __ralloc.v1[90]
-    tmp629 = __ralloc.v1[91]
-    tmp630 = __ralloc.v1[92]
-    tmp641 = __ralloc.v1[93]
-    tmp643 = __ralloc.v1[94]
-    tmp645 = __ralloc.v1[95]
-    tmp647 = __ralloc.v1[96]
-    tmp852 = __ralloc.v1[97]
-    tmp653 = __ralloc.v1[98]
-    tmp853 = __ralloc.v1[99]
-    tmp656 = __ralloc.v1[100]
-    tmp662 = __ralloc.v1[101]
-    tmp664 = __ralloc.v1[102]
-    tmp667 = __ralloc.v1[103]
-    tmp670 = __ralloc.v1[104]
-    tmp672 = __ralloc.v1[105]
-    tmp674 = __ralloc.v1[106]
-    tmp676 = __ralloc.v1[107]
-    tmp678 = __ralloc.v1[108]
-    tmp680 = __ralloc.v1[109]
-    tmp692 = __ralloc.v1[110]
-    tmp854 = __ralloc.v1[111]
-    tmp694 = __ralloc.v1[112]
-    tmp855 = __ralloc.v1[113]
-    tmp695 = __ralloc.v1[114]
-    tmp697 = __ralloc.v1[115]
-    tmp856 = __ralloc.v1[116]
-    temp_004 = __ralloc.v1[117]
-    tmp708 = __ralloc.v1[118]
-    tmp710 = __ralloc.v1[119]
-    tmp712 = __ralloc.v1[120]
-    tmp718 = __ralloc.v1[121]
-    tmp720 = __ralloc.v1[122]
-    tmp721 = __ralloc.v1[123]
+    tmp1 = __ralloc.v1[76]
+    tmp2 = __ralloc.v1[77]
+    tmp3 = __ralloc.v1[78]
+    tmp4 = __ralloc.v1[79]
+    tmp5 = __ralloc.v1[80]
+    tmp6 = __ralloc.v1[81]
+    tmp7 = __ralloc.v1[82]
+    tmp8 = __ralloc.v1[83]
+    tmp9 = __ralloc.v1[84]
+    tmp10 = __ralloc.v1[85]
+    tmp11 = __ralloc.v1[86]
+    tmp12 = __ralloc.v1[87]
+    tmp13 = __ralloc.v1[88]
+    tmp14 = __ralloc.v1[89]
+    tmp15 = __ralloc.v1[90]
+    tmp16 = __ralloc.v1[91]
+    tmp17 = __ralloc.v1[92]
+    tmp18 = __ralloc.v1[93]
+    tmp19 = __ralloc.v1[94]
+    tmp20 = __ralloc.v1[95]
+    tmp21 = __ralloc.v1[96]
+    tmp22 = __ralloc.v1[97]
+    tmp23 = __ralloc.v1[98]
+    tmp24 = __ralloc.v1[99]
+    tmp25 = __ralloc.v1[100]
+    temp_004 = __ralloc.v1[101]
+    tmp33 = __ralloc.v1[102]
+    tmp34 = __ralloc.v1[103]
+    tmp35 = __ralloc.v1[104]
+    tmp36 = __ralloc.v1[105]
+    tmp37 = __ralloc.v1[106]
+    tmp38 = __ralloc.v1[107]
+    pn2x = __ralloc.v1[108]
+    pn2y = __ralloc.v1[109]
+    pn2z = __ralloc.v1[110]
+    tmp39 = __ralloc.v1[111]
+    tmp40 = __ralloc.v1[112]
+    tmp41 = __ralloc.v1[113]
+    tmp42 = __ralloc.v1[114]
+    tmp43 = __ralloc.v1[115]
+    tmp44 = __ralloc.v1[116]
+    tmp45 = __ralloc.v1[117]
+    tmp46 = __ralloc.v1[118]
+    tmp47 = __ralloc.v1[119]
+    tmp48 = __ralloc.v1[120]
+    tmp49 = __ralloc.v1[121]
+    tmp50 = __ralloc.v1[122]
+    tmp51 = __ralloc.v1[123]
     Xij_t_Ui = __ralloc.v1[124]
     Yij_t_Vi = __ralloc.v1[125]
     Zij_t_Wi = __ralloc.v1[126]
-    tmp727 = __ralloc.v1[127]
+    tmp52 = __ralloc.v1[127]
     Rij_dot_Vi = __ralloc.v1[128]
-    tmp730 = __ralloc.v1[129]
-    tmp860 = __ralloc.v1[130]
+    tmp53 = __ralloc.v1[129]
+    tmp54 = __ralloc.v1[130]
     pn1t7 = __ralloc.v1[131]
-    tmp733 = __ralloc.v1[132]
+    tmp55 = __ralloc.v1[132]
     pn1t2_7 = __ralloc.v1[133]
-    tmp740 = __ralloc.v1[134]
-    tmp741 = __ralloc.v1[135]
-    tmp742 = __ralloc.v1[136]
-    tmp750 = __ralloc.v1[137]
+    tmp56 = __ralloc.v1[134]
+    tmp57 = __ralloc.v1[135]
+    tmp58 = __ralloc.v1[136]
+    tmp59 = __ralloc.v1[137]
     termpnx = __ralloc.v1[138]
     sumpnx = __ralloc.v1[139]
-    tmp753 = __ralloc.v1[140]
+    tmp60 = __ralloc.v1[140]
     termpny = __ralloc.v1[141]
     sumpny = __ralloc.v1[142]
-    tmp756 = __ralloc.v1[143]
+    tmp61 = __ralloc.v1[143]
     termpnz = __ralloc.v1[144]
     sumpnz = __ralloc.v1[145]
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
+    local sseph_ephU = params.sseph(dsj2k)
+    local acceph_ephU = params.acceph(dsj2k)
+    local poteph_ephU = params.poteph(dsj2k)
     local S = eltype(q)
     local UJ_interaction = params.UJ_interaction
     local N = params.N
@@ -958,9 +960,6 @@ end
     local marsden_k = -(params.marsden_radial[5])
     local zero_q_1 = params.zeroq1
     local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
-    local sseph_ephU = params.sseph(dsj2k)
-    local acceph_ephU = params.acceph(dsj2k)
-    local poteph_ephU = params.poteph(dsj2k)
     for ord = 0:order - 1
         ordnext = ord + 1
         TaylorSeries.identity!(pntempX, zero_q_1, ord)
@@ -976,88 +975,59 @@ end
         TaylorSeries.identity!(dq[2], q[5], ord)
         TaylorSeries.identity!(dq[3], q[6], ord)
         TaylorSeries.identity!(newtonianNb_Potential[N], zero_q_1, ord)
-        TaylorSeries.mul!(_4dq1, 4, dq[1], ord)
-        TaylorSeries.mul!(_4dq2, 4, dq[2], ord)
-        TaylorSeries.mul!(_4dq3, 4, dq[3], ord)
-        #= /Users/lerm/.julia/dev/NEOs.jl/ex.jl:222 =# Threads.@threads for i = 1:Nm1
-                TaylorSeries.identity!(ui[i], sseph_ephU[3 * ((N - 1) + i) - 2], ord)
-                TaylorSeries.identity!(vi[i], sseph_ephU[3 * ((N - 1) + i) - 1], ord)
-                TaylorSeries.identity!(wi[i], sseph_ephU[3 * ((N - 1) + i)], ord)
+        Threads.@threads for i = 1:Nm1
                 TaylorSeries.subst!(X[i], sseph_ephU[3i - 2], q[1], ord)
                 TaylorSeries.subst!(Y[i], sseph_ephU[3i - 1], q[2], ord)
                 TaylorSeries.subst!(Z[i], sseph_ephU[3i], q[3], ord)
-                TaylorSeries.subst!(U[i], ui[i], dq[1], ord)
-                TaylorSeries.subst!(V[i], vi[i], dq[2], ord)
-                TaylorSeries.subst!(W[i], wi[i], dq[3], ord)
-                TaylorSeries.mul!(tmp602[i], -3, ui[i], ord)
-                TaylorSeries.add!(_4U_m_3X[i], tmp602[i], _4dq1, ord)
-                TaylorSeries.mul!(tmp605[i], -3, vi[i], ord)
-                TaylorSeries.add!(_4V_m_3Y[i], tmp605[i], _4dq2, ord)
-                TaylorSeries.mul!(tmp608[i], -3, wi[i], ord)
-                TaylorSeries.add!(_4W_m_3Z[i], tmp608[i], _4dq3, ord)
-                TaylorSeries.mul!(pn2x[i], X[i], _4U_m_3X[i], ord)
-                TaylorSeries.mul!(pn2y[i], Y[i], _4V_m_3Y[i], ord)
-                TaylorSeries.mul!(pn2z[i], Z[i], _4W_m_3Z[i], ord)
-                TaylorSeries.mul!(UU[i], ui[i], dq[1], ord)
-                TaylorSeries.mul!(VV[i], vi[i], dq[2], ord)
-                TaylorSeries.mul!(WW[i], wi[i], dq[3], ord)
-                TaylorSeries.add!(tmp616[i], UU[i], VV[i], ord)
-                TaylorSeries.add!(vi_dot_vj[i], tmp616[i], WW[i], ord)
-                TaylorSeries.pow!(tmp619[i], X[i], tmp848[i], 2, ord)
-                TaylorSeries.pow!(tmp621[i], Y[i], tmp849[i], 2, ord)
-                TaylorSeries.add!(tmp622[i], tmp619[i], tmp621[i], ord)
-                TaylorSeries.pow!(tmp624[i], Z[i], tmp850[i], 2, ord)
-                TaylorSeries.add!(r_p2[i], tmp622[i], tmp624[i], ord)
-                TaylorSeries.sqrt!(r_p1d2[i], r_p2[i], tmp851[i], ord)
+                TaylorSeries.pow!(tmp1[i], X[i], tmp2[i], 2, ord)
+                TaylorSeries.pow!(tmp3[i], Y[i], tmp4[i], 2, ord)
+                TaylorSeries.add!(tmp5[i], tmp1[i], tmp3[i], ord)
+                TaylorSeries.pow!(tmp6[i], Z[i], tmp7[i], 2, ord)
+                TaylorSeries.add!(r_p2[i], tmp5[i], tmp6[i], ord)
+                TaylorSeries.sqrt!(r_p1d2[i], r_p2[i], tmp8[i], ord)
                 TaylorSeries.mul!(r_p3d2[i], r_p2[i], r_p1d2[i], ord)
                 TaylorSeries.div!(newtonianCoeff[i], μ[i], r_p3d2[i], ord)
-                TaylorSeries.add!(tmp629[i], pn2x[i], pn2y[i], ord)
-                TaylorSeries.add!(tmp630[i], tmp629[i], pn2z[i], ord)
-                TaylorSeries.mul!(pn2[i], newtonianCoeff[i], tmp630[i], ord)
                 TaylorSeries.mul!(newton_acc_X[i], X[i], newtonianCoeff[i], ord)
                 TaylorSeries.mul!(newton_acc_Y[i], Y[i], newtonianCoeff[i], ord)
                 TaylorSeries.mul!(newton_acc_Z[i], Z[i], newtonianCoeff[i], ord)
                 TaylorSeries.div!(newtonian1b_Potential[i], μ[i], r_p1d2[i], ord)
                 TaylorSeries.mul!(pn3[i], 3.5, newtonian1b_Potential[i], ord)
-                TaylorSeries.mul!(U_t_pn2[i], pn2[i], U[i], ord)
-                TaylorSeries.mul!(V_t_pn2[i], pn2[i], V[i], ord)
-                TaylorSeries.mul!(W_t_pn2[i], pn2[i], W[i], ord)
                 if UJ_interaction[i]
-                    TaylorSeries.subst!(tmp641[i], X[i], ord)
-                    TaylorSeries.mul!(t31[i], tmp641[i], M_[1, 3, i], ord)
-                    TaylorSeries.subst!(tmp643[i], Y[i], ord)
-                    TaylorSeries.mul!(t32[i], tmp643[i], M_[2, 3, i], ord)
-                    TaylorSeries.subst!(tmp645[i], Z[i], ord)
-                    TaylorSeries.mul!(t33[i], tmp645[i], M_[3, 3, i], ord)
-                    TaylorSeries.add!(tmp647[i], t31[i], t32[i], ord)
-                    TaylorSeries.add!(r_sin_ϕ[i], tmp647[i], t33[i], ord)
+                    TaylorSeries.subst!(tmp9[i], X[i], ord)
+                    TaylorSeries.mul!(t31[i], tmp9[i], M_[1, 3, i], ord)
+                    TaylorSeries.subst!(tmp10[i], Y[i], ord)
+                    TaylorSeries.mul!(t32[i], tmp10[i], M_[2, 3, i], ord)
+                    TaylorSeries.subst!(tmp11[i], Z[i], ord)
+                    TaylorSeries.mul!(t33[i], tmp11[i], M_[3, 3, i], ord)
+                    TaylorSeries.add!(tmp12[i], t31[i], t32[i], ord)
+                    TaylorSeries.add!(r_sin_ϕ[i], tmp12[i], t33[i], ord)
                     TaylorSeries.div!(sin_ϕ[i], r_sin_ϕ[i], r_p1d2[i], ord)
-                    TaylorSeries.pow!(sin2_ϕ[i], sin_ϕ[i], tmp852[i], 2, ord)
-                    TaylorSeries.subst!(tmp653[i], 1, sin2_ϕ[i], ord)
-                    TaylorSeries.sqrt!(cos_ϕ[i], tmp653[i], tmp853[i], ord)
-                    TaylorSeries.mul!(tmp656[i], 1.5, sin2_ϕ[i], ord)
-                    TaylorSeries.subst!(P_2_sin_ϕ[i], tmp656[i], 0.5, ord)
+                    TaylorSeries.pow!(sin2_ϕ[i], sin_ϕ[i], tmp13[i], 2, ord)
+                    TaylorSeries.subst!(tmp14[i], 1, sin2_ϕ[i], ord)
+                    TaylorSeries.sqrt!(cos_ϕ[i], tmp14[i], tmp15[i], ord)
+                    TaylorSeries.mul!(tmp16[i], 1.5, sin2_ϕ[i], ord)
+                    TaylorSeries.subst!(P_2_sin_ϕ[i], tmp16[i], 0.5, ord)
                     TaylorSeries.mul!(∂P_2_sin_ϕ[i], 3, sin_ϕ[i], ord)
                     TaylorSeries.mul!(r_p4[i], r_p2[i], r_p2[i], ord)
-                    TaylorSeries.div!(tmp662[i], Λ2[i], r_p4[i], ord)
-                    TaylorSeries.subst!(Λ2j_div_r4[i], tmp662[i], ord)
-                    TaylorSeries.subst!(tmp664[i], cos_ϕ[i], ord)
-                    TaylorSeries.mul!(m_c_ϕ_∂P_2[i], tmp664[i], ∂P_2_sin_ϕ[i], ord)
-                    TaylorSeries.mul!(tmp667[i], Λ2j_div_r4[i], 3, ord)
-                    TaylorSeries.mul!(F_J2_ξ[i], tmp667[i], P_2_sin_ϕ[i], ord)
+                    TaylorSeries.div!(tmp17[i], Λ2[i], r_p4[i], ord)
+                    TaylorSeries.subst!(Λ2j_div_r4[i], tmp17[i], ord)
+                    TaylorSeries.subst!(tmp18[i], cos_ϕ[i], ord)
+                    TaylorSeries.mul!(m_c_ϕ_∂P_2[i], tmp18[i], ∂P_2_sin_ϕ[i], ord)
+                    TaylorSeries.mul!(tmp19[i], Λ2j_div_r4[i], 3, ord)
+                    TaylorSeries.mul!(F_J2_ξ[i], tmp19[i], P_2_sin_ϕ[i], ord)
                     TaylorSeries.mul!(F_J2_ζ[i], Λ2j_div_r4[i], m_c_ϕ_∂P_2[i], ord)
-                    TaylorSeries.subst!(tmp670[i], X[i], ord)
-                    TaylorSeries.div!(ξx[i], tmp670[i], r_p1d2[i], ord)
-                    TaylorSeries.subst!(tmp672[i], Y[i], ord)
-                    TaylorSeries.div!(ξy[i], tmp672[i], r_p1d2[i], ord)
-                    TaylorSeries.subst!(tmp674[i], Z[i], ord)
-                    TaylorSeries.div!(ξz[i], tmp674[i], r_p1d2[i], ord)
-                    TaylorSeries.mul!(tmp676[i], sin_ϕ[i], ξx[i], ord)
-                    TaylorSeries.subst!(ζx[i], M_[1, 3, i], tmp676[i], ord)
-                    TaylorSeries.mul!(tmp678[i], sin_ϕ[i], ξy[i], ord)
-                    TaylorSeries.subst!(ζy[i], M_[2, 3, i], tmp678[i], ord)
-                    TaylorSeries.mul!(tmp680[i], sin_ϕ[i], ξz[i], ord)
-                    TaylorSeries.subst!(ζz[i], M_[3, 3, i], tmp680[i], ord)
+                    TaylorSeries.subst!(tmp20[i], X[i], ord)
+                    TaylorSeries.div!(ξx[i], tmp20[i], r_p1d2[i], ord)
+                    TaylorSeries.subst!(tmp21[i], Y[i], ord)
+                    TaylorSeries.div!(ξy[i], tmp21[i], r_p1d2[i], ord)
+                    TaylorSeries.subst!(tmp22[i], Z[i], ord)
+                    TaylorSeries.div!(ξz[i], tmp22[i], r_p1d2[i], ord)
+                    TaylorSeries.mul!(tmp23[i], sin_ϕ[i], ξx[i], ord)
+                    TaylorSeries.subst!(ζx[i], M_[1, 3, i], tmp23[i], ord)
+                    TaylorSeries.mul!(tmp24[i], sin_ϕ[i], ξy[i], ord)
+                    TaylorSeries.subst!(ζy[i], M_[2, 3, i], tmp24[i], ord)
+                    TaylorSeries.mul!(tmp25[i], sin_ϕ[i], ξz[i], ord)
+                    TaylorSeries.subst!(ζz[i], M_[3, 3, i], tmp25[i], ord)
                     TaylorSeries.mul!(F_J2_x1[i], F_J2_ξ[i], ξx[i], ord)
                     TaylorSeries.mul!(F_J2_y1[i], F_J2_ξ[i], ξy[i], ord)
                     TaylorSeries.mul!(F_J2_z1[i], F_J2_ξ[i], ξz[i], ord)
@@ -1068,57 +1038,86 @@ end
                     TaylorSeries.add!(F_J2_y[i], F_J2_y1[i], F_J2_y2[i], ord)
                     TaylorSeries.add!(F_J2_z[i], F_J2_z1[i], F_J2_z2[i], ord)
                 end
-                TaylorSeries.pow!(tmp692[i], ui[i], tmp854[i], 2, ord)
-                TaylorSeries.pow!(tmp694[i], vi[i], tmp855[i], 2, ord)
-                TaylorSeries.add!(tmp695[i], tmp692[i], tmp694[i], ord)
-                TaylorSeries.pow!(tmp697[i], wi[i], tmp856[i], 2, ord)
-                TaylorSeries.add!(v2[i], tmp695[i], tmp697[i], ord)
             end
-        TaylorSeries.pow!(tmp700, q[4], tmp857, 2, ord)
-        TaylorSeries.pow!(tmp702, q[5], tmp858, 2, ord)
-        TaylorSeries.add!(tmp703, tmp700, tmp702, ord)
-        TaylorSeries.pow!(tmp705, q[6], tmp859, 2, ord)
-        TaylorSeries.add!(v2[N], tmp703, tmp705, ord)
+        TaylorSeries.pow!(tmp26, q[4], tmp27, 2, ord)
+        TaylorSeries.pow!(tmp28, q[5], tmp29, 2, ord)
+        TaylorSeries.add!(tmp30, tmp26, tmp28, ord)
+        TaylorSeries.pow!(tmp31, q[6], tmp32, 2, ord)
+        TaylorSeries.add!(v2[N], tmp30, tmp31, ord)
         for i = 1:Nm1
             TaylorSeries.add!(temp_004[i], newtonian1b_Potential[i], newtonianNb_Potential[N], ord)
             TaylorSeries.identity!(newtonianNb_Potential[N], temp_004[i], ord)
             if UJ_interaction[i]
-                TaylorSeries.mul!(tmp708[i], μ[i], F_J2_x[i], ord)
-                TaylorSeries.subst!(temp_accX, accX, tmp708[i], ord)
+                TaylorSeries.mul!(tmp33[i], μ[i], F_J2_x[i], ord)
+                TaylorSeries.subst!(temp_accX, accX, tmp33[i], ord)
                 TaylorSeries.identity!(accX, temp_accX, ord)
-                TaylorSeries.mul!(tmp710[i], μ[i], F_J2_y[i], ord)
-                TaylorSeries.subst!(temp_accY, accY, tmp710[i], ord)
+                TaylorSeries.mul!(tmp34[i], μ[i], F_J2_y[i], ord)
+                TaylorSeries.subst!(temp_accY, accY, tmp34[i], ord)
                 TaylorSeries.identity!(accY, temp_accY, ord)
-                TaylorSeries.mul!(tmp712[i], μ[i], F_J2_z[i], ord)
-                TaylorSeries.subst!(temp_accZ, accZ, tmp712[i], ord)
+                TaylorSeries.mul!(tmp35[i], μ[i], F_J2_z[i], ord)
+                TaylorSeries.subst!(temp_accZ, accZ, tmp35[i], ord)
                 TaylorSeries.identity!(accZ, temp_accZ, ord)
             end
         end
         TaylorSeries.mul!(_4ϕj[N], 4, newtonianNb_Potential[N], ord)
-        #= /Users/lerm/.julia/dev/NEOs.jl/ex.jl:387 =# Threads.@threads for i = 1:10
+        TaylorSeries.mul!(_4dq1, 4, dq[1], ord)
+        TaylorSeries.mul!(_4dq2, 4, dq[2], ord)
+        TaylorSeries.mul!(_4dq3, 4, dq[3], ord)
+        Threads.@threads for i = 1:10
+                TaylorSeries.identity!(ui[i], sseph_ephU[3 * ((N - 1) + i) - 2], ord)
+                TaylorSeries.identity!(vi[i], sseph_ephU[3 * ((N - 1) + i) - 1], ord)
+                TaylorSeries.identity!(wi[i], sseph_ephU[3 * ((N - 1) + i)], ord)
+                TaylorSeries.subst!(U[i], ui[i], dq[1], ord)
+                TaylorSeries.subst!(V[i], vi[i], dq[2], ord)
+                TaylorSeries.subst!(W[i], wi[i], dq[3], ord)
+                TaylorSeries.mul!(tmp36[i], -3, ui[i], ord)
+                TaylorSeries.add!(_4U_m_3X[i], tmp36[i], _4dq1, ord)
+                TaylorSeries.mul!(tmp37[i], -3, vi[i], ord)
+                TaylorSeries.add!(_4V_m_3Y[i], tmp37[i], _4dq2, ord)
+                TaylorSeries.mul!(tmp38[i], -3, wi[i], ord)
+                TaylorSeries.add!(_4W_m_3Z[i], tmp38[i], _4dq3, ord)
+                TaylorSeries.mul!(pn2x[i], X[i], _4U_m_3X[i], ord)
+                TaylorSeries.mul!(pn2y[i], Y[i], _4V_m_3Y[i], ord)
+                TaylorSeries.mul!(pn2z[i], Z[i], _4W_m_3Z[i], ord)
+                TaylorSeries.mul!(UU[i], ui[i], dq[1], ord)
+                TaylorSeries.mul!(VV[i], vi[i], dq[2], ord)
+                TaylorSeries.mul!(WW[i], wi[i], dq[3], ord)
+                TaylorSeries.add!(tmp39[i], UU[i], VV[i], ord)
+                TaylorSeries.add!(vi_dot_vj[i], tmp39[i], WW[i], ord)
+                TaylorSeries.add!(tmp40[i], pn2x[i], pn2y[i], ord)
+                TaylorSeries.add!(tmp41[i], tmp40[i], pn2z[i], ord)
+                TaylorSeries.mul!(pn2[i], newtonianCoeff[i], tmp41[i], ord)
+                TaylorSeries.mul!(U_t_pn2[i], pn2[i], U[i], ord)
+                TaylorSeries.mul!(V_t_pn2[i], pn2[i], V[i], ord)
+                TaylorSeries.mul!(W_t_pn2[i], pn2[i], W[i], ord)
+                TaylorSeries.pow!(tmp42[i], ui[i], tmp43[i], 2, ord)
+                TaylorSeries.pow!(tmp44[i], vi[i], tmp45[i], 2, ord)
+                TaylorSeries.add!(tmp46[i], tmp42[i], tmp44[i], ord)
+                TaylorSeries.pow!(tmp47[i], wi[i], tmp48[i], 2, ord)
+                TaylorSeries.add!(v2[i], tmp46[i], tmp47[i], ord)
                 TaylorSeries.add!(ϕi_plus_4ϕj[i], poteph_ephU[i], _4ϕj[N], ord)
-                TaylorSeries.mul!(tmp718[i], 2, v2[i], ord)
-                TaylorSeries.mul!(tmp720[i], 4, vi_dot_vj[i], ord)
-                TaylorSeries.subst!(tmp721[i], tmp718[i], tmp720[i], ord)
-                TaylorSeries.add!(sj2_plus_2si2_minus_4vivj[i], tmp721[i], v2[N], ord)
+                TaylorSeries.mul!(tmp49[i], 2, v2[i], ord)
+                TaylorSeries.mul!(tmp50[i], 4, vi_dot_vj[i], ord)
+                TaylorSeries.subst!(tmp51[i], tmp49[i], tmp50[i], ord)
+                TaylorSeries.add!(sj2_plus_2si2_minus_4vivj[i], tmp51[i], v2[N], ord)
                 TaylorSeries.subst!(ϕs_and_vs[i], sj2_plus_2si2_minus_4vivj[i], ϕi_plus_4ϕj[i], ord)
                 TaylorSeries.mul!(Xij_t_Ui[i], X[i], ui[i], ord)
                 TaylorSeries.mul!(Yij_t_Vi[i], Y[i], vi[i], ord)
                 TaylorSeries.mul!(Zij_t_Wi[i], Z[i], wi[i], ord)
-                TaylorSeries.add!(tmp727[i], Xij_t_Ui[i], Yij_t_Vi[i], ord)
-                TaylorSeries.add!(Rij_dot_Vi[i], tmp727[i], Zij_t_Wi[i], ord)
-                TaylorSeries.pow!(tmp730[i], Rij_dot_Vi[i], tmp860[i], 2, ord)
-                TaylorSeries.div!(pn1t7[i], tmp730[i], r_p2[i], ord)
-                TaylorSeries.mul!(tmp733[i], 1.5, pn1t7[i], ord)
-                TaylorSeries.subst!(pn1t2_7[i], ϕs_and_vs[i], tmp733[i], ord)
+                TaylorSeries.add!(tmp52[i], Xij_t_Ui[i], Yij_t_Vi[i], ord)
+                TaylorSeries.add!(Rij_dot_Vi[i], tmp52[i], Zij_t_Wi[i], ord)
+                TaylorSeries.pow!(tmp53[i], Rij_dot_Vi[i], tmp54[i], 2, ord)
+                TaylorSeries.div!(pn1t7[i], tmp53[i], r_p2[i], ord)
+                TaylorSeries.mul!(tmp55[i], 1.5, pn1t7[i], ord)
+                TaylorSeries.subst!(pn1t2_7[i], ϕs_and_vs[i], tmp55[i], ord)
                 TaylorSeries.add!(pn1t1_7[i], c_p2, pn1t2_7[i], ord)
                 TaylorSeries.mul!(pNX_t_X[i], acceph_ephU[3i - 2], X[i], ord)
                 TaylorSeries.mul!(pNY_t_Y[i], acceph_ephU[3i - 1], Y[i], ord)
                 TaylorSeries.mul!(pNZ_t_Z[i], acceph_ephU[3i], Z[i], ord)
-                TaylorSeries.add!(tmp740[i], pNX_t_X[i], pNY_t_Y[i], ord)
-                TaylorSeries.add!(tmp741[i], tmp740[i], pNZ_t_Z[i], ord)
-                TaylorSeries.mul!(tmp742[i], 0.5, tmp741[i], ord)
-                TaylorSeries.add!(pn1[i], pn1t1_7[i], tmp742[i], ord)
+                TaylorSeries.add!(tmp56[i], pNX_t_X[i], pNY_t_Y[i], ord)
+                TaylorSeries.add!(tmp57[i], tmp56[i], pNZ_t_Z[i], ord)
+                TaylorSeries.mul!(tmp58[i], 0.5, tmp57[i], ord)
+                TaylorSeries.add!(pn1[i], pn1t1_7[i], tmp58[i], ord)
                 TaylorSeries.mul!(X_t_pn1[i], newton_acc_X[i], pn1[i], ord)
                 TaylorSeries.mul!(Y_t_pn1[i], newton_acc_Y[i], pn1[i], ord)
                 TaylorSeries.mul!(Z_t_pn1[i], newton_acc_Z[i], pn1[i], ord)
@@ -1127,20 +1126,20 @@ end
                 TaylorSeries.mul!(pNZ_t_pn3[i], acceph_ephU[3i], pn3[i], ord)
             end
         for i = 1:10
-            TaylorSeries.add!(tmp750[i], U_t_pn2[i], pNX_t_pn3[i], ord)
-            TaylorSeries.add!(termpnx[i], X_t_pn1[i], tmp750[i], ord)
+            TaylorSeries.add!(tmp59[i], U_t_pn2[i], pNX_t_pn3[i], ord)
+            TaylorSeries.add!(termpnx[i], X_t_pn1[i], tmp59[i], ord)
             TaylorSeries.add!(sumpnx[i], pntempX, termpnx[i], ord)
             TaylorSeries.identity!(pntempX, sumpnx[i], ord)
-            TaylorSeries.add!(tmp753[i], V_t_pn2[i], pNY_t_pn3[i], ord)
-            TaylorSeries.add!(termpny[i], Y_t_pn1[i], tmp753[i], ord)
+            TaylorSeries.add!(tmp60[i], V_t_pn2[i], pNY_t_pn3[i], ord)
+            TaylorSeries.add!(termpny[i], Y_t_pn1[i], tmp60[i], ord)
             TaylorSeries.add!(sumpny[i], pntempY, termpny[i], ord)
             TaylorSeries.identity!(pntempY, sumpny[i], ord)
-            TaylorSeries.add!(tmp756[i], W_t_pn2[i], pNZ_t_pn3[i], ord)
-            TaylorSeries.add!(termpnz[i], Z_t_pn1[i], tmp756[i], ord)
+            TaylorSeries.add!(tmp61[i], W_t_pn2[i], pNZ_t_pn3[i], ord)
+            TaylorSeries.add!(termpnz[i], Z_t_pn1[i], tmp61[i], ord)
             TaylorSeries.add!(sumpnz[i], pntempZ, termpnz[i], ord)
             TaylorSeries.identity!(pntempZ, sumpnz[i], ord)
         end
-        #= /Users/lerm/.julia/dev/NEOs.jl/ex.jl:440 =# Threads.@threads for i = 11:Nm1
+        Threads.@threads for i = 11:Nm1
                 TaylorSeries.mul!(X_t_pn1[i], c_p2, newton_acc_X[i], ord)
                 TaylorSeries.mul!(Y_t_pn1[i], c_p2, newton_acc_Y[i], ord)
                 TaylorSeries.mul!(Z_t_pn1[i], c_p2, newton_acc_Z[i], ord)
@@ -1159,79 +1158,79 @@ end
         TaylorSeries.mul!(postNewtonX, pntempX, c_m2, ord)
         TaylorSeries.mul!(postNewtonY, pntempY, c_m2, ord)
         TaylorSeries.mul!(postNewtonZ, pntempZ, c_m2, ord)
-        TaylorSeries.mul!(tmp768, Y[1], W[1], ord)
-        TaylorSeries.mul!(tmp769, Z[1], V[1], ord)
-        TaylorSeries.subst!(h_x, tmp768, tmp769, ord)
-        TaylorSeries.mul!(tmp771, Z[1], U[1], ord)
-        TaylorSeries.mul!(tmp772, X[1], W[1], ord)
-        TaylorSeries.subst!(h_y, tmp771, tmp772, ord)
-        TaylorSeries.mul!(tmp774, X[1], V[1], ord)
-        TaylorSeries.mul!(tmp775, Y[1], U[1], ord)
-        TaylorSeries.subst!(h_z, tmp774, tmp775, ord)
-        TaylorSeries.pow!(tmp778, h_x, tmp861, 2, ord)
-        TaylorSeries.pow!(tmp780, h_y, tmp862, 2, ord)
-        TaylorSeries.add!(tmp781, tmp778, tmp780, ord)
-        TaylorSeries.pow!(tmp783, h_z, tmp863, 2, ord)
-        TaylorSeries.add!(tmp784, tmp781, tmp783, ord)
-        TaylorSeries.sqrt!(h_norm, tmp784, tmp864, ord)
+        TaylorSeries.mul!(tmp62, Y[1], W[1], ord)
+        TaylorSeries.mul!(tmp63, Z[1], V[1], ord)
+        TaylorSeries.subst!(h_x, tmp62, tmp63, ord)
+        TaylorSeries.mul!(tmp64, Z[1], U[1], ord)
+        TaylorSeries.mul!(tmp65, X[1], W[1], ord)
+        TaylorSeries.subst!(h_y, tmp64, tmp65, ord)
+        TaylorSeries.mul!(tmp66, X[1], V[1], ord)
+        TaylorSeries.mul!(tmp67, Y[1], U[1], ord)
+        TaylorSeries.subst!(h_z, tmp66, tmp67, ord)
+        TaylorSeries.pow!(tmp68, h_x, tmp69, 2, ord)
+        TaylorSeries.pow!(tmp70, h_y, tmp71, 2, ord)
+        TaylorSeries.add!(tmp72, tmp68, tmp70, ord)
+        TaylorSeries.pow!(tmp73, h_z, tmp74, 2, ord)
+        TaylorSeries.add!(tmp75, tmp72, tmp73, ord)
+        TaylorSeries.sqrt!(h_norm, tmp75, tmp76, ord)
         TaylorSeries.div!(h_x_unit, h_x, h_norm, ord)
         TaylorSeries.div!(h_y_unit, h_y, h_norm, ord)
         TaylorSeries.div!(h_z_unit, h_z, h_norm, ord)
-        TaylorSeries.mul!(tmp789, h_z, Y[1], ord)
-        TaylorSeries.mul!(tmp790, h_y, Z[1], ord)
-        TaylorSeries.subst!(t_x, tmp789, tmp790, ord)
-        TaylorSeries.mul!(tmp792, h_x, Z[1], ord)
-        TaylorSeries.mul!(tmp793, h_z, X[1], ord)
-        TaylorSeries.subst!(t_y, tmp792, tmp793, ord)
-        TaylorSeries.mul!(tmp795, h_y, X[1], ord)
-        TaylorSeries.mul!(tmp796, h_x, Y[1], ord)
-        TaylorSeries.subst!(t_z, tmp795, tmp796, ord)
-        TaylorSeries.pow!(tmp799, t_x, tmp865, 2, ord)
-        TaylorSeries.pow!(tmp801, t_y, tmp866, 2, ord)
-        TaylorSeries.add!(tmp802, tmp799, tmp801, ord)
-        TaylorSeries.pow!(tmp804, t_z, tmp867, 2, ord)
-        TaylorSeries.add!(tmp805, tmp802, tmp804, ord)
-        TaylorSeries.sqrt!(t_norm, tmp805, tmp868, ord)
+        TaylorSeries.mul!(tmp77, h_z, Y[1], ord)
+        TaylorSeries.mul!(tmp78, h_y, Z[1], ord)
+        TaylorSeries.subst!(t_x, tmp77, tmp78, ord)
+        TaylorSeries.mul!(tmp79, h_x, Z[1], ord)
+        TaylorSeries.mul!(tmp80, h_z, X[1], ord)
+        TaylorSeries.subst!(t_y, tmp79, tmp80, ord)
+        TaylorSeries.mul!(tmp81, h_y, X[1], ord)
+        TaylorSeries.mul!(tmp82, h_x, Y[1], ord)
+        TaylorSeries.subst!(t_z, tmp81, tmp82, ord)
+        TaylorSeries.pow!(tmp83, t_x, tmp84, 2, ord)
+        TaylorSeries.pow!(tmp85, t_y, tmp86, 2, ord)
+        TaylorSeries.add!(tmp87, tmp83, tmp85, ord)
+        TaylorSeries.pow!(tmp88, t_z, tmp89, 2, ord)
+        TaylorSeries.add!(tmp90, tmp87, tmp88, ord)
+        TaylorSeries.sqrt!(t_norm, tmp90, tmp91, ord)
         TaylorSeries.div!(t_x_unit, t_x, t_norm, ord)
         TaylorSeries.div!(t_y_unit, t_y, t_norm, ord)
         TaylorSeries.div!(t_z_unit, t_z, t_norm, ord)
-        TaylorSeries.div!(tmp810, X[1], r_p1d2[1], ord)
-        TaylorSeries.subst!(r_x_unit, tmp810, ord)
-        TaylorSeries.div!(tmp812, Y[1], r_p1d2[1], ord)
-        TaylorSeries.subst!(r_y_unit, tmp812, ord)
-        TaylorSeries.div!(tmp814, Z[1], r_p1d2[1], ord)
-        TaylorSeries.subst!(r_z_unit, tmp814, ord)
+        TaylorSeries.div!(tmp92, X[1], r_p1d2[1], ord)
+        TaylorSeries.subst!(r_x_unit, tmp92, ord)
+        TaylorSeries.div!(tmp93, Y[1], r_p1d2[1], ord)
+        TaylorSeries.subst!(r_y_unit, tmp93, ord)
+        TaylorSeries.div!(tmp94, Z[1], r_p1d2[1], ord)
+        TaylorSeries.subst!(r_z_unit, tmp94, ord)
         TaylorSeries.div!(g_r_quotient, r_p1d2[1], marsden_r₀, ord)
-        TaylorSeries.pow!(tmp817, g_r_quotient, tmp869, marsden_m, ord)
-        TaylorSeries.mul!(g_r_A, marsden_α, tmp817, ord)
-        TaylorSeries.pow!(tmp820, g_r_quotient, tmp870, marsden_n, ord)
-        TaylorSeries.add!(tmp821, 1, tmp820, ord)
-        TaylorSeries.pow!(g_r_B, tmp821, tmp871, marsden_k, ord)
+        TaylorSeries.pow!(tmp95, g_r_quotient, tmp96, marsden_m, ord)
+        TaylorSeries.mul!(g_r_A, marsden_α, tmp95, ord)
+        TaylorSeries.pow!(tmp97, g_r_quotient, tmp98, marsden_n, ord)
+        TaylorSeries.add!(tmp99, 1, tmp97, ord)
+        TaylorSeries.pow!(g_r_B, tmp99, tmp100, marsden_k, ord)
         TaylorSeries.mul!(g_r, g_r_A, g_r_B, ord)
         TaylorSeries.mul!(A2_t_g_r, g_r, q[7], ord)
         TaylorSeries.mul!(A1_t_g_r, g_r, q[8], ord)
         TaylorSeries.mul!(A3_t_g_r, g_r, q[9], ord)
-        TaylorSeries.mul!(tmp827, A2_t_g_r, t_x_unit, ord)
-        TaylorSeries.mul!(tmp828, A1_t_g_r, r_x_unit, ord)
-        TaylorSeries.add!(tmp829, tmp827, tmp828, ord)
-        TaylorSeries.mul!(tmp830, A3_t_g_r, h_x_unit, ord)
-        TaylorSeries.add!(NGAx, tmp829, tmp830, ord)
-        TaylorSeries.mul!(tmp832, A2_t_g_r, t_y_unit, ord)
-        TaylorSeries.mul!(tmp833, A1_t_g_r, r_y_unit, ord)
-        TaylorSeries.add!(tmp834, tmp832, tmp833, ord)
-        TaylorSeries.mul!(tmp835, A3_t_g_r, h_y_unit, ord)
-        TaylorSeries.add!(NGAy, tmp834, tmp835, ord)
-        TaylorSeries.mul!(tmp837, A2_t_g_r, t_z_unit, ord)
-        TaylorSeries.mul!(tmp838, A1_t_g_r, r_z_unit, ord)
-        TaylorSeries.add!(tmp839, tmp837, tmp838, ord)
-        TaylorSeries.mul!(tmp840, A3_t_g_r, h_z_unit, ord)
-        TaylorSeries.add!(NGAz, tmp839, tmp840, ord)
-        TaylorSeries.add!(tmp842, postNewtonX, accX, ord)
-        TaylorSeries.add!(dq[4], tmp842, NGAx, ord)
-        TaylorSeries.add!(tmp844, postNewtonY, accY, ord)
-        TaylorSeries.add!(dq[5], tmp844, NGAy, ord)
-        TaylorSeries.add!(tmp846, postNewtonZ, accZ, ord)
-        TaylorSeries.add!(dq[6], tmp846, NGAz, ord)
+        TaylorSeries.mul!(tmp101, A2_t_g_r, t_x_unit, ord)
+        TaylorSeries.mul!(tmp102, A1_t_g_r, r_x_unit, ord)
+        TaylorSeries.add!(tmp103, tmp101, tmp102, ord)
+        TaylorSeries.mul!(tmp104, A3_t_g_r, h_x_unit, ord)
+        TaylorSeries.add!(NGAx, tmp103, tmp104, ord)
+        TaylorSeries.mul!(tmp105, A2_t_g_r, t_y_unit, ord)
+        TaylorSeries.mul!(tmp106, A1_t_g_r, r_y_unit, ord)
+        TaylorSeries.add!(tmp107, tmp105, tmp106, ord)
+        TaylorSeries.mul!(tmp108, A3_t_g_r, h_y_unit, ord)
+        TaylorSeries.add!(NGAy, tmp107, tmp108, ord)
+        TaylorSeries.mul!(tmp109, A2_t_g_r, t_z_unit, ord)
+        TaylorSeries.mul!(tmp110, A1_t_g_r, r_z_unit, ord)
+        TaylorSeries.add!(tmp111, tmp109, tmp110, ord)
+        TaylorSeries.mul!(tmp112, A3_t_g_r, h_z_unit, ord)
+        TaylorSeries.add!(NGAz, tmp111, tmp112, ord)
+        TaylorSeries.add!(tmp113, postNewtonX, accX, ord)
+        TaylorSeries.add!(dq[4], tmp113, NGAx, ord)
+        TaylorSeries.add!(tmp114, postNewtonY, accY, ord)
+        TaylorSeries.add!(dq[5], tmp114, NGAy, ord)
+        TaylorSeries.add!(tmp115, postNewtonZ, accZ, ord)
+        TaylorSeries.add!(dq[6], tmp115, NGAz, ord)
         TaylorSeries.identity!(dq[7], zero_q_1, ord)
         TaylorSeries.identity!(dq[8], zero_q_1, ord)
         TaylorSeries.identity!(dq[9], zero_q_1, ord)
@@ -1247,6 +1246,9 @@ end
     order = TS.order(t)
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
+    local sseph_ephU = params.sseph(dsj2k)
+    local acceph_ephU = params.acceph(dsj2k)
+    local poteph_ephU = params.poteph(dsj2k)
     local S = eltype(q)
     local UJ_interaction = params.UJ_interaction
     local N = params.N
@@ -1254,10 +1256,6 @@ end
     local μ = params.μ
     local orientAlloc = params.orientAlloc
     local zero_q_1 = params.zeroq1
-    local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
-    local sseph_ephU = params.sseph(dsj2k)
-    local acceph_ephU = params.acceph(dsj2k)
-    local poteph_ephU = params.poteph(dsj2k)
     X = Array{S}(undef, N)
     Y = Array{S}(undef, N)
     Z = Array{S}(undef, N)
@@ -1342,24 +1340,235 @@ end
     accX = Taylor1(identity(constant_term(zero_q_1)), order)
     accY = Taylor1(identity(constant_term(zero_q_1)), order)
     accZ = Taylor1(identity(constant_term(zero_q_1)), order)
+    local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
     dq[1] = Taylor1(identity(constant_term(q[4])), order)
     dq[2] = Taylor1(identity(constant_term(q[5])), order)
     dq[3] = Taylor1(identity(constant_term(q[6])), order)
     newtonianNb_Potential[N] = Taylor1(identity(constant_term(zero_q_1)), order)
+    tmp1 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp1)
+        tmp1[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp2 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp2)
+        tmp2[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp3 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp3)
+        tmp3[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp4 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp4)
+        tmp4[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp5 = Array{Taylor1{_S}}(undef, size(tmp1))
+    for i = eachindex(tmp5)
+        tmp5[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp6 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp6)
+        tmp6[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp7 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp7)
+        tmp7[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp8 = Array{Taylor1{_S}}(undef, size(r_p2))
+    for i = eachindex(tmp8)
+        tmp8[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp9 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp9)
+        tmp9[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp10 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp10)
+        tmp10[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp11 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp11)
+        tmp11[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp12 = Array{Taylor1{_S}}(undef, size(t31))
+    for i = eachindex(tmp12)
+        tmp12[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp13 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
+    for i = eachindex(tmp13)
+        tmp13[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp14 = Array{Taylor1{_S}}(undef, size(sin2_ϕ))
+    for i = eachindex(tmp14)
+        tmp14[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp15 = Array{Taylor1{_S}}(undef, size(tmp14))
+    for i = eachindex(tmp15)
+        tmp15[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp16 = Array{Taylor1{_S}}(undef, size(sin2_ϕ))
+    for i = eachindex(tmp16)
+        tmp16[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp17 = Array{Taylor1{_S}}(undef, size(Λ2))
+    for i = eachindex(tmp17)
+        tmp17[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp18 = Array{Taylor1{_S}}(undef, size(cos_ϕ))
+    for i = eachindex(tmp18)
+        tmp18[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp19 = Array{Taylor1{_S}}(undef, size(Λ2j_div_r4))
+    for i = eachindex(tmp19)
+        tmp19[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp20 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp20)
+        tmp20[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp21 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp21)
+        tmp21[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp22 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp22)
+        tmp22[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp23 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
+    for i = eachindex(tmp23)
+        tmp23[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp24 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
+    for i = eachindex(tmp24)
+        tmp24[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp25 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
+    for i = eachindex(tmp25)
+        tmp25[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    Threads.@threads for i = 1:Nm1
+            X[i] = Taylor1(constant_term(sseph_ephU[3i - 2]) - constant_term(q[1]), order)
+            Y[i] = Taylor1(constant_term(sseph_ephU[3i - 1]) - constant_term(q[2]), order)
+            Z[i] = Taylor1(constant_term(sseph_ephU[3i]) - constant_term(q[3]), order)
+            tmp1[i] = Taylor1(constant_term(X[i]) ^ float(constant_term(2)), order)
+            tmp2[i] = Taylor1(zero(constant_term(X[i])), order)
+            tmp3[i] = Taylor1(constant_term(Y[i]) ^ float(constant_term(2)), order)
+            tmp4[i] = Taylor1(zero(constant_term(Y[i])), order)
+            tmp5[i] = Taylor1(constant_term(tmp1[i]) + constant_term(tmp3[i]), order)
+            tmp6[i] = Taylor1(constant_term(Z[i]) ^ float(constant_term(2)), order)
+            tmp7[i] = Taylor1(zero(constant_term(Z[i])), order)
+            r_p2[i] = Taylor1(constant_term(tmp5[i]) + constant_term(tmp6[i]), order)
+            r_p1d2[i] = Taylor1(sqrt(constant_term(r_p2[i])), order)
+            tmp8[i] = Taylor1(zero(constant_term(r_p2[i])), order)
+            r_p3d2[i] = Taylor1(constant_term(r_p2[i]) * constant_term(r_p1d2[i]), order)
+            newtonianCoeff[i] = Taylor1(constant_term(μ[i]) / constant_term(r_p3d2[i]), order)
+            newton_acc_X[i] = Taylor1(constant_term(X[i]) * constant_term(newtonianCoeff[i]), order)
+            newton_acc_Y[i] = Taylor1(constant_term(Y[i]) * constant_term(newtonianCoeff[i]), order)
+            newton_acc_Z[i] = Taylor1(constant_term(Z[i]) * constant_term(newtonianCoeff[i]), order)
+            newtonian1b_Potential[i] = Taylor1(constant_term(μ[i]) / constant_term(r_p1d2[i]), order)
+            pn3[i] = Taylor1(constant_term(3.5) * constant_term(newtonian1b_Potential[i]), order)
+            if UJ_interaction[i]
+                tmp9[i] = Taylor1(-(constant_term(X[i])), order)
+                t31[i] = Taylor1(constant_term(tmp9[i]) * constant_term(M_[1, 3, i]), order)
+                tmp10[i] = Taylor1(-(constant_term(Y[i])), order)
+                t32[i] = Taylor1(constant_term(tmp10[i]) * constant_term(M_[2, 3, i]), order)
+                tmp11[i] = Taylor1(-(constant_term(Z[i])), order)
+                t33[i] = Taylor1(constant_term(tmp11[i]) * constant_term(M_[3, 3, i]), order)
+                tmp12[i] = Taylor1(constant_term(t31[i]) + constant_term(t32[i]), order)
+                r_sin_ϕ[i] = Taylor1(constant_term(tmp12[i]) + constant_term(t33[i]), order)
+                sin_ϕ[i] = Taylor1(constant_term(r_sin_ϕ[i]) / constant_term(r_p1d2[i]), order)
+                sin2_ϕ[i] = Taylor1(constant_term(sin_ϕ[i]) ^ float(constant_term(2)), order)
+                tmp13[i] = Taylor1(zero(constant_term(sin_ϕ[i])), order)
+                tmp14[i] = Taylor1(constant_term(1) - constant_term(sin2_ϕ[i]), order)
+                cos_ϕ[i] = Taylor1(sqrt(constant_term(tmp14[i])), order)
+                tmp15[i] = Taylor1(zero(constant_term(tmp14[i])), order)
+                tmp16[i] = Taylor1(constant_term(1.5) * constant_term(sin2_ϕ[i]), order)
+                P_2_sin_ϕ[i] = Taylor1(constant_term(tmp16[i]) - constant_term(0.5), order)
+                ∂P_2_sin_ϕ[i] = Taylor1(constant_term(3) * constant_term(sin_ϕ[i]), order)
+                r_p4[i] = Taylor1(constant_term(r_p2[i]) * constant_term(r_p2[i]), order)
+                tmp17[i] = Taylor1(constant_term(Λ2[i]) / constant_term(r_p4[i]), order)
+                Λ2j_div_r4[i] = Taylor1(-(constant_term(tmp17[i])), order)
+                tmp18[i] = Taylor1(-(constant_term(cos_ϕ[i])), order)
+                m_c_ϕ_∂P_2[i] = Taylor1(constant_term(tmp18[i]) * constant_term(∂P_2_sin_ϕ[i]), order)
+                tmp19[i] = Taylor1(constant_term(Λ2j_div_r4[i]) * constant_term(3), order)
+                F_J2_ξ[i] = Taylor1(constant_term(tmp19[i]) * constant_term(P_2_sin_ϕ[i]), order)
+                F_J2_ζ[i] = Taylor1(constant_term(Λ2j_div_r4[i]) * constant_term(m_c_ϕ_∂P_2[i]), order)
+                tmp20[i] = Taylor1(-(constant_term(X[i])), order)
+                ξx[i] = Taylor1(constant_term(tmp20[i]) / constant_term(r_p1d2[i]), order)
+                tmp21[i] = Taylor1(-(constant_term(Y[i])), order)
+                ξy[i] = Taylor1(constant_term(tmp21[i]) / constant_term(r_p1d2[i]), order)
+                tmp22[i] = Taylor1(-(constant_term(Z[i])), order)
+                ξz[i] = Taylor1(constant_term(tmp22[i]) / constant_term(r_p1d2[i]), order)
+                tmp23[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξx[i]), order)
+                ζx[i] = Taylor1(constant_term(M_[1, 3, i]) - constant_term(tmp23[i]), order)
+                tmp24[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξy[i]), order)
+                ζy[i] = Taylor1(constant_term(M_[2, 3, i]) - constant_term(tmp24[i]), order)
+                tmp25[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξz[i]), order)
+                ζz[i] = Taylor1(constant_term(M_[3, 3, i]) - constant_term(tmp25[i]), order)
+                F_J2_x1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξx[i]), order)
+                F_J2_y1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξy[i]), order)
+                F_J2_z1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξz[i]), order)
+                F_J2_x2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζx[i]), order)
+                F_J2_y2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζy[i]), order)
+                F_J2_z2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζz[i]), order)
+                F_J2_x[i] = Taylor1(constant_term(F_J2_x1[i]) + constant_term(F_J2_x2[i]), order)
+                F_J2_y[i] = Taylor1(constant_term(F_J2_y1[i]) + constant_term(F_J2_y2[i]), order)
+                F_J2_z[i] = Taylor1(constant_term(F_J2_z1[i]) + constant_term(F_J2_z2[i]), order)
+            end
+        end
+    tmp26 = Taylor1(constant_term(q[4]) ^ float(constant_term(2)), order)
+    tmp27 = Taylor1(zero(constant_term(q[4])), order)
+    tmp28 = Taylor1(constant_term(q[5]) ^ float(constant_term(2)), order)
+    tmp29 = Taylor1(zero(constant_term(q[5])), order)
+    tmp30 = Taylor1(constant_term(tmp26) + constant_term(tmp28), order)
+    tmp31 = Taylor1(constant_term(q[6]) ^ float(constant_term(2)), order)
+    tmp32 = Taylor1(zero(constant_term(q[6])), order)
+    v2[N] = Taylor1(constant_term(tmp30) + constant_term(tmp31), order)
+    temp_004 = Array{Taylor1{_S}}(undef, size(newtonian1b_Potential))
+    for i = eachindex(temp_004)
+        temp_004[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp33 = Array{Taylor1{_S}}(undef, size(μ))
+    for i = eachindex(tmp33)
+        tmp33[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp34 = Array{Taylor1{_S}}(undef, size(μ))
+    for i = eachindex(tmp34)
+        tmp34[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    tmp35 = Array{Taylor1{_S}}(undef, size(μ))
+    for i = eachindex(tmp35)
+        tmp35[i] = Taylor1(zero(constant_term(q[1])), order)
+    end
+    for i = 1:Nm1
+        temp_004[i] = Taylor1(constant_term(newtonian1b_Potential[i]) + constant_term(newtonianNb_Potential[N]), order)
+        newtonianNb_Potential[N] = Taylor1(identity(constant_term(temp_004[i])), order)
+        if UJ_interaction[i]
+            tmp33[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_x[i]), order)
+            temp_accX = Taylor1(constant_term(accX) - constant_term(tmp33[i]), order)
+            accX = Taylor1(identity(constant_term(temp_accX)), order)
+            tmp34[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_y[i]), order)
+            temp_accY = Taylor1(constant_term(accY) - constant_term(tmp34[i]), order)
+            accY = Taylor1(identity(constant_term(temp_accY)), order)
+            tmp35[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_z[i]), order)
+            temp_accZ = Taylor1(constant_term(accZ) - constant_term(tmp35[i]), order)
+            accZ = Taylor1(identity(constant_term(temp_accZ)), order)
+        end
+    end
+    _4ϕj[N] = Taylor1(constant_term(4) * constant_term(newtonianNb_Potential[N]), order)
     _4dq1 = Taylor1(constant_term(4) * constant_term(dq[1]), order)
     _4dq2 = Taylor1(constant_term(4) * constant_term(dq[2]), order)
     _4dq3 = Taylor1(constant_term(4) * constant_term(dq[3]), order)
-    tmp1161 = Array{Taylor1{_S}}(undef, size(ui))
-    for i = eachindex(tmp1161)
-        tmp1161[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp36 = Array{Taylor1{_S}}(undef, size(ui))
+    for i = eachindex(tmp36)
+        tmp36[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1164 = Array{Taylor1{_S}}(undef, size(vi))
-    for i = eachindex(tmp1164)
-        tmp1164[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp37 = Array{Taylor1{_S}}(undef, size(vi))
+    for i = eachindex(tmp37)
+        tmp37[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1167 = Array{Taylor1{_S}}(undef, size(wi))
-    for i = eachindex(tmp1167)
-        tmp1167[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp38 = Array{Taylor1{_S}}(undef, size(wi))
+    for i = eachindex(tmp38)
+        tmp38[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     pn2x = Array{Taylor1{_S}}(undef, size(X))
     for i = eachindex(pn2x)
@@ -1373,301 +1582,57 @@ end
     for i = eachindex(pn2z)
         pn2z[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1175 = Array{Taylor1{_S}}(undef, size(UU))
-    for i = eachindex(tmp1175)
-        tmp1175[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp39 = Array{Taylor1{_S}}(undef, size(UU))
+    for i = eachindex(tmp39)
+        tmp39[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1178 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp1178)
-        tmp1178[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp40 = Array{Taylor1{_S}}(undef, size(pn2x))
+    for i = eachindex(tmp40)
+        tmp40[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1330 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp1330)
-        tmp1330[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp41 = Array{Taylor1{_S}}(undef, size(tmp40))
+    for i = eachindex(tmp41)
+        tmp41[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1180 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp1180)
-        tmp1180[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp42 = Array{Taylor1{_S}}(undef, size(ui))
+    for i = eachindex(tmp42)
+        tmp42[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1331 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp1331)
-        tmp1331[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp43 = Array{Taylor1{_S}}(undef, size(ui))
+    for i = eachindex(tmp43)
+        tmp43[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1181 = Array{Taylor1{_S}}(undef, size(tmp1178))
-    for i = eachindex(tmp1181)
-        tmp1181[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp44 = Array{Taylor1{_S}}(undef, size(vi))
+    for i = eachindex(tmp44)
+        tmp44[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1183 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp1183)
-        tmp1183[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp45 = Array{Taylor1{_S}}(undef, size(vi))
+    for i = eachindex(tmp45)
+        tmp45[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1332 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp1332)
-        tmp1332[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp46 = Array{Taylor1{_S}}(undef, size(tmp42))
+    for i = eachindex(tmp46)
+        tmp46[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1333 = Array{Taylor1{_S}}(undef, size(r_p2))
-    for i = eachindex(tmp1333)
-        tmp1333[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp47 = Array{Taylor1{_S}}(undef, size(wi))
+    for i = eachindex(tmp47)
+        tmp47[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1188 = Array{Taylor1{_S}}(undef, size(pn2x))
-    for i = eachindex(tmp1188)
-        tmp1188[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp48 = Array{Taylor1{_S}}(undef, size(wi))
+    for i = eachindex(tmp48)
+        tmp48[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1189 = Array{Taylor1{_S}}(undef, size(tmp1188))
-    for i = eachindex(tmp1189)
-        tmp1189[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp49 = Array{Taylor1{_S}}(undef, size(v2))
+    for i = eachindex(tmp49)
+        tmp49[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1251 = Array{Taylor1{_S}}(undef, size(ui))
-    for i = eachindex(tmp1251)
-        tmp1251[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp50 = Array{Taylor1{_S}}(undef, size(vi_dot_vj))
+    for i = eachindex(tmp50)
+        tmp50[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1336 = Array{Taylor1{_S}}(undef, size(ui))
-    for i = eachindex(tmp1336)
-        tmp1336[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1253 = Array{Taylor1{_S}}(undef, size(vi))
-    for i = eachindex(tmp1253)
-        tmp1253[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1337 = Array{Taylor1{_S}}(undef, size(vi))
-    for i = eachindex(tmp1337)
-        tmp1337[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1254 = Array{Taylor1{_S}}(undef, size(tmp1251))
-    for i = eachindex(tmp1254)
-        tmp1254[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1256 = Array{Taylor1{_S}}(undef, size(wi))
-    for i = eachindex(tmp1256)
-        tmp1256[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1338 = Array{Taylor1{_S}}(undef, size(wi))
-    for i = eachindex(tmp1338)
-        tmp1338[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1200 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp1200)
-        tmp1200[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1202 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp1202)
-        tmp1202[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1204 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp1204)
-        tmp1204[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1206 = Array{Taylor1{_S}}(undef, size(t31))
-    for i = eachindex(tmp1206)
-        tmp1206[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1334 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
-    for i = eachindex(tmp1334)
-        tmp1334[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1212 = Array{Taylor1{_S}}(undef, size(sin2_ϕ))
-    for i = eachindex(tmp1212)
-        tmp1212[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1335 = Array{Taylor1{_S}}(undef, size(tmp1212))
-    for i = eachindex(tmp1335)
-        tmp1335[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1215 = Array{Taylor1{_S}}(undef, size(sin2_ϕ))
-    for i = eachindex(tmp1215)
-        tmp1215[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1221 = Array{Taylor1{_S}}(undef, size(Λ2))
-    for i = eachindex(tmp1221)
-        tmp1221[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1223 = Array{Taylor1{_S}}(undef, size(cos_ϕ))
-    for i = eachindex(tmp1223)
-        tmp1223[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1226 = Array{Taylor1{_S}}(undef, size(Λ2j_div_r4))
-    for i = eachindex(tmp1226)
-        tmp1226[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1229 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp1229)
-        tmp1229[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1231 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp1231)
-        tmp1231[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1233 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp1233)
-        tmp1233[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1235 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
-    for i = eachindex(tmp1235)
-        tmp1235[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1237 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
-    for i = eachindex(tmp1237)
-        tmp1237[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1239 = Array{Taylor1{_S}}(undef, size(sin_ϕ))
-    for i = eachindex(tmp1239)
-        tmp1239[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    #= /Users/lerm/.julia/dev/NEOs.jl/ex.jl:736 =# Threads.@threads for i = 1:Nm1
-            ui[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i) - 2])), order)
-            vi[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i) - 1])), order)
-            wi[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i)])), order)
-            X[i] = Taylor1(constant_term(sseph_ephU[3i - 2]) - constant_term(q[1]), order)
-            Y[i] = Taylor1(constant_term(sseph_ephU[3i - 1]) - constant_term(q[2]), order)
-            Z[i] = Taylor1(constant_term(sseph_ephU[3i]) - constant_term(q[3]), order)
-            U[i] = Taylor1(constant_term(ui[i]) - constant_term(dq[1]), order)
-            V[i] = Taylor1(constant_term(vi[i]) - constant_term(dq[2]), order)
-            W[i] = Taylor1(constant_term(wi[i]) - constant_term(dq[3]), order)
-            tmp1161[i] = Taylor1(constant_term(-3) * constant_term(ui[i]), order)
-            _4U_m_3X[i] = Taylor1(constant_term(tmp1161[i]) + constant_term(_4dq1), order)
-            tmp1164[i] = Taylor1(constant_term(-3) * constant_term(vi[i]), order)
-            _4V_m_3Y[i] = Taylor1(constant_term(tmp1164[i]) + constant_term(_4dq2), order)
-            tmp1167[i] = Taylor1(constant_term(-3) * constant_term(wi[i]), order)
-            _4W_m_3Z[i] = Taylor1(constant_term(tmp1167[i]) + constant_term(_4dq3), order)
-            pn2x[i] = Taylor1(constant_term(X[i]) * constant_term(_4U_m_3X[i]), order)
-            pn2y[i] = Taylor1(constant_term(Y[i]) * constant_term(_4V_m_3Y[i]), order)
-            pn2z[i] = Taylor1(constant_term(Z[i]) * constant_term(_4W_m_3Z[i]), order)
-            UU[i] = Taylor1(constant_term(ui[i]) * constant_term(dq[1]), order)
-            VV[i] = Taylor1(constant_term(vi[i]) * constant_term(dq[2]), order)
-            WW[i] = Taylor1(constant_term(wi[i]) * constant_term(dq[3]), order)
-            tmp1175[i] = Taylor1(constant_term(UU[i]) + constant_term(VV[i]), order)
-            vi_dot_vj[i] = Taylor1(constant_term(tmp1175[i]) + constant_term(WW[i]), order)
-            tmp1178[i] = Taylor1(constant_term(X[i]) ^ float(constant_term(2)), order)
-            tmp1330[i] = Taylor1(zero(constant_term(X[i])), order)
-            tmp1180[i] = Taylor1(constant_term(Y[i]) ^ float(constant_term(2)), order)
-            tmp1331[i] = Taylor1(zero(constant_term(Y[i])), order)
-            tmp1181[i] = Taylor1(constant_term(tmp1178[i]) + constant_term(tmp1180[i]), order)
-            tmp1183[i] = Taylor1(constant_term(Z[i]) ^ float(constant_term(2)), order)
-            tmp1332[i] = Taylor1(zero(constant_term(Z[i])), order)
-            r_p2[i] = Taylor1(constant_term(tmp1181[i]) + constant_term(tmp1183[i]), order)
-            r_p1d2[i] = Taylor1(sqrt(constant_term(r_p2[i])), order)
-            tmp1333[i] = Taylor1(zero(constant_term(r_p2[i])), order)
-            r_p3d2[i] = Taylor1(constant_term(r_p2[i]) * constant_term(r_p1d2[i]), order)
-            newtonianCoeff[i] = Taylor1(constant_term(μ[i]) / constant_term(r_p3d2[i]), order)
-            tmp1188[i] = Taylor1(constant_term(pn2x[i]) + constant_term(pn2y[i]), order)
-            tmp1189[i] = Taylor1(constant_term(tmp1188[i]) + constant_term(pn2z[i]), order)
-            pn2[i] = Taylor1(constant_term(newtonianCoeff[i]) * constant_term(tmp1189[i]), order)
-            newton_acc_X[i] = Taylor1(constant_term(X[i]) * constant_term(newtonianCoeff[i]), order)
-            newton_acc_Y[i] = Taylor1(constant_term(Y[i]) * constant_term(newtonianCoeff[i]), order)
-            newton_acc_Z[i] = Taylor1(constant_term(Z[i]) * constant_term(newtonianCoeff[i]), order)
-            newtonian1b_Potential[i] = Taylor1(constant_term(μ[i]) / constant_term(r_p1d2[i]), order)
-            pn3[i] = Taylor1(constant_term(3.5) * constant_term(newtonian1b_Potential[i]), order)
-            U_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(U[i]), order)
-            V_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(V[i]), order)
-            W_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(W[i]), order)
-            if UJ_interaction[i]
-                tmp1200[i] = Taylor1(-(constant_term(X[i])), order)
-                t31[i] = Taylor1(constant_term(tmp1200[i]) * constant_term(M_[1, 3, i]), order)
-                tmp1202[i] = Taylor1(-(constant_term(Y[i])), order)
-                t32[i] = Taylor1(constant_term(tmp1202[i]) * constant_term(M_[2, 3, i]), order)
-                tmp1204[i] = Taylor1(-(constant_term(Z[i])), order)
-                t33[i] = Taylor1(constant_term(tmp1204[i]) * constant_term(M_[3, 3, i]), order)
-                tmp1206[i] = Taylor1(constant_term(t31[i]) + constant_term(t32[i]), order)
-                r_sin_ϕ[i] = Taylor1(constant_term(tmp1206[i]) + constant_term(t33[i]), order)
-                sin_ϕ[i] = Taylor1(constant_term(r_sin_ϕ[i]) / constant_term(r_p1d2[i]), order)
-                sin2_ϕ[i] = Taylor1(constant_term(sin_ϕ[i]) ^ float(constant_term(2)), order)
-                tmp1334[i] = Taylor1(zero(constant_term(sin_ϕ[i])), order)
-                tmp1212[i] = Taylor1(constant_term(1) - constant_term(sin2_ϕ[i]), order)
-                cos_ϕ[i] = Taylor1(sqrt(constant_term(tmp1212[i])), order)
-                tmp1335[i] = Taylor1(zero(constant_term(tmp1212[i])), order)
-                tmp1215[i] = Taylor1(constant_term(1.5) * constant_term(sin2_ϕ[i]), order)
-                P_2_sin_ϕ[i] = Taylor1(constant_term(tmp1215[i]) - constant_term(0.5), order)
-                ∂P_2_sin_ϕ[i] = Taylor1(constant_term(3) * constant_term(sin_ϕ[i]), order)
-                r_p4[i] = Taylor1(constant_term(r_p2[i]) * constant_term(r_p2[i]), order)
-                tmp1221[i] = Taylor1(constant_term(Λ2[i]) / constant_term(r_p4[i]), order)
-                Λ2j_div_r4[i] = Taylor1(-(constant_term(tmp1221[i])), order)
-                tmp1223[i] = Taylor1(-(constant_term(cos_ϕ[i])), order)
-                m_c_ϕ_∂P_2[i] = Taylor1(constant_term(tmp1223[i]) * constant_term(∂P_2_sin_ϕ[i]), order)
-                tmp1226[i] = Taylor1(constant_term(Λ2j_div_r4[i]) * constant_term(3), order)
-                F_J2_ξ[i] = Taylor1(constant_term(tmp1226[i]) * constant_term(P_2_sin_ϕ[i]), order)
-                F_J2_ζ[i] = Taylor1(constant_term(Λ2j_div_r4[i]) * constant_term(m_c_ϕ_∂P_2[i]), order)
-                tmp1229[i] = Taylor1(-(constant_term(X[i])), order)
-                ξx[i] = Taylor1(constant_term(tmp1229[i]) / constant_term(r_p1d2[i]), order)
-                tmp1231[i] = Taylor1(-(constant_term(Y[i])), order)
-                ξy[i] = Taylor1(constant_term(tmp1231[i]) / constant_term(r_p1d2[i]), order)
-                tmp1233[i] = Taylor1(-(constant_term(Z[i])), order)
-                ξz[i] = Taylor1(constant_term(tmp1233[i]) / constant_term(r_p1d2[i]), order)
-                tmp1235[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξx[i]), order)
-                ζx[i] = Taylor1(constant_term(M_[1, 3, i]) - constant_term(tmp1235[i]), order)
-                tmp1237[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξy[i]), order)
-                ζy[i] = Taylor1(constant_term(M_[2, 3, i]) - constant_term(tmp1237[i]), order)
-                tmp1239[i] = Taylor1(constant_term(sin_ϕ[i]) * constant_term(ξz[i]), order)
-                ζz[i] = Taylor1(constant_term(M_[3, 3, i]) - constant_term(tmp1239[i]), order)
-                F_J2_x1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξx[i]), order)
-                F_J2_y1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξy[i]), order)
-                F_J2_z1[i] = Taylor1(constant_term(F_J2_ξ[i]) * constant_term(ξz[i]), order)
-                F_J2_x2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζx[i]), order)
-                F_J2_y2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζy[i]), order)
-                F_J2_z2[i] = Taylor1(constant_term(F_J2_ζ[i]) * constant_term(ζz[i]), order)
-                F_J2_x[i] = Taylor1(constant_term(F_J2_x1[i]) + constant_term(F_J2_x2[i]), order)
-                F_J2_y[i] = Taylor1(constant_term(F_J2_y1[i]) + constant_term(F_J2_y2[i]), order)
-                F_J2_z[i] = Taylor1(constant_term(F_J2_z1[i]) + constant_term(F_J2_z2[i]), order)
-            end
-            tmp1251[i] = Taylor1(constant_term(ui[i]) ^ float(constant_term(2)), order)
-            tmp1336[i] = Taylor1(zero(constant_term(ui[i])), order)
-            tmp1253[i] = Taylor1(constant_term(vi[i]) ^ float(constant_term(2)), order)
-            tmp1337[i] = Taylor1(zero(constant_term(vi[i])), order)
-            tmp1254[i] = Taylor1(constant_term(tmp1251[i]) + constant_term(tmp1253[i]), order)
-            tmp1256[i] = Taylor1(constant_term(wi[i]) ^ float(constant_term(2)), order)
-            tmp1338[i] = Taylor1(zero(constant_term(wi[i])), order)
-            v2[i] = Taylor1(constant_term(tmp1254[i]) + constant_term(tmp1256[i]), order)
-        end
-    tmp1259 = Taylor1(constant_term(q[4]) ^ float(constant_term(2)), order)
-    tmp1339 = Taylor1(zero(constant_term(q[4])), order)
-    tmp1261 = Taylor1(constant_term(q[5]) ^ float(constant_term(2)), order)
-    tmp1340 = Taylor1(zero(constant_term(q[5])), order)
-    tmp1262 = Taylor1(constant_term(tmp1259) + constant_term(tmp1261), order)
-    tmp1264 = Taylor1(constant_term(q[6]) ^ float(constant_term(2)), order)
-    tmp1341 = Taylor1(zero(constant_term(q[6])), order)
-    v2[N] = Taylor1(constant_term(tmp1262) + constant_term(tmp1264), order)
-    temp_004 = Array{Taylor1{_S}}(undef, size(newtonian1b_Potential))
-    for i = eachindex(temp_004)
-        temp_004[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1267 = Array{Taylor1{_S}}(undef, size(μ))
-    for i = eachindex(tmp1267)
-        tmp1267[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1269 = Array{Taylor1{_S}}(undef, size(μ))
-    for i = eachindex(tmp1269)
-        tmp1269[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1271 = Array{Taylor1{_S}}(undef, size(μ))
-    for i = eachindex(tmp1271)
-        tmp1271[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    for i = 1:Nm1
-        temp_004[i] = Taylor1(constant_term(newtonian1b_Potential[i]) + constant_term(newtonianNb_Potential[N]), order)
-        newtonianNb_Potential[N] = Taylor1(identity(constant_term(temp_004[i])), order)
-        if UJ_interaction[i]
-            tmp1267[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_x[i]), order)
-            temp_accX = Taylor1(constant_term(accX) - constant_term(tmp1267[i]), order)
-            accX = Taylor1(identity(constant_term(temp_accX)), order)
-            tmp1269[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_y[i]), order)
-            temp_accY = Taylor1(constant_term(accY) - constant_term(tmp1269[i]), order)
-            accY = Taylor1(identity(constant_term(temp_accY)), order)
-            tmp1271[i] = Taylor1(constant_term(μ[i]) * constant_term(F_J2_z[i]), order)
-            temp_accZ = Taylor1(constant_term(accZ) - constant_term(tmp1271[i]), order)
-            accZ = Taylor1(identity(constant_term(temp_accZ)), order)
-        end
-    end
-    _4ϕj[N] = Taylor1(constant_term(4) * constant_term(newtonianNb_Potential[N]), order)
-    tmp1277 = Array{Taylor1{_S}}(undef, size(v2))
-    for i = eachindex(tmp1277)
-        tmp1277[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1279 = Array{Taylor1{_S}}(undef, size(vi_dot_vj))
-    for i = eachindex(tmp1279)
-        tmp1279[i] = Taylor1(zero(constant_term(q[1])), order)
-    end
-    tmp1280 = Array{Taylor1{_S}}(undef, size(tmp1277))
-    for i = eachindex(tmp1280)
-        tmp1280[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp51 = Array{Taylor1{_S}}(undef, size(tmp49))
+    for i = eachindex(tmp51)
+        tmp51[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     Xij_t_Ui = Array{Taylor1{_S}}(undef, size(X))
     for i = eachindex(Xij_t_Ui)
@@ -1681,71 +1646,105 @@ end
     for i = eachindex(Zij_t_Wi)
         Zij_t_Wi[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1286 = Array{Taylor1{_S}}(undef, size(Xij_t_Ui))
-    for i = eachindex(tmp1286)
-        tmp1286[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp52 = Array{Taylor1{_S}}(undef, size(Xij_t_Ui))
+    for i = eachindex(tmp52)
+        tmp52[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    Rij_dot_Vi = Array{Taylor1{_S}}(undef, size(tmp1286))
+    Rij_dot_Vi = Array{Taylor1{_S}}(undef, size(tmp52))
     for i = eachindex(Rij_dot_Vi)
         Rij_dot_Vi[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1289 = Array{Taylor1{_S}}(undef, size(Rij_dot_Vi))
-    for i = eachindex(tmp1289)
-        tmp1289[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp53 = Array{Taylor1{_S}}(undef, size(Rij_dot_Vi))
+    for i = eachindex(tmp53)
+        tmp53[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1342 = Array{Taylor1{_S}}(undef, size(Rij_dot_Vi))
-    for i = eachindex(tmp1342)
-        tmp1342[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp54 = Array{Taylor1{_S}}(undef, size(Rij_dot_Vi))
+    for i = eachindex(tmp54)
+        tmp54[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    pn1t7 = Array{Taylor1{_S}}(undef, size(tmp1289))
+    pn1t7 = Array{Taylor1{_S}}(undef, size(tmp53))
     for i = eachindex(pn1t7)
         pn1t7[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1292 = Array{Taylor1{_S}}(undef, size(pn1t7))
-    for i = eachindex(tmp1292)
-        tmp1292[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp55 = Array{Taylor1{_S}}(undef, size(pn1t7))
+    for i = eachindex(tmp55)
+        tmp55[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     pn1t2_7 = Array{Taylor1{_S}}(undef, size(ϕs_and_vs))
     for i = eachindex(pn1t2_7)
         pn1t2_7[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1299 = Array{Taylor1{_S}}(undef, size(pNX_t_X))
-    for i = eachindex(tmp1299)
-        tmp1299[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp56 = Array{Taylor1{_S}}(undef, size(pNX_t_X))
+    for i = eachindex(tmp56)
+        tmp56[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1300 = Array{Taylor1{_S}}(undef, size(tmp1299))
-    for i = eachindex(tmp1300)
-        tmp1300[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp57 = Array{Taylor1{_S}}(undef, size(tmp56))
+    for i = eachindex(tmp57)
+        tmp57[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1301 = Array{Taylor1{_S}}(undef, size(tmp1300))
-    for i = eachindex(tmp1301)
-        tmp1301[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp58 = Array{Taylor1{_S}}(undef, size(tmp57))
+    for i = eachindex(tmp58)
+        tmp58[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    #= /Users/lerm/.julia/dev/NEOs.jl/ex.jl:901 =# Threads.@threads for i = 1:10
+    Threads.@threads for i = 1:10
+            ui[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i) - 2])), order)
+            vi[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i) - 1])), order)
+            wi[i] = Taylor1(identity(constant_term(sseph_ephU[3 * ((N - 1) + i)])), order)
+            U[i] = Taylor1(constant_term(ui[i]) - constant_term(dq[1]), order)
+            V[i] = Taylor1(constant_term(vi[i]) - constant_term(dq[2]), order)
+            W[i] = Taylor1(constant_term(wi[i]) - constant_term(dq[3]), order)
+            tmp36[i] = Taylor1(constant_term(-3) * constant_term(ui[i]), order)
+            _4U_m_3X[i] = Taylor1(constant_term(tmp36[i]) + constant_term(_4dq1), order)
+            tmp37[i] = Taylor1(constant_term(-3) * constant_term(vi[i]), order)
+            _4V_m_3Y[i] = Taylor1(constant_term(tmp37[i]) + constant_term(_4dq2), order)
+            tmp38[i] = Taylor1(constant_term(-3) * constant_term(wi[i]), order)
+            _4W_m_3Z[i] = Taylor1(constant_term(tmp38[i]) + constant_term(_4dq3), order)
+            pn2x[i] = Taylor1(constant_term(X[i]) * constant_term(_4U_m_3X[i]), order)
+            pn2y[i] = Taylor1(constant_term(Y[i]) * constant_term(_4V_m_3Y[i]), order)
+            pn2z[i] = Taylor1(constant_term(Z[i]) * constant_term(_4W_m_3Z[i]), order)
+            UU[i] = Taylor1(constant_term(ui[i]) * constant_term(dq[1]), order)
+            VV[i] = Taylor1(constant_term(vi[i]) * constant_term(dq[2]), order)
+            WW[i] = Taylor1(constant_term(wi[i]) * constant_term(dq[3]), order)
+            tmp39[i] = Taylor1(constant_term(UU[i]) + constant_term(VV[i]), order)
+            vi_dot_vj[i] = Taylor1(constant_term(tmp39[i]) + constant_term(WW[i]), order)
+            tmp40[i] = Taylor1(constant_term(pn2x[i]) + constant_term(pn2y[i]), order)
+            tmp41[i] = Taylor1(constant_term(tmp40[i]) + constant_term(pn2z[i]), order)
+            pn2[i] = Taylor1(constant_term(newtonianCoeff[i]) * constant_term(tmp41[i]), order)
+            U_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(U[i]), order)
+            V_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(V[i]), order)
+            W_t_pn2[i] = Taylor1(constant_term(pn2[i]) * constant_term(W[i]), order)
+            tmp42[i] = Taylor1(constant_term(ui[i]) ^ float(constant_term(2)), order)
+            tmp43[i] = Taylor1(zero(constant_term(ui[i])), order)
+            tmp44[i] = Taylor1(constant_term(vi[i]) ^ float(constant_term(2)), order)
+            tmp45[i] = Taylor1(zero(constant_term(vi[i])), order)
+            tmp46[i] = Taylor1(constant_term(tmp42[i]) + constant_term(tmp44[i]), order)
+            tmp47[i] = Taylor1(constant_term(wi[i]) ^ float(constant_term(2)), order)
+            tmp48[i] = Taylor1(zero(constant_term(wi[i])), order)
+            v2[i] = Taylor1(constant_term(tmp46[i]) + constant_term(tmp47[i]), order)
             ϕi_plus_4ϕj[i] = Taylor1(constant_term(poteph_ephU[i]) + constant_term(_4ϕj[N]), order)
-            tmp1277[i] = Taylor1(constant_term(2) * constant_term(v2[i]), order)
-            tmp1279[i] = Taylor1(constant_term(4) * constant_term(vi_dot_vj[i]), order)
-            tmp1280[i] = Taylor1(constant_term(tmp1277[i]) - constant_term(tmp1279[i]), order)
-            sj2_plus_2si2_minus_4vivj[i] = Taylor1(constant_term(tmp1280[i]) + constant_term(v2[N]), order)
+            tmp49[i] = Taylor1(constant_term(2) * constant_term(v2[i]), order)
+            tmp50[i] = Taylor1(constant_term(4) * constant_term(vi_dot_vj[i]), order)
+            tmp51[i] = Taylor1(constant_term(tmp49[i]) - constant_term(tmp50[i]), order)
+            sj2_plus_2si2_minus_4vivj[i] = Taylor1(constant_term(tmp51[i]) + constant_term(v2[N]), order)
             ϕs_and_vs[i] = Taylor1(constant_term(sj2_plus_2si2_minus_4vivj[i]) - constant_term(ϕi_plus_4ϕj[i]), order)
             Xij_t_Ui[i] = Taylor1(constant_term(X[i]) * constant_term(ui[i]), order)
             Yij_t_Vi[i] = Taylor1(constant_term(Y[i]) * constant_term(vi[i]), order)
             Zij_t_Wi[i] = Taylor1(constant_term(Z[i]) * constant_term(wi[i]), order)
-            tmp1286[i] = Taylor1(constant_term(Xij_t_Ui[i]) + constant_term(Yij_t_Vi[i]), order)
-            Rij_dot_Vi[i] = Taylor1(constant_term(tmp1286[i]) + constant_term(Zij_t_Wi[i]), order)
-            tmp1289[i] = Taylor1(constant_term(Rij_dot_Vi[i]) ^ float(constant_term(2)), order)
-            tmp1342[i] = Taylor1(zero(constant_term(Rij_dot_Vi[i])), order)
-            pn1t7[i] = Taylor1(constant_term(tmp1289[i]) / constant_term(r_p2[i]), order)
-            tmp1292[i] = Taylor1(constant_term(1.5) * constant_term(pn1t7[i]), order)
-            pn1t2_7[i] = Taylor1(constant_term(ϕs_and_vs[i]) - constant_term(tmp1292[i]), order)
+            tmp52[i] = Taylor1(constant_term(Xij_t_Ui[i]) + constant_term(Yij_t_Vi[i]), order)
+            Rij_dot_Vi[i] = Taylor1(constant_term(tmp52[i]) + constant_term(Zij_t_Wi[i]), order)
+            tmp53[i] = Taylor1(constant_term(Rij_dot_Vi[i]) ^ float(constant_term(2)), order)
+            tmp54[i] = Taylor1(zero(constant_term(Rij_dot_Vi[i])), order)
+            pn1t7[i] = Taylor1(constant_term(tmp53[i]) / constant_term(r_p2[i]), order)
+            tmp55[i] = Taylor1(constant_term(1.5) * constant_term(pn1t7[i]), order)
+            pn1t2_7[i] = Taylor1(constant_term(ϕs_and_vs[i]) - constant_term(tmp55[i]), order)
             pn1t1_7[i] = Taylor1(constant_term(c_p2) + constant_term(pn1t2_7[i]), order)
             pNX_t_X[i] = Taylor1(constant_term(acceph_ephU[3i - 2]) * constant_term(X[i]), order)
             pNY_t_Y[i] = Taylor1(constant_term(acceph_ephU[3i - 1]) * constant_term(Y[i]), order)
             pNZ_t_Z[i] = Taylor1(constant_term(acceph_ephU[3i]) * constant_term(Z[i]), order)
-            tmp1299[i] = Taylor1(constant_term(pNX_t_X[i]) + constant_term(pNY_t_Y[i]), order)
-            tmp1300[i] = Taylor1(constant_term(tmp1299[i]) + constant_term(pNZ_t_Z[i]), order)
-            tmp1301[i] = Taylor1(constant_term(0.5) * constant_term(tmp1300[i]), order)
-            pn1[i] = Taylor1(constant_term(pn1t1_7[i]) + constant_term(tmp1301[i]), order)
+            tmp56[i] = Taylor1(constant_term(pNX_t_X[i]) + constant_term(pNY_t_Y[i]), order)
+            tmp57[i] = Taylor1(constant_term(tmp56[i]) + constant_term(pNZ_t_Z[i]), order)
+            tmp58[i] = Taylor1(constant_term(0.5) * constant_term(tmp57[i]), order)
+            pn1[i] = Taylor1(constant_term(pn1t1_7[i]) + constant_term(tmp58[i]), order)
             X_t_pn1[i] = Taylor1(constant_term(newton_acc_X[i]) * constant_term(pn1[i]), order)
             Y_t_pn1[i] = Taylor1(constant_term(newton_acc_Y[i]) * constant_term(pn1[i]), order)
             Z_t_pn1[i] = Taylor1(constant_term(newton_acc_Z[i]) * constant_term(pn1[i]), order)
@@ -1753,9 +1752,9 @@ end
             pNY_t_pn3[i] = Taylor1(constant_term(acceph_ephU[3i - 1]) * constant_term(pn3[i]), order)
             pNZ_t_pn3[i] = Taylor1(constant_term(acceph_ephU[3i]) * constant_term(pn3[i]), order)
         end
-    tmp1309 = Array{Taylor1{_S}}(undef, size(U_t_pn2))
-    for i = eachindex(tmp1309)
-        tmp1309[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp59 = Array{Taylor1{_S}}(undef, size(U_t_pn2))
+    for i = eachindex(tmp59)
+        tmp59[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     termpnx = Array{Taylor1{_S}}(undef, size(X_t_pn1))
     for i = eachindex(termpnx)
@@ -1765,9 +1764,9 @@ end
     for i = eachindex(sumpnx)
         sumpnx[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1312 = Array{Taylor1{_S}}(undef, size(V_t_pn2))
-    for i = eachindex(tmp1312)
-        tmp1312[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp60 = Array{Taylor1{_S}}(undef, size(V_t_pn2))
+    for i = eachindex(tmp60)
+        tmp60[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     termpny = Array{Taylor1{_S}}(undef, size(Y_t_pn1))
     for i = eachindex(termpny)
@@ -1777,9 +1776,9 @@ end
     for i = eachindex(sumpny)
         sumpny[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1315 = Array{Taylor1{_S}}(undef, size(W_t_pn2))
-    for i = eachindex(tmp1315)
-        tmp1315[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp61 = Array{Taylor1{_S}}(undef, size(W_t_pn2))
+    for i = eachindex(tmp61)
+        tmp61[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     termpnz = Array{Taylor1{_S}}(undef, size(Z_t_pn1))
     for i = eachindex(termpnz)
@@ -1790,20 +1789,20 @@ end
         sumpnz[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     for i = 1:10
-        tmp1309[i] = Taylor1(constant_term(U_t_pn2[i]) + constant_term(pNX_t_pn3[i]), order)
-        termpnx[i] = Taylor1(constant_term(X_t_pn1[i]) + constant_term(tmp1309[i]), order)
+        tmp59[i] = Taylor1(constant_term(U_t_pn2[i]) + constant_term(pNX_t_pn3[i]), order)
+        termpnx[i] = Taylor1(constant_term(X_t_pn1[i]) + constant_term(tmp59[i]), order)
         sumpnx[i] = Taylor1(constant_term(pntempX) + constant_term(termpnx[i]), order)
         pntempX = Taylor1(identity(constant_term(sumpnx[i])), order)
-        tmp1312[i] = Taylor1(constant_term(V_t_pn2[i]) + constant_term(pNY_t_pn3[i]), order)
-        termpny[i] = Taylor1(constant_term(Y_t_pn1[i]) + constant_term(tmp1312[i]), order)
+        tmp60[i] = Taylor1(constant_term(V_t_pn2[i]) + constant_term(pNY_t_pn3[i]), order)
+        termpny[i] = Taylor1(constant_term(Y_t_pn1[i]) + constant_term(tmp60[i]), order)
         sumpny[i] = Taylor1(constant_term(pntempY) + constant_term(termpny[i]), order)
         pntempY = Taylor1(identity(constant_term(sumpny[i])), order)
-        tmp1315[i] = Taylor1(constant_term(W_t_pn2[i]) + constant_term(pNZ_t_pn3[i]), order)
-        termpnz[i] = Taylor1(constant_term(Z_t_pn1[i]) + constant_term(tmp1315[i]), order)
+        tmp61[i] = Taylor1(constant_term(W_t_pn2[i]) + constant_term(pNZ_t_pn3[i]), order)
+        termpnz[i] = Taylor1(constant_term(Z_t_pn1[i]) + constant_term(tmp61[i]), order)
         sumpnz[i] = Taylor1(constant_term(pntempZ) + constant_term(termpnz[i]), order)
         pntempZ = Taylor1(identity(constant_term(sumpnz[i])), order)
     end
-    #= /Users/lerm/.julia/dev/NEOs.jl/ex.jl:954 =# Threads.@threads for i = 11:Nm1
+    Threads.@threads for i = 11:Nm1
             X_t_pn1[i] = Taylor1(constant_term(c_p2) * constant_term(newton_acc_X[i]), order)
             Y_t_pn1[i] = Taylor1(constant_term(c_p2) * constant_term(newton_acc_Y[i]), order)
             Z_t_pn1[i] = Taylor1(constant_term(c_p2) * constant_term(newton_acc_Z[i]), order)
@@ -1825,15 +1824,15 @@ end
     dq[4] = Taylor1(constant_term(postNewtonX) + constant_term(accX), order)
     dq[5] = Taylor1(constant_term(postNewtonY) + constant_term(accY), order)
     dq[6] = Taylor1(constant_term(postNewtonZ) + constant_term(accZ), order)
-    return TaylorIntegration.RetAlloc{Taylor1{_S}}([tmp1259, tmp1261, tmp1262, tmp1264, pntempX, pntempY, pntempZ, temp_accX, temp_accY, temp_accZ, accX, accY, accZ, _4dq1, _4dq2, _4dq3, tmp1339, tmp1340, tmp1341, postNewtonX, postNewtonY, postNewtonZ], [X, Y, Z, r_p2, r_p4, r_p1d2, r_p3d2, newtonianCoeff, ui, vi, wi, U, V, W, _4U_m_3X, _4V_m_3Y, _4W_m_3Z, UU, VV, WW, newtonian1b_Potential, newtonianNb_Potential, newton_acc_X, newton_acc_Y, newton_acc_Z, v2, vi_dot_vj, pn2, U_t_pn2, V_t_pn2, W_t_pn2, pn3, pNX_t_pn3, pNY_t_pn3, pNZ_t_pn3, _4ϕj, ϕi_plus_4ϕj, sj2_plus_2si2_minus_4vivj, ϕs_and_vs, pn1t1_7, pNX_t_X, pNY_t_Y, pNZ_t_Z, pn1, X_t_pn1, Y_t_pn1, Z_t_pn1, t31, t32, t33, r_sin_ϕ, sin_ϕ, sin2_ϕ, cos_ϕ, F_J2_x, F_J2_y, F_J2_z, F_J2_x1, F_J2_y1, F_J2_z1, F_J2_x2, F_J2_y2, F_J2_z2, P_2_sin_ϕ, ∂P_2_sin_ϕ, m_c_ϕ_∂P_2, Λ2j_div_r4, F_J2_ξ, F_J2_ζ, ξx, ξy, ξz, ζx, ζy, ζz, tmp1161, tmp1164, tmp1167, pn2x, pn2y, pn2z, tmp1175, tmp1178, tmp1330, tmp1180, tmp1331, tmp1181, tmp1183, tmp1332, tmp1333, tmp1188, tmp1189, tmp1200, tmp1202, tmp1204, tmp1206, tmp1334, tmp1212, tmp1335, tmp1215, tmp1221, tmp1223, tmp1226, tmp1229, tmp1231, tmp1233, tmp1235, tmp1237, tmp1239, tmp1251, tmp1336, tmp1253, tmp1337, tmp1254, tmp1256, tmp1338, temp_004, tmp1267, tmp1269, tmp1271, tmp1277, tmp1279, tmp1280, Xij_t_Ui, Yij_t_Vi, Zij_t_Wi, tmp1286, Rij_dot_Vi, tmp1289, tmp1342, pn1t7, tmp1292, pn1t2_7, tmp1299, tmp1300, tmp1301, tmp1309, termpnx, sumpnx, tmp1312, termpny, sumpny, tmp1315, termpnz, sumpnz], [Array{Taylor1{_S}, 2}(undef, 0, 0)], [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)])
+    return TaylorIntegration.RetAlloc{Taylor1{_S}}([tmp26, tmp28, tmp30, tmp31, pntempX, pntempY, pntempZ, temp_accX, temp_accY, temp_accZ, accX, accY, accZ, tmp27, tmp29, tmp32, _4dq1, _4dq2, _4dq3, postNewtonX, postNewtonY, postNewtonZ], [X, Y, Z, r_p2, r_p4, r_p1d2, r_p3d2, newtonianCoeff, ui, vi, wi, U, V, W, _4U_m_3X, _4V_m_3Y, _4W_m_3Z, UU, VV, WW, newtonian1b_Potential, newtonianNb_Potential, newton_acc_X, newton_acc_Y, newton_acc_Z, v2, vi_dot_vj, pn2, U_t_pn2, V_t_pn2, W_t_pn2, pn3, pNX_t_pn3, pNY_t_pn3, pNZ_t_pn3, _4ϕj, ϕi_plus_4ϕj, sj2_plus_2si2_minus_4vivj, ϕs_and_vs, pn1t1_7, pNX_t_X, pNY_t_Y, pNZ_t_Z, pn1, X_t_pn1, Y_t_pn1, Z_t_pn1, t31, t32, t33, r_sin_ϕ, sin_ϕ, sin2_ϕ, cos_ϕ, F_J2_x, F_J2_y, F_J2_z, F_J2_x1, F_J2_y1, F_J2_z1, F_J2_x2, F_J2_y2, F_J2_z2, P_2_sin_ϕ, ∂P_2_sin_ϕ, m_c_ϕ_∂P_2, Λ2j_div_r4, F_J2_ξ, F_J2_ζ, ξx, ξy, ξz, ζx, ζy, ζz, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8, tmp9, tmp10, tmp11, tmp12, tmp13, tmp14, tmp15, tmp16, tmp17, tmp18, tmp19, tmp20, tmp21, tmp22, tmp23, tmp24, tmp25, temp_004, tmp33, tmp34, tmp35, tmp36, tmp37, tmp38, pn2x, pn2y, pn2z, tmp39, tmp40, tmp41, tmp42, tmp43, tmp44, tmp45, tmp46, tmp47, tmp48, tmp49, tmp50, tmp51, Xij_t_Ui, Yij_t_Vi, Zij_t_Wi, tmp52, Rij_dot_Vi, tmp53, tmp54, pn1t7, tmp55, pn1t2_7, tmp56, tmp57, tmp58, tmp59, termpnx, sumpnx, tmp60, termpny, sumpny, tmp61, termpnz, sumpnz], [Array{Taylor1{_S}, 2}(undef, 0, 0)], [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)])
 end
 
 @cyclicbarrier function TaylorIntegration.jetcoeffs!(::Val{gravityonly!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
     order = TS.order(t)
-    tmp1259 = __ralloc.v0[1]
-    tmp1261 = __ralloc.v0[2]
-    tmp1262 = __ralloc.v0[3]
-    tmp1264 = __ralloc.v0[4]
+    tmp26 = __ralloc.v0[1]
+    tmp28 = __ralloc.v0[2]
+    tmp30 = __ralloc.v0[3]
+    tmp31 = __ralloc.v0[4]
     pntempX = __ralloc.v0[5]
     pntempY = __ralloc.v0[6]
     pntempZ = __ralloc.v0[7]
@@ -1843,12 +1842,12 @@ end
     accX = __ralloc.v0[11]
     accY = __ralloc.v0[12]
     accZ = __ralloc.v0[13]
-    _4dq1 = __ralloc.v0[14]
-    _4dq2 = __ralloc.v0[15]
-    _4dq3 = __ralloc.v0[16]
-    tmp1339 = __ralloc.v0[17]
-    tmp1340 = __ralloc.v0[18]
-    tmp1341 = __ralloc.v0[19]
+    tmp27 = __ralloc.v0[14]
+    tmp29 = __ralloc.v0[15]
+    tmp32 = __ralloc.v0[16]
+    _4dq1 = __ralloc.v0[17]
+    _4dq2 = __ralloc.v0[18]
+    _4dq3 = __ralloc.v0[19]
     postNewtonX = __ralloc.v0[20]
     postNewtonY = __ralloc.v0[21]
     postNewtonZ = __ralloc.v0[22]
@@ -1927,78 +1926,81 @@ end
     ζx = __ralloc.v1[73]
     ζy = __ralloc.v1[74]
     ζz = __ralloc.v1[75]
-    tmp1161 = __ralloc.v1[76]
-    tmp1164 = __ralloc.v1[77]
-    tmp1167 = __ralloc.v1[78]
-    pn2x = __ralloc.v1[79]
-    pn2y = __ralloc.v1[80]
-    pn2z = __ralloc.v1[81]
-    tmp1175 = __ralloc.v1[82]
-    tmp1178 = __ralloc.v1[83]
-    tmp1330 = __ralloc.v1[84]
-    tmp1180 = __ralloc.v1[85]
-    tmp1331 = __ralloc.v1[86]
-    tmp1181 = __ralloc.v1[87]
-    tmp1183 = __ralloc.v1[88]
-    tmp1332 = __ralloc.v1[89]
-    tmp1333 = __ralloc.v1[90]
-    tmp1188 = __ralloc.v1[91]
-    tmp1189 = __ralloc.v1[92]
-    tmp1200 = __ralloc.v1[93]
-    tmp1202 = __ralloc.v1[94]
-    tmp1204 = __ralloc.v1[95]
-    tmp1206 = __ralloc.v1[96]
-    tmp1334 = __ralloc.v1[97]
-    tmp1212 = __ralloc.v1[98]
-    tmp1335 = __ralloc.v1[99]
-    tmp1215 = __ralloc.v1[100]
-    tmp1221 = __ralloc.v1[101]
-    tmp1223 = __ralloc.v1[102]
-    tmp1226 = __ralloc.v1[103]
-    tmp1229 = __ralloc.v1[104]
-    tmp1231 = __ralloc.v1[105]
-    tmp1233 = __ralloc.v1[106]
-    tmp1235 = __ralloc.v1[107]
-    tmp1237 = __ralloc.v1[108]
-    tmp1239 = __ralloc.v1[109]
-    tmp1251 = __ralloc.v1[110]
-    tmp1336 = __ralloc.v1[111]
-    tmp1253 = __ralloc.v1[112]
-    tmp1337 = __ralloc.v1[113]
-    tmp1254 = __ralloc.v1[114]
-    tmp1256 = __ralloc.v1[115]
-    tmp1338 = __ralloc.v1[116]
-    temp_004 = __ralloc.v1[117]
-    tmp1267 = __ralloc.v1[118]
-    tmp1269 = __ralloc.v1[119]
-    tmp1271 = __ralloc.v1[120]
-    tmp1277 = __ralloc.v1[121]
-    tmp1279 = __ralloc.v1[122]
-    tmp1280 = __ralloc.v1[123]
+    tmp1 = __ralloc.v1[76]
+    tmp2 = __ralloc.v1[77]
+    tmp3 = __ralloc.v1[78]
+    tmp4 = __ralloc.v1[79]
+    tmp5 = __ralloc.v1[80]
+    tmp6 = __ralloc.v1[81]
+    tmp7 = __ralloc.v1[82]
+    tmp8 = __ralloc.v1[83]
+    tmp9 = __ralloc.v1[84]
+    tmp10 = __ralloc.v1[85]
+    tmp11 = __ralloc.v1[86]
+    tmp12 = __ralloc.v1[87]
+    tmp13 = __ralloc.v1[88]
+    tmp14 = __ralloc.v1[89]
+    tmp15 = __ralloc.v1[90]
+    tmp16 = __ralloc.v1[91]
+    tmp17 = __ralloc.v1[92]
+    tmp18 = __ralloc.v1[93]
+    tmp19 = __ralloc.v1[94]
+    tmp20 = __ralloc.v1[95]
+    tmp21 = __ralloc.v1[96]
+    tmp22 = __ralloc.v1[97]
+    tmp23 = __ralloc.v1[98]
+    tmp24 = __ralloc.v1[99]
+    tmp25 = __ralloc.v1[100]
+    temp_004 = __ralloc.v1[101]
+    tmp33 = __ralloc.v1[102]
+    tmp34 = __ralloc.v1[103]
+    tmp35 = __ralloc.v1[104]
+    tmp36 = __ralloc.v1[105]
+    tmp37 = __ralloc.v1[106]
+    tmp38 = __ralloc.v1[107]
+    pn2x = __ralloc.v1[108]
+    pn2y = __ralloc.v1[109]
+    pn2z = __ralloc.v1[110]
+    tmp39 = __ralloc.v1[111]
+    tmp40 = __ralloc.v1[112]
+    tmp41 = __ralloc.v1[113]
+    tmp42 = __ralloc.v1[114]
+    tmp43 = __ralloc.v1[115]
+    tmp44 = __ralloc.v1[116]
+    tmp45 = __ralloc.v1[117]
+    tmp46 = __ralloc.v1[118]
+    tmp47 = __ralloc.v1[119]
+    tmp48 = __ralloc.v1[120]
+    tmp49 = __ralloc.v1[121]
+    tmp50 = __ralloc.v1[122]
+    tmp51 = __ralloc.v1[123]
     Xij_t_Ui = __ralloc.v1[124]
     Yij_t_Vi = __ralloc.v1[125]
     Zij_t_Wi = __ralloc.v1[126]
-    tmp1286 = __ralloc.v1[127]
+    tmp52 = __ralloc.v1[127]
     Rij_dot_Vi = __ralloc.v1[128]
-    tmp1289 = __ralloc.v1[129]
-    tmp1342 = __ralloc.v1[130]
+    tmp53 = __ralloc.v1[129]
+    tmp54 = __ralloc.v1[130]
     pn1t7 = __ralloc.v1[131]
-    tmp1292 = __ralloc.v1[132]
+    tmp55 = __ralloc.v1[132]
     pn1t2_7 = __ralloc.v1[133]
-    tmp1299 = __ralloc.v1[134]
-    tmp1300 = __ralloc.v1[135]
-    tmp1301 = __ralloc.v1[136]
-    tmp1309 = __ralloc.v1[137]
+    tmp56 = __ralloc.v1[134]
+    tmp57 = __ralloc.v1[135]
+    tmp58 = __ralloc.v1[136]
+    tmp59 = __ralloc.v1[137]
     termpnx = __ralloc.v1[138]
     sumpnx = __ralloc.v1[139]
-    tmp1312 = __ralloc.v1[140]
+    tmp60 = __ralloc.v1[140]
     termpny = __ralloc.v1[141]
     sumpny = __ralloc.v1[142]
-    tmp1315 = __ralloc.v1[143]
+    tmp61 = __ralloc.v1[143]
     termpnz = __ralloc.v1[144]
     sumpnz = __ralloc.v1[145]
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
+    local sseph_ephU = params.sseph(dsj2k)
+    local acceph_ephU = params.acceph(dsj2k)
+    local poteph_ephU = params.poteph(dsj2k)
     local S = eltype(q)
     local UJ_interaction = params.UJ_interaction
     local N = params.N
@@ -2007,9 +2009,6 @@ end
     local orientAlloc = params.orientAlloc
     local zero_q_1 = params.zeroq1
     local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
-    local sseph_ephU = params.sseph(dsj2k)
-    local acceph_ephU = params.acceph(dsj2k)
-    local poteph_ephU = params.poteph(dsj2k)
     for ord = 0:order - 1
         ordnext = ord + 1
         TaylorSeries.identity!(pntempX, zero_q_1, ord)
@@ -2025,175 +2024,175 @@ end
         TaylorSeries.identity!(dq[2], q[5], ord)
         TaylorSeries.identity!(dq[3], q[6], ord)
         TaylorSeries.identity!(newtonianNb_Potential[N], zero_q_1, ord)
-        TaylorSeries.mul!(_4dq1, 4, dq[1], ord)
-        TaylorSeries.mul!(_4dq2, 4, dq[2], ord)
-        TaylorSeries.mul!(_4dq3, 4, dq[3], ord)
         Threads.@threads for i = 1:Nm1
-            TaylorSeries.identity!(ui[i], sseph_ephU[3 * ((N - 1) + i) - 2], ord)
-            TaylorSeries.identity!(vi[i], sseph_ephU[3 * ((N - 1) + i) - 1], ord)
-            TaylorSeries.identity!(wi[i], sseph_ephU[3 * ((N - 1) + i)], ord)
-            TaylorSeries.subst!(X[i], sseph_ephU[3i - 2], q[1], ord)
-            TaylorSeries.subst!(Y[i], sseph_ephU[3i - 1], q[2], ord)
-            TaylorSeries.subst!(Z[i], sseph_ephU[3i], q[3], ord)
-            TaylorSeries.subst!(U[i], ui[i], dq[1], ord)
-            TaylorSeries.subst!(V[i], vi[i], dq[2], ord)
-            TaylorSeries.subst!(W[i], wi[i], dq[3], ord)
-            TaylorSeries.mul!(tmp1161[i], -3, ui[i], ord)
-            TaylorSeries.add!(_4U_m_3X[i], tmp1161[i], _4dq1, ord)
-            TaylorSeries.mul!(tmp1164[i], -3, vi[i], ord)
-            TaylorSeries.add!(_4V_m_3Y[i], tmp1164[i], _4dq2, ord)
-            TaylorSeries.mul!(tmp1167[i], -3, wi[i], ord)
-            TaylorSeries.add!(_4W_m_3Z[i], tmp1167[i], _4dq3, ord)
-            TaylorSeries.mul!(pn2x[i], X[i], _4U_m_3X[i], ord)
-            TaylorSeries.mul!(pn2y[i], Y[i], _4V_m_3Y[i], ord)
-            TaylorSeries.mul!(pn2z[i], Z[i], _4W_m_3Z[i], ord)
-            TaylorSeries.mul!(UU[i], ui[i], dq[1], ord)
-            TaylorSeries.mul!(VV[i], vi[i], dq[2], ord)
-            TaylorSeries.mul!(WW[i], wi[i], dq[3], ord)
-            TaylorSeries.add!(tmp1175[i], UU[i], VV[i], ord)
-            TaylorSeries.add!(vi_dot_vj[i], tmp1175[i], WW[i], ord)
-            TaylorSeries.pow!(tmp1178[i], X[i], tmp1330[i], 2, ord)
-            TaylorSeries.pow!(tmp1180[i], Y[i], tmp1331[i], 2, ord)
-            TaylorSeries.add!(tmp1181[i], tmp1178[i], tmp1180[i], ord)
-            TaylorSeries.pow!(tmp1183[i], Z[i], tmp1332[i], 2, ord)
-            TaylorSeries.add!(r_p2[i], tmp1181[i], tmp1183[i], ord)
-            TaylorSeries.sqrt!(r_p1d2[i], r_p2[i], tmp1333[i], ord)
-            TaylorSeries.mul!(r_p3d2[i], r_p2[i], r_p1d2[i], ord)
-            TaylorSeries.div!(newtonianCoeff[i], μ[i], r_p3d2[i], ord)
-            TaylorSeries.add!(tmp1188[i], pn2x[i], pn2y[i], ord)
-            TaylorSeries.add!(tmp1189[i], tmp1188[i], pn2z[i], ord)
-            TaylorSeries.mul!(pn2[i], newtonianCoeff[i], tmp1189[i], ord)
-            TaylorSeries.mul!(newton_acc_X[i], X[i], newtonianCoeff[i], ord)
-            TaylorSeries.mul!(newton_acc_Y[i], Y[i], newtonianCoeff[i], ord)
-            TaylorSeries.mul!(newton_acc_Z[i], Z[i], newtonianCoeff[i], ord)
-            TaylorSeries.div!(newtonian1b_Potential[i], μ[i], r_p1d2[i], ord)
-            TaylorSeries.mul!(pn3[i], 3.5, newtonian1b_Potential[i], ord)
-            TaylorSeries.mul!(U_t_pn2[i], pn2[i], U[i], ord)
-            TaylorSeries.mul!(V_t_pn2[i], pn2[i], V[i], ord)
-            TaylorSeries.mul!(W_t_pn2[i], pn2[i], W[i], ord)
-            if UJ_interaction[i]
-                TaylorSeries.subst!(tmp1200[i], X[i], ord)
-                TaylorSeries.mul!(t31[i], tmp1200[i], M_[1, 3, i], ord)
-                TaylorSeries.subst!(tmp1202[i], Y[i], ord)
-                TaylorSeries.mul!(t32[i], tmp1202[i], M_[2, 3, i], ord)
-                TaylorSeries.subst!(tmp1204[i], Z[i], ord)
-                TaylorSeries.mul!(t33[i], tmp1204[i], M_[3, 3, i], ord)
-                TaylorSeries.add!(tmp1206[i], t31[i], t32[i], ord)
-                TaylorSeries.add!(r_sin_ϕ[i], tmp1206[i], t33[i], ord)
-                TaylorSeries.div!(sin_ϕ[i], r_sin_ϕ[i], r_p1d2[i], ord)
-                TaylorSeries.pow!(sin2_ϕ[i], sin_ϕ[i], tmp1334[i], 2, ord)
-                TaylorSeries.subst!(tmp1212[i], 1, sin2_ϕ[i], ord)
-                TaylorSeries.sqrt!(cos_ϕ[i], tmp1212[i], tmp1335[i], ord)
-                TaylorSeries.mul!(tmp1215[i], 1.5, sin2_ϕ[i], ord)
-                TaylorSeries.subst!(P_2_sin_ϕ[i], tmp1215[i], 0.5, ord)
-                TaylorSeries.mul!(∂P_2_sin_ϕ[i], 3, sin_ϕ[i], ord)
-                TaylorSeries.mul!(r_p4[i], r_p2[i], r_p2[i], ord)
-                TaylorSeries.div!(tmp1221[i], Λ2[i], r_p4[i], ord)
-                TaylorSeries.subst!(Λ2j_div_r4[i], tmp1221[i], ord)
-                TaylorSeries.subst!(tmp1223[i], cos_ϕ[i], ord)
-                TaylorSeries.mul!(m_c_ϕ_∂P_2[i], tmp1223[i], ∂P_2_sin_ϕ[i], ord)
-                TaylorSeries.mul!(tmp1226[i], Λ2j_div_r4[i], 3, ord)
-                TaylorSeries.mul!(F_J2_ξ[i], tmp1226[i], P_2_sin_ϕ[i], ord)
-                TaylorSeries.mul!(F_J2_ζ[i], Λ2j_div_r4[i], m_c_ϕ_∂P_2[i], ord)
-                TaylorSeries.subst!(tmp1229[i], X[i], ord)
-                TaylorSeries.div!(ξx[i], tmp1229[i], r_p1d2[i], ord)
-                TaylorSeries.subst!(tmp1231[i], Y[i], ord)
-                TaylorSeries.div!(ξy[i], tmp1231[i], r_p1d2[i], ord)
-                TaylorSeries.subst!(tmp1233[i], Z[i], ord)
-                TaylorSeries.div!(ξz[i], tmp1233[i], r_p1d2[i], ord)
-                TaylorSeries.mul!(tmp1235[i], sin_ϕ[i], ξx[i], ord)
-                TaylorSeries.subst!(ζx[i], M_[1, 3, i], tmp1235[i], ord)
-                TaylorSeries.mul!(tmp1237[i], sin_ϕ[i], ξy[i], ord)
-                TaylorSeries.subst!(ζy[i], M_[2, 3, i], tmp1237[i], ord)
-                TaylorSeries.mul!(tmp1239[i], sin_ϕ[i], ξz[i], ord)
-                TaylorSeries.subst!(ζz[i], M_[3, 3, i], tmp1239[i], ord)
-                TaylorSeries.mul!(F_J2_x1[i], F_J2_ξ[i], ξx[i], ord)
-                TaylorSeries.mul!(F_J2_y1[i], F_J2_ξ[i], ξy[i], ord)
-                TaylorSeries.mul!(F_J2_z1[i], F_J2_ξ[i], ξz[i], ord)
-                TaylorSeries.mul!(F_J2_x2[i], F_J2_ζ[i], ζx[i], ord)
-                TaylorSeries.mul!(F_J2_y2[i], F_J2_ζ[i], ζy[i], ord)
-                TaylorSeries.mul!(F_J2_z2[i], F_J2_ζ[i], ζz[i], ord)
-                TaylorSeries.add!(F_J2_x[i], F_J2_x1[i], F_J2_x2[i], ord)
-                TaylorSeries.add!(F_J2_y[i], F_J2_y1[i], F_J2_y2[i], ord)
-                TaylorSeries.add!(F_J2_z[i], F_J2_z1[i], F_J2_z2[i], ord)
+                TaylorSeries.subst!(X[i], sseph_ephU[3i - 2], q[1], ord)
+                TaylorSeries.subst!(Y[i], sseph_ephU[3i - 1], q[2], ord)
+                TaylorSeries.subst!(Z[i], sseph_ephU[3i], q[3], ord)
+                TaylorSeries.pow!(tmp1[i], X[i], tmp2[i], 2, ord)
+                TaylorSeries.pow!(tmp3[i], Y[i], tmp4[i], 2, ord)
+                TaylorSeries.add!(tmp5[i], tmp1[i], tmp3[i], ord)
+                TaylorSeries.pow!(tmp6[i], Z[i], tmp7[i], 2, ord)
+                TaylorSeries.add!(r_p2[i], tmp5[i], tmp6[i], ord)
+                TaylorSeries.sqrt!(r_p1d2[i], r_p2[i], tmp8[i], ord)
+                TaylorSeries.mul!(r_p3d2[i], r_p2[i], r_p1d2[i], ord)
+                TaylorSeries.div!(newtonianCoeff[i], μ[i], r_p3d2[i], ord)
+                TaylorSeries.mul!(newton_acc_X[i], X[i], newtonianCoeff[i], ord)
+                TaylorSeries.mul!(newton_acc_Y[i], Y[i], newtonianCoeff[i], ord)
+                TaylorSeries.mul!(newton_acc_Z[i], Z[i], newtonianCoeff[i], ord)
+                TaylorSeries.div!(newtonian1b_Potential[i], μ[i], r_p1d2[i], ord)
+                TaylorSeries.mul!(pn3[i], 3.5, newtonian1b_Potential[i], ord)
+                if UJ_interaction[i]
+                    TaylorSeries.subst!(tmp9[i], X[i], ord)
+                    TaylorSeries.mul!(t31[i], tmp9[i], M_[1, 3, i], ord)
+                    TaylorSeries.subst!(tmp10[i], Y[i], ord)
+                    TaylorSeries.mul!(t32[i], tmp10[i], M_[2, 3, i], ord)
+                    TaylorSeries.subst!(tmp11[i], Z[i], ord)
+                    TaylorSeries.mul!(t33[i], tmp11[i], M_[3, 3, i], ord)
+                    TaylorSeries.add!(tmp12[i], t31[i], t32[i], ord)
+                    TaylorSeries.add!(r_sin_ϕ[i], tmp12[i], t33[i], ord)
+                    TaylorSeries.div!(sin_ϕ[i], r_sin_ϕ[i], r_p1d2[i], ord)
+                    TaylorSeries.pow!(sin2_ϕ[i], sin_ϕ[i], tmp13[i], 2, ord)
+                    TaylorSeries.subst!(tmp14[i], 1, sin2_ϕ[i], ord)
+                    TaylorSeries.sqrt!(cos_ϕ[i], tmp14[i], tmp15[i], ord)
+                    TaylorSeries.mul!(tmp16[i], 1.5, sin2_ϕ[i], ord)
+                    TaylorSeries.subst!(P_2_sin_ϕ[i], tmp16[i], 0.5, ord)
+                    TaylorSeries.mul!(∂P_2_sin_ϕ[i], 3, sin_ϕ[i], ord)
+                    TaylorSeries.mul!(r_p4[i], r_p2[i], r_p2[i], ord)
+                    TaylorSeries.div!(tmp17[i], Λ2[i], r_p4[i], ord)
+                    TaylorSeries.subst!(Λ2j_div_r4[i], tmp17[i], ord)
+                    TaylorSeries.subst!(tmp18[i], cos_ϕ[i], ord)
+                    TaylorSeries.mul!(m_c_ϕ_∂P_2[i], tmp18[i], ∂P_2_sin_ϕ[i], ord)
+                    TaylorSeries.mul!(tmp19[i], Λ2j_div_r4[i], 3, ord)
+                    TaylorSeries.mul!(F_J2_ξ[i], tmp19[i], P_2_sin_ϕ[i], ord)
+                    TaylorSeries.mul!(F_J2_ζ[i], Λ2j_div_r4[i], m_c_ϕ_∂P_2[i], ord)
+                    TaylorSeries.subst!(tmp20[i], X[i], ord)
+                    TaylorSeries.div!(ξx[i], tmp20[i], r_p1d2[i], ord)
+                    TaylorSeries.subst!(tmp21[i], Y[i], ord)
+                    TaylorSeries.div!(ξy[i], tmp21[i], r_p1d2[i], ord)
+                    TaylorSeries.subst!(tmp22[i], Z[i], ord)
+                    TaylorSeries.div!(ξz[i], tmp22[i], r_p1d2[i], ord)
+                    TaylorSeries.mul!(tmp23[i], sin_ϕ[i], ξx[i], ord)
+                    TaylorSeries.subst!(ζx[i], M_[1, 3, i], tmp23[i], ord)
+                    TaylorSeries.mul!(tmp24[i], sin_ϕ[i], ξy[i], ord)
+                    TaylorSeries.subst!(ζy[i], M_[2, 3, i], tmp24[i], ord)
+                    TaylorSeries.mul!(tmp25[i], sin_ϕ[i], ξz[i], ord)
+                    TaylorSeries.subst!(ζz[i], M_[3, 3, i], tmp25[i], ord)
+                    TaylorSeries.mul!(F_J2_x1[i], F_J2_ξ[i], ξx[i], ord)
+                    TaylorSeries.mul!(F_J2_y1[i], F_J2_ξ[i], ξy[i], ord)
+                    TaylorSeries.mul!(F_J2_z1[i], F_J2_ξ[i], ξz[i], ord)
+                    TaylorSeries.mul!(F_J2_x2[i], F_J2_ζ[i], ζx[i], ord)
+                    TaylorSeries.mul!(F_J2_y2[i], F_J2_ζ[i], ζy[i], ord)
+                    TaylorSeries.mul!(F_J2_z2[i], F_J2_ζ[i], ζz[i], ord)
+                    TaylorSeries.add!(F_J2_x[i], F_J2_x1[i], F_J2_x2[i], ord)
+                    TaylorSeries.add!(F_J2_y[i], F_J2_y1[i], F_J2_y2[i], ord)
+                    TaylorSeries.add!(F_J2_z[i], F_J2_z1[i], F_J2_z2[i], ord)
+                end
             end
-            TaylorSeries.pow!(tmp1251[i], ui[i], tmp1336[i], 2, ord)
-            TaylorSeries.pow!(tmp1253[i], vi[i], tmp1337[i], 2, ord)
-            TaylorSeries.add!(tmp1254[i], tmp1251[i], tmp1253[i], ord)
-            TaylorSeries.pow!(tmp1256[i], wi[i], tmp1338[i], 2, ord)
-            TaylorSeries.add!(v2[i], tmp1254[i], tmp1256[i], ord)
-        end
-        TaylorSeries.pow!(tmp1259, q[4], tmp1339, 2, ord)
-        TaylorSeries.pow!(tmp1261, q[5], tmp1340, 2, ord)
-        TaylorSeries.add!(tmp1262, tmp1259, tmp1261, ord)
-        TaylorSeries.pow!(tmp1264, q[6], tmp1341, 2, ord)
-        TaylorSeries.add!(v2[N], tmp1262, tmp1264, ord)
+        TaylorSeries.pow!(tmp26, q[4], tmp27, 2, ord)
+        TaylorSeries.pow!(tmp28, q[5], tmp29, 2, ord)
+        TaylorSeries.add!(tmp30, tmp26, tmp28, ord)
+        TaylorSeries.pow!(tmp31, q[6], tmp32, 2, ord)
+        TaylorSeries.add!(v2[N], tmp30, tmp31, ord)
         for i = 1:Nm1
             TaylorSeries.add!(temp_004[i], newtonian1b_Potential[i], newtonianNb_Potential[N], ord)
             TaylorSeries.identity!(newtonianNb_Potential[N], temp_004[i], ord)
             if UJ_interaction[i]
-                TaylorSeries.mul!(tmp1267[i], μ[i], F_J2_x[i], ord)
-                TaylorSeries.subst!(temp_accX, accX, tmp1267[i], ord)
+                TaylorSeries.mul!(tmp33[i], μ[i], F_J2_x[i], ord)
+                TaylorSeries.subst!(temp_accX, accX, tmp33[i], ord)
                 TaylorSeries.identity!(accX, temp_accX, ord)
-                TaylorSeries.mul!(tmp1269[i], μ[i], F_J2_y[i], ord)
-                TaylorSeries.subst!(temp_accY, accY, tmp1269[i], ord)
+                TaylorSeries.mul!(tmp34[i], μ[i], F_J2_y[i], ord)
+                TaylorSeries.subst!(temp_accY, accY, tmp34[i], ord)
                 TaylorSeries.identity!(accY, temp_accY, ord)
-                TaylorSeries.mul!(tmp1271[i], μ[i], F_J2_z[i], ord)
-                TaylorSeries.subst!(temp_accZ, accZ, tmp1271[i], ord)
+                TaylorSeries.mul!(tmp35[i], μ[i], F_J2_z[i], ord)
+                TaylorSeries.subst!(temp_accZ, accZ, tmp35[i], ord)
                 TaylorSeries.identity!(accZ, temp_accZ, ord)
             end
         end
         TaylorSeries.mul!(_4ϕj[N], 4, newtonianNb_Potential[N], ord)
+        TaylorSeries.mul!(_4dq1, 4, dq[1], ord)
+        TaylorSeries.mul!(_4dq2, 4, dq[2], ord)
+        TaylorSeries.mul!(_4dq3, 4, dq[3], ord)
         Threads.@threads for i = 1:10
-            TaylorSeries.add!(ϕi_plus_4ϕj[i], poteph_ephU[i], _4ϕj[N], ord)
-            TaylorSeries.mul!(tmp1277[i], 2, v2[i], ord)
-            TaylorSeries.mul!(tmp1279[i], 4, vi_dot_vj[i], ord)
-            TaylorSeries.subst!(tmp1280[i], tmp1277[i], tmp1279[i], ord)
-            TaylorSeries.add!(sj2_plus_2si2_minus_4vivj[i], tmp1280[i], v2[N], ord)
-            TaylorSeries.subst!(ϕs_and_vs[i], sj2_plus_2si2_minus_4vivj[i], ϕi_plus_4ϕj[i], ord)
-            TaylorSeries.mul!(Xij_t_Ui[i], X[i], ui[i], ord)
-            TaylorSeries.mul!(Yij_t_Vi[i], Y[i], vi[i], ord)
-            TaylorSeries.mul!(Zij_t_Wi[i], Z[i], wi[i], ord)
-            TaylorSeries.add!(tmp1286[i], Xij_t_Ui[i], Yij_t_Vi[i], ord)
-            TaylorSeries.add!(Rij_dot_Vi[i], tmp1286[i], Zij_t_Wi[i], ord)
-            TaylorSeries.pow!(tmp1289[i], Rij_dot_Vi[i], tmp1342[i], 2, ord)
-            TaylorSeries.div!(pn1t7[i], tmp1289[i], r_p2[i], ord)
-            TaylorSeries.mul!(tmp1292[i], 1.5, pn1t7[i], ord)
-            TaylorSeries.subst!(pn1t2_7[i], ϕs_and_vs[i], tmp1292[i], ord)
-            TaylorSeries.add!(pn1t1_7[i], c_p2, pn1t2_7[i], ord)
-            TaylorSeries.mul!(pNX_t_X[i], acceph_ephU[3i - 2], X[i], ord)
-            TaylorSeries.mul!(pNY_t_Y[i], acceph_ephU[3i - 1], Y[i], ord)
-            TaylorSeries.mul!(pNZ_t_Z[i], acceph_ephU[3i], Z[i], ord)
-            TaylorSeries.add!(tmp1299[i], pNX_t_X[i], pNY_t_Y[i], ord)
-            TaylorSeries.add!(tmp1300[i], tmp1299[i], pNZ_t_Z[i], ord)
-            TaylorSeries.mul!(tmp1301[i], 0.5, tmp1300[i], ord)
-            TaylorSeries.add!(pn1[i], pn1t1_7[i], tmp1301[i], ord)
-            TaylorSeries.mul!(X_t_pn1[i], newton_acc_X[i], pn1[i], ord)
-            TaylorSeries.mul!(Y_t_pn1[i], newton_acc_Y[i], pn1[i], ord)
-            TaylorSeries.mul!(Z_t_pn1[i], newton_acc_Z[i], pn1[i], ord)
-            TaylorSeries.mul!(pNX_t_pn3[i], acceph_ephU[3i - 2], pn3[i], ord)
-            TaylorSeries.mul!(pNY_t_pn3[i], acceph_ephU[3i - 1], pn3[i], ord)
-            TaylorSeries.mul!(pNZ_t_pn3[i], acceph_ephU[3i], pn3[i], ord)
-        end
+                TaylorSeries.identity!(ui[i], sseph_ephU[3 * ((N - 1) + i) - 2], ord)
+                TaylorSeries.identity!(vi[i], sseph_ephU[3 * ((N - 1) + i) - 1], ord)
+                TaylorSeries.identity!(wi[i], sseph_ephU[3 * ((N - 1) + i)], ord)
+                TaylorSeries.subst!(U[i], ui[i], dq[1], ord)
+                TaylorSeries.subst!(V[i], vi[i], dq[2], ord)
+                TaylorSeries.subst!(W[i], wi[i], dq[3], ord)
+                TaylorSeries.mul!(tmp36[i], -3, ui[i], ord)
+                TaylorSeries.add!(_4U_m_3X[i], tmp36[i], _4dq1, ord)
+                TaylorSeries.mul!(tmp37[i], -3, vi[i], ord)
+                TaylorSeries.add!(_4V_m_3Y[i], tmp37[i], _4dq2, ord)
+                TaylorSeries.mul!(tmp38[i], -3, wi[i], ord)
+                TaylorSeries.add!(_4W_m_3Z[i], tmp38[i], _4dq3, ord)
+                TaylorSeries.mul!(pn2x[i], X[i], _4U_m_3X[i], ord)
+                TaylorSeries.mul!(pn2y[i], Y[i], _4V_m_3Y[i], ord)
+                TaylorSeries.mul!(pn2z[i], Z[i], _4W_m_3Z[i], ord)
+                TaylorSeries.mul!(UU[i], ui[i], dq[1], ord)
+                TaylorSeries.mul!(VV[i], vi[i], dq[2], ord)
+                TaylorSeries.mul!(WW[i], wi[i], dq[3], ord)
+                TaylorSeries.add!(tmp39[i], UU[i], VV[i], ord)
+                TaylorSeries.add!(vi_dot_vj[i], tmp39[i], WW[i], ord)
+                TaylorSeries.add!(tmp40[i], pn2x[i], pn2y[i], ord)
+                TaylorSeries.add!(tmp41[i], tmp40[i], pn2z[i], ord)
+                TaylorSeries.mul!(pn2[i], newtonianCoeff[i], tmp41[i], ord)
+                TaylorSeries.mul!(U_t_pn2[i], pn2[i], U[i], ord)
+                TaylorSeries.mul!(V_t_pn2[i], pn2[i], V[i], ord)
+                TaylorSeries.mul!(W_t_pn2[i], pn2[i], W[i], ord)
+                TaylorSeries.pow!(tmp42[i], ui[i], tmp43[i], 2, ord)
+                TaylorSeries.pow!(tmp44[i], vi[i], tmp45[i], 2, ord)
+                TaylorSeries.add!(tmp46[i], tmp42[i], tmp44[i], ord)
+                TaylorSeries.pow!(tmp47[i], wi[i], tmp48[i], 2, ord)
+                TaylorSeries.add!(v2[i], tmp46[i], tmp47[i], ord)
+                TaylorSeries.add!(ϕi_plus_4ϕj[i], poteph_ephU[i], _4ϕj[N], ord)
+                TaylorSeries.mul!(tmp49[i], 2, v2[i], ord)
+                TaylorSeries.mul!(tmp50[i], 4, vi_dot_vj[i], ord)
+                TaylorSeries.subst!(tmp51[i], tmp49[i], tmp50[i], ord)
+                TaylorSeries.add!(sj2_plus_2si2_minus_4vivj[i], tmp51[i], v2[N], ord)
+                TaylorSeries.subst!(ϕs_and_vs[i], sj2_plus_2si2_minus_4vivj[i], ϕi_plus_4ϕj[i], ord)
+                TaylorSeries.mul!(Xij_t_Ui[i], X[i], ui[i], ord)
+                TaylorSeries.mul!(Yij_t_Vi[i], Y[i], vi[i], ord)
+                TaylorSeries.mul!(Zij_t_Wi[i], Z[i], wi[i], ord)
+                TaylorSeries.add!(tmp52[i], Xij_t_Ui[i], Yij_t_Vi[i], ord)
+                TaylorSeries.add!(Rij_dot_Vi[i], tmp52[i], Zij_t_Wi[i], ord)
+                TaylorSeries.pow!(tmp53[i], Rij_dot_Vi[i], tmp54[i], 2, ord)
+                TaylorSeries.div!(pn1t7[i], tmp53[i], r_p2[i], ord)
+                TaylorSeries.mul!(tmp55[i], 1.5, pn1t7[i], ord)
+                TaylorSeries.subst!(pn1t2_7[i], ϕs_and_vs[i], tmp55[i], ord)
+                TaylorSeries.add!(pn1t1_7[i], c_p2, pn1t2_7[i], ord)
+                TaylorSeries.mul!(pNX_t_X[i], acceph_ephU[3i - 2], X[i], ord)
+                TaylorSeries.mul!(pNY_t_Y[i], acceph_ephU[3i - 1], Y[i], ord)
+                TaylorSeries.mul!(pNZ_t_Z[i], acceph_ephU[3i], Z[i], ord)
+                TaylorSeries.add!(tmp56[i], pNX_t_X[i], pNY_t_Y[i], ord)
+                TaylorSeries.add!(tmp57[i], tmp56[i], pNZ_t_Z[i], ord)
+                TaylorSeries.mul!(tmp58[i], 0.5, tmp57[i], ord)
+                TaylorSeries.add!(pn1[i], pn1t1_7[i], tmp58[i], ord)
+                TaylorSeries.mul!(X_t_pn1[i], newton_acc_X[i], pn1[i], ord)
+                TaylorSeries.mul!(Y_t_pn1[i], newton_acc_Y[i], pn1[i], ord)
+                TaylorSeries.mul!(Z_t_pn1[i], newton_acc_Z[i], pn1[i], ord)
+                TaylorSeries.mul!(pNX_t_pn3[i], acceph_ephU[3i - 2], pn3[i], ord)
+                TaylorSeries.mul!(pNY_t_pn3[i], acceph_ephU[3i - 1], pn3[i], ord)
+                TaylorSeries.mul!(pNZ_t_pn3[i], acceph_ephU[3i], pn3[i], ord)
+            end
         for i = 1:10
-            TaylorSeries.add!(tmp1309[i], U_t_pn2[i], pNX_t_pn3[i], ord)
-            TaylorSeries.add!(termpnx[i], X_t_pn1[i], tmp1309[i], ord)
+            TaylorSeries.add!(tmp59[i], U_t_pn2[i], pNX_t_pn3[i], ord)
+            TaylorSeries.add!(termpnx[i], X_t_pn1[i], tmp59[i], ord)
             TaylorSeries.add!(sumpnx[i], pntempX, termpnx[i], ord)
             TaylorSeries.identity!(pntempX, sumpnx[i], ord)
-            TaylorSeries.add!(tmp1312[i], V_t_pn2[i], pNY_t_pn3[i], ord)
-            TaylorSeries.add!(termpny[i], Y_t_pn1[i], tmp1312[i], ord)
+            TaylorSeries.add!(tmp60[i], V_t_pn2[i], pNY_t_pn3[i], ord)
+            TaylorSeries.add!(termpny[i], Y_t_pn1[i], tmp60[i], ord)
             TaylorSeries.add!(sumpny[i], pntempY, termpny[i], ord)
             TaylorSeries.identity!(pntempY, sumpny[i], ord)
-            TaylorSeries.add!(tmp1315[i], W_t_pn2[i], pNZ_t_pn3[i], ord)
-            TaylorSeries.add!(termpnz[i], Z_t_pn1[i], tmp1315[i], ord)
+            TaylorSeries.add!(tmp61[i], W_t_pn2[i], pNZ_t_pn3[i], ord)
+            TaylorSeries.add!(termpnz[i], Z_t_pn1[i], tmp61[i], ord)
             TaylorSeries.add!(sumpnz[i], pntempZ, termpnz[i], ord)
             TaylorSeries.identity!(pntempZ, sumpnz[i], ord)
         end
         Threads.@threads for i = 11:Nm1
-            TaylorSeries.mul!(X_t_pn1[i], c_p2, newton_acc_X[i], ord)
-            TaylorSeries.mul!(Y_t_pn1[i], c_p2, newton_acc_Y[i], ord)
-            TaylorSeries.mul!(Z_t_pn1[i], c_p2, newton_acc_Z[i], ord)
-        end
+                TaylorSeries.mul!(X_t_pn1[i], c_p2, newton_acc_X[i], ord)
+                TaylorSeries.mul!(Y_t_pn1[i], c_p2, newton_acc_Y[i], ord)
+                TaylorSeries.mul!(Z_t_pn1[i], c_p2, newton_acc_Z[i], ord)
+            end
         for i = 11:Nm1
             TaylorSeries.identity!(termpnx[i], X_t_pn1[i], ord)
             TaylorSeries.add!(sumpnx[i], pntempX, termpnx[i], ord)
@@ -2223,12 +2222,12 @@ end
     order = TS.order(t)
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
+    local sseph_ephU = params.sseph(dsj2k)
     local S = eltype(q)
     local N = params.N
     local Nm1 = N - 1
     local μ = params.μ
     local zero_q_1 = params.zeroq1
-    local sseph_ephU = params.sseph(dsj2k)
     X = Array{S}(undef, N)
     Y = Array{S}(undef, N)
     Z = Array{S}(undef, N)
@@ -2247,52 +2246,52 @@ end
     dq[1] = Taylor1(identity(constant_term(q[4])), order)
     dq[2] = Taylor1(identity(constant_term(q[5])), order)
     dq[3] = Taylor1(identity(constant_term(q[6])), order)
-    tmp1470 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp1470)
-        tmp1470[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp1 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp1)
+        tmp1[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1486 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp1486)
-        tmp1486[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp2 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp2)
+        tmp2[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1472 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp1472)
-        tmp1472[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp3 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp3)
+        tmp3[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1487 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp1487)
-        tmp1487[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp4 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp4)
+        tmp4[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1473 = Array{Taylor1{_S}}(undef, size(tmp1470))
-    for i = eachindex(tmp1473)
-        tmp1473[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp5 = Array{Taylor1{_S}}(undef, size(tmp1))
+    for i = eachindex(tmp5)
+        tmp5[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1475 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp1475)
-        tmp1475[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp6 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp6)
+        tmp6[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1488 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp1488)
-        tmp1488[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp7 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp7)
+        tmp7[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1489 = Array{Taylor1{_S}}(undef, size(r_p2))
-    for i = eachindex(tmp1489)
-        tmp1489[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp8 = Array{Taylor1{_S}}(undef, size(r_p2))
+    for i = eachindex(tmp8)
+        tmp8[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    #= /Users/lerm/.julia/dev/NEOs.jl/ex.jl:63 =# Threads.@threads for i = 1:Nm1
+    Threads.@threads for i = 1:Nm1
             X[i] = Taylor1(constant_term(sseph_ephU[3i - 2]) - constant_term(q[1]), order)
             Y[i] = Taylor1(constant_term(sseph_ephU[3i - 1]) - constant_term(q[2]), order)
             Z[i] = Taylor1(constant_term(sseph_ephU[3i]) - constant_term(q[3]), order)
-            tmp1470[i] = Taylor1(constant_term(X[i]) ^ float(constant_term(2)), order)
-            tmp1486[i] = Taylor1(zero(constant_term(X[i])), order)
-            tmp1472[i] = Taylor1(constant_term(Y[i]) ^ float(constant_term(2)), order)
-            tmp1487[i] = Taylor1(zero(constant_term(Y[i])), order)
-            tmp1473[i] = Taylor1(constant_term(tmp1470[i]) + constant_term(tmp1472[i]), order)
-            tmp1475[i] = Taylor1(constant_term(Z[i]) ^ float(constant_term(2)), order)
-            tmp1488[i] = Taylor1(zero(constant_term(Z[i])), order)
-            r_p2[i] = Taylor1(constant_term(tmp1473[i]) + constant_term(tmp1475[i]), order)
+            tmp1[i] = Taylor1(constant_term(X[i]) ^ float(constant_term(2)), order)
+            tmp2[i] = Taylor1(zero(constant_term(X[i])), order)
+            tmp3[i] = Taylor1(constant_term(Y[i]) ^ float(constant_term(2)), order)
+            tmp4[i] = Taylor1(zero(constant_term(Y[i])), order)
+            tmp5[i] = Taylor1(constant_term(tmp1[i]) + constant_term(tmp3[i]), order)
+            tmp6[i] = Taylor1(constant_term(Z[i]) ^ float(constant_term(2)), order)
+            tmp7[i] = Taylor1(zero(constant_term(Z[i])), order)
+            r_p2[i] = Taylor1(constant_term(tmp5[i]) + constant_term(tmp6[i]), order)
             r_p3d2[i] = Taylor1(constant_term(r_p2[i]) ^ float(constant_term(1.5)), order)
-            tmp1489[i] = Taylor1(zero(constant_term(r_p2[i])), order)
+            tmp8[i] = Taylor1(zero(constant_term(r_p2[i])), order)
             newtonianCoeff[i] = Taylor1(constant_term(μ[i]) / constant_term(r_p3d2[i]), order)
             newton_acc_X[i] = Taylor1(constant_term(X[i]) * constant_term(newtonianCoeff[i]), order)
             newton_acc_Y[i] = Taylor1(constant_term(Y[i]) * constant_term(newtonianCoeff[i]), order)
@@ -2309,7 +2308,7 @@ end
     dq[4] = Taylor1(identity(constant_term(accX)), order)
     dq[5] = Taylor1(identity(constant_term(accY)), order)
     dq[6] = Taylor1(identity(constant_term(accZ)), order)
-    return TaylorIntegration.RetAlloc{Taylor1{_S}}([temp_accX, temp_accY, temp_accZ, accX, accY, accZ], [X, Y, Z, r_p2, r_p3d2, newtonianCoeff, newton_acc_X, newton_acc_Y, newton_acc_Z, tmp1470, tmp1486, tmp1472, tmp1487, tmp1473, tmp1475, tmp1488, tmp1489], [Array{Taylor1{_S}, 2}(undef, 0, 0)], [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)])
+    return TaylorIntegration.RetAlloc{Taylor1{_S}}([temp_accX, temp_accY, temp_accZ, accX, accY, accZ], [X, Y, Z, r_p2, r_p3d2, newtonianCoeff, newton_acc_X, newton_acc_Y, newton_acc_Z, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8], [Array{Taylor1{_S}, 2}(undef, 0, 0)], [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)])
 end
 
 @cyclicbarrier function TaylorIntegration.jetcoeffs!(::Val{newtonian!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
@@ -2329,22 +2328,22 @@ end
     newton_acc_X = __ralloc.v1[7]
     newton_acc_Y = __ralloc.v1[8]
     newton_acc_Z = __ralloc.v1[9]
-    tmp1470 = __ralloc.v1[10]
-    tmp1486 = __ralloc.v1[11]
-    tmp1472 = __ralloc.v1[12]
-    tmp1487 = __ralloc.v1[13]
-    tmp1473 = __ralloc.v1[14]
-    tmp1475 = __ralloc.v1[15]
-    tmp1488 = __ralloc.v1[16]
-    tmp1489 = __ralloc.v1[17]
+    tmp1 = __ralloc.v1[10]
+    tmp2 = __ralloc.v1[11]
+    tmp3 = __ralloc.v1[12]
+    tmp4 = __ralloc.v1[13]
+    tmp5 = __ralloc.v1[14]
+    tmp6 = __ralloc.v1[15]
+    tmp7 = __ralloc.v1[16]
+    tmp8 = __ralloc.v1[17]
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
+    local sseph_ephU = params.sseph(dsj2k)
     local S = eltype(q)
     local N = params.N
     local Nm1 = N - 1
     local μ = params.μ
     local zero_q_1 = params.zeroq1
-    local sseph_ephU = params.sseph(dsj2k)
     for ord = 0:order - 1
         ordnext = ord + 1
         TaylorSeries.identity!(temp_accX, zero_q_1, ord)
@@ -2360,12 +2359,12 @@ end
                 TaylorSeries.subst!(X[i], sseph_ephU[3i - 2], q[1], ord)
                 TaylorSeries.subst!(Y[i], sseph_ephU[3i - 1], q[2], ord)
                 TaylorSeries.subst!(Z[i], sseph_ephU[3i], q[3], ord)
-                TaylorSeries.pow!(tmp1470[i], X[i], tmp1486[i], 2, ord)
-                TaylorSeries.pow!(tmp1472[i], Y[i], tmp1487[i], 2, ord)
-                TaylorSeries.add!(tmp1473[i], tmp1470[i], tmp1472[i], ord)
-                TaylorSeries.pow!(tmp1475[i], Z[i], tmp1488[i], 2, ord)
-                TaylorSeries.add!(r_p2[i], tmp1473[i], tmp1475[i], ord)
-                TaylorSeries.pow!(r_p3d2[i], r_p2[i], tmp1489[i], 1.5, ord)
+                TaylorSeries.pow!(tmp1[i], X[i], tmp2[i], 2, ord)
+                TaylorSeries.pow!(tmp3[i], Y[i], tmp4[i], 2, ord)
+                TaylorSeries.add!(tmp5[i], tmp1[i], tmp3[i], ord)
+                TaylorSeries.pow!(tmp6[i], Z[i], tmp7[i], 2, ord)
+                TaylorSeries.add!(r_p2[i], tmp5[i], tmp6[i], ord)
+                TaylorSeries.pow!(r_p3d2[i], r_p2[i], tmp8[i], 1.5, ord)
                 TaylorSeries.div!(newtonianCoeff[i], μ[i], r_p3d2[i], ord)
                 TaylorSeries.mul!(newton_acc_X[i], X[i], newtonianCoeff[i], ord)
                 TaylorSeries.mul!(newton_acc_Y[i], Y[i], newtonianCoeff[i], ord)
@@ -2394,12 +2393,12 @@ end
     order = TS.order(t)
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
+    local sseph_ephU = params.sseph(dsj2k)
     local S = eltype(q)
     local N = params.N
     local Nm1 = N - 1
     local μ = params.μ
     local zero_q_1 = params.zeroq1
-    local sseph_ephU = params.sseph(dsj2k)
     X = Array{S}(undef, N)
     Y = Array{S}(undef, N)
     Z = Array{S}(undef, N)
@@ -2418,52 +2417,52 @@ end
     dq[1] = Taylor1(identity(constant_term(q[4])), order)
     dq[2] = Taylor1(identity(constant_term(q[5])), order)
     dq[3] = Taylor1(identity(constant_term(q[6])), order)
-    tmp1533 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp1533)
-        tmp1533[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp1 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp1)
+        tmp1[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1549 = Array{Taylor1{_S}}(undef, size(X))
-    for i = eachindex(tmp1549)
-        tmp1549[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp2 = Array{Taylor1{_S}}(undef, size(X))
+    for i = eachindex(tmp2)
+        tmp2[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1535 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp1535)
-        tmp1535[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp3 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp3)
+        tmp3[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1550 = Array{Taylor1{_S}}(undef, size(Y))
-    for i = eachindex(tmp1550)
-        tmp1550[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp4 = Array{Taylor1{_S}}(undef, size(Y))
+    for i = eachindex(tmp4)
+        tmp4[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1536 = Array{Taylor1{_S}}(undef, size(tmp1533))
-    for i = eachindex(tmp1536)
-        tmp1536[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp5 = Array{Taylor1{_S}}(undef, size(tmp1))
+    for i = eachindex(tmp5)
+        tmp5[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1538 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp1538)
-        tmp1538[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp6 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp6)
+        tmp6[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1551 = Array{Taylor1{_S}}(undef, size(Z))
-    for i = eachindex(tmp1551)
-        tmp1551[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp7 = Array{Taylor1{_S}}(undef, size(Z))
+    for i = eachindex(tmp7)
+        tmp7[i] = Taylor1(zero(constant_term(q[1])), order)
     end
-    tmp1552 = Array{Taylor1{_S}}(undef, size(r_p2))
-    for i = eachindex(tmp1552)
-        tmp1552[i] = Taylor1(zero(constant_term(q[1])), order)
+    tmp8 = Array{Taylor1{_S}}(undef, size(r_p2))
+    for i = eachindex(tmp8)
+        tmp8[i] = Taylor1(zero(constant_term(q[1])), order)
     end
     Threads.@threads for i = 1:Nm1
             X[i] = Taylor1(constant_term(sseph_ephU[3i - 2]) - constant_term(q[1]), order)
             Y[i] = Taylor1(constant_term(sseph_ephU[3i - 1]) - constant_term(q[2]), order)
             Z[i] = Taylor1(constant_term(sseph_ephU[3i]) - constant_term(q[3]), order)
-            tmp1533[i] = Taylor1(constant_term(X[i]) ^ float(constant_term(2)), order)
-            tmp1549[i] = Taylor1(zero(constant_term(X[i])), order)
-            tmp1535[i] = Taylor1(constant_term(Y[i]) ^ float(constant_term(2)), order)
-            tmp1550[i] = Taylor1(zero(constant_term(Y[i])), order)
-            tmp1536[i] = Taylor1(constant_term(tmp1533[i]) + constant_term(tmp1535[i]), order)
-            tmp1538[i] = Taylor1(constant_term(Z[i]) ^ float(constant_term(2)), order)
-            tmp1551[i] = Taylor1(zero(constant_term(Z[i])), order)
-            r_p2[i] = Taylor1(constant_term(tmp1536[i]) + constant_term(tmp1538[i]), order)
+            tmp1[i] = Taylor1(constant_term(X[i]) ^ float(constant_term(2)), order)
+            tmp2[i] = Taylor1(zero(constant_term(X[i])), order)
+            tmp3[i] = Taylor1(constant_term(Y[i]) ^ float(constant_term(2)), order)
+            tmp4[i] = Taylor1(zero(constant_term(Y[i])), order)
+            tmp5[i] = Taylor1(constant_term(tmp1[i]) + constant_term(tmp3[i]), order)
+            tmp6[i] = Taylor1(constant_term(Z[i]) ^ float(constant_term(2)), order)
+            tmp7[i] = Taylor1(zero(constant_term(Z[i])), order)
+            r_p2[i] = Taylor1(constant_term(tmp5[i]) + constant_term(tmp6[i]), order)
             r_p3d2[i] = Taylor1(constant_term(r_p2[i]) ^ float(constant_term(1.5)), order)
-            tmp1552[i] = Taylor1(zero(constant_term(r_p2[i])), order)
+            tmp8[i] = Taylor1(zero(constant_term(r_p2[i])), order)
             newtonianCoeff[i] = Taylor1(constant_term(μ[i]) / constant_term(r_p3d2[i]), order)
             newton_acc_X[i] = Taylor1(constant_term(X[i]) * constant_term(newtonianCoeff[i]), order)
             newton_acc_Y[i] = Taylor1(constant_term(Y[i]) * constant_term(newtonianCoeff[i]), order)
@@ -2480,7 +2479,7 @@ end
     dq[4] = Taylor1(identity(constant_term(accX)), order)
     dq[5] = Taylor1(identity(constant_term(accY)), order)
     dq[6] = Taylor1(identity(constant_term(accZ)), order)
-    return TaylorIntegration.RetAlloc{Taylor1{_S}}([temp_accX, temp_accY, temp_accZ, accX, accY, accZ], [X, Y, Z, r_p2, r_p3d2, newtonianCoeff, newton_acc_X, newton_acc_Y, newton_acc_Z, tmp1533, tmp1549, tmp1535, tmp1550, tmp1536, tmp1538, tmp1551, tmp1552], [Array{Taylor1{_S}, 2}(undef, 0, 0)], [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)])
+    return TaylorIntegration.RetAlloc{Taylor1{_S}}([temp_accX, temp_accY, temp_accZ, accX, accY, accZ], [X, Y, Z, r_p2, r_p3d2, newtonianCoeff, newton_acc_X, newton_acc_Y, newton_acc_Z, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8], [Array{Taylor1{_S}, 2}(undef, 0, 0)], [Array{Taylor1{_S}, 3}(undef, 0, 0, 0)], [Array{Taylor1{_S}, 4}(undef, 0, 0, 0, 0)])
 end
 
 @cyclicbarrier function TaylorIntegration.jetcoeffs!(::Val{sunearthmoon!}, t::Taylor1{_T}, q::AbstractArray{Taylor1{_S}, _N}, dq::AbstractArray{Taylor1{_S}, _N}, params, __ralloc::TaylorIntegration.RetAlloc{Taylor1{_S}}) where {_T <: Real, _S <: Number, _N}
@@ -2500,22 +2499,22 @@ end
     newton_acc_X = __ralloc.v1[7]
     newton_acc_Y = __ralloc.v1[8]
     newton_acc_Z = __ralloc.v1[9]
-    tmp1533 = __ralloc.v1[10]
-    tmp1549 = __ralloc.v1[11]
-    tmp1535 = __ralloc.v1[12]
-    tmp1550 = __ralloc.v1[13]
-    tmp1536 = __ralloc.v1[14]
-    tmp1538 = __ralloc.v1[15]
-    tmp1551 = __ralloc.v1[16]
-    tmp1552 = __ralloc.v1[17]
+    tmp1 = __ralloc.v1[10]
+    tmp2 = __ralloc.v1[11]
+    tmp3 = __ralloc.v1[12]
+    tmp4 = __ralloc.v1[13]
+    tmp5 = __ralloc.v1[14]
+    tmp6 = __ralloc.v1[15]
+    tmp7 = __ralloc.v1[16]
+    tmp8 = __ralloc.v1[17]
     local jd0 = params.jd0
     local dsj2k = t + (jd0 - JD_J2000)
+    local sseph_ephU = params.sseph(dsj2k)
     local S = eltype(q)
     local N = params.N
     local Nm1 = N - 1
     local μ = params.μ
     local zero_q_1 = params.zeroq1
-    local sseph_ephU = params.sseph(dsj2k)
     for ord = 0:order - 1
         ordnext = ord + 1
         TaylorSeries.identity!(temp_accX, zero_q_1, ord)
@@ -2531,12 +2530,12 @@ end
                 TaylorSeries.subst!(X[i], sseph_ephU[3i - 2], q[1], ord)
                 TaylorSeries.subst!(Y[i], sseph_ephU[3i - 1], q[2], ord)
                 TaylorSeries.subst!(Z[i], sseph_ephU[3i], q[3], ord)
-                TaylorSeries.pow!(tmp1533[i], X[i], tmp1549[i], 2, ord)
-                TaylorSeries.pow!(tmp1535[i], Y[i], tmp1550[i], 2, ord)
-                TaylorSeries.add!(tmp1536[i], tmp1533[i], tmp1535[i], ord)
-                TaylorSeries.pow!(tmp1538[i], Z[i], tmp1551[i], 2, ord)
-                TaylorSeries.add!(r_p2[i], tmp1536[i], tmp1538[i], ord)
-                TaylorSeries.pow!(r_p3d2[i], r_p2[i], tmp1552[i], 1.5, ord)
+                TaylorSeries.pow!(tmp1[i], X[i], tmp2[i], 2, ord)
+                TaylorSeries.pow!(tmp3[i], Y[i], tmp4[i], 2, ord)
+                TaylorSeries.add!(tmp5[i], tmp1[i], tmp3[i], ord)
+                TaylorSeries.pow!(tmp6[i], Z[i], tmp7[i], 2, ord)
+                TaylorSeries.add!(r_p2[i], tmp5[i], tmp6[i], ord)
+                TaylorSeries.pow!(r_p3d2[i], r_p2[i], tmp8[i], 1.5, ord)
                 TaylorSeries.div!(newtonianCoeff[i], μ[i], r_p3d2[i], ord)
                 TaylorSeries.mul!(newton_acc_X[i], X[i], newtonianCoeff[i], ord)
                 TaylorSeries.mul!(newton_acc_Y[i], Y[i], newtonianCoeff[i], ord)

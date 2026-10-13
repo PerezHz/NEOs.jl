@@ -253,43 +253,11 @@ For other dynamical models, see [`gravityonly!`](@ref), [`newtonian!`](@ref) and
     Compute point-mass Newtonian accelerations, all bodies
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
-    # 4 * Velocity of the asteroid
-    _4dq1 = 4dq[1]
-    _4dq2 = 4dq[2]
-    _4dq3 = 4dq[3]
     Threads.@threads for i in 1:Nm1
-        # Velocity of the i-th body
-        ui[i] = sseph_ephU[3(N-1+i)-2]    # X-axis component
-        vi[i] = sseph_ephU[3(N-1+i)-1]    # Y-axis component
-        wi[i] = sseph_ephU[3(N-1+i)  ]    # Z-axis component
-
         # Position of the i-th body - position of the asteroid
         X[i] = sseph_ephU[3i-2]-q[1]      # X-axis component
         Y[i] = sseph_ephU[3i-1]-q[2]      # Y-axis component
         Z[i] = sseph_ephU[3i  ]-q[3]      # Z-axis component
-
-        # Velocity of the i-th body - velocity of the asteroid
-        U[i] = ui[i]-dq[1]                  # X-axis component
-        V[i] = vi[i]-dq[2]                  # Y-axis component
-        W[i] = wi[i]-dq[3]                  # Z-axis component
-
-        # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
-        _4U_m_3X[i] = (-3ui[i]) + (_4dq1)   # X-axis component
-        _4V_m_3Y[i] = (-3vi[i]) + (_4dq2)   # Y-axis component
-        _4W_m_3Z[i] = (-3wi[i]) + (_4dq3)   # Z-axis component
-
-        # Dot product inside the [] in the second term
-        pn2x = X[i]*_4U_m_3X[i]
-        pn2y = Y[i]*_4V_m_3Y[i]
-        pn2z = Z[i]*_4W_m_3Z[i]
-
-        # v_{ij}v_{asteroid} j = x, y, z
-        UU[i] = ui[i]*dq[1]
-        VV[i] = vi[i]*dq[2]
-        WW[i] = wi[i]*dq[3]
-
-        # <Velocity of the i-th body, velocity of the asteroid>
-        vi_dot_vj[i] = ( UU[i]+VV[i] ) + WW[i]
 
         # Distance between the i-th body and the asteroid
         r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,asteroid}^2
@@ -298,9 +266,6 @@ For other dynamical models, see [`gravityonly!`](@ref), [`newtonian!`](@ref) and
 
         # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
         newtonianCoeff[i] =  μ[i]/r_p3d2[i]
-
-        # Second term without (\mathbf{v}_i - \mathbf{v}_asteroid)
-        pn2[i] = newtonianCoeff[i]*(( pn2x+pn2y ) + pn2z)
 
         # Newtonian coefficient * difference between two positions, i.e.,
         # \mu_i * (\mathbf{r_i} - \mathbf{r_asteroid}) / r_{ij}^3
@@ -312,10 +277,6 @@ For other dynamical models, see [`gravityonly!`](@ref), [`newtonian!`](@ref) and
         newtonian1b_Potential[i] = μ[i]/r_p1d2[i]
         # Third term without newtonian accelerations \mathbf{a}_i
         pn3[i] = 3.5newtonian1b_Potential[i]
-        # Full second term
-        U_t_pn2[i] = pn2[i]*U[i]    # X-axis component
-        V_t_pn2[i] = pn2[i]*V[i]    # Y-axis component
-        W_t_pn2[i] = pn2[i]*W[i]    # Z-axis component
 
         #=
         Extended body accelerations
@@ -386,8 +347,6 @@ For other dynamical models, see [`gravityonly!`](@ref), [`newtonian!`](@ref) and
             F_J2_y[i] = F_J2_y1[i] + F_J2_y2[i]
             F_J2_z[i] = F_J2_z1[i] + F_J2_z2[i]
         end
-        # Velocity magnitude of the i-th body
-        v2[i] = ( (ui[i]^2)+(vi[i]^2) ) + (wi[i]^2)
     end
     # Asteroid velocity magnitude
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
@@ -422,7 +381,52 @@ For other dynamical models, see [`gravityonly!`](@ref), [`newtonian!`](@ref) and
 
     # 4*\sum term inside {}
     _4ϕj[N] = 4newtonianNb_Potential[N]
+    # 4 * Velocity of the asteroid
+    _4dq1 = 4dq[1]
+    _4dq2 = 4dq[2]
+    _4dq3 = 4dq[3]
+    # The velocity-dependent terms are only needed for the bodies of this loop,
+    # i.e. the first ten perturbers (POST_NEWTONIAN_BODIES in src/constants.jl)
     Threads.@threads for i in 1:10
+        # Velocity of the i-th body
+        ui[i] = sseph_ephU[3(N-1+i)-2]    # X-axis component
+        vi[i] = sseph_ephU[3(N-1+i)-1]    # Y-axis component
+        wi[i] = sseph_ephU[3(N-1+i)  ]    # Z-axis component
+
+        # Velocity of the i-th body - velocity of the asteroid
+        U[i] = ui[i]-dq[1]                  # X-axis component
+        V[i] = vi[i]-dq[2]                  # Y-axis component
+        W[i] = wi[i]-dq[3]                  # Z-axis component
+
+        # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
+        _4U_m_3X[i] = (-3ui[i]) + (_4dq1)   # X-axis component
+        _4V_m_3Y[i] = (-3vi[i]) + (_4dq2)   # Y-axis component
+        _4W_m_3Z[i] = (-3wi[i]) + (_4dq3)   # Z-axis component
+
+        # Dot product inside the [] in the second term
+        pn2x = X[i]*_4U_m_3X[i]
+        pn2y = Y[i]*_4V_m_3Y[i]
+        pn2z = Z[i]*_4W_m_3Z[i]
+
+        # v_{ij}v_{asteroid} j = x, y, z
+        UU[i] = ui[i]*dq[1]
+        VV[i] = vi[i]*dq[2]
+        WW[i] = wi[i]*dq[3]
+
+        # <Velocity of the i-th body, velocity of the asteroid>
+        vi_dot_vj[i] = ( UU[i]+VV[i] ) + WW[i]
+
+        # Second term without (\mathbf{v}_i - \mathbf{v}_asteroid)
+        pn2[i] = newtonianCoeff[i]*(( pn2x+pn2y ) + pn2z)
+
+        # Full second term
+        U_t_pn2[i] = pn2[i]*U[i]    # X-axis component
+        V_t_pn2[i] = pn2[i]*V[i]    # Y-axis component
+        W_t_pn2[i] = pn2[i]*W[i]    # Z-axis component
+
+        # Velocity magnitude of the i-th body
+        v2[i] = ( (ui[i]^2)+(vi[i]^2) ) + (wi[i]^2)
+
         # 4*\sum + \sum terms inside {}
         ϕi_plus_4ϕj[i] = poteph_ephU[i] + _4ϕj[N]
         # \dot{s}_j^2 + 2\dot{s}_i^2 - 4 <, > terms inside {}
@@ -802,43 +806,11 @@ For other dynamical models, see [`nongravs!`](@ref), [`newtonian!`](@ref) and
     Compute point-mass Newtonian accelerations, all bodies
     See equation (35) in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract
     =#
-    # 4 * Velocity of the asteroid
-    _4dq1 = 4dq[1]
-    _4dq2 = 4dq[2]
-    _4dq3 = 4dq[3]
     Threads.@threads for i in 1:Nm1
-        # Velocity of the i-th body
-        ui[i] = sseph_ephU[3(N-1+i)-2]    # X-axis component
-        vi[i] = sseph_ephU[3(N-1+i)-1]    # Y-axis component
-        wi[i] = sseph_ephU[3(N-1+i)  ]    # Z-axis component
-
         # Position of the i-th body - position of the asteroid
         X[i] = sseph_ephU[3i-2]-q[1]      # X-axis component
         Y[i] = sseph_ephU[3i-1]-q[2]      # Y-axis component
         Z[i] = sseph_ephU[3i  ]-q[3]      # Z-axis component
-
-        # Velocity of the i-th body - velocity of the asteroid
-        U[i] = ui[i]-dq[1]                  # X-axis component
-        V[i] = vi[i]-dq[2]                  # Y-axis component
-        W[i] = wi[i]-dq[3]                  # Z-axis component
-
-        # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
-        _4U_m_3X[i] = (-3ui[i]) + (_4dq1)   # X-axis component
-        _4V_m_3Y[i] = (-3vi[i]) + (_4dq2)   # Y-axis component
-        _4W_m_3Z[i] = (-3wi[i]) + (_4dq3)   # Z-axis component
-
-        # Dot product inside the [] in the second term
-        pn2x = X[i]*_4U_m_3X[i]
-        pn2y = Y[i]*_4V_m_3Y[i]
-        pn2z = Z[i]*_4W_m_3Z[i]
-
-        # v_{ij}v_{asteroid} j = x, y, z
-        UU[i] = ui[i]*dq[1]
-        VV[i] = vi[i]*dq[2]
-        WW[i] = wi[i]*dq[3]
-
-        # <Velocity of the i-th body, velocity of the asteroid>
-        vi_dot_vj[i] = ( UU[i]+VV[i] ) + WW[i]
 
         # Distance between the i-th body and the asteroid
         r_p2[i] = ( (X[i]^2)+(Y[i]^2) ) + (Z[i]^2)  # r_{i,asteroid}^2
@@ -847,9 +819,6 @@ For other dynamical models, see [`nongravs!`](@ref), [`newtonian!`](@ref) and
 
         # Newtonian coefficient, i.e., mass parameter / distance^3 -> \mu_i / r_{i, asteroid}^3
         newtonianCoeff[i] =  μ[i]/r_p3d2[i]
-
-        # Second term without (\mathbf{v}_i - \mathbf{v}_asteroid)
-        pn2[i] = newtonianCoeff[i]*(( pn2x+pn2y ) + pn2z)
 
         # Newtonian coefficient * difference between two positions, i.e.,
         # \mu_i * (\mathbf{r_i} - \mathbf{r_asteroid}) / r_{ij}^3
@@ -861,10 +830,6 @@ For other dynamical models, see [`nongravs!`](@ref), [`newtonian!`](@ref) and
         newtonian1b_Potential[i] = μ[i]/r_p1d2[i]
         # Third term without newtonian accelerations \mathbf{a}_i
         pn3[i] = 3.5newtonian1b_Potential[i]
-        # Full second term
-        U_t_pn2[i] = pn2[i]*U[i]    # X-axis component
-        V_t_pn2[i] = pn2[i]*V[i]    # Y-axis component
-        W_t_pn2[i] = pn2[i]*W[i]    # Z-axis component
 
         #=
         Extended body accelerations
@@ -935,8 +900,6 @@ For other dynamical models, see [`nongravs!`](@ref), [`newtonian!`](@ref) and
             F_J2_y[i] = F_J2_y1[i] + F_J2_y2[i]
             F_J2_z[i] = F_J2_z1[i] + F_J2_z2[i]
         end
-        # Velocity magnitude of the i-th body
-        v2[i] = ( (ui[i]^2)+(vi[i]^2) ) + (wi[i]^2)
     end
     # Asteroid velocity magnitude
     v2[N] = ( (q[4]^2)+(q[5]^2) ) + (q[6]^2)
@@ -971,7 +934,52 @@ For other dynamical models, see [`nongravs!`](@ref), [`newtonian!`](@ref) and
 
     # 4*\sum term inside {}
     _4ϕj[N] = 4newtonianNb_Potential[N]
+    # 4 * Velocity of the asteroid
+    _4dq1 = 4dq[1]
+    _4dq2 = 4dq[2]
+    _4dq3 = 4dq[3]
+    # The velocity-dependent terms are only needed for the bodies of this loop,
+    # i.e. the first ten perturbers (POST_NEWTONIAN_BODIES in src/constants.jl)
     Threads.@threads for i in 1:10
+        # Velocity of the i-th body
+        ui[i] = sseph_ephU[3(N-1+i)-2]    # X-axis component
+        vi[i] = sseph_ephU[3(N-1+i)-1]    # Y-axis component
+        wi[i] = sseph_ephU[3(N-1+i)  ]    # Z-axis component
+
+        # Velocity of the i-th body - velocity of the asteroid
+        U[i] = ui[i]-dq[1]                  # X-axis component
+        V[i] = vi[i]-dq[2]                  # Y-axis component
+        W[i] = wi[i]-dq[3]                  # Z-axis component
+
+        # 4 * Velocity of the asteroid - 3 * velocity of the i-th body
+        _4U_m_3X[i] = (-3ui[i]) + (_4dq1)   # X-axis component
+        _4V_m_3Y[i] = (-3vi[i]) + (_4dq2)   # Y-axis component
+        _4W_m_3Z[i] = (-3wi[i]) + (_4dq3)   # Z-axis component
+
+        # Dot product inside the [] in the second term
+        pn2x = X[i]*_4U_m_3X[i]
+        pn2y = Y[i]*_4V_m_3Y[i]
+        pn2z = Z[i]*_4W_m_3Z[i]
+
+        # v_{ij}v_{asteroid} j = x, y, z
+        UU[i] = ui[i]*dq[1]
+        VV[i] = vi[i]*dq[2]
+        WW[i] = wi[i]*dq[3]
+
+        # <Velocity of the i-th body, velocity of the asteroid>
+        vi_dot_vj[i] = ( UU[i]+VV[i] ) + WW[i]
+
+        # Second term without (\mathbf{v}_i - \mathbf{v}_asteroid)
+        pn2[i] = newtonianCoeff[i]*(( pn2x+pn2y ) + pn2z)
+
+        # Full second term
+        U_t_pn2[i] = pn2[i]*U[i]    # X-axis component
+        V_t_pn2[i] = pn2[i]*V[i]    # Y-axis component
+        W_t_pn2[i] = pn2[i]*W[i]    # Z-axis component
+
+        # Velocity magnitude of the i-th body
+        v2[i] = ( (ui[i]^2)+(vi[i]^2) ) + (wi[i]^2)
+
         # 4*\sum + \sum terms inside {}
         ϕi_plus_4ϕj[i] = poteph_ephU[i] + _4ϕj[N]
         # \dot{s}_j^2 + 2\dot{s}_i^2 - 4 <, > terms inside {}
@@ -1332,6 +1340,12 @@ bodyindices(::Val{sunearthmoon!}) = [su, ea, mo]
 bodyindices(::Val{newtonian!}) = 1:9
 bodyindices(::Val{gravityonly!}) = 1:SSEPHNBODIES
 bodyindices(::Val{nongravs!}) = 1:SSEPHNBODIES
+
+# Indices of the bodies whose velocities are read by each dynamical model (or by `rvelea`)
+velocitybodies(::Val{sunearthmoon!}) = [ea]
+velocitybodies(::Val{newtonian!}) = [ea]
+velocitybodies(::Val{gravityonly!}) = POST_NEWTONIAN_BODIES
+velocitybodies(::Val{nongravs!}) = POST_NEWTONIAN_BODIES
 
 # Gravitational parameters used by each dynamical model
 gm(::Val{sunearthmoon!}) = μ_DE430[bodyindices(Val(sunearthmoon!))]
