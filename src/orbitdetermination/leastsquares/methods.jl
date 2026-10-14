@@ -184,17 +184,18 @@ function Newton(
     ) where {T <: Real}
     # Number of observations and degrees of freedom
     nobs, npar = notoutobs(res), length(idxs)
-    # Mean square residual and its gradient
+    # Mean square residual
     Q = nms(res)
     if !isnothing(penalty)
         Q += penalty
     end
-    GQ = TaylorSeries.gradient(Q)[idxs]
-    # Hessian of the target function
-    HQ = [zero(Q) for _ in 1:npar, _ in 1:npar]
+    # Gradient and Hessian
+    GQ = Vector{TaylorN{T}}(undef, npar)
+    HQ = Matrix{TaylorN{T}}(undef, npar, npar)
     for j in eachindex(idxs)
+        GQ[j] = TaylorSeries.differentiate(Q, idxs[j])
         for i in eachindex(idxs)
-            HQ[i, j] = TS.differentiate(GQ[idxs[j]], idxs[i])
+            HQ[i, j] = TS.differentiate(GQ[j], idxs[i])
         end
     end
     # Evaluate gradient and hessian
@@ -236,18 +237,18 @@ function update!(
     ) where {T <: Real}
     # Number of observations and degrees of freedom
     ls.nobs, ls.npar = notoutobs(res), length(idxs)
-    # Mean square residual and its gradient
+    # Mean square residual
     ls.Q = nms(res)
     if !isnothing(penalty)
         ls.Q += penalty
     end
+    # Gradient and Hessian
     TS.zero!.(ls.GQ)
-    ls.GQ .= TaylorSeries.gradient(ls.Q)[idxs]
-    # Hessian
     TS.zero!.(ls.HQ)
     for j in eachindex(idxs)
+        ls.GQ[j] = TaylorSeries.differentiate(ls.Q, idxs[j])
         for i in eachindex(idxs)
-            ls.HQ[i, j] = TS.differentiate(ls.GQ[idxs[j]], idxs[i])
+            ls.HQ[i, j] = TS.differentiate(ls.GQ[j], idxs[i])
         end
     end
     # Evaluate gradient and hessian
@@ -465,17 +466,18 @@ function LevenbergMarquardt(
     nobs, npar = notoutobs(res), length(idxs)
     # Damping factor
     λ = T(0.001)
-    # Mean square residual and its gradient
+    # Mean square residual
     Q = nms(res)
     if !isnothing(penalty)
         Q += penalty
     end
-    GQ = TaylorSeries.gradient(Q)[idxs]
-    # Hessian
-    HQ = [zero(Q) for _ in 1:npar, _ in 1:npar]
+    # Gradient and Hessian
+    GQ = Vector{TaylorN{T}}(undef, npar)
+    HQ = Matrix{TaylorN{T}}(undef, npar, npar)
     for j in eachindex(idxs)
+        GQ[j] = TaylorSeries.differentiate(Q, idxs[j])
         for i in eachindex(idxs)
-            HQ[i, j] = TS.differentiate(GQ[idxs[j]], idxs[i])
+            HQ[i, j] = TS.differentiate(GQ[j], idxs[i])
         end
     end
     # Evaluate gradient and hessian
@@ -528,18 +530,18 @@ function update!(
     ls.nobs, ls.npar = notoutobs(res), length(idxs)
     # Damping factor
     ls.λ = T(0.001)
-    # Mean square residual and its gradient
+    # Mean square residual
     ls.Q = nms(res)
     if !isnothing(penalty)
         ls.Q += penalty
     end
+    # Gradient and Hessian
     TS.zero!.(ls.GQ)
-    ls.GQ .= TaylorSeries.gradient(ls.Q)[idxs]
-    # Hessian
     TS.zero!.(ls.HQ)
     for j in eachindex(idxs)
+        ls.GQ[j] = TaylorSeries.differentiate(ls.Q, idxs[j])
         for i in eachindex(idxs)
-            ls.HQ[i, j] = TS.differentiate(ls.GQ[idxs[j]], idxs[i])
+            ls.HQ[i, j] = TS.differentiate(ls.GQ[j], idxs[i])
         end
     end
     # Evaluate gradient and hessian
