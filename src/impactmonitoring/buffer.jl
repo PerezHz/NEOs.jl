@@ -149,7 +149,9 @@ memory for [`closeapproaches`](@ref).
 # Arguments
 
 - `IM::IMProblem`: impact monitoring problem.
-- `q0::Vector{<:Number}`: initial condition.
+- `q0::Vector{<:Number}`: initial condition; its element type sets the arithmetic
+    of the propagation, e.g. `SigmaJet{N, T}` or `Taylor1{T}` for a virtual asteroid
+    with `Taylor1{T}` coefficients of order `N - 1`.
 - `nyears::Real`: number of years.
 - `params::Parameters`: see the `Propagation` section of [`Parameters`](@ref).
 """
