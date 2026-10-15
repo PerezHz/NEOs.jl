@@ -16,6 +16,46 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
 @testset "Impact monitoring" begin
 
+    @testset "Taylor1S" begin
+        using NEOs: Taylor1S, vanumber
+
+        # Nested Taylor1 kernels and their Taylor1S analogues must agree exactly
+        n, m = 12, 4
+        inner(k, s) = Taylor1([cos(s * k + j) / (1 + k + j) for j in 0:m], m)
+        a = Taylor1([inner(k, 3) + 2.0 * (k == 0) for k in 0:n], n)
+        b = Taylor1([inner(k, 5) + 1.5 * (k == 0) for k in 0:n], n)
+        T1S = Taylor1S{m + 1, Float64}
+        A, B = Taylor1(T1S.(a.coeffs), n), Taylor1(T1S.(b.coeffs), n)
+        function samekernel(f!)
+            cN, cS, auxN, auxS = zero(a), zero(A), zero(a), zero(A)
+            for k in 0:n
+                f!(cN, a, b, auxN, k)
+                f!(cS, A, B, auxS, k)
+            end
+            return all(T1S(cN[k]) == cS[k] for k in 0:n)
+        end
+        @test samekernel((c, x, y, aux, k) -> TaylorSeries.mul!(c, x, y, k))
+        @test samekernel((c, x, y, aux, k) -> TaylorSeries.div!(c, x, y, k))
+        @test samekernel((c, x, y, aux, k) -> TaylorSeries.div!(c, 0.7, y, k))
+        @test samekernel((c, x, y, aux, k) -> TaylorSeries.subst!(c, x, 0.3, k))
+        @test samekernel((c, x, y, aux, k) -> TaylorSeries.sqrt!(c, x, aux, k))
+        for r in (2, -2.0, 1.5)
+            @test samekernel((c, x, y, aux, k) -> TaylorSeries.pow!(c, x, aux, r, k))
+        end
+        x, y = A[0], B[0]
+        @test x + y == T1S(a[0] + b[0]) && x - y == T1S(a[0] - b[0])
+        @test x * y == T1S(a[0] * b[0]) && x / y == T1S(a[0] / b[0])
+        @test (x < y) == (a[0] < b[0]) && x + 1.0 == T1S(a[0] + 1.0)
+        @test x + Taylor1S{m + 1, Float32}(1.0) isa T1S
+        xN, xS = [zero(a[0])], [zero(A[0])]
+        TaylorSeries.evaluate!([a], 0.25, xN)
+        TaylorSeries.evaluate!([A], 0.25, xS)
+        @test T1S(xN[1]) == xS[1]
+        @test T1S(evaluate(a, b[0])) == evaluate(A, B[0])
+        @test (a < 3.0) == (A < 3.0) && (a > 3.0) == (A > 3.0)
+        @test vanumber(Taylor1{Float64}, T1S(a[1])) == a[1]
+    end
+
     @testset "Common" begin
         using NEOs: PLANET_NAMES_TO_INDEX, PLANET_RADII, sseph, numtype,
               μ_S, lovtransform
@@ -193,6 +233,9 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         Threads.threadpoolsize() == 1 && @warn "Running with a single thread; " *
             "both close approaches computations use serial code"
         @test closeapproaches(IM, VA, nyears, Parameters(params; threads = false); ctol) == CAs
+        # Taylor1S (default) and nested Taylor1 close approaches must agree exactly
+        buffer = NEOs.CloseApproachesBuffer(IM, initialcondition(VA), nyears, params)
+        @test closeapproaches(IM, VA, nyears, params; ctol, buffer) == CAs
         @test length(CAs) == 1
         CA = CAs[1]
 
@@ -391,6 +434,9 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         Threads.threadpoolsize() == 1 && @warn "Running with a single thread; " *
             "both close approaches computations use serial code"
         @test closeapproaches(IM, VA, nyears, Parameters(params; threads = false); ctol) == CAs
+        # Taylor1S (default) and nested Taylor1 close approaches must agree exactly
+        buffer = NEOs.CloseApproachesBuffer(IM, initialcondition(VA), nyears, params)
+        @test closeapproaches(IM, VA, nyears, params; ctol, buffer) == CAs
         @test length(CAs) == 1
         CA = CAs[1]
 

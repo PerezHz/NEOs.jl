@@ -242,14 +242,30 @@ list of parameters see the `Propagation` section of  [`Parameters`](@ref).
 - `nrabstol::Real`: allowed tolerance for the Newton-Raphson process
     (default: `eps()`).
 - `buffer::Union{Nothing, CloseApproachesBuffer}`: pre-allocated memory
-    (default: `nothing`).
+    (default: `nothing`). The number type of `buffer` sets the arithmetic of
+    the propagation; by default, a virtual asteroid with `Taylor1{T}`
+    coefficients is propagated with `Taylor1{Taylor1S{N, T}}` series.
 """
 function closeapproaches(
         IM::AbstractIMProblem{D, T}, VA::VirtualAsteroid{T, U},
         nyears::T, params::Parameters{T}; R_TP::T = 0.2,
         ctol::T = T(Inf), newtoniter::Int = 25, nrabstol::T = eps(T),
-        buffer::Union{Nothing, CloseApproachesBuffer{T, U}} = nothing
+        buffer::Union{Nothing, CloseApproachesBuffer{T}} = nothing
     ) where {D, T <: Real, U <: Number}
+    # Close approaches buffer
+    if isnothing(buffer)
+        q0 = propagationic(initialcondition(VA))
+        buffer = CloseApproachesBuffer(IM, q0, nyears, params)
+    end
+    return _closeapproaches(IM, VA, nyears, params, buffer; R_TP, ctol,
+                            newtoniter, nrabstol)
+end
+
+function _closeapproaches(
+        IM::AbstractIMProblem{D, T}, VA::VirtualAsteroid{T, U},
+        nyears::T, params::Parameters{T}, buffer::CloseApproachesBuffer{T, V};
+        R_TP::T, ctol::T, newtoniter::Int, nrabstol::T
+    ) where {D, T <: Real, U <: Number, V <: Number}
     # Unpack problem and parameters
     @unpack target = IM
     @unpack abstol, maxsteps, eph_su = params
@@ -258,13 +274,9 @@ function closeapproaches(
     R_P = radius(target)
     # Dynamical model
     dynamics = dynamicalmodel(IM)
-    # Initial conditions
+    # Initial conditions (in the number type of the buffer)
     t0, tmax = zero(T), nyears * yr
-    q0 = initialcondition(VA)
-    # Close approaches buffer
-    if isnothing(buffer)
-        buffer = CloseApproachesBuffer(IM, q0, nyears, params)
-    end
+    q0 = convert_ic(V, initialcondition(VA))
     @unpack prop, root = buffer
     # Unpack propagation buffer
     @unpack cache, dparams = prop
@@ -312,14 +324,14 @@ function closeapproaches(
         flag, dt_nr = findroot(f_tupl_old, f_tupl, δt_old, root; nrabstol, newtoniter)
         if flag
             # Time at surface crossing
-            t_CA = epoch(VA) + told + dt_nr
+            t_CA = epoch(VA) + told + vanumber(U, dt_nr)
             if !isintimerange(t_CA, target)
                 @warn("Time of close approach is outside the target's ephemeris \
                        timerange; exiting.")
                 break
             end
             # Asteroid's planetocentric state vector
-            xap = xold(dt_nr) - target(t_CA)
+            xap = vanumber.(U, xold(dt_nr)) - target(t_CA)
             # Planetocentric keplerian elements
             kep = KeplerianElements{T, U}(
                 gm(target),
@@ -352,14 +364,14 @@ function closeapproaches(
         flag, dt_nr = findroot(g_tupl_old, g_tupl, δt_old, root; nrabstol, newtoniter)
         if flag
             # Time at close approach
-            t_CA = epoch(VA) + told + dt_nr
+            t_CA = epoch(VA) + told + vanumber(U, dt_nr)
             if !isintimerange(t_CA, target)
                 @warn("Time of close approach is outside the target's ephemeris \
                        timerange; exiting.")
                 break
             end
             # Asteroid's planetocentric state vector
-            xap = xold(dt_nr) - target(t_CA)
+            xap = vanumber.(U, xold(dt_nr)) - target(t_CA)
             # Asteroid's planetocentric semimajor axis
             a = semimajoraxis(xap..., gm(target), zero(T))
             if a < 0
