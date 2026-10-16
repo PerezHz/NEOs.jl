@@ -74,6 +74,11 @@ end
 
 Farnocchia et al. (2015) optical astrometry debiasing scheme.
 
+The bias table is loaded on first use and shared by schemes with the same
+number type (`Float16`, `Float32` or `Float64`). Treat `table` and `catcodes`
+as read-only; copy them before making changes. Each scheme has its own vector
+of corrections, which is replaced by `update!`.
+
 !!! reference
     See:
     - https://doi.org/10.1016/j.icarus.2014.07.033
@@ -108,6 +113,12 @@ end
 
 Eggl et al. (2020) optical astrometry debiasing scheme.
 
+Use `Eggl20(optical, true)` to select the high-resolution table. Each resolution
+and number type (`Float16`, `Float32` or `Float64`) has its own table, loaded on
+first use and shared by subsequent schemes. Treat `table` and `catcodes` as
+read-only; copy them before making changes. Each scheme has its own vector of
+corrections, which is replaced by `update!`.
+
 !!! reference
     See:
     - https://doi.org/10.1016/j.icarus.2019.113596
@@ -139,18 +150,49 @@ function update!(x::Eggl20{T}, optical::AbstractOpticalVector{T}) where {T <: Re
     return nothing
 end
 
-# Return the catalogue codes, truth catalogue, resolution and bias matrix of the
-# corresponding debiasing scheme. The possible values for `id` are:
-# - `2014` (Farnocchia et al. 2015):
-#    * Truth catalogue: PPM-XL [t]
-#    * Source: https://doi.org/10.1016/j.icarus.2014.07.033
-# - `2018` (Eggl et al. 2020, default):
-#    * Truth catalogue: Gaia DR2 [V]
-#    * Source: https://doi.org/10.1016/j.icarus.2019.113596
-# - `hires2018` (Eggl et al. 2020, high resolution):
-#    * Truth catalogue: Gaia DR2 [V]
-#    * Source: https://doi.org/10.1016/j.icarus.2019.113596
-function select_debiasing_table(::Type{T}, id::String = "2018") where {T <: Real}
+# Tables are kept for the lifetime of the Julia process, only after first use.
+const DEBIASING_TABLES = Dict{Tuple{DataType, String}, Any}()
+const DEBIASING_TABLES_LOCK = ReentrantLock()
+
+"""
+    select_debiasing_table(T, id = "2018")
+
+Return the catalogue codes, truth catalogue, resolution and bias matrix for
+debiasing scheme `id`, with matrix entries of type `T`.
+
+- `"2014"`: Farnocchia et al. (2015), relative to PPM-XL [t].
+- `"2018"`: Eggl et al. (2020), relative to Gaia DR2 [V].
+- `"hires2018"`: high-resolution Eggl et al. (2020), relative to Gaia DR2 [V].
+
+For `Float16`, `Float32` and `Float64`, load each table once per Julia process.
+The returned arrays are shared and must not be modified. Simultaneous requests
+for a table wait for its first load to finish. Other number types are read anew,
+so changes to settings such as `BigFloat` precision are respected.
+"""
+select_debiasing_table(::Type{T}, id::String = "2018") where {T <: Real} =
+    read_debiasing_table(T, id)
+
+function select_debiasing_table(::Type{T}, id::String = "2018") where
+        {T <: Union{Float16, Float32, Float64}}
+    # Hold the lock during loading too, to avoid reading a large table twice.
+    data = lock(DEBIASING_TABLES_LOCK) do
+        get!(DEBIASING_TABLES, (T, id)) do
+            read_debiasing_table(T, id)
+        end
+    end
+    # The dictionary contains several number types; callers receive a fixed type.
+    return data::Tuple{Vector{Char}, String, Resolution, Matrix{T}}
+end
+
+"""
+    read_debiasing_table(T, id)
+
+Read and check a debiasing table from its artifact, without retaining it for
+later calls. Return the catalogue codes, truth catalogue, resolution and bias
+matrix, as in [`select_debiasing_table`](@ref). A failed read is not retained by
+`select_debiasing_table`, so a later call can try again.
+"""
+function read_debiasing_table(::Type{T}, id::String) where {T <: Real}
     # Debiasing tables are loaded "lazily" via Julia artifacts,
     # according to rules in Artifacts.toml
     comment_char, comments = '!', true
@@ -173,8 +215,8 @@ function select_debiasing_table(::Type{T}, id::String = "2018") where {T <: Real
         catcodes = CATALOGUE_MPC_CODES_2014
         debias_path = artifact"debias_2014"
     else
-        @error "Unknown bias map: $(id). Possible values are `2014`, `2018` \
-            and `hires2018`."
+        throw(ArgumentError("Unknown bias map: $(id). Possible values are `2014`, \
+            `2018` and `hires2018`."))
     end
     # Debias table file
     bias_file = joinpath(debias_path, "bias.dat")
