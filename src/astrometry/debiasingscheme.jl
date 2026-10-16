@@ -150,8 +150,13 @@ function update!(x::Eggl20{T}, optical::AbstractOpticalVector{T}) where {T <: Re
     return nothing
 end
 
-# Tables are kept for the lifetime of the Julia process, only after first use.
+# Store the catalogue codes, truth catalogue, resolution and bias matrix for each
+# (number type, scheme ID), so repeated fits do not read the same file again.
+# Entries are added on first use and kept for the lifetime of the Julia process.
 const DEBIASING_TABLES = Dict{Tuple{DataType, String}, Any}()
+# Protect all access to the dictionary, including the first read of a table, so
+# simultaneous requests reuse the same completed entry rather than loading it twice.
+# This helps loading and accessing the debiasing-table cache thread-safe.
 const DEBIASING_TABLES_LOCK = ReentrantLock()
 
 """
