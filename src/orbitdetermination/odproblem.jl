@@ -148,8 +148,14 @@ end
 function init_optical_residuals(
         ::Type{U}, od::ODProblem,
         idxs::AbstractVector{Int} = opticalindices(od),
+        outlier_flags::AbstractVector{Bool} = outliers(od),
     ) where {U <: Number}
-    return init_optical_residuals(U, od.weights, od.debias, idxs)
+    res = init_optical_residuals(U, od.weights, od.debias, idxs)
+    flags = length(outlier_flags) == length(idxs) ? outlier_flags : view(outlier_flags, idxs)
+    for i in eachindex(res)
+        res[i] = setoutlier(res[i], flags[i])
+    end
+    return res
 end
 
 function init_radar_residuals(
@@ -158,7 +164,8 @@ function init_radar_residuals(
         outliers = falses(nradar(od))
     ) where {U <: Number}
     radar = view(od.radar, idxs)
-    return init_radar_residuals(U, radar, view(outliers, idxs))
+    outlier_flags = length(outliers) == length(idxs) ? outliers : view(outliers, idxs)
+    return init_radar_residuals(U, radar, outlier_flags)
 end
 
 function set_od_order(::Type{T}, varorder::Int, numvars::Int = 6) where {T <: Real}

@@ -512,7 +512,7 @@ function linkage(
     # Original weights
     w8s = deepcopy(od.weights.weights)
     # Dynamical initial condition
-    q0 = initialcondition(porbit, dof(od), params)
+    q0 = initialcondition(porbit, jd0, dof(od), params)
     # Initialize buffer and set of residuals
     buffer = PropresBuffer(od, q0, jd0, params)
     res = init_residuals(T, od, porbit)
@@ -560,7 +560,7 @@ function linkage(
             break
         end
         # Scale up weights
-        q0 = initialcondition(orbit, dof(od), params)
+        q0 = initialcondition(orbit, jd0, dof(od), params)
         propres!(res, od, q0, jd0, params; buffer)
         if isempty(res)
             verbose && @warn("Linkage did not converge within the given parameters \

@@ -360,7 +360,7 @@ function admissibleregionfallbackseed(od::ODProblem, params::Parameters)
     seed_tracklets = isnothing(tracklet) ? collect(enumerate(od.tracklets)) : [(1, tracklet)]
     seed_fractions = ((0.5, 0.5), (0.6, 0.7), (0.4, 0.3),
                       (0.25, 0.5), (0.75, 0.5), (0.1, 0.5), (0.9, 0.5))
-    profile_params = Parameters(params; adamiter = 1, adammode = true)
+    profile_params = Parameters(params; mmoviter = 1, mmovmode = true)
     best, best_tracklet, best_domain = nothing, 0, (0.0, 0.0)
     NEOs.set_od_order(params, 6)
     for (i, candidate_tracklet) in seed_tracklets
@@ -1755,7 +1755,7 @@ function main()
         marsden_radial = use_cometary_nongravs ? COMETARY_MARSDEN_RADIAL :
                          (1.0, 1.0, 2.0, 0.0, 0.0),
         gaussorder = 2, safegauss = true, refscale = :log,
-        tsaorder = 2, adamiter = 500, adamQtol = 1E-5,
+        mmovorder = 2, mmoviter = 500, mmovQtol = 1E-5,
         jtlsorder = 2, jtlsmask = false, jtlsiter = 20, lsiter = 30,
         jtlsproject = true, significance = 0.99, verbose = true,
         outrej = true, χ2_rec = 4.0, χ2_rej = 5.0, fudge = 100.0,
