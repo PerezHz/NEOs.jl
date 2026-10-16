@@ -74,7 +74,7 @@ function PropresBuffer(
     prop = PropagationBuffer(dynamicalmodel(IM), q0, jd0, tlim, params)
     optical = [OpticalBuffer(q0[1], x) for x in IM.orbit.optical]
     radar = RadarBuffer{T, U}[]
-    return PropresBuffer{T, U, V}(prop, optical, radar)
+    return PropresBuffer{T, U, V, typeof(prop.cache.parse_eqs)}(prop, optical, radar)
 end
 
 function propres!(

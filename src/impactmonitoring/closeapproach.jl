@@ -290,7 +290,7 @@ function closeapproaches(
     flagA, flagB = true, true
     while flagA || flagB
         δt_old = t0 - told
-        δt = taylorstep!(Val(parse_eqs), dynamics, t, x, dx, xaux, abstol, dparams, rv) # δt is positive!
+        δt = taylorstep!(parse_eqs, dynamics, t, x, dx, xaux, abstol, dparams, rv) # δt is positive!
         # Below, δt has the proper sign according to the direction of the integration
         if iszero(δt)
             @warn("The step-size is zero; exiting.")

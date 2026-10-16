@@ -185,7 +185,7 @@ end
                 # back to parse_eqs = false)
                 for p in paramsv
                     buffer = NEOs.PropagationBuffer(dynamics, q0, jd0, tlim, p)
-                    @test buffer.cache.parse_eqs == p.parse_eqs
+                    @test buffer.cache.parse_eqs === Val(p.parse_eqs)
                 end
                 sols = [NEOs.propagate(dynamics, q0, jd0, nyears, p) for p in paramsv]
                 # More than one step was taken

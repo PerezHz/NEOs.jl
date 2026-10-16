@@ -144,19 +144,20 @@ mutable struct DynamicalParameters{T <: Real, U <: Number, V <: Number}
 end
 
 """
-    PropagationBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
+    PropagationBuffer{T <: Real, U <: Number, V <: Number, P <: Val} <: AbstractBuffer
 
 Pre-allocated memory for the propagation functions: [`propagate`](@ref),
-[`propagate_root`](@ref) and [`propagate_lyap`](@ref).
+[`propagate_root`](@ref) and [`propagate_lyap`](@ref). `P` is the type of
+`cache.parse_eqs`, either `Val{true}` or `Val{false}`.
 
 # Fields
 
 - `cache::VectorCache{...}`: `TaylorIntegration` cache.
 - `dparams::DynamicalParameters{T, U, V}`: parameters used by the dynamical model.
 """
-struct PropagationBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
+struct PropagationBuffer{T <: Real, U <: Number, V <: Number, P <: Val} <: AbstractBuffer
     cache::VectorCache{Vector{T}, Matrix{U}, Matrix{Taylor1{U}}, Vector{Taylor1{U}},
-        Taylor1{T}, Vector{Taylor1{U}}, Vector{Taylor1{U}}, RetAlloc{Taylor1{U}}, Bool}
+        Taylor1{T}, Vector{Taylor1{U}}, Vector{Taylor1{U}}, RetAlloc{Taylor1{U}}, P}
     dparams::DynamicalParameters{T, U, V}
 end
 
@@ -225,5 +226,5 @@ function PropagationBuffer(
     cache = init_cache(Val(true), zero(T), q0, maxsteps, order, dynamics, dparams;
                        parse_eqs)
 
-    return PropagationBuffer{T, U, V}(cache, dparams)
+    return PropagationBuffer{T, U, V, typeof(cache.parse_eqs)}(cache, dparams)
 end
