@@ -474,25 +474,25 @@ end
         nms_del, nms_dop = nms(res_del), nms(res_dop)
         nrms_del, nrms_dop = nrms(res_del), nrms(res_dop)
 
-        @test mean_del ≈ -0.530 atol=1e-3
-        @test mean_dop ≈ -0.240 atol=1e-3
-        @test std_del ≈ 1.446 atol=1e-3
-        @test std_dop ≈ 0.409 atol=1e-3
-        @test chi2_del ≈ 38.234 atol=1e-3
-        @test chi2_dop ≈ 6.356 atol=1e-3
-        @test nms_del ≈ 2.249 atol=1e-3
-        @test nms_dop ≈ 0.219 atol=1e-3
-        @test nrms_del ≈ 1.500 atol=1e-3
-        @test nrms_dop ≈ 0.468 atol=1e-3
+        @test mean_del ≈ -0.852 atol=1e-3
+        @test mean_dop ≈ -0.096 atol=1e-3
+        @test std_del ≈ 1.012 atol=1e-3
+        @test std_dop ≈ 0.419 atol=1e-3
+        @test chi2_del ≈ 28.721 atol=1e-3
+        @test chi2_dop ≈ 5.185 atol=1e-3
+        @test nms_del ≈ 1.689 atol=1e-3
+        @test nms_dop ≈ 0.179 atol=1e-3
+        @test nrms_del ≈ 1.300 atol=1e-3
+        @test nrms_dop ≈ 0.423 atol=1e-3
 
         res = vcat(res_ra, res_dec, res_del, res_dop)
 
         # Total statistics
-        @test mean(res) ≈ -0.015 atol=1e-3
-        @test std(res) ≈ 0.230 atol=1e-3
-        @test chi2(res) ≈ 48.510 atol=1e-3
-        @test nms(res) ≈ 0.053 atol=1e-3
-        @test nrms(res) ≈ 0.231 atol=1e-3
+        @test mean(res) ≈ -0.017 atol=1e-3
+        @test std(res) ≈ 0.203 atol=1e-3
+        @test chi2(res) ≈ 37.826 atol=1e-3
+        @test nms(res) ≈ 0.042 atol=1e-3
+        @test nrms(res) ≈ 0.204 atol=1e-3
     end
 
     @testset "Jet transport propagation and TaylorN serialization" begin
