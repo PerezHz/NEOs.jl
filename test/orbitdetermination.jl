@@ -77,7 +77,10 @@ function jpl_compatibility_tests(spkid, orbit, params, bounds)
         @test mre(q1, equinoctial2cartesian(eqn0; μ = μ_S), σ0) < bounds[3]
         @test mre(q2, attributable2cartesian(attr0), σ0) < bounds[3]
         @test mre(kep(mjd0 + yr), eqn(mjd0 + yr), σ0) < bounds[3]
-        @test mre(cartesian2keplerian(q1, mjd0; μ = μ_S), kep0, σkep0) < bounds[4]
+        kep1 = cartesian2keplerian(q1, mjd0; μ = μ_S)
+        # Scalar and Taylor arithmetic can differ by roundoff; angles are in degrees.
+        roundoff = 16eps(eltype(kep0)) .* max.(abs.(kep0), (1, 1, 360, 360, 360, 360))
+        @test all(abs.(kep1 - kep0) .<= max.(bounds[4] .* σkep0, roundoff))
         @test mre(cartesian2equinoctial(q1; μ = μ_S), eqn0, σeqn0) < bounds[4]
         @test mre(cartesian2attributable(q2), attr0, σattr0) < bounds[4]
         @test mre(keplerian2equinoctial(kep0, mjd0; μ = μ_S), eqn0, σeqn0) < bounds[5]

@@ -1051,7 +1051,7 @@ function printpostfitephemeris(orbit::LeastSquaresOrbit, params::Parameters, H::
         geometry = ephemerisgeometry(t, postfitstate(scalar_eph, t)[1:3], params)
         elevation = elevationdeg(obs, date, αas, δas)
         phase = deg2rad(geometry.phase_angle)
-        Φ = NEOs.phase_integral(phase, params.slope)
+        Φ = NEOs.phase_integral(phase; slope = params.slope)
         V = H + 5 * log10(geometry.geocentric_distance * geometry.heliocentric_distance) -
             2.5 * log10(Φ)
         σmajor, σminor, σpa = skyplaneuncertainty(obs, date, jet_eph, orbit, params)
@@ -1110,7 +1110,7 @@ function motionarcvalue(x::Real, width::Int = 9)
     return lpad(@sprintf("%.2f", x), width)
 end
 
-motiontrackletindices(orbit::LeastSquaresOrbit) = indices.(orbit.tracklets)
+motiontrackletindices(orbit::LeastSquaresOrbit) = opticalindices.(orbit.tracklets)
 
 
 function trackletmotion(idxs::AbstractVector{Int}, orbit::LeastSquaresOrbit,
@@ -1234,7 +1234,7 @@ function magnituderesiduals(orbit::LeastSquaresOrbit, H::Real, params::Parameter
         d_OS = norm(xe - xs)
         d_BO = norm(xa - xe)
         phase = acos(clamp((d_BO^2 + d_BS^2 - d_OS^2) / (2 * d_BO * d_BS), -1, 1))
-        phase_integral = NEOs.phase_integral(phase, params.slope)
+        phase_integral = NEOs.phase_integral(phase; slope = params.slope)
         isfinite(phase_integral) && phase_integral > 0 || continue
         computed_v = H + 5 * log10(d_BS * d_BO) - 2.5 * log10(phase_integral)
         res[i] = observed_v - computed_v
@@ -1802,8 +1802,7 @@ function main()
             )
             full_residuals_attached = true
         catch err
-            println("• Could not compute residuals for held-out observations; ",
-                    "saving fit-only orbit (", typeof(err), ")")
+            @warn "Could not compute residuals for held-out observations; saving fit-only orbit" exception = (err, catch_backtrace())
         end
     end
     printitle("Final orbit", "*")
