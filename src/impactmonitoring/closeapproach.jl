@@ -290,13 +290,20 @@ function closeapproaches(
     flagA, flagB = true, true
     while flagA || flagB
         δt_old = t0 - told
-        δt = taylorstep!(Val(parse_eqs), dynamics, t, x, dx, xaux, abstol, dparams, rv) # δt is positive!
+        δt = taylorstep!(parse_eqs, dynamics, t, x, dx, xaux, abstol, dparams, rv) # δt is positive!
         # Below, δt has the proper sign according to the direction of the integration
         if iszero(δt)
-            @warn("The step-size is zero; exiting.")
+            @warn("The step-size is zero; aborting integration.")
             break
         end
-        δt = sign_tstep * min(δt, sign_tstep * (tmax - t0))
+        # Exact step: t0 + δt is exactly representable (as in `taylorinteg!`);
+        # δt is zero in the extra iteration (flagA = false) at the final time
+        δt = TaylorIntegration._exact_step(t0, sign_tstep * δt, tmax, sign_tstep)
+        if flagA && iszero(δt)
+            @warn("The step-size is below the resolution of the time variable; \
+                   aborting integration.")
+            break
+        end
         flagB = flagA
         # New initial condition
         TS.evaluate!(x, δt, x0)

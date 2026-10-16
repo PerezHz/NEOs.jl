@@ -1,16 +1,16 @@
 """
-    PropresBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
+    PropresBuffer{T <: Real, U <: Number, V <: Number, P <: Val} <: AbstractBuffer
 
 Pre-allocated memory for [`propres`](@ref).
 
 # Fields
 
-- `prop::PropagationBuffer{T, U, V}`: buffer for [`propagate`](@ref).
+- `prop::PropagationBuffer{T, U, V, P}`: buffer for [`propagate`](@ref).
 - `optical::Vector{OpticalBuffer{T, U}}`: buffer for [`compute_radec`](@ref).
 - `radar::Vector{RadarBuffer{T, U}}`: buffer for [`compute_delay`](@ref).
 """
-struct PropresBuffer{T <: Real, U <: Number, V <: Number} <: AbstractBuffer
-    prop::PropagationBuffer{T, U, V}
+struct PropresBuffer{T <: Real, U <: Number, V <: Number, P <: Val} <: AbstractBuffer
+    prop::PropagationBuffer{T, U, V, P}
     optical::Vector{OpticalBuffer{T, U}}
     radar::Vector{RadarBuffer{T, U}}
 end
@@ -27,7 +27,7 @@ function PropresBuffer(
     prop = PropagationBuffer(od.dynamics, q0, jd0, tlim, params)
     optical = [OpticalBuffer(q0[1], od.optical[i]) for i in idxs]
     radar = RadarBuffer{T, U}[]
-    return PropresBuffer{T, U, V}(prop, optical, radar)
+    return PropresBuffer{T, U, V, typeof(prop.cache.parse_eqs)}(prop, optical, radar)
 end
 
 function PropresBuffer(
@@ -41,7 +41,7 @@ function PropresBuffer(
     optical = [OpticalBuffer(q0[1], x) for x in od.optical]
     radar = hasradar(od) ? [RadarBuffer(q0[1], x, params.radarord) for x in od.radar] :
         RadarBuffer{T, U}[]
-    return PropresBuffer{T, U, V}(prop, optical, radar)
+    return PropresBuffer{T, U, V, typeof(prop.cache.parse_eqs)}(prop, optical, radar)
 end
 
 """

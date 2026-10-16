@@ -3,7 +3,8 @@
         D,
         T <: Real,
         R <: AbstractResidualSet{T, TaylorN{T}},
-        O <: AbstractOrbitVector{D, T, T}
+        O <: AbstractOrbitVector{D, T, T},
+        P <: Val
     } <: AbstractBuffer
 
 Pre-allocated memory for [`jtls`](@ref).
@@ -15,7 +16,7 @@ Pre-allocated memory for [`jtls`](@ref).
 - `Qs::Vector{T}`: nrms history.
 - `q00s::Matrix{T}`: initial conditions history.
 - `outs::Union{Nothing, Vector{Int}}`: number of non rejected observations history.
-- `prbuffer::PropresBuffer{T, TaylorN{T}, T}`: buffer for [`propres`](@ref).
+- `prbuffer::PropresBuffer{T, TaylorN{T}, T, P}`: buffer for [`propres`](@ref).
 - `lscache::LeastSquaresCache{T}`: buffer for [`leastsquares!`](@ref).
 - `orcache::Union{Nothing, OutlierRejectionCache{T}}`:  buffer for
     [`outlier_rejection!`](@ref).
@@ -24,20 +25,21 @@ struct JTLSBuffer{
         D,
         T <: Real,
         R <: AbstractResidualSet{T, TaylorN{T}},
-        O <: AbstractOrbitVector{D, T, T}
+        O <: AbstractOrbitVector{D, T, T},
+        P <: Val
     } <: AbstractBuffer
     res::R
     orbits::O
     Qs::Vector{T}
     q00s::Matrix{T}
     outs::Union{Nothing, Vector{Int}}
-    prbuffer::PropresBuffer{T, TaylorN{T}, T}
+    prbuffer::PropresBuffer{T, TaylorN{T}, T, P}
     lscache::LeastSquaresCache{T}
     orcache::Union{Nothing, OutlierRejectionCache{T}}
 end
 
 # Abbreviation
-const AbstractJTLSBuffer{D, T} = JTLSBuffer{D, T, R, O} where {R, O}
+const AbstractJTLSBuffer{D, T} = JTLSBuffer{D, T, R, O, P} where {R, O, P}
 
 # Constructor
 function JTLSBuffer(od::AbstractODProblem{D, T}, orbit::AbstractOrbit,
@@ -60,7 +62,8 @@ function JTLSBuffer(od::AbstractODProblem{D, T}, orbit::AbstractOrbit,
     prbuffer = PropresBuffer(od, q0, jd0, params)
     lscache = LeastSquaresCache(zeros(T, Npar), 1:Npar, lsiter)
     orcache = OutlierRejectionCache(T, noptical(od))
-    return JTLSBuffer{D, T, typeof(res), typeof(orbits)}(res, orbits, Qs, q00s, outs,
+    P = typeof(prbuffer.prop.cache.parse_eqs)
+    return JTLSBuffer{D, T, typeof(res), typeof(orbits), P}(res, orbits, Qs, q00s, outs,
         prbuffer, lscache, orcache)
 end
 

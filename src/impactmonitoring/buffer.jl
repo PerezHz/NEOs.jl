@@ -1,5 +1,5 @@
 """
-    LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
+    LineOfVariationsBuffer{T <: Real, P <: Val} <: AbstractBuffer
 
 Pre-allocated memory for [`lineofvariations`](@ref).
 
@@ -9,14 +9,14 @@ Pre-allocated memory for [`lineofvariations`](@ref).
 - `sun::Vector{T}`: Sun barycentric cartesian state vector at `t0` [au, au/day].
 - `scalings::Vector{T}`: covariance matrix scaling factors.
 - `res::Vector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
-- `propres::PropresBuffer{T, TaylorN{T}, T}`: buffer for [`propres`](@ref).
+- `propres::PropresBuffer{T, TaylorN{T}, T, P}`: buffer for [`propres`](@ref).
 """
-struct LineOfVariationsBuffer{T <: Real} <: AbstractBuffer
+struct LineOfVariationsBuffer{T <: Real, P <: Val} <: AbstractBuffer
     t0::T
     sun::Vector{T}
     scalings::Vector{T}
     res::Vector{OpticalResidual{T, TaylorN{T}}}
-    propres::PropresBuffer{T, TaylorN{T}, T}
+    propres::PropresBuffer{T, TaylorN{T}, T, P}
 end
 
 TaylorSeries.order(x::LineOfVariationsBuffer) =
@@ -62,7 +62,8 @@ function LineOfVariationsBuffer(
     # Propagation and residuals buffer
     propres = PropresBuffer(IM, q0TN, jd0, params)
 
-    return LineOfVariationsBuffer{T}(t0, sun, scalings, res, propres)
+    P = typeof(propres.prop.cache.parse_eqs)
+    return LineOfVariationsBuffer{T, P}(t0, sun, scalings, res, propres)
 end
 
 """
@@ -125,17 +126,17 @@ mutable struct RootFindingBuffer{T <: Real, U <: Number} <: AbstractBuffer
 end
 
 """
-    CloseApproachesBuffer{T <: Real, U <: Number} <: AbstractBuffer
+    CloseApproachesBuffer{T <: Real, U <: Number, P <: Val} <: AbstractBuffer
 
 Pre-allocated memory for [`closeapproaches`](@ref).
 
 # Fields
 
-- `prop::PropagationBuffer{T, U, T}`: propagation buffer.
+- `prop::PropagationBuffer{T, U, T, P}`: propagation buffer.
 - `root::RootFindingBuffer{T, U}`: root-finding buffer.
 """
-struct CloseApproachesBuffer{T <: Real, U <: Number} <: AbstractBuffer
-    prop::PropagationBuffer{T, U, T}
+struct CloseApproachesBuffer{T <: Real, U <: Number, P <: Val} <: AbstractBuffer
+    prop::PropagationBuffer{T, U, T, P}
     root::RootFindingBuffer{T, U}
 end
 
@@ -184,24 +185,24 @@ function CloseApproachesBuffer(
     root = RootFindingBuffer{T, U}(jd0, rv, teph,  g_dg_val, g_dg, g_constant,
         f_tupl, g_tupl, f_tupl_old, g_tupl_old)
     # Close approaches buffer
-    return CloseApproachesBuffer{T, U}(prop, root)
+    return CloseApproachesBuffer{T, U, typeof(prop.cache.parse_eqs)}(prop, root)
 end
 
 """
-    VirtualImpactorsBuffer{T <: Real} <: AbstractBuffer
+    VirtualImpactorsBuffer{T <: Real, P <: Val, Q <: Val} <: AbstractBuffer
 
 Pre-allocated memory for [`verifyvirtualimpactor`](@ref).
 
 # Fields
 
 - `res::Vector{OpticalResidual{T, TaylorN{T}}}`: vector of residuals.
-- `propres::PropresBuffer{T, TaylorN{T}, T}`: buffer for [`propres`](@ref).
-- `CAs::CloseApproachesBuffer{T, TaylorN{T}}`: buffer for [`closeapproaches`](@ref).
+- `propres::PropresBuffer{T, TaylorN{T}, T, P}`: buffer for [`propres`](@ref).
+- `CAs::CloseApproachesBuffer{T, TaylorN{T}, Q}`: buffer for [`closeapproaches`](@ref).
 """
-struct VirtualImpactorsBuffer{T <: Real} <: AbstractBuffer
+struct VirtualImpactorsBuffer{T <: Real, P <: Val, Q <: Val} <: AbstractBuffer
     res::Vector{OpticalResidual{T, TaylorN{T}}}
-    propres::PropresBuffer{T, TaylorN{T}, T}
-    CAs::CloseApproachesBuffer{T, TaylorN{T}}
+    propres::PropresBuffer{T, TaylorN{T}, T, P}
+    CAs::CloseApproachesBuffer{T, TaylorN{T}, Q}
 end
 
 """
@@ -230,5 +231,6 @@ function VirtualImpactorsBuffer(
     nyears = ( datetime2julian(MAXDTTDB) - jd0 ) / yr
     CAs = CloseApproachesBuffer(IM, q0, nyears, params)
     # Virtual impactors buffer
-    return VirtualImpactorsBuffer{T}(res, propres, CAs)
+    P, Q = typeof(propres.prop.cache.parse_eqs), typeof(CAs.prop.cache.parse_eqs)
+    return VirtualImpactorsBuffer{T, P, Q}(res, propres, CAs)
 end
