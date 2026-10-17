@@ -1045,6 +1045,38 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), debias(d14), debias(d34))) < 0.95
         @test maximum(map((x, y) -> hypot(x[1] - y[1], x[2] - y[2]), debias(d24), debias(d34))) < 0.95
 
+        @testset "Debiasing table reuse" begin
+            # Schemes share the table, but never the observation corrections.
+            @test d13.table === d23.table === d33.table
+            @test d14.table === d24.table === d34.table
+            @test d13.table !== d14.table
+            @test debias(d13) !== debias(d23)
+            @test debias(d14) !== debias(d24)
+
+            for (id, scheme) in (("2014", d13), ("2018", d14))
+                data = @inferred NEOs.select_debiasing_table(Float64, id)
+                reference = NEOs.read_debiasing_table(Float64, id)
+                @test data == reference
+                @test last(data) === scheme.table
+                @test debias(scheme) == NEOs.debiasing(optical1, reference...)
+            end
+
+            # Simultaneous requests for another number type share a single table.
+            tasks = [Threads.@spawn NEOs.select_debiasing_table(Float32, "2014")
+                     for _ in 1:4]
+            tables = fetch.(tasks)
+            table32 = last(first(tables))
+            @test all(x -> last(x) === table32, tables)
+            @test table32 isa Matrix{Float32}
+            @test table32 == Float32.(d13.table)
+            @test last(@inferred NEOs.select_debiasing_table(Float32, "2014")) === table32
+
+            # A failed load must leave subsequent requests usable.
+            @test_throws ArgumentError NEOs.select_debiasing_table(Float64, "unknown")
+            @test_throws ArgumentError NEOs.select_debiasing_table(Float64, "unknown")
+            @test last(NEOs.select_debiasing_table(Float64)) === d14.table
+        end
+
         update!(d11, optical1[1:1])
         update!(d12, optical1[1:1])
         update!(d13, optical1[1:1])
@@ -1074,6 +1106,10 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         @test d32.debias == [(0.0, 0.0)]
         @test d33.debias != [(0.0, 0.0)]
         @test d34.debias != [(0.0, 0.0)]
+
+        @test d13.table === d23.table === d33.table
+        @test d14.table === d24.table === d34.table
+        @test length(debias(d13)) == length(debias(d14)) == 1
 
     end
 
