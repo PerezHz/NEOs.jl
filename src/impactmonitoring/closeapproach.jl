@@ -67,6 +67,10 @@ convergence_radius(x::NumberNotSeries, ctol::Real) = ctol / zero(x)
 convergence_radius(x::AbstractSeries, ctol::Real) =
     (ctol / norm(x[end], Inf))^(1 / TaylorSeries.order(x))
 
+# Taylor1S <: Real, so it must not fall into the `NumberNotSeries` method
+convergence_radius(x::Taylor1S, ctol::Real) =
+    (ctol / norm(getcoeff(x, TaylorSeries.order(x)), Inf))^(1 / TaylorSeries.order(x))
+
 function convergence_radius(x::CloseApproach, ctol::Real)
     return min(
         convergence_radius(x.x, ctol),

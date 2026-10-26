@@ -54,6 +54,38 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test T1S(evaluate(a, b[0])) == evaluate(A, B[0])
         @test (a < 3.0) == (A < 3.0) && (a > 3.0) == (A > 3.0)
         @test vanumber(Taylor1{Float64}, T1S(a[1])) == a[1]
+        # Series interface
+        p = a[1]
+        P = T1S(Tuple(p.coeffs))
+        @test TaylorSeries.order(P) == m && all(getcoeff(P, i) == p[i] for i in 0:m)
+        @test Taylor1S(Float64, Val(m + 1)) == T1S(Tuple(Taylor1(m).coeffs))
+        @test P(0.3) == p(0.3) && evaluate(P, -0.2) == evaluate(p, -0.2)
+        # Elementary functions must reproduce the Taylor1 ones exactly
+        q = Taylor1([0.4, 0.3, -0.2, 0.1, 0.05], m)
+        Q = T1S(Tuple(q.coeffs))
+        samefunc(f, q) = f(T1S(Tuple(q.coeffs))).c == Tuple(f(q).coeffs)
+        for f in (sin, cos, tan, tanh, sinh, cosh, acos, atan, atanh,
+                  mod2pi, rad2deg, deg2rad)
+            @test samefunc(f, q)
+        end
+        @test samefunc(mod2pi, q + 7)
+        s, c = sincos(Q)
+        sN, cN = sincos(q)
+        @test s.c == Tuple(sN.coeffs) && c.c == Tuple(cN.coeffs)
+        @test_throws DomainError acos(T1S(1.0))
+        @test_throws DomainError atanh(T1S(-1.0))
+        # Dense TaylorSolution evaluated at a Taylor1S time: exact composition, i.e.
+        # all the time coefficients contribute (Taylor1 arguments of lower order
+        # truncate the time polynomials)
+        ts = [0.0, 1.0, 2.0]
+        ps = [Taylor1([(1.0 + i + j) / (1 + k)^2 for k in 0:m+2], m + 2) for i in 1:2, j in 1:3]
+        τS, τN = 1.3 + 0.1 * Taylor1S(Float64, Val(m + 1)), 1.3 + 0.1 * Taylor1(m + 2)
+        sol2, sol1 = NEOs.TaylorSolution(ts, ps), NEOs.TaylorSolution(ts, ps[:, 1])
+        @test sol2(τS) isa Vector{T1S} && sol1(τS) isa T1S
+        @test all(sol2(τS)[i].c == Tuple(sol2(τN)[i].coeffs[1:m+1]) for i in 1:3)
+        @test sol1(τS).c == Tuple(sol1(τN).coeffs[1:m+1])
+        # Taylor1S must not fall into the NumberNotSeries method of convergence_radius
+        @test convergence_radius(Q, 1E-8) == convergence_radius(q, 1E-8)
     end
 
     @testset "Common" begin

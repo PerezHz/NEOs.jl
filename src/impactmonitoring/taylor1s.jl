@@ -60,6 +60,29 @@ Base.promote_rule(::Type{Taylor1S{N, T}}, ::Type{Taylor1S{N, S}}) where
 # As for the coefficients of a nested Taylor1, the constant term is a scalar
 TaylorSeries.constant_term(x::Taylor1S) = x.c[1]
 
+# Series interface: degree, coefficients (starting from 0) and independent variable
+TaylorSeries.order(::Taylor1S{N}) where {N} = N - 1
+TaylorSeries.getcoeff(x::Taylor1S, i::Int) = x.c[i+1]
+
+"""
+    Taylor1S(T, Val(N))
+
+Return the independent variable (the LOV index offset) as a `Taylor1S{N, T}`.
+"""
+Taylor1S(::Type{T}, ::Val{N}) where {T <: Real, N} =
+    Taylor1S{N, T}(ntuple(i -> i == 2 ? one(T) : zero(T), Val(N)))
+
+# Evaluation at `dx`, as `TaylorSeries.evaluate` for a `Taylor1` (Horner's rule)
+function TaylorSeries.evaluate(x::Taylor1S{N}, dx::Number) where {N}
+    @inbounds suma = x.c[N] * zero(dx)
+    @inbounds for k in N:-1:1
+        suma = suma * dx + x.c[k]
+    end
+    return suma
+end
+
+(x::Taylor1S)(dx::Number) = TaylorSeries.evaluate(x, dx)
+
 # Infinity norm as in `TaylorIntegration._norminf` for a Taylor1
 function LinearAlgebra.norm(x::Taylor1S{N, T}, p::Real = 2) where {N, T <: Real}
     p == Inf || return norm(x.c, p)
@@ -364,6 +387,167 @@ function Base.abs(x::Taylor1S)
         (abs(x) is not differentiable at x=0)."""))
 end
 
+# Elementary functions. Each method reproduces the floating point operations, in the
+# same order, of the analogous out-of-place `TaylorSeries` function for `Taylor1{T}`
+
+# Constant Taylor1S coefficients
+_t1s_constant(x0::T, ::Val{N}) where {T, N} = ntuple(i -> i == 1 ? x0 : zero(x0), Val(N))
+
+# k-th coefficient (k ≥ 1) of the square of `a`, as in `sqr!`
+@inline function _t1s_sqrcoeff(a::NTuple{N, T}, k::Int) where {N, T}
+    kodd = k % 2
+    kend = (k - 2 + kodd) >> 1
+    acc = zero(T)
+    @inbounds for i in 0:kend
+        acc += a[i+1] * a[k-i+1]
+    end
+    acc = 2 * acc
+    if kodd == 0
+        @inbounds acc += a[(k >> 1)+1]^2
+    end
+    return acc
+end
+
+# k-th coefficient (k ≥ 1) of the square root `c` of a series whose k-th coefficient
+# is `ak`, as in `sqrt!` (with a non-zero constant term)
+@inline function _t1s_sqrtcoeff(c::NTuple{N, T}, ak::T, k::Int) where {N, T}
+    n = N - 1
+    kodd = k % 2
+    kend = (k - 2 + kodd) >> 1
+    imax = min(kend, n)
+    imin = max(1, k - n)
+    acc = ak
+    if kodd == 0
+        @inbounds acc -= (c[kend+2])^2
+    end
+    @inbounds imin ≤ imax && (acc -= 2 * c[imin+1] * c[k-imin+1])
+    @inbounds for i in imin+1:imax
+        acc -= 2 * c[i+1] * c[k-i+1]
+    end
+    @inbounds return acc / (2*c[1])
+end
+
+# Sine and cosine (`sincos!`)
+function Base.sincos(x::Taylor1S{N, T}) where {N, T <: Real}
+    s0, c0 = sincos(x.c[1])
+    S = typeof(s0)
+    a = map(S, x.c)
+    s, c = _t1s_constant(s0, Val(N)), _t1s_constant(c0, Val(N))
+    @inbounds for k in 1:N-1
+        s_acc, c_acc = zero(S), zero(S)
+        for i in 1:k
+            y = i * a[i+1]
+            s_acc += y * c[k-i+1]
+            c_acc -= y * s[k-i+1]
+        end
+        s = Base.setindex(s, s_acc / k, k+1)
+        c = Base.setindex(c, c_acc / k, k+1)
+    end
+    return Taylor1S{N, S}(s), Taylor1S{N, S}(c)
+end
+
+Base.sin(x::Taylor1S) = sincos(x)[1]
+Base.cos(x::Taylor1S) = sincos(x)[2]
+
+# Hyperbolic sine and cosine (`sinhcosh!`)
+function _t1s_sinhcosh(x::Taylor1S{N, T}) where {N, T <: Real}
+    s0, c0 = sinh(x.c[1]), cosh(x.c[1])
+    S = typeof(s0)
+    a = map(S, x.c)
+    s, c = _t1s_constant(s0, Val(N)), _t1s_constant(c0, Val(N))
+    @inbounds for k in 1:N-1
+        s_acc, c_acc = zero(S), zero(S)
+        for i in 1:k
+            y = i * a[i+1]
+            s_acc += y * c[k-i+1]
+            c_acc += y * s[k-i+1]
+        end
+        s = Base.setindex(s, s_acc / k, k+1)
+        c = Base.setindex(c, c_acc / k, k+1)
+    end
+    return Taylor1S{N, S}(s), Taylor1S{N, S}(c)
+end
+
+Base.sinh(x::Taylor1S) = _t1s_sinhcosh(x)[1]
+Base.cosh(x::Taylor1S) = _t1s_sinhcosh(x)[2]
+
+# Tangent (`tan!`) and hyperbolic tangent (`tanh!`)
+for f in (:tan, :tanh)
+    @eval function Base.$f(x::Taylor1S{N, T}) where {N, T <: Real}
+        aux = $f(x.c[1])
+        S = typeof(aux)
+        a = map(S, x.c)
+        c, c2 = _t1s_constant(aux, Val(N)), _t1s_constant(aux^2, Val(N))
+        @inbounds for k in 1:N-1
+            acc = zero(S)
+            for i in 1:k
+                acc += (k-i+1) * a[k-i+2] * c2[i]
+            end
+            ck = $(f == :tan ? :(acc / k + a[k+1]) : :(a[k+1] - acc / k))
+            c = Base.setindex(c, ck, k+1)
+            c2 = Base.setindex(c2, _t1s_sqrcoeff(c, k), k+1)
+        end
+        return Taylor1S{N, S}(c)
+    end
+end
+
+# Inverse cosine (`acos!`)
+function Base.acos(x::Taylor1S{N, T}) where {N, T <: Real}
+    a0 = x.c[1]
+    a0^2 == one(a0) && throw(DomainError(x,
+        """Series expansion of acos(x) diverges at x = ±1."""))
+    aux = acos(a0)
+    S = typeof(aux)
+    a = map(S, x.c)
+    c, r = _t1s_constant(aux, Val(N)), _t1s_constant(sqrt(1 - a[1]^2), Val(N))
+    @inbounds for k in 1:N-1
+        ck = zero(S)
+        for i in 1:k-1
+            ck += (k-i) * r[i+1] * c[k-i+1]
+        end
+        # k-th coefficient of the auxiliary series r = sqrt(1 - a^2)
+        rk = -_t1s_sqrcoeff(a, k)
+        r = Base.setindex(r, _t1s_sqrtcoeff(r, rk, k), k+1)
+        c = Base.setindex(c, -(a[k+1] + ck/k) / r[1], k+1)
+    end
+    return Taylor1S{N, S}(c)
+end
+
+# Inverse tangent (`atan!`) and inverse hyperbolic tangent (`atanh!`)
+for (f, opr, opc) in ((:atan, :+, :-), (:atanh, :-, :+))
+    @eval function Base.$f(x::Taylor1S{N, T}) where {N, T <: Real}
+        a0 = x.c[1]
+        aux = $f(a0)
+        S = typeof(aux)
+        a = map(S, x.c)
+        c = _t1s_constant(aux, Val(N))
+        r = _t1s_constant($opr(1, a[1]^2), Val(N))
+        iszero(r[1]) && throw(DomainError(x,
+            $("Series expansion of $f(x) diverges at x = " *
+              (f == :atan ? "±im." : "±1."))))
+        @inbounds for k in 1:N-1
+            acc = zero(S)
+            for i in 1:k-1
+                acc += (k-i) * r[i+1] * c[k-i+1]
+            end
+            r = Base.setindex(r, _t1s_sqrcoeff(a, k), k+1)
+            c = Base.setindex(c, $opc(a[k+1], acc/k) / r[1], k+1)
+        end
+        return Taylor1S{N, S}(c)
+    end
+end
+
+# Reduction of the constant term to [0, 2π) (`mod2pi`)
+Base.mod2pi(x::Taylor1S{N, T}) where {N, T <: Real} =
+    Taylor1S{N, T}(Base.setindex(x.c, mod2pi(x.c[1]), 1))
+
+# Conversions between radians and degrees; the generic `Real` methods of Base
+# call `float`, which returns a `Taylor1S`
+Base.deg2rad(x::Taylor1S{N, T}) where {N, T <: AbstractFloat} = x * (convert(T, pi) / 180)
+Base.deg2rad(x::Taylor1S{N, T}) where {N, T <: Real} = x * (convert(float(T), pi) / 180)
+Base.rad2deg(x::Taylor1S{N, T}) where {N, T <: AbstractFloat} = x * (180 / convert(T, pi))
+Base.rad2deg(x::Taylor1S{N, T}) where {N, T <: Real} = x * (180 / convert(float(T), pi))
+
 # The generic `pow!` for `Taylor1{T}` accumulates the recursion in a different
 # order than `pow!` for `Taylor1{Taylor1{T}}`, which is reproduced here
 function TaylorSeries.pow!(c::Taylor1{Taylor1S{N, T}}, a::Taylor1{Taylor1S{N, T}},
@@ -420,6 +604,20 @@ function PE.t2c_jpl_de430!(M::Array{Taylor1{Taylor1S{N, T}}, 3}, ea::Int,
         end
     end
     return M
+end
+
+# Evaluation of a dense `TaylorSolution` at a `Taylor1S` time, which is not covered
+# by `TaylorIntegration.TaylorSolutionCallingArgs`
+function (sol::TaylorSolution{T, T, 1})(::Val{false}, t::Taylor1S{N, T}) where {N, T <: Real}
+    ind::Int, δt::Taylor1S{N, T} = TaylorIntegration.timeindex(sol, t)
+    isempty(sol.p) && return sol.x[ind] + zero(δt)
+    return (sol.p[ind])(δt)::Taylor1S{N, T}
+end
+
+function (sol::TaylorSolution{T, T, 2})(::Val{false}, t::Taylor1S{N, T}) where {N, T <: Real}
+    ind::Int, δt::Taylor1S{N, T} = TaylorIntegration.timeindex(sol, t)
+    isempty(sol.p) && return view(sol.x, ind, :) .+ zero(δt)
+    return view(sol.p, ind, :)(δt)::Vector{Taylor1S{N, T}}
 end
 
 # Default initial condition for the propagation of a virtual asteroid
