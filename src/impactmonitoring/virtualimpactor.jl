@@ -30,7 +30,7 @@ VirtualImpactor(
 ) where {T <: Real} = VirtualImpactor{T}(t, σ, σimp, ip, a, domain, Γ_tp)
 
 function VirtualImpactor(
-        RT::ReturnT1{T}, σ::T, σimp::T,
+        RT::Union{ReturnT1{T}, ReturnT1S{N, T} where N}, σ::T, σimp::T,
         domain::NTuple{2, T}, ctol::T
     ) where {T <: Real}
     t = timeofca(RT, σ, ctol)
@@ -42,6 +42,7 @@ end
 # Abbreviations
 const Shower{T, U} = AbstractVector{Return{T, U}}
 const ShowerT1{T} = Shower{T, Taylor1{T}}
+const ShowerT1S{N, T} = Shower{T, Taylor1S{N, T}}
 
 # AbstractVirtualImpactor interface
 sigma(x::VirtualImpactor) = x.σ
@@ -264,8 +265,9 @@ function verifyvirtualimpactor(
     return VI
 end
 
-function virtualimpactors(RT::ReturnT1{T}; ctol::Real = T(Inf), σmax::Real = 5.0,
-                          no_pts::Int = 100, dmax::Real = zero(T)) where {T <: Real}
+function virtualimpactors(RT::Union{ReturnT1{T}, ReturnT1S{N, T} where N};
+                          ctol::Real = T(Inf), σmax::Real = 5.0, no_pts::Int = 100,
+                          dmax::Real = zero(T)) where {T <: Real}
     # Allocate memory
     VIs = Vector{VirtualImpactor{T}}(undef, 0)
     # Convergence domain
@@ -323,8 +325,9 @@ function virtualimpactors(RT::ReturnT1{T}; ctol::Real = T(Inf), σmax::Real = 5.
     return newVIs
 end
 
-function virtualimpactors(RTs::ShowerT1{T}; ctol::Real = T(Inf), σmax::Real = 5.0,
-                          no_pts::Int = 100, dmax::Real = zero(T)) where {T <: Real}
+function virtualimpactors(RTs::Union{ShowerT1{T}, ShowerT1S{N, T} where N};
+                          ctol::Real = T(Inf), σmax::Real = 5.0, no_pts::Int = 100,
+                          dmax::Real = zero(T)) where {T <: Real}
     # Search for virtual impactors in each return
     _VIs_ = virtualimpactors.(RTs; ctol, σmax, no_pts, dmax)
     ks = reduce(vcat, fill.(eachindex(_VIs_), length.(_VIs_)))
@@ -387,8 +390,8 @@ Return the virtual impactors, under the impact monitoring problem
 """
 function virtualimpactors(
         IM::AbstractIMProblem{D, T}, lov::LineOfVariations{D, T},
-        RTs::ShowerT1{T}, params::Parameters; ctol::Real = T(Inf),
-        no_pts::Int = 100, dmax::Real = zero(T), ε::Real = 0.01,
+        RTs::Union{ShowerT1{T}, ShowerT1S{N, T} where N}, params::Parameters;
+        ctol::Real = T(Inf), no_pts::Int = 100, dmax::Real = zero(T), ε::Real = 0.01,
         α::Real = 100, Qmax::Real = 100, Qtol::Real = 0.001,
         buffer::Union{Nothing, VirtualImpactorsBuffer{T}} = nothing
     ) where {D, T <: Real}

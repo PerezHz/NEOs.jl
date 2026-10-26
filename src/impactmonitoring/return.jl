@@ -16,6 +16,7 @@ end
 
 # Abbreviations
 const ReturnT1{T} = Return{T, Taylor1{T}}
+const ReturnT1S{N, T} = Return{T, Taylor1S{N, T}}
 
 numtypes(::Return{T, U}) where {T, U} = T, U
 
@@ -33,7 +34,7 @@ closeapproaches(x::Return) = x.CAs
 sigma(x::Return) = (lbound(x) + ubound(x)) / 2
 nominaltime(x::Return) = mean(nominaltime, x.CAs)
 
-TaylorSeries.order(x::Return{T, U}) where {T, U <: AbstractSeries} =
+TaylorSeries.order(x::Return{T, U}) where {T, U <: Union{AbstractSeries, Taylor1S}} =
     TaylorSeries.order(x[1])
 
 getindex(x::Return, i::Int) = x.CAs[i]
@@ -57,7 +58,7 @@ end
 for f in (:(targetplane), :(timeofca), :(semimajoraxis), :(distance),
     :(radialvelocity), :(concavity))
     @eval begin
-        function $f(x::ReturnT1, σ::Real, ctol::Real)
+        function $f(x::Union{ReturnT1, ReturnT1S}, σ::Real, ctol::Real)
             d = convergence_domain(x, ctol)
             @assert d[1] ≤ σ ≤ d[2] "`σ` is outside the convergence domain of `x`"
             ws = @. exponential_weights(x.CAs, σ, ctol)
@@ -67,8 +68,8 @@ for f in (:(targetplane), :(timeofca), :(semimajoraxis), :(distance),
     end
 end
 
-nominaltime(x::ReturnT1, ctol::Real) = timeofca(x, sigma(x), ctol)
-nominalstate(x::ReturnT1, ctol::Real) = targetplane(x, sigma(x), ctol)
+nominaltime(x::Union{ReturnT1, ReturnT1S}, ctol::Real) = timeofca(x, sigma(x), ctol)
+nominalstate(x::Union{ReturnT1, ReturnT1S}, ctol::Real) = targetplane(x, sigma(x), ctol)
 
 issamereturn(x::CloseApproach, y::CloseApproach, Δt::Real) = (x.tp == y.tp) &&
     ubound(x) == lbound(y) && difft(x, y) < Δt

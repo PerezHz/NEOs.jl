@@ -51,8 +51,17 @@ function (x::LineOfVariations)(σ::Number)
     return lovtransform(mjd0, y, x.sun, Val(x.coord), Val(:cartesian))
 end
 
+# Expansion of the LOV around `σ` over `domain`, as `Taylor1S{N, T}` polynomials of
+# degree `N - 1` (default: `TaylorSeries.order(x)`) in the LOV index offset, normalized
+# so that the offset is ±1 at the farthest endpoint of `domain`
 (x::LineOfVariations)(σ::Number, domain::NTuple{2, <:Number}) =
-    x(σ + max(domain[2] - σ, σ - domain[1]) * Taylor1(TaylorSeries.order(x)))
+    x(σ, domain, Val(TaylorSeries.order(x) + 1))
+
+function (x::LineOfVariations{D, T})(σ::Number, domain::NTuple{2, <:Number},
+                                     ::Val{N}) where {D, T, N}
+    dσ = Taylor1S(T, Val(N))
+    return x(σ + max(domain[2] - σ, σ - domain[1]) * dσ)
+end
 
 # Coordinate transformations
 lovtransform(::Real, x::AbstractVector, ::AbstractVector, ::Val{:cartesian},
@@ -103,6 +112,9 @@ function covariance(
     Γ_coord = Symmetric(project(coord, Γ_res))
     return Γ_coord
 end
+
+# This function assumes that order ≤ TaylorSeries.order(x)
+reduceorder(x::Taylor1, order::Int) = Taylor1(x[0:order], order)
 
 # Return the Taylor expansion of the vector field associated to the
 # weak direction of Γ; see https://doi.org/10.1137/23M1551961

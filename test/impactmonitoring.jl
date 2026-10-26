@@ -14,8 +14,9 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
 
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
-# Copy of a Taylor1 as a Taylor1S of the same order
+# Copy of a Taylor1 as a Taylor1S of the same order, and vice versa
 t1s(x::Taylor1) = NEOs.Taylor1S(Tuple(x.coeffs))
+t1(x::NEOs.Taylor1S) = Taylor1(collect(x.c), TaylorSeries.order(x))
 
 @testset "Impact monitoring" begin
 
@@ -211,6 +212,10 @@ t1s(x::Taylor1) = NEOs.Taylor1S(Tuple(x.coeffs))
         @test TaylorSeries.order(lov) == lovorder
         @test lov(0.0) == orbit()
         @test constant_term(lov(0.0, (-σmax, σmax))) == orbit()
+        # The Taylor1S expansion of the LOV must reproduce the Taylor1 one exactly
+        @test lov(0.0, (-σmax, σmax)) == t1s.(lov(σmax * Taylor1(lovorder)))
+        @test lov(0.5, (0.0, 1.5), Val(3)) ==
+            [t1s(Taylor1(x.coeffs[1:3], 2)) for x in lov(0.5 + Taylor1(lovorder))]
         @test isa(string(lov), String)
 
         @test lov.domain == (-σmax, σmax)
@@ -267,15 +272,15 @@ t1s(x::Taylor1) = NEOs.Taylor1S(Tuple(x.coeffs))
         Threads.threadpoolsize() == 1 && @warn "Running with a single thread; " *
             "both close approaches computations use serial code"
         @test closeapproaches(IM, VA, nyears, Parameters(params; threads = false); ctol) == CAs
-        # Taylor1S and nested Taylor1 close approaches must agree, up to the truncation
-        # of the ephemeris time polynomials in the nested Taylor1 path
-        VAS = VirtualAsteroid(epoch(VA), sigma(VA), VA.domain, t1s.(initialcondition(VA)))
-        CAsS = closeapproaches(IM, VAS, nyears, params; ctol)
-        @test length(CAsS) == length(CAs)
-        @test all(nameof(CAsS[i].tp) == nameof(CAs[i].tp) for i in eachindex(CAs))
-        @test CAsS == closeapproaches(IM, VAS, nyears, params; ctol, buffer =
-            NEOs.CloseApproachesBuffer(IM, initialcondition(VAS), nyears, params))
-        CADIFF = [maximum(abs, (getfield(CAsS[i], f) - t1s(getfield(CAs[i], f))).c) for
+        @test closeapproaches(IM, VA, nyears, params; ctol, buffer =
+            NEOs.CloseApproachesBuffer(IM, initialcondition(VA), nyears, params)) == CAs
+        # Taylor1S (default) and nested Taylor1 close approaches must agree, up to the
+        # truncation of the ephemeris time polynomials in the nested Taylor1 path
+        VAN = VirtualAsteroid(epoch(VA), sigma(VA), VA.domain, t1.(initialcondition(VA)))
+        CAsN = closeapproaches(IM, VAN, nyears, params; ctol)
+        @test length(CAsN) == length(CAs)
+        @test all(nameof(CAsN[i].tp) == nameof(CAs[i].tp) for i in eachindex(CAs))
+        CADIFF = [maximum(abs, (getfield(CAs[i], f) - t1s(getfield(CAsN[i], f))).c) for
                   i in eachindex(CAs), f in (:t, :a, :x, :y, :z)]
         @test all(<(1E-5), CADIFF)
         @test length(CAs) == 1
@@ -285,7 +290,7 @@ t1s(x::Taylor1) = NEOs.Taylor1S(Tuple(x.coeffs))
         @test sigma(CA) == sigma(VA)
         @test semimajoraxis(CA) < 0
         @test TaylorSeries.order(CA) == TaylorSeries.order(VA) == vaorder
-        @test nominalstate(CA) == [CA.x[0], CA.y[0], CA.z[0]] == targetplane(CA, 0.0)
+        @test nominalstate(CA) == constant_term.([CA.x, CA.y, CA.z]) == targetplane(CA, 0.0)
         @test difft(CA, CA) == 0.0
         @test domain_radius(CA) == σmax
 
@@ -297,7 +302,7 @@ t1s(x::Taylor1) = NEOs.Taylor1S(Tuple(x.coeffs))
         a, b = convergence_domain(CA, ctol)
         @test a < -σmax && σmax < b
         @test isconvergent(CA, ctol)
-        @test targetplane(CA) == BPlane{Taylor1{Float64}}
+        @test targetplane(CA) == BPlane{NEOs.Taylor1S{vaorder + 1, Float64}}
         @test isa(string(CA), String)
 
         # Returns
@@ -420,6 +425,10 @@ t1s(x::Taylor1) = NEOs.Taylor1S(Tuple(x.coeffs))
         @test TaylorSeries.order(lov) == lovorder
         @test lov(0.0) == orbit()
         @test constant_term(lov(0.0, (-σmax, σmax))) == orbit()
+        # The Taylor1S expansion of the LOV must reproduce the Taylor1 one exactly
+        @test lov(0.0, (-σmax, σmax)) == t1s.(lov(σmax * Taylor1(lovorder)))
+        @test lov(0.5, (0.0, 1.5), Val(3)) ==
+            [t1s(Taylor1(x.coeffs[1:3], 2)) for x in lov(0.5 + Taylor1(lovorder))]
         @test isa(string(lov), String)
 
         @test lov.domain == (-σmax, σmax)
@@ -476,15 +485,15 @@ t1s(x::Taylor1) = NEOs.Taylor1S(Tuple(x.coeffs))
         Threads.threadpoolsize() == 1 && @warn "Running with a single thread; " *
             "both close approaches computations use serial code"
         @test closeapproaches(IM, VA, nyears, Parameters(params; threads = false); ctol) == CAs
-        # Taylor1S and nested Taylor1 close approaches must agree, up to the truncation
-        # of the ephemeris time polynomials in the nested Taylor1 path
-        VAS = VirtualAsteroid(epoch(VA), sigma(VA), VA.domain, t1s.(initialcondition(VA)))
-        CAsS = closeapproaches(IM, VAS, nyears, params; ctol)
-        @test length(CAsS) == length(CAs)
-        @test all(nameof(CAsS[i].tp) == nameof(CAs[i].tp) for i in eachindex(CAs))
-        @test CAsS == closeapproaches(IM, VAS, nyears, params; ctol, buffer =
-            NEOs.CloseApproachesBuffer(IM, initialcondition(VAS), nyears, params))
-        CADIFF = [maximum(abs, (getfield(CAsS[i], f) - t1s(getfield(CAs[i], f))).c) for
+        @test closeapproaches(IM, VA, nyears, params; ctol, buffer =
+            NEOs.CloseApproachesBuffer(IM, initialcondition(VA), nyears, params)) == CAs
+        # Taylor1S (default) and nested Taylor1 close approaches must agree, up to the
+        # truncation of the ephemeris time polynomials in the nested Taylor1 path
+        VAN = VirtualAsteroid(epoch(VA), sigma(VA), VA.domain, t1.(initialcondition(VA)))
+        CAsN = closeapproaches(IM, VAN, nyears, params; ctol)
+        @test length(CAsN) == length(CAs)
+        @test all(nameof(CAsN[i].tp) == nameof(CAs[i].tp) for i in eachindex(CAs))
+        CADIFF = [maximum(abs, (getfield(CAs[i], f) - t1s(getfield(CAsN[i], f))).c) for
                   i in eachindex(CAs), f in (:t, :a, :x, :y, :z)]
         @test all(<(1E-5), CADIFF)
         @test length(CAs) == 1
@@ -494,7 +503,7 @@ t1s(x::Taylor1) = NEOs.Taylor1S(Tuple(x.coeffs))
         @test sigma(CA) == sigma(VA)
         @test semimajoraxis(CA) > 0
         @test TaylorSeries.order(CA) == TaylorSeries.order(VA) == vaorder
-        @test nominalstate(CA) == [CA.x[0], CA.y[0], CA.z[0]] == targetplane(CA, 0.0)
+        @test nominalstate(CA) == constant_term.([CA.x, CA.y, CA.z]) == targetplane(CA, 0.0)
         @test difft(CA, CA) == 0.0
         @test domain_radius(CA) == σmax
 
@@ -506,7 +515,7 @@ t1s(x::Taylor1) = NEOs.Taylor1S(Tuple(x.coeffs))
         a, b = convergence_domain(CA, ctol)
         @test a < -σmax && σmax < b
         @test isconvergent(CA, ctol)
-        @test targetplane(CA) == MTP{Taylor1{Float64}}
+        @test targetplane(CA) == MTP{NEOs.Taylor1S{vaorder + 1, Float64}}
         @test isa(string(CA), String)
 
         # Returns

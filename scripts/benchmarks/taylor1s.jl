@@ -31,8 +31,9 @@ function parse_commandline()
     return parse_args(s)
 end
 
-# Copy of a Taylor1 as a Taylor1S of the same order
+# Copy of a Taylor1 as a Taylor1S of the same order, and vice versa
 t1s(x::Taylor1) = Taylor1S(Tuple(x.coeffs))
+t1(x::Taylor1S) = Taylor1(collect(x.c), TaylorSeries.order(x))
 
 # Deterministic test series: nested Taylor1 (time order n, σ order m) and its Taylor1S copy
 function testseries(n::Int, m::Int, s::Int, a0::Float64)
@@ -136,15 +137,15 @@ function benchmark_closeapproaches(input::String, nva::Int, ctol::Float64, sampl
             "|", "-"^10, "|", "-"^14, "|", "-"^16, "|")
     for i in idxs
         VA = VAs[i]
-        VAS = VirtualAsteroid(epoch(VA), sigma(VA), VA.domain, t1s.(initialcondition(VA)))
-        CAsN = closeapproaches(IM, VA, nyears, params; R_TP, ctol, buffer = nested)
-        CAsS = closeapproaches(IM, VAS, nyears, params; R_TP, ctol, buffer = t1sbuf)
+        VAN = VirtualAsteroid(epoch(VA), sigma(VA), VA.domain, t1.(initialcondition(VA)))
+        CAsN = closeapproaches(IM, VAN, nyears, params; R_TP, ctol, buffer = nested)
+        CAsS = closeapproaches(IM, VA, nyears, params; R_TP, ctol, buffer = t1sbuf)
         d = length(CAsN) == length(CAsS) ?
             maximum(cadiff.(CAsS, CAsN); init = 0.0) : NaN
         eq = iszero(d)
-        bN = @benchmark closeapproaches($IM, $VA, $nyears, $params; R_TP = $R_TP,
+        bN = @benchmark closeapproaches($IM, $VAN, $nyears, $params; R_TP = $R_TP,
             ctol = $ctol, buffer = $nested) samples = samples evals = 1 seconds = 1E4
-        bS = @benchmark closeapproaches($IM, $VAS, $nyears, $params; R_TP = $R_TP,
+        bS = @benchmark closeapproaches($IM, $VA, $nyears, $params; R_TP = $R_TP,
             ctol = $ctol, buffer = $t1sbuf) samples = samples evals = 1 seconds = 1E4
         tN, tS = 1E-9 * minimum(bN).time, 1E-9 * minimum(bS).time
         @printf("| %5d | %4d | %5s | %9.2e | %11.3f | %12.3f | %8.2f | %12.1f | %14.1f |\n",
