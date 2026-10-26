@@ -149,9 +149,9 @@ memory for [`closeapproaches`](@ref).
 # Arguments
 
 - `IM::IMProblem`: impact monitoring problem.
-- `q0::Vector{<:Number}`: initial condition; its element type sets the arithmetic
-    of the propagation, e.g. `Taylor1S{N, T}` or `Taylor1{T}` for a virtual asteroid
-    with `Taylor1{T}` coefficients of order `N - 1`.
+- `q0::Vector{<:Number}`: initial condition; its element type `U` sets the arithmetic
+    of the propagation and must be the number type of the virtual asteroids propagated
+    with the buffer, e.g. `Taylor1S{N, T}`, `Taylor1{T}` or `TaylorN{T}`.
 - `nyears::Real`: number of years.
 - `params::Parameters`: see the `Propagation` section of [`Parameters`](@ref).
 """

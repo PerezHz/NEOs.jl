@@ -14,10 +14,13 @@ using NEOs: dynamicalmodel, opticalindices, numtypes, nominaltime, radius,
 
 const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
+# Copy of a Taylor1 as a Taylor1S of the same order
+t1s(x::Taylor1) = NEOs.Taylor1S(Tuple(x.coeffs))
+
 @testset "Impact monitoring" begin
 
     @testset "Taylor1S" begin
-        using NEOs: Taylor1S, vanumber
+        using NEOs: Taylor1S
 
         # Nested Taylor1 kernels and their Taylor1S analogues must agree exactly
         n, m = 12, 4
@@ -25,14 +28,14 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         a = Taylor1([inner(k, 3) + 2.0 * (k == 0) for k in 0:n], n)
         b = Taylor1([inner(k, 5) + 1.5 * (k == 0) for k in 0:n], n)
         T1S = Taylor1S{m + 1, Float64}
-        A, B = Taylor1(T1S.(a.coeffs), n), Taylor1(T1S.(b.coeffs), n)
+        A, B = Taylor1(t1s.(a.coeffs), n), Taylor1(t1s.(b.coeffs), n)
         function samekernel(f!)
             cN, cS, auxN, auxS = zero(a), zero(A), zero(a), zero(A)
             for k in 0:n
                 f!(cN, a, b, auxN, k)
                 f!(cS, A, B, auxS, k)
             end
-            return all(T1S(cN[k]) == cS[k] for k in 0:n)
+            return all(t1s(cN[k]) == cS[k] for k in 0:n)
         end
         @test samekernel((c, x, y, aux, k) -> TaylorSeries.mul!(c, x, y, k))
         @test samekernel((c, x, y, aux, k) -> TaylorSeries.div!(c, x, y, k))
@@ -43,27 +46,26 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
             @test samekernel((c, x, y, aux, k) -> TaylorSeries.pow!(c, x, aux, r, k))
         end
         x, y = A[0], B[0]
-        @test x + y == T1S(a[0] + b[0]) && x - y == T1S(a[0] - b[0])
-        @test x * y == T1S(a[0] * b[0]) && x / y == T1S(a[0] / b[0])
-        @test (x < y) == (a[0] < b[0]) && x + 1.0 == T1S(a[0] + 1.0)
+        @test x + y == t1s(a[0] + b[0]) && x - y == t1s(a[0] - b[0])
+        @test x * y == t1s(a[0] * b[0]) && x / y == t1s(a[0] / b[0])
+        @test (x < y) == (a[0] < b[0]) && x + 1.0 == t1s(a[0] + 1.0)
         @test x + Taylor1S{m + 1, Float32}(1.0) isa T1S
         xN, xS = [zero(a[0])], [zero(A[0])]
         TaylorSeries.evaluate!([a], 0.25, xN)
         TaylorSeries.evaluate!([A], 0.25, xS)
-        @test T1S(xN[1]) == xS[1]
-        @test T1S(evaluate(a, b[0])) == evaluate(A, B[0])
+        @test t1s(xN[1]) == xS[1]
+        @test t1s(evaluate(a, b[0])) == evaluate(A, B[0])
         @test (a < 3.0) == (A < 3.0) && (a > 3.0) == (A > 3.0)
-        @test vanumber(Taylor1{Float64}, T1S(a[1])) == a[1]
         # Series interface
         p = a[1]
-        P = T1S(Tuple(p.coeffs))
+        P = t1s(p)
         @test TaylorSeries.order(P) == m && all(getcoeff(P, i) == p[i] for i in 0:m)
-        @test Taylor1S(Float64, Val(m + 1)) == T1S(Tuple(Taylor1(m).coeffs))
+        @test Taylor1S(Float64, Val(m + 1)) == t1s(Taylor1(m))
         @test P(0.3) == p(0.3) && evaluate(P, -0.2) == evaluate(p, -0.2)
         # Elementary functions must reproduce the Taylor1 ones exactly
         q = Taylor1([0.4, 0.3, -0.2, 0.1, 0.05], m)
-        Q = T1S(Tuple(q.coeffs))
-        samefunc(f, q) = f(T1S(Tuple(q.coeffs))).c == Tuple(f(q).coeffs)
+        Q = t1s(q)
+        samefunc(f, q) = f(t1s(q)) == t1s(f(q))
         for f in (sin, cos, tan, tanh, sinh, cosh, acos, atan, atanh,
                   mod2pi, rad2deg, deg2rad)
             @test samefunc(f, q)
@@ -71,7 +73,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         @test samefunc(mod2pi, q + 7)
         s, c = sincos(Q)
         sN, cN = sincos(q)
-        @test s.c == Tuple(sN.coeffs) && c.c == Tuple(cN.coeffs)
+        @test s == t1s(sN) && c == t1s(cN)
         @test_throws DomainError acos(T1S(1.0))
         @test_throws DomainError atanh(T1S(-1.0))
         # Dense TaylorSolution evaluated at a Taylor1S time: exact composition, i.e.
@@ -265,9 +267,17 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         Threads.threadpoolsize() == 1 && @warn "Running with a single thread; " *
             "both close approaches computations use serial code"
         @test closeapproaches(IM, VA, nyears, Parameters(params; threads = false); ctol) == CAs
-        # Taylor1S (default) and nested Taylor1 close approaches must agree exactly
-        buffer = NEOs.CloseApproachesBuffer(IM, initialcondition(VA), nyears, params)
-        @test closeapproaches(IM, VA, nyears, params; ctol, buffer) == CAs
+        # Taylor1S and nested Taylor1 close approaches must agree, up to the truncation
+        # of the ephemeris time polynomials in the nested Taylor1 path
+        VAS = VirtualAsteroid(epoch(VA), sigma(VA), VA.domain, t1s.(initialcondition(VA)))
+        CAsS = closeapproaches(IM, VAS, nyears, params; ctol)
+        @test length(CAsS) == length(CAs)
+        @test all(nameof(CAsS[i].tp) == nameof(CAs[i].tp) for i in eachindex(CAs))
+        @test CAsS == closeapproaches(IM, VAS, nyears, params; ctol, buffer =
+            NEOs.CloseApproachesBuffer(IM, initialcondition(VAS), nyears, params))
+        CADIFF = [maximum(abs, (getfield(CAsS[i], f) - t1s(getfield(CAs[i], f))).c) for
+                  i in eachindex(CAs), f in (:t, :a, :x, :y, :z)]
+        @test all(<(1E-5), CADIFF)
         @test length(CAs) == 1
         CA = CAs[1]
 
@@ -466,9 +476,17 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         Threads.threadpoolsize() == 1 && @warn "Running with a single thread; " *
             "both close approaches computations use serial code"
         @test closeapproaches(IM, VA, nyears, Parameters(params; threads = false); ctol) == CAs
-        # Taylor1S (default) and nested Taylor1 close approaches must agree exactly
-        buffer = NEOs.CloseApproachesBuffer(IM, initialcondition(VA), nyears, params)
-        @test closeapproaches(IM, VA, nyears, params; ctol, buffer) == CAs
+        # Taylor1S and nested Taylor1 close approaches must agree, up to the truncation
+        # of the ephemeris time polynomials in the nested Taylor1 path
+        VAS = VirtualAsteroid(epoch(VA), sigma(VA), VA.domain, t1s.(initialcondition(VA)))
+        CAsS = closeapproaches(IM, VAS, nyears, params; ctol)
+        @test length(CAsS) == length(CAs)
+        @test all(nameof(CAsS[i].tp) == nameof(CAs[i].tp) for i in eachindex(CAs))
+        @test CAsS == closeapproaches(IM, VAS, nyears, params; ctol, buffer =
+            NEOs.CloseApproachesBuffer(IM, initialcondition(VAS), nyears, params))
+        CADIFF = [maximum(abs, (getfield(CAsS[i], f) - t1s(getfield(CAs[i], f))).c) for
+                  i in eachindex(CAs), f in (:t, :a, :x, :y, :z)]
+        @test all(<(1E-5), CADIFF)
         @test length(CAs) == 1
         CA = CAs[1]
 

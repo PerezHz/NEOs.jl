@@ -3,7 +3,7 @@
 # Example:
 #   julia --project taylor1s.jl -i ../../risklist/2022UE61/2022UE61Orbit.jld2
 using ArgParse, NEOs, PlanetaryEphemeris, TaylorSeries, Dates, JLD2, Printf, BenchmarkTools
-using NEOs: CloseApproachesBuffer, Taylor1S, radius
+using NEOs: CloseApproachesBuffer, Taylor1S, initialcondition, radius
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -31,11 +31,14 @@ function parse_commandline()
     return parse_args(s)
 end
 
+# Copy of a Taylor1 as a Taylor1S of the same order
+t1s(x::Taylor1) = Taylor1S(Tuple(x.coeffs))
+
 # Deterministic test series: nested Taylor1 (time order n, σ order m) and its Taylor1S copy
 function testseries(n::Int, m::Int, s::Int, a0::Float64)
     inner(k) = Taylor1([cos(s * k + j) / (1 + k + j) for j in 0:m], m)
     x = Taylor1([inner(k) + a0 * (k == 0) for k in 0:n], n)
-    X = Taylor1(Taylor1S{m + 1, Float64}.(x.coeffs), n)
+    X = Taylor1(t1s.(x.coeffs), n)
     return x, X
 end
 
@@ -92,8 +95,9 @@ function benchmark_kernels(; n::Int = 20, ms = (2, 4, 6, 8))
     return nothing
 end
 
-# Maximum absolute difference between the coefficients of two close approaches
-cadiff(x, y) = maximum(f -> maximum(abs, getfield(x, f).coeffs .- getfield(y, f).coeffs),
+# Maximum absolute difference between the coefficients of a Taylor1S close approach `x`
+# and a nested Taylor1 close approach `y`
+cadiff(x, y) = maximum(f -> maximum(abs, (getfield(x, f) - t1s(getfield(y, f))).c),
                        (:t, :a, :x, :y, :z))
 
 function benchmark_closeapproaches(input::String, nva::Int, ctol::Float64, samples::Int)
@@ -119,8 +123,8 @@ function benchmark_closeapproaches(input::String, nva::Int, ctol::Float64, sampl
     nyears = (datetime2julian(DateTime(2100, 1, 1, 12)) - jd0) / yr
     q0 = orbit() .+ 1E-8 * Taylor1(vaorder)
     nested = CloseApproachesBuffer(IM, q0, nyears, params)
-    sigma = CloseApproachesBuffer(IM, Taylor1S.(q0), nyears, params)
-    @assert nested.prop.cache.parse_eqs === sigma.prop.cache.parse_eqs === Val(true)
+    t1sbuf = CloseApproachesBuffer(IM, t1s.(q0), nyears, params)
+    @assert nested.prop.cache.parse_eqs === t1sbuf.prop.cache.parse_eqs === Val(true)
     idxs = nva == 1 ? [1] : unique(round.(Int, range(1, length(VAs), length = nva)))
 
     println("\n# closeapproaches ($(length(VAs)) VAs, ctol = $ctol, ",
@@ -132,15 +136,16 @@ function benchmark_closeapproaches(input::String, nva::Int, ctol::Float64, sampl
             "|", "-"^10, "|", "-"^14, "|", "-"^16, "|")
     for i in idxs
         VA = VAs[i]
+        VAS = VirtualAsteroid(epoch(VA), sigma(VA), VA.domain, t1s.(initialcondition(VA)))
         CAsN = closeapproaches(IM, VA, nyears, params; R_TP, ctol, buffer = nested)
-        CAsS = closeapproaches(IM, VA, nyears, params; R_TP, ctol, buffer = sigma)
-        eq = CAsN == CAsS
+        CAsS = closeapproaches(IM, VAS, nyears, params; R_TP, ctol, buffer = t1sbuf)
         d = length(CAsN) == length(CAsS) ?
-            maximum(cadiff.(CAsN, CAsS); init = 0.0) : NaN
+            maximum(cadiff.(CAsS, CAsN); init = 0.0) : NaN
+        eq = iszero(d)
         bN = @benchmark closeapproaches($IM, $VA, $nyears, $params; R_TP = $R_TP,
             ctol = $ctol, buffer = $nested) samples = samples evals = 1 seconds = 1E4
-        bS = @benchmark closeapproaches($IM, $VA, $nyears, $params; R_TP = $R_TP,
-            ctol = $ctol, buffer = $sigma) samples = samples evals = 1 seconds = 1E4
+        bS = @benchmark closeapproaches($IM, $VAS, $nyears, $params; R_TP = $R_TP,
+            ctol = $ctol, buffer = $t1sbuf) samples = samples evals = 1 seconds = 1E4
         tN, tS = 1E-9 * minimum(bN).time, 1E-9 * minimum(bS).time
         @printf("| %5d | %4d | %5s | %9.2e | %11.3f | %12.3f | %8.2f | %12.1f | %14.1f |\n",
                 i, length(CAsN), eq, d, tN, tS, tN / tS, bN.memory / 2^20, bS.memory / 2^20)

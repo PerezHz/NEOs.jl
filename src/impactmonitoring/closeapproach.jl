@@ -28,6 +28,7 @@ end
 
 # Abbreviations
 const CloseApproachT1{T} = CloseApproach{T, Taylor1{T}}
+const CloseApproachT1S{N, T} = CloseApproach{T, Taylor1S{N, T}}
 
 # Outer constructors
 function CloseApproach(σ::T, domain::NTuple{2, T}, t::U, a::U, x::U, y::U, z::U,
@@ -57,7 +58,7 @@ nominalstate(x::CloseApproach) = [cte(x.x), cte(x.y), cte(x.z)]
 
 difft(x::CloseApproach, y::CloseApproach) = abs(nominaltime(x) - nominaltime(y))
 
-TaylorSeries.order(x::CloseApproach{T, U}) where {T, U <: AbstractSeries} =
+TaylorSeries.order(x::CloseApproach{T, U}) where {T, U <: Union{AbstractSeries, Taylor1S}} =
     TaylorSeries.order(x.t)
 
 domain_radius(x::CloseApproach) = max(ubound(x) - sigma(x), sigma(x) - lbound(x))
@@ -89,51 +90,51 @@ isconvergent(x, ctol::Real) = convergence_radius(x, ctol) > 1
 
 deltasigma(x::CloseApproach, σ::Real) = (σ - sigma(x)) / domain_radius(x)
 
-function timeofca(x::CloseApproachT1, σ::Real)
+function timeofca(x::Union{CloseApproachT1, CloseApproachT1S}, σ::Real)
     dσ = deltasigma(x, σ)
     return x.t(dσ)
 end
 
-function semimajoraxis(x::CloseApproachT1, σ::Real)
+function semimajoraxis(x::Union{CloseApproachT1, CloseApproachT1S}, σ::Real)
     dσ = deltasigma(x, σ)
     return x.a(dσ)
 end
 
-function targetplane(x::CloseApproachT1, σ::Real)
+function targetplane(x::Union{CloseApproachT1, CloseApproachT1S}, σ::Real)
     dσ = deltasigma(x, σ)
     return [x.x(dσ), x.y(dσ), x.z(dσ)]
 end
 
-function distance(x::CloseApproachT1, σ::Real)
+function distance(x::Union{CloseApproachT1, CloseApproachT1S}, σ::Real)
     dσ = deltasigma(x, σ)
     return hypot(x.x(dσ), x.y(dσ)) - x.z(dσ)
 end
 
-function radialvelocity(x::CloseApproachT1, σ::Real)
+function radialvelocity(x::Union{CloseApproachT1, CloseApproachT1S}, σ::Real)
     dσ = deltasigma(x, σ)
     n = TaylorSeries.order(x)
-    ξ, ζ, b = x.x[end], x.y[end], x.z[end]
+    ξ, ζ, b = getcoeff(x.x, n), getcoeff(x.y, n), getcoeff(x.z, n)
     dξ, dζ, db = zero(ξ), zero(ζ), zero(b)
     for i in n-1:-1:0
         dξ = ξ + dσ * dξ
         dζ = ζ + dσ * dζ
         db = b + dσ * db
-        ξ = x.x[i] + dσ * ξ
-        ζ = x.y[i] + dσ * ζ
-        b = x.z[i] + dσ * b
+        ξ = getcoeff(x.x, i) + dσ * ξ
+        ζ = getcoeff(x.y, i) + dσ * ζ
+        b = getcoeff(x.z, i) + dσ * b
     end
     r = hypot(ξ, ζ)
     rv = ξ*dξ + ζ*dζ
     return (rv/r - db) / domain_radius(x)
 end
 
-function concavity(x::CloseApproachT1, σ::Real)
+function concavity(x::Union{CloseApproachT1, CloseApproachT1S}, σ::Real)
     dσ = deltasigma(x, σ)
     n = TaylorSeries.order(x)
-    ξ = x.x[end-1] + dσ * x.x[end]
-    ζ = x.y[end-1] + dσ * x.y[end]
-    b = x.z[end-1] + dσ * x.z[end]
-    dξ, dζ, db = x.x[end], x.y[end], x.z[end]
+    ξ = getcoeff(x.x, n-1) + dσ * getcoeff(x.x, n)
+    ζ = getcoeff(x.y, n-1) + dσ * getcoeff(x.y, n)
+    b = getcoeff(x.z, n-1) + dσ * getcoeff(x.z, n)
+    dξ, dζ, db = getcoeff(x.x, n), getcoeff(x.y, n), getcoeff(x.z, n)
     d2ξ, d2ζ, d2b = zero(ξ), zero(ζ), zero(b)
     for i in n-2:-1:0
         d2ξ = 2dξ + dσ * d2ξ
@@ -142,9 +143,9 @@ function concavity(x::CloseApproachT1, σ::Real)
         dξ = ξ + dσ * dξ
         dζ = ζ + dσ * dζ
         db = b + dσ * db
-        ξ = x.x[i] + dσ * ξ
-        ζ = x.y[i] + dσ * ζ
-        b = x.z[i] + dσ * b
+        ξ = getcoeff(x.x, i) + dσ * ξ
+        ζ = getcoeff(x.y, i) + dσ * ζ
+        b = getcoeff(x.z, i) + dσ * b
     end
     r = hypot(ξ, ζ)
     rv = ξ*dξ + ζ*dζ
@@ -246,20 +247,19 @@ list of parameters see the `Propagation` section of  [`Parameters`](@ref).
 - `nrabstol::Real`: allowed tolerance for the Newton-Raphson process
     (default: `eps()`).
 - `buffer::Union{Nothing, CloseApproachesBuffer}`: pre-allocated memory
-    (default: `nothing`). The number type of `buffer` sets the arithmetic of
-    the propagation; by default, a virtual asteroid with `Taylor1{T}`
-    coefficients is propagated with `Taylor1{Taylor1S{N, T}}` series.
+    (default: `nothing`). The number type of `buffer` must be the number type
+    `U` of `VA`, e.g. `Taylor1S{N, T}`, `Taylor1{T}` or `TaylorN{T}`; `VA` is
+    then propagated with `Taylor1{U}` series.
 """
 function closeapproaches(
         IM::AbstractIMProblem{D, T}, VA::VirtualAsteroid{T, U},
         nyears::T, params::Parameters{T}; R_TP::T = 0.2,
         ctol::T = T(Inf), newtoniter::Int = 25, nrabstol::T = eps(T),
-        buffer::Union{Nothing, CloseApproachesBuffer{T}} = nothing
+        buffer::Union{Nothing, CloseApproachesBuffer{T, U}} = nothing
     ) where {D, T <: Real, U <: Number}
     # Close approaches buffer
     if isnothing(buffer)
-        q0 = propagationic(initialcondition(VA))
-        buffer = CloseApproachesBuffer(IM, q0, nyears, params)
+        buffer = CloseApproachesBuffer(IM, initialcondition(VA), nyears, params)
     end
     return _closeapproaches(IM, VA, nyears, params, buffer; R_TP, ctol,
                             newtoniter, nrabstol)
@@ -267,9 +267,9 @@ end
 
 function _closeapproaches(
         IM::AbstractIMProblem{D, T}, VA::VirtualAsteroid{T, U},
-        nyears::T, params::Parameters{T}, buffer::CloseApproachesBuffer{T, V};
+        nyears::T, params::Parameters{T}, buffer::CloseApproachesBuffer{T, U};
         R_TP::T, ctol::T, newtoniter::Int, nrabstol::T
-    ) where {D, T <: Real, U <: Number, V <: Number}
+    ) where {D, T <: Real, U <: Number}
     # Unpack problem and parameters
     @unpack target = IM
     @unpack abstol, maxsteps, eph_su = params
@@ -278,9 +278,9 @@ function _closeapproaches(
     R_P = radius(target)
     # Dynamical model
     dynamics = dynamicalmodel(IM)
-    # Initial conditions (in the number type of the buffer)
+    # Initial conditions
     t0, tmax = zero(T), nyears * yr
-    q0 = convert_ic(V, initialcondition(VA))
+    q0 = initialcondition(VA)
     @unpack prop, root = buffer
     # Unpack propagation buffer
     @unpack cache, dparams = prop
@@ -328,14 +328,14 @@ function _closeapproaches(
         flag, dt_nr = findroot(f_tupl_old, f_tupl, δt_old, root; nrabstol, newtoniter)
         if flag
             # Time at surface crossing
-            t_CA = epoch(VA) + told + vanumber(U, dt_nr)
+            t_CA = epoch(VA) + told + dt_nr
             if !isintimerange(t_CA, target)
                 @warn("Time of close approach is outside the target's ephemeris \
                        timerange; exiting.")
                 break
             end
             # Asteroid's planetocentric state vector
-            xap = vanumber.(U, xold(dt_nr)) - target(t_CA)
+            xap = xold(dt_nr) - target(t_CA)
             # Planetocentric keplerian elements
             kep = KeplerianElements{T, U}(
                 gm(target),
@@ -368,14 +368,14 @@ function _closeapproaches(
         flag, dt_nr = findroot(g_tupl_old, g_tupl, δt_old, root; nrabstol, newtoniter)
         if flag
             # Time at close approach
-            t_CA = epoch(VA) + told + vanumber(U, dt_nr)
+            t_CA = epoch(VA) + told + dt_nr
             if !isintimerange(t_CA, target)
                 @warn("Time of close approach is outside the target's ephemeris \
                        timerange; exiting.")
                 break
             end
             # Asteroid's planetocentric state vector
-            xap = vanumber.(U, xold(dt_nr)) - target(t_CA)
+            xap = xold(dt_nr) - target(t_CA)
             # Asteroid's planetocentric semimajor axis
             a = semimajoraxis(xap..., gm(target), zero(T))
             if a < 0

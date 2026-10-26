@@ -26,13 +26,6 @@ Taylor1S{N, T}(x::Taylor1S{N}) where {N, T <: Real} = Taylor1S{N, T}(map(T, x.c)
 Taylor1S{N, T}(x::Real) where {N, T <: Real} =
     Taylor1S{N, T}(ntuple(i -> i == 1 ? T(x) : zero(T), Val(N)))
 
-function Taylor1S{N, T}(x::Taylor1) where {N, T <: Real}
-    @assert TaylorSeries.order(x) == N - 1 "Taylor1 order must be $(N - 1)"
-    return Taylor1S{N, T}(ntuple(i -> T(x.coeffs[i]), Val(N)))
-end
-
-Taylor1S(x::Taylor1{T}) where {T <: Real} = Taylor1S{TaylorSeries.order(x) + 1, T}(x)
-
 # Print method for Taylor1S
 Base.show(io::IO, x::Taylor1S{N, T}) where {N, T <: Real} =
     print(io, "Taylor1S{", N, ", ", T, "}", x.c)
@@ -619,18 +612,3 @@ function (sol::TaylorSolution{T, T, 2})(::Val{false}, t::Taylor1S{N, T}) where {
     isempty(sol.p) && return view(sol.x, ind, :) .+ zero(δt)
     return view(sol.p, ind, :)(δt)::Vector{Taylor1S{N, T}}
 end
-
-# Default initial condition for the propagation of a virtual asteroid
-propagationic(q0::Vector{Taylor1{T}}) where {T <: Real} = map(Taylor1S, q0)
-propagationic(q0::Vector{<:Number}) = q0
-
-# Conversion of the initial condition of a virtual asteroid into the
-# number type `V` of the propagation
-convert_ic(::Type{U}, q0::Vector{U}) where {U <: Number} = q0
-convert_ic(::Type{Taylor1S{N, T}}, q0::Vector{Taylor1{T}}) where {N, T <: Real} =
-    map(Taylor1S{N, T}, q0)
-
-# Conversion of a propagation number into the number type `U` of a virtual asteroid
-vanumber(::Type{U}, x::U) where {U <: Number} = x
-vanumber(::Type{Taylor1{T}}, x::Taylor1S{N, T}) where {N, T <: Real} =
-    Taylor1(collect(x.c), N - 1)
