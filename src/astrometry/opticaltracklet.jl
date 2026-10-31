@@ -52,7 +52,7 @@ nobs(x::OpticalTracklet) = x.nobs
 nobs(x::AbstractTrackletVector) = sum(nobs, x; init = 0)
 
 opticalindices(x::OpticalTracklet) = x.indices
-opticalindices(x::AbstractTrackletVector) = sort!(mapreduce(opticalindices, vcat, x))
+opticalindices(x::AbstractTrackletVector) = sort!(mapreduce(opticalindices, vcat, x, init = Int[]))
 opticalindices(x::AbstractTrackletVector, i::AbstractVector{Int}) = opticalindices(view(x, i))
 
 #=
