@@ -489,12 +489,12 @@ function jtls(
 end
 
 """
-    linkage(od, porbit, params; kwargs...)
+    linkage(od, orbit, params; kwargs...)
 
 Fit an orbit to an orbit determination problem `od` by successively
-scaling the weights of the observations that are in `od` but not in
-a preliminary orbit `porbit`. For a list of parameters, see the
-`Least Squares` section of [`Parameters`](@ref).
+scaling the weights of the observations in `od` with large residuals
+with respect to a preliminary `orbit`. For a list of parameters, see
+the `Least Squares` section of [`Parameters`](@ref).
 
 # Keyword arguments
 
@@ -506,31 +506,36 @@ function linkage(
     ) where {D, T <: Real, O <: AbstractOpticalVector{T}}
     # Unpack
     @unpack verbose = params
-    # Reference epoch [Julian days TDB]
-    jd0 = epoch(porbit) + PE.J2000
-    # Find observations in od that are not in porbit
-    trks = setdiff(od.tracklets, porbit.tracklets)
-    idxs = opticalindices(trks)
+    @unpack tracklets = od
+    # Pre-allocate orbit
+    orbit = zero(OpticalLeastSquaresOrbit{D, T, T, O})
     # Original weights
     w8s = deepcopy(od.weights.weights)
     # Initialize buffer and set of residuals
-    buffer = PropresBuffer(od, porbit(), jd0, params)
+    Ndof = dof(od)
+    jd0 = epoch(porbit) + PE.J2000
+    q00 = initialcondition(porbit, jd0, Ndof, params)
+    buffer = PropresBuffer(od, q00, jd0, params)
     res = init_residuals(T, od, porbit)
-    orbit = zero(OpticalLeastSquaresOrbit{D, T, T, O})
-    # Select first scaling factor
-    mags = Vector{Int}(undef, length(trks))
-    propres!(res, od, porbit(), jd0, params; buffer)
+    propres!(res, od, q00, jd0, params; buffer)
     if isempty(res)
         verbose && @warn("Linkage did not converge within the given parameters \
             or could not fit all the astrometry")
         od.weights.weights .= w8s
         return orbit
     end
-    for i in eachindex(mags)
-        x = maximum(log10chi, view(res, opticalindices(trks[i])))
+    # Select first scaling factor
+    k = typemax(Int)
+    mask = BitVector(undef, length(tracklets))
+    mags = Vector{Int}(undef, length(tracklets))
+    for (i, trk) in enumerate(tracklets)
+        x = maximum(log10chi, view(res, opticalindices(trk)))
         mags[i] = ceil(Int, x)
+        mask[i] = mags[i] > 0
+        k = mask[i] ? min(k, mags[i]) : k
     end
-    k = max(0, minimum(mags) - 1)
+    k = k == typemax(Int) ? 0 : k - 1
+    idxs = opticalindices(view(tracklets, mask))
     # Main cycle
     for i in 1:maxiter
         # Scale down weights
@@ -560,17 +565,19 @@ function linkage(
             break
         end
         # Scale up weights
-        propres!(res, od, orbit(), jd0, params; buffer)
+        jd0 = epoch(orbit) + PE.J2000
+        q00 = initialcondition(orbit, jd0, Ndof, params)
+        propres!(res, od, q00, jd0, params; buffer)
         if isempty(res)
             verbose && @warn("Linkage did not converge within the given parameters \
                 or could not fit all the astrometry")
             break
         end
-        for i in eachindex(mags)
-            x = maximum(log10chi, view(res, opticalindices(trks[i])))
+        for (i, trk) in enumerate(tracklets)
+            x = maximum(log10chi, view(res, opticalindices(trk)))
             mags[i] = ceil(Int, x)
         end
-        k += min(-1, minimum(mags))
+        k += min(-1, minimum(view(mags, mask)))
         k = max(0, k)
     end
     # Return weights to original
