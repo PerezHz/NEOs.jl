@@ -525,16 +525,17 @@ function linkage(
         return orbit
     end
     # Select first scaling factor
-    k = typemax(Int)
+    kmin, kmax = typemin(Int), typemax(Int)
+    k = kmax
     mask = BitVector(undef, length(tracklets))
     mags = Vector{Int}(undef, length(tracklets))
     for (i, trk) in enumerate(tracklets)
         x = maximum(log10chi, view(res, opticalindices(trk)))
-        mags[i] = ceil(Int, x)
+        mags[i] = ceil(Int, clamp(x, kmin, kmax))
         mask[i] = mags[i] > 0
         k = mask[i] ? min(k, mags[i]) : k
     end
-    k = k == typemax(Int) ? 0 : k - 1
+    k = k == kmax ? 0 : k - 1
     idxs = opticalindices(view(tracklets, mask))
     # Main cycle
     for i in 1:maxiter
@@ -575,7 +576,7 @@ function linkage(
         end
         for (i, trk) in enumerate(tracklets)
             x = maximum(log10chi, view(res, opticalindices(trk)))
-            mags[i] = ceil(Int, x)
+            mags[i] = ceil(Int, clamp(x, kmin, kmax))
         end
         k += min(-1, minimum(view(mags, mask)))
         k = max(0, k)
