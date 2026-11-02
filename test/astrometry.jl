@@ -16,22 +16,36 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         date1, date2 = julian2datetime(PE.J2000), now()
         @test floor(Int, numberofdays([date1, date2])) == floor(date2 - date1, Day).value
 
-        # This tests are based on the examples in:
-        # https://minorplanetcenter.net/iau/info/PackedDes.html
+        # (un)packdesig
 
-        # (Un)packdesig
-        packedids = ["J95X00A", "J95X01L", "J95F13B", "J98SA8Q", "J98SC7V", "J98SG2S",
-            "K99AJ3Z", "K08Aa0A", "K07Tf8A"]
-        unpackedids = ["1995 XA", "1995 XL1", "1995 FB13", "1998 SQ108", "1998 SV127",
-            "1998 SS162", "2099 AZ193", "2008 AA360", "2007 TA418"]
+        # This tests are based on the examples in:
+        # https://docs.minorplanetcenter.net/mpc-ops-docs/designations/provisional-designations/
+        packedids = [
+            "J95X00A", "J95X01L", "J95F13B", "J98SA8Q", "J98SC7V", "J98SG2S", "K99AJ3Z",
+            "K08Aa0A", "K07Tf8A", "K26Cz9Z", "_QC0000", "_QC0aEM", "_QCzzzz", "K23B00A",
+            "K24C03Z", "K25Dz9Z", "_PD0000", "_QD000N", "_RD0aEM", "_SEZZZZ", "_TFzzzz"
+        ]
+        unpackedids = [
+            "1995 XA", "1995 XL1", "1995 FB13", "1998 SQ108", "1998 SV127", "1998 SS162",
+            "2099 AZ193", "2008 AA360", "2007 TA418", "2026 CZ619", "2026 CA620",
+            "2026 CZ6190", "2026 CL591673", "2023 BA", "2024 CZ3", "2025 DZ619",
+            "2025 DA620", "2026 DY620", "2027 DZ6190", "2028 EA339749", "2029 FL591673"
+        ]
 
         @test all(unpackdesig.(packedids) .== unpackedids)
         @test all(packdesig.(unpackedids) .== packedids)
 
-        packednums = ["03202", "50000", "A0345", "a0017", "K3289", "~0000",
-            "~000z", "~AZaz", "~zzzz", "0003I"]
-        unpackednums = ["3202", "50000", "100345", "360017", "203289", "620000",
-            "620061", "3140113", "15396335", "3I"]
+        # (un)packnum
+        # This tests are based on the examples in:
+        # https://docs.minorplanetcenter.net/mpc-ops-docs/designations/packed-designations/
+        packednums = [
+            "03202", "50000", "A0345", "a0017", "K3289",
+            "~0000", "~000z", "~AZaz", "~zzzz", "0003I"
+        ]
+        unpackednums = [
+            "3202", "50000", "100345", "360017", "203289",
+            "620000", "620061", "3140113", "15396335", "3I"
+        ]
 
         @test all(unpacknum.(packednums) .== unpackednums)
         @test all(packnum.(unpackednums) .== packednums)
