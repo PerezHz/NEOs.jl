@@ -17,6 +17,7 @@ const MAGNITUDE_BANDS_PATH = joinpath(DATA_PATH, "magnitudebandsmpc.json")
 
 # Designations
 
+const MONTH_ORDER_LETTERS = "ABCDEFGHJKLMNOPQRSTUVWXYZ"
 const BASE_62_ENCODING = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 const MPC_API_URL = "https://data.minorplanetcenter.net/api/"
 const DESIGNATIONS_MPC_API = MPC_API_URL * "query-identifier"

@@ -1,3 +1,8 @@
+# Base-62 encoding
+encode62(x::Int) = reverse(BASE_62_ENCODING[digits(x, base = 62) .+ 1])
+decode62(x::AbstractString) =
+    sum( (findfirst(c, BASE_62_ENCODING) - 1) * 62^(4-i) for (i, c) in enumerate(x))
+
 """
     unpacknum(::AbstractString)
 
@@ -23,8 +28,7 @@ function unpacknum(s::AbstractString)
         return string(num)
     # number is above 619,999
     elseif s[1] == '~'
-        num = 620_000 + sum((findfirst(c, BASE_62_ENCODING) - 1) * 62^(4-i)
-            for (i, c) in enumerate(s[2:5]))
+        num = 620_000 + decode62(s[2:5])
         return string(num)
     else
         return throw(ArgumentError("Invalid MPC packed permanent designation"))
@@ -59,9 +63,7 @@ function packnum(s::AbstractString)
         return string(s1, s2)
     # number is above 619,999
     elseif 620_000 ≤ num
-        num = num - 620_000
-        d = digits(num, base = 62) .+ 1
-        encoding = reverse(BASE_62_ENCODING[d])
+        encoding = encode62(num - 620_000)
         return string("~", lpad(encoding, 4, '0'))
     else
         return throw(ArgumentError("Invalid MPC permanent designation"))
@@ -80,27 +82,29 @@ See also [`packdesig`](@ref).
     - https://docs.minorplanetcenter.net/mpc-ops-docs/designations/provisional-designations/
 """
 function unpackdesig(s::AbstractString)
-    if s[1] == 'I'
-        century = 1800
-    elseif s[1] == 'J'
-        century = 1900
-    elseif s[1] == 'K'
-        century = 2000
-    end
-    year = century + parse(Int, s[2:3])
-    half_month_letter = s[4]
-    second_letter = s[7]
-    if all(isnumeric, s[5:6])
-        cycle_count = parse(Int, s[5:6])
-    elseif isuppercase(s[5])
-        cycle_count = 100 + 10 * (s[5] - 'A') + parse(Int, s[6])
+    # Original scheme
+    if 'I' ≤ s[1] ≤ 'K'
+        year = 100 * (Int(s[1]) - 55) + parse(Int, s[2:3])
+        half_month_letter, second_letter = s[4], s[7]
+        if all(isnumeric, s[5:6])
+            cycle_count = parse(Int, s[5:6])
+        elseif isuppercase(s[5])
+            cycle_count = 100 + 10 * (s[5] - 'A') + parse(Int, s[6])
+        else
+            cycle_count = 100 + 10 * (s[5] - 6 - 'A') + parse(Int, s[6])
+        end
+    # Extended scheme
+    elseif s[1] == '_'
+        year = 2000 + (Int(s[2]) - 55)
+        half_month_letter = s[3]
+        num = decode62(s[4:7])
+        second_letter = MONTH_ORDER_LETTERS[mod(num, 25) + 1]
+        cycle_count = div(num, 25) + 620
     else
-        cycle_count = 100 + 10 * (s[5] - 6 - 'A') + parse(Int, s[6])
+        return throw(ArgumentError("Invalid MPC packed provisional designation"))
     end
     cycle_count_s = iszero(cycle_count) ? "" : string(cycle_count)
-
-    return string(year, " ", half_month_letter, second_letter,
-        cycle_count_s)
+    return string(year, " ", half_month_letter, second_letter, cycle_count_s)
 end
 
 """
@@ -116,24 +120,28 @@ See also [`unpackdesig`](@ref).
 """
 function packdesig(s::AbstractString)
     year, tail = split(s, " ")
-    if year[1:2] == "18"
-        packed_year = string("I", year[3:4])
-    elseif year[1:2] == "19"
-        packed_year = string("J", year[3:4])
-    elseif year[1:2] == "20"
-        packed_year = string("K", year[3:4])
-    end
     half_month_letter, second_letter = tail[1:2]
     number = length(tail) > 2 ? parse(Int, tail[3:end]) : 0
-    if number ≤ 99
-        cycle_count = lpad(tail[3:end], 2, "0")
-    elseif 100 ≤ number ≤ 359
-        cycle_count = string(parse(Int, tail[3:4]) - 10 + 'A', tail[end])
+    # Original scheme
+    if number < 620
+        packed_year = string(Char(parse(Int, year) ÷ 100 + 55), year[3:4])
+        if number ≤ 99
+            cycle_count = lpad(tail[3:end], 2, "0")
+        elseif 100 ≤ number ≤ 359
+            cycle_count = string(parse(Int, tail[3:4]) - 10 + 'A', tail[end])
+        else
+            cycle_count = string(parse(Int, tail[3:4]) - 36 + 'a', tail[end])
+        end
+        return string(packed_year, half_month_letter, cycle_count, second_letter)
+    # Extended scheme
+    elseif 620 ≤ number < 14_791_836
+        packed_year = string('_', Char(parse(Int, year[3:4]) + 55))
+        num = (number - 620) * 25 + findfirst(second_letter, NEOs.MONTH_ORDER_LETTERS) - 1
+        cycle_count = lpad(encode62(num), 4, '0')
+        return string(packed_year, half_month_letter, cycle_count)
     else
-        cycle_count = string(parse(Int, tail[3:4]) - 36 + 'a', tail[end])
+        return throw(ArgumentError("Invalid MPC provisional designation"))
     end
-
-    return string(packed_year, half_month_letter, cycle_count, second_letter)
 end
 
 """
