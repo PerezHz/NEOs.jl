@@ -93,6 +93,8 @@ function unpackdesig(s::AbstractString)
         else
             cycle_count = 100 + 10 * (s[5] - 6 - 'A') + parse(Int, s[6])
         end
+        cycle_count_s = iszero(cycle_count) ? "" : string(cycle_count)
+        return string(year, " ", half_month_letter, second_letter, cycle_count_s)
     # Extended scheme
     elseif s[1] == '_'
         year = 2000 + (Int(s[2]) - 55)
@@ -100,11 +102,16 @@ function unpackdesig(s::AbstractString)
         num = decode62(s[4:7])
         second_letter = MONTH_ORDER_LETTERS[mod(num, 25) + 1]
         cycle_count = div(num, 25) + 620
+        cycle_count_s = iszero(cycle_count) ? "" : string(cycle_count)
+        return string(year, " ", half_month_letter, second_letter, cycle_count_s)
+    # Survey designations
+    elseif s[3] == 'S' && s[1:2] in ("PL", "T1", "T2", "T3")
+        year = parse(Int, s[4:7])
+        survey = string(s[1], "-", s[2])
+        return string(year, " ", survey)
     else
         return throw(ArgumentError("Invalid MPC packed provisional designation"))
     end
-    cycle_count_s = iszero(cycle_count) ? "" : string(cycle_count)
-    return string(year, " ", half_month_letter, second_letter, cycle_count_s)
 end
 
 """
@@ -120,27 +127,32 @@ See also [`unpackdesig`](@ref).
 """
 function packdesig(s::AbstractString)
     year, tail = split(s, " ")
-    half_month_letter, second_letter = tail[1:2]
-    number = length(tail) > 2 ? parse(Int, tail[3:end]) : 0
-    # Original scheme
-    if number < 620
-        packed_year = string(Char(parse(Int, year) ÷ 100 + 55), year[3:4])
-        if number ≤ 99
-            cycle_count = lpad(tail[3:end], 2, "0")
-        elseif 100 ≤ number ≤ 359
-            cycle_count = string(parse(Int, tail[3:4]) - 10 + 'A', tail[end])
-        else
-            cycle_count = string(parse(Int, tail[3:4]) - 36 + 'a', tail[end])
-        end
-        return string(packed_year, half_month_letter, cycle_count, second_letter)
-    # Extended scheme
-    elseif 620 ≤ number < 14_791_836
-        packed_year = string('_', Char(parse(Int, year[3:4]) + 55))
-        num = (number - 620) * 25 + findfirst(second_letter, NEOs.MONTH_ORDER_LETTERS) - 1
-        cycle_count = lpad(encode62(num), 4, '0')
-        return string(packed_year, half_month_letter, cycle_count)
+    # Survey designations
+    if contains(tail, '-')
+        return string(tail[1], tail[3], 'S', year)
     else
-        return throw(ArgumentError("Invalid MPC provisional designation"))
+        half_month_letter, second_letter = tail[1:2]
+        number = length(tail) > 2 ? parse(Int, tail[3:end]) : 0
+        # Original scheme
+        if number < 620
+            packed_year = string(Char(parse(Int, year) ÷ 100 + 55), year[3:4])
+            if number ≤ 99
+                cycle_count = lpad(tail[3:end], 2, "0")
+            elseif 100 ≤ number ≤ 359
+                cycle_count = string(parse(Int, tail[3:4]) - 10 + 'A', tail[end])
+            else
+                cycle_count = string(parse(Int, tail[3:4]) - 36 + 'a', tail[end])
+            end
+            return string(packed_year, half_month_letter, cycle_count, second_letter)
+        # Extended scheme
+        elseif 620 ≤ number < 14_791_836
+            packed_year = string('_', Char(parse(Int, year[3:4]) + 55))
+            num = (number - 620) * 25 + findfirst(second_letter, NEOs.MONTH_ORDER_LETTERS) - 1
+            cycle_count = lpad(encode62(num), 4, '0')
+            return string(packed_year, half_month_letter, cycle_count)
+        else
+            return throw(ArgumentError("Invalid MPC provisional designation"))
+        end
     end
 end
 
