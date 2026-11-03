@@ -21,13 +21,17 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         # This tests are based on the examples in:
         # https://docs.minorplanetcenter.net/mpc-ops-docs/designations/provisional-designations/
         packedids = [
-            "J95X00A", "J95X01L", "J95F13B", "J98SA8Q", "J98SC7V", "J98SG2S", "K99AJ3Z",
-            "K08Aa0A", "K07Tf8A", "K26Cz9Z", "_QC0000", "_QC0aEM", "_QCzzzz", "K23B00A",
-            "K24C03Z", "K25Dz9Z", "_PD0000", "_QD000N", "_RD0aEM", "_SEZZZZ", "_TFzzzz"
+            "J95X00A", "J95X01L", "J95F13B", "J98SA8Q", "J98SC7V",
+            "J98SG2S", "K99AJ3Z", "K08Aa0A", "K07Tf8A", "PLS2040",
+            "T1S3138", "T2S1010", "T3S4101", "K26Cz9Z", "_QC0000",
+            "_QC0aEM", "_QCzzzz", "K23B00A", "K24C03Z", "K25Dz9Z",
+            "_PD0000", "_QD000N", "_RD0aEM", "_SEZZZZ", "_TFzzzz"
         ]
+
         unpackedids = [
-            "1995 XA", "1995 XL1", "1995 FB13", "1998 SQ108", "1998 SV127", "1998 SS162",
-            "2099 AZ193", "2008 AA360", "2007 TA418", "2026 CZ619", "2026 CA620",
+            "1995 XA", "1995 XL1", "1995 FB13", "1998 SQ108", "1998 SV127",
+            "1998 SS162", "2099 AZ193", "2008 AA360", "2007 TA418", "2040 P-L",
+            "3138 T-1", "1010 T-2", "4101 T-3", "2026 CZ619", "2026 CA620",
             "2026 CZ6190", "2026 CL591673", "2023 BA", "2024 CZ3", "2025 DZ619",
             "2025 DA620", "2026 DY620", "2027 DZ6190", "2028 EA339749", "2029 FL591673"
         ]
