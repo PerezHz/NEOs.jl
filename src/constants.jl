@@ -269,13 +269,25 @@ function set_sseph_source(filename::AbstractString)
           restart your Julia session for this change to take effect!")
 end
 
-const sseph::DensePropagation2{Float64, Float64} =
-    JLD2.load(SSEPH_SOURCE, "ss16ast_eph")
-const acceph::DensePropagation2{Float64, Float64} =
-    JLD2.load(SSEPH_SOURCE, "acc_eph")
-const poteph::DensePropagation2{Float64, Float64} =
-    JLD2.load(SSEPH_SOURCE, "pot_eph")
-const ttmtdb::DensePropagation1{Float64, Float64} = TaylorSolution(sseph.t, sseph.p[:, end])
+function load_sseph()
+    eph::Dict{String, Any} = JLD2.load(SSEPH_SOURCE)
+    @assert haskey(eph, "ss16ast_eph") "Solar system ephemeris source file has \
+        no key \"ss16ast_eph\""
+    sseph::DensePropagation2{Float64, Float64} = eph["ss16ast_eph"]
+    if haskey(eph, "acc_eph") && haskey(eph, "pot_eph")
+        acceph::DensePropagation2{Float64, Float64} = eph["acc_eph"]
+        poteph::DensePropagation2{Float64, Float64} = eph["pot_eph"]
+    else
+        @info "Computing acceph and poteph; then saving them to SSEPH_SOURCE"
+        acceph, poteph = PE.loadeph(sseph, PE.μ)
+        jldsave(SSEPH_SOURCE; ss16ast_eph = sseph, acc_eph = acceph, pot_eph = poteph)
+    end
+    ttmtdb::DensePropagation1{Float64, Float64} = TaylorSolution(sseph.t, sseph.p[:, end])
+    return sseph, acceph, poteph, ttmtdb
+end
+
+const sseph, acceph, poteph, ttmtdb = load_sseph()
+
 const SSEPHORDER::Int = TaylorSeries.order(sseph.p[1])
 const SSEPHNBODIES::Int = numberofbodies(sseph)
 const MINDTTDB::DateTime = julian2datetime(firsttime(sseph) + JD_J2000)
