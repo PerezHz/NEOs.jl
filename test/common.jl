@@ -9,11 +9,21 @@ using Test
 @testset "Common" begin
 
     @testset "Solar system ephemerides" begin
-        using NEOs: SSEPH_SOURCE, SSEPH_ARTIFACT_PATH, print_sseph_summary, set_sseph_source
+        using NEOs: SSEPH_SOURCE, SSEPH_ARTIFACT_PATH, print_sseph_summary, set_sseph_source,
+              SSEPHORDER, set_sseph_order, SSEPHNBODIES, SSEPHSPKIDS, SSEPHGMS, sseph,
+              acceph, poteph, ttmtdb
 
         print_sseph_summary()
 
         @test SSEPH_SOURCE == SSEPH_ARTIFACT_PATH
+        @test SSEPHORDER == 25
+        @test all(x -> TaylorSeries.order(x) == SSEPHORDER, sseph.p)
+        @test all(x -> TaylorSeries.order(x) == SSEPHORDER, acceph.p)
+        @test all(x -> TaylorSeries.order(x) == SSEPHORDER, poteph.p)
+        @test all(x -> TaylorSeries.order(x) == SSEPHORDER, ttmtdb.p)
+        @test length(SSEPHSPKIDS) == length(SSEPHGMS) == SSEPHNBODIES
+        @test SSEPHSPKIDS[1:11] == [10, 199, 299, 399, 301, 4, 5, 6, 7, 8, 9]
+        @test SSEPHGMS == PlanetaryEphemeris.μ[1:SSEPHNBODIES]
 
         set_sseph_source("sseph343ast016_p100y_et.jld2")
 
@@ -24,6 +34,18 @@ using Test
 
         @test has_preference(NEOs, "SSEPH_SOURCE")
         @test load_preference(NEOs, "SSEPH_SOURCE") == SSEPH_ARTIFACT_PATH
+
+        set_sseph_order(30)
+
+        @test has_preference(NEOs, "SSEPHORDER")
+        @test load_preference(NEOs, "SSEPHORDER") == 30
+
+        set_sseph_order(25)
+
+        @test has_preference(NEOs, "SSEPHORDER")
+        @test load_preference(NEOs, "SSEPHORDER") == 25
+
+        @test_throws ArgumentError set_sseph_order(0)
     end
 
     @testset "Unit conversions" begin

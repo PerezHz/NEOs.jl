@@ -50,7 +50,7 @@ For the computation of the planet's impact cross section ("critical B"), see
 [`crosssection`](@ref).
 """
 function bopik(xae::AbstractVector{U}, xes::AbstractVector{U};
-               μ::Real = PE.μ[ea], R::Real = PLANET_RADII[ea]) where {U <: Number}
+               μ::Real = μ_E, R::Real = PLANET_RADII[ea]) where {U <: Number}
 
     # Computation of Öpik's frame (\mathbf{ξ}, \mathbf{ζ})
     # See equations (37)-(38) in page 14 of https://doi.org/10.1007/s10569-019-9914-4

@@ -18,7 +18,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
 
     @testset "Common" begin
         using NEOs: PLANET_NAMES_TO_INDEX, PLANET_RADII, sseph, numtype,
-              μ_S, lovtransform
+              μ_S, lovtransform, SSEPHGMS
 
         # Impact monitoring scales
         Es  = [1E2,  1E4,  1E5,  1E1,  1E3,  1E4,  1E7,  1E7,  1E1,   1E4,   1E7] # Mt
@@ -38,7 +38,7 @@ const TEST_DATA = joinpath(pkgdir(NEOs), "test", "data")
         planets = Symbol.(first.(sort(collect(PLANET_NAMES_TO_INDEX), by = last)))
         for (i, planet) in enumerate(planets)
             target = ImpactTarget(:($planet))
-            @test gm(target) == PE.μ[i]
+            @test gm(target) == SSEPHGMS[i]
             @test radius(target) == PLANET_RADII[i]
             @test escapevelocity(target) == sqrt(2 * gm(target) / radius(target)) * (au/daysec)
             @test target(t) == sseph(i, t)
