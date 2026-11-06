@@ -16,6 +16,21 @@ auxzero(a::AbstractSeries) = zero(a)
 # Extract the linear scaling factor from a TaylorN
 scalingfactor(x::TaylorN{T}) where {T <: Real} = x[1][findfirst(x[1])]
 
+# Return a copy of `x` truncated, or padded with zeros, to order `order`
+function changeorder(x::Taylor1{T}, order::Int) where {T <: Number}
+    coeffs = zeros(T, order + 1)
+    n = min(TaylorSeries.order(x), order) + 1
+    coeffs[1:n] .= view(x.coeffs, 1:n)
+    return Taylor1(coeffs, order)
+end
+
+# Return a copy of the dense TaylorSolution `eph` whose polynomials have been
+# truncated, or padded with zeros, to order `order`
+function changeorder(eph::DensePropagation2{T, T}, order::Int) where {T <: Real}
+    all(x -> TaylorSeries.order(x) == order, eph.p) && return eph
+    return TaylorSolution(eph.t, map(x -> changeorder(x, order), eph.p))
+end
+
 # In-place methods of auday2kmsec
 function auday2kmsec!(y::AbstractVector{T}) where {T <: Real}
     for i in eachindex(y)

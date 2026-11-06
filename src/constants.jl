@@ -246,9 +246,16 @@ const CATALOGUE_MPC_CODES_2018 = [
 
 # Propagation
 
-# Load Solar System, accelerations, newtonian potentials and TT-TDB 2000-2100 ephemeris
+# Solar system ephemeris source file
 const SSEPH_ARTIFACT_PATH = joinpath(artifact"sseph_p100", "sseph343ast016_p100y_et.jld2")
 const SSEPH_SOURCE = @load_preference("SSEPH_SOURCE", SSEPH_ARTIFACT_PATH)
+# Order of the Taylor polynomials of the solar system ephemeris
+const SSEPHORDER::Int = @load_preference("SSEPHORDER", 25)
+
+# NAIF ids of the Sun, Mercury, Venus, the Earth, the Moon, the barycenters of Mars,
+# Jupiter, Saturn, Uranus and Neptune, and the barycenter of Pluto; i.e. the first 11
+# bodies of every solar system ephemeris
+const SSEPH_PLANETS_SPKIDS = [10, 199, 299, 399, 301, 4, 5, 6, 7, 8, 9]
 
 """
     set_sseph_source(filename)
@@ -257,11 +264,23 @@ Set the solar system ephemeris source file to `filename`.
 
 # Extended help
 
-`filename` must be a valid `.jld2` file produced by PlanetaryEphemeris.jl,
-meaning that it contains the following fields:
-- `ss16ast_eph`: solar system ephemeris.
-- `acc_eph`: acceleration ephemeris.
-- `pot_eph`: Newtonian potential ephemeris.
+`filename` must be a valid `.jld2` file produced by PlanetaryEphemeris.jl (e.g. by its
+`scripts/spice_to_pe.jl` script), meaning that it contains the following fields:
+- `ss16ast_eph`: solar system ephemeris. Its first 11 bodies must be the Sun, Mercury,
+    Venus, the Earth, the Moon, and the barycenters of Mars, Jupiter, Saturn, Uranus,
+    Neptune and Pluto (in that order).
+- `spkids` (optional): NAIF ids of the bodies in `ss16ast_eph`.
+- `μ` (optional): gravitational parameters [au³/day²] of the bodies in `ss16ast_eph`.
+- `acc_eph` (optional): acceleration ephemeris.
+- `pot_eph` (optional): Newtonian potential ephemeris.
+
+`spkids` and `μ` must be given together; if both are missing, the bodies and
+gravitational parameters of the JPL DE430 model (as integrated by PlanetaryEphemeris.jl)
+are assumed. If `acc_eph` and `pot_eph` are missing, or their order is smaller than
+`SSEPHORDER` (see `set_sseph_order`), they are computed when NEOs is loaded and
+then saved to `filename`.
+
+See also [`set_sseph_order`](@ref).
 """
 function set_sseph_source(filename::AbstractString)
     @set_preferences!("SSEPH_SOURCE" => filename)
@@ -269,26 +288,121 @@ function set_sseph_source(filename::AbstractString)
           restart your Julia session for this change to take effect!")
 end
 
-function load_sseph()
-    eph::Dict{String, Any} = JLD2.load(SSEPH_SOURCE)
-    @assert haskey(eph, "ss16ast_eph") "Solar system ephemeris source file has \
-        no key \"ss16ast_eph\""
-    sseph::DensePropagation2{Float64, Float64} = eph["ss16ast_eph"]
-    if haskey(eph, "acc_eph") && haskey(eph, "pot_eph")
-        acceph::DensePropagation2{Float64, Float64} = eph["acc_eph"]
-        poteph::DensePropagation2{Float64, Float64} = eph["pot_eph"]
-    else
-        @info "Computing acceph and poteph; then saving them to SSEPH_SOURCE"
-        acceph, poteph = PE.loadeph(sseph, PE.μ)
-        jldsave(SSEPH_SOURCE; ss16ast_eph = sseph, acc_eph = acceph, pot_eph = poteph)
-    end
-    ttmtdb::DensePropagation1{Float64, Float64} = TaylorSolution(sseph.t, sseph.p[:, end])
-    return sseph, acceph, poteph, ttmtdb
+"""
+    set_sseph_order(order)
+
+Set the order of the Taylor polynomials of the solar system
+ephemeris to `order` (default: `25`).
+
+# Extended help
+
+When NEOs is loaded, the polynomials in the source file
+(see [`set_sseph_source`](@ref)) are truncated, if their
+order is larger than `order`, or padded with zeros otherwise.
+"""
+function set_sseph_order(order::Integer)
+    order ≥ 1 || throw(ArgumentError("The solar system ephemeris order must be positive"))
+    @set_preferences!("SSEPHORDER" => Int(order))
+    @info("Solar system ephemeris order set to $order; \
+          restart your Julia session for this change to take effect!")
 end
 
-const sseph, acceph, poteph, ttmtdb = load_sseph()
+# NAIF ids of the first `N` bodies of the JPL DE430 model integrated by
+# PlanetaryEphemeris.jl (e.g. the ephemeris in SSEPH_ARTIFACT_PATH)
+de430_spkids(N::Int) = vcat(SSEPH_PLANETS_SPKIDS,
+    2_000_000 .+ PE.de430_343ast_ids[1:N-length(SSEPH_PLANETS_SPKIDS)])
 
-const SSEPHORDER::Int = TaylorSeries.order(sseph.p[1])
+# Read `key` from the open .jld2 `file` if it is a dense TaylorSolution whose
+# polynomials have order ≥ SSEPHORDER, and return it with polynomials of order
+# SSEPHORDER; otherwise, return `nothing`
+function readsseph(file, key::AbstractString)
+    haskey(file, key) || return nothing
+    eph::DensePropagation2{Float64, Float64} = file[key]
+    all(x -> TaylorSeries.order(x) ≥ SSEPHORDER, eph.p) || return nothing
+    return changeorder(eph, SSEPHORDER)
+end
+
+# Read the solar system ephemeris (with polynomials of order SSEPHORDER), the NAIF ids
+# and gravitational parameters of its bodies and, if available, the accelerations and
+# Newtonian potentials ephemerides (with polynomials of order SSEPHORDER) from the open
+# .jld2 file `file`
+function readssephsource(file)
+    @assert haskey(file, "ss16ast_eph") "Solar system ephemeris source file has \
+        no key \"ss16ast_eph\""
+    # Solar system ephemeris, with polynomials of order SSEPHORDER
+    sseph::DensePropagation2{Float64, Float64} = changeorder(file["ss16ast_eph"],
+        SSEPHORDER)
+    N = numberofbodies(sseph)
+    # NAIF ids and gravitational parameters [au³/day²] of the bodies in sseph
+    @assert haskey(file, "spkids") == haskey(file, "μ") "Solar system ephemeris \
+        source file must contain both or none of the keys \"spkids\" and \"μ\""
+    if haskey(file, "spkids")
+        spkids = Vector{Int}(file["spkids"])
+        gms = Vector{Float64}(file["μ"])
+    else
+        # Bodies and gravitational parameters of the JPL DE430 model
+        spkids = de430_spkids(N)
+        gms = PE.μ[1:N]
+    end
+    @assert length(spkids) == length(gms) == N "Solar system ephemeris source file \
+        has $N bodies, but $(length(spkids)) NAIF ids and $(length(gms)) \
+        gravitational parameters"
+    @assert spkids[1:length(SSEPH_PLANETS_SPKIDS)] == SSEPH_PLANETS_SPKIDS "The \
+        first $(length(SSEPH_PLANETS_SPKIDS)) bodies of the solar system ephemeris \
+        must have NAIF ids $SSEPH_PLANETS_SPKIDS"
+    # Accelerations and Newtonian potentials, with polynomials of order SSEPHORDER
+    # (only if they are stored with polynomials of order ≥ SSEPHORDER)
+    acceph = readsseph(file, "acc_eph")
+    poteph = readsseph(file, "pot_eph")
+    return sseph, spkids, gms, acceph, poteph
+end
+
+# Replace the .jld2 file `filename` by a new file with the same name and contents,
+# except for the keys `acc_eph` and `pot_eph`, which are set to `acceph` and `poteph`.
+# A new file is written (instead of modifying `filename` in place) because JLD2 does
+# not free the space of deleted keys
+function savesseph(filename::AbstractString, acceph::DensePropagation2,
+                   poteph::DensePropagation2)
+    # Temporary file in the same directory, so the final move is a rename
+    tmp = tempname(dirname(abspath(filename)); cleanup = false)
+    try
+        jldopen(filename, "r") do src
+            jldopen(tmp, "w") do dst
+                for key in keys(src)
+                    key in ("acc_eph", "pot_eph") && continue
+                    dst[key] = src[key]
+                end
+                dst["acc_eph"] = acceph
+                dst["pot_eph"] = poteph
+            end
+        end
+        mv(tmp, filename; force = true)
+    finally
+        isfile(tmp) && rm(tmp)
+    end
+    return nothing
+end
+
+function load_sseph()
+    sseph, spkids, gms, acceph, poteph = jldopen(readssephsource, SSEPH_SOURCE, "r")
+    if isnothing(acceph) || isnothing(poteph)
+        @info "Computing acceph and poteph"
+        acceph, poteph = PE.loadeph(sseph, gms)
+        # Save them to SSEPH_SOURCE, so they are not computed again
+        try
+            savesseph(SSEPH_SOURCE, acceph, poteph)
+            @info "Saved acceph and poteph to $SSEPH_SOURCE"
+        catch e
+            @warn "Could not save acceph and poteph to $SSEPH_SOURCE" exception = e
+        end
+    end
+    ttmtdb::DensePropagation1{Float64, Float64} = TaylorSolution(sseph.t, sseph.p[:, end])
+    return sseph, acceph, poteph, ttmtdb, spkids, gms
+end
+
+# Load Solar System, accelerations, newtonian potentials and TT-TDB ephemeris
+const sseph, acceph, poteph, ttmtdb, SSEPHSPKIDS, SSEPHGMS = load_sseph()
+
 const SSEPHNBODIES::Int = numberofbodies(sseph)
 const MINDTTDB::DateTime = julian2datetime(firsttime(sseph) + JD_J2000)
 const MAXDTTDB::DateTime = julian2datetime(lasttime(sseph) + JD_J2000)
@@ -324,19 +438,15 @@ const EPOCHMSJ2000::Int = (DTJ2000 - DateTime(0)).value
 # Abbreviations
 const cte = constant_term
 
-# Integration parameters
-const order = 30
-const abstol = 1.0E-30
-
 # 1 rad = 57.29577951308232 deg
 const onerad = rad2deg(1.0)
 # 1 day = 86,400,000 millisec
 const daymillisec = 1_000 * daysec
 
-# Vector of GM's (DE430 values) [au^2 / day^3]
-const μ_DE430 = PE.μ
-# Gravitational parameter of the Sun [au^2 / day^3]
-const μ_S::Float64 = PE.GMS
+# Gravitational parameter of the Sun [au^3 / day^2]
+const μ_S::Float64 = SSEPHGMS[su]
+# Gravitational parameter of the Earth [au^3 / day^2]
+const μ_E::Float64 = SSEPHGMS[ea]
 
 # Standard value of nominal mean angular velocity of Earth (rad/sec)
 # See Explanatory Supplement to the Astronomical Almanac 2014 Sec 7.4.3.3 p. 296
@@ -389,12 +499,12 @@ const R_SI = 0.010044
 # Earth's physical radius [AU]
 const R_EA = 4.24E-5
 # Ratio between the mass of the Earth and the mass of the Sun
-const μ_ES = PE.μ[ea] / PE.μ[su] # 1 / 328_900.5614
+const μ_ES = μ_E / μ_S # 1 / 328_900.5614
 # Heliopause radius [au]
 const HELIOPAUSE_RADIUS = 120.0
 
 # Coefficient of g1 (used in compute_radec)
-const g1coeff = 2μ_DE430[su] / c_au_per_day^2
+const g1coeff = 2μ_S / c_au_per_day^2
 
 # Sigma parameter of the Rayleigh distribution of the
 # eccentricities of all asteroids recognized by the

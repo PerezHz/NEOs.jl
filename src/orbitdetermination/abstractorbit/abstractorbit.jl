@@ -498,7 +498,7 @@ function attributable(orbit::AbstractOrbit{D, T, T}, params::Parameters{T},
     # Attributable elements
     elements = cartesian2attributable(q0)
     Γ_attr = project(elements, covariance(orbit))
-    attr = AttributableElements{T, TaylorN{T}}(PE.μ[ea], t + MJD2000, :equatorial,
+    attr = AttributableElements{T, TaylorN{T}}(μ_E, t + MJD2000, :equatorial,
         elements, Γ_attr)
 
     return evaldeltas(attr, x0)

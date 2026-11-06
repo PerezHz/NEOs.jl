@@ -10,7 +10,7 @@ using Test
 using NEOs: OpticalMPC80, RadarJPL, AbstractOpticalVector, RadarResidual, KeplerianElements,
       EquinoctialElements, AttributableElements, μ_S, opticalindices, equatorial2ecliptic,
       ecliptic2equatorial, numtypes, sseph, covariance, scalartype, opticaltype, radartype,
-      dof, hasradar
+      dof, hasradar, μ_E
 using SPICE: furnsh, spkgeo
 using Statistics: mean
 
@@ -59,7 +59,7 @@ function jpl_compatibility_tests(spkid, orbit, params, bounds)
         @test conicsection(kep) == conicsection(eqn) == :elliptic
         @test conicsection(attr) == :hyperbolic
         @test gm(kep) == gm(eqn) == μ_S
-        @test gm(attr) == PE.μ[ea]
+        @test gm(attr) == μ_E
         @test epoch(kep) == epoch(eqn) == epoch(attr) == mjd0
         @test frame(kep) == frame(eqn) == :ecliptic
         @test frame(attr) == :equatorial

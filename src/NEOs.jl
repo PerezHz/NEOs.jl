@@ -113,11 +113,11 @@ export VirtualImpactor, isspurious, sigmaimp, semiwidth, stretching, virtualimpa
        verifyvirtualimpactor, impact_probability, impactor_table, vinf,
        impactenergy, palermoscale, torinoscale
 
+include("fasttaylors.jl")
 include("constants.jl")
 include("units.jl")
 include("jpleph.jl")
 include("parameters.jl")
-include("fasttaylors.jl")
 include("astrometry/astrometry.jl")
 include("propagation/propagation.jl")
 include("orbitdetermination/orbitdetermination.jl")

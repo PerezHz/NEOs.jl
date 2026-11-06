@@ -117,7 +117,7 @@ function shapiro_delay(e, p, q)
     # Ansatz
     shap = 0.0 # 2μ[1]/(c_au_per_day^2)
     # Shapiro time-delay [days]
-    shap_del_days = (2μ_DE430[su] / (c_au_per_day^3)) * log( (e+p+q+shap)/(e+p-q+shap) )
+    shap_del_days = (2μ_S / (c_au_per_day^3)) * log( (e+p+q+shap)/(e+p-q+shap) )
     # Shapiro time-delay [sec]
     return shap_del_days * daysec
 end
@@ -155,7 +155,7 @@ differential of the Shapiro delay.
 function shapiro_doppler(e, de, p, dp, q, dq, F_tx)
     # Differential of Shapiro delay [adim]
     # shap_del_diff = 2μ[1]*( (de+dp+dq)/(e+p+q) - (de+dp-dq)/(e+p-q) )/(c_au_per_day^3)
-    shap_del_diff = (4μ_DE430[su] / (c_au_per_day^3)) * (  ( dq*(e+p) - q*(de+dp) ) /
+    shap_del_diff = (4μ_S / (c_au_per_day^3)) * (  ( dq*(e+p) - q*(de+dp) ) /
         ( (e+p)^2 - q^2 )  )
     # ν = -F_tx * dτ / dt [units of F_tx]
     # Shapiro Doppler shift [units of F_tx]
