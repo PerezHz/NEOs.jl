@@ -265,12 +265,15 @@ Set the solar system ephemeris source file to `filename`.
 # Extended help
 
 `filename` must be a valid `.jld2` file produced by PlanetaryEphemeris.jl (e.g. by its
-`scripts/spice_to_pe.jl` script), meaning that it contains the following fields:
-- `ss16ast_eph`: solar system ephemeris. Its first 11 bodies must be the Sun, Mercury,
+`scripts/de430.jl` or `scripts/spice_to_pe.jl` scripts), meaning that it contains the
+following fields:
+- `sseph`: solar system ephemeris. Its first 11 bodies must be the Sun, Mercury,
     Venus, the Earth, the Moon, and the barycenters of Mars, Jupiter, Saturn, Uranus,
-    Neptune and Pluto (in that order).
-- `spkids` (optional): NAIF ids of the bodies in `ss16ast_eph`.
-- `μ` (optional): gravitational parameters [au³/day²] of the bodies in `ss16ast_eph`.
+    Neptune and Pluto (in that order). Files produced by PlanetaryEphemeris.jl versions
+    older than 0.14 (e.g. the default artifact) store it as `ss16ast_eph`, which is
+    also accepted.
+- `spkids` (optional): NAIF ids of the bodies in `sseph`.
+- `μ` (optional): gravitational parameters [au³/day²] of the bodies in `sseph`.
 - `acc_eph` (optional): acceleration ephemeris.
 - `pot_eph` (optional): Newtonian potential ephemeris.
 
@@ -327,11 +330,13 @@ end
 # Newtonian potentials ephemerides (with polynomials of order SSEPHORDER) from the open
 # .jld2 file `file`
 function readssephsource(file)
-    @assert haskey(file, "ss16ast_eph") "Solar system ephemeris source file has \
-        no key \"ss16ast_eph\""
+    # Solar system ephemeris key: `sseph` (PlanetaryEphemeris.jl ≥ 0.14) or
+    # `ss16ast_eph` (older files, e.g. the default artifact)
+    key = haskey(file, "sseph") ? "sseph" : "ss16ast_eph"
+    @assert haskey(file, key) "Solar system ephemeris source file has no key \
+        \"sseph\" (or \"ss16ast_eph\")"
     # Solar system ephemeris, with polynomials of order SSEPHORDER
-    sseph::DensePropagation2{Float64, Float64} = changeorder(file["ss16ast_eph"],
-        SSEPHORDER)
+    sseph::DensePropagation2{Float64, Float64} = changeorder(file[key], SSEPHORDER)
     N = numberofbodies(sseph)
     # NAIF ids and gravitational parameters [au³/day²] of the bodies in sseph
     @assert haskey(file, "spkids") == haskey(file, "μ") "Solar system ephemeris \
