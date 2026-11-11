@@ -114,6 +114,7 @@ export VirtualImpactor, isspurious, sigmaimp, semiwidth, stretching, virtualimpa
        impactenergy, palermoscale, torinoscale
 
 include("fasttaylors.jl")
+include("sseph.jl")
 include("constants.jl")
 include("units.jl")
 include("jpleph.jl")
