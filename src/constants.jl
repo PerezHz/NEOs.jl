@@ -274,12 +274,17 @@ following fields:
     also accepted.
 - `spkids` (optional): NAIF ids of the bodies in `sseph`.
 - `μ` (optional): gravitational parameters [au³/day²] of the bodies in `sseph`.
+- `model` (optional): name of the ephemeris model (e.g. `"DE440"`).
+- `params` (optional): model parameters, with the names and units of JPL's technical
+    comments: `"RE"` [km], `"J2E"` and `"J3E"`.
 - `acc_eph` (optional): acceleration ephemeris.
 - `pot_eph` (optional): Newtonian potential ephemeris.
 
 `spkids` and `μ` must be given together; if both are missing, the bodies and
 gravitational parameters of the JPL DE430 model (as integrated by PlanetaryEphemeris.jl)
-are assumed. If `acc_eph` and `pot_eph` are missing, or their order is smaller than
+are assumed. `model` and `params` must also be given together; if both are missing,
+the file must come from the JPL DE430 model, whose parameters are then assumed.
+If `acc_eph` and `pot_eph` are missing, or their order is smaller than
 `SSEPHORDER` (see `set_sseph_order`), they are computed when NEOs is loaded and
 then saved to `filename`.
 
@@ -309,6 +314,14 @@ function set_sseph_order(order::Integer)
     @info("Solar system ephemeris order set to $order; \
           restart your Julia session for this change to take effect!")
 end
+
+# Model parameters required in the solar system ephemeris source file
+const SSEPH_PARAMS_NAMES = ["RE", "J2E", "J3E"]
+
+# Ephemeris model and model parameters of the JPL DE430 model
+const DE430_MODEL = "DE430"
+const DE430_PARAMS = Dict{String, Float64}("RE" => PE.RE, "J2E" => PE.J2E,
+    "J3E" => PE.J3E)
 
 # NAIF ids of the first `N` bodies of the JPL DE430 model integrated by
 # PlanetaryEphemeris.jl (e.g. the ephemeris in SSEPH_ARTIFACT_PATH)
@@ -355,11 +368,30 @@ function readssephsource(file)
     @assert spkids[1:length(SSEPH_PLANETS_SPKIDS)] == SSEPH_PLANETS_SPKIDS "The \
         first $(length(SSEPH_PLANETS_SPKIDS)) bodies of the solar system ephemeris \
         must have NAIF ids $SSEPH_PLANETS_SPKIDS"
+    # Ephemeris model and model parameters
+    @assert haskey(file, "model") == haskey(file, "params") "Solar system ephemeris \
+        source file must contain both or none of the keys \"model\" and \"params\""
+    if haskey(file, "model")
+        model = String(file["model"])
+        params = Dict{String, Float64}(file["params"])
+        missingparams = setdiff(SSEPH_PARAMS_NAMES, keys(params))
+        @assert isempty(missingparams) "Solar system ephemeris source file is missing \
+            the model parameters $missingparams"
+    else
+        # Files without model parameters (PlanetaryEphemeris.jl < 0.14) are only
+        # accepted if they come from the JPL DE430 model; i.e. if the gravitational
+        # parameters of the Sun, the planets, the Moon and Pluto match
+        n = length(SSEPH_PLANETS_SPKIDS)
+        @assert isapprox(gms[1:n], PE.μ[1:n]; rtol = 1E-14) "Solar system ephemeris \
+            source file has no model parameters and does not come from the JPL DE430 \
+            model; convert it again with PlanetaryEphemeris.jl ≥ 0.14"
+        model, params = DE430_MODEL, copy(DE430_PARAMS)
+    end
     # Accelerations and Newtonian potentials, with polynomials of order SSEPHORDER
     # (only if they are stored with polynomials of order ≥ SSEPHORDER)
     acceph = readsseph(file, "acc_eph")
     poteph = readsseph(file, "pot_eph")
-    return sseph, spkids, gms, acceph, poteph
+    return sseph, spkids, gms, model, params, acceph, poteph
 end
 
 # Replace the .jld2 file `filename` by a new file with the same name and contents,
@@ -389,7 +421,8 @@ function savesseph(filename::AbstractString, acceph::DensePropagation2,
 end
 
 function load_sseph()
-    sseph, spkids, gms, acceph, poteph = jldopen(readssephsource, SSEPH_SOURCE, "r")
+    sseph, spkids, gms, model, params, acceph, poteph = jldopen(readssephsource,
+        SSEPH_SOURCE, "r")
     if isnothing(acceph) || isnothing(poteph)
         @info "Computing acceph and poteph"
         acceph, poteph = PE.loadeph(sseph, gms)
@@ -402,11 +435,14 @@ function load_sseph()
         end
     end
     ttmtdb::DensePropagation1{Float64, Float64} = TaylorSolution(sseph.t, sseph.p[:, end])
-    return sseph, acceph, poteph, ttmtdb, spkids, gms
+    return sseph, acceph, poteph, ttmtdb, spkids, gms, model, params
 end
 
-# Load Solar System, accelerations, newtonian potentials and TT-TDB ephemeris
-const sseph, acceph, poteph, ttmtdb, SSEPHSPKIDS, SSEPHGMS = load_sseph()
+# Load Solar System, accelerations, newtonian potentials and TT-TDB ephemeris, the NAIF
+# ids and gravitational parameters of its bodies, and the ephemeris model and its
+# parameters
+const sseph, acceph, poteph, ttmtdb, SSEPHSPKIDS, SSEPHGMS, SSEPHMODEL, SSEPHPARAMS =
+    load_sseph()
 
 const SSEPHNBODIES::Int = numberofbodies(sseph)
 const MINDTTDB::DateTime = julian2datetime(firsttime(sseph) + JD_J2000)
@@ -468,16 +504,16 @@ const S0_sun = 63.15E6
 # Conversion factor from m^2/sec^3 to au^2/day^3
 const m2_s3_to_au2_day3 = 1e-6daysec^3/au^2
 
-# Vector of J_2*R^2 values
+# Vector of J_2*R^2 values [au^2]
 # J_2: second zonal harmonic coefficient
 # R: radius of the body
 const Λ2 = zeros(11)
-Λ2[ea] = 1.9679542578489185e-12  # Earth
-# Vector of J_3*R^3 values
+Λ2[ea] = SSEPHPARAMS["J2E"] * (SSEPHPARAMS["RE"] / au)^2  # Earth
+# Vector of J_3*R^3 values [au^3]
 # J_3: third zonal harmonic coefficient
 # R: radius of the body
 const Λ3 = zeros(11)
-Λ3[ea] = -1.962633335678878e-19  # Earth
+Λ3[ea] = SSEPHPARAMS["J3E"] * (SSEPHPARAMS["RE"] / au)^3  # Earth
 
 # Speed of light
 const clightkms = 2.99792458E5   # km/sec
