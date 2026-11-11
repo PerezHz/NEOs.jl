@@ -11,7 +11,7 @@ using Test
     @testset "Solar system ephemerides" begin
         using NEOs: SSEPH_SOURCE, SSEPH_ARTIFACT_PATH, print_sseph_summary, set_sseph_source,
               SSEPHORDER, set_sseph_order, SSEPHNBODIES, SSEPHSPKIDS, SSEPHGMS, sseph,
-              acceph, poteph, ttmtdb
+              acceph, poteph, ttmtdb, SSEPHMODEL, SSEPHPARAMS, SSEPH_PARAMS_NAMES, Λ2, Λ3
 
         print_sseph_summary()
 
@@ -24,6 +24,19 @@ using Test
         @test length(SSEPHSPKIDS) == length(SSEPHGMS) == SSEPHNBODIES
         @test SSEPHSPKIDS[1:11] == [10, 199, 299, 399, 301, 4, 5, 6, 7, 8, 9]
         @test SSEPHGMS == PlanetaryEphemeris.μ[1:SSEPHNBODIES]
+        # The artifact has no model parameters, so the DE430 ones are used
+        @test SSEPHMODEL == "DE430"
+        @test issetequal(keys(SSEPHPARAMS), SSEPH_PARAMS_NAMES)
+        @test SSEPHPARAMS["RE"] == PlanetaryEphemeris.RE
+        @test SSEPHPARAMS["J2E"] == PlanetaryEphemeris.J2E
+        @test SSEPHPARAMS["J3E"] == PlanetaryEphemeris.J3E
+        # Earth's zonal harmonics coefficients must match the values hard-coded in
+        # NEOs < 0.34
+        ea = PlanetaryEphemeris.ea
+        @test Λ2[ea] == 1.9679542578489185e-12
+        @test Λ3[ea] == -1.962633335678878e-19
+        @test all(iszero, Λ2[setdiff(eachindex(Λ2), ea)])
+        @test all(iszero, Λ3[setdiff(eachindex(Λ3), ea)])
 
         set_sseph_source("sseph343ast016_p100y_et.jld2")
 
