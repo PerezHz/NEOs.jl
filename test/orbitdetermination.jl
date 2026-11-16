@@ -111,6 +111,17 @@ end
     end
 
     @testset "Pérez-Hernández & Benet (2022) Apophis OR7 orbit" begin
+        # Physical parameters
+
+        # https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=Apophis
+        D = 0.34                # km
+        p = 0.35
+        A = p/3
+        # https://en.wikipedia.org/wiki/99942_Apophis
+        ρ = 2.6                 # g/cm³
+        # https://doi.org/10.1016/j.icarus.2014.01.026
+        ϕ = 165.0               # deg
+
         # Pérez-Hernández & Benet (2022) Apophis OR7 orbit
         # See Tables 2 and 3 of the Supplementary Information in
         # https://doi.org/10.1038/s43247-021-00337-x
@@ -161,11 +172,14 @@ end
         @test meananomaly(kep) ≈ M
         @test timeperipass(kep) ≈ tp
 
-        # Average semimajor axis drift [au/day]
+        # Expected vs reported average semimajor axis drift [m/yr]
+        _adot_ = expectedadot(a, e, D, ρ, ϕ, A) * au / 1E3
+        @test abs(adot / _adot_) ≤ 2
+        # Conversion between A2 and adot [au, day]
         _adot_ = yarkp2adot(A2, a, e)
         _A2_ = adot2yarkp(_adot_, a, e)
         @test A2 ≈ _A2_
-        # Average semimajor axis drift [m/yr]
+        # Computed vs reported average semimajor axis drift [m/yr]
         _adot_ = 1E3au * yr * _adot_
         _dadot_ = hypot(_adot_*dA2/A2, -_adot_*da/(2a), 2*_adot_*e*de/(1 - e^2))
         @test abs((adot - _adot_) / adot) < 1.6E-4

@@ -66,3 +66,37 @@ and ``a`` is the semimajor axis.
 """
 adot2yarkp(adot::Number, a::Number, e::Number; μ::Real = μ_S) =
     adot * sqrt(a * μ) * (1 - e^2) / 2
+
+@doc raw"""
+    expectedadot(a, e, D, ρ, ϕ, A)
+
+Return the expected average semimajor axis drift [au/Myr] of an asteroid with
+semimajor axis `a` [au], eccentricity `e`, diameter `D` [km], density `ρ` [g/cm³],
+obliquity `ϕ` [deg] and Bond albedo `A`, taking Bennu as a reference.
+
+See also [`yarkp2adot`](@ref) and [`adot2yarkp`](@ref).
+
+!!! reference
+    See:
+    - https://doi.org/10.1051/0004-6361/201833153
+
+# Extended help
+
+The expected average semimajor axis drift is given by:
+```math
+\begin{align*}
+    \left\langle\dot{a}\right\rangle_{\text{exp}} =
+    \left\langle\dot{a}\right\rangle_{B}\times
+    \frac{\sqrt{a_B}(1-e^2)}{\sqrt{a}(1-e^2)}
+    \frac{D_B}{D}\frac{\rho_B}{\rho}\frac{\cos\phi_B}{\cos\phi}\frac{1-A}{1-A_B}
+\end{align*}
+```
+where ``\left\langle\dot{a}\right\rangle`` is the average semimajor axis drift,
+``a`` is the semimajor axis, ``e`` is the eccentricity, ``D`` is the diameter,
+``ρ`` is the density, ``ϕ`` is the obliquity and ``A`` is the Bond albedo; the
+``B`` subscript denotes Bennu's phisical parameters.
+"""
+expectedadot(a::Number, e::Number, D::Number, ρ::Number, ϕ::Number, A::Number) =
+    BENNU_ADOT * sqrt(BENNU_SEMIMAJOR_AXIS / a) * ((1 - BENNU_ECCENTRICITY^2) / (1 - e^2)) *
+    (BENNU_DIAMETER / D) * (BENNU_DENSITY / ρ) * (cosd(ϕ) / cosd(BENNU_OBLIQUITY)) *
+    ((1 - A) / (1 - BENNU_BOND_ALBEDO))

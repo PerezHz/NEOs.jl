@@ -372,3 +372,17 @@ const PLANET_NAMES_TO_INDEX = Dict{String, Int}(
 # Earth escape velocity
 # See https://doi.org/10.1006/icar.2002.6910
 const EARTH_ESCAPE_VELOCITY = 11.18 # km/s
+
+# Bennu physical parameters
+
+# https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=Bennu
+const BENNU_SEMIMAJOR_AXIS = 1.126391025894812 # au
+const BENNU_ECCENTRICITY = 0.2037450762416414
+const BENNU_DIAMETER = 0.48444 # km
+const BENNU_DENSITY = 1.194 # g/cm³
+const BENNU_GEOMETRIC_ALBEDO = 0.044
+const BENNU_BOND_ALBEDO = BENNU_GEOMETRIC_ALBEDO / 3
+# https://doi.org/10.1038/s41467-019-09213-x
+const BENNU_OBLIQUITY = 178.0 # deg
+# https://doi.org/10.1038/s41550-019-0721-3
+const BENNU_ADOT = −19.020E-4 # au/Myr
