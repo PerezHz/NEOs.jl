@@ -89,10 +89,10 @@ export rvelea, scaled_variables, propagate, propagate_lyap, propagate_root
 # Orbit determination
 export ODProblem, LeastSquaresCache, Newton, DifferentialCorrections, LevenbergMarquardt,
        GaussOrbit, MMOVOrbit, LeastSquaresOrbit, AdmissibleRegion
-export gm, frame, elements, iscircular, iselliptic, isparabolic, ishyperbolic, conicsection,
-       yarkp2adot, cartesian2keplerian, cartesian2equinoctial, cartesian2attributable,
-       keplerian2cartesian, equinoctial2cartesian, attributable2cartesian,
-       keplerian2equinoctial, equinoctial2keplerian, pericenter
+export gm, frame, elements, iscircular, iselliptic, isparabolic, ishyperbolic,
+       conicsection, yarkp2adot, adot2yarkp, cartesian2keplerian, cartesian2equinoctial,
+       cartesian2attributable, keplerian2cartesian, equinoctial2cartesian,
+       attributable2cartesian, keplerian2equinoctial, equinoctial2keplerian, pericenter
 export curvature
 export apparentmagnitude, absolutemagnitude
 export bwdfwdeph, propres, propres!

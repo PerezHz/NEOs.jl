@@ -161,8 +161,12 @@ end
         @test meananomaly(kep) ≈ M
         @test timeperipass(kep) ≈ tp
 
+        # Average semimajor axis drift [au/day]
+        _adot_ = yarkp2adot(A2, a, e)
+        _A2_ = adot2yarkp(_adot_, a, e)
+        @test A2 ≈ _A2_
         # Average semimajor axis drift [m/yr]
-        _adot_ = 1E3au * yr * yarkp2adot(A2, a, e)
+        _adot_ = 1E3au * yr * _adot_
         _dadot_ = hypot(_adot_*dA2/A2, -_adot_*da/(2a), 2*_adot_*e*de/(1 - e^2))
         @test abs((adot - _adot_) / adot) < 1.6E-4
         @test abs((dadot - _dadot_) / dadot) < 1.4E-1

@@ -102,33 +102,3 @@ function ecliptic2equatorial(xas::AbstractVector)
     # Rotated state vector
     return m_xv_ecl2eq * xas
 end
-
-@doc raw"""
-    yarkp2adot(A2, a, e; kwargs...)
-
-Return the average semimajor axis drift of an orbit with Yarkovsky coefficient `A2`,
-semimajor axis `a` and eccentricity `e`.
-
-# Keyword argument
-
-- `μ`: gravitational parameter of the central body (default: `μ_S`).
-
-!!! reference
-    See:
-    - https://doi.org/10.1016/j.icarus.2013.02.004
-
-# Extended help
-
-The average semimajor axis drift is given by:
-```math
-\begin{align*}
-    \left\langle\dot{a}\right\rangle
-    & = \frac{2A_2(1-e^2)}{n}\left(\frac{1 \ \text{AU}}{p}\right)^2 \\
-    & = \frac{2A_2}{(1-e^2)\sqrt{a\mu_\odot}}(1 \ \text{AU})^2,
-\end{align*}
-```
-where ``A_2`` is the Yarkovsky parameter, ``\mu_\odot = GM_\odot`` is the Sun's
-gravitational parameter, ``e`` is the eccentricity, ``n = \sqrt{\mu/a^3}`` is the
-mean motion, ``p = a(1-e^2)`` is the semilatus rectum, and ``a`` is the semimajor axis.
-"""
-yarkp2adot(A2, a, e; μ = μ_S) = 2A2 / (sqrt(a) * (1 - e^2) * sqrt(μ))
