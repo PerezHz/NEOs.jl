@@ -10,10 +10,11 @@ First, we declare the orbit determination problem that we want to solve, which c
 - the error model.
 [Selecting the dynamical model](@ref DynamicalModel) and [fetching the optical astrometry](@ref OpticalAstrometry) of a particular object have already been discussed in previous sections of this documentation. On the other hand, in NEOs an error model is composed of a weighting scheme and a debiasing scheme.
 
-Currently, NEOs supports three weighting schemes:
-- `UniformWeights`: all observations have the same 1 arcsec weight.
-- `SourceWeights`: the weights are extracted from the observations' format.
-- `Veres17`: assign weights according to [Veres2017](@cite);
+A weighting scheme assigns to each observation the covariance matrix [arcsec²] of its right ascension (times the cosine of the declination) and declination measurement errors. Currently, NEOs supports four weighting schemes:
+- `UniformWeights`: all observations have uncorrelated 1 arcsec uncertainties.
+- `SourceWeights`: the uncertainties and correlations are extracted from the observations' format.
+- `Veres17`: assign uncertainties according to [Veres2017](@cite).
+- `CustomWeights`: user-defined covariance matrices (see `radeccovariance`);
 and four debiasing schemes:
 - `ZeroDebiasing`: all debiasing factors are set to zero.
 - `SourceDebiasing`: the debiasing factors are extracted from the observations' format.
@@ -21,7 +22,7 @@ and four debiasing schemes:
 - `Eggl20`: assign debiasing factors according to [Eggl2020](@cite).
 
 !!! note
-    Most weighting and debiasing schemes do not define a custom value for each observatory. In that case, the default weight is 1 arcsec and the default debasing factor is 0 arcsec.
+    Most weighting and debiasing schemes do not define a custom value for each observatory. In that case, the default uncertainty is 1 arcsec and the default debasing factor is 0 arcsec.
 
 Thus, to declare the orbit determination problem use the following sintax:
 ```@example 2024XA1

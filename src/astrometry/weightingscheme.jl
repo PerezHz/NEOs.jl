@@ -6,20 +6,26 @@ Supertype for the optical astrometry weighting schemes interface.
 Every weighting scheme `W{T}` must:
 - be a mutable subtype of `AbstractWeightingScheme{T}`,
 - implement a `W(::AbstractOpticalVector{T})` constructor,
-- override `getid(::W)`, `weights(::W)`, `corrs(::W)` and `outliers(::W)`.
+- override `getid(::W)`, `covariances(::W)` and `outliers(::W)`,
 - override `update!(::W{T}, ::AbstractOpticalVector{T})`.
+
+`covariances(::W)` must return a `Vector{SMatrix{2, 2, T, 4}}` with the covariance
+matrix of the measurement errors of each observation, in the `(α cos(δ), δ)`
+coordinates and units of arcsec², while `outliers(::W)` must return a `BitVector`
+flagging the observations to be excluded a priori. Observations whose covariance
+matrix is not positive definite must be flagged as outliers.
+
+See also [`radeccovariance`](@ref).
 """
 abstract type AbstractWeightingScheme{T} <: AbstractAstrometryErrorModel{T} end
 
 # AbstractWeightingScheme interface
-nobs(x::AbstractWeightingScheme) = length(weights(x))
+nobs(x::AbstractWeightingScheme) = length(covariances(x))
 
-weights(x::AbstractWeightingScheme, i::Int) = weights(x)[i]
-corrs(x::AbstractWeightingScheme, i::Int) = corrs(x)[i]
+covariances(x::AbstractWeightingScheme, i::Int) = covariances(x)[i]
 outliers(x::AbstractWeightingScheme, i::Int) = outliers(x)[i]
 
-weights(x::AbstractWeightingScheme, i::AbstractVector{Int}) = view(weights(x), i)
-corrs(x::AbstractWeightingScheme, i::AbstractVector{Int}) = view(corrs(x), i)
+covariances(x::AbstractWeightingScheme, i::AbstractVector{Int}) = view(covariances(x), i)
 outliers(x::AbstractWeightingScheme, i::AbstractVector{Int}) = view(outliers(x), i)
 
 setoutlier!(x::AbstractWeightingScheme, i::Int, y::Bool) = outliers(x)[i] = y
@@ -31,72 +37,101 @@ show(io::IO, x::AbstractWeightingScheme) = print(io, getid(x),
     " weighting scheme with ", nobs(x), " observations")
 
 """
+    radeccovariance(σα, σδ [, ρ])
+
+Return the covariance matrix [arcsec²] of a pair of `(α cos(δ), δ)` measurement
+errors with standard deviations `σα`, `σδ` [arcsec] and correlation `ρ`
+(default: `0`).
+"""
+function radeccovariance(σα::T, σδ::T, ρ::T = zero(T)) where {T <: Real}
+    c = ρ * σα * σδ
+    return SMatrix{2, 2, T, 4}(σα^2, c, c, σδ^2)
+end
+
+# Whether a 2x2 covariance matrix is symmetric positive definite
+# Note: a matrix with NaN entries is never positive definite
+isposdefcov(Γ::SMatrix{2, 2}) = Γ[1, 2] == Γ[2, 1] && Γ[1, 1] > 0 &&
+    Γ[1, 1] * Γ[2, 2] - Γ[1, 2]^2 > 0
+
+# Flag as outliers the observations with a non positive definite covariance matrix
+covoutliers(flags::AbstractVector{Bool}, Γs::AbstractVector{<:SMatrix{2, 2}}) =
+    BitVector(flags) .| .!isposdefcov.(Γs)
+
+# Right ascension and declination weights [arcsec⁻¹] and correlation
+# corresponding to a 2x2 covariance matrix [arcsec²]; a non positive definite
+# matrix returns a unit correlation, which flags the residual as degenerate
+# TO DO: remove once `OpticalResidual` stores a weight matrix
+function cov2weights(Γ::SMatrix{2, 2, T}) where {T <: Real}
+    !isposdefcov(Γ) && return zero(T), zero(T), one(T)
+    σα, σδ = sqrt(Γ[1, 1]), sqrt(Γ[2, 2])
+    return 1 / σα, 1 / σδ, Γ[1, 2] / (σα * σδ)
+end
+
+"""
     UniformWeights{T} <: AbstractWeightingScheme{T}
 
-Uniform optical astrometry weighting scheme.
+Uniform optical astrometry weighting scheme: every observation has
+uncorrelated 1 arcsec uncertainties in both coordinates.
 """
 mutable struct UniformWeights{T} <: AbstractWeightingScheme{T}
-    weights::Vector{NTuple{2, T}}
-    corrs::Vector{T}
+    covariances::Vector{SMatrix{2, 2, T, 4}}
     outliers::BitVector
 end
 
 # Constructor
 function UniformWeights(optical::AbstractOpticalVector{T}) where {T <: Real}
-    weights = [(one(T), one(T)) for _ in eachindex(optical)]
-    corrs = [zero(T) for _ in eachindex(optical)]
-    outliers = isdeprecated.(optical)
-    return UniformWeights{T}(weights, corrs, outliers)
+    covariances = covsuniform(optical)
+    outliers = covoutliers(isdeprecated.(optical), covariances)
+    return UniformWeights{T}(covariances, outliers)
 end
 
-# Override getid, weights, corrs and outliers
+# Override getid, covariances and outliers
 getid(::UniformWeights) = "Uniform"
-weights(x::UniformWeights) = x.weights
-corrs(x::UniformWeights) = x.corrs
+covariances(x::UniformWeights) = x.covariances
 outliers(x::UniformWeights) = x.outliers
 
 # Override update!
 function update!(x::UniformWeights{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
-    x.weights = [(one(T), one(T)) for _ in eachindex(optical)]
-    x.corrs = [zero(T) for _ in eachindex(optical)]
-    x.outliers = isdeprecated.(optical)
+    x.covariances = covsuniform(optical)
+    x.outliers = covoutliers(isdeprecated.(optical), x.covariances)
     return nothing
 end
+
+covsuniform(optical::AbstractOpticalVector{T}) where {T <: Real} =
+    [radeccovariance(one(T), one(T)) for _ in eachindex(optical)]
 
 """
     SourceWeights{T} <: AbstractWeightingScheme{T}
 
-Source optical astrometry weighting scheme.
+Source optical astrometry weighting scheme: the uncertainties and
+correlations are extracted from the observations' format.
 """
 mutable struct SourceWeights{T} <: AbstractWeightingScheme{T}
-    weights::Vector{NTuple{2, T}}
-    corrs::Vector{T}
+    covariances::Vector{SMatrix{2, 2, T, 4}}
     outliers::BitVector
 end
 
-# Constructors
+# Constructor
 function SourceWeights(optical::AbstractOpticalVector{T}) where {T <: Real}
-    σs = rms.(optical)
-    weights = @. tuple(1 / first(σs), 1 / last(σs))
-    corrs = corr.(optical)
-    outliers = isoutlier.(optical)
-    return SourceWeights{T}(weights, corrs, outliers)
+    covariances = covssource(optical)
+    outliers = covoutliers(isoutlier.(optical), covariances)
+    return SourceWeights{T}(covariances, outliers)
 end
 
-# Override getid, weights, corrs and outliers
+# Override getid, covariances and outliers
 getid(::SourceWeights) = "Source"
-weights(x::SourceWeights) = x.weights
-corrs(x::SourceWeights) = x.corrs
+covariances(x::SourceWeights) = x.covariances
 outliers(x::SourceWeights) = x.outliers
 
 # Override update!
 function update!(x::SourceWeights{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
-    σs = rms.(optical)
-    x.weights = @. tuple(1 / first(σs), 1 / last(σs))
-    x.corrs = corr.(optical)
-    x.outliers = isoutlier.(optical)
+    x.covariances = covssource(optical)
+    x.outliers = covoutliers(isoutlier.(optical), x.covariances)
     return nothing
 end
+
+covssource(optical::AbstractOpticalVector{T}) where {T <: Real} =
+    [radeccovariance(rms(x)..., corr(x)) for x in optical]
 
 """
     Veres17{T} <: AbstractWeightingScheme{T}
@@ -108,30 +143,26 @@ Veres et al. (2017) optical astrometry weighting scheme.
     - https://doi.org/10.1016/j.icarus.2017.05.021.
 """
 mutable struct Veres17{T} <: AbstractWeightingScheme{T}
-    weights::Vector{NTuple{2, T}}
-    corrs::Vector{T}
+    covariances::Vector{SMatrix{2, 2, T, 4}}
     outliers::BitVector
 end
 
 # Constructor
 function Veres17(optical::AbstractOpticalVector{T}) where {T <: Real}
-    weights = w8sveres17(optical)
-    corrs = [zero(T) for _ in eachindex(optical)]
-    outliers = isdeprecated.(optical)
-    return Veres17{T}(weights, corrs, outliers)
+    covariances = covsveres17(optical)
+    outliers = covoutliers(isdeprecated.(optical), covariances)
+    return Veres17{T}(covariances, outliers)
 end
 
-# Override getid, weights, corrs and outliers
+# Override getid, covariances and outliers
 getid(::Veres17) = "Veres et al. (2017)"
-weights(x::Veres17) = x.weights
-corrs(x::Veres17) = x.corrs
+covariances(x::Veres17) = x.covariances
 outliers(x::Veres17) = x.outliers
 
 # Override update!
 function update!(x::Veres17{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
-    x.weights = w8sveres17(optical)
-    x.corrs = [zero(T) for _ in eachindex(optical)]
-    x.outliers = isdeprecated.(optical)
+    x.covariances = covsveres17(optical)
+    x.outliers = covoutliers(isdeprecated.(optical), x.covariances)
     return nothing
 end
 
@@ -224,11 +255,71 @@ function rexveres17(optical::AbstractOpticalVector{T}) where {T <: Real}
     return map(N -> N > 4.0 ? sqrt(N/4.0) : 1.0, Nv)
 end
 
-# Return the statistical weight of each element of `optical` according
-# to Veres et al. (2017)
+# Return the covariance matrix [arcsec²] of each element of `optical`
+# according to Veres et al. (2017)
 # https://doi.org/10.1016/j.icarus.2017.05.021
-function w8sveres17(optical::AbstractOpticalVector{T}) where {T <: Real}
+function covsveres17(optical::AbstractOpticalVector{T}) where {T <: Real}
     σs = σsveres17.(optical)
     rex = rexveres17(optical)
-    return @. tuple(1 / (rex * σs), 1 / (rex * σs))
+    return [radeccovariance(r * σ, r * σ) for (r, σ) in zip(rex, σs)]
+end
+
+"""
+    CustomWeights{T} <: AbstractWeightingScheme{T}
+
+Optical astrometry weighting scheme with user-defined covariance matrices.
+
+# Constructors
+
+    CustomWeights(covariances [, outliers])
+    CustomWeights(x::AbstractWeightingScheme [, idxs])
+
+The first constructor takes a vector of `(α cos(δ), δ)` covariance matrices [arcsec²]
+and an optional vector of outlier flags (default: none). The second one returns a copy
+of the covariance matrices and outlier flags of another weighting scheme `x`,
+optionally restricted to the observations with indices `idxs`. In both cases, the
+observations with a non positive definite covariance matrix are flagged as outliers.
+
+!!! warning
+    `CustomWeights` cannot compute covariance matrices for a new set of observations;
+    hence, `update!` throws an `ArgumentError` if the number of observations changes.
+
+See also [`radeccovariance`](@ref).
+"""
+mutable struct CustomWeights{T} <: AbstractWeightingScheme{T}
+    covariances::Vector{SMatrix{2, 2, T, 4}}
+    outliers::BitVector
+    # Inner constructor
+    # Note: it replaces the default constructors, so every instance copies the
+    # covariance matrices and flags the non positive definite ones as outliers
+    function CustomWeights{T}(
+            covariances::AbstractVector{SMatrix{2, 2, T, 4}},
+            outliers::AbstractVector{Bool}
+        ) where {T <: Real}
+        @assert length(covariances) == length(outliers) "Number of covariance \
+            matrices and outlier flags must be equal"
+        Γs = collect(covariances)
+        return new{T}(Γs, covoutliers(outliers, Γs))
+    end
+end
+
+# Outer constructors
+CustomWeights(
+    covariances::AbstractVector{SMatrix{2, 2, T, 4}},
+    outliers::AbstractVector{Bool} = falses(length(covariances))
+) where {T <: Real} = CustomWeights{T}(covariances, outliers)
+
+CustomWeights(x::AbstractWeightingScheme, idxs::AbstractVector{Int} = 1:nobs(x)) =
+    CustomWeights(covariances(x, idxs), outliers(x, idxs))
+
+# Override getid, covariances and outliers
+getid(::CustomWeights) = "Custom"
+covariances(x::CustomWeights) = x.covariances
+outliers(x::CustomWeights) = x.outliers
+
+# Override update!
+function update!(x::CustomWeights{T}, optical::AbstractOpticalVector{T}) where {T <: Real}
+    length(optical) == nobs(x) || throw(ArgumentError("CustomWeights cannot compute \
+        covariance matrices for a different number of observations"))
+    return nothing
 end

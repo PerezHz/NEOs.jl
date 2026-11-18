@@ -8,7 +8,6 @@ import PlanetaryEphemeris as PE
 import PlanetaryEphemeris: semimajoraxis, eccentricity, inclination, argperi, longascnode,
        meanmotion, meananomaly, timeperipass, numberofbodies, selecteph
 import SatelliteToolboxTransformations: sv_ecef_to_eci, sv_ecef_to_ecef, ecef_to_geocentric
-import StatsBase: weights
 import Tables: Schema, istable, rowaccess, rows, schema
 import TaylorIntegration: surfacecrossing, firsttime, lasttime
 import TaylorSeries: evaluate, constant_term, identity!
@@ -44,7 +43,7 @@ using SatelliteToolboxTransformations: DCM, EARTH_ANGULAR_SPEED, EopIau1980, Eop
       sv_eci_to_ecef, read_iers_eop
 using SpecialFunctions: erf
 using StaticArraysCore: SVector, MVector, SMatrix, MMatrix
-using StatsBase: mean, std
+using StatsBase: mean, std, weights
 using TaylorIntegration: VectorCache, RetAlloc, init_cache, taylorinteg!, update_cache!,
       taylorstep!, set_psol!, nrconvergencecriterion, TaylorSolution, DensePropagation1,
       DensePropagation2, TaylorSolutionCallingArgs, timeindex
@@ -61,13 +60,13 @@ export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophis
        tt_tdb, dtt_tdb
 # Minor bodies astrometry interface
 export MPC, NEOCP, NEOCC, NEODyS2, JPL
-export UniformWeights, SourceWeights, Veres17
+export UniformWeights, SourceWeights, Veres17, CustomWeights, radeccovariance
 export ZeroDebiasing, SourceDebiasing, Farnocchia15, Eggl20
 export numberofdays, unpacknum, packnum, unpackdesig, packdesig,
        fetch_designation_information, fetch_mpec_information
 export date, measure, observatory, rms, debias, ra, dec, mag, band, catalogue,
        cataloguecode, observatorycode, vconversion, timeofday, isdiscovery, isdeprecated,
-       trackletid, frequency, residual, weight, weights, corr, corrs, isoutlier, outliers,
+       trackletid, frequency, residual, weight, covariances, corr, isoutlier, outliers,
        setoutlier, setoutlier!, nout, notout, notoutobs, apparitions
 export obsposECEF, obsposvelECI
 export update_catalogues_mpc, search_catalogue_code, search_catalogue_value

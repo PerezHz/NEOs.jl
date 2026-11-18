@@ -272,7 +272,7 @@ end
         # Orbit determination problem
         OD = ODProblem(dynamics, optical_2023DW, weights = Veres17, debias = Eggl20)
         # Weigths and debiasing corrections
-        w8s, bias = weights(OD), debias(OD)
+        w8s, bias = map(Γ -> NEOs.cov2weights(Γ)[1:2], covariances(OD)), debias(OD)
         # Propagation parameters
         params = Parameters(
             bwdoffset = (ti - t0) + nyears * yr,
@@ -403,7 +403,7 @@ end
         # Orbit determination problem
         OD = ODProblem(dynamics, optical_Apophis, radar_Apophis, weights = Veres17, debias = Eggl20)
         # Weigths and debiasing corrections
-        w8s, bias = weights(OD), debias(OD)
+        w8s, bias = map(Γ -> NEOs.cov2weights(Γ)[1:2], covariances(OD)), debias(OD)
         # Propagation parameters
         params = Parameters(
             bwdoffset = (ti - t0) + 1,
@@ -582,7 +582,7 @@ end
         # Orbit determination problem
         OD = ODProblem(dynamicsng, optical_Apophis, radar_Apophis, weights = Veres17, debias = Eggl20)
         # Weigths and debiasing corrections
-        w8s, bias = weights(OD), debias(OD)
+        w8s, bias = map(Γ -> NEOs.cov2weights(Γ)[1:2], covariances(OD)), debias(OD)
 
         # Test parsed vs non-parsed propagation: gravity-only model
         params = Parameters(maxsteps = 10, order = 25, abstol = 1e-20, parse_eqs = true,

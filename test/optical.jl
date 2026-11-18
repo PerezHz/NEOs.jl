@@ -826,22 +826,14 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         @test getid(w12) == "Source"
         @test getid(w13) == "Veres et al. (2017)"
 
-        ww11, ww12, ww13 = weights(w11), weights(w12), weights(w13)
-        @test length(ww11) == length(ww12) == length(ww13)
-        @test all(==((1.0, 1.0)), ww11)
-        @test all(==((1.0, 1.0)), ww12)
-        @test ww11 == weights.(Ref(w11), eachindex(ww11)) == weights(w11, eachindex(ww11))
-        @test ww12 == weights.(Ref(w12), eachindex(ww12)) == weights(w12, eachindex(ww12))
-        @test ww13 == weights.(Ref(w13), eachindex(ww13)) == weights(w13, eachindex(ww13))
-
-        cw11, cw12, cw13 = corrs(w11), corrs(w12), corrs(w13)
-        @test length(cw11) == length(cw12) == length(cw13)
-        @test all(iszero, cw11)
-        @test all(iszero, cw12)
-        @test all(iszero, cw13)
-        @test cw11 == corrs.(Ref(w11), eachindex(cw11)) == corrs(w11, eachindex(cw11))
-        @test cw12 == corrs.(Ref(w12), eachindex(cw12)) == corrs(w12, eachindex(cw12))
-        @test cw13 == corrs.(Ref(w13), eachindex(cw13)) == corrs(w13, eachindex(cw13))
+        Γ11, Γ12, Γ13 = covariances(w11), covariances(w12), covariances(w13)
+        @test length(Γ11) == length(Γ12) == length(Γ13)
+        @test all(==(radeccovariance(1.0, 1.0)), Γ11)
+        @test all(==(radeccovariance(1.0, 1.0)), Γ12)
+        @test all(Γ -> Γ[1, 1] == Γ[2, 2] > 0 && iszero(Γ[1, 2]) && iszero(Γ[2, 1]), Γ13)
+        @test Γ11 == covariances.(Ref(w11), eachindex(Γ11)) == covariances(w11, eachindex(Γ11))
+        @test Γ12 == covariances.(Ref(w12), eachindex(Γ12)) == covariances(w12, eachindex(Γ12))
+        @test Γ13 == covariances.(Ref(w13), eachindex(Γ13)) == covariances(w13, eachindex(Γ13))
 
         ow11, ow12, ow13 = outliers(w11), outliers(w12), outliers(w13)
         @test length(ow11) == length(ow12) == length(ow13)
@@ -871,23 +863,15 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         @test getid(w22) == "Source"
         @test getid(w23) == "Veres et al. (2017)"
 
-        ww21, ww22, ww23 = weights(w21), weights(w22), weights(w23)
-        @test length(ww21) == length(ww22) == length(ww23)
-        @test all(==((1.0, 1.0)), ww21)
-        @test all( @. ww22 == tuple(1 / getfield(optical2, :ra_rms),
-            1 / getfield(optical2, :dec_rms)) )
-        @test ww21 == weights.(Ref(w21), eachindex(ww21)) == weights(w21, eachindex(ww21))
-        @test ww22 == weights.(Ref(w22), eachindex(ww22)) == weights(w22, eachindex(ww22))
-        @test ww23 == weights.(Ref(w23), eachindex(ww23)) == weights(w23, eachindex(ww23))
-
-        cw21, cw22, cw23 = corrs(w21), corrs(w22), corrs(w23)
-        @test length(cw21) == length(cw22) == length(cw23)
-        @test all(iszero, cw21)
-        @test all(iszero, cw22)
-        @test all(iszero, cw23)
-        @test cw21 == corrs.(Ref(w21), eachindex(cw21)) == corrs(w21, eachindex(cw21))
-        @test cw22 == corrs.(Ref(w22), eachindex(cw22)) == corrs(w22, eachindex(cw22))
-        @test cw23 == corrs.(Ref(w23), eachindex(cw23)) == corrs(w23, eachindex(cw23))
+        Γ21, Γ22, Γ23 = covariances(w21), covariances(w22), covariances(w23)
+        @test length(Γ21) == length(Γ22) == length(Γ23)
+        @test all(==(radeccovariance(1.0, 1.0)), Γ21)
+        @test all( @. Γ22 == radeccovariance(getfield(optical2, :ra_rms),
+            getfield(optical2, :dec_rms)) )
+        @test all(Γ -> Γ[1, 1] == Γ[2, 2] > 0 && iszero(Γ[1, 2]) && iszero(Γ[2, 1]), Γ23)
+        @test Γ21 == covariances.(Ref(w21), eachindex(Γ21)) == covariances(w21, eachindex(Γ21))
+        @test Γ22 == covariances.(Ref(w22), eachindex(Γ22)) == covariances(w22, eachindex(Γ22))
+        @test Γ23 == covariances.(Ref(w23), eachindex(Γ23)) == covariances(w23, eachindex(Γ23))
 
         ow21, ow22, ow23 = outliers(w21), outliers(w22), outliers(w23)
         @test length(ow21) == length(ow22) == length(ow23)
@@ -917,27 +901,18 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         @test getid(w32) == "Source"
         @test getid(w33) == "Veres et al. (2017)"
 
-        ww31, ww32, ww33 = weights(w31), weights(w32), weights(w33)
-        @test length(ww31) == length(ww32) == length(ww33)
-        @test all(==((1.0, 1.0)), ww31)
-        @test all(map(ww32, optical3) do w, x
+        Γ31, Γ32, Γ33 = covariances(w31), covariances(w32), covariances(w33)
+        @test length(Γ31) == length(Γ32) == length(Γ33)
+        @test all(==(radeccovariance(1.0, 1.0)), Γ31)
+        @test all(map(Γ32, optical3) do Γ, x
             σx = rms(x)
-            w == (1 / σx[1], 1 / σx[2])
+            ρ = isnan(x.rmscorr) ? 0.0 : x.rmscorr
+            Γ == radeccovariance(σx[1], σx[2], ρ)
         end)
-        @test ww31 == weights.(Ref(w31), eachindex(ww31)) == weights(w31, eachindex(ww31))
-        @test ww32 == weights.(Ref(w32), eachindex(ww32)) == weights(w32, eachindex(ww32))
-        @test ww33 == weights.(Ref(w33), eachindex(ww33)) == weights(w33, eachindex(ww33))
-
-        cw31, cw32, cw33 = corrs(w31), corrs(w32), corrs(w33)
-        @test length(cw31) == length(cw32) == length(cw33)
-        @test all(iszero, cw31)
-        @test all(map(cw32, optical3) do ρ, x
-            ρ == (isnan(x.rmscorr) ? 0.0 : x.rmscorr)
-        end)
-        @test all(iszero, cw33)
-        @test cw31 == corrs.(Ref(w31), eachindex(cw31)) == corrs(w31, eachindex(cw31))
-        @test cw32 == corrs.(Ref(w32), eachindex(cw32)) == corrs(w32, eachindex(cw32))
-        @test cw33 == corrs.(Ref(w33), eachindex(cw33)) == corrs(w33, eachindex(cw33))
+        @test all(Γ -> Γ[1, 1] == Γ[2, 2] > 0 && iszero(Γ[1, 2]) && iszero(Γ[2, 1]), Γ33)
+        @test Γ31 == covariances.(Ref(w31), eachindex(Γ31)) == covariances(w31, eachindex(Γ31))
+        @test Γ32 == covariances.(Ref(w32), eachindex(Γ32)) == covariances(w32, eachindex(Γ32))
+        @test Γ33 == covariances.(Ref(w33), eachindex(Γ33)) == covariances(w33, eachindex(Γ33))
 
         ow31, ow32, ow33 = outliers(w31), outliers(w32), outliers(w33)
         @test length(ow31) == length(ow32) == length(ow33)
@@ -958,32 +933,52 @@ isvalidEros(x::AbstractOpticalAstrometry) =
         setoutlier!(w33, eachindex(ow33), falses(length(ow33)))
         @test all(!, ow31) && all(!, ow32) && all(!, ow33)
 
-        @test ww13 == ww23 == ww33
-        @test cw13 == cw23 == cw33
+        @test Γ13 == Γ23 == Γ33
 
         update!(w11, optical1[1:1])
         update!(w12, optical1[1:1])
         update!(w13, optical1[1:1])
 
-        @test w11.weights == [(1.0, 1.0)] && w11.corrs == [0.0] && w11.outliers == [false]
-        @test w12.weights == [(1.0, 1.0)] && w12.corrs == [0.0] && w12.outliers == [false]
-        @test w13.weights == [(1.0, 1.0)] && w13.corrs == [0.0] && w13.outliers == [false]
+        @test covariances(w11) == [radeccovariance(1.0, 1.0)] && outliers(w11) == [false]
+        @test covariances(w12) == [radeccovariance(1.0, 1.0)] && outliers(w12) == [false]
+        @test covariances(w13) == [radeccovariance(1.0, 1.0)] && outliers(w13) == [false]
 
         update!(w21, optical2[1:1])
         update!(w22, optical2[1:1])
         update!(w23, optical2[1:1])
 
-        @test w21.weights == [(1.0, 1.0)] && w21.corrs == [0.0] && w21.outliers == [false]
-        @test w22.weights == [(1.0, 1.0)] && w22.corrs == [0.0] && w22.outliers == [false]
-        @test w23.weights == [(1.0, 1.0)] && w23.corrs == [0.0] && w23.outliers == [false]
+        @test covariances(w21) == [radeccovariance(1.0, 1.0)] && outliers(w21) == [false]
+        @test covariances(w22) == [radeccovariance(1.0, 1.0)] && outliers(w22) == [false]
+        @test covariances(w23) == [radeccovariance(1.0, 1.0)] && outliers(w23) == [false]
 
         update!(w31, optical3[1:1])
         update!(w32, optical3[1:1])
         update!(w33, optical3[1:1])
 
-        @test w31.weights == [(1.0, 1.0)] && w31.corrs == [0.0] && w31.outliers == [false]
-        @test w32.weights == [(1.0, 1.0)] && w32.corrs == [0.0] && w32.outliers == [false]
-        @test w33.weights == [(1.0, 1.0)] && w33.corrs == [0.0] && w33.outliers == [false]
+        @test covariances(w31) == [radeccovariance(1.0, 1.0)] && outliers(w31) == [false]
+        @test covariances(w32) == [radeccovariance(1.0, 1.0)] && outliers(w32) == [false]
+        @test covariances(w33) == [radeccovariance(1.0, 1.0)] && outliers(w33) == [false]
+
+        # Custom weights
+        w14 = Veres17(optical1)
+        c14 = CustomWeights(w14)
+        @test isa(string(c14), String)
+        @test getid(c14) == "Custom"
+        @test covariances(c14) == covariances(w14) && outliers(c14) == outliers(w14)
+        @test covariances(c14) !== covariances(w14) && outliers(c14) !== outliers(w14)
+        c14s = CustomWeights(w14, 1:2)
+        @test nobs(c14s) == 2 && covariances(c14s) == covariances(w14, 1:2)
+        cbad = CustomWeights([radeccovariance(1.0, 1.0, 1.0), radeccovariance(1.0, 1.0),
+                              radeccovariance(1.0, 1.0, NaN)])
+        @test outliers(cbad) == [true, false, true]
+        @test outliers(CustomWeights(cbad)) == outliers(cbad)
+        @test isnothing(update!(c14, optical1))
+        @test_throws ArgumentError update!(cbad, optical1[1:1])
+        od14 = ODProblem(newtonian!, optical1; weights = c14, debias = ZeroDebiasing)
+        @test od14.weights === c14
+        @test covariances(od14) == covariances(w14)
+        @test_throws AssertionError ODProblem(newtonian!, optical1[1:2]; weights = c14,
+            debias = ZeroDebiasing)
 
     end
 

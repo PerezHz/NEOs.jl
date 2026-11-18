@@ -213,14 +213,14 @@ function init_optical_residuals(
     ) where {T <: Real, U <: Number}
     @assert nobs(wsm) == nobs(dsm) "Weighting and debiasing schemes must have the \
         same number of observations"
-    w8s = weights(wsm, idxs)
+    Γs = covariances(wsm, idxs)
     bias = debias(dsm, idxs)
-    korrs = corrs(wsm, idxs)
     outs = outliers(wsm, idxs)
     res = Vector{OpticalResidual{T, U}}(undef, length(idxs))
     for i in eachindex(res)
-        res[i] = OpticalResidual{T, U}(zero(U), zero(U), w8s[i]..., bias[i]...,
-                                       korrs[i], outs[i])
+        wra, wdec, korr = cov2weights(Γs[i])
+        res[i] = OpticalResidual{T, U}(zero(U), zero(U), wra, wdec, bias[i]...,
+                                       korr, outs[i])
     end
     return res
 end

@@ -28,15 +28,16 @@ function init_optical_residuals(::Type{U}, od::ODProblem,
     T = scalartype(od)
     # Optical astrometry
     optical1, optical2 = optical(od), optical(orbit)
-    # Weights, debiasing factors, correlations and outliers
-    w8s, bias, korrs, outs = weights(od), debias(od), corrs(od), outliers(od)
+    # Covariance matrices, debiasing factors and outliers
+    Γs, bias, outs = covariances(od), debias(od), outliers(od)
     # Initialize vector of optical residuals
     res = Vector{OpticalResidual{T, U}}(undef, length(optical1))
     for i in eachindex(optical1)
         j = findfirst(==(optical1[i]), optical2)
         outlier = isnothing(j) ? outs[i] : isoutlier(orbit.ores[j])
-        res[i] = OpticalResidual{T, U}(zero(U), zero(U), w8s[i]..., bias[i]...,
-                                       korrs[i], outlier)
+        wra, wdec, korr = cov2weights(Γs[i])
+        res[i] = OpticalResidual{T, U}(zero(U), zero(U), wra, wdec, bias[i]...,
+                                       korr, outlier)
     end
     return res
 end

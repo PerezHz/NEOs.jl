@@ -509,8 +509,8 @@ function linkage(
     @unpack tracklets = od
     # Pre-allocate orbit
     orbit = zero(OpticalLeastSquaresOrbit{D, T, T, O})
-    # Original weights
-    w8s = deepcopy(od.weights.weights)
+    # Original covariance matrices
+    Γs = copy(covariances(od.weights))
     # Initialize buffer and set of residuals
     Ndof = dof(od)
     jd0 = epoch(porbit) + PE.J2000
@@ -521,7 +521,7 @@ function linkage(
     if isempty(res)
         verbose && @warn("Linkage did not converge within the given parameters \
             or could not fit all the astrometry")
-        od.weights.weights .= w8s
+        covariances(od.weights) .= Γs
         return orbit
     end
     # Select first scaling factor
@@ -539,12 +539,13 @@ function linkage(
     idxs = opticalindices(view(tracklets, mask))
     # Main cycle
     for i in 1:maxiter
-        # Scale down weights
+        # Scale down weights (i.e. scale up covariance matrices)
         for j in idxs
-            wra, wdec = w8s[j] ./ 10^k
+            Γ = Γs[j] * exp10(T(2k))
+            wra, wdec, korr = cov2weights(Γ)
             res[j] = OpticalResidual{T, T}(ra(res[j]), dec(res[j]), wra, wdec,
-                dra(res[j]), ddec(res[j]), corr(res[j]), isoutlier(res[j]))
-            od.weights.weights[j] = (wra, wdec)
+                dra(res[j]), ddec(res[j]), korr, isoutlier(res[j]))
+            covariances(od.weights)[j] = Γ
         end
         # Jet transport least squares
         if i == 1
@@ -581,8 +582,8 @@ function linkage(
         k += min(-1, minimum(view(mags, mask)))
         k = max(0, k)
     end
-    # Return weights to original
-    od.weights.weights .= w8s
+    # Return covariance matrices to original
+    covariances(od.weights) .= Γs
 
     return orbit
 end

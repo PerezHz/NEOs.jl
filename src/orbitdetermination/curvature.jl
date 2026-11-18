@@ -17,11 +17,11 @@ function curvature(optical::AbstractOpticalVector, w8s::AbstractWeightingScheme)
     αs = ra.(optical)
     # Declination [rad]
     δs = dec.(optical)
-    # Weights [rad⁻¹]
+    # Weights [rad⁻²]
     k = 3_600 * 180 / π
-    wt = weights(w8s)
-    wtα = @. ( k * first(wt) )^2
-    wtδ = @. ( k * last(wt)  )^2
+    Γs = covariances(w8s)
+    wtα = [k^2 / Γ[1, 1] for Γ in Γs]
+    wtδ = [k^2 / Γ[2, 2] for Γ in Γs]
 
     return curvature(ts, αs, δs, wtα, wtδ)
 end
