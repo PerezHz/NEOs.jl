@@ -130,12 +130,15 @@ Every optical observation `x` has a:
 - `rms(x)`: a-priori formal RMS [arcsec].
 - `debias(x)`: debiasing factor [arcsec].
 - `corr(x)`: correlation.
+- `poscov(x)`: covariance matrix of the observer's ICRF position [km²], or `nothing`
+    if not available (default).
 """
 abstract type AbstractOpticalAstrometry{T} <: AbstractAstrometryObservation{T} end
 
 const AbstractOpticalVector{T} = AbstractVector{<:AbstractOpticalAstrometry{T}} where {T}
 
 measure(x::AbstractOpticalAstrometry) = (ra(x), dec(x))
+poscov(::AbstractOpticalAstrometry) = nothing
 ra(x::AbstractOpticalAstrometry) = x.ra
 dec(x::AbstractOpticalAstrometry) = x.dec
 mag(x::AbstractOpticalAstrometry) = x.mag

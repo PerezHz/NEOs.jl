@@ -982,6 +982,53 @@ isvalidEros(x::AbstractOpticalAstrometry) =
 
     end
 
+    @testset "Observer position uncertainty" begin
+
+        using NEOs: observercovariance, isposdefcov
+
+        # Synthetic satellite observations: ICRF_KM with an anisotropic position
+        # covariance, ICRF_AU with an isotropic one and ICRF_KM without covariance
+        sat = read_optical_ades(joinpath(TEST_DATA, "satellite.xml"))
+        @test length(sat) == 3
+        @test all(x -> observatory(x).frame in ("ICRF_KM", "ICRF_AU"), sat)
+
+        # Observer's position covariance matrices [km²]
+        Σ1, Σ2, Σ3 = poscov.(sat)
+        @test Σ1 == [1.0 0.5 0.0; 0.5 2.0 0.0; 0.0 0.0 3.0]
+        @test Σ2 ≈ (NEOs.au^2 * 1E-16) * I(3)
+        @test isnothing(Σ3)
+        @test all(isnothing, poscov.(optical1))
+
+        # Observer to asteroid vector [km] (|ρ| = 5E4 km)
+        ρ_vec = [3E4, -4E4, 0.0]
+        k = rad2arcsec(1.0)^2 / 5E4^2
+
+        # No covariance: no contribution
+        @test iszero(observercovariance(sat[3], ρ_vec))
+        @test iszero(observercovariance(optical1[1], ρ_vec))
+
+        # Isotropic covariance: Γ = (σ / ρ)² I
+        Γ2 = observercovariance(sat[2], ρ_vec)
+        @test Γ2 ≈ k * (NEOs.au^2 * 1E-16) * I(2)
+
+        # Anisotropic covariance: Γ = P Σ Pᵀ / ρ²
+        Γ1 = observercovariance(sat[1], ρ_vec)
+        α, δ = measure(sat[1])
+        P = [-sin(α) cos(α) 0.0; -sin(δ)*cos(α) -sin(δ)*sin(α) cos(δ)]
+        @test Γ1 ≈ k * P * Σ1 * P'
+        @test Γ1[1, 2] == Γ1[2, 1]
+        @test isposdefcov(Γ1)
+        # The contribution scales as 1 / ρ²
+        @test observercovariance(sat[1], 2 * ρ_vec) ≈ Γ1 / 4
+
+        # Total weight matrix
+        Γε = radeccovariance(1.0, 1.0)
+        W = weightmatrix(Γε + Γ1)
+        @test W * (Γε + Γ1) ≈ I(2)
+        @test all(diag(W) .< diag(weightmatrix(Γε)))
+
+    end
+
     @testset "AbstractDebiasingScheme" begin
 
         # Debiasing schemes

@@ -65,7 +65,7 @@ export UniformWeights, SourceWeights, Veres17, CustomWeights, radeccovariance,
 export ZeroDebiasing, SourceDebiasing, Farnocchia15, Eggl20
 export numberofdays, unpacknum, packnum, unpackdesig, packdesig,
        fetch_designation_information, fetch_mpec_information
-export date, measure, observatory, rms, debias, ra, dec, mag, band, catalogue,
+export date, measure, observatory, rms, debias, poscov, ra, dec, mag, band, catalogue,
        cataloguecode, observatorycode, vconversion, timeofday, isdiscovery, isdeprecated,
        trackletid, frequency, residual, weight, covariances, corr, isoutlier, outliers,
        setoutlier, setoutlier!, nout, notout, notoutobs, apparitions

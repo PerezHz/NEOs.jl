@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ades version="2022">
+  <optical>
+    <trkSub>TEST</trkSub>
+    <provID>2000 AA</provID>
+    <mode>CCD</mode>
+    <stn>250</stn>
+    <sys>ICRF_KM</sys>
+    <ctr>399</ctr>
+    <pos1>4512.345</pos1>
+    <pos2>-3961.258</pos2>
+    <pos3>3297.111</pos3>
+    <posCov11>1.0</posCov11>
+    <posCov12>0.5</posCov12>
+    <posCov13>0.0</posCov13>
+    <posCov22>2.0</posCov22>
+    <posCov23>0.0</posCov23>
+    <posCov33>3.0</posCov33>
+    <obsTime>2024-01-10T12:00:00.0Z</obsTime>
+    <ra>121.234567</ra>
+    <dec>-12.345678</dec>
+    <rmsRA>1</rmsRA>
+    <rmsDec>1</rmsDec>
+    <astCat>Gaia3</astCat>
+  </optical>
+  <optical>
+    <trkSub>TEST</trkSub>
+    <provID>2000 AA</provID>
+    <mode>CCD</mode>
+    <stn>250</stn>
+    <sys>ICRF_AU</sys>
+    <ctr>399</ctr>
+    <pos1>0.0000301630</pos1>
+    <pos2>-0.0000264796</pos2>
+    <pos3>0.0000220397</pos3>
+    <posCov11>1.0E-16</posCov11>
+    <posCov12>0.0</posCov12>
+    <posCov13>0.0</posCov13>
+    <posCov22>1.0E-16</posCov22>
+    <posCov23>0.0</posCov23>
+    <posCov33>1.0E-16</posCov33>
+    <obsTime>2024-01-10T13:00:00.0Z</obsTime>
+    <ra>121.244567</ra>
+    <dec>-12.335678</dec>
+    <rmsRA>1</rmsRA>
+    <rmsDec>1</rmsDec>
+    <astCat>Gaia3</astCat>
+  </optical>
+  <optical>
+    <trkSub>TEST</trkSub>
+    <provID>2000 AA</provID>
+    <mode>CCD</mode>
+    <stn>250</stn>
+    <sys>ICRF_KM</sys>
+    <ctr>399</ctr>
+    <pos1>4513.345</pos1>
+    <pos2>-3960.258</pos2>
+    <pos3>3298.111</pos3>
+    <obsTime>2024-01-10T14:00:00.0Z</obsTime>
+    <ra>121.254567</ra>
+    <dec>-12.325678</dec>
+    <rmsRA>1</rmsRA>
+    <rmsDec>1</rmsDec>
+    <astCat>Gaia3</astCat>
+  </optical>
+</ades>

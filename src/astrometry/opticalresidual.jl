@@ -275,9 +275,12 @@ end
 
 Overwrite the vector of optical residuals `res` with the observed minus computed
 residuals of `optical`, using the vector of buffers `buffer` and the vector of
-`(α cos(δ), δ)` covariance matrices `Γs` [arcsec²] to assemble the weight matrices.
-The debiasing factors and outlier flags are taken from `res`. For a list of keyword
-arguments see [`residuals`](@ref).
+`(α cos(δ), δ)` measurement errors covariance matrices `Γs` [arcsec²]. The weight
+matrix of each residual is the inverse of `Γs[i]` plus the contribution of the
+uncertainty in the observer's position (see [`observercovariance`](@ref)), which
+depends on the current observer to asteroid distance; hence, the weight matrices are
+reassembled every time the residuals are computed. The debiasing factors and outlier
+flags are taken from `res`. For a list of keyword arguments see [`residuals`](@ref).
 """
 function residuals!(res::AbstractVector{OpticalResidual{T, U}},
                     optical::AbstractOpticalVector{T},
@@ -294,10 +297,47 @@ function residuals!(res::AbstractVector{OpticalResidual{T, U}},
     return nothing
 end
 
-# Observed minus computed residual of optical observation `x` with covariance matrix `Γ`;
-# the debiasing factors and outlier flag are taken from the previous residual `r`, while
-# the weight matrix is assembled from `Γ`. Observations with a non positive definite
-# covariance matrix are flagged as outliers
+"""
+    observercovariance(x, ρ_vec)
+
+Return the covariance matrix [arcsec²] of the `(α cos(δ), δ)` residuals of optical
+observation `x` due to the uncertainty in the observer's position, given the observer
+to asteroid vector `ρ_vec` [km]. If `poscov(x)` is not available, return a zero matrix.
+
+The observer's position covariance matrix `Σ = poscov(x)` [km²] is projected onto the
+tangent plane at the observed position, i.e. `P Σ Pᵀ / ρ²` [rad²], where the rows of
+`P` are the unit vectors along the directions of increasing right ascension and
+declination. This is the linear (first order) approximation of the effect of an
+observer's position offset on the observed direction.
+"""
+function observercovariance(x::AbstractOpticalAstrometry{T},
+                            ρ_vec::AbstractVector) where {T <: Real}
+    # Covariance matrix of the observer's position [km²]
+    Σ = poscov(x)
+    isnothing(Σ) && return SMatrix{2, 2, T, 4}(zero(T), zero(T), zero(T), zero(T))
+    # Unit vectors along increasing right ascension and declination at the
+    # observed position
+    α, δ = measure(x)
+    sα, cα = sincos(α)
+    sδ, cδ = sincos(δ)
+    e_α = SVector{3, T}(-sα, cα, zero(T))
+    e_δ = SVector{3, T}(-sδ * cα, -sδ * sα, cδ)
+    # Squared observer to asteroid distance [km²]
+    ρ2 = sum(i -> cte(ρ_vec[i])^2, 1:3)
+    # Projection onto the tangent plane [rad² -> arcsec²]
+    k = rad2arcsec(one(T))^2 / ρ2
+    g11 = k * dot(e_α, Σ, e_α)
+    g12 = k * dot(e_α, Σ, e_δ)
+    g22 = k * dot(e_δ, Σ, e_δ)
+    return SMatrix{2, 2, T, 4}(g11, g12, g12, g22)
+end
+
+# Observed minus computed residual of optical observation `x` with measurement errors
+# covariance matrix `Γ`; the debiasing factors and outlier flag are taken from the
+# previous residual `r`, while the weight matrix is assembled from `Γ` plus the
+# contribution of the uncertainty in the observer's position, evaluated at the
+# (constant term of the) current observer to asteroid vector. Observations with a
+# non positive definite covariance matrix are flagged as outliers
 function optical_residual(r::OpticalResidual{T, U}, x::AbstractOpticalAstrometry{T},
                           buffer::OpticalBuffer{T, U}, Γ::SMatrix{2, 2, T, 4};
                           kwargs...) where {T <: Real, U <: Number}
@@ -307,8 +347,10 @@ function optical_residual(r::OpticalResidual{T, U}, x::AbstractOpticalAstrometry
     compra, compdec = compute_radec(x, buffer; kwargs...)
     # Debiasing factors [arcsec]
     dra, ddec = debias(r)
+    # Total covariance matrix [arcsec²]
+    Γ_tot = Γ + observercovariance(x, losvector(buffer))
     # Weight matrix [arcsec⁻²]
-    W = weightmatrix(Γ)
+    W = weightmatrix(Γ_tot)
     # Observed minus computed residual ra/dec
     # Note: ra is multiplied by a metric factor cos(dec) to match the format of
     # debiasing corrections
@@ -318,6 +360,6 @@ function optical_residual(r::OpticalResidual{T, U}, x::AbstractOpticalAstrometry
         W,
         dra,
         ddec,
-        isoutlier(r) || !isposdefcov(Γ)
+        isoutlier(r) || !isposdefcov(Γ) || !isposdefcov(Γ_tot)
     )
 end

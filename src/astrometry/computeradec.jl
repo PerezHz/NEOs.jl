@@ -44,6 +44,10 @@ function OpticalBuffer(x::U, observatory::ObservatoryMPC{T},
     return OpticalBuffer{T, U}(v0, v1, observer)
 end
 
+# Observer to asteroid (light-time corrected) position vector [km] computed by the
+# last call to `compute_radec` with `buffer`
+losvector(buffer::OpticalBuffer) = buffer.v1[2]
+
 """
     compute_radec(::AbstractOpticalAstrometry [, ::OpticalBuffer]; kwargs...)
 
@@ -338,6 +342,9 @@ function compute_radec(
 
     δ_as = rad2arcsec(δ_rad) # rad -> arcsec + debiasing
     α_as = rad2arcsec(α_rad) # rad -> arcsec + debiasing
+
+    # Save the observer to asteroid vector in the buffer (see `losvector`)
+    buffer.v1[2] .= ρ_vec_r
 
     return α_as, δ_as # right ascension, declination both in arcsec
 end
