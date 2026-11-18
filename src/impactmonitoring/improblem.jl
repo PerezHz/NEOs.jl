@@ -33,6 +33,7 @@ dof(x::IMProblem) = dof(Val(dynamicalmodel(x)))
 epoch(x::IMProblem) = epoch(x.orbit)
 
 noptical(x::IMProblem) = length(x.orbit.optical)
+covariances(x::IMProblem) = covariances(x.orbit)
 opticalindices(x::IMProblem) = eachindex(x.orbit.optical)
 
 gm(x::IMProblem) = gm(x.target)
@@ -57,8 +58,8 @@ function init_optical_residuals(
     @unpack ores = orbit
     res = Vector{OpticalResidual{T, U}}(undef, length(ores) + iobs)
     for (i, r) in enumerate(ores)
-        res[i] = OpticalResidual{T, U}(zero(U), zero(U), wra(r), wdec(r), dra(r), ddec(r),
-                                       corr(r), isoutlier(r))
+        res[i] = OpticalResidual{T, U}(zero(U), zero(U), weight(r), dra(r), ddec(r),
+                                       isoutlier(r))
     end
     res[end] = iobs ? zero(OpticalResidual{T, U}) : res[end]
     return res
@@ -103,8 +104,8 @@ function propres!(
     Nres = length(res)
     subres = Nres == noptical(IM) ? view(res, 1:Nres) : view(res, 1:Nres-1)
     try
-        residuals!(subres, optical, buffer.optical; niter = opticaliter,
-                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
+        residuals!(subres, optical, buffer.optical, covariances(IM);
+                   niter = opticaliter, xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         return bwd, fwd
     catch
         empty!(res)

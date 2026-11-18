@@ -69,25 +69,26 @@ function outlier_rejection!(
     # Compute χ2s
     @inbounds for i in eachindex(χ2s)
         # Skip degenerate observations
-        if abs(corr(res[i])) ≥ 1
+        if !isposdefcov(weight(res[i]))
             χ2s[i] = T(Inf)
             continue
         end
         # Outlier flag
         outlier = mask[i]
         # Current observation covariance matrix
-        # Note: since the residuals are already normalized, the single
-        # observation covariance matrix is:
-        γ[1], γ[2], γ[3], γ[4] = one(T), corr(res[i]), corr(res[i]), one(T)
+        # Note: since the residuals are normalized (whitened), the single
+        # observation covariance matrix is the identity
+        γ[1], γ[2], γ[3], γ[4] = one(T), zero(T), zero(T), one(T)
         # Current model matrix
-        A[:, 1] = TS.gradient(ra(res[i]))(x)
-        A[:, 2] = TS.gradient(dec(res[i]))(x)
+        z_α, z_δ = normalized_residual(res[i])
+        A[:, 1] = TS.gradient(z_α)(x)
+        A[:, 2] = TS.gradient(z_δ)(x)
         # Outlier sign
         outlier_sign = 2 * outlier - 1
         # Current residual covariance matrix
         γ_ξ .= γ + outlier_sign * (A') * Γ * A
         # Current residual
-        ξ .= ra(eval_res[i]), dec(eval_res[i])
+        ξ .= normalized_residual(eval_res[i])
         # Current chi2
         χ2s[i] = abs(ξ' * inv(γ_ξ) * ξ)
         # Update maximum χ2

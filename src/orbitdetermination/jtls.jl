@@ -387,8 +387,9 @@ function jtls(
         end
         # Update orbit
         orbits[i] = updateorbit(LeastSquaresOrbit(
-            od.dynamics, variables, od.optical[oidxs], trksin, nothing, bwd, fwd,
-            res[oidxs], nothing, fit, q00s[variables, 1:i], Qs[1:i]
+            od.dynamics, variables, od.optical[oidxs], trksin, nothing,
+            CustomWeights(od.weights, oidxs), bwd, fwd, res[oidxs], nothing, fit,
+            q00s[variables, 1:i], Qs[1:i]
         ), lsmethods, params)
         Qs[i] = orbits[i].Qs[end] = nrms(orbits[i])
         if outrej
@@ -469,8 +470,9 @@ function jtls(
         end
         # Update orbit
         orbits[i] = updateorbit(LeastSquaresOrbit(
-            od.dynamics, variables, od.optical[oidxs], trksin, od.radar[ridxs], bwd, fwd,
-            res[1][oidxs], res[2][ridxs], fit, q00s[variables, 1:i], Qs[1:i]
+            od.dynamics, variables, od.optical[oidxs], trksin, od.radar[ridxs],
+            CustomWeights(od.weights, oidxs), bwd, fwd, res[1][oidxs], res[2][ridxs],
+            fit, q00s[variables, 1:i], Qs[1:i]
         ), lsmethods, params)
         Qs[i] = orbits[i].Qs[end] = nrms(orbits[i])
         if outrej
@@ -540,12 +542,10 @@ function linkage(
     # Main cycle
     for i in 1:maxiter
         # Scale down weights (i.e. scale up covariance matrices)
+        # Note: the weight matrices of the residuals are assembled from these
+        # covariance matrices every time the residuals are computed
         for j in idxs
-            Γ = Γs[j] * exp10(T(2k))
-            wra, wdec, korr = cov2weights(Γ)
-            res[j] = OpticalResidual{T, T}(ra(res[j]), dec(res[j]), wra, wdec,
-                dra(res[j]), ddec(res[j]), korr, isoutlier(res[j]))
-            covariances(od.weights)[j] = Γ
+            covariances(od.weights)[j] = Γs[j] * exp10(T(2k))
         end
         # Jet transport least squares
         if i == 1

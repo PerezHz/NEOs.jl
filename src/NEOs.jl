@@ -60,7 +60,8 @@ export loadjpleph, sunposvel, earthposvel, moonposvel, apophisposvel197, apophis
        tt_tdb, dtt_tdb
 # Minor bodies astrometry interface
 export MPC, NEOCP, NEOCC, NEODyS2, JPL
-export UniformWeights, SourceWeights, Veres17, CustomWeights, radeccovariance
+export UniformWeights, SourceWeights, Veres17, CustomWeights, radeccovariance,
+       weightmatrix
 export ZeroDebiasing, SourceDebiasing, Farnocchia15, Eggl20
 export numberofdays, unpacknum, packnum, unpackdesig, packdesig,
        fetch_designation_information, fetch_mpec_information
@@ -78,7 +79,7 @@ export fetch_optical_rwo, read_optical_rwo, write_optical_rwo
 export fetch_optical_ades, read_optical_ades, write_optical_ades
 export read_optical_astrometry, fetch_optical_astrometry, load_optical_astrometry
 export nobs, datediff, reduce_tracklets
-export wra, wdec, dra, ddec, unfold, compute_radec, residuals
+export dra, ddec, unfold, compute_radec, residuals
 export fetch_radar_jpl, read_radar_jpl, write_radar_jpl
 export fetch_radar_rwo, read_radar_rwo, write_radar_rwo
 export compute_delay, radar_astrometry

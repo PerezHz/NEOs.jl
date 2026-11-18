@@ -48,7 +48,7 @@ function radeccovariance(σα::T, σδ::T, ρ::T = zero(T)) where {T <: Real}
     return SMatrix{2, 2, T, 4}(σα^2, c, c, σδ^2)
 end
 
-# Whether a 2x2 covariance matrix is symmetric positive definite
+# Whether a 2x2 (covariance or weight) matrix is symmetric positive definite
 # Note: a matrix with NaN entries is never positive definite
 isposdefcov(Γ::SMatrix{2, 2}) = Γ[1, 2] == Γ[2, 1] && Γ[1, 1] > 0 &&
     Γ[1, 1] * Γ[2, 2] - Γ[1, 2]^2 > 0
@@ -57,14 +57,22 @@ isposdefcov(Γ::SMatrix{2, 2}) = Γ[1, 2] == Γ[2, 1] && Γ[1, 1] > 0 &&
 covoutliers(flags::AbstractVector{Bool}, Γs::AbstractVector{<:SMatrix{2, 2}}) =
     BitVector(flags) .| .!isposdefcov.(Γs)
 
-# Right ascension and declination weights [arcsec⁻¹] and correlation
-# corresponding to a 2x2 covariance matrix [arcsec²]; a non positive definite
-# matrix returns a unit correlation, which flags the residual as degenerate
-# TO DO: remove once `OpticalResidual` stores a weight matrix
-function cov2weights(Γ::SMatrix{2, 2, T}) where {T <: Real}
-    !isposdefcov(Γ) && return zero(T), zero(T), one(T)
-    σα, σδ = sqrt(Γ[1, 1]), sqrt(Γ[2, 2])
-    return 1 / σα, 1 / σδ, Γ[1, 2] / (σα * σδ)
+"""
+    weightmatrix(Γ)
+
+Return the weight matrix [arcsec⁻²], i.e. the inverse, of a 2x2 covariance matrix
+`Γ` [arcsec²]. If `Γ` is not positive definite, return a zero matrix.
+
+See also [`radeccovariance`](@ref).
+"""
+function weightmatrix(Γ::SMatrix{2, 2, T, 4}) where {T <: Real}
+    !isposdefcov(Γ) && return SMatrix{2, 2, T, 4}(zero(T), zero(T), zero(T), zero(T))
+    # Note: these expressions reduce to 1/Γ[1, 1] and 1/Γ[2, 2]
+    # for uncorrelated errors
+    w11 = 1 / (Γ[1, 1] - Γ[1, 2]^2 / Γ[2, 2])
+    w22 = 1 / (Γ[2, 2] - Γ[1, 2]^2 / Γ[1, 1])
+    w12 = -Γ[1, 2] / (Γ[1, 1] * Γ[2, 2] - Γ[1, 2]^2)
+    return SMatrix{2, 2, T, 4}(w11, w12, w12, w22)
 end
 
 """
@@ -311,6 +319,14 @@ CustomWeights(
 
 CustomWeights(x::AbstractWeightingScheme, idxs::AbstractVector{Int} = 1:nobs(x)) =
     CustomWeights(covariances(x, idxs), outliers(x, idxs))
+
+# Equality and hash methods
+# Note: `CustomWeights` is stored in orbits, whose equality (e.g. `iszero`)
+# must compare the contents of the weighting scheme
+Base.:(==)(x::CustomWeights, y::CustomWeights) = covariances(x) == covariances(y) &&
+    outliers(x) == outliers(y)
+Base.hash(x::CustomWeights, h::UInt) = hash(outliers(x),
+    hash(covariances(x), hash(:CustomWeights, h)))
 
 # Override getid, covariances and outliers
 getid(::CustomWeights) = "Custom"
