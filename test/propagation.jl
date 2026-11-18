@@ -33,7 +33,7 @@ end
 
 scalarra(x) = -arcsec2rad(ra(x) + dra(x))
 scalardec(x) = -arcsec2rad(dec(x) + ddec(x))
-scalarradar(x) = -(residual(x) / weight(x) + debias(x))
+scalarradar(x) = -(residual(x) + debias(x))
 isapproxtuple(x, y; kwargs...) = isapprox(x[1], y[1]; kwargs...) &&
     isapprox(x[2], y[2]; kwargs...)
 
@@ -466,8 +466,8 @@ end
         taylorizeddelaytests(observatory.(radar_Apophis), date.(radar_Apophis),
             q0, sol_bwd, sol_fwd, params)
 
-        res_del = residual.(res_radar[isdelay.(radar_Apophis)])
-        res_dop = residual.(res_radar[isdoppler.(radar_Apophis)])
+        res_del = NEOs.normalized_residual.(res_radar[isdelay.(radar_Apophis)])
+        res_dop = NEOs.normalized_residual.(res_radar[isdoppler.(radar_Apophis)])
 
         mean_del, mean_dop = mean(res_del), mean(res_dop)
         std_del, std_dop = std(res_del), std(res_dop)
@@ -656,25 +656,25 @@ end
             q0, sol_bwd, sol_fwd, params)
 
         # Compute mean radar (time-delay and Doppler-shift) residuals
-        res_del, w_del = @. residual(res_radar[mask_del]), weight(res_radar[mask_del])
-        res_dop, w_dop = @. residual(res_radar[mask_dop]), weight(res_radar[mask_dop])
+        res_del = residual.(res_radar[mask_del])
+        res_dop = residual.(res_radar[mask_dop])
 
-        # Doppler astrometry normalized residuals (i.e., residual/sigma) at nominal solution
-        @test abs(res_dop[1]() / w_dop[1]) ≤ rms(dop[1])
-        @test abs(res_dop[2]() / w_dop[2]) ≤ rms(dop[2])
-        @test abs(res_dop[3]() / w_dop[3]) ≤ rms(dop[3])
-        @test abs(res_dop[4]() / w_dop[4]) ≤ rms(dop[4])
-        # delay astrometry normalized residuals (i.e., residual/sigma) at nominal solution
-        @test abs(res_del[1]() / w_del[1]) ≤ rms(del[1])
-        @test abs(res_del[2]() / w_del[2]) ≤ rms(del[2])
+        # Doppler astrometry residuals at nominal solution are within one sigma
+        @test abs(res_dop[1]()) ≤ rms(dop[1])
+        @test abs(res_dop[2]()) ≤ rms(dop[2])
+        @test abs(res_dop[3]()) ≤ rms(dop[3])
+        @test abs(res_dop[4]()) ≤ rms(dop[4])
+        # Delay astrometry residuals at nominal solution are within one sigma
+        @test abs(res_del[1]()) ≤ rms(del[1])
+        @test abs(res_del[2]()) ≤ rms(del[2])
 
         dq_sample = 2ones(7)
-        # Doppler astrometry normalized residuals at non-nominal solution
+        # Doppler astrometry residuals at non-nominal solution
         @test abs(res_dop[1]()) ≤ abs(res_dop[1](dq_sample))
         @test abs(res_dop[2]()) ≤ abs(res_dop[2](dq_sample))
         @test abs(res_dop[3]()) ≤ abs(res_dop[3](dq_sample))
         @test abs(res_dop[4]()) ≤ abs(res_dop[4](dq_sample))
-        # delay astrometry normalized residuals at non-nominal solution
+        # Delay astrometry residuals at non-nominal solution
         @test abs(res_del[1]()) ≤ abs(res_del[1](dq_sample))
         @test abs(res_del[2]()) ≤ abs(res_del[2](dq_sample))
 

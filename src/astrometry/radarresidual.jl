@@ -5,10 +5,18 @@ An astrometric radar observed minus computed residual.
 
 # Fields
 
-- `residual::U`: normalized time delay [us] or Doppler shift [Hz] residual.
-- `weight::T`: statistical weight [same units as `residual`⁻¹].
+- `residual::U`: debiased time delay [us] or Doppler shift [Hz] observed minus
+    computed residual.
+- `weight::T`: statistical weight, i.e. the inverse of the variance of `residual`
+    [same units as `residual`⁻²].
 - `debias::T`: debiasing factor [same units as `residual`].
 - `outlier::Bool`: whether the residual is an outlier or not.
+
+!!! note
+    A non-outlier residual contributes `w ξ²` to the chi-square, where
+    `ξ = residual` and `w = weight`.
+
+See also [`normalized_residual`](@ref).
 """
 @auto_hash_equals struct RadarResidual{T, U} <: AbstractRadarResidual{T, U}
     residual::U
@@ -28,7 +36,15 @@ weight(x::RadarResidual) = x.weight
 debias(x::RadarResidual) = x.debias
 
 dof(::Type{RadarResidual{T, U}}) where {T, U} = 1
-chi2(x::RadarResidual) = !isoutlier(x) * residual(x)^2
+chi2(x::RadarResidual) = isoutlier(x) ? zero(residual(x)) : weight(x) * residual(x)^2
+
+"""
+    normalized_residual(x::RadarResidual)
+
+Return the normalized residual `√w ξ`, where `ξ = residual(x)` and `w = weight(x)`.
+Hence, `normalized_residual(x)^2 == chi2(x)` for a non-outlier residual.
+"""
+normalized_residual(x::RadarResidual) = sqrt(weight(x)) * residual(x)
 
 # Definition of zero RadarResidual
 zero(::Type{RadarResidual{T, U}}) where {T, U} = RadarResidual{T, U}(
@@ -60,32 +76,12 @@ end
     evaluate(y, x)
 
 """
-    unfold(::AbstractVector{RadarResidual})
+    normalized_residuals(::AbstractVector{RadarResidual})
 
-Return three vectors by concatenating the non-outlier time-delay and
-Doppler shift residuals, weights and debiasing factors.
+Return a vector with the normalized residuals of the non-outliers.
+
+See also [`normalized_residual`](@ref).
 """
-function unfold(y::AbstractVector{RadarResidual{T, U}}) where {T <: Real, U <: Number}
-    # Number of non outliers
-    L = notout(y)
-    # Vector of residuals, weights and debiasing factors
-    z = Vector{U}(undef, L)
-    w = Vector{T}(undef, L)
-    d = Vector{T}(undef, L)
-    # Global counter
-    k = 1
-    # Fill residuals, weights and debiasing factors
-    for i in eachindex(y)
-        isoutlier(y[i]) && continue
-        # Residual
-        z[k], w[k], d[k] = residual(y[i]), weight(y[i]), debias(y[i])
-        # Update global counter
-        k += 1
-    end
-
-    return z, w, d
-end
-
 function normalized_residuals(y::AbstractVector{RadarResidual{T, U}}) where {T, U}
     # Number of non outliers
     L = notout(y)
@@ -97,7 +93,7 @@ function normalized_residuals(y::AbstractVector{RadarResidual{T, U}}) where {T, 
     for i in eachindex(y)
         isoutlier(y[i]) && continue
         # Residual
-        z[k] = residual(y[i])
+        z[k] = normalized_residual(y[i])
         # Update global counter
         k += 1
     end
@@ -115,7 +111,7 @@ function init_radar_residuals(
     res = Vector{RadarResidual{T, U}}(undef, length(radar))
     for i in eachindex(radar)
         residual = zero(U)
-        weight = 1 / rms(radar[i])
+        weight = 1 / rms(radar[i])^2
         bias = debias(radar[i])
         res[i] = RadarResidual{T, U}(residual, weight, bias, outliers[i])
     end
@@ -201,7 +197,7 @@ function radar_residual(r::RadarResidual{T, U}, x::AbstractRadarAstrometry{T},
     computed = isdelay(x) ? delay : doppler
     # Observed minus computed residual
     return RadarResidual{T, U}(
-        w8 * ( observed - computed - bias ),
+        observed - computed - bias,
         w8,
         bias,
         outlier

@@ -63,7 +63,7 @@ function init_radar_residuals(::Type{U}, od::MixedODProblem,
     res = Vector{RadarResidual{T, U}}(undef, length(radar1))
     for i in eachindex(radar1)
         residual = zero(U)
-        weight = 1 / rms(radar1[i])
+        weight = 1 / rms(radar1[i])^2
         bias = debias(radar1[i])
         j = findfirst(==(radar1[i]), radar2)
         outlier = isnothing(j) ? false : isoutlier(orbit.rres[j])

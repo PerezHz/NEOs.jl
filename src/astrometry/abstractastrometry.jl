@@ -173,9 +173,15 @@ abstract type AbstractAstrometryErrorModel{T <: Real} <: AbstractAstrometry end
 Supertye for the astrometric observed minus computed residuals interface.
 
 Every astrometric residual `x` has a:
-- `residual(x)`: normalized observed minus computed residual(s) [adimensional].
-- `weight(x)`: statistical weight [same units as measure⁻¹].
-- `debias(x)`: debiasing factor [same units as measure].
+- `residual(x)`: debiased observed minus computed residual(s) [arcsec for optical
+    astrometry and same units as measure for radar astrometry].
+- `weight(x)`: statistical weight, i.e. the inverse of the covariance matrix
+    (variance) of `residual(x)` [same units as `residual(x)`⁻²].
+- `debias(x)`: debiasing factor [same units as `residual(x)`].
+- `normalized_residual(x)`: normalized (whitened) residual(s), i.e. with uncorrelated
+    unit-variance components [adimensional].
+- `chi2(x)`: contribution to the chi-square, i.e. the squared norm of
+    `normalized_residual(x)` (zero for outliers) [adimensional].
 """
 abstract type AbstractAstrometryResidual{T <: Real, U <: Number} <: AbstractAstrometry end
 

@@ -79,7 +79,7 @@ export fetch_optical_rwo, read_optical_rwo, write_optical_rwo
 export fetch_optical_ades, read_optical_ades, write_optical_ades
 export read_optical_astrometry, fetch_optical_astrometry, load_optical_astrometry
 export nobs, datediff, reduce_tracklets
-export dra, ddec, unfold, compute_radec, residuals
+export dra, ddec, compute_radec, residuals
 export fetch_radar_jpl, read_radar_jpl, write_radar_jpl
 export fetch_radar_rwo, read_radar_rwo, write_radar_rwo
 export compute_delay, radar_astrometry
