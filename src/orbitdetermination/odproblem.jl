@@ -52,15 +52,37 @@ astrometry `radar`.
 
 - `weights`: optical astrometry weighting scheme (default: `Veres17`).
 - `debias`: optical astrometry debiasing scheme (default: `Eggl20`).
+
+Both keyword arguments accept either a type, which is then constructed from `optical`,
+or an instance with the same number of observations as `optical` (e.g. a
+[`CustomWeights`](@ref)).
 """
-function ODProblem(dynamics::D, optical::O, radar::R = nothing; weights::Type{WT} = Veres17,
-                   debias::Type{DT} = Eggl20) where {D, T <: Real, O <: AbstractOpticalVector{T},
-                   R <: Union{Nothing, AbstractRadarVector{T}}, WT <: AbstractWeightingScheme,
-                   DT <: AbstractDebiasingScheme}
+function ODProblem(
+        dynamics::D, optical::O, radar::R = nothing;
+        weights::Union{Type{<:AbstractWeightingScheme}, AbstractWeightingScheme} = Veres17,
+        debias::Union{Type{<:AbstractDebiasingScheme}, AbstractDebiasingScheme} = Eggl20
+    ) where {D, T <: Real, O <: AbstractOpticalVector{T},
+             R <: Union{Nothing, AbstractRadarVector{T}}}
     # Group optical astrometry in tracklets
     tracklets = reduce_tracklets(optical)
-    return ODProblem{D, T, O, R, WT{T}, DT{T}}(dynamics, optical, tracklets, radar,
-                                               weights(optical), debias(optical))
+    # Error model
+    wsm, dsm = errormodel(weights, optical), errormodel(debias, optical)
+    return ODProblem{D, T, O, R, typeof(wsm), typeof(dsm)}(dynamics, optical, tracklets,
+                                                           radar, wsm, dsm)
+end
+
+# Note: the first argument of `errormodel` is not annotated as
+# `Type{<:AbstractAstrometryErrorModel}` because the unbounded parameter of, e.g.,
+# `ZeroDebiasing{T}` makes the `UnionAll` type `ZeroDebiasing` not a subtype of
+# `AbstractAstrometryErrorModel`, whose parameter must be `<: Real`; anyway, the
+# keyword arguments of `ODProblem` already restrict the admissible types
+errormodel(x::Type, optical::AbstractOpticalVector) = x(optical)
+
+function errormodel(x::AbstractAstrometryErrorModel{T},
+                    optical::AbstractOpticalVector{T}) where {T <: Real}
+    @assert nobs(x) == length(optical) "Error model and optical astrometry must have \
+        the same number of observations"
+    return x
 end
 
 # Print method for ODProblem
@@ -95,9 +117,8 @@ nobs(x::ODProblem) = noptical(x) + nradar(x)
 opticalindices(x::ODProblem) = eachindex(x.optical)
 radarindices(x::MixedODProblem) = eachindex(x.radar)
 
-weights(x::ODProblem) = weights(x.weights)
+covariances(x::ODProblem) = covariances(x.weights)
 debias(x::ODProblem) = debias(x.debias)
-corrs(x::ODProblem) = corrs(x.weights)
 outliers(x::ODProblem) = outliers(x.weights)
 
 function minmaxdates(x::ODProblem)
@@ -125,11 +146,10 @@ function meandate(x::ODProblem)
     T = scalartype(x)
     t = Vector{T}(undef, noptical(x))
     w = Vector{T}(undef, noptical(x))
-    for (i, (obs, weight)) in enumerate(zip(optical(x), weights(x)))
+    for (i, (obs, Γ)) in enumerate(zip(optical(x), covariances(x)))
         δ = dec(obs)
-        σα, σδ = inv.(weight)
         t[i] = datetime2julian(obs) - PE.J2000
-        w[i] = 1 / (σα^2 * cos(δ)^2 + σδ^2)
+        w[i] = 1 / (Γ[1, 1] * cos(δ)^2 + Γ[2, 2])
     end
     tmean = mean(t, weights(w))
     return julian2datetime(tmean + PE.J2000)

@@ -240,8 +240,9 @@ function verifyvirtualimpactor(
             return VirtualImpactor{T}(t, σ, σimp, ip, a, domain, Γ_tp)
         end
         # Impact pseudo-observation
-        res[end] = OpticalResidual{T, TaylorN{T}}((εx - X)/σ_b, (εy - Y)/σ_b, 1/σ_b, 1/σ_b,
-            zero(T), zero(T), zero(T), false)
+        w_b = 1 / σ_b^2
+        res[end] = OpticalResidual{T, TaylorN{T}}(εx - X, εy - Y,
+            SMatrix{2, 2, T, 4}(w_b, zero(T), zero(T), w_b), zero(T), zero(T), false)
         # Least squares fit
         update!(lsmethod, res, x0, lscache.idxs)
         fit = leastsquares!(lsmethod, lscache; Qtol = lsQtol, Mtol = lsMtol)

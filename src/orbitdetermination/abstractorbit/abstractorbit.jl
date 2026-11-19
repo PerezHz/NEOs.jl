@@ -93,9 +93,12 @@ function meandate(x::AbstractOrbit)
     w = Vector{T}(undef, noptical(x))
     for (i, (obs, res)) in enumerate(zip(optical(x), x.ores))
         δ = dec(obs)
-        σα, σδ = 1 / wra(res), 1 / wdec(res)
+        # Note: 1 / (Γ[1, 1] cos(δ)² + Γ[2, 2]) = det(W) / (W[2, 2] cos(δ)² + W[1, 1]),
+        # with Γ = W⁻¹; observations with a degenerate weight matrix are ignored
+        W = weight(res)
+        detW = W[1, 1] * W[2, 2] - W[1, 2]^2
         t[i] = datetime2julian(obs) - PE.J2000
-        w[i] = 1 / (σα^2 * cos(δ)^2 + σδ^2)
+        w[i] = detW > 0 ? detW / (W[2, 2] * cos(δ)^2 + W[1, 1]) : zero(T)
     end
     tmean = mean(t, weights(w))
     return julian2datetime(tmean + PE.J2000)
@@ -222,8 +225,8 @@ function init_optical_residuals(::Type{V}, orbit::AbstractOrbit{D, T, U}) where 
     # Initialize vector of optical residuals
     res = Vector{OpticalResidual{T, V}}(undef, noptical(orbit))
     for (i, r) in enumerate(orbit.ores)
-        res[i] = OpticalResidual{T, V}(zero(V), zero(V), wra(r), wdec(r), dra(r),
-                                       ddec(r), corr(r), isoutlier(r))
+        res[i] = OpticalResidual{T, V}(zero(V), zero(V), weight(r), dra(r), ddec(r),
+                                       isoutlier(r))
     end
     return res
 end

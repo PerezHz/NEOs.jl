@@ -5,62 +5,82 @@ An astrometric optical observed minus computed residual.
 
 # Fields
 
-- `ra/dec::U`: normalized right ascension (declination) residual [arcsec].
-- `wra/wdec::T`: right ascension (declination) weight [arcsec⁻¹].
+- `ra/dec::U`: debiased right ascension (times the cosine of the declination) and
+    declination observed minus computed residuals [arcsec].
+- `weight::SMatrix{2, 2, T, 4}`: weight matrix, i.e. the inverse of the covariance
+    matrix of `(ra, dec)` [arcsec⁻²].
 - `dra/ddec::T`: right ascension (declination) debiasing factor [arcsec].
-- `corr::T` correlation between `ra` and `dec`.
 - `outlier::Bool`: whether the residual is an outlier or not.
+
+!!! note
+    A non-outlier residual contributes `ξᵀ W ξ` to the chi-square, where
+    `ξ = (ra, dec)` and `W = weight`.
+
+See also [`normalized_residual`](@ref) and [`weightmatrix`](@ref).
 """
 @auto_hash_equals struct OpticalResidual{T, U} <: AbstractOpticalResidual{T, U}
     ra::U
     dec::U
-    wra::T
-    wdec::T
+    weight::SMatrix{2, 2, T, 4}
     dra::T
     ddec::T
-    corr::T
     outlier::Bool
     # Inner constructor
     function OpticalResidual{T, U}(
-        ra::U, dec::U, wra::T, wdec::T, dra::T,
-        ddec::T, corr::T, outlier::Bool = false
-    ) where {T <: Real, U <:  Number}
-        return new{T, U}(ra, dec, wra, wdec, dra, ddec, corr, outlier)
+            ra::U, dec::U, weight::SMatrix{2, 2, T, 4}, dra::T, ddec::T,
+            outlier::Bool = false
+        ) where {T <: Real, U <: Number}
+        return new{T, U}(ra, dec, weight, dra, ddec, outlier)
     end
 end
 
 # AbstractAstrometryResidual interface
 residual(x::OpticalResidual) = (ra(x), dec(x))
-weight(x::OpticalResidual) = (wra(x), wdec(x))
+weight(x::OpticalResidual) = x.weight
 debias(x::OpticalResidual) = (dra(x), ddec(x))
 
 dof(::Type{OpticalResidual{T, U}}) where {T, U} = 2
 
 function chi2(x::OpticalResidual)
-    ξ_α, ξ_δ, ρ = ra(x), dec(x), corr(x)
-    if isoutlier(x) || abs(ρ) ≥ 1
-        return zero(ξ_α)
-    else
-        return (ξ_α^2 + ξ_δ^2 - 2ρ*ξ_α*ξ_δ) / (1 - ρ^2)
-    end
+    ξ_α, ξ_δ, W = ra(x), dec(x), weight(x)
+    isoutlier(x) && return zero(ξ_α)
+    return W[1, 1] * ξ_α^2 + 2 * W[1, 2] * ξ_α * ξ_δ + W[2, 2] * ξ_δ^2
 end
 chi(x::OpticalResidual) = sqrt(chi2(x))
 logchi(x::OpticalResidual) = log(chi(x))
 log10chi(x::OpticalResidual) = log10(chi(x))
 
+"""
+    normalized_residual(x::OpticalResidual)
+
+Return the normalized (whitened) right ascension and declination residuals
+`z = U ξ`, where `ξ = (ra(x), dec(x))` and `W = Uᵀ U` is the Cholesky
+factorization of the weight matrix `W = weight(x)`. Hence, the components of
+`z` are uncorrelated with unit variance and `z₁² + z₂² == chi2(x)` for a
+non-outlier residual.
+
+!!! warning
+    The weight matrix must be positive definite.
+"""
+function normalized_residual(x::OpticalResidual{T}) where {T <: Real}
+    W = weight(x)
+    u11 = sqrt(W[1, 1])
+    u12 = W[1, 2] / u11
+    u22 = sqrt(max(zero(T), W[2, 2] - u12^2))
+    return u11 * ra(x) + u12 * dec(x), u22 * dec(x)
+end
+
 ra(x::OpticalResidual) = x.ra
 dec(x::OpticalResidual) = x.dec
-wra(x::OpticalResidual) = x.wra
-wdec(x::OpticalResidual) = x.wdec
 dra(x::OpticalResidual) = x.dra
 ddec(x::OpticalResidual) = x.ddec
-corr(x::OpticalResidual) = x.corr
 setoutlier(x::OpticalResidual{T, U}, y::Bool) where {T, U} = OpticalResidual{T, U}(
-    ra(x), dec(x), wra(x), wdec(x), dra(x), ddec(x), corr(x), y)
+    ra(x), dec(x), weight(x), dra(x), ddec(x), y)
 
 # Definition of zero OpticalResidual
 zero(::Type{OpticalResidual{T, U}}) where {T, U} = OpticalResidual{T, U}(
-        zero(U), zero(U), zero(T), zero(T), zero(T), zero(T), zero(T), false)
+    zero(U), zero(U), SMatrix{2, 2, T, 4}(zero(T), zero(T), zero(T), zero(T)),
+    zero(T), zero(T), false)
 iszero(x::OpticalResidual{T, U}) where {T, U} = x == zero(OpticalResidual{T, U})
 
 # Print method for OpticalResidual
@@ -125,7 +145,7 @@ end
 
 # Evaluate methods
 evaluate(y::OpticalResidual{T, TaylorN{T}}, x::Vector{T}) where {T <: Real} =
-    OpticalResidual{T, T}(y.ra(x), y.dec(x), y.wra, y.wdec, y.dra, y.ddec, y.corr, y.outlier)
+    OpticalResidual{T, T}(y.ra(x), y.dec(x), y.weight, y.dra, y.ddec, y.outlier)
 
 (y::OpticalResidual{T, TaylorN{T}})(x::Vector{T}) where {T <: Real} = evaluate(y, x)
 
@@ -142,34 +162,13 @@ end
     evaluate(y, x)
 
 """
-    unfold(::AbstractVector{OpticalResidual})
+    normalized_residuals(::AbstractVector{OpticalResidual})
 
-Return three vectors by concatenating the non-outlier right ascension
-and declination residuals, weights and debiasing factors.
+Return a vector with the normalized (whitened) right ascension residuals of the
+non-outliers, followed by the normalized declination residuals.
+
+See also [`normalized_residual`](@ref).
 """
-function unfold(y::AbstractVector{OpticalResidual{T, U}}) where {T <: Real, U <: Number}
-    # Number of non outliers
-    L = notout(y)
-    # Vector of residuals, weights and debiasing factors
-    z = Vector{U}(undef, 2L)
-    w = Vector{T}(undef, 2L)
-    d = Vector{T}(undef, 2L)
-    # Global counter
-    k = 1
-    # Fill residuals, weights and debiasing factors
-    for i in eachindex(y)
-        isoutlier(y[i]) && continue
-        # Right ascension
-        z[k], w[k], d[k] = ra(y[i]), wra(y[i]), dra(y[i])
-        # Declination
-        z[k+L], w[k+L], d[k+L] = dec(y[i]), wdec(y[i]), ddec(y[i])
-        # Update global counter
-        k += 1
-    end
-
-    return z, w, d
-end
-
 function normalized_residuals(y::AbstractVector{OpticalResidual{T, U}}) where {T, U}
     # Number of non outliers
     L = notout(y)
@@ -181,7 +180,7 @@ function normalized_residuals(y::AbstractVector{OpticalResidual{T, U}}) where {T
     for i in eachindex(y)
         isoutlier(y[i]) && continue
         # Right ascension and declination
-        z[k], z[k+L] = ra(y[i]), dec(y[i])
+        z[k], z[k+L] = normalized_residual(y[i])
         # Update global counter
         k += 1
     end
@@ -213,14 +212,13 @@ function init_optical_residuals(
     ) where {T <: Real, U <: Number}
     @assert nobs(wsm) == nobs(dsm) "Weighting and debiasing schemes must have the \
         same number of observations"
-    w8s = weights(wsm, idxs)
+    Γs = covariances(wsm, idxs)
     bias = debias(dsm, idxs)
-    korrs = corrs(wsm, idxs)
     outs = outliers(wsm, idxs)
     res = Vector{OpticalResidual{T, U}}(undef, length(idxs))
     for i in eachindex(res)
-        res[i] = OpticalResidual{T, U}(zero(U), zero(U), w8s[i]..., bias[i]...,
-                                       korrs[i], outs[i])
+        res[i] = OpticalResidual{T, U}(zero(U), zero(U), weightmatrix(Γs[i]),
+                                       bias[i]..., outs[i])
     end
     return res
 end
@@ -267,50 +265,101 @@ function residuals(
     buffer = [OpticalBuffer(a1_et1, x) for x in optical]
     # Vector of residuals
     res = init_optical_residuals(U, wsm, dsm)
-    residuals!(res, optical, buffer; xva, kwargs...)
+    residuals!(res, optical, buffer, covariances(wsm); xva, kwargs...)
 
     return res
 end
 
+"""
+    residuals!(res, optical, buffer, Γs; kwargs...)
+
+Overwrite the vector of optical residuals `res` with the observed minus computed
+residuals of `optical`, using the vector of buffers `buffer` and the vector of
+`(α cos(δ), δ)` measurement errors covariance matrices `Γs` [arcsec²]. The weight
+matrix of each residual is the inverse of `Γs[i]` plus the contribution of the
+uncertainty in the observer's position (see [`observercovariance`](@ref)), which
+depends on the current observer to asteroid distance; hence, the weight matrices are
+reassembled every time the residuals are computed. The debiasing factors and outlier
+flags are taken from `res`. For a list of keyword arguments see [`residuals`](@ref).
+"""
 function residuals!(res::AbstractVector{OpticalResidual{T, U}},
                     optical::AbstractOpticalVector{T},
-                    buffer::Vector{OpticalBuffer{T, U}};
+                    buffer::Vector{OpticalBuffer{T, U}},
+                    Γs::AbstractVector{SMatrix{2, 2, T, 4}};
                     kwargs...) where {T <: Real, U <: Number}
 
     # Function barrier: the closure only captures the (never reassigned) arguments,
     # so none of its captured variables is boxed
-    tforeach(eachindex(res, optical, buffer)) do i
-        res[i] = optical_residual(res[i], optical[i], buffer[i]; kwargs...)
+    tforeach(eachindex(res, optical, buffer, Γs)) do i
+        res[i] = optical_residual(res[i], optical[i], buffer[i], Γs[i]; kwargs...)
     end
 
     return nothing
 end
 
-# Observed minus computed residual of optical observation `x`; the weights, debiasing
-# factors, correlation and outlier flag are taken from the previous residual `r`
+"""
+    observercovariance(x, ρ_vec)
+
+Return the covariance matrix [arcsec²] of the `(α cos(δ), δ)` residuals of optical
+observation `x` due to the uncertainty in the observer's position, given the observer
+to asteroid vector `ρ_vec` [km]. If `poscov(x)` is not available, return a zero matrix.
+
+The observer's position covariance matrix `Σ = poscov(x)` [km²] is projected onto the
+tangent plane at the observed position, i.e. `P Σ Pᵀ / ρ²` [rad²], where the rows of
+`P` are the unit vectors along the directions of increasing right ascension and
+declination. This is the linear (first order) approximation of the effect of an
+observer's position offset on the observed direction.
+"""
+function observercovariance(x::AbstractOpticalAstrometry{T},
+                            ρ_vec::AbstractVector) where {T <: Real}
+    # Covariance matrix of the observer's position [km²]
+    Σ = poscov(x)
+    isnothing(Σ) && return SMatrix{2, 2, T, 4}(zero(T), zero(T), zero(T), zero(T))
+    # Unit vectors along increasing right ascension and declination at the
+    # observed position
+    α, δ = measure(x)
+    sα, cα = sincos(α)
+    sδ, cδ = sincos(δ)
+    e_α = SVector{3, T}(-sα, cα, zero(T))
+    e_δ = SVector{3, T}(-sδ * cα, -sδ * sα, cδ)
+    # Squared observer to asteroid distance [km²]
+    ρ2 = sum(i -> cte(ρ_vec[i])^2, 1:3)
+    # Projection onto the tangent plane [rad² -> arcsec²]
+    k = rad2arcsec(one(T))^2 / ρ2
+    g11 = k * dot(e_α, Σ, e_α)
+    g12 = k * dot(e_α, Σ, e_δ)
+    g22 = k * dot(e_δ, Σ, e_δ)
+    return SMatrix{2, 2, T, 4}(g11, g12, g12, g22)
+end
+
+# Observed minus computed residual of optical observation `x` with measurement errors
+# covariance matrix `Γ`; the debiasing factors and outlier flag are taken from the
+# previous residual `r`, while the weight matrix is assembled from `Γ` plus the
+# contribution of the uncertainty in the observer's position, evaluated at the
+# (constant term of the) current observer to asteroid vector. Observations with a
+# non positive definite covariance matrix are flagged as outliers
 function optical_residual(r::OpticalResidual{T, U}, x::AbstractOpticalAstrometry{T},
-                          buffer::OpticalBuffer{T, U}; kwargs...) where {T <: Real, U <: Number}
+                          buffer::OpticalBuffer{T, U}, Γ::SMatrix{2, 2, T, 4};
+                          kwargs...) where {T <: Real, U <: Number}
     # Observed ra/dec [arcsec]
     obsra, obsdec = rad2arcsec.(measure(x))
     # Computed ra/dec [arcsec]
     compra, compdec = compute_radec(x, buffer; kwargs...)
-    # Statistical weights [arcsec⁻²]
-    wra, wdec = weight(r)
     # Debiasing factors [arcsec]
     dra, ddec = debias(r)
-    # Correlation between ra and dec, and outlier flag
-    rho, outlier = corr(r), isoutlier(r)
+    # Total covariance matrix [arcsec²]
+    Γ_tot = Γ + observercovariance(x, losvector(buffer))
+    # Weight matrix [arcsec⁻²]
+    W = weightmatrix(Γ_tot)
     # Observed minus computed residual ra/dec
     # Note: ra is multiplied by a metric factor cos(dec) to match the format of
     # debiasing corrections
     return OpticalResidual{T, U}(
-        wra * ( anglediff(obsra, compra) * cos(dec(x)) - dra ),
-        wdec * ( obsdec - compdec - ddec ),
-        wra,
-        wdec,
+        anglediff(obsra, compra) * cos(dec(x)) - dra,
+        obsdec - compdec - ddec,
+        W,
         dra,
         ddec,
-        rho,
-        -1 < rho < 1 ? outlier : true
+        isoutlier(r) || !isposdefcov(Γ) || !isposdefcov(Γ_tot)
     )
 end

@@ -387,8 +387,9 @@ function jtls(
         end
         # Update orbit
         orbits[i] = updateorbit(LeastSquaresOrbit(
-            od.dynamics, variables, od.optical[oidxs], trksin, nothing, bwd, fwd,
-            res[oidxs], nothing, fit, q00s[variables, 1:i], Qs[1:i]
+            od.dynamics, variables, od.optical[oidxs], trksin, nothing,
+            CustomWeights(od.weights, oidxs), bwd, fwd, res[oidxs], nothing, fit,
+            q00s[variables, 1:i], Qs[1:i]
         ), lsmethods, params)
         Qs[i] = orbits[i].Qs[end] = nrms(orbits[i])
         if outrej
@@ -469,8 +470,9 @@ function jtls(
         end
         # Update orbit
         orbits[i] = updateorbit(LeastSquaresOrbit(
-            od.dynamics, variables, od.optical[oidxs], trksin, od.radar[ridxs], bwd, fwd,
-            res[1][oidxs], res[2][ridxs], fit, q00s[variables, 1:i], Qs[1:i]
+            od.dynamics, variables, od.optical[oidxs], trksin, od.radar[ridxs],
+            CustomWeights(od.weights, oidxs), bwd, fwd, res[1][oidxs], res[2][ridxs],
+            fit, q00s[variables, 1:i], Qs[1:i]
         ), lsmethods, params)
         Qs[i] = orbits[i].Qs[end] = nrms(orbits[i])
         if outrej
@@ -509,8 +511,8 @@ function linkage(
     @unpack tracklets = od
     # Pre-allocate orbit
     orbit = zero(OpticalLeastSquaresOrbit{D, T, T, O})
-    # Original weights
-    w8s = deepcopy(od.weights.weights)
+    # Original covariance matrices
+    Γs = copy(covariances(od.weights))
     # Initialize buffer and set of residuals
     Ndof = dof(od)
     jd0 = epoch(porbit) + PE.J2000
@@ -521,7 +523,7 @@ function linkage(
     if isempty(res)
         verbose && @warn("Linkage did not converge within the given parameters \
             or could not fit all the astrometry")
-        od.weights.weights .= w8s
+        covariances(od.weights) .= Γs
         return orbit
     end
     # Select first scaling factor
@@ -539,12 +541,11 @@ function linkage(
     idxs = opticalindices(view(tracklets, mask))
     # Main cycle
     for i in 1:maxiter
-        # Scale down weights
+        # Scale down weights (i.e. scale up covariance matrices)
+        # Note: the weight matrices of the residuals are assembled from these
+        # covariance matrices every time the residuals are computed
         for j in idxs
-            wra, wdec = w8s[j] ./ 10^k
-            res[j] = OpticalResidual{T, T}(ra(res[j]), dec(res[j]), wra, wdec,
-                dra(res[j]), ddec(res[j]), corr(res[j]), isoutlier(res[j]))
-            od.weights.weights[j] = (wra, wdec)
+            covariances(od.weights)[j] = Γs[j] * exp10(T(2k))
         end
         # Jet transport least squares
         if i == 1
@@ -581,8 +582,8 @@ function linkage(
         k += min(-1, minimum(view(mags, mask)))
         k = max(0, k)
     end
-    # Return weights to original
-    od.weights.weights .= w8s
+    # Return covariance matrices to original
+    covariances(od.weights) .= Γs
 
     return orbit
 end

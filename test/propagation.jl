@@ -31,9 +31,9 @@ function compute_radec_rad(x; kwargs...)
     return arcsec2rad(α), arcsec2rad(δ)
 end
 
-scalarra(x) = -arcsec2rad(ra(x) / wra(x) + dra(x))
-scalardec(x) = -arcsec2rad(dec(x) / wdec(x) + ddec(x))
-scalarradar(x) = -(residual(x) / weight(x) + debias(x))
+scalarra(x) = -arcsec2rad(ra(x) + dra(x))
+scalardec(x) = -arcsec2rad(dec(x) + ddec(x))
+scalarradar(x) = -(residual(x) + debias(x))
 isapproxtuple(x, y; kwargs...) = isapprox(x[1], y[1]; kwargs...) &&
     isapprox(x[2], y[2]; kwargs...)
 
@@ -272,7 +272,7 @@ end
         # Orbit determination problem
         OD = ODProblem(dynamics, optical_2023DW, weights = Veres17, debias = Eggl20)
         # Weigths and debiasing corrections
-        w8s, bias = weights(OD), debias(OD)
+        w8s, bias = weightmatrix.(covariances(OD)), debias(OD)
         # Propagation parameters
         params = Parameters(
             bwdoffset = (ti - t0) + nyears * yr,
@@ -311,7 +311,7 @@ end
         @test sqrt(chi2(_res_)) ≤ sum(chi, _res_)
         @test all(@. logchi(_res_) < log10chi(_res_) || chi(_res_) > 1)
 
-        res, _, _ = unfold(_res_)
+        res = NEOs.normalized_residuals(_res_)
         mean_optical0 = mean(res)
         std_optical0 = std(res)
         chi2_optical0 = chi2(res)
@@ -360,7 +360,7 @@ end
         @test sqrt(chi2(_res1_)) ≤ sum(chi, _res1_)
         @test all(@. logchi(_res1_) < log10chi(_res1_) || chi(_res1_) > 1)
 
-        res1, _, _ = unfold(_res1_)
+        res1 = NEOs.normalized_residuals(_res1_)
         mean_optical1 = mean(res1)
         std_optical1 = std(res1)
         chi2_optical1 = chi2(res1)
@@ -403,7 +403,7 @@ end
         # Orbit determination problem
         OD = ODProblem(dynamics, optical_Apophis, radar_Apophis, weights = Veres17, debias = Eggl20)
         # Weigths and debiasing corrections
-        w8s, bias = weights(OD), debias(OD)
+        w8s, bias = weightmatrix.(covariances(OD)), debias(OD)
         # Propagation parameters
         params = Parameters(
             bwdoffset = (ti - t0) + 1,
@@ -433,7 +433,8 @@ end
         @test all(@. logchi(res_optical) < log10chi(res_optical) || chi(res_optical) > 1)
 
         # Compute mean optical astrometric residual (right ascension and declination)
-        res_ra, res_dec = @. ra(res_optical), dec(res_optical)
+        z_optical = NEOs.normalized_residual.(res_optical)
+        res_ra, res_dec = first.(z_optical), last.(z_optical)
         mean_ra, mean_dec = mean(res_ra), mean(res_dec)
         std_ra, std_dec = std(res_ra), std(res_dec)
         chi2_ra, chi2_dec = chi2(res_ra), chi2(res_dec)
@@ -465,8 +466,8 @@ end
         taylorizeddelaytests(observatory.(radar_Apophis), date.(radar_Apophis),
             q0, sol_bwd, sol_fwd, params)
 
-        res_del = residual.(res_radar[isdelay.(radar_Apophis)])
-        res_dop = residual.(res_radar[isdoppler.(radar_Apophis)])
+        res_del = NEOs.normalized_residual.(res_radar[isdelay.(radar_Apophis)])
+        res_dop = NEOs.normalized_residual.(res_radar[isdoppler.(radar_Apophis)])
 
         mean_del, mean_dop = mean(res_del), mean(res_dop)
         std_del, std_dop = std(res_del), std(res_dop)
@@ -582,7 +583,7 @@ end
         # Orbit determination problem
         OD = ODProblem(dynamicsng, optical_Apophis, radar_Apophis, weights = Veres17, debias = Eggl20)
         # Weigths and debiasing corrections
-        w8s, bias = weights(OD), debias(OD)
+        w8s, bias = weightmatrix.(covariances(OD)), debias(OD)
 
         # Test parsed vs non-parsed propagation: gravity-only model
         params = Parameters(maxsteps = 10, order = 25, abstol = 1e-20, parse_eqs = true,
@@ -621,7 +622,8 @@ end
         # @test all(@. logchi(res_optical) < log10chi(res_optical) || chi(res_optical) > 1)
 
         # Compute mean optical astrometric residual (right ascension and declination)
-        res_ra, res_dec = @. ra(res_optical), dec(res_optical)
+        z_optical = NEOs.normalized_residual.(res_optical)
+        res_ra, res_dec = first.(z_optical), last.(z_optical)
         mean_ra, mean_dec = mean(res_ra), mean(res_dec)
         std_ra, std_dec = std(res_ra), std(res_dec)
         chi2_ra, chi2_dec = chi2(res_ra), chi2(res_dec)
@@ -654,25 +656,25 @@ end
             q0, sol_bwd, sol_fwd, params)
 
         # Compute mean radar (time-delay and Doppler-shift) residuals
-        res_del, w_del = @. residual(res_radar[mask_del]), weight(res_radar[mask_del])
-        res_dop, w_dop = @. residual(res_radar[mask_dop]), weight(res_radar[mask_dop])
+        res_del = residual.(res_radar[mask_del])
+        res_dop = residual.(res_radar[mask_dop])
 
-        # Doppler astrometry normalized residuals (i.e., residual/sigma) at nominal solution
-        @test abs(res_dop[1]() / w_dop[1]) ≤ rms(dop[1])
-        @test abs(res_dop[2]() / w_dop[2]) ≤ rms(dop[2])
-        @test abs(res_dop[3]() / w_dop[3]) ≤ rms(dop[3])
-        @test abs(res_dop[4]() / w_dop[4]) ≤ rms(dop[4])
-        # delay astrometry normalized residuals (i.e., residual/sigma) at nominal solution
-        @test abs(res_del[1]() / w_del[1]) ≤ rms(del[1])
-        @test abs(res_del[2]() / w_del[2]) ≤ rms(del[2])
+        # Doppler astrometry residuals at nominal solution are within one sigma
+        @test abs(res_dop[1]()) ≤ rms(dop[1])
+        @test abs(res_dop[2]()) ≤ rms(dop[2])
+        @test abs(res_dop[3]()) ≤ rms(dop[3])
+        @test abs(res_dop[4]()) ≤ rms(dop[4])
+        # Delay astrometry residuals at nominal solution are within one sigma
+        @test abs(res_del[1]()) ≤ rms(del[1])
+        @test abs(res_del[2]()) ≤ rms(del[2])
 
         dq_sample = 2ones(7)
-        # Doppler astrometry normalized residuals at non-nominal solution
+        # Doppler astrometry residuals at non-nominal solution
         @test abs(res_dop[1]()) ≤ abs(res_dop[1](dq_sample))
         @test abs(res_dop[2]()) ≤ abs(res_dop[2](dq_sample))
         @test abs(res_dop[3]()) ≤ abs(res_dop[3](dq_sample))
         @test abs(res_dop[4]()) ≤ abs(res_dop[4](dq_sample))
-        # delay astrometry normalized residuals at non-nominal solution
+        # Delay astrometry residuals at non-nominal solution
         @test abs(res_del[1]()) ≤ abs(res_del[1](dq_sample))
         @test abs(res_del[2]()) ≤ abs(res_del[2](dq_sample))
 

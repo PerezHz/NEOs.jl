@@ -8,9 +8,16 @@ Every least squares orbit has:
 - a vector of variables of type `Vector{Int}`,
 - a vector of optical astrometry of type `O <: AbstractOpticalVector{T}`,
 - a vector of optical tracklets of type `TrackletVector{T}`,
+- a vector of radar astrometry of type `R <: Union{Nothing, AbstractRadarVector{T}}`,
+- a copy of the optical astrometry weighting scheme used in the fit, of type
+    `CustomWeights{T}`,
 - a backward and a forward integration, both of type `DensePropagation2{T, U}`,
 - a vector of optical residuals of type `Vector{OpticalResidual{T, U}}`,
+- a vector of radar residuals of type
+    `RR <: Union{Nothing, Vector{RadarResidual{T, U}}}`,
 - a least squares fit of type `LeastSquaresFit{T}`,
+- a history of initial conditions of type `Matrix{T}`,
+- a history of the target function of type `Vector{T}`.
 """
 abstract type AbstractLeastSquaresOrbit{D, T, U} <: AbstractOrbit{D, T, U} end
 
@@ -18,6 +25,9 @@ abstract type AbstractLeastSquaresOrbit{D, T, U} <: AbstractOrbit{D, T, U} end
 hasradar(x::AbstractLeastSquaresOrbit) = !isnothing(x.radar)
 
 covariance(x::AbstractLeastSquaresOrbit) = x.fit.Γ
+
+# Covariance matrices [arcsec²] of the optical astrometry used in the fit
+covariances(x::AbstractLeastSquaresOrbit) = covariances(x.weights)
 
 variances(x::AbstractLeastSquaresOrbit) = diag(covariance(x))
 
@@ -28,15 +38,15 @@ function init_optical_residuals(::Type{U}, od::ODProblem,
     T = scalartype(od)
     # Optical astrometry
     optical1, optical2 = optical(od), optical(orbit)
-    # Weights, debiasing factors, correlations and outliers
-    w8s, bias, korrs, outs = weights(od), debias(od), corrs(od), outliers(od)
+    # Covariance matrices, debiasing factors and outliers
+    Γs, bias, outs = covariances(od), debias(od), outliers(od)
     # Initialize vector of optical residuals
     res = Vector{OpticalResidual{T, U}}(undef, length(optical1))
     for i in eachindex(optical1)
         j = findfirst(==(optical1[i]), optical2)
         outlier = isnothing(j) ? outs[i] : isoutlier(orbit.ores[j])
-        res[i] = OpticalResidual{T, U}(zero(U), zero(U), w8s[i]..., bias[i]...,
-                                       korrs[i], outlier)
+        res[i] = OpticalResidual{T, U}(zero(U), zero(U), weightmatrix(Γs[i]),
+                                       bias[i]..., outlier)
     end
     return res
 end
@@ -53,7 +63,7 @@ function init_radar_residuals(::Type{U}, od::MixedODProblem,
     res = Vector{RadarResidual{T, U}}(undef, length(radar1))
     for i in eachindex(radar1)
         residual = zero(U)
-        weight = 1 / rms(radar1[i])
+        weight = 1 / rms(radar1[i])^2
         bias = debias(radar1[i])
         j = findfirst(==(radar1[i]), radar2)
         outlier = isnothing(j) ? false : isoutlier(orbit.rres[j])
@@ -79,6 +89,8 @@ An asteroid least squares orbit.
 - `optical::O`: vector of optical astrometry.
 - `tracklets::TrackletVector{T}`: vector of optical tracklets.
 - `radar::R`: vector of radar astrometry.
+- `weights::CustomWeights{T}`: copy of the optical astrometry weighting scheme
+    used in the fit (one covariance matrix per element of `optical`).
 - `bwd/fwd::DensePropagation2{T, U}`: backward (forward) integration.
 - `ores::Vector{OpticalResidual{T, U}}`: vector of optical residuals.
 - `rres::RR`: vector of radar residuals.
@@ -96,6 +108,7 @@ An asteroid least squares orbit.
     optical::O
     tracklets::TrackletVector{T}
     radar::R
+    weights::CustomWeights{T}
     bwd::DensePropagation2{T, U}
     fwd::DensePropagation2{T, U}
     ores::Vector{OpticalResidual{T, U}}
@@ -106,9 +119,9 @@ An asteroid least squares orbit.
     # Inner constructor
     function LeastSquaresOrbit{D, T, U, O, R, RR}(
             dynamics::D, variables::Vector{Int}, optical::O, tracklets::TrackletVector{T},
-            radar::R, bwd::DensePropagation2{T, U}, fwd::DensePropagation2{T, U},
-            ores::Vector{OpticalResidual{T, U}}, rres::RR, fit::LeastSquaresFit{T},
-            qs::Matrix{T}, Qs::Vector{T}
+            radar::R, weights::CustomWeights{T}, bwd::DensePropagation2{T, U},
+            fwd::DensePropagation2{T, U}, ores::Vector{OpticalResidual{T, U}}, rres::RR,
+            fit::LeastSquaresFit{T}, qs::Matrix{T}, Qs::Vector{T}
         ) where {
             D, T <: Real, U <: Number, O <: AbstractOpticalVector{T},
             R <: Union{Nothing, AbstractRadarVector{T}},
@@ -118,11 +131,13 @@ An asteroid least squares orbit.
             times must match"
         @assert length(optical) == length(ores) "Number of observations must \
             match number of residuals"
+        @assert length(optical) == nobs(weights) "Number of observations must \
+            match number of covariance matrices"
         cols = length(variables) < size(bwd.p, 2) ? variables : axes(bwd.p, 2)
         _bwd_ = TaylorSolution(bwd.t, collect(view(bwd.p, :, cols)))
         _fwd_ = TaylorSolution(fwd.t, collect(view(fwd.p, :, cols)))
         return new{D, T, U, O, R, RR}(dynamics, variables, optical, tracklets, radar,
-                                      _bwd_, _fwd_, ores, rres, fit, qs, Qs)
+                                      weights, _bwd_, _fwd_, ores, rres, fit, qs, Qs)
     end
 end
 
@@ -133,16 +148,17 @@ const MixedLeastSquaresOrbit{D, T, U, O, R} = LeastSquaresOrbit{D, T, U, O, R, V
 # Outer constructor
 function LeastSquaresOrbit(
         dynamics::D, variables::Vector{Int}, optical::O, tracklets::TrackletVector{T},
-        radar::R, bwd::DensePropagation2{T, U}, fwd::DensePropagation2{T, U},
-        ores::Vector{OpticalResidual{T, U}}, rres::RR, fit::LeastSquaresFit{T},
-        qs::Matrix{T}, Qs::Vector{T}
+        radar::R, weights::CustomWeights{T}, bwd::DensePropagation2{T, U},
+        fwd::DensePropagation2{T, U}, ores::Vector{OpticalResidual{T, U}}, rres::RR,
+        fit::LeastSquaresFit{T}, qs::Matrix{T}, Qs::Vector{T}
     ) where {
         D, T <: Real, U <: Number, O <: AbstractOpticalVector{T},
         R <: Union{Nothing, AbstractRadarVector{T}},
         RR <: Union{Nothing, Vector{RadarResidual{T, U}}}
     }
-    return LeastSquaresOrbit{D, T, U, O, R, RR}(dynamics, variables, optical, tracklets, radar,
-                                                bwd, fwd, ores, rres, fit, qs, Qs)
+    return LeastSquaresOrbit{D, T, U, O, R, RR}(dynamics, variables, optical, tracklets,
+                                                radar, weights, bwd, fwd, ores, rres, fit,
+                                                qs, Qs)
 end
 
 function LeastSquaresOrbit(od::OpticalODProblem{D, T, O}, q00::Vector{T}, jd0::T,
@@ -175,8 +191,8 @@ function LeastSquaresOrbit(od::OpticalODProblem{D, T, O}, q00::Vector{T}, jd0::T
     Qs = [nrms(res, fit)]
 
     return evalfit(LeastSquaresOrbit(
-        dynamics, variables, optical, tracklets, nothing, bwd, fwd, res, nothing,
-        fit, qs, Qs
+        dynamics, variables, optical, tracklets, nothing, CustomWeights(od.weights),
+        bwd, fwd, res, nothing, fit, qs, Qs
     ))
 end
 
@@ -210,8 +226,8 @@ function LeastSquaresOrbit(od::MixedODProblem{D, T, O, R}, q00::Vector{T}, jd0::
     Qs = [nrms(res, fit)]
 
     return evalfit(LeastSquaresOrbit(
-        dynamics, variables, optical, tracklets, radar, bwd, fwd, res[1], res[2],
-        fit, qs, Qs
+        dynamics, variables, optical, tracklets, radar, CustomWeights(od.weights),
+        bwd, fwd, res[1], res[2], fit, qs, Qs
     ))
 end
 
@@ -226,6 +242,7 @@ function zero(::Type{LeastSquaresOrbit{D, T, U, O, R, RR}}) where {D, T, U, O, R
     optical = O()
     tracklets = TrackletVector{T}()
     radar = R == Nothing ? nothing : R()
+    weights = CustomWeights(Vector{SMatrix{2, 2, T, 4}}(undef, 0))
     bwd = zero(DensePropagation2{T, U})
     fwd = zero(DensePropagation2{T, U})
     ores = Vector{OpticalResidual{T, U}}(undef, 0)
@@ -233,8 +250,8 @@ function zero(::Type{LeastSquaresOrbit{D, T, U, O, R, RR}}) where {D, T, U, O, R
     fit = zero(LeastSquaresFit{T})
     qs = Matrix{T}(undef, 0, 0)
     Qs = Vector{T}(undef, 0)
-    return LeastSquaresOrbit(dynamics, variables, optical, tracklets, radar, bwd, fwd,
-                             ores, rres, fit, qs, Qs)
+    return LeastSquaresOrbit(dynamics, variables, optical, tracklets, radar, weights,
+                             bwd, fwd, ores, rres, fit, qs, Qs)
 end
 
 iszero(x::LeastSquaresOrbit) = x == zero(typeof(x))
@@ -253,8 +270,8 @@ function evalfit(orbit::OpticalLeastSquaresOrbit{D, T, TaylorN{T}, O}) where {D,
 
     return LeastSquaresOrbit(
         orbit.dynamics, orbit.variables, orbit.optical, orbit.tracklets,
-        orbit.radar, new_bwd, new_fwd, new_ores, orbit.rres, orbit.fit,
-        orbit.qs, orbit.Qs
+        orbit.radar, orbit.weights, new_bwd, new_fwd, new_ores, orbit.rres,
+        orbit.fit, orbit.qs, orbit.Qs
     )
 end
 
@@ -272,8 +289,8 @@ function evalfit(orbit::MixedLeastSquaresOrbit{D, T, TaylorN{T}, O, R}) where {D
 
     return LeastSquaresOrbit(
         orbit.dynamics, orbit.variables, orbit.optical, orbit.tracklets,
-        orbit.radar, new_bwd, new_fwd, new_ores, new_rres, orbit.fit,
-        orbit.qs, orbit.Qs
+        orbit.radar, orbit.weights, new_bwd, new_fwd, new_ores, new_rres,
+        orbit.fit, orbit.qs, orbit.Qs
     )
 end
 
@@ -313,7 +330,8 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
     # O-C residuals
     ores = init_optical_residuals(T, orbit)
     obuffer = [OpticalBuffer(q00[1], x) for x in optical]
-    residuals!(ores, optical, obuffer; niter = opticaliter, xvs = eph_su,
+    residuals!(ores, optical, obuffer, covariances(orbit); niter = opticaliter,
+               xvs = eph_su,
                xve = eph_ea, xva = (bwd, fwd))
     if hasradar(orbit)
         rres = init_radar_residuals(T, orbit)
@@ -340,7 +358,7 @@ function shiftepoch(orbit::LeastSquaresOrbit{D, T, T, O, R, RR}, jdnew::T,
     fit = LeastSquaresFit{T}(issuccess(orbit.fit), x0, Γ, orbit.fit.routine)
 
     return LeastSquaresOrbit(
-        dynamics, variables, optical, tracklets, radar, bwd, fwd,
+        dynamics, variables, optical, tracklets, radar, orbit.weights, bwd, fwd,
         ores, rres, fit, qs, Qs
     )
 end

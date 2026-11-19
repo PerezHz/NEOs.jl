@@ -124,6 +124,23 @@ end
 debias(x::OpticalADES{T}) where {T <: Real} = (zero(T), zero(T))
 corr(x::OpticalADES{T}) where {T <: Real} = isnan(x.rmscorr) ? zero(T) : x.rmscorr
 
+# Covariance matrix of the observer's ICRF position [km²]; only the `ICRF_KM` and
+# `ICRF_AU` frames are currently supported
+function poscov(x::OpticalADES{T}) where {T <: Real}
+    c = (x.poscov11, x.poscov12, x.poscov13, x.poscov22, x.poscov23, x.poscov33)
+    any(isnan, c) && return nothing
+    frame = observatory(x).frame
+    if frame == "ICRF_KM"
+        k = one(T)
+    elseif frame == "ICRF_AU"
+        k = T(au)^2
+    else
+        return nothing
+    end
+    c11, c12, c13, c22, c23, c33 = k .* c
+    return SMatrix{3, 3, T, 9}(c11, c12, c13, c12, c22, c23, c13, c23, c33)
+end
+
 trackletid(x::OpticalADES) = x.trkid
 
 isdiscovery(x::OpticalADES) = !isempty(x.disc)

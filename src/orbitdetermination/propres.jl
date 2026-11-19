@@ -122,8 +122,8 @@ function propres(
     # O-C residuals
     res = init_optical_residuals(U, od, idxs)
     try
-        residuals!(res, optical, buffer.optical; niter = opticaliter,
-                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
+        residuals!(res, optical, buffer.optical, covariances(od.weights, idxs);
+                   niter = opticaliter, xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         return bwd, fwd, res
     catch
         empty!(res)
@@ -156,8 +156,8 @@ function propres(
     # O-C residuals
     res = (init_optical_residuals(U, od), init_radar_residuals(U, od))
     try
-        residuals!(res[1], optical, buffer.optical; niter = opticaliter,
-                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
+        residuals!(res[1], optical, buffer.optical, covariances(od);
+                   niter = opticaliter, xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         residuals!(res[2], radar, buffer.radar; niter = radariter,
                    xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         return bwd, fwd, res
@@ -200,8 +200,8 @@ function propres!(
     end
     # O-C residuals
     try
-        residuals!(res, optical, buffer.optical; niter = opticaliter,
-                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
+        residuals!(res, optical, buffer.optical, covariances(od.weights, idxs);
+                   niter = opticaliter, xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         return bwd, fwd
     catch
         empty!(res)
@@ -236,8 +236,8 @@ function propres!(
     end
     # O-C residuals
     try
-        residuals!(res[1], optical, buffer.optical; niter = opticaliter,
-                   xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
+        residuals!(res[1], optical, buffer.optical, covariances(od);
+                   niter = opticaliter, xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         residuals!(res[2], radar, buffer.radar; niter = radariter,
                    xvs = eph_su, xve = eph_ea, xva = (bwd, fwd))
         return bwd, fwd
