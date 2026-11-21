@@ -4,29 +4,29 @@
 Asteroid dynamical model specially suited for long-term integrations and impact monitoring.
 
 The model considers the asteroid of interest as a test particle with null mass. Perturbing
-bodies included in the model are: the Sun, the eight planets, the Moon, Pluto and the 16
-most massive asteroids. Planetary ephemerides are provided by `PlanetaryEphemeris.jl`,
-which is based on the JPL DE430 model.
+bodies included in the model are all the bodies in the solar system ephemeris (see
+[`set_sseph_source`](@ref)): the Sun, the eight planets, the Moon, Pluto and the
+asteroids in the ephemeris (the 16 most massive ones in the default ephemeris).
 
 Dynamical effects considered are:
 
-- Post-Newtonian point-mass accelerations between all bodies. See equation (35) in page
-    7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
+- Post-Newtonian point-mass accelerations due to the Sun, the planets and the Moon, and
+    Newtonian point-mass accelerations due to Pluto and the asteroids. See equation (35)
+    in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
 
-- Figure-effects (oblateness) of the Earth (``J_2`` and ``J_3``), ``J_2`` effect of the
-    Sun and ``J_2`` and ``J_3`` effect of the Moon. See equation (28) in page 13 of
-    https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract and equations (173)
-    and (174) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
+- Figure-effects (oblateness) of the Earth: second zonal harmonic ``J_2``. See equation
+    (28) in page 13 of https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract
+    and equations (173) and (174) in page 33 of
+    https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
 
-- Kinematic model for the precession and nutation of the Earth's orientation (IAU 1976/1980
-    Earth orientation model). See [`PlanetaryEphemeris.c2t_jpl_de430`](@ref).
+- Kinematic model for the precession and nutation of the Earth's pole, consistent with
+    the solar system ephemeris: the JPL DE430/431 or DE440/441 Earth orientation model.
+    See [`PlanetaryEphemeris.c2t_jpl_de430`](@ref) and
+    [`PlanetaryEphemeris.c2t_jpl_de440`](@ref).
 
-- Kinematic model for the Moon's orientation (Seidelmann et al., 2006). See equations
-    (14)-(15) in page 9 and equations (34)-(35) in page 16 of
-    https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract.
-
-- Non-gravitational accelerations model (Marsden et al., 1973). See equations (1)-(5) in
-    pages (211)-(212) of https://articles.adsabs.harvard.edu/pdf/1973AJ.....78..211M.
+- Non-gravitational accelerations model (Marsden et al., 1973), with radial (``A_1``),
+    transverse (``A_2``) and normal (``A_3``) components. See equations (1)-(5) in pages
+    (211)-(212) of https://articles.adsabs.harvard.edu/pdf/1973AJ.....78..211M.
 
 To improve performance, some internal loops can be multi-threaded via `@threads`.
 Multi-threading is optional and controlled by the `threads` keyword of
@@ -238,8 +238,8 @@ For other dynamical models, see [`gravityonly!`](@ref), [`newtonian!`](@ref) and
     accY = zero_q_1
     accZ = zero_q_1
 
-    # Rotations to and from Earth, Sun and Moon pole-oriented frames
-    local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
+    # Rotation from the Earth's true equator of date frame to the inertial frame
+    local M_ = t2c_earth!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
 
     # Fill first 3 elements of dq with velocities
     dq[1] = q[4]
@@ -569,26 +569,25 @@ Asteroid dynamical model specially suited for long-term integrations and multi-a
 determination.
 
 The model considers the asteroid of interest as a test particle with null mass. Perturbing
-bodies included in the model are: the Sun, the eight planets, the Moon, Pluto and the 16
-most massive asteroids. Planetary ephemerides are provided by `PlanetaryEphemeris.jl`,
-which is based on the JPL DE430 model.
+bodies included in the model are all the bodies in the solar system ephemeris (see
+[`set_sseph_source`](@ref)): the Sun, the eight planets, the Moon, Pluto and the
+asteroids in the ephemeris (the 16 most massive ones in the default ephemeris).
 
 Dynamical effects considered are:
 
-- Post-Newtonian point-mass accelerations between all bodies. See equation (35) in page
-    7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
+- Post-Newtonian point-mass accelerations due to the Sun, the planets and the Moon, and
+    Newtonian point-mass accelerations due to Pluto and the asteroids. See equation (35)
+    in page 7 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
 
-- Figure-effects (oblateness) of the Earth (``J_2`` and ``J_3``), ``J_2`` effect of the
-    Sun and ``J_2`` and ``J_3`` effect of the Moon. See equation (28) in page 13 of
-    https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract and equations (173)
-    and (174) in page 33 of https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
+- Figure-effects (oblateness) of the Earth: second zonal harmonic ``J_2``. See equation
+    (28) in page 13 of https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract
+    and equations (173) and (174) in page 33 of
+    https://ui.adsabs.harvard.edu/abs/1971mfdo.book.....M/abstract.
 
-- Kinematic model for the precession and nutation of the Earth's orientation (IAU 1976/1980
-    Earth orientation model). See [`PlanetaryEphemeris.c2t_jpl_de430`](@ref).
-
-- Kinematic model for the Moon's orientation (Seidelmann et al., 2006). See equations
-    (14)-(15) in page 9 and equations (34)-(35) in page 16 of
-    https://ui.adsabs.harvard.edu/abs/2014IPNPR.196C...1F%2F/abstract.
+- Kinematic model for the precession and nutation of the Earth's pole, consistent with
+    the solar system ephemeris: the JPL DE430/431 or DE440/441 Earth orientation model.
+    See [`PlanetaryEphemeris.c2t_jpl_de430`](@ref) and
+    [`PlanetaryEphemeris.c2t_jpl_de440`](@ref).
 
 To improve performance, some internal loops can be multi-threaded via `@threads`.
 Multi-threading is optional and controlled by the `threads` keyword of
@@ -792,8 +791,8 @@ For other dynamical models, see [`nongravs!`](@ref), [`newtonian!`](@ref) and
     accY = zero_q_1
     accZ = zero_q_1
 
-    # Rotations to and from Earth, Sun and Moon pole-oriented frames
-    local M_ = t2c_jpl_de430!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
+    # Rotation from the Earth's true equator of date frame to the inertial frame
+    local M_ = t2c_earth!(params.Mmatrix, ea, dsj2k, zero_q_1, orientAlloc)
     # Fill first 3 elements of dq with velocities
     dq[1] = q[4]
     dq[2] = q[5]
@@ -1071,13 +1070,13 @@ Asteroid dynamical model specially suited for short-term integrations and initia
 orbit determination.
 
 The model considers the asteroid of interest as a test particle with null mass.
-Perturbing bodies included in the model are: the Sun, the eight planets and the
-Moon. Planetary ephemerides are provided by `PlanetaryEphemeris.jl`, which is
-based on the JPL DE430 model.
+Perturbing bodies included in the model are the first nine bodies of the solar system
+ephemeris (see [`set_sseph_source`](@ref)): the Sun, Mercury, Venus, the Earth, the Moon,
+Mars, Jupiter, Saturn and Uranus.
 
 Dynamical effects considered are:
 
-- Newtonian point-mass accelerations between all bodies.
+- Newtonian point-mass accelerations due to the perturbing bodies.
 
 To improve performance, some internal loops can be multi-threaded via `@threads`.
 Multi-threading is optional and controlled by the `threads` keyword of
@@ -1194,13 +1193,12 @@ end
 Asteroid dynamical model specially suited for imminent impactors analysis.
 
 The model considers the asteroid of interest as a test particle with null mass.
-Perturbing bodies included in the model are: the Sun, the Earth and the Moon.
-Planetary ephemerides are provided by `PlanetaryEphemeris.jl`, which is based
-on the JPL DE430 model.
+Perturbing bodies included in the model are the Sun, the Earth and the Moon, from the
+solar system ephemeris (see [`set_sseph_source`](@ref)).
 
 Dynamical effects considered are:
 
-- Newtonian point-mass accelerations between all bodies.
+- Newtonian point-mass accelerations due to the perturbing bodies.
 
 To improve performance, some internal loops can be multi-threaded via `@threads`.
 Multi-threading is optional and controlled by the `threads` keyword of
