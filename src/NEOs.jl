@@ -33,7 +33,8 @@ using PlanetaryEphemeris: au, su, ea, mo, yr, RE, Rx, Ry, Rz, R_sun, α_p_sun,
       c_au_per_day, c_au_per_sec, c_cm_per_sec, semimajoraxis, eccentricity, inclination,
       longascnode, argperi, timeperipass, meanmotion, meananomaly, eccentricanomaly,
       trueanomaly, pole_rotation, nbodyind, t2c_jpl_de430,
-      t2c_jpl_de430!, allocate_c2t_jpl_de430
+      t2c_jpl_de430!, allocate_c2t_jpl_de430, t2c_jpl_de440, t2c_jpl_de440!,
+      allocate_c2t_jpl_de440
 using Preferences: @load_preference, @set_preferences!
 using QuadGK: quadgk
 using Roots: Bisection, find_zero, find_zeros
