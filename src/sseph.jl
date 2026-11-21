@@ -179,7 +179,7 @@ function load_sseph()
         SSEPH_SOURCE, "r")
     if isnothing(acceph) || isnothing(poteph)
         @info "Computing acceph and poteph"
-        acceph, poteph = PE.loadeph(sseph, gms)
+        acceph, poteph = PE.accpoteph(sseph, gms)
         # Save them to SSEPH_SOURCE, so they are not computed again
         try
             savesseph(SSEPH_SOURCE, acceph, poteph)
