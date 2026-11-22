@@ -210,7 +210,7 @@ function PropagationBuffer(
         UJ_interaction = falses(N)
         # Turn on Earth interaction
         UJ_interaction[ea] = true
-        _orientation_ = allocate_c2t_jpl_de430(Taylor1(order))
+        _orientation_ = allocate_c2t_earth(Taylor1(order))
     end
     M_ = Array{Taylor1{U}}(undef, 3, 3, N)
     zero_q_1 = auxzero(Taylor1(q0[1], order))

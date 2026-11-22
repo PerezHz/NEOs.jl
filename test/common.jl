@@ -37,6 +37,22 @@ using Test
         @test Λ3[ea] == -1.962633335678878e-19
         @test all(iszero, Λ2[setdiff(eachindex(Λ2), ea)])
         @test all(iszero, Λ3[setdiff(eachindex(Λ3), ea)])
+        # Earth orientation model
+        @test NEOs.EARTH_ORIENTATION_MODEL == "DE430"
+        @test NEOs.allocate_c2t_earth === PE.allocate_c2t_jpl_de430
+        @test NEOs.t2c_earth! === PE.t2c_jpl_de430!
+        for model in ("DE430", "DE431")
+            @test NEOs.earthorientationmodel(model) == "DE430"
+            @test NEOs.earthorientationfunctions(model) ==
+                (PE.allocate_c2t_jpl_de430, PE.t2c_jpl_de430!)
+        end
+        for model in ("DE440", "DE441")
+            @test NEOs.earthorientationmodel(model) == "DE440"
+            @test NEOs.earthorientationfunctions(model) ==
+                (PE.allocate_c2t_jpl_de440, PE.t2c_jpl_de440!)
+        end
+        @test_throws ArgumentError NEOs.earthorientationmodel("DE432")
+        @test_throws ArgumentError NEOs.earthorientationfunctions("DE432")
 
         set_sseph_source("sseph343ast016_p100y_et.jld2")
 

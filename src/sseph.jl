@@ -26,7 +26,9 @@ following fields:
     also accepted.
 - `spkids` (optional): NAIF ids of the bodies in `sseph`.
 - `μ` (optional): gravitational parameters [au³/day²] of the bodies in `sseph`.
-- `model` (optional): name of the ephemeris model (e.g. `"DE440"`).
+- `model` (optional): name of the ephemeris model: `"DE430"`, `"DE431"`, `"DE440"` or
+    `"DE441"`. It also sets the Earth orientation model (see
+    `PlanetaryEphemeris.c2t_jpl_de430` and `PlanetaryEphemeris.c2t_jpl_de440`).
 - `params` (optional): model parameters, with the names and units of JPL's technical
     comments: `"RE"` [km], `"J2E"` and `"J3E"`.
 - `acc_eph` (optional): acceleration ephemeris.
@@ -179,7 +181,7 @@ function load_sseph()
         SSEPH_SOURCE, "r")
     if isnothing(acceph) || isnothing(poteph)
         @info "Computing acceph and poteph"
-        acceph, poteph = PE.loadeph(sseph, gms)
+        acceph, poteph = PE.accpoteph(sseph, gms)
         # Save them to SSEPH_SOURCE, so they are not computed again
         try
             savesseph(SSEPH_SOURCE, acceph, poteph)
@@ -199,6 +201,33 @@ const sseph, acceph, poteph, ttmtdb, SSEPHSPKIDS, SSEPHGMS, SSEPHMODEL, SSEPHPAR
     load_sseph()
 
 const SSEPHNBODIES::Int = numberofbodies(sseph)
+
+# Earth orientation model of the solar system ephemeris model `model`: "DE430" for JPL
+# DE430/431 and "DE440" for JPL DE440/441
+function earthorientationmodel(model::AbstractString)
+    model in ("DE430", "DE431") && return "DE430"
+    model in ("DE440", "DE441") && return "DE440"
+    throw(ArgumentError("No Earth orientation model for the solar system ephemeris \
+        model $model; supported models are DE430, DE431, DE440 and DE441. Set the \
+        solar system ephemeris source file (key SSEPH_SOURCE of LocalPreferences.toml) \
+        to a file of a supported model"))
+end
+
+# Functions that allocate the buffers of, and evaluate, the Earth orientation model of
+# the solar system ephemeris model `model` (see allocate_c2t_jpl_de430/de440 and
+# t2c_jpl_de430!/de440! in PlanetaryEphemeris.jl)
+function earthorientationfunctions(model::AbstractString)
+    if earthorientationmodel(model) == "DE430"
+        return allocate_c2t_jpl_de430, t2c_jpl_de430!
+    else
+        return allocate_c2t_jpl_de440, t2c_jpl_de440!
+    end
+end
+
+# Earth orientation model consistent with the solar system ephemeris
+const EARTH_ORIENTATION_MODEL = earthorientationmodel(SSEPHMODEL)
+const allocate_c2t_earth, t2c_earth! = earthorientationfunctions(SSEPHMODEL)
+
 const MINDTTDB::DateTime = julian2datetime(firsttime(sseph) + JD_J2000)
 const MAXDTTDB::DateTime = julian2datetime(lasttime(sseph) + JD_J2000)
 
@@ -216,6 +245,7 @@ function print_sseph_summary()
         t, rpad("Initial time:", 21), MINDTTDB, " TDB", "\n",
         t, rpad("Final time:", 21), MAXDTTDB, " TDB", "\n",
         t, rpad("Model:", 21), SSEPHMODEL, "\n",
+        t, rpad("Earth orientation:", 21), EARTH_ORIENTATION_MODEL, "\n",
         t, "Model parameters:\n",
     )
     # Required parameters first, then any other parameter in the file
